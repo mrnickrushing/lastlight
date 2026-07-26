@@ -1,6 +1,7 @@
 --!strict
 
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local TutorialService = {}
 TutorialService.__index = TutorialService
@@ -33,8 +34,10 @@ export type TutorialService = typeof(setmetatable(
         _worldService: any,
         _enemyService: any,
         _phaseService: any,
+        _expeditionService: any,
         _analyticsService: any,
         _sessions: { [Player]: Session },
+        _expeditionModuleIndex: { [Player]: number },
         _limiter: any,
     },
     TutorialService
@@ -51,6 +54,7 @@ function TutorialService.new(
     worldService: any,
     enemyService: any,
     phaseService: any,
+    expeditionService: any,
     analyticsService: any
 ): TutorialService
     return setmetatable({
@@ -65,8 +69,10 @@ function TutorialService.new(
         _worldService = worldService,
         _enemyService = enemyService,
         _phaseService = phaseService,
+        _expeditionService = expeditionService,
         _analyticsService = analyticsService,
         _sessions = {},
+        _expeditionModuleIndex = {},
         _limiter = rateLimiter.new(config.ActionRatePerSecond, config.ActionRatePerSecond * 2),
     }, TutorialService)
 end
@@ -112,6 +118,7 @@ end
 function TutorialService.Start(self: TutorialService)
     Players.PlayerRemoving:Connect(function(player: Player)
         self._sessions[player] = nil
+        self._expeditionModuleIndex[player] = nil
         self._limiter:clear(tostring(player.UserId))
         self._analyticsService:clear(player)
     end)
@@ -122,6 +129,24 @@ function TutorialService.Start(self: TutorialService)
             self:_profileLoaded(player, profile)
         end
     end
+
+    local expeditionAccumulator = 0
+    RunService.Heartbeat:Connect(function(deltaTime: number)
+        expeditionAccumulator += deltaTime
+        if expeditionAccumulator < 0.5 then
+            return
+        end
+        expeditionAccumulator = 0
+
+        for player in self._sessions do
+            local expedition = self._expeditionService:snapshot(player)
+            local moduleIndex = if expedition.active then expedition.moduleIndex else 0
+            if self._expeditionModuleIndex[player] ~= moduleIndex then
+                self._expeditionModuleIndex[player] = moduleIndex
+                self:_publish(player)
+            end
+        end
+    end)
 
     self._networkService:setWorldReady(true)
 end
@@ -229,6 +254,20 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         return
     end
 
+    if actionId == self._runtimeIds.Actions.Reveal and session.stage == "complete" then
+        if self._expeditionService:enter(player) then
+            self:_setToast(player, "ENTERING BRAMBLEWAKE")
+            self._analyticsService:expeditionStarted(
+                player,
+                self._expeditionService:snapshot(player)
+            )
+        else
+            self:_setToast(player, "BRAMBLEWAKE IS STILL FORMING")
+        end
+        self:_publish(player)
+        return
+    end
+
     local ok, reason = self:_advance(player, actionId)
     if not ok then
         local expected = self._tutorialFlow.definition(session.stage).objective
@@ -264,7 +303,15 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self:_setToast(player, "THE FIRST LANTERN BURNS")
         self._phaseService:startFirstNight()
     elseif actionId == self._runtimeIds.Actions.Reveal then
-        self:_setToast(player, "FIRST LIGHT COMPLETE")
+        if self._expeditionService:enter(player) then
+            self:_setToast(player, "BRAMBLEWAKE REMEMBERS YOU")
+            self._analyticsService:expeditionStarted(
+                player,
+                self._expeditionService:snapshot(player)
+            )
+        else
+            self:_setToast(player, "FIRST LIGHT COMPLETE")
+        end
         self._analyticsService:complete(player)
     end
 
@@ -382,6 +429,24 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
 
     local definition = self._tutorialFlow.definition(session.stage)
     local progress, total = self._tutorialFlow.progress(session.stage)
+    local objective = definition.objective
+    local detail = definition.detail
+    local mara = definition.mara
+    local trailName = "FIRST LIGHT"
+    local expedition = self._expeditionService:snapshot(player)
+    if expedition.active then
+        trailName = "BRAMBLEWAKE"
+        progress = expedition.moduleIndex
+        total = expedition.moduleTotal
+        objective = if expedition.moduleIndex == expedition.moduleTotal
+            then "REACH THE WAYHOME GATE"
+            else "FOLLOW THE FOXFIRE TRAIL"
+        local discovery = expedition.pointOfInterestName or expedition.eventName
+        detail = if discovery == nil
+            then expedition.moduleName
+            else string.format("%s · %s", expedition.moduleName, discovery)
+        mara = "The roots remember every traveler. Keep to the amber path."
+    end
     local phase = self._phaseService:snapshot()
     return {
         schemaVersion = 1,
@@ -389,9 +454,10 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         worldReady = true,
         stage = session.stage,
         tutorialComplete = session.stage == "complete",
-        objective = definition.objective,
-        detail = definition.detail,
-        mara = definition.mara,
+        objective = objective,
+        detail = detail,
+        mara = mara,
+        trailName = trailName,
         progress = progress,
         progressTotal = total,
         resources = session.resources,
@@ -404,6 +470,12 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         nightActive = phase.nightActive,
         lanternHealth = phase.lanternHealth,
         enemyCount = phase.enemyCount,
+        expeditionActive = expedition.active,
+        expeditionSeed = expedition.seed,
+        expeditionManifestHash = expedition.manifestHash,
+        expeditionModuleId = expedition.moduleId,
+        expeditionPointOfInterestId = expedition.poiId,
+        expeditionEventId = expedition.eventId,
     }
 end
 

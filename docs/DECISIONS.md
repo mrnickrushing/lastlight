@@ -29,6 +29,17 @@ handcrafted modules with validated seeds, not fully procedural terrain.
 variety without sacrificing authored landmarks, navigation, art quality, or
 impossible-layout prevention.
 
+## 2026-07-25 — Bramblewake manifests before active encounters
+
+**Decision:** Start the vertical slice with a versioned, deterministic
+12-module Bramblewake manifest and a known-good authored fallback. POIs and event
+sockets are stable content IDs; active event state and rewards arrive in later
+scoped increments.
+
+**Reason:** Connectivity, streaming cells, content distribution, replay, and
+mobile budgets must be trustworthy before combat, quests, rewards, and authored
+events depend on generated layouts.
+
 ## 2026-07-25 — One Active Trail onboarding HUD
 
 **Decision:** Implement the first session with one phase capsule, one active

@@ -2,7 +2,7 @@
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.3.0",
+    BuildVersion = "0.4.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -13,6 +13,7 @@ return table.freeze({
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
+    BramblewakePreviewSeed = 1847,
     BaseWalkSpeed = 16,
     SprintWalkSpeed = 24,
     InteractionDistance = 14,

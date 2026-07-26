@@ -7,7 +7,9 @@ local root = ReplicatedStorage:WaitForChild("LastLight", 8)
 assert(root ~= nil, "Last Light shared root did not replicate before bootstrap timeout")
 
 local Config = require(root.Config)
+local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
 local Environment = require(root.Environment)
+local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local NightSchedule = require(root.NightSchedule)
 local RateLimiter = require(root.RateLimiter)
 local RuntimeIds = require(root.RuntimeIds)
@@ -18,6 +20,7 @@ local Regions = require(root.Content.Definitions.Regions)
 
 local AnalyticsService = require(script.Services.AnalyticsService)
 local EnemyService = require(script.Services.EnemyService)
+local ExpeditionService = require(script.Services.ExpeditionService)
 local Logger = require(script.Services.Logger)
 local FeatureFlagService = require(script.Services.FeatureFlagService)
 local NetworkService = require(script.Services.NetworkService)
@@ -44,6 +47,13 @@ local networkService = NetworkService.new(logger)
 local profileService = ProfileService.new(logger, environmentConfig.UsePersistentData)
 local analyticsService = AnalyticsService.new(logger)
 local worldService = WorldService.new(logger)
+local expeditionService = ExpeditionService.new(
+    logger,
+    worldService,
+    ExpeditionGenerator,
+    BramblewakeExpedition,
+    Config.BramblewakePreviewSeed
+)
 local enemyService = EnemyService.new(logger, worldService)
 local phaseService = PhaseService.new(
     logger,
@@ -64,6 +74,7 @@ local tutorialService = TutorialService.new(
     worldService,
     enemyService,
     phaseService,
+    expeditionService,
     analyticsService
 )
 
@@ -80,6 +91,7 @@ services:register(networkService)
 services:register(profileService)
 services:register(analyticsService)
 services:register(worldService)
+services:register(expeditionService)
 services:register(enemyService)
 services:register(phaseService)
 services:register(tutorialService)

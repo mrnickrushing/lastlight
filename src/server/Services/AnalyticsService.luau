@@ -17,6 +17,7 @@ export type AnalyticsService = typeof(setmetatable(
         Name: string,
         _logger: Logger,
         _startedAt: { [Player]: number },
+        _expeditionStarted: { [Player]: boolean },
     },
     AnalyticsService
 ))
@@ -26,6 +27,7 @@ function AnalyticsService.new(logger: Logger): AnalyticsService
         Name = AnalyticsService.Name,
         _logger = logger,
         _startedAt = {},
+        _expeditionStarted = {},
     }, AnalyticsService)
 end
 
@@ -73,8 +75,29 @@ function AnalyticsService.complete(self: AnalyticsService, player: Player)
     end
 end
 
+function AnalyticsService.expeditionStarted(self: AnalyticsService, player: Player, snapshot: any)
+    if self._expeditionStarted[player] then
+        return
+    end
+    self._expeditionStarted[player] = true
+
+    self._logger:info("expedition_started", {
+        hash = snapshot.manifestHash,
+        player = player.UserId,
+        region = "region_bramblewake",
+        seed = snapshot.seed,
+        source = snapshot.source,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "BramblewakeExpeditionStarted", 1, {})
+        end)
+    end
+end
+
 function AnalyticsService.clear(self: AnalyticsService, player: Player)
     self._startedAt[player] = nil
+    self._expeditionStarted[player] = nil
 end
 
 return table.freeze(AnalyticsService)
