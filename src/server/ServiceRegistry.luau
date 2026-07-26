@@ -85,4 +85,8 @@ function ServiceRegistry.state(self: Registry): string
     return self._state
 end
 
+function ServiceRegistry.count(self: Registry): number
+    return #self._ordered
+end
+
 return table.freeze(ServiceRegistry)

@@ -202,9 +202,6 @@ function TutorialService._advance(
     local definition = self._tutorialFlow.definition(nextStage)
     self._analyticsService:stage(player, definition.index, nextStage)
 
-    task.spawn(function()
-        self._profileService:save(player)
-    end)
     return true, nil
 end
 
@@ -294,9 +291,6 @@ function TutorialService._advanceSurvivorToReveal(
     self._profileService:setTutorial(player, nextStage, session.selectedTool)
     local definition = self._tutorialFlow.definition(nextStage)
     self._analyticsService:stage(player, definition.index, nextStage)
-    task.spawn(function()
-        self._profileService:save(player)
-    end)
     return true
 end
 
@@ -382,7 +376,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         return {
             schemaVersion = 1,
             status = "loading",
-            worldReady = true,
+            worldReady = self._networkService:isWorldReady(),
         }
     end
 

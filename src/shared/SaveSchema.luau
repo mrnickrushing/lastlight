@@ -69,7 +69,11 @@ function SaveSchema.normalize(value: any, now: number): Profile
         then
             profile.tutorial.selectedTool = tutorial.selectedTool
         end
-        if type(tutorial.completedAt) == "number" and tutorial.completedAt > 0 then
+        if
+            profile.tutorial.complete
+            and type(tutorial.completedAt) == "number"
+            and tutorial.completedAt > 0
+        then
             profile.tutorial.completedAt = tutorial.completedAt
         end
     end
@@ -89,8 +93,12 @@ function SaveSchema.withTutorial(
     nextProfile.tutorial.stage = stage
     nextProfile.tutorial.complete = stage == "complete"
     nextProfile.tutorial.selectedTool = selectedTool
-    if stage == "complete" and nextProfile.tutorial.completedAt == nil then
-        nextProfile.tutorial.completedAt = now
+    if stage == "complete" then
+        if not profile.tutorial.complete or nextProfile.tutorial.completedAt == nil then
+            nextProfile.tutorial.completedAt = now
+        end
+    else
+        nextProfile.tutorial.completedAt = nil
     end
     nextProfile.updatedAt = now
     nextProfile.revision += 1

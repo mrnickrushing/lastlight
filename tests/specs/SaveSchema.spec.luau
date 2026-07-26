@@ -61,6 +61,26 @@ return {
                 TestRunner.equal(complete.tutorial.completedAt, 220)
                 TestRunner.equal(complete.revision, 1)
                 TestRunner.equal(profile.tutorial.complete, false)
+
+                local repeated = SaveSchema.withTutorial(complete, "complete", "torch", 400)
+                TestRunner.equal(repeated.tutorial.completedAt, 220)
+                TestRunner.equal(repeated.revision, 2)
+            end,
+        },
+        {
+            name = "drops stale completion timestamps from incomplete progress",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    tutorial = {
+                        stage = "build",
+                        complete = false,
+                        completedAt = 99,
+                    },
+                }, 300)
+                TestRunner.equal(profile.tutorial.completedAt, nil)
+
+                local complete = SaveSchema.withTutorial(profile, "complete", nil, 450)
+                TestRunner.equal(complete.tutorial.completedAt, 450)
             end,
         },
     },

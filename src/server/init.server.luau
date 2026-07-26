@@ -90,5 +90,5 @@ logger:info("server_boot_complete", {
     build = Config.BuildVersion,
     contentDefinitions = content:count(),
     environment = environment,
-    services = 8,
+    services = services:count(),
 })

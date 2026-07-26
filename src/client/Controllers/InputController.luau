@@ -98,6 +98,14 @@ function InputController.new(
     end)
 
     if not ok then
+        for _, connection in self._connections do
+            connection:Disconnect()
+        end
+        table.clear(self._connections)
+        if self._context ~= nil then
+            self._context:Destroy()
+            self._context = nil
+        end
         self:_installFallback(onInteract, onUseTool, onSprint)
     end
 

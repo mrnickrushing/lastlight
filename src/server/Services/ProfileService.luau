@@ -19,6 +19,8 @@ export type ProfileService = typeof(setmetatable(
         _persistent: boolean,
         _profiles: { [Player]: any },
         _writable: { [Player]: boolean },
+        _dirty: { [Player]: boolean },
+        _saving: { [Player]: boolean },
         _loading: { [Player]: boolean },
         _loadedEvent: BindableEvent,
         _saveSchema: any,
@@ -34,6 +36,8 @@ function ProfileService.new(logger: Logger, persistent: boolean): ProfileService
         _persistent = persistent,
         _profiles = {},
         _writable = {},
+        _dirty = {},
+        _saving = {},
         _loading = {},
         _loadedEvent = Instance.new("BindableEvent"),
         _saveSchema = nil,
@@ -123,12 +127,29 @@ function ProfileService.Start(self: ProfileService)
         self:save(player)
         self._profiles[player] = nil
         self._writable[player] = nil
+        self._dirty[player] = nil
+        self._saving[player] = nil
         self._loading[player] = nil
     end)
 
     for _, player in Players:GetPlayers() do
         task.spawn(function()
             self:_load(player)
+        end)
+    end
+
+    if self._persistent then
+        task.spawn(function()
+            while true do
+                task.wait(10)
+                for player in self._dirty do
+                    if player.Parent ~= nil then
+                        task.spawn(function()
+                            self:save(player)
+                        end)
+                    end
+                end
+            end
         end)
     end
 
@@ -181,6 +202,9 @@ function ProfileService.setTutorial(
     end
 
     self._profiles[player] = self._saveSchema.withTutorial(profile, stage, selectedTool, os.time())
+    if self._persistent and self._writable[player] == true then
+        self._dirty[player] = true
+    end
     return true
 end
 
@@ -198,15 +222,30 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
         })
         return false
     end
+    if self._saving[player] then
+        return false
+    end
+    self._saving[player] = true
 
+    local retainedNewer = false
+    local newerProfile: any = nil
     local ok, message = pcall(function()
         (self._store :: GlobalDataStore):UpdateAsync(
             string.format("player_%d", player.UserId),
-            function()
+            function(current: any)
+                if current ~= nil then
+                    local normalized = self._saveSchema.normalize(current, os.time())
+                    if normalized.revision > profile.revision then
+                        retainedNewer = true
+                        newerProfile = normalized
+                        return current
+                    end
+                end
                 return profile
             end
         )
     end)
+    self._saving[player] = nil
 
     if not ok then
         self._logger:warn("profile_save_failed", {
@@ -216,6 +255,24 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
         return false
     end
 
+    if retainedNewer and newerProfile ~= nil then
+        local activeProfile = self._profiles[player]
+        if activeProfile ~= nil and activeProfile.revision <= newerProfile.revision then
+            self._profiles[player] = newerProfile
+            self._dirty[player] = nil
+        end
+        self._logger:warn("profile_save_retained_newer_revision", {
+            player = player.UserId,
+            attemptedRevision = profile.revision,
+            storedRevision = newerProfile.revision,
+        })
+        return true
+    end
+
+    local activeProfile = self._profiles[player]
+    if activeProfile ~= nil and activeProfile.revision == profile.revision then
+        self._dirty[player] = nil
+    end
     self._logger:info("profile_saved", {
         player = player.UserId,
         revision = profile.revision,

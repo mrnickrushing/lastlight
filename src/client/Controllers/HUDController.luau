@@ -363,33 +363,31 @@ function HUDController.new(playerGui: PlayerGui): HUDController
         end
     end)
 
-    local camera = workspace.CurrentCamera
-    local function resize()
-        local viewport = if camera == nil then Vector2.new(1280, 720) else camera.ViewportSize
-        local shortest = math.min(viewport.X, viewport.Y)
-        scale.Scale = math.clamp(shortest / 720, 0.78, 1)
-        if viewport.X < 700 then
-            objectiveFrame.Position = UDim2.fromOffset(18, 70)
-            objectiveFrame.Size = UDim2.new(1, -36, 0, if self._compactEnabled then 76 else 132)
-            resource.Position = UDim2.fromOffset(18, if self._compactEnabled then 158 else 218)
-            compact.Size = UDim2.fromOffset(44, 38)
-            compact.Text = if self._compactEnabled then "+" else "−"
-        else
-            objectiveFrame.Position = UDim2.fromOffset(18, 18)
-            objectiveFrame.Size = if self._compactEnabled
-                then UDim2.fromOffset(284, 76)
-                else UDim2.fromOffset(326, 132)
-            resource.Position = UDim2.fromOffset(18, 164)
-            compact.Size = UDim2.fromOffset(118, 38)
-            compact.Text = if self._compactEnabled then "EXPAND" else "COMPACT"
+    local viewportConnection: RBXScriptConnection? = nil
+    local function bindCamera()
+        if viewportConnection ~= nil then
+            viewportConnection:Disconnect()
+            viewportConnection = nil
         end
-    end
-    resize()
-    if camera ~= nil then
-        camera:GetPropertyChangedSignal("ViewportSize"):Connect(resize)
-    end
 
-    RunService.RenderStepped:Connect(function()
+        local camera = workspace.CurrentCamera
+        if camera ~= nil then
+            viewportConnection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+                self:_layout()
+            end)
+        end
+        self:_layout()
+    end
+    bindCamera()
+    workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(bindCamera)
+
+    local clockAccumulator = 0
+    RunService.RenderStepped:Connect(function(deltaTime: number)
+        clockAccumulator += deltaTime
+        if clockAccumulator < 1 then
+            return
+        end
+        clockAccumulator = 0
         self:_updateClock()
     end)
 
@@ -443,19 +441,36 @@ end
 function HUDController._applyCompact(self: HUDController)
     self._detail.Visible = not self._compactEnabled
     self._mara.Visible = not self._compactEnabled
-    local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize
-        or Vector2.new(1280, 720)
-    self._objectiveFrame.Size = if viewport.X < 700
-        then UDim2.new(1, -36, 0, if self._compactEnabled then 76 else 132)
-        elseif self._compactEnabled then UDim2.fromOffset(284, 76)
-        else UDim2.fromOffset(326, 132)
     self._objective.Position = if self._compactEnabled
         then UDim2.fromOffset(14, 31)
         else UDim2.fromOffset(14, 32)
-    self._compact.Text = if viewport.X < 700
-        then if self._compactEnabled then "+" else "−"
-        else if self._compactEnabled then "EXPAND" else "COMPACT"
     self._compact.TextColor3 = if self._compactEnabled then COLORS.amber else COLORS.muted
+    self:_layout()
+end
+
+function HUDController._layout(self: HUDController)
+    local camera = workspace.CurrentCamera
+    local viewport = if camera == nil then Vector2.new(1280, 720) else camera.ViewportSize
+    local narrow = viewport.X < 700
+    self._scale.Scale = math.clamp(math.min(viewport.X, viewport.Y) / 720, 0.78, 1)
+
+    if narrow then
+        self._objectiveFrame.Position = UDim2.fromOffset(18, 70)
+        self._objectiveFrame.Size = UDim2.new(1, -36, 0, if self._compactEnabled then 76 else 132)
+        self._resource.Position = UDim2.fromOffset(18, if self._compactEnabled then 158 else 218)
+        self._compact.Size = UDim2.fromOffset(44, 38)
+        self._compact.Text = if self._compactEnabled then "+" else "−"
+        self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 212)
+    else
+        self._objectiveFrame.Position = UDim2.fromOffset(18, 18)
+        self._objectiveFrame.Size = if self._compactEnabled
+            then UDim2.fromOffset(284, 76)
+            else UDim2.fromOffset(326, 132)
+        self._resource.Position = UDim2.fromOffset(18, 164)
+        self._compact.Size = UDim2.fromOffset(118, 38)
+        self._compact.Text = if self._compactEnabled then "EXPAND" else "COMPACT"
+        self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 66)
+    end
 end
 
 function HUDController._updateClock(self: HUDController)
@@ -466,14 +481,16 @@ function HUDController._updateClock(self: HUDController)
 
     local phase = string.upper(tostring(state.phase or "day"))
     local phaseEndsAt = tonumber(state.phaseEndsAt) or 0
+    local clockText: string
     if phaseEndsAt > 0 then
         local remaining = math.max(0, math.ceil(phaseEndsAt - workspace:GetServerTimeNow()))
-        self._phase.Text =
+        clockText =
             string.format("%s · %02d:%02d", phase, math.floor(remaining / 60), remaining % 60)
     else
-        self._phase.Text = if phase == "REVEAL"
-            then "DAWN · FIRST LIGHT"
-            else phase .. " · MORNING"
+        clockText = if phase == "REVEAL" then "DAWN · FIRST LIGHT" else phase .. " · MORNING"
+    end
+    if self._phase.Text ~= clockText then
+        self._phase.Text = clockText
     end
 end
 
@@ -502,11 +519,6 @@ function HUDController.update(self: HUDController, state: any)
         and ((tonumber(state.resources) or 0) > 0 or state.selectedTool ~= nil)
     self._tool.Visible = nightActive
     self._lanternFrame.Visible = nightActive
-    local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize
-        or Vector2.new(1280, 720)
-    self._lanternFrame.Position = if viewport.X < 700
-        then UDim2.new(0.5, 0, 0, 212)
-        else UDim2.new(0.5, 0, 0, 66)
     local lanternHealth = math.clamp(tonumber(state.lanternHealth) or 100, 0, 100)
     self._lanternFill.Size = UDim2.new(lanternHealth / 100, -8, 1, -8)
     self._lanternFill.BackgroundColor3 = if lanternHealth <= 35 then COLORS.danger else COLORS.amber
@@ -517,6 +529,7 @@ function HUDController.update(self: HUDController, state: any)
         self._compactEnabled = state.compactHud == true
         self:_applyCompact()
     end
+    self:_layout()
 
     local revision = tonumber(state.toastRevision) or 0
     if revision > self._lastToastRevision and state.toast ~= nil then

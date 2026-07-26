@@ -30,6 +30,7 @@ return {
 
                 TestRunner.equal(table.concat(calls, ","), "init:One,init:Two,start:One,start:Two")
                 TestRunner.equal(registry:state(), "started")
+                TestRunner.equal(registry:count(), 2)
             end,
         },
         {
