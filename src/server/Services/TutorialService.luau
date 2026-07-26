@@ -7,6 +7,16 @@ local TutorialService = {}
 TutorialService.__index = TutorialService
 TutorialService.Name = "TutorialService"
 
+-- Mirrors the earliest stage the authored First Night can target a player
+-- (TutorialFlow only reaches "survive" once a player has a barricade, a
+-- tool, and the First Lantern prepared). EnemyService reads this attribute
+-- so the recurring town night cycle can't target a player still gathering,
+-- choosing a tool, or building, the same way the one-time first night never
+-- could before it existed.
+local function isCombatEligibleStage(stage: string): boolean
+    return stage == "survive" or stage == "reveal" or stage == "complete"
+end
+
 type Session = {
     stage: string,
     resources: number,
@@ -37,6 +47,7 @@ export type TutorialService = typeof(setmetatable(
         _combatService: any,
         _professionService: any,
         _phaseService: any,
+        _townNightService: any,
         _expeditionService: any,
         _oldGrowthService: any,
         _wardenStagService: any,
@@ -65,6 +76,7 @@ function TutorialService.new(
     combatService: any,
     professionService: any,
     phaseService: any,
+    townNightService: any,
     expeditionService: any,
     oldGrowthService: any,
     wardenStagService: any,
@@ -86,6 +98,7 @@ function TutorialService.new(
         _combatService = combatService,
         _professionService = professionService,
         _phaseService = phaseService,
+        _townNightService = townNightService,
         _expeditionService = expeditionService,
         _oldGrowthService = oldGrowthService,
         _wardenStagService = wardenStagService,
@@ -123,6 +136,17 @@ function TutorialService.Init(self: TutorialService, _context: any)
     end)
     self._phaseService:setCompleteHandler(function()
         self:_nightComplete()
+    end)
+    self._townNightService:setChangedHandler(function(toast: string?)
+        if toast ~= nil then
+            for _, session in self._sessions do
+                if session.stage == "complete" then
+                    session.toast = toast
+                    session.toastRevision += 1
+                end
+            end
+        end
+        self:_publishAll()
     end)
     self._enemyService:setChangedHandler(function(toast: string?)
         if toast ~= nil then
@@ -244,6 +268,7 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     end
 
     local stage = profile.tutorial.stage
+    player:SetAttribute("LastLightTutorialSurvivalReady", isCombatEligibleStage(stage))
     local session: Session = {
         stage = stage,
         resources = if stage == "gather"
@@ -277,6 +302,7 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
         end
     elseif stage == "reveal" or stage == "complete" then
         self._worldService:setBeaconVisible(true)
+        self._townNightService:ensureStarted()
     end
 
     local currentStage = session.stage
@@ -310,6 +336,7 @@ function TutorialService._advance(
     end
 
     session.stage = nextStage
+    player:SetAttribute("LastLightTutorialSurvivalReady", isCombatEligibleStage(nextStage))
     self._profileService:setTutorial(player, nextStage, session.selectedTool)
     local definition = self._tutorialFlow.definition(nextStage)
     self._analyticsService:stage(player, definition.index, nextStage)
@@ -478,6 +505,7 @@ function TutorialService._nightComplete(self: TutorialService)
     for player, session in self._sessions do
         self:_advanceSurvivorToReveal(player, session)
     end
+    self._townNightService:ensureStarted()
     self:_publishAll()
 end
 
@@ -622,7 +650,9 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             end
         end
     end
-    local phase = self._phaseService:snapshot()
+    local phase = if self._phaseService:hasCompletedFirstNight()
+        then self._townNightService:snapshot()
+        else self._phaseService:snapshot()
     local survival = self._survivalService:snapshot(player)
     local blackout = self._blackoutService:snapshot(player)
     if blackout ~= nil then
@@ -744,6 +774,8 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         nightActive = phase.nightActive,
         lanternHealth = phase.lanternHealth,
         enemyCount = phase.enemyCount,
+        nightNumber = phase.nightNumber,
+        blackoutDue = phase.blackoutDue,
         expeditionActive = expedition.active,
         expeditionSeed = expedition.seed,
         expeditionManifestHash = expedition.manifestHash,

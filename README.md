@@ -17,8 +17,9 @@ playable game exists.
 **Milestone 2 source implemented; Milestone 3 Bramblewake expedition foundation,
 four active events, durable extraction settlement, player rescue, combat
 mobility, six-enemy first-night roster, four basic profession kits, Old Growth,
-the Warden Stag, the Bramblewake Blackout, and permanent chapter-one resolution
-implemented; Studio and device exit gates remain pending.**
+the Warden Stag, the Bramblewake Blackout, permanent chapter-one resolution,
+and a repeating town normal-night cycle implemented; Studio and device exit
+gates remain pending.**
 
 The repository currently contains:
 
@@ -49,6 +50,9 @@ The repository currently contains:
 - a server-owned Bramblewake Blackout with a recoverable nine-minute target,
   chained rootfire relays, elite/boss integration, present-party Greenward vote,
   and immutable chapter-one outcome persistence;
+- a repeating server-owned town day/dusk/night cycle after First Light, with an
+  escalating six-enemy wave schedule, a seventh-night telegraph deliberately
+  decoupled from Blackout access, and a feature kill switch;
 - persistent free-town selection for Scout, Warden, Engineer, and Medic, with
   server-owned reveal/slow, guard, lantern-repair, and area-heal abilities;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
@@ -59,7 +63,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 129 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 138 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -92,6 +96,9 @@ gates are in
 The rootfire relay, overtime recovery, chapter vote, persistence, mobile, and
 abuse gates are in
 [the Bramblewake Blackout runbook](docs/MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md).
+The wave-escalation, determinism, kill-switch, and Blackout-independence gates
+for the repeating town cycle are in
+[the Normal Night runbook](docs/MILESTONE_3_NORMAL_NIGHT.md).
 
 The current UI direction is documented in the
 [Last Light mobile gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create).

@@ -296,3 +296,18 @@ to staging, and production requires an explicitly registered place ID.
 **Reason:** A new or copied place must not silently gain production data, commerce,
 or feature behavior. Promoting a place is an intentional reviewed configuration
 change.
+
+## 2026-07-26 — Normal Night decoupled from the Blackout trigger
+
+**Decision:** The repeating town day/dusk/night cycle counts nights and
+telegraphs the seventh-night threshold (`blackoutDue`), but does not gate,
+block, or auto-start the Bramblewake Blackout. Manual Bramblewake entry after
+First Light remains the way to reach the Blackout, exactly as the preview
+decision above already established.
+
+**Reason:** Coupling the two now would remove the tested fast path Windows and
+device testers rely on to reach the complete chapter-one flow, in exchange for
+a "seventh night" gate this increment has no Studio/device evidence for yet.
+Building the counting-and-defense half of the seven-night structure first, and
+wiring it to the Blackout only once the cycle itself is validated, keeps each
+change reviewable and reversible on its own.

@@ -104,13 +104,15 @@ shield breaks, lane root and canopy attacks, a three-phase 480-health boss,
 two/three/four living-root patterns, an explicit antler consequence shortcut,
 preserved/scarred/harmed outcomes, idempotent shared Amber Sap, a chained
 three-node rootfire relay, a recoverable nine-minute Blackout target, a
-present-participant Greenward vote with deterministic tie handling, and an
-immutable per-player chapter transaction.
-Profession mastery/specializations, full inventory/crafting/quests, normal
-night, recurring seven-night scheduling, consequences visibly changing future
-town/region content, town tier, final art/audio, and all
-Studio/device/group evidence remain open. See
-[MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md) and
+present-participant Greenward vote with deterministic tie handling, an
+immutable per-player chapter transaction, and a repeating server-owned town
+day/dusk/night cycle with an escalating six-enemy wave schedule and a
+seventh-night telegraph that is deliberately decoupled from Blackout access.
+Profession mastery/specializations, full inventory/crafting/quests,
+persistent night-count storage across restarts, per-night content
+differentiation, consequences visibly changing future town/region content,
+town tier, final art/audio, and all Studio/device/group evidence remain open.
+See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md) and
 [MILESTONE_3_BRAMBLEWAKE_EVENTS.md](MILESTONE_3_BRAMBLEWAKE_EVENTS.md), and
 [MILESTONE_3_INVENTORY_EXTRACTION.md](MILESTONE_3_INVENTORY_EXTRACTION.md), and
 [MILESTONE_3_PLAYER_SURVIVAL.md](MILESTONE_3_PLAYER_SURVIVAL.md), and
@@ -119,7 +121,8 @@ Studio/device/group evidence remain open. See
 [MILESTONE_3_BRAMBLEWAKE_ENEMIES.md](MILESTONE_3_BRAMBLEWAKE_ENEMIES.md), and
 [MILESTONE_3_OLD_GROWTH_ELITE.md](MILESTONE_3_OLD_GROWTH_ELITE.md), and
 [MILESTONE_3_WARDEN_STAG_BOSS.md](MILESTONE_3_WARDEN_STAG_BOSS.md), and
-[MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md](MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md).
+[MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md](MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md), and
+[MILESTONE_3_NORMAL_NIGHT.md](MILESTONE_3_NORMAL_NIGHT.md).
 
 ### Deliverables
 

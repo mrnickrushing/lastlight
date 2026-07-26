@@ -27,4 +27,5 @@ TestRunner.run({
     require("./specs/TutorialFlow.spec"),
     require("./specs/WardenStagEncounter.spec"),
     require("./specs/BramblewakeBlackout.spec"),
+    require("./specs/TownNightSchedule.spec"),
 })

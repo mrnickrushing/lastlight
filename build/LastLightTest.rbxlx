@@ -1091,7 +1091,7 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.13.0",
+    BuildVersion = "0.14.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -1143,6 +1143,7 @@ return table.freeze({
         old_growth_elite_enabled = true,
         warden_stag_boss_enabled = true,
         bramblewake_blackout_enabled = true,
+        town_night_cycle_enabled = true,
         region_bramblewake_enabled = true,
         region_ironroot_enabled = false,
         region_mireglass_enabled = false,
@@ -4918,6 +4919,92 @@ return table.freeze(SurvivalState)
       </Item>
       <Item class="ModuleScript" referent="31">
         <Properties>
+          <string name="Name">TownNightSchedule</string>
+          <string name="Source"><![CDATA[--!strict
+
+local TownNightSchedule = {}
+
+export type Beat = {
+    at: number,
+    kind: "spawn" | "warning" | "breach",
+    enemyId: string?,
+}
+
+-- The same six-enemy Bramblewake roster the authored first night uses. Normal
+-- nights reuse it rather than adding new content: escalating pressure comes
+-- from wave count, not new enemies, until a later production pass adds
+-- night-specific variety.
+local ROSTER: { string } = {
+    "enemy_rootling",
+    "enemy_briarback",
+    "enemy_pollen_wisp",
+    "enemy_hollow_crow",
+    "enemy_snapvine",
+    "enemy_bark_ram",
+}
+
+local MIN_WAVES = 3
+local MAX_WAVES = 8
+
+function TownNightSchedule.waveCount(nightNumber: number): number
+    assert(
+        nightNumber >= 1 and nightNumber == math.floor(nightNumber),
+        "night number must be a positive integer"
+    )
+    return math.clamp(MIN_WAVES - 1 + nightNumber, MIN_WAVES, MAX_WAVES)
+end
+
+-- Deterministic by design (no randomness) so a night's wave layout is fully
+-- reproducible and testable, matching this project's existing expedition and
+-- first-night schedules.
+function TownNightSchedule.beats(duration: number, nightNumber: number): { Beat }
+    assert(duration > 0, "duration must be positive")
+    local waves = TownNightSchedule.waveCount(nightNumber)
+    local result: { Beat } = { { at = 0, kind = "warning", enemyId = nil } }
+
+    local windowStart = duration * 0.05
+    local windowEnd = duration * 0.85
+    local span = math.max(windowEnd - windowStart, 0)
+    local breachAfterWave = math.ceil(waves / 2)
+    local lastValidAt = math.max(duration - 1, 0)
+
+    for index = 1, waves do
+        local at = if waves == 1
+            then windowStart
+            else windowStart + span * (index - 1) / (waves - 1)
+        at = math.min(at, lastValidAt)
+        local enemyId = ROSTER[(index - 1) % #ROSTER + 1]
+        table.insert(result, { at = at, kind = "spawn", enemyId = enemyId })
+        if index == breachAfterWave then
+            table.insert(
+                result,
+                { at = math.min(at + 1, lastValidAt), kind = "breach", enemyId = nil }
+            )
+        end
+    end
+
+    table.sort(result, function(a, b)
+        return a.at < b.at
+    end)
+    return result
+end
+
+function TownNightSchedule.pending(duration: number, nightNumber: number, elapsed: number): { Beat }
+    local result: { Beat } = {}
+    for _, beat in TownNightSchedule.beats(duration, nightNumber) do
+        if beat.at >= elapsed then
+            table.insert(result, beat)
+        end
+    end
+    return result
+end
+
+return table.freeze(TownNightSchedule)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="32">
+        <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -5060,7 +5147,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -5096,7 +5183,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -5480,11 +5567,11 @@ return table.freeze(WardenStagEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="34">
+  <Item class="ServerScriptService" referent="35">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="35">
+    <Item class="Script" referent="36">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -5518,6 +5605,7 @@ local RuntimeIds = require(root.RuntimeIds)
 local SaveSchema = require(root.SaveSchema)
 local StatusEffectState = require(root.StatusEffectState)
 local SurvivalState = require(root.SurvivalState)
+local TownNightSchedule = require(root.TownNightSchedule)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
@@ -5533,6 +5621,7 @@ local WardenStagService = require(script.Services.WardenStagService)
 local BramblewakeBlackoutService = require(script.Services.BramblewakeBlackoutService)
 local PhaseService = require(script.Services.PhaseService)
 local ProfileService = require(script.Services.ProfileService)
+local TownNightService = require(script.Services.TownNightService)
 local PlayerSurvivalService = require(script.Services.PlayerSurvivalService)
 local PlayerCombatService = require(script.Services.PlayerCombatService)
 local ProfessionService = require(script.Services.ProfessionService)
@@ -5672,12 +5761,20 @@ local phaseService = PhaseService.new(
     Config.FirstNightDuskSeconds,
     Config.FirstNightSeconds
 )
+local townNightService = TownNightService.new(
+    logger,
+    Config,
+    worldService,
+    enemyService,
+    TownNightSchedule,
+    featureFlags
+)
 professionService:setSwitchProvider(function(player: Player): (boolean, string?)
     local profile = profileService:get(player)
     if profile == nil or profile.tutorial.complete ~= true then
         return false, "COMPLETE FIRST LIGHT TO CHOOSE A PROFESSION"
     end
-    if phaseService:snapshot().nightActive then
+    if phaseService:snapshot().nightActive or townNightService:isNightActive() then
         return false, "RETURN TO DAYLIGHT BEFORE SWITCHING PROFESSION"
     end
     if expeditionService:snapshot(player).active then
@@ -5699,6 +5796,7 @@ local tutorialService = TutorialService.new(
     combatService,
     professionService,
     phaseService,
+    townNightService,
     expeditionService,
     oldGrowthService,
     wardenStagService,
@@ -5728,6 +5826,7 @@ services:register(oldGrowthService)
 services:register(wardenStagService)
 services:register(blackoutService)
 services:register(phaseService)
+services:register(townNightService)
 services:register(tutorialService)
 services:initialize()
 services:start()
@@ -5740,7 +5839,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -5838,11 +5937,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="37">
+      <Item class="Folder" referent="38">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="38">
+        <Item class="ModuleScript" referent="39">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -6471,7 +6570,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="39">
+        <Item class="ModuleScript" referent="40">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -6969,7 +7068,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="40">
+        <Item class="ModuleScript" referent="41">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -7510,7 +7609,12 @@ function EnemyService._closestPlayer(self: EnemyService, enemy: Enemy): (Player?
     end
     for _, player in Players:GetPlayers() do
         local root = rootPart(player)
-        if root ~= nil and self._survivalService:canAct(player) then
+        if
+            root ~= nil
+            and self._survivalService:canAct(player)
+            and player:GetAttribute("LastLightTutorialSurvivalReady") == true
+            and player:GetAttribute("LastLightInExpedition") ~= true
+        then
             local distance = (root.Position - primary.Position).Magnitude
             if distance < closestDistance then
                 closestDistance = distance
@@ -7648,11 +7752,13 @@ function EnemyService.canMarkNearest(
     player: Player,
     range: number
 ): (boolean, string)
-    if not self._nightActive then
-        local encounterService = self:_activeEncounterService()
-        if encounterService ~= nil then
-            return encounterService:canMarkNearest(player, range)
-        end
+    -- Checked before (not instead of) the town-night branch below: a normal
+    -- town night and an active Old Growth/Warden Stag encounter can now run
+    -- concurrently (the town cycle repeats independently of Bramblewake), so
+    -- _nightActive can no longer be used to infer "no encounter is active."
+    local encounterService = self:_activeEncounterService()
+    if encounterService ~= nil then
+        return encounterService:canMarkNearest(player, range)
     end
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
@@ -7667,11 +7773,9 @@ function EnemyService.markNearest(
     range: number,
     duration: number
 ): (boolean, string)
-    if not self._nightActive then
-        local encounterService = self:_activeEncounterService()
-        if encounterService ~= nil then
-            return encounterService:markNearest(player, range, duration)
-        end
+    local encounterService = self:_activeEncounterService()
+    if encounterService ~= nil then
+        return encounterService:markNearest(player, range, duration)
     end
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
@@ -7726,11 +7830,11 @@ function EnemyService.repairLantern(
 end
 
 function EnemyService.damageNearest(self: EnemyService, player: Player): (boolean, string)
+    local encounterService = self:_activeEncounterService()
+    if encounterService ~= nil then
+        return encounterService:damageNearest(player)
+    end
     if not self._nightActive then
-        local encounterService = self:_activeEncounterService()
-        if encounterService ~= nil then
-            return encounterService:damageNearest(player)
-        end
         return false, "The tool is calm in daylight."
     end
     if not self._survivalService:canAct(player) then
@@ -7828,7 +7932,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="42">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -8298,7 +8402,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="43">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -8402,7 +8506,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -8496,7 +8600,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -8651,7 +8755,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9474,7 +9578,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9652,7 +9756,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10084,7 +10188,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10891,7 +10995,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11245,7 +11349,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11814,7 +11918,188 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
+          <Properties>
+            <string name="Name">TownNightService</string>
+            <string name="Source"><![CDATA[--!strict
+
+local TownNightService = {}
+TownNightService.__index = TownNightService
+TownNightService.Name = "TownNightService"
+
+export type Logger = {
+    info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+}
+
+export type TownNightService = typeof(setmetatable(
+    {} :: {
+        Name: string,
+        _logger: Logger,
+        _worldService: any,
+        _enemyService: any,
+        _townNightSchedule: any,
+        _daySeconds: number,
+        _duskSeconds: number,
+        _nightSeconds: number,
+        _blackoutInterval: number,
+        _enabled: boolean,
+        _started: boolean,
+        _nightNumber: number,
+        _phase: string,
+        _phaseEndsAt: number,
+        _onChanged: ((string?) -> ())?,
+    },
+    TownNightService
+))
+
+function TownNightService.new(
+    logger: Logger,
+    config: any,
+    worldService: any,
+    enemyService: any,
+    townNightSchedule: any,
+    featureFlags: any
+): TownNightService
+    return setmetatable({
+        Name = TownNightService.Name,
+        _logger = logger,
+        _worldService = worldService,
+        _enemyService = enemyService,
+        _townNightSchedule = townNightSchedule,
+        _daySeconds = config.NormalDaySeconds,
+        _duskSeconds = config.DuskSeconds,
+        _nightSeconds = config.NormalNightSeconds,
+        _blackoutInterval = config.BlackoutInterval,
+        _enabled = featureFlags:isEnabled("town_night_cycle_enabled"),
+        _started = false,
+        _nightNumber = 1,
+        _phase = "dormant",
+        _phaseEndsAt = 0,
+        _onChanged = nil,
+    }, TownNightService)
+end
+
+function TownNightService.Init(_self: TownNightService, _context: any) end
+
+function TownNightService.Start(_self: TownNightService) end
+
+function TownNightService.setChangedHandler(self: TownNightService, callback: (string?) -> ())
+    self._onChanged = callback
+end
+
+function TownNightService._notify(self: TownNightService, toast: string?)
+    local callback = self._onChanged
+    if callback ~= nil then
+        callback(toast)
+    end
+end
+
+local function waitUntilTime(target: number)
+    while workspace:GetServerTimeNow() < target do
+        task.wait(0.15)
+    end
+end
+
+-- Called once the first player in this server session is known to be past
+-- First Light — either a fresh player who just finished it, or a returning
+-- player whose saved profile already had it complete. Idempotent and safe to
+-- call from either path; only the first call starts the loop. Disabling the
+-- kill switch leaves the tutorial's authored First Night, Bramblewake
+-- expeditions, and manual Blackout entry untouched — only this repeating
+-- town day/dusk/night loop stops advancing.
+function TownNightService.ensureStarted(self: TownNightService)
+    if not self._enabled or self._started then
+        return
+    end
+    self._started = true
+    task.spawn(function()
+        self:_runCycle()
+    end)
+end
+
+function TownNightService._runCycle(self: TownNightService)
+    while true do
+        self._phase = "day"
+        self._phaseEndsAt = workspace:GetServerTimeNow() + self._daySeconds
+        self:_notify(nil)
+        self._logger:info("town_day_started", { night = self._nightNumber })
+        waitUntilTime(self._phaseEndsAt)
+
+        self._phase = "dusk"
+        self._phaseEndsAt = workspace:GetServerTimeNow() + self._duskSeconds
+        self:_notify(string.format("DUSK FALLS — NIGHT %d APPROACHES", self._nightNumber))
+        waitUntilTime(self._phaseEndsAt)
+
+        self._phase = "night"
+        local nightStartedAt = workspace:GetServerTimeNow()
+        self._phaseEndsAt = nightStartedAt + self._nightSeconds
+        self._worldService:setNight(true)
+        self._enemyService:startNight()
+        local blackoutDue = self:_isBlackoutDue()
+        self:_notify(
+            if blackoutDue
+                then string.format(
+                    "NIGHT %d — THE BLACKOUT LOOMS IN BRAMBLEWAKE",
+                    self._nightNumber
+                )
+                else string.format("NIGHT %d HAS ARRIVED", self._nightNumber)
+        )
+        self._logger:info("town_night_started", {
+            blackoutDue = blackoutDue,
+            night = self._nightNumber,
+        })
+
+        for _, beat in self._townNightSchedule.beats(self._nightSeconds, self._nightNumber) do
+            waitUntilTime(nightStartedAt + beat.at)
+            if beat.kind == "spawn" then
+                self._enemyService:spawn(beat.enemyId)
+            elseif beat.kind == "breach" then
+                self._enemyService:setBreach()
+            elseif beat.kind == "warning" and beat.at > 0 then
+                -- The schedule's opening warning beat always lands at at=0,
+                -- immediately after the arrival toast above (which already
+                -- carries the seventh-night Blackout telegraph on the nights
+                -- that matter) — publishing it too would replace that toast
+                -- before a player could read it.
+                self:_notify("THE FOREST GOES QUIET")
+            end
+        end
+
+        waitUntilTime(self._phaseEndsAt)
+        self._enemyService:stopNight()
+        self._worldService:setNight(false)
+        self:_notify(string.format("DAWN BREAKS — NIGHT %d SURVIVED", self._nightNumber))
+        self._logger:info("town_night_completed", { night = self._nightNumber })
+        self._nightNumber += 1
+    end
+end
+
+function TownNightService._isBlackoutDue(self: TownNightService): boolean
+    return self._nightNumber % self._blackoutInterval == 0
+end
+
+function TownNightService.isNightActive(self: TownNightService): boolean
+    return self._phase == "night"
+end
+
+function TownNightService.snapshot(self: TownNightService): any
+    return {
+        blackoutDue = self:_isBlackoutDue(),
+        blackoutInterval = self._blackoutInterval,
+        enemyCount = self._enemyService:activeCount(),
+        lanternHealth = self._enemyService:lanternHealth(),
+        nightActive = self:isNightActive(),
+        nightNumber = self._nightNumber,
+        phase = self._phase,
+        phaseEndsAt = self._phaseEndsAt,
+    }
+end
+
+return table.freeze(TownNightService)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11825,6 +12110,16 @@ local RunService = game:GetService("RunService")
 local TutorialService = {}
 TutorialService.__index = TutorialService
 TutorialService.Name = "TutorialService"
+
+-- Mirrors the earliest stage the authored First Night can target a player
+-- (TutorialFlow only reaches "survive" once a player has a barricade, a
+-- tool, and the First Lantern prepared). EnemyService reads this attribute
+-- so the recurring town night cycle can't target a player still gathering,
+-- choosing a tool, or building, the same way the one-time first night never
+-- could before it existed.
+local function isCombatEligibleStage(stage: string): boolean
+    return stage == "survive" or stage == "reveal" or stage == "complete"
+end
 
 type Session = {
     stage: string,
@@ -11856,6 +12151,7 @@ export type TutorialService = typeof(setmetatable(
         _combatService: any,
         _professionService: any,
         _phaseService: any,
+        _townNightService: any,
         _expeditionService: any,
         _oldGrowthService: any,
         _wardenStagService: any,
@@ -11884,6 +12180,7 @@ function TutorialService.new(
     combatService: any,
     professionService: any,
     phaseService: any,
+    townNightService: any,
     expeditionService: any,
     oldGrowthService: any,
     wardenStagService: any,
@@ -11905,6 +12202,7 @@ function TutorialService.new(
         _combatService = combatService,
         _professionService = professionService,
         _phaseService = phaseService,
+        _townNightService = townNightService,
         _expeditionService = expeditionService,
         _oldGrowthService = oldGrowthService,
         _wardenStagService = wardenStagService,
@@ -11942,6 +12240,17 @@ function TutorialService.Init(self: TutorialService, _context: any)
     end)
     self._phaseService:setCompleteHandler(function()
         self:_nightComplete()
+    end)
+    self._townNightService:setChangedHandler(function(toast: string?)
+        if toast ~= nil then
+            for _, session in self._sessions do
+                if session.stage == "complete" then
+                    session.toast = toast
+                    session.toastRevision += 1
+                end
+            end
+        end
+        self:_publishAll()
     end)
     self._enemyService:setChangedHandler(function(toast: string?)
         if toast ~= nil then
@@ -12063,6 +12372,7 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     end
 
     local stage = profile.tutorial.stage
+    player:SetAttribute("LastLightTutorialSurvivalReady", isCombatEligibleStage(stage))
     local session: Session = {
         stage = stage,
         resources = if stage == "gather"
@@ -12096,6 +12406,7 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
         end
     elseif stage == "reveal" or stage == "complete" then
         self._worldService:setBeaconVisible(true)
+        self._townNightService:ensureStarted()
     end
 
     local currentStage = session.stage
@@ -12129,6 +12440,7 @@ function TutorialService._advance(
     end
 
     session.stage = nextStage
+    player:SetAttribute("LastLightTutorialSurvivalReady", isCombatEligibleStage(nextStage))
     self._profileService:setTutorial(player, nextStage, session.selectedTool)
     local definition = self._tutorialFlow.definition(nextStage)
     self._analyticsService:stage(player, definition.index, nextStage)
@@ -12297,6 +12609,7 @@ function TutorialService._nightComplete(self: TutorialService)
     for player, session in self._sessions do
         self:_advanceSurvivorToReveal(player, session)
     end
+    self._townNightService:ensureStarted()
     self:_publishAll()
 end
 
@@ -12441,7 +12754,9 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             end
         end
     end
-    local phase = self._phaseService:snapshot()
+    local phase = if self._phaseService:hasCompletedFirstNight()
+        then self._townNightService:snapshot()
+        else self._phaseService:snapshot()
     local survival = self._survivalService:snapshot(player)
     local blackout = self._blackoutService:snapshot(player)
     if blackout ~= nil then
@@ -12563,6 +12878,8 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         nightActive = phase.nightActive,
         lanternHealth = phase.lanternHealth,
         enemyCount = phase.enemyCount,
+        nightNumber = phase.nightNumber,
+        blackoutDue = phase.blackoutDue,
         expeditionActive = expedition.active,
         expeditionSeed = expedition.seed,
         expeditionManifestHash = expedition.manifestHash,
@@ -12602,7 +12919,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13435,7 +13752,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13468,6 +13785,7 @@ export type WorldService = typeof(setmetatable(
         _beacon: BasePart?,
         _barricadeBuilt: boolean,
         _night: boolean,
+        _blackoutLightingActive: boolean,
         _expeditionEntry: CFrame?,
         _expeditionManifest: any,
         _expeditionModuleCenters: { any },
@@ -13646,6 +13964,7 @@ function WorldService.new(logger: Logger): WorldService
         _beacon = nil,
         _barricadeBuilt = false,
         _night = false,
+        _blackoutLightingActive = false,
         _expeditionEntry = nil,
         _expeditionManifest = nil,
         _expeditionModuleCenters = {},
@@ -14441,6 +14760,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
 end
 
 function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
+    self._blackoutLightingActive = active
     local world = self._world
     if world ~= nil then
         world:SetAttribute("BlackoutLighting", active)
@@ -14450,9 +14770,10 @@ function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
         if effect ~= nil then
             effect:Destroy()
         end
-        if not self._night then
-            Lighting.Ambient = DAY_AMBIENT
-        end
+        -- Restore whichever of day/night is actually current -- the town
+        -- cycle may have ticked past this Blackout's own start/end while it
+        -- ran and setNight() skipped applying it (see setNight above).
+        self:_applyTownLighting(self._night)
         return
     end
     Lighting.Ambient = Color3.fromRGB(18, 28, 35)
@@ -14727,9 +15048,11 @@ function WorldService.expeditionSnapshot(self: WorldService, player: Player): an
     }
 end
 
-function WorldService.setNight(self: WorldService, enabled: boolean)
-    self._night = enabled
-    if enabled then
+-- Raw property application shared by setNight and setBlackoutLighting's
+-- restore path, so the two never disagree about what "town day" or "town
+-- night" actually looks like.
+function WorldService._applyTownLighting(_self: WorldService, night: boolean)
+    if night then
         Lighting.ClockTime = 0.2
         Lighting.Brightness = 1.25
         Lighting.Ambient = NIGHT_AMBIENT
@@ -14742,6 +15065,21 @@ function WorldService.setNight(self: WorldService, enabled: boolean)
         Lighting.OutdoorAmbient = Color3.fromRGB(102, 120, 110)
         Lighting.ExposureCompensation = 0
     end
+end
+
+function WorldService.setNight(self: WorldService, enabled: boolean)
+    self._night = enabled
+    -- The recurring town cycle and the Blackout are timed independently and
+    -- can now be active at once (an earlier decision deliberately keeps
+    -- Bramblewake entry unblocked regardless of the town's night count).
+    -- Let the Blackout's own dramatic presentation own shared Lighting while
+    -- it's active instead of the two fighting over the same properties every
+    -- time either one ticks; setBlackoutLighting(false) restores whichever
+    -- of these this flag says is current once it ends.
+    if self._blackoutLightingActive then
+        return
+    end
+    self:_applyTownLighting(enabled)
 end
 
 function WorldService.spawnCFrame(self: WorldService): CFrame
@@ -14762,11 +15100,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="54">
+      <Item class="Folder" referent="56">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -15882,7 +16220,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -16271,7 +16609,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -16434,7 +16772,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -16629,11 +16967,11 @@ return table.freeze(WardenStagBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="59">
+    <Item class="Folder" referent="61">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="60">
+      <Item class="Script" referent="62">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -16675,7 +17013,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 4, "unexpected save schema version")
-assert(Config.BuildVersion == "0.13.0", "unexpected build version")
+assert(Config.BuildVersion == "0.14.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -17103,15 +17441,15 @@ print("[Last Light] PASS FoundationIntegration")
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="61">
+  <Item class="StarterPlayer" referent="63">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="62">
+    <Item class="StarterPlayerScripts" referent="64">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="63">
+      <Item class="LocalScript" referent="65">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -17197,11 +17535,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="64">
+        <Item class="Folder" referent="66">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="65">
+          <Item class="ModuleScript" referent="67">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -18820,7 +19158,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="66">
+          <Item class="ModuleScript" referent="68">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -19101,7 +19439,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="67">
+          <Item class="ModuleScript" referent="69">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -19210,7 +19548,7 @@ return InteractionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="68">
+  <Item class="Workspace" referent="70">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>
