@@ -104,5 +104,23 @@ return {
                 TestRunner.equal(respawned.revision, state.revision + 1)
             end,
         },
+        {
+            name = "heals active players up to max health without reviving",
+            run = function()
+                local state = SurvivalState.create(0)
+                state = SurvivalState.damage(state, 30, 1)
+                local healed, result = SurvivalState.heal(state, 22)
+                local capped, cappedResult = SurvivalState.heal(healed, 50)
+                TestRunner.equal(result.healed, 22)
+                TestRunner.equal(healed.health, 92)
+                TestRunner.equal(cappedResult.healed, 8)
+                TestRunner.equal(capped.health, 100)
+
+                local downed = SurvivalState.damage(state, 100, 2)
+                local unchanged, rejected = SurvivalState.heal(downed, 22)
+                TestRunner.equal(rejected.reason, "player_downed")
+                TestRunner.equal(unchanged, downed)
+            end,
+        },
     },
 }

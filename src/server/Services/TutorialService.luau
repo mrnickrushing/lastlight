@@ -35,6 +35,7 @@ export type TutorialService = typeof(setmetatable(
         _enemyService: any,
         _survivalService: any,
         _combatService: any,
+        _professionService: any,
         _phaseService: any,
         _expeditionService: any,
         _analyticsService: any,
@@ -59,6 +60,7 @@ function TutorialService.new(
     enemyService: any,
     survivalService: any,
     combatService: any,
+    professionService: any,
     phaseService: any,
     expeditionService: any,
     analyticsService: any
@@ -76,6 +78,7 @@ function TutorialService.new(
         _enemyService = enemyService,
         _survivalService = survivalService,
         _combatService = combatService,
+        _professionService = professionService,
         _phaseService = phaseService,
         _expeditionService = expeditionService,
         _analyticsService = analyticsService,
@@ -134,6 +137,12 @@ function TutorialService.Init(self: TutorialService, _context: any)
             self:_setToast(player, toast)
         end
         self:_publish(player)
+    end)
+    self._professionService:setChangedHandler(function(player: Player, toast: string?)
+        if toast ~= nil then
+            self:_setToast(player, toast)
+        end
+        self:_publishAll()
     end)
 end
 
@@ -425,6 +434,8 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
     }
     if kind == self._runtimeIds.Actions.Interact then
         allowedFields.interactionId = true
+    elseif kind == self._runtimeIds.Actions.SelectProfession then
+        allowedFields.professionId = true
     elseif
         kind == self._runtimeIds.Actions.Sprint
         or kind == self._runtimeIds.Actions.CompactHud
@@ -440,7 +451,10 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         not self._limiter:allow(
             tostring(player.UserId),
             os.clock(),
-            if kind == self._runtimeIds.Actions.UseTool then 2 else 1
+            if kind == self._runtimeIds.Actions.UseTool
+                    or kind == self._runtimeIds.Actions.ProfessionAbility
+                then 2
+                else 1
         )
     then
         return
@@ -466,6 +480,21 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         self._combatService:setSprint(player, payload.enabled)
     elseif kind == self._runtimeIds.Actions.Dodge then
         self._combatService:dodge(player)
+    elseif kind == self._runtimeIds.Actions.ProfessionAbility then
+        local result = self._professionService:useAbility(player)
+        if not result.accepted then
+            self:_setToast(player, result.message)
+            self:_publish(player)
+        end
+    elseif kind == self._runtimeIds.Actions.SelectProfession then
+        local professionId = payload.professionId
+        if type(professionId) == "string" and #professionId <= 32 then
+            local result = self._professionService:select(player, professionId)
+            if not result.accepted then
+                self:_setToast(player, result.message)
+                self:_publish(player)
+            end
+        end
     elseif kind == self._runtimeIds.Actions.CompactHud and type(payload.enabled) == "boolean" then
         local session = self._sessions[player]
         if session ~= nil then
@@ -571,6 +600,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         unbankedExpeditionRewards = expedition.unbankedRewards,
         bankedMaterials = expedition.bankedMaterials,
         combat = self._combatService:snapshot(player),
+        profession = self._professionService:snapshot(player),
         threat = self._enemyService:threatSnapshot(player),
         survival = survival,
     }

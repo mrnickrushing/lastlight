@@ -2,6 +2,7 @@
 
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local GuiService = game:GetService("GuiService")
 
 local HUDController = {}
 HUDController.__index = HUDController
@@ -120,7 +121,14 @@ export type HUDController = typeof(setmetatable(
         _tool: TextButton,
         _sprint: TextButton,
         _dodge: TextButton,
+        _ability: TextButton,
         _compact: TextButton,
+        _professionButton: TextButton,
+        _professionOverlay: Frame,
+        _professionPanel: Frame,
+        _professionCards: { [string]: TextButton },
+        _professionOrder: { string },
+        _professionClose: TextButton,
         _currentState: any,
         _interactionLabel: string?,
         _interactionAvailable: boolean,
@@ -128,13 +136,16 @@ export type HUDController = typeof(setmetatable(
         _compactEnabled: boolean,
         _playerDowned: boolean,
         _combatContext: boolean,
+        _professionMenuOpen: boolean,
+        _professionSwitchable: boolean,
         _lastToastRevision: number,
         _onCompact: ((boolean) -> ())?,
+        _onProfessionSelected: ((string) -> ())?,
     },
     HUDController
 ))
 
-function HUDController.new(playerGui: PlayerGui): HUDController
+function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDController
     local existing = playerGui:FindFirstChild("LastLightHUD")
     if existing ~= nil then
         existing:Destroy()
@@ -524,6 +535,16 @@ function HUDController.new(playerGui: PlayerGui): HUDController
         actionButton(canvas, "Dodge", "DODGE", 84, UDim2.new(1, -252, 1, -40), Vector2.new(1, 1))
     dodge.Visible = false
     stroke(dodge, COLORS.amber, 0.12)
+    local ability = actionButton(
+        canvas,
+        "ProfessionAbility",
+        "ABILITY",
+        84,
+        UDim2.new(1, -346, 1, -40),
+        Vector2.new(1, 1)
+    )
+    ability.Visible = false
+    stroke(ability, COLORS.green, 0.12)
 
     local compact = Instance.new("TextButton")
     compact.Name = "CompactToggle"
@@ -539,6 +560,136 @@ function HUDController.new(playerGui: PlayerGui): HUDController
     compact.Parent = canvas
     corner(compact, 12)
     stroke(compact, COLORS.cream, 0.7)
+
+    local professionButton = Instance.new("TextButton")
+    professionButton.Name = "ProfessionMenu"
+    professionButton.AnchorPoint = Vector2.new(1, 0)
+    professionButton.Position = UDim2.new(1, -18, 0, 64)
+    professionButton.Size = UDim2.fromOffset(118, 42)
+    professionButton.BackgroundColor3 = COLORS.panel
+    professionButton.BackgroundTransparency = 0.08
+    professionButton.Font = Enum.Font.GothamBold
+    professionButton.Text = "CHOOSE KIT"
+    professionButton.TextColor3 = COLORS.amber
+    professionButton.TextSize = 12
+    professionButton.Visible = false
+    professionButton.ZIndex = 10
+    professionButton.Parent = canvas
+    corner(professionButton, 12)
+    stroke(professionButton, COLORS.amber, 0.42)
+
+    local professionOverlay = Instance.new("Frame")
+    professionOverlay.Name = "ProfessionOverlay"
+    professionOverlay.Size = UDim2.fromScale(1, 1)
+    professionOverlay.BackgroundColor3 = COLORS.ink
+    professionOverlay.BackgroundTransparency = 0.18
+    professionOverlay.Active = true
+    professionOverlay.Visible = false
+    professionOverlay.ZIndex = 40
+    professionOverlay.Parent = canvas
+
+    local professionPanel = Instance.new("Frame")
+    professionPanel.Name = "ProfessionPanel"
+    professionPanel.AnchorPoint = Vector2.new(0.5, 0.5)
+    professionPanel.Position = UDim2.fromScale(0.5, 0.5)
+    professionPanel.Size = UDim2.fromOffset(640, 440)
+    professionPanel.BackgroundColor3 = COLORS.panel
+    professionPanel.BackgroundTransparency = 0.02
+    professionPanel.ZIndex = 41
+    professionPanel.Parent = professionOverlay
+    corner(professionPanel, 20)
+    stroke(professionPanel, COLORS.amber, 0.18)
+
+    local professionTitle = textLabel(
+        professionPanel,
+        "Title",
+        "CHOOSE YOUR PROFESSION",
+        UDim2.new(1, -100, 0, 34),
+        UDim2.fromOffset(24, 18),
+        22,
+        COLORS.cream
+    )
+    professionTitle.Font = Enum.Font.GothamBold
+    professionTitle.ZIndex = 42
+    local professionDetail = textLabel(
+        professionPanel,
+        "Detail",
+        "Switch freely in Emberhollow. Every traveler keeps core combat, building, and rescue.",
+        UDim2.new(1, -48, 0, 42),
+        UDim2.fromOffset(24, 52),
+        13,
+        COLORS.muted
+    )
+    professionDetail.TextYAlignment = Enum.TextYAlignment.Top
+    professionDetail.ZIndex = 42
+
+    local professionClose = Instance.new("TextButton")
+    professionClose.Name = "Close"
+    professionClose.AnchorPoint = Vector2.new(1, 0)
+    professionClose.Position = UDim2.new(1, -18, 0, 18)
+    professionClose.Size = UDim2.fromOffset(72, 64)
+    professionClose.BackgroundColor3 = COLORS.panelSoft
+    professionClose.Font = Enum.Font.GothamBold
+    professionClose.Text = "CLOSE"
+    professionClose.TextColor3 = COLORS.cream
+    professionClose.TextSize = 11
+    professionClose.ZIndex = 43
+    professionClose.Parent = professionPanel
+    corner(professionClose, 12)
+    stroke(professionClose, COLORS.cream, 0.58)
+
+    local professionGrid = Instance.new("Frame")
+    professionGrid.Name = "ProfessionGrid"
+    professionGrid.BackgroundTransparency = 1
+    professionGrid.Position = UDim2.fromOffset(20, 106)
+    professionGrid.Size = UDim2.new(1, -40, 1, -130)
+    professionGrid.ZIndex = 42
+    professionGrid.Parent = professionPanel
+    local grid = Instance.new("UIGridLayout")
+    grid.CellPadding = UDim2.fromOffset(12, 12)
+    grid.CellSize = UDim2.new(0.5, -6, 0.5, -6)
+    grid.FillDirectionMaxCells = 2
+    grid.SortOrder = Enum.SortOrder.LayoutOrder
+    grid.Parent = professionGrid
+
+    local professionCards: { [string]: TextButton } = {}
+    local professionOrder = {}
+    for index, definition in professions do
+        local card = Instance.new("TextButton")
+        card.Name = tostring(definition.displayName or definition.id)
+        card.LayoutOrder = index
+        card.BackgroundColor3 = COLORS.panelSoft
+        card.BackgroundTransparency = 0.04
+        card.AutoButtonColor = true
+        card.Font = Enum.Font.GothamMedium
+        card.Text = string.format(
+            "%s\n%s\n%s\n%s",
+            tostring(definition.displayName),
+            tostring(definition.role),
+            tostring(definition.abilityName),
+            tostring(definition.abilityDescription)
+        )
+        card.TextColor3 = COLORS.cream
+        card.TextSize = 14
+        card.TextWrapped = true
+        card.TextYAlignment = Enum.TextYAlignment.Center
+        card.Selectable = true
+        card.ZIndex = 42
+        card:SetAttribute("ProfessionId", definition.id)
+        card:SetAttribute("BaseText", card.Text)
+        card.Parent = professionGrid
+        corner(card, 14)
+        stroke(card, COLORS.cream, 0.7)
+        professionCards[definition.id] = card
+        table.insert(professionOrder, definition.id)
+    end
+    if professionOrder[1] ~= nil then
+        professionClose.NextSelectionDown = professionCards[professionOrder[1]]
+        professionCards[professionOrder[1]].NextSelectionUp = professionClose
+    end
+    if professionOrder[2] ~= nil then
+        professionCards[professionOrder[2]].NextSelectionUp = professionClose
+    end
 
     local self = setmetatable({
         _gui = gui,
@@ -573,7 +724,14 @@ function HUDController.new(playerGui: PlayerGui): HUDController
         _tool = tool,
         _sprint = sprint,
         _dodge = dodge,
+        _ability = ability,
         _compact = compact,
+        _professionButton = professionButton,
+        _professionOverlay = professionOverlay,
+        _professionPanel = professionPanel,
+        _professionCards = professionCards,
+        _professionOrder = professionOrder,
+        _professionClose = professionClose,
         _currentState = nil,
         _interactionLabel = nil,
         _interactionAvailable = false,
@@ -581,8 +739,11 @@ function HUDController.new(playerGui: PlayerGui): HUDController
         _compactEnabled = false,
         _playerDowned = false,
         _combatContext = false,
+        _professionMenuOpen = false,
+        _professionSwitchable = false,
         _lastToastRevision = 0,
         _onCompact = nil,
+        _onProfessionSelected = nil,
     }, HUDController)
 
     compact.Activated:Connect(function()
@@ -593,6 +754,21 @@ function HUDController.new(playerGui: PlayerGui): HUDController
             callback(self._compactEnabled)
         end
     end)
+    professionClose.Activated:Connect(function()
+        self:setProfessionMenuOpen(false)
+    end)
+    for professionId, card in professionCards do
+        card.Activated:Connect(function()
+            if not self._professionSwitchable then
+                return
+            end
+            local callback = self._onProfessionSelected
+            if callback ~= nil then
+                callback(professionId)
+            end
+            self:setProfessionMenuOpen(false)
+        end)
+    end
 
     local viewportConnection: RBXScriptConnection? = nil
     local function bindCamera()
@@ -645,8 +821,53 @@ function HUDController.dodgeButton(self: HUDController): TextButton
     return self._dodge
 end
 
+function HUDController.abilityButton(self: HUDController): TextButton
+    return self._ability
+end
+
+function HUDController.professionButton(self: HUDController): TextButton
+    return self._professionButton
+end
+
 function HUDController.setCompactHandler(self: HUDController, callback: (boolean) -> ())
     self._onCompact = callback
+end
+
+function HUDController.setProfessionHandler(self: HUDController, callback: (string) -> ())
+    self._onProfessionSelected = callback
+end
+
+function HUDController.setProfessionMenuOpen(self: HUDController, open: boolean)
+    local shouldOpen = open and self._professionSwitchable and not self._playerDowned
+    self._professionMenuOpen = shouldOpen
+    self._professionOverlay.Visible = shouldOpen
+    if shouldOpen then
+        local profession = if self._currentState == nil then nil else self._currentState.profession
+        local selectedId = if type(profession) == "table" then profession.selectedId else nil
+        local selectedCard = if type(selectedId) == "string"
+            then self._professionCards[selectedId]
+            else nil
+        if selectedCard == nil then
+            local firstId = self._professionOrder[1]
+            selectedCard = if firstId == nil then nil else self._professionCards[firstId]
+        end
+        if selectedCard ~= nil then
+            GuiService.SelectedObject = selectedCard
+        end
+    elseif
+        GuiService.SelectedObject ~= nil
+        and GuiService.SelectedObject:IsDescendantOf(self._professionPanel)
+    then
+        GuiService.SelectedObject = nil
+    end
+end
+
+function HUDController.toggleProfessionMenu(self: HUDController)
+    self:setProfessionMenuOpen(not self._professionMenuOpen)
+end
+
+function HUDController.isProfessionMenuOpen(self: HUDController): boolean
+    return self._professionMenuOpen
 end
 
 function HUDController.setInputMode(self: HUDController, mode: string)
@@ -659,6 +880,7 @@ function HUDController.setInputMode(self: HUDController, mode: string)
         elseif mode == "gamepad" then "RT\nSTRIKE"
         else "STRIKE"
     self:_updateCombatClock()
+    self:_updateProfessionClock()
 end
 
 function HUDController._updateCombatClock(self: HUDController)
@@ -718,6 +940,88 @@ function HUDController._updateCombatClock(self: HUDController)
         else prefix .. "DODGE"
 end
 
+function HUDController._updateProfessionClock(self: HUDController)
+    local state = self._currentState
+    if state == nil then
+        return
+    end
+    local profession = state.profession
+    if type(profession) ~= "table" or profession.enabled == false then
+        self._professionButton.Visible = false
+        self._ability.Visible = false
+        self:setProfessionMenuOpen(false)
+        return
+    end
+
+    local selectedId = if type(profession.selectedId) == "string"
+        then profession.selectedId
+        else nil
+    local displayName = if type(profession.displayName) == "string"
+        then profession.displayName
+        else nil
+    self._professionSwitchable = profession.switchable == true
+    self._professionButton.Visible = state.tutorialComplete == true
+    self._professionButton.Active = self._professionSwitchable
+    self._professionButton.AutoButtonColor = self._professionSwitchable
+    self._professionButton.BackgroundColor3 = if self._professionSwitchable
+        then COLORS.panel
+        else Color3.fromRGB(42, 48, 45)
+    self._professionButton.TextColor3 = if self._professionSwitchable
+        then COLORS.amber
+        else COLORS.muted
+    self._professionButton.Text = if displayName == nil
+        then "CHOOSE KIT"
+        else "KIT · " .. displayName
+
+    for professionId, card in self._professionCards do
+        local selected = professionId == selectedId
+        local baseText = tostring(card:GetAttribute("BaseText") or "")
+        card.Text = if selected then "✓ EQUIPPED\n" .. baseText else baseText
+        card.BackgroundColor3 = if selected then Color3.fromRGB(37, 68, 55) else COLORS.panelSoft
+        card.TextColor3 = if selected then COLORS.cream else COLORS.muted
+        local cardStroke = card:FindFirstChildOfClass("UIStroke")
+        if cardStroke ~= nil then
+            cardStroke.Color = if selected then COLORS.amber else COLORS.cream
+            cardStroke.Transparency = if selected then 0.08 else 0.7
+            cardStroke.Thickness = if selected then 2.5 else 1.5
+        end
+    end
+
+    if not self._professionSwitchable and self._professionMenuOpen then
+        self:setProfessionMenuOpen(false)
+    end
+    if selectedId == nil then
+        self._ability.Visible = false
+        return
+    end
+
+    local now = workspace:GetServerTimeNow()
+    local readyAt = tonumber(profession.cooldownReadyAt) or 0
+    local activeUntil = tonumber(profession.activeUntil) or 0
+    local remaining = math.max(0, readyAt - now)
+    local active = now < activeUntil
+    local ready = profession.enabled ~= false and not self._playerDowned and remaining <= 0
+    local abilityName = string.upper(tostring(profession.abilityName or "ABILITY"))
+    local compactAbilityName = string.gsub(abilityName, " ", "\n", 1)
+    local prefix = if self._inputMode == "keyboard"
+        then "Q\n"
+        elseif self._inputMode == "gamepad" then "L1\n"
+        else ""
+
+    self._ability.Visible = not self._playerDowned
+    self._ability.Active = ready
+    self._ability.AutoButtonColor = ready
+    self._ability.BackgroundColor3 = if active
+        then COLORS.green
+        elseif ready then COLORS.panel
+        else Color3.fromRGB(42, 48, 45)
+    self._ability.TextColor3 = if ready or active then COLORS.cream else COLORS.muted
+    self._ability.Text = if active
+        then string.format("%s\n%.1fs", compactAbilityName, math.max(0, activeUntil - now))
+        elseif remaining > 0 then string.format("%s\n%.1fs", compactAbilityName, remaining)
+        else prefix .. compactAbilityName
+end
+
 function HUDController.setInteraction(self: HUDController, label: string?, available: boolean)
     self._interactionLabel = label
     self._interactionAvailable = available
@@ -770,6 +1074,10 @@ function HUDController._layout(self: HUDController)
             UDim2.new(0.5, 0, 0, if self._allyFrame.Visible then 326 else 254)
         self._threatFrame.Size = UDim2.new(1, -36, 0, 66)
         self._downedFrame.Size = UDim2.new(1, -36, 0, 90)
+        self._professionButton.Position =
+            UDim2.new(1, -18, 0, if self._compactEnabled then 158 else 218)
+        self._professionPanel.Size = UDim2.new(1, -24, 0, 440)
+        self._ability.Position = UDim2.new(1, -158, 1, -138)
     else
         self._objectiveFrame.Position = UDim2.fromOffset(18, 18)
         self._objectiveFrame.Size = if self._compactEnabled
@@ -785,6 +1093,9 @@ function HUDController._layout(self: HUDController)
         self._threatFrame.Position = UDim2.fromScale(0.5, 0.32)
         self._threatFrame.Size = UDim2.fromOffset(330, 66)
         self._downedFrame.Size = UDim2.fromOffset(540, 90)
+        self._professionButton.Position = UDim2.new(1, -18, 0, 64)
+        self._professionPanel.Size = UDim2.fromOffset(640, 440)
+        self._ability.Position = UDim2.new(1, -346, 1, -40)
     end
 end
 
@@ -808,6 +1119,7 @@ function HUDController._updateClock(self: HUDController)
         self._phase.Text = clockText
     end
     self:_updateCombatClock()
+    self:_updateProfessionClock()
 
     local threat = state.threat
     if type(threat) == "table" and not self._playerDowned then
@@ -906,6 +1218,7 @@ function HUDController.update(self: HUDController, state: any)
     self._sprint.Visible = self._inputMode == "touch" and not self._playerDowned
     self._dodge.Visible = not self._playerDowned
         and (self._inputMode == "touch" or self._combatContext)
+    self:_updateProfessionClock()
     self._lanternFrame.Visible = nightActive
     local lanternHealth = math.clamp(tonumber(state.lanternHealth) or 100, 0, 100)
     self._lanternFill.Size = UDim2.new(lanternHealth / 100, -8, 1, -8)

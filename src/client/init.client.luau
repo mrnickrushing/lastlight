@@ -7,6 +7,7 @@ local root = ReplicatedStorage:WaitForChild("LastLight", 8)
 assert(root ~= nil, "Last Light shared root did not replicate before client bootstrap timeout")
 
 local Config = require(root.Config)
+local ProfessionCatalog = require(root.ProfessionCatalog)
 local RuntimeIds = require(root.RuntimeIds)
 local HUDController = require(script.Controllers.HUDController)
 local InputController = require(script.Controllers.InputController)
@@ -29,7 +30,7 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui", Config.BootstrapTimeoutSeconds)
 assert(playerGui ~= nil and playerGui:IsA("PlayerGui"), "PlayerGui unavailable")
 
-local hud = HUDController.new(playerGui)
+local hud = HUDController.new(playerGui, ProfessionCatalog.list())
 local interaction = InteractionController.new(RuntimeIds.InteractionTag, hud)
 
 local function send(kind: string, fields: { [string]: any }?)
@@ -50,10 +51,18 @@ end, function(enabled: boolean)
     send(RuntimeIds.Actions.Sprint, { enabled = enabled })
 end, function()
     send(RuntimeIds.Actions.Dodge)
+end, function()
+    send(RuntimeIds.Actions.ProfessionAbility)
+end, function()
+    hud:setProfessionMenuOpen(true)
 end)
 
 hud:setCompactHandler(function(enabled: boolean)
     send(RuntimeIds.Actions.CompactHud, { enabled = enabled })
+end)
+
+hud:setProfessionHandler(function(professionId: string)
+    send(RuntimeIds.Actions.SelectProfession, { professionId = professionId })
 end)
 
 stateChanged.OnClientEvent:Connect(function(snapshot: any)

@@ -2,6 +2,7 @@
 
 local TutorialFlow = require("./TutorialFlow")
 local ExpeditionInventory = require("./ExpeditionInventory")
+local ProfessionCatalog = require("./ProfessionCatalog")
 
 local SaveSchema = {}
 
@@ -19,11 +20,14 @@ export type Profile = {
     revision: number,
     tutorial: Tutorial,
     inventory: any,
+    profession: {
+        selectedId: string?,
+    },
 }
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 2,
+        schemaVersion = 3,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -34,6 +38,9 @@ function SaveSchema.default(now: number): Profile
             completedAt = nil,
         },
         inventory = ExpeditionInventory.default(),
+        profession = {
+            selectedId = nil,
+        },
     }
 end
 
@@ -82,7 +89,11 @@ function SaveSchema.normalize(value: any, now: number): Profile
     end
 
     profile.inventory = ExpeditionInventory.normalize(value.inventory)
-    profile.schemaVersion = 2
+    local profession = value.profession
+    if type(profession) == "table" and ProfessionCatalog.isValid(profession.selectedId) then
+        profile.profession.selectedId = profession.selectedId
+    end
+    profile.schemaVersion = 3
     return profile
 end
 
@@ -104,6 +115,16 @@ function SaveSchema.withTutorial(
     else
         nextProfile.tutorial.completedAt = nil
     end
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile
+end
+
+function SaveSchema.withProfession(profile: Profile, professionId: string, now: number): Profile
+    assert(ProfessionCatalog.isValid(professionId), "profession ID is invalid")
+    local nextProfile = table.clone(profile)
+    nextProfile.profession = table.clone(profile.profession)
+    nextProfile.profession.selectedId = professionId
     nextProfile.updatedAt = now
     nextProfile.revision += 1
     return nextProfile

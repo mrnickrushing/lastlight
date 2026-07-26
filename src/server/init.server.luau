@@ -15,6 +15,8 @@ local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local ExpeditionRewardLedger = require(root.ExpeditionRewardLedger)
 local NightSchedule = require(root.NightSchedule)
+local ProfessionCatalog = require(root.ProfessionCatalog)
+local ProfessionState = require(root.ProfessionState)
 local RateLimiter = require(root.RateLimiter)
 local ReviveFlow = require(root.ReviveFlow)
 local RuntimeIds = require(root.RuntimeIds)
@@ -34,6 +36,7 @@ local PhaseService = require(script.Services.PhaseService)
 local ProfileService = require(script.Services.ProfileService)
 local PlayerSurvivalService = require(script.Services.PlayerSurvivalService)
 local PlayerCombatService = require(script.Services.PlayerCombatService)
+local ProfessionService = require(script.Services.ProfessionService)
 local TutorialService = require(script.Services.TutorialService)
 local WorldService = require(script.Services.WorldService)
 local ServiceRegistry = require(script.ServiceRegistry)
@@ -85,6 +88,15 @@ local combatService = PlayerCombatService.new(
     survivalService,
     analyticsService
 )
+local professionService = ProfessionService.new(
+    logger,
+    ProfessionCatalog,
+    ProfessionState,
+    featureFlags,
+    profileService,
+    survivalService,
+    analyticsService
+)
 local enemyService = EnemyService.new(
     logger,
     Config,
@@ -94,6 +106,8 @@ local enemyService = EnemyService.new(
     EnemyAttackFlow,
     analyticsService
 )
+professionService:setEnemyService(enemyService)
+enemyService:setProfessionService(professionService)
 local phaseService = PhaseService.new(
     logger,
     worldService,
@@ -102,6 +116,19 @@ local phaseService = PhaseService.new(
     Config.FirstNightDuskSeconds,
     Config.FirstNightSeconds
 )
+professionService:setSwitchProvider(function(player: Player): (boolean, string?)
+    local profile = profileService:get(player)
+    if profile == nil or profile.tutorial.complete ~= true then
+        return false, "COMPLETE FIRST LIGHT TO CHOOSE A PROFESSION"
+    end
+    if phaseService:snapshot().nightActive then
+        return false, "RETURN TO DAYLIGHT BEFORE SWITCHING PROFESSION"
+    end
+    if expeditionService:snapshot(player).active then
+        return false, "RETURN THROUGH THE WAYHOME GATE BEFORE SWITCHING"
+    end
+    return true, nil
+end)
 local tutorialService = TutorialService.new(
     logger,
     Config,
@@ -114,6 +141,7 @@ local tutorialService = TutorialService.new(
     enemyService,
     survivalService,
     combatService,
+    professionService,
     phaseService,
     expeditionService,
     analyticsService
@@ -135,6 +163,7 @@ services:register(worldService)
 services:register(expeditionService)
 services:register(survivalService)
 services:register(combatService)
+services:register(professionService)
 services:register(enemyService)
 services:register(phaseService)
 services:register(tutorialService)

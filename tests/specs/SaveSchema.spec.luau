@@ -10,7 +10,7 @@ return {
             name = "creates a safe first-session profile",
             run = function()
                 local profile = SaveSchema.default(100)
-                TestRunner.equal(profile.schemaVersion, 2)
+                TestRunner.equal(profile.schemaVersion, 3)
                 TestRunner.equal(profile.tutorial.stage, "arrive")
                 TestRunner.equal(profile.tutorial.complete, false)
                 TestRunner.equal(profile.revision, 0)
@@ -51,7 +51,7 @@ return {
                 TestRunner.equal(profile.tutorial.stage, "build")
                 TestRunner.equal(profile.tutorial.selectedTool, "hammer")
                 TestRunner.equal(profile.revision, 4)
-                TestRunner.equal(profile.schemaVersion, 2)
+                TestRunner.equal(profile.schemaVersion, 3)
             end,
         },
         {
@@ -67,7 +67,7 @@ return {
                         complete = true,
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 2)
+                TestRunner.equal(profile.schemaVersion, 3)
                 TestRunner.equal(profile.revision, 7)
                 TestRunner.equal(profile.tutorial.complete, true)
                 TestRunner.equal(SaveSchema.expeditionPending(profile).count, 0)
@@ -142,6 +142,24 @@ return {
 
                 local complete = SaveSchema.withTutorial(profile, "complete", nil, 450)
                 TestRunner.equal(complete.tutorial.completedAt, 450)
+            end,
+        },
+        {
+            name = "migrates and persists only valid profession selections",
+            run = function()
+                local migrated = SaveSchema.normalize({
+                    schemaVersion = 2,
+                    profession = {
+                        selectedId = "profession_hacker",
+                    },
+                }, 300)
+                TestRunner.equal(migrated.schemaVersion, 3)
+                TestRunner.equal(migrated.profession.selectedId, nil)
+
+                local selected = SaveSchema.withProfession(migrated, "profession_medic", 320)
+                TestRunner.equal(selected.profession.selectedId, "profession_medic")
+                TestRunner.equal(selected.revision, migrated.revision + 1)
+                TestRunner.equal(migrated.profession.selectedId, nil)
             end,
         },
     },

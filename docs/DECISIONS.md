@@ -155,6 +155,20 @@ justify the operational cost.
 **Reason:** Cooperative roles should encourage experimentation without permanent
 class regret or monetized respec pressure.
 
+## 2026-07-26 — Profession abilities remain optional team utility
+
+**Decision:** Implement Scout, Warden, Engineer, and Medic as free, persistent
+safe-town selections with one server-authoritative utility ability each. Preserve
+baseline combat, gathering, construction, revive, and completion paths for every
+player, regardless of profession.
+
+**Evidence:** [Profession Selector + Ability HUD report](https://www.lazyweb.com/report/lazyweb/73595230-6584-431c-8d84-c7eb06fdeaa5/?source=create).
+
+**Reason:** The vertical slice needs distinct cooperative identities without
+class locks, paid power, or impossible solo objectives. A single readable
+cooldown action proves the authority, save, input, HUD, and balance seams before
+mastery trees or specializations multiply complexity.
+
 ## 2026-07-25 — Recoverable failure
 
 **Decision:** Routine defeat damages temporary state and unbanked value but never
