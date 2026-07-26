@@ -129,7 +129,7 @@ function TutorialService.Init(self: TutorialService, _context: any)
     end)
     self._townNightService:setChangedHandler(function(toast: string?)
         if toast ~= nil then
-            for player, session in self._sessions do
+            for _, session in self._sessions do
                 if session.stage == "complete" then
                     session.toast = toast
                     session.toastRevision += 1
