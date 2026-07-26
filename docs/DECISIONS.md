@@ -52,6 +52,18 @@ persistent inventory settlement exists.
 turning optional content, disconnects, streaming, or remote retries into
 impossible routes or duplicate value.
 
+## 2026-07-26 — Durable pouch before full inventory
+
+**Decision:** Event rewards enter a versioned unbanked profile pouch under
+run-specific transaction IDs. Wayhome extraction atomically converts the pouch
+to banked material totals and retains settlement tombstones. A failed or
+read-only save never clears the server-session fallback.
+
+**Reason:** Rewards need reconnect and retry safety before crafting or a larger
+inventory interface depends on them. Separating unbanked and banked state also
+preserves recoverable expedition failure without granting clients authority or
+pretending the Milestone 4 persistence platform is complete.
+
 ## 2026-07-25 — One Active Trail onboarding HUD
 
 **Decision:** Implement the first session with one phase capsule, one active

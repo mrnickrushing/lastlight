@@ -154,6 +154,44 @@ function AnalyticsService.expeditionEventFailed(
     })
 end
 
+function AnalyticsService.expeditionExtracted(
+    self: AnalyticsService,
+    player: Player,
+    manifestHash: string,
+    settlementId: string?,
+    bankedAmount: number
+)
+    self._logger:info("expedition_extracted", {
+        bankedAmount = bankedAmount,
+        hash = manifestHash,
+        player = player.UserId,
+        settlement = settlementId or "empty",
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(
+                player,
+                "BramblewakeExtracted",
+                math.max(1, bankedAmount),
+                {}
+            )
+        end)
+    end
+end
+
+function AnalyticsService.expeditionExtractionFailed(
+    self: AnalyticsService,
+    player: Player,
+    manifestHash: string,
+    reason: string?
+)
+    self._logger:warn("expedition_extraction_failed", {
+        hash = manifestHash,
+        player = player.UserId,
+        reason = reason or "unknown",
+    })
+end
+
 function AnalyticsService.clear(self: AnalyticsService, player: Player)
     self._startedAt[player] = nil
     self._expeditionStarted[player] = nil

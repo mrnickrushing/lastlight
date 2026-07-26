@@ -57,6 +57,7 @@ local expeditionService = ExpeditionService.new(
     featureFlags,
     ExpeditionEventFlow,
     ExpeditionRewardLedger,
+    profileService,
     analyticsService,
     Config.BramblewakePreviewSeed
 )

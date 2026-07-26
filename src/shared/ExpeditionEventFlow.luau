@@ -132,18 +132,29 @@ function ExpeditionEventFlow.interactionId(eventId: string, stepId: string): str
     return INTERACTION_PREFIX .. eventId .. ":" .. stepId
 end
 
-function ExpeditionEventFlow.transactionId(manifestHash: string, eventId: string): string
-    return string.format("event_reward:%s:%s", manifestHash, eventId)
+function ExpeditionEventFlow.transactionId(
+    runId: string,
+    manifestHash: string,
+    eventId: string
+): string
+    return string.format("event_reward:%s:%s:%s", runId, manifestHash, eventId)
 end
 
-function ExpeditionEventFlow.create(definition: any, manifestHash: string, enabled: boolean?): any
+function ExpeditionEventFlow.create(
+    definition: any,
+    runId: string,
+    manifestHash: string,
+    enabled: boolean?
+): any
     local valid, issues = ExpeditionEventFlow.validateDefinition(definition)
     assert(valid, table.concat(issues, "; "))
+    assert(type(runId) == "string" and runId ~= "", "expedition run ID is required")
     assert(type(manifestHash) == "string" and manifestHash ~= "", "manifest hash is required")
 
     local isEnabled = enabled ~= false and definition.enabled == true
     return {
         eventId = definition.id,
+        runId = runId,
         manifestHash = manifestHash,
         status = if isEnabled then "dormant" else "disabled",
         progress = 0,
@@ -248,7 +259,7 @@ function ExpeditionEventFlow.contribute(
         state.status = "completed"
         state.completedAt = now
         state.rewardTransactionId =
-            ExpeditionEventFlow.transactionId(state.manifestHash, state.eventId)
+            ExpeditionEventFlow.transactionId(state.runId, state.manifestHash, state.eventId)
     end
 
     return {

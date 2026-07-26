@@ -1,5 +1,7 @@
 --!strict
 
+local Players = game:GetService("Players")
+
 local ExpeditionService = {}
 ExpeditionService.__index = ExpeditionService
 ExpeditionService.Name = "ExpeditionService"
@@ -19,6 +21,7 @@ export type ExpeditionService = typeof(setmetatable(
         _featureFlags: any,
         _eventFlow: any,
         _rewardLedger: any,
+        _profileService: any,
         _analyticsService: any,
         _seed: number,
         _manifest: any,
@@ -26,6 +29,7 @@ export type ExpeditionService = typeof(setmetatable(
         _eventStates: { [string]: any },
         _rewardLedgerState: any,
         _eventsEnabled: boolean,
+        _runId: string,
     },
     ExpeditionService
 ))
@@ -38,6 +42,7 @@ function ExpeditionService.new(
     featureFlags: any,
     eventFlow: any,
     rewardLedger: any,
+    profileService: any,
     analyticsService: any,
     seed: number
 ): ExpeditionService
@@ -50,6 +55,7 @@ function ExpeditionService.new(
         _featureFlags = featureFlags,
         _eventFlow = eventFlow,
         _rewardLedger = rewardLedger,
+        _profileService = profileService,
         _analyticsService = analyticsService,
         _seed = seed,
         _manifest = nil,
@@ -57,10 +63,15 @@ function ExpeditionService.new(
         _eventStates = {},
         _rewardLedgerState = rewardLedger.create(),
         _eventsEnabled = false,
+        _runId = "",
     }, ExpeditionService)
 end
 
 function ExpeditionService.Init(self: ExpeditionService, _context: any)
+    local jobId = game.JobId
+    self._runId = if jobId ~= ""
+        then jobId
+        else string.format("studio_%d_%d", os.time(), math.floor(os.clock() * 1000))
     local requestedSeed = game:GetAttribute("LastLightExpeditionSeed")
     local seed = if type(requestedSeed) == "number" then requestedSeed else self._seed
     local manifest = self._generator.generate(seed)
@@ -75,7 +86,8 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
     for _, placement in manifest.modules do
         if placement.eventId ~= nil then
             local definition = self._generator.eventDefinition(placement.eventId)
-            local state = self._eventFlow.create(definition, manifest.hash, self._eventsEnabled)
+            local state =
+                self._eventFlow.create(definition, self._runId, manifest.hash, self._eventsEnabled)
             self._eventStates[placement.eventId] = state
             self._worldService:setExpeditionEventState(placement.eventId, state)
         end
@@ -92,6 +104,7 @@ function ExpeditionService.Start(self: ExpeditionService)
         modules = #manifest.modules,
         parts = self._partCount,
         pois = self._catalog.PointOfInterestCount,
+        runId = self._runId,
         seed = manifest.seed,
         source = manifest.source,
     })
@@ -135,7 +148,13 @@ function ExpeditionService._grantReward(
     end
 
     local reward = definition.reward
-    local granted = self._rewardLedger.grant(self._rewardLedgerState, userId, transactionId, reward)
+    local granted = self._rewardLedger.grant(
+        self._rewardLedgerState,
+        userId,
+        transactionId,
+        state.manifestHash,
+        reward
+    )
     if not granted then
         return false
     end
@@ -146,6 +165,21 @@ function ExpeditionService._grantReward(
         transaction = transactionId,
         userId = userId,
     })
+    local player = Players:GetPlayerByUserId(userId)
+    if player ~= nil then
+        local profileResult = self._profileService:grantUnbankedExpeditionReward(
+            player,
+            transactionId,
+            state.manifestHash,
+            reward
+        )
+        self._logger:info("expedition_event_reward_persisted", {
+            durable = profileResult.durable == true,
+            event = definition.id,
+            player = userId,
+            transaction = transactionId,
+        })
+    end
     return true
 end
 
@@ -235,9 +269,125 @@ function ExpeditionService.interact(
     return result
 end
 
+function ExpeditionService._combinedPending(self: ExpeditionService, player: Player): any
+    local sessionPending = self._rewardLedger.pending(self._rewardLedgerState, player.UserId)
+    local profileInventory = self._profileService:inventorySnapshot(player)
+    local materials: { [string]: number } = {}
+    local rewards = {}
+    local seen: { [string]: boolean } = {}
+    for _, reward in profileInventory.pendingRewards do
+        seen[reward.transactionId] = true
+        materials[reward.materialId] = (materials[reward.materialId] or 0) + reward.amount
+        table.insert(rewards, reward)
+    end
+    for _, reward in sessionPending.rewards do
+        if not seen[reward.transactionId] then
+            seen[reward.transactionId] = true
+            materials[reward.materialId] = (materials[reward.materialId] or 0) + reward.amount
+            table.insert(rewards, reward)
+        end
+    end
+    table.sort(rewards, function(left: any, right: any): boolean
+        return left.transactionId < right.transactionId
+    end)
+    return {
+        banked = profileInventory.banked,
+        materials = materials,
+        rewards = rewards,
+    }
+end
+
+function ExpeditionService.extract(self: ExpeditionService, player: Player): any
+    if player:GetAttribute("LastLightInExpedition") ~= true then
+        return {
+            accepted = false,
+            message = "YOU ARE NOT INSIDE BRAMBLEWAKE",
+            reason = "player_not_in_expedition",
+        }
+    end
+
+    local manifest = assert(self._manifest, "expedition manifest was not initialized")
+    local sessionPending = self._rewardLedger.pending(self._rewardLedgerState, player.UserId)
+    local combinedPending = self:_combinedPending(player)
+    if #combinedPending.rewards == 0 then
+        if not self._worldService:exitBramblewake(player) then
+            return {
+                accepted = false,
+                message = "WAYHOME TRANSITION WILL RETRY",
+                reason = "transition_unavailable",
+            }
+        end
+        self._analyticsService:expeditionExtracted(player, manifest.hash, nil, 0)
+        return {
+            accepted = true,
+            banked = combinedPending.banked,
+            message = "RETURNING TO EMBERHOLLOW — POUCH EMPTY",
+            settlementId = nil,
+        }
+    end
+
+    local settlement = self._profileService:settleExpedition(
+        player,
+        self._runId,
+        manifest.hash,
+        sessionPending.rewards
+    )
+    if not settlement.accepted then
+        self._analyticsService:expeditionExtractionFailed(player, manifest.hash, settlement.reason)
+        return {
+            accepted = false,
+            message = if settlement.reason == "profile_read_only"
+                then "PROFILE OFFLINE — REWARDS REMAIN UNBANKED"
+                elseif
+                    settlement.reason == "save_pending"
+                then "BANKING RETRY NEEDED — REWARDS REMAIN UNBANKED"
+                else "WAYHOME GATE IS WAITING FOR YOUR PROFILE",
+            reason = settlement.reason,
+        }
+    end
+
+    if settlement.settlementId ~= nil then
+        self._rewardLedger.settle(
+            self._rewardLedgerState,
+            player.UserId,
+            settlement.settlementId,
+            sessionPending.transactionIds
+        )
+    end
+    if not self._worldService:exitBramblewake(player) then
+        return {
+            accepted = false,
+            message = "REWARDS BANKED — WAYHOME TRANSITION WILL RETRY",
+            reason = "transition_unavailable",
+        }
+    end
+
+    local bankedAmount = 0
+    for _, amount in settlement.materials or {} do
+        bankedAmount += amount
+    end
+    self._analyticsService:expeditionExtracted(
+        player,
+        manifest.hash,
+        settlement.settlementId,
+        bankedAmount
+    )
+    return {
+        accepted = true,
+        banked = settlement.inventory,
+        message = if settlement.empty
+            then "RETURNING TO EMBERHOLLOW — POUCH EMPTY"
+            else string.format("WAYHOME — %d MATERIALS BANKED", bankedAmount),
+        settlementId = settlement.settlementId,
+    }
+end
+
 function ExpeditionService.snapshot(self: ExpeditionService, player: Player): any
     self:_refreshExpired(os.clock())
     local snapshot = self._worldService:expeditionSnapshot(player)
+    local inventory = self:_combinedPending(player)
+    snapshot.unbankedRewards = inventory.materials
+    snapshot.bankedMaterials = inventory.banked
     if not snapshot.active then
         return snapshot
     end
@@ -259,8 +409,6 @@ function ExpeditionService.snapshot(self: ExpeditionService, player: Player): an
             snapshot.eventRevision = state.revision
         end
     end
-    snapshot.unbankedRewards =
-        self._rewardLedger.snapshot(self._rewardLedgerState, player.UserId).materials
     return snapshot
 end
 

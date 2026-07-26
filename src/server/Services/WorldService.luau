@@ -632,7 +632,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-events-v2")
+    world:SetAttribute("WorldVersion", "bramblewake-extraction-v3")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -696,7 +696,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-events-v2",
+        worldVersion = "bramblewake-extraction-v3",
     })
 end
 
@@ -803,7 +803,11 @@ function WorldService.buildBramblewake(
 ): any
     local world = assert(self._world, "world service has not initialized")
     for interactionId, prompt in self._interactions do
-        if prompt:GetAttribute("ActionId") == self._runtimeIds.Actions.ExpeditionEvent then
+        local actionId = prompt:GetAttribute("ActionId")
+        if
+            actionId == self._runtimeIds.Actions.ExpeditionEvent
+            or actionId == self._runtimeIds.Actions.Extract
+        then
             self._interactions[interactionId] = nil
         end
     end
@@ -815,6 +819,15 @@ function WorldService.buildBramblewake(
     self._expeditionManifest = manifest
     self._expeditionModuleCenters = result.moduleCenters
     self._eventSockets = result.eventSockets
+    self:_registerInteraction(
+        result.extractionTarget,
+        self._runtimeIds.InteractionIds.Wayhome,
+        self._runtimeIds.Actions.Extract,
+        "BANK & RETURN",
+        "Wayhome Gate",
+        nil,
+        nil
+    )
     for _, descriptor in result.eventInteractions do
         self:_registerInteraction(
             descriptor.target,
@@ -925,6 +938,41 @@ function WorldService.enterBramblewake(self: WorldService, player: Player): bool
             and activeCharacter ~= nil
         then
             activeCharacter:PivotTo(entry)
+        end
+        player:SetAttribute("LastLightExpeditionTransition", false)
+    end)
+    return true
+end
+
+function WorldService.exitBramblewake(self: WorldService, player: Player): boolean
+    local character = player.Character
+    if character == nil then
+        return false
+    end
+    if player:GetAttribute("LastLightExpeditionTransition") == true then
+        return true
+    end
+
+    local destination = self:spawnCFrame()
+    player:SetAttribute("LastLightInExpedition", false)
+    player:SetAttribute("LastLightExpeditionTransition", true)
+    task.spawn(function()
+        local streamFinished = false
+        task.spawn(function()
+            pcall(function()
+                player:RequestStreamAroundAsync(destination.Position)
+            end)
+            streamFinished = true
+        end)
+
+        local deadline = os.clock() + 5
+        while not streamFinished and os.clock() < deadline and player.Parent ~= nil do
+            task.wait(0.1)
+        end
+
+        local activeCharacter = player.Character
+        if player.Parent ~= nil and activeCharacter ~= nil then
+            activeCharacter:PivotTo(destination)
         end
         player:SetAttribute("LastLightExpeditionTransition", false)
     end)

@@ -84,16 +84,19 @@ this milestone to complete from CI alone.
 
 ## Milestone 3 — Bramblewake vertical slice
 
-**Increment status (2026-07-25):** the expedition foundation and first active
-event layer are implemented in source: 12 representative modules, four POIs,
+**Increment status (2026-07-26):** the expedition foundation, first active
+event layer, and durable extraction settlement are implemented in source: 12
+representative modules, four POIs,
 four active events with 13 shared steps, deterministic assembly, a known-good
 fallback, 1,000-seed invariants, streamed preview geometry, beacon entry,
-recovery, timeout-safe optional routes, idempotent session rewards, kill switch,
-telemetry, and HUD progress. Profession kits, persistent inventory/crafting/
-quests, the remaining enemies, elite, boss, normal night, Blackout, town tier,
-final art/audio, and all Studio/device/group evidence remain open. See
+recovery, timeout-safe optional routes, schema-v2 unbanked/banked materials,
+run-specific reward and settlement tombstones, Wayhome return, kill switch,
+telemetry, and HUD progress. Profession kits, full inventory/crafting/quests,
+the remaining enemies, elite, boss, normal night, Blackout, town tier, final
+art/audio, and all Studio/device/group evidence remain open. See
 [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md) and
-[MILESTONE_3_BRAMBLEWAKE_EVENTS.md](MILESTONE_3_BRAMBLEWAKE_EVENTS.md).
+[MILESTONE_3_BRAMBLEWAKE_EVENTS.md](MILESTONE_3_BRAMBLEWAKE_EVENTS.md), and
+[MILESTONE_3_INVENTORY_EXTRACTION.md](MILESTONE_3_INVENTORY_EXTRACTION.md).
 
 ### Deliverables
 

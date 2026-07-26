@@ -20,7 +20,7 @@ local Regions = require(root.Content.Definitions.Regions)
 local ServiceRegistry = require(serverRoot.ServiceRegistry)
 
 local content = Registry.new(Regions)
-assert(Config.SaveSchemaVersion == 1, "unexpected save schema version")
+assert(Config.SaveSchemaVersion == 2, "unexpected save schema version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -97,8 +97,8 @@ assert(
 
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
-    #tagged == 8 + BramblewakeExpedition.EventInteractionCount,
-    "expected tutorial and expedition event interaction prompts"
+    #tagged == 9 + BramblewakeExpedition.EventInteractionCount,
+    "expected tutorial, event, and extraction interaction prompts"
 )
 local expeditionModules = CollectionService:GetTagged(RuntimeIds.ExpeditionModuleTag)
 assert(
@@ -161,6 +161,23 @@ for _, socket in CollectionService:GetTagged(RuntimeIds.ExpeditionEventTag) do
         "event must require multiple readable interactions"
     )
 end
+local extractionTargets = CollectionService:GetTagged(RuntimeIds.ExpeditionExtractionTag)
+assert(#extractionTargets == 1, "expected one Wayhome extraction target")
+local extractionTarget = extractionTargets[1]
+assert(
+    extractionTarget:GetAttribute("ExtractionId") == "extraction_bw_wayhome",
+    "Wayhome target is missing its stable extraction ID"
+)
+local extractionPrompt = extractionTarget:FindFirstChildOfClass("ProximityPrompt")
+assert(extractionPrompt ~= nil and extractionPrompt.Enabled, "Wayhome extraction prompt is missing")
+assert(
+    extractionPrompt:GetAttribute("InteractionId") == RuntimeIds.InteractionIds.Wayhome,
+    "Wayhome prompt uses the wrong interaction ID"
+)
+assert(
+    extractionPrompt:GetAttribute("ActionId") == RuntimeIds.Actions.Extract,
+    "Wayhome prompt does not route to server extraction"
+)
 assert(
     workspace.PlayerScriptsUseInputActionSystem == Enum.RolloutState.Enabled,
     "Input Action System must be enabled"

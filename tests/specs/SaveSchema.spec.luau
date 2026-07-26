@@ -10,10 +10,11 @@ return {
             name = "creates a safe first-session profile",
             run = function()
                 local profile = SaveSchema.default(100)
-                TestRunner.equal(profile.schemaVersion, 1)
+                TestRunner.equal(profile.schemaVersion, 2)
                 TestRunner.equal(profile.tutorial.stage, "arrive")
                 TestRunner.equal(profile.tutorial.complete, false)
                 TestRunner.equal(profile.revision, 0)
+                TestRunner.equal(next(profile.inventory.materials), nil)
             end,
         },
         {
@@ -50,6 +51,66 @@ return {
                 TestRunner.equal(profile.tutorial.stage, "build")
                 TestRunner.equal(profile.tutorial.selectedTool, "hammer")
                 TestRunner.equal(profile.revision, 4)
+                TestRunner.equal(profile.schemaVersion, 2)
+            end,
+        },
+        {
+            name = "migrates schema one profiles into an empty versioned inventory",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    schemaVersion = 1,
+                    createdAt = 10,
+                    updatedAt = 20,
+                    revision = 7,
+                    tutorial = {
+                        stage = "complete",
+                        complete = true,
+                    },
+                }, 300)
+                TestRunner.equal(profile.schemaVersion, 2)
+                TestRunner.equal(profile.revision, 7)
+                TestRunner.equal(profile.tutorial.complete, true)
+                TestRunner.equal(SaveSchema.expeditionPending(profile).count, 0)
+            end,
+        },
+        {
+            name = "persists and settles expedition rewards exactly once",
+            run = function()
+                local profile = SaveSchema.default(100)
+                local rewardProfile, rewardResult = SaveSchema.withUnbankedExpeditionReward(
+                    profile,
+                    "event_reward:run:hash:event",
+                    "hash",
+                    {
+                        materialId = "material_heartwood",
+                        amount = 4,
+                    },
+                    110
+                )
+                local duplicate = SaveSchema.withUnbankedExpeditionReward(
+                    rewardProfile,
+                    "event_reward:run:hash:event",
+                    "hash",
+                    {
+                        materialId = "material_heartwood",
+                        amount = 4,
+                    },
+                    111
+                )
+                local pending = SaveSchema.expeditionPending(rewardProfile)
+                local settlementId =
+                    SaveSchema.expeditionSettlementId("run", 42, pending.fingerprint)
+                local settled, settlementResult =
+                    SaveSchema.withExpeditionSettlement(rewardProfile, settlementId, "hash", 120)
+                local replay =
+                    SaveSchema.withExpeditionSettlement(settled, settlementId, "hash", 130)
+
+                TestRunner.equal(rewardResult.applied, true)
+                TestRunner.equal(duplicate, rewardProfile)
+                TestRunner.equal(settlementResult.applied, true)
+                TestRunner.equal(settled.inventory.materials.material_heartwood, 4)
+                TestRunner.equal(replay, settled)
+                TestRunner.equal(settled.revision, 2)
             end,
         },
         {

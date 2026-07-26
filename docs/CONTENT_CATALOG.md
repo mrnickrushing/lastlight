@@ -239,6 +239,16 @@ interactions, day and night animation sets, and at least three earned visual set
 | Frostmere | frostglass, wool moss, blue salt, ember lichen, aurora thread |
 | Cinderfall | cindersteel, memory glass, ash silk, kiln pearl, crown coal |
 
+The implemented Bramblewake material IDs are:
+
+| Stable ID | Display name |
+|---|---|
+| `material_heartwood` | Heartwood |
+| `material_amber_sap` | Amber Sap |
+| `material_meadow_fiber` | Meadow Fiber |
+| `material_brightcap` | Brightcap |
+| `material_spring_clay` | Spring Clay |
+
 Shared resources are food, clean water, scrap, cloth, stone, resin, and lantern
 oil. Finale components are bound story items and cannot be traded or purchased.
 
@@ -294,7 +304,7 @@ salvage result, and migration version.
 
 Each surface region ships eight event templates:
 
-Build `0.5.0` activates the first four representative Bramblewake templates
+Build `0.6.0` activates the first four representative Bramblewake templates
 listed below: Moving Hedge, Lost Wagon, Root Bridge, and Foxlight Trail. The
 remaining Bramblewake templates and all later-region events are catalog targets,
 not implemented runtime content yet.

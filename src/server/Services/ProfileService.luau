@@ -208,6 +208,186 @@ function ProfileService.setTutorial(
     return true
 end
 
+function ProfileService.grantUnbankedExpeditionReward(
+    self: ProfileService,
+    player: Player,
+    transactionId: string,
+    manifestHash: string,
+    reward: any
+): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {
+            accepted = false,
+            durable = false,
+            reason = "profile_loading",
+        }
+    end
+    if not self:isWritable(player) then
+        return {
+            accepted = false,
+            durable = false,
+            reason = "profile_read_only",
+        }
+    end
+
+    local nextProfile, result = self._saveSchema.withUnbankedExpeditionReward(
+        profile,
+        transactionId,
+        manifestHash,
+        reward,
+        os.time()
+    )
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent then
+            self._dirty[player] = true
+        end
+    elseif not result.duplicate then
+        return {
+            accepted = false,
+            durable = false,
+            reason = result.reason,
+        }
+    end
+
+    local durable = not self._persistent
+    if self._persistent and result.applied then
+        task.spawn(function()
+            self:save(player)
+        end)
+    elseif self._persistent and result.duplicate then
+        durable = self._dirty[player] ~= true
+    end
+    return {
+        accepted = true,
+        applied = result.applied == true,
+        durable = durable,
+        reason = if durable then nil else "save_queued",
+    }
+end
+
+function ProfileService.settleExpedition(
+    self: ProfileService,
+    player: Player,
+    runId: string,
+    manifestHash: string,
+    sessionRewards: { any }
+): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {
+            accepted = false,
+            reason = "profile_loading",
+        }
+    end
+    if not self:isWritable(player) then
+        return {
+            accepted = false,
+            reason = "profile_read_only",
+        }
+    end
+
+    local workingProfile = profile
+    local sessionTransactionIds = {}
+    for _, sessionReward in sessionRewards do
+        local nextProfile, result = self._saveSchema.withUnbankedExpeditionReward(
+            workingProfile,
+            sessionReward.transactionId,
+            sessionReward.manifestHash,
+            {
+                amount = sessionReward.amount,
+                materialId = sessionReward.materialId,
+            },
+            os.time()
+        )
+        if not result.applied and not result.duplicate then
+            return {
+                accepted = false,
+                reason = result.reason,
+            }
+        end
+        workingProfile = nextProfile
+        table.insert(sessionTransactionIds, sessionReward.transactionId)
+    end
+
+    local pending = self._saveSchema.expeditionPending(workingProfile)
+    local settlementId = nil
+    local settlementRecord = nil
+    if pending.count > 0 then
+        settlementId =
+            self._saveSchema.expeditionSettlementId(runId, player.UserId, pending.fingerprint)
+        local nextProfile, result = self._saveSchema.withExpeditionSettlement(
+            workingProfile,
+            settlementId,
+            manifestHash,
+            os.time()
+        )
+        if not result.applied and not result.duplicate then
+            return {
+                accepted = false,
+                reason = result.reason,
+            }
+        end
+        workingProfile = nextProfile
+        settlementRecord = result.record
+    elseif #sessionTransactionIds > 0 then
+        settlementId, settlementRecord = self._saveSchema.findExpeditionSettlementForRewards(
+            workingProfile,
+            sessionTransactionIds
+        )
+    end
+
+    if workingProfile ~= profile then
+        self._profiles[player] = workingProfile
+        if self._persistent then
+            self._dirty[player] = true
+        end
+    end
+    if settlementId == nil then
+        return {
+            accepted = true,
+            empty = true,
+            inventory = table.clone(workingProfile.inventory.materials),
+            sessionTransactionIds = sessionTransactionIds,
+        }
+    end
+
+    local saved = if self._persistent then self:save(player) else true
+    local activeProfile = self._profiles[player]
+    local durable = saved
+        and activeProfile ~= nil
+        and self._saveSchema.hasExpeditionSettlement(activeProfile, settlementId)
+    return {
+        accepted = durable,
+        durable = durable,
+        inventory = if activeProfile == nil
+            then {}
+            else table.clone(activeProfile.inventory.materials),
+        materials = if settlementRecord == nil then {} else table.clone(settlementRecord.materials),
+        reason = if durable then nil else "save_pending",
+        settlementId = settlementId,
+        sessionTransactionIds = sessionTransactionIds,
+    }
+end
+
+function ProfileService.inventorySnapshot(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {
+            banked = {},
+            pending = {},
+            pendingRewards = {},
+        }
+    end
+    local pending = self._saveSchema.expeditionPending(profile)
+    return {
+        banked = table.clone(profile.inventory.materials),
+        pending = pending.materials,
+        pendingRewards = pending.rewards,
+    }
+end
+
 function ProfileService.save(self: ProfileService, player: Player): boolean
     local profile = self._profiles[player]
     if profile == nil then

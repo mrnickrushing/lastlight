@@ -8,6 +8,7 @@ TestRunner.run({
     require("./specs/Environment.spec"),
     require("./specs/ExpeditionEventFlow.spec"),
     require("./specs/ExpeditionGenerator.spec"),
+    require("./specs/ExpeditionInventory.spec"),
     require("./specs/ExpeditionRewardLedger.spec"),
     require("./specs/FeatureFlagService.spec"),
     require("./specs/NightSchedule.spec"),
