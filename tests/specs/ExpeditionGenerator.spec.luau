@@ -61,5 +61,33 @@ return {
                 )
             end,
         },
+        {
+            name = "requires the authored Old Growth arena module",
+            run = function()
+                local manifest = ExpeditionGenerator.generate(93)
+                local oldGrowthIndex: number? = nil
+                for index, placement in manifest.modules do
+                    if placement.moduleId == "module_bw_old_growth_approach" then
+                        oldGrowthIndex = index
+                        break
+                    end
+                end
+                TestRunner.truthy(oldGrowthIndex ~= nil, "generated route lost Old Growth")
+                manifest.modules[oldGrowthIndex :: number].moduleId = "module_bw_briar_ring"
+                manifest.hash = ExpeditionGenerator.computeHash(manifest)
+
+                local valid, issues = ExpeditionGenerator.validate(manifest)
+                TestRunner.equal(valid, false)
+                TestRunner.truthy(
+                    string.find(
+                        table.concat(issues, "; "),
+                        "missing required module module_bw_old_growth_approach",
+                        1,
+                        true
+                    ),
+                    "expected a missing required-module failure"
+                )
+            end,
+        },
     },
 }

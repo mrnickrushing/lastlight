@@ -616,7 +616,7 @@ function BramblewakeBuilder.build(
             tree(module, center + Vector3.new(x, 0, z), 0.62 + (cornerIndex % 2) * 0.08)
         end
         buildModuleVisual(module, definition.visual, center)
-        if placement.moduleId == "module_bw_old_growth_approach" then
+        if definition.eliteId == "elite_old_growth" then
             local fireSource = orb(
                 module,
                 "OldGrowthFireSource",
@@ -626,7 +626,7 @@ function BramblewakeBuilder.build(
                 Enum.Material.SmoothPlastic
             )
             fireSource.Transparency = 0.48
-            fireSource:SetAttribute("EliteId", "elite_old_growth")
+            fireSource:SetAttribute("EliteId", definition.eliteId)
             fireSource:SetAttribute("EliteInteraction", "fire_source")
             billboard(fireSource, "LANTERN FIRE", CREAM)
 
@@ -639,7 +639,7 @@ function BramblewakeBuilder.build(
                 Enum.Material.SmoothPlastic
             )
             rootHeart.Transparency = 0.56
-            rootHeart:SetAttribute("EliteId", "elite_old_growth")
+            rootHeart:SetAttribute("EliteId", definition.eliteId)
             rootHeart:SetAttribute("EliteInteraction", "root_heart")
             billboard(rootHeart, "ROOT HEART", CREAM)
             CollectionService:AddTag(fireSource, runtimeIds.ExpeditionEliteTag)

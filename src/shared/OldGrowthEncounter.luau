@@ -49,6 +49,13 @@ OldGrowthEncounter.Reward = table.freeze({
     amount = 3,
     materialId = "material_amber_sap",
 })
+OldGrowthEncounter.Tuning = table.freeze({
+    attackCooldownSeconds = 3,
+    markedAttackCooldownMultiplier = 1.35,
+    markedStrikeDamage = 40,
+    shieldedAttackCooldownSeconds = 4.2,
+    strikeDamage = 34,
+})
 
 local function cloneState(state: State): State
     local nextState = table.clone(state)
@@ -251,6 +258,7 @@ function OldGrowthEncounter.snapshot(state: State, userId: number, now: number):
         instruction = instruction,
         maxHealth = MAX_HEALTH,
         phase = math.min(3, state.shieldIndex + 1),
+        rewardEligible = state.participants[tostring(userId)] == true,
         revision = state.revision,
         shielded = state.status == "shielded",
         shieldIndex = state.shieldIndex,

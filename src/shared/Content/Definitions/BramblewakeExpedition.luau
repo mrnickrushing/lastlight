@@ -163,6 +163,7 @@ local modules = {
     frozenDefinition({
         id = "module_bw_old_growth_approach",
         displayName = "Old Growth Approach",
+        eliteId = "elite_old_growth",
         role = "combat",
         visual = "old_growth",
         tags = { "combat", "elite", "landmark", "arena" },
@@ -446,6 +447,9 @@ return table.freeze({
         story = 2,
         puzzle = 1,
         landmark = 1,
+    }),
+    RequiredModuleIds = table.freeze({
+        "module_bw_old_growth_approach",
     }),
     Modules = table.freeze(modules),
     PointsOfInterest = table.freeze(pointsOfInterest),

@@ -136,6 +136,53 @@ function ExpeditionService._refreshExpired(self: ExpeditionService, now: number)
     end
 end
 
+function ExpeditionService._grant(
+    self: ExpeditionService,
+    userId: number,
+    transactionId: string,
+    manifestHash: string,
+    reward: any,
+    sourceKind: string,
+    sourceId: string
+): boolean
+    local granted = self._rewardLedger.grant(
+        self._rewardLedgerState,
+        userId,
+        transactionId,
+        manifestHash,
+        reward
+    )
+    if not granted then
+        return false
+    end
+    local sourceField = if sourceKind == "event" then "event" else "encounter"
+    local grantedFields: { [string]: any } = {
+        amount = reward.amount,
+        material = reward.materialId,
+        transaction = transactionId,
+        userId = userId,
+    }
+    grantedFields[sourceField] = sourceId
+    self._logger:info("expedition_" .. sourceKind .. "_reward_granted", grantedFields)
+    local player = Players:GetPlayerByUserId(userId)
+    if player ~= nil then
+        local profileResult = self._profileService:grantUnbankedExpeditionReward(
+            player,
+            transactionId,
+            manifestHash,
+            reward
+        )
+        local persistedFields: { [string]: any } = {
+            durable = profileResult.durable == true,
+            player = userId,
+            transaction = transactionId,
+        }
+        persistedFields[sourceField] = sourceId
+        self._logger:info("expedition_" .. sourceKind .. "_reward_persisted", persistedFields)
+    end
+    return true
+end
+
 function ExpeditionService._grantReward(
     self: ExpeditionService,
     userId: number,
@@ -146,41 +193,14 @@ function ExpeditionService._grantReward(
     if type(transactionId) ~= "string" then
         return false
     end
-
-    local reward = definition.reward
-    local granted = self._rewardLedger.grant(
-        self._rewardLedgerState,
+    return self:_grant(
         userId,
         transactionId,
         state.manifestHash,
-        reward
+        definition.reward,
+        "event",
+        definition.id
     )
-    if not granted then
-        return false
-    end
-    self._logger:info("expedition_event_reward_granted", {
-        amount = reward.amount,
-        event = definition.id,
-        material = reward.materialId,
-        transaction = transactionId,
-        userId = userId,
-    })
-    local player = Players:GetPlayerByUserId(userId)
-    if player ~= nil then
-        local profileResult = self._profileService:grantUnbankedExpeditionReward(
-            player,
-            transactionId,
-            state.manifestHash,
-            reward
-        )
-        self._logger:info("expedition_event_reward_persisted", {
-            durable = profileResult.durable == true,
-            event = definition.id,
-            player = userId,
-            transaction = transactionId,
-        })
-    end
-    return true
 end
 
 function ExpeditionService.grantEncounterReward(
@@ -199,39 +219,7 @@ function ExpeditionService.grantEncounterReward(
         return false
     end
     local manifest = assert(self._manifest, "expedition manifest was not initialized")
-    local granted = self._rewardLedger.grant(
-        self._rewardLedgerState,
-        userId,
-        transactionId,
-        manifest.hash,
-        reward
-    )
-    if not granted then
-        return false
-    end
-    self._logger:info("expedition_encounter_reward_granted", {
-        amount = reward.amount,
-        encounter = encounterId,
-        material = reward.materialId,
-        transaction = transactionId,
-        userId = userId,
-    })
-    local player = Players:GetPlayerByUserId(userId)
-    if player ~= nil then
-        local profileResult = self._profileService:grantUnbankedExpeditionReward(
-            player,
-            transactionId,
-            manifest.hash,
-            reward
-        )
-        self._logger:info("expedition_encounter_reward_persisted", {
-            durable = profileResult.durable == true,
-            encounter = encounterId,
-            player = userId,
-            transaction = transactionId,
-        })
-    end
-    return true
+    return self:_grant(userId, transactionId, manifest.hash, reward, "encounter", encounterId)
 end
 
 function ExpeditionService.interact(

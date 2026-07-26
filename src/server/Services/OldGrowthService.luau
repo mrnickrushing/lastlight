@@ -63,6 +63,15 @@ local function rootPart(player: Player): BasePart?
     return if root ~= nil and root:IsA("BasePart") then root else nil
 end
 
+local function weakPoint(model: Model): BasePart?
+    local heart = model:FindFirstChild("AmberHeart")
+    return if heart ~= nil
+            and heart:IsA("BasePart")
+            and heart:GetAttribute("WeakPoint") == true
+        then heart
+        else nil
+end
+
 function OldGrowthService.new(
     logger: Logger,
     worldService: any,
@@ -445,6 +454,26 @@ function OldGrowthService._playersInArena(self: OldGrowthService): { Player }
     return players
 end
 
+function OldGrowthService._nearestPlayer(self: OldGrowthService, players: { Player }): Player?
+    local anchor = self._arena.center
+    if self._model ~= nil and self._model.PrimaryPart ~= nil then
+        anchor = self._model.PrimaryPart.Position
+    end
+    local nearest: Player? = nil
+    local nearestDistance = math.huge
+    for _, player in players do
+        local root = rootPart(player)
+        if root ~= nil then
+            local distance = (root.Position - anchor).Magnitude
+            if distance < nearestDistance then
+                nearest = player
+                nearestDistance = distance
+            end
+        end
+    end
+    return nearest
+end
+
 function OldGrowthService._step(self: OldGrowthService, now: number)
     local previousRevision = self._state.revision
     self._state = self._encounter.expire(self._state, now)
@@ -485,7 +514,7 @@ function OldGrowthService._step(self: OldGrowthService, now: number)
         self._state = self._encounter.join(self._state, player.UserId)
     end
     if self._model == nil or self._model.Parent == nil then
-        local target = players[1]
+        local target = self:_nearestPlayer(players)
         if target ~= nil then
             self:_spawnModel(target)
         end
@@ -506,13 +535,16 @@ function OldGrowthService._step(self: OldGrowthService, now: number)
         self:_stepAttack(now)
         return
     end
-    local target = players[1]
+    local target = self:_nearestPlayer(players)
     if target == nil then
         return
     end
-    local cooldown = if self._state.status == "shielded" then 4.2 else 3
+    local tuning = self._encounter.Tuning
+    local cooldown = if self._state.status == "shielded"
+        then tuning.shieldedAttackCooldownSeconds
+        else tuning.attackCooldownSeconds
     if now < self._markedUntil then
-        cooldown *= 1.35
+        cooldown *= tuning.markedAttackCooldownMultiplier
     end
     if now - self._lastAttackAt >= cooldown then
         self:_startAttack(target, now)
@@ -531,7 +563,10 @@ function OldGrowthService.interact(
             reason = "player_unavailable",
         }
     end
-    local interaction = prompt.Parent:GetAttribute("EliteInteraction")
+    local promptParent = prompt.Parent
+    local interaction = if promptParent == nil
+        then nil
+        else promptParent:GetAttribute("EliteInteraction")
     local now = workspace:GetServerTimeNow()
     local nextState, result
     if interaction == "fire_source" then
@@ -581,16 +616,16 @@ function OldGrowthService._lineOfSight(
     model: Model
 ): boolean
     local root = rootPart(player)
-    local primary = model.PrimaryPart
+    local heart = weakPoint(model)
     local character = player.Character
-    if root == nil or primary == nil or character == nil then
+    if root == nil or heart == nil or character == nil then
         return false
     end
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = { character }
-    local result = workspace:Raycast(root.Position, primary.Position - root.Position, params)
-    return result == nil or result.Instance:IsDescendantOf(model)
+    local result = workspace:Raycast(root.Position, heart.Position - root.Position, params)
+    return result ~= nil and result.Instance == heart
 end
 
 function OldGrowthService.damageNearest(self: OldGrowthService, player: Player): (boolean, string)
@@ -602,17 +637,21 @@ function OldGrowthService.damageNearest(self: OldGrowthService, player: Player):
     end
     local model = self._model
     local root = rootPart(player)
-    if model == nil or root == nil or model.PrimaryPart == nil then
+    local heart = if model == nil then nil else weakPoint(model)
+    if model == nil or root == nil or heart == nil then
         return false, "Old Growth is still taking shape."
     end
-    if (root.Position - model.PrimaryPart.Position).Magnitude > STRIKE_RANGE then
+    if (root.Position - heart.Position).Magnitude > STRIKE_RANGE then
         return false, "Move closer to the amber heart."
     end
     if not self:_lineOfSight(player, model) then
         return false, "The amber heart is behind the trunk."
     end
 
-    local amount = if workspace:GetServerTimeNow() < self._markedUntil then 40 else 34
+    local tuning = self._encounter.Tuning
+    local amount = if workspace:GetServerTimeNow() < self._markedUntil
+        then tuning.markedStrikeDamage
+        else tuning.strikeDamage
     local nextState, result = self._encounter.strike(self._state, player.UserId, amount)
     if not result.accepted then
         if result.reason == "shielded" then
@@ -689,6 +728,7 @@ function OldGrowthService.canMarkNearest(
         or model.PrimaryPart == nil
         or root == nil
         or not self:_inArena(player, ENCOUNTER_RADIUS)
+        or not self._survivalService:canAct(player)
     then
         return false, "NO ELITE THREAT CAN BE MARKED"
     end

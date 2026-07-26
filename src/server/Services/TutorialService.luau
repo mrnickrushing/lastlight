@@ -597,8 +597,12 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
                 else "The amber heart is exposed. Strike, then clear the roots when they rise."
         elseif elite.complete then
             objective = "OLD GROWTH CLEANSED — CONTINUE TO WAYHOME"
-            detail = "+3 AMBER SAP UNBANKED"
-            mara = "The oldest roots have released the trail."
+            detail = if elite.rewardEligible
+                then "+3 AMBER SAP UNBANKED"
+                else "THE OLDEST ROOTS HAVE RELEASED THE TRAIL"
+            mara = if elite.rewardEligible
+                then "The oldest roots have released their Amber Sap."
+                else "The oldest roots were cleansed before you arrived."
         end
     end
     return {

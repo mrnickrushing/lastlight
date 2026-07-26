@@ -12,6 +12,8 @@ Implemented in source:
 - stable elite, interaction, attack, and reward IDs;
 - a server-run 360-health state machine with exposed phases at 360–240,
   240–120, and 120–0 health;
+- an explicit required-module contract so every valid representative manifest
+  contains the authored Old Growth arena before world construction begins;
 - hard shield stops at 240 and 120 so excess strike damage cannot skip a phase;
 - one shared lantern-fire carrier with a 15-second server timer;
 - dormant fire-source and root-heart prompts enabled only during a shield;
@@ -87,6 +89,8 @@ A participant who disconnects before completion is retained in the current
 server-run participant set. The session ledger can settle the reward if that
 player rejoins the same server. Cross-server encounter migration is not claimed
 by this single-place slice and remains part of the later expedition platform.
+A player who first enters after completion sees the cleansed route but is not
+shown or granted a participant reward.
 
 ## Mobile and accessibility direction
 
