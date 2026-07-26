@@ -23,6 +23,14 @@ assert(
     sharedRoot:FindFirstChild("ExpeditionGenerator") ~= nil,
     "game build is missing ExpeditionGenerator"
 )
+assert(
+    sharedRoot:FindFirstChild("ExpeditionEventFlow") ~= nil,
+    "game build is missing ExpeditionEventFlow"
+)
+assert(
+    sharedRoot:FindFirstChild("ExpeditionRewardLedger") ~= nil,
+    "game build is missing ExpeditionRewardLedger"
+)
 local contentDefinitions = assert(
     sharedRoot:FindFirstChild("Content"),
     "game build is missing Content"

@@ -9,7 +9,8 @@ Bramblewake route backed by deterministic content contracts.
 Implemented:
 
 - 12 representative original Bramblewake modules;
-- four points of interest and four catalog-backed dormant event sockets;
+- four points of interest and four catalog-backed event sockets, now activated
+  by the follow-on [event increment](MILESTONE_3_BRAMBLEWAKE_EVENTS.md);
 - deterministic seeded assembly with a stable manifest hash;
 - arrival-to-extraction connectivity, cell-overlap, content-distribution, socket,
   and mobile-budget validation;
@@ -26,7 +27,7 @@ Implemented:
 
 Not implemented by this increment:
 
-- active event behaviors or rewards;
+- persistent event reward settlement or the remaining four Bramblewake events;
 - profession kits, full inventory, crafting, quests, or extraction settlement;
 - the complete enemy roster, elite, boss, normal night, or Blackout;
 - final module art, audio, VFX, navigation bake, or device evidence;

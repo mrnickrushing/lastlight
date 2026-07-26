@@ -95,6 +95,65 @@ function AnalyticsService.expeditionStarted(self: AnalyticsService, player: Play
     end
 end
 
+function AnalyticsService.expeditionEventStarted(
+    self: AnalyticsService,
+    player: Player,
+    definition: any,
+    manifestHash: string
+)
+    self._logger:info("expedition_event_started", {
+        event = definition.id,
+        hash = manifestHash,
+        player = player.UserId,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, definition.analyticsId .. "Started", 1, {})
+        end)
+    end
+end
+
+function AnalyticsService.expeditionEventCompleted(
+    self: AnalyticsService,
+    player: Player,
+    definition: any,
+    manifestHash: string,
+    transactionId: string,
+    participantCount: number
+)
+    self._logger:info("expedition_event_completed", {
+        event = definition.id,
+        hash = manifestHash,
+        participantCount = participantCount,
+        player = player.UserId,
+        transaction = transactionId,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(
+                player,
+                definition.analyticsId .. "Completed",
+                math.max(1, participantCount),
+                {}
+            )
+        end)
+    end
+end
+
+function AnalyticsService.expeditionEventFailed(
+    self: AnalyticsService,
+    eventId: string,
+    manifestHash: string,
+    participantCount: number
+)
+    self._logger:info("expedition_event_failed", {
+        event = eventId,
+        hash = manifestHash,
+        participantCount = participantCount,
+        reason = "expired",
+    })
+end
+
 function AnalyticsService.clear(self: AnalyticsService, player: Player)
     self._startedAt[player] = nil
     self._expeditionStarted[player] = nil

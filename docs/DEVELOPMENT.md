@@ -66,13 +66,16 @@ full DataModel. The first engine integration test is intentionally separate:
 7. Complete the journey in [MILESTONE_2_PLAYTEST.md](MILESTONE_2_PLAYTEST.md).
 8. Enter and traverse the generated route using
    [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md).
-9. Stop immediately if any assertion errors.
+9. Complete and deliberately expire events using
+   [MILESTONE_3_BRAMBLEWAKE_EVENTS.md](MILESTONE_3_BRAMBLEWAKE_EVENTS.md).
+10. Stop immediately if any assertion errors.
 
 The test verifies the real Rojo tree, shared module replication, seven-region
-registry, save-schema constant, eight tutorial interactions, runtime remotes,
+registry, save-schema constant, eight tutorial interactions, 13 active event
+interactions, runtime remotes,
 Input Action System rollout, world readiness, arrival collision, deterministic
-Bramblewake replay, 12 streamed modules, four POIs, four event sockets, mobile
-part budget, and service initialization/start lifecycle. Human play is still
+Bramblewake replay, 12 streamed modules, four POIs, four event state contracts,
+mobile part budget, and service initialization/start lifecycle. Human play is still
 required for physics, streaming, device layout, input switching, timing, and
 usability.
 

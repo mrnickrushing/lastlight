@@ -11,6 +11,31 @@ local function frozenDefinition(definition: any): any
     if copy.tags ~= nil then
         copy.tags = table.freeze(table.clone(copy.tags))
     end
+    for _, key in { "startConditions", "incompatibleEvents" } do
+        if copy[key] ~= nil then
+            copy[key] = table.freeze(table.clone(copy[key]))
+        end
+    end
+    if copy.reward ~= nil then
+        copy.reward = table.freeze(table.clone(copy.reward))
+    end
+    if copy.soloVariant ~= nil then
+        copy.soloVariant = table.freeze(table.clone(copy.soloVariant))
+    end
+    if copy.groupVariant ~= nil then
+        copy.groupVariant = table.freeze(table.clone(copy.groupVariant))
+    end
+    if copy.steps ~= nil then
+        local steps: { any } = {}
+        for _, step in copy.steps do
+            local stepCopy: any = table.clone(step :: any)
+            if stepCopy.offset ~= nil then
+                stepCopy.offset = table.freeze(table.clone(stepCopy.offset))
+            end
+            table.insert(steps, table.freeze(stepCopy))
+        end
+        copy.steps = table.freeze(steps)
+    end
     return table.freeze(copy)
 end
 
@@ -194,34 +219,222 @@ local events = {
         displayName = "Moving Hedge",
         visual = "hedge",
         tags = { "route_change", "traversal" },
+        objective = "TURN THE THREE ROOT LATCHES",
+        detail = "The hedge changes its side paths unless every amber latch is turned.",
+        completionMessage = "THE HEDGE SETTLES — +4 HEARTWOOD",
+        failureMessage = "THE HEDGE SLIPS AWAY",
+        durationSeconds = 90,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 18,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The side cache closes; the marked critical path remains open.",
+        localizationKey = "events.bramblewake.moving_hedge",
+        analyticsId = "BramblewakeMovingHedge",
+        killSwitchFlag = "bramblewake_events_enabled",
+        soloVariant = {
+            guidance = "Turn each latch before the roots move again.",
+        },
+        groupVariant = {
+            guidance = "Split up and turn separate latches.",
+        },
+        reward = {
+            materialId = "material_heartwood",
+            amount = 4,
+        },
+        steps = {
+            {
+                id = "latch_west",
+                actionText = "TURN",
+                objectText = "West Root Latch",
+                offset = { x = -7, y = 1.5, z = 0 },
+            },
+            {
+                id = "latch_center",
+                actionText = "TURN",
+                objectText = "Center Root Latch",
+                offset = { x = 0, y = 1.5, z = 0 },
+            },
+            {
+                id = "latch_east",
+                actionText = "TURN",
+                objectText = "East Root Latch",
+                offset = { x = 7, y = 1.5, z = 0 },
+            },
+        },
     }),
     frozenDefinition({
         id = "event_bw_lost_wagon",
         displayName = "Lost Wagon",
         visual = "wagon",
         tags = { "rescue", "choice" },
+        objective = "STABILIZE THE LOST WAGON",
+        detail = "Brace the axle, lift the tongue, and secure the seed crate.",
+        completionMessage = "THE WAGON IS SAFE — +3 MEADOW FIBER",
+        failureMessage = "THE WAGON SINKS INTO THE FERNS",
+        durationSeconds = 120,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 20,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The wagon reward is lost; no resident or critical route is removed.",
+        localizationKey = "events.bramblewake.lost_wagon",
+        analyticsId = "BramblewakeLostWagon",
+        killSwitchFlag = "bramblewake_events_enabled",
+        soloVariant = {
+            guidance = "Complete the three braces in any order.",
+        },
+        groupVariant = {
+            guidance = "Several travelers can stabilize the wagon together.",
+        },
+        reward = {
+            materialId = "material_meadow_fiber",
+            amount = 3,
+        },
+        steps = {
+            {
+                id = "brace_axle",
+                actionText = "BRACE",
+                objectText = "Broken Axle",
+                offset = { x = -5, y = 1, z = 3 },
+            },
+            {
+                id = "lift_tongue",
+                actionText = "LIFT",
+                objectText = "Wagon Tongue",
+                offset = { x = 6, y = 1, z = 1 },
+            },
+            {
+                id = "secure_crate",
+                actionText = "SECURE",
+                objectText = "Seed Crate",
+                offset = { x = 0, y = 3.5, z = -3 },
+            },
+        },
     }),
     frozenDefinition({
         id = "event_bw_root_bridge",
         displayName = "Root Bridge",
         visual = "root_bridge",
         tags = { "traversal", "repair" },
+        objective = "BIND THE THREE BRIDGE ROOTS",
+        detail = "Tighten the living knots to open a safe optional crossing.",
+        completionMessage = "THE ROOT BRIDGE HOLDS — +2 AMBER SAP",
+        failureMessage = "THE OPTIONAL CROSSING UNRAVELS",
+        durationSeconds = 105,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 16,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The shortcut closes; the default amber trail remains traversable.",
+        localizationKey = "events.bramblewake.root_bridge",
+        analyticsId = "BramblewakeRootBridge",
+        killSwitchFlag = "bramblewake_events_enabled",
+        soloVariant = {
+            guidance = "Bind each knot from stable ground.",
+        },
+        groupVariant = {
+            guidance = "Travelers may bind different knots at the same time.",
+        },
+        reward = {
+            materialId = "material_amber_sap",
+            amount = 2,
+        },
+        steps = {
+            {
+                id = "bind_left",
+                actionText = "BIND",
+                objectText = "Left Root Knot",
+                offset = { x = -6, y = 2, z = 2 },
+            },
+            {
+                id = "bind_center",
+                actionText = "BIND",
+                objectText = "Center Root Knot",
+                offset = { x = 0, y = 3, z = 0 },
+            },
+            {
+                id = "bind_right",
+                actionText = "BIND",
+                objectText = "Right Root Knot",
+                offset = { x = 6, y = 2, z = 2 },
+            },
+        },
     }),
     frozenDefinition({
         id = "event_bw_foxlight_trail",
         displayName = "Foxlight Trail",
         visual = "foxlight",
         tags = { "navigation", "mystery" },
+        objective = "WAKE THE FOUR FOXLIGHTS",
+        detail = "Attune every quiet light to reveal a hidden grove memory.",
+        completionMessage = "THE FOXLIGHTS ANSWER — +2 BRIGHTCAP",
+        failureMessage = "THE FOXLIGHTS RETURN TO SLEEP",
+        durationSeconds = 100,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 14,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The hidden memory remains undiscovered; extraction stays reachable.",
+        localizationKey = "events.bramblewake.foxlight_trail",
+        analyticsId = "BramblewakeFoxlightTrail",
+        killSwitchFlag = "bramblewake_events_enabled",
+        soloVariant = {
+            guidance = "Follow the lights around the clearing.",
+        },
+        groupVariant = {
+            guidance = "Wake separate lights to reveal the memory sooner.",
+        },
+        reward = {
+            materialId = "material_brightcap",
+            amount = 2,
+        },
+        steps = {
+            {
+                id = "wake_north",
+                actionText = "ATTUNE",
+                objectText = "North Foxlight",
+                offset = { x = 0, y = 3, z = -6 },
+            },
+            {
+                id = "wake_east",
+                actionText = "ATTUNE",
+                objectText = "East Foxlight",
+                offset = { x = 6, y = 4, z = 0 },
+            },
+            {
+                id = "wake_south",
+                actionText = "ATTUNE",
+                objectText = "South Foxlight",
+                offset = { x = 0, y = 5, z = 6 },
+            },
+            {
+                id = "wake_west",
+                actionText = "ATTUNE",
+                objectText = "West Foxlight",
+                offset = { x = -6, y = 4, z = 0 },
+            },
+        },
     }),
 }
 
+local eventInteractionCount = 0
+for _, definition in events do
+    eventInteractionCount += #definition.steps
+end
+
 return table.freeze({
     RegionId = "region_bramblewake",
-    Version = 1,
+    Version = 2,
     CellSize = 72,
     ModuleCount = 12,
     PointOfInterestCount = 4,
     EventCount = 4,
+    EventInteractionCount = eventInteractionCount,
     PartBudget = 480,
     LightBudget = 32,
     EffectBudget = 32,

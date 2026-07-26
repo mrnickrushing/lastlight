@@ -294,6 +294,11 @@ salvage result, and migration version.
 
 Each surface region ships eight event templates:
 
+Build `0.5.0` activates the first four representative Bramblewake templates
+listed below: Moving Hedge, Lost Wagon, Root Bridge, and Foxlight Trail. The
+remaining Bramblewake templates and all later-region events are catalog targets,
+not implemented runtime content yet.
+
 ### Bramblewake
 
 `event_bw_moving_hedge`, `event_bw_lost_wagon`, `event_bw_pollen_storm`,

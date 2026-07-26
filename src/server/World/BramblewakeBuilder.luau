@@ -409,7 +409,12 @@ local function buildPointOfInterest(
     billboard(memory, string.upper(definition.displayName), FOXFIRE)
 end
 
-local function buildEventSocket(parent: Instance, center: Vector3, definition: any, runtimeIds: any)
+local function buildEventSocket(
+    parent: Instance,
+    center: Vector3,
+    definition: any,
+    runtimeIds: any
+): any
     local anchor = part(
         parent,
         "EventSocket",
@@ -421,7 +426,11 @@ local function buildEventSocket(parent: Instance, center: Vector3, definition: a
     anchor:SetAttribute("ContentId", definition.id)
     anchor:SetAttribute("DisplayName", definition.displayName)
     anchor:SetAttribute("Dormant", true)
+    anchor:SetAttribute("Status", "dormant")
+    anchor:SetAttribute("Progress", 0)
+    anchor:SetAttribute("ProgressTotal", #definition.steps)
     CollectionService:AddTag(anchor, runtimeIds.ExpeditionEventTag)
+    billboard(anchor, string.upper(definition.displayName), AMBER)
 
     if definition.visual == "wagon" then
         part(
@@ -443,18 +452,59 @@ local function buildEventSocket(parent: Instance, center: Vector3, definition: a
         )
     elseif definition.visual == "root_bridge" then
         rootArch(parent, anchor.Position, 0.52)
-    else
-        for index = 1, 4 do
-            orb(
+    end
+
+    local interactions = {}
+    for index, step in definition.steps do
+        local offset = step.offset
+        local position = anchor.Position + Vector3.new(offset.x, offset.y, offset.z)
+        local target: Part
+        if definition.visual == "foxlight" then
+            target = orb(parent, "Foxlight_" .. step.id, position, 2.2, FOXFIRE, Enum.Material.Neon)
+            target.Transparency = 0.16
+            light(target, FOXFIRE, 1.1, 14)
+        elseif definition.visual == "root_bridge" then
+            target = orb(parent, "RootKnot_" .. step.id, position, 2.7, AMBER, Enum.Material.Wood)
+        elseif definition.visual == "wagon" then
+            target = part(
                 parent,
-                "FoxlightTrail",
-                anchor.Position + Vector3.new(index * 2 - 5, 2 + index, index * 2 - 5),
-                1,
-                FOXFIRE,
-                Enum.Material.Neon
+                "WagonBrace_" .. step.id,
+                Vector3.new(2.8, 1.4, 2.8),
+                CFrame.new(position) * CFrame.Angles(0, index * 0.55, math.rad(8)),
+                AMBER,
+                Enum.Material.WoodPlanks,
+                false
+            )
+        else
+            target = part(
+                parent,
+                "HedgeLatch_" .. step.id,
+                Vector3.new(1.4, 3.2, 1.4),
+                CFrame.new(position) * CFrame.Angles(0, 0, math.rad(index * 8 - 16)),
+                AMBER,
+                Enum.Material.WoodPlanks,
+                false
             )
         end
+        target.CastShadow = false
+        target:SetAttribute("EventId", definition.id)
+        target:SetAttribute("EventStepId", step.id)
+        target:SetAttribute("EventStepState", "available")
+        CollectionService:AddTag(target, runtimeIds.ExpeditionEventStepTag)
+        table.insert(interactions, {
+            actionText = step.actionText,
+            eventId = definition.id,
+            interactionId = runtimeIds.eventInteractionId(definition.id, step.id),
+            objectText = step.objectText,
+            stepId = step.id,
+            target = target,
+        })
     end
+
+    return {
+        interactions = interactions,
+        socket = anchor,
+    }
 end
 
 local function buildBackdrop(parent: Instance, centers: { Vector3 })
@@ -512,6 +562,8 @@ function BramblewakeBuilder.build(
     expedition.Parent = parent
 
     local centers: { Vector3 } = {}
+    local eventInteractions = {}
+    local eventSockets: { [string]: BasePart } = {}
     for _, placement in manifest.modules do
         centers[placement.index] = ORIGIN
             + Vector3.new(placement.cellX * catalog.CellSize, 0, placement.cellZ * catalog.CellSize)
@@ -571,12 +623,16 @@ function BramblewakeBuilder.build(
                 runtimeIds
             )
         elseif placement.eventId ~= nil then
-            buildEventSocket(
+            local eventResult = buildEventSocket(
                 module,
                 center,
                 generator.eventDefinition(placement.eventId),
                 runtimeIds
             )
+            eventSockets[placement.eventId] = eventResult.socket
+            for _, interaction in eventResult.interactions do
+                table.insert(eventInteractions, interaction)
+            end
         end
 
         if placement.index == 1 then
@@ -605,6 +661,7 @@ function BramblewakeBuilder.build(
     expedition:SetAttribute("ModuleCount", #manifest.modules)
     expedition:SetAttribute("PointOfInterestCount", catalog.PointOfInterestCount)
     expedition:SetAttribute("EventCount", catalog.EventCount)
+    expedition:SetAttribute("EventInteractionCount", #eventInteractions)
     expedition:SetAttribute("Ready", true)
 
     local moduleCenters = {}
@@ -618,6 +675,8 @@ function BramblewakeBuilder.build(
     return {
         model = expedition,
         entryCFrame = CFrame.new(centers[1] + Vector3.new(0, 5, 0)),
+        eventInteractions = eventInteractions,
+        eventSockets = eventSockets,
         moduleCenters = moduleCenters,
         partCount = generatedParts,
     }
