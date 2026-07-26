@@ -1127,14 +1127,14 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.17.0",
+    BuildVersion = "0.18.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 6,
+    SaveSchemaVersion = 7,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -4253,6 +4253,194 @@ return table.freeze(ProfessionState)
       </Item>
       <Item class="ModuleScript" referent="27">
         <Properties>
+          <string name="Name">QuestCatalog</string>
+          <string name="Source"><![CDATA[--!strict
+
+local QuestCatalog = {}
+
+export type Objective = {
+    kind: string,
+    threshold: number,
+}
+
+export type Reward = {
+    materialId: string,
+    amount: number,
+}
+
+export type Quest = {
+    id: string,
+    displayName: string,
+    objective: Objective,
+    reward: Reward,
+}
+
+local ORDER = table.freeze({
+    "quest_survive_three_nights",
+    "quest_first_craft",
+    "quest_bramblewake_veteran",
+})
+
+local DEFINITIONS: { [string]: Quest } = {
+    quest_survive_three_nights = table.freeze({
+        id = "quest_survive_three_nights",
+        displayName = "THREE NIGHTS SURVIVED",
+        objective = table.freeze({ kind = "survive_nights", threshold = 3 }),
+        reward = table.freeze({ materialId = "material_heartwood", amount = 5 }),
+    }),
+    quest_first_craft = table.freeze({
+        id = "quest_first_craft",
+        displayName = "FIRST CRAFT",
+        objective = table.freeze({ kind = "craft_items", threshold = 1 }),
+        reward = table.freeze({ materialId = "material_amber_sap", amount = 3 }),
+    }),
+    quest_bramblewake_veteran = table.freeze({
+        id = "quest_bramblewake_veteran",
+        displayName = "BRAMBLEWAKE VETERAN",
+        objective = table.freeze({ kind = "bramblewake_settlements", threshold = 3 }),
+        reward = table.freeze({ materialId = "material_brightcap", amount = 3 }),
+    }),
+}
+
+function QuestCatalog.isValid(id: any): boolean
+    return type(id) == "string" and DEFINITIONS[id] ~= nil
+end
+
+function QuestCatalog.get(id: string): Quest?
+    return DEFINITIONS[id]
+end
+
+function QuestCatalog.list(): { Quest }
+    local result = {}
+    for _, id in ORDER do
+        table.insert(result, DEFINITIONS[id])
+    end
+    return result
+end
+
+return table.freeze(QuestCatalog)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="28">
+        <Properties>
+          <string name="Name">Quests</string>
+          <string name="Source"><![CDATA[--!strict
+
+local QuestCatalog = require("./QuestCatalog")
+
+local Quests = {}
+
+export type Signals = {
+    nightsSurvived: number,
+    craftedItems: number,
+    bramblewakeSettlements: number,
+}
+
+local function currentValue(kind: string, signals: Signals): number
+    if kind == "survive_nights" then
+        return signals.nightsSurvived
+    elseif kind == "craft_items" then
+        return signals.craftedItems
+    elseif kind == "bramblewake_settlements" then
+        return signals.bramblewakeSettlements
+    end
+    return 0
+end
+
+function Quests.default(): { [string]: boolean }
+    return {}
+end
+
+function Quests.normalizeClaimed(value: any): { [string]: boolean }
+    local claimed: { [string]: boolean } = {}
+    if type(value) ~= "table" then
+        return claimed
+    end
+    for questId, isClaimed in value do
+        if QuestCatalog.isValid(questId) and isClaimed == true then
+            claimed[questId] = true
+        end
+    end
+    return claimed
+end
+
+-- Progress is always read live from `signals`, never stored, so a quest
+-- that briefly regresses (e.g. crafting an item and then using it up)
+-- doesn't lose credit once already claimed — only the claimed set persists.
+function Quests.progress(questId: string, signals: Signals): (number, number, boolean)
+    if not QuestCatalog.isValid(questId) then
+        return 0, 0, false
+    end
+    local quest = QuestCatalog.get(questId) :: QuestCatalog.Quest
+    local current = currentValue(quest.objective.kind, signals)
+    local threshold = quest.objective.threshold
+    return current, threshold, current >= threshold
+end
+
+function Quests.snapshot(claimed: { [string]: boolean }, signals: Signals): { any }
+    local result = {}
+    for _, quest in QuestCatalog.list() do
+        local current, threshold, complete = Quests.progress(quest.id, signals)
+        table.insert(result, {
+            claimed = claimed[quest.id] == true,
+            complete = complete,
+            displayName = quest.displayName,
+            id = quest.id,
+            progress = current,
+            threshold = threshold,
+        })
+    end
+    return result
+end
+
+-- Silently claims every not-yet-claimed quest whose objective is currently
+-- met, granting each one's material reward. Called opportunistically after
+-- any action that could move a signal (a night completing, a craft
+-- succeeding, an expedition settling) rather than through a quest board —
+-- no quest-giver or accept step exists yet, so a quest that's already
+-- satisfiable claims itself the moment it's checked.
+function Quests.checkAndClaim(
+    claimed: { [string]: boolean },
+    materials: { [string]: number },
+    signals: Signals
+): ({ [string]: boolean }, { [string]: number }, { any })
+    local claimedResults = {}
+    local nextClaimed = claimed
+    local nextMaterials = materials
+
+    for _, quest in QuestCatalog.list() do
+        if claimed[quest.id] ~= true then
+            local _current, _threshold, complete = Quests.progress(quest.id, signals)
+            if complete then
+                if nextClaimed == claimed then
+                    nextClaimed = table.clone(claimed)
+                end
+                if nextMaterials == materials then
+                    nextMaterials = table.clone(materials)
+                end
+                nextClaimed[quest.id] = true
+                nextMaterials[quest.reward.materialId] = (
+                    nextMaterials[quest.reward.materialId] or 0
+                ) + quest.reward.amount
+                table.insert(claimedResults, {
+                    displayName = quest.displayName,
+                    questId = quest.id,
+                    reward = table.clone(quest.reward),
+                })
+            end
+        end
+    end
+
+    return nextClaimed, nextMaterials, claimedResults
+end
+
+return table.freeze(Quests)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="29">
+        <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -4310,7 +4498,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -4425,7 +4613,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -4508,7 +4696,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -4517,6 +4705,7 @@ local TutorialFlow = require("./TutorialFlow")
 local ExpeditionInventory = require("./ExpeditionInventory")
 local ProfessionCatalog = require("./ProfessionCatalog")
 local Crafting = require("./Crafting")
+local Quests = require("./Quests")
 
 local SaveSchema = {}
 
@@ -4550,6 +4739,9 @@ export type Profile = {
         nightNumber: number,
     },
     gear: { [string]: number },
+    quests: {
+        claimed: { [string]: boolean },
+    },
 }
 
 local MAX_NIGHT_NUMBER = 1_000_000
@@ -4567,7 +4759,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 6,
+        schemaVersion = 7,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -4594,6 +4786,9 @@ function SaveSchema.default(now: number): Profile
             nightNumber = 1,
         },
         gear = Crafting.default(),
+        quests = {
+            claimed = Quests.default(),
+        },
     }
 end
 
@@ -4678,8 +4873,11 @@ function SaveSchema.normalize(value: any, now: number): Profile
         profile.town.nightNumber = town.nightNumber
     end
     profile.gear = Crafting.normalizeGear(value.gear)
+    local quests = value.quests
+    profile.quests.claimed =
+        Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 6
+    profile.schemaVersion = 7
     return profile
 end
 
@@ -4889,11 +5087,52 @@ function SaveSchema.withUsedGearItem(profile: Profile, itemId: string, now: numb
     return nextProfile, result
 end
 
+local function questSignals(profile: Profile): Quests.Signals
+    local craftedItems = 0
+    for _, count in profile.gear do
+        craftedItems += count
+    end
+    return {
+        bramblewakeSettlements = #profile.inventory.settlementOrder,
+        craftedItems = craftedItems,
+        nightsSurvived = math.max(0, profile.town.nightNumber - 1),
+    }
+end
+
+-- Opportunistic, not event-driven: call this after any action that could
+-- move a quest signal (a night completing, a craft succeeding, an
+-- expedition settling). Safe to call anytime, including when nothing is
+-- newly claimable — it just returns an empty result list and the same
+-- profile reference.
+function SaveSchema.checkAndClaimQuests(profile: Profile, now: number): (Profile, { any })
+    local nextClaimed, nextMaterials, claimedResults = Quests.checkAndClaim(
+        profile.quests.claimed,
+        profile.inventory.materials,
+        questSignals(profile)
+    )
+    if #claimedResults == 0 then
+        return profile, claimedResults
+    end
+
+    local nextProfile = table.clone(profile)
+    nextProfile.quests = table.clone(profile.quests)
+    nextProfile.quests.claimed = nextClaimed
+    nextProfile.inventory = table.clone(profile.inventory)
+    nextProfile.inventory.materials = nextMaterials
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, claimedResults
+end
+
+function SaveSchema.questSnapshot(profile: Profile): { any }
+    return Quests.snapshot(profile.quests.claimed, questSignals(profile))
+end
+
 return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -5012,7 +5251,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -5263,7 +5502,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -5349,7 +5588,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -5493,7 +5732,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -5529,7 +5768,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -5913,11 +6152,11 @@ return table.freeze(WardenStagEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="37">
+  <Item class="ServerScriptService" referent="39">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="38">
+    <Item class="Script" referent="40">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -6185,7 +6424,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -6283,11 +6522,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="40">
+      <Item class="Folder" referent="42">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="43">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -6656,6 +6895,20 @@ function AnalyticsService.usedGear(
     end
 end
 
+function AnalyticsService.questClaimed(self: AnalyticsService, player: Player, questId: string)
+    self._logger:info("quest_claimed", {
+        player = player.UserId,
+        quest = string.sub(questId, 1, 48),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "QuestClaimed", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = questId,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.eliteStarted(
     self: AnalyticsService,
     player: Player,
@@ -6960,7 +7213,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -7458,7 +7711,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -8323,7 +8576,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -8793,7 +9046,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -8897,7 +9150,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -8991,7 +9244,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9204,7 +9457,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10028,7 +10281,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10206,7 +10459,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10703,7 +10956,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11510,7 +11763,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11864,7 +12117,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12183,6 +12436,35 @@ function ProfileService.useGearItem(self: ProfileService, player: Player, itemId
         accepted = true,
         itemId = result.itemId,
     }
+end
+
+-- Safe to call after any action, whether or not it moved a quest signal:
+-- returns an empty list and touches nothing when there's nothing newly
+-- claimable.
+function ProfileService.checkQuests(self: ProfileService, player: Player): { any }
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return {}
+    end
+
+    local nextProfile, claimedResults = self._saveSchema.checkAndClaimQuests(profile, os.time())
+    if #claimedResults == 0 then
+        return claimedResults
+    end
+
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    return claimedResults
+end
+
+function ProfileService.questSnapshot(self: ProfileService, player: Player): { any }
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {}
+    end
+    return self._saveSchema.questSnapshot(profile)
 end
 
 function ProfileService.gearSnapshot(self: ProfileService, player: Player): { [string]: number }
@@ -12532,7 +12814,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12740,7 +13022,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12896,7 +13178,12 @@ function TutorialService.Init(self: TutorialService, _context: any)
     self._townNightService:setNightCompletedHandler(function(nightNumber: number)
         for player in self._sessions do
             self._profileService:setNightNumber(player, nightNumber)
+            local questSuffix = self:_questToastSuffix(player)
+            if questSuffix ~= nil then
+                self:_setToast(player, questSuffix)
+            end
         end
+        self:_publishAll()
     end)
     self._enemyService:setChangedHandler(function(toast: string?)
         if toast ~= nil then
@@ -13070,6 +13357,24 @@ function TutorialService._setToast(self: TutorialService, player: Player, messag
     session.toastRevision += 1
 end
 
+-- Quests have no quest board or accept step: this opportunistically claims
+-- anything newly satisfiable and returns a toast fragment to fold into
+-- whatever toast the caller was already about to show (a single session
+-- only ever carries one pending toast, so the caller must combine rather
+-- than set two in a row and lose the first).
+function TutorialService._questToastSuffix(self: TutorialService, player: Player): string?
+    local claimed = self._profileService:checkQuests(player)
+    if #claimed == 0 then
+        return nil
+    end
+    local parts = {}
+    for _, quest in claimed do
+        self._analyticsService:questClaimed(player, quest.questId)
+        table.insert(parts, string.format("QUEST COMPLETE: %s", quest.displayName))
+    end
+    return table.concat(parts, " · ")
+end
+
 function TutorialService._advance(
     self: TutorialService,
     player: Player,
@@ -13151,7 +13456,14 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
     end
     if actionId == self._runtimeIds.Actions.Extract then
         local result = self._expeditionService:extract(player)
-        self:_setToast(player, result.message)
+        local toast = result.message
+        if result.accepted then
+            local questSuffix = self:_questToastSuffix(player)
+            if questSuffix ~= nil then
+                toast = toast .. " · " .. questSuffix
+            end
+        end
+        self:_setToast(player, toast)
         self:_publishAll()
         return
     end
@@ -13167,13 +13479,19 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         end
         local result = self._profileService:craftItem(player, recipeId)
         self._analyticsService:crafted(player, recipeId, result.accepted, result.reason)
+        local toast: string
         if result.accepted then
-            self:_setToast(player, string.format("CRAFTED %s", prompt.ObjectText))
+            toast = string.format("CRAFTED %s", prompt.ObjectText)
+            local questSuffix = self:_questToastSuffix(player)
+            if questSuffix ~= nil then
+                toast = toast .. " · " .. questSuffix
+            end
         elseif result.reason == "insufficient_materials" then
-            self:_setToast(player, "NOT ENOUGH MATERIALS")
+            toast = "NOT ENOUGH MATERIALS"
         else
-            self:_setToast(player, "CRAFTING UNAVAILABLE")
+            toast = "CRAFTING UNAVAILABLE"
         end
+        self:_setToast(player, toast)
         self:_publish(player)
         return
     end
@@ -13615,6 +13933,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         unbankedExpeditionRewards = expedition.unbankedRewards,
         bankedMaterials = expedition.bankedMaterials,
         gear = self._profileService:gearSnapshot(player),
+        quests = self._profileService:questSnapshot(player),
         combat = self._combatService:snapshot(player),
         profession = self._professionService:snapshot(player),
         elite = elite,
@@ -13639,7 +13958,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14473,7 +14792,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15891,11 +16210,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="58">
+      <Item class="Folder" referent="60">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -17011,7 +17330,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -17400,7 +17719,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -17563,7 +17882,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -17758,11 +18077,11 @@ return table.freeze(WardenStagBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="63">
+    <Item class="Folder" referent="65">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="64">
+      <Item class="Script" referent="66">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -17803,8 +18122,8 @@ local OldGrowthBuilder = require(serverRoot.World.OldGrowthBuilder)
 local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
-assert(Config.SaveSchemaVersion == 6, "unexpected save schema version")
-assert(Config.BuildVersion == "0.17.0", "unexpected build version")
+assert(Config.SaveSchemaVersion == 7, "unexpected save schema version")
+assert(Config.BuildVersion == "0.18.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -18232,15 +18551,15 @@ print("[Last Light] PASS FoundationIntegration")
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="65">
+  <Item class="StarterPlayer" referent="67">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="66">
+    <Item class="StarterPlayerScripts" referent="68">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="67">
+      <Item class="LocalScript" referent="69">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -18330,11 +18649,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="68">
+        <Item class="Folder" referent="70">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="69">
+          <Item class="ModuleScript" referent="71">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -20023,7 +20342,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="70">
+          <Item class="ModuleScript" referent="72">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -20340,7 +20659,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="71">
+          <Item class="ModuleScript" referent="73">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -20449,7 +20768,7 @@ return InteractionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="72">
+  <Item class="Workspace" referent="74">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

@@ -18,9 +18,9 @@ playable game exists.
 four active events, durable extraction settlement, player rescue, combat
 mobility, six-enemy first-night roster, four basic profession kits, Old Growth,
 the Warden Stag, the Bramblewake Blackout, permanent chapter-one resolution, a
-repeating town normal-night cycle, a first pair of crafting recipes, and a
-first pair of consumable gear effects implemented; Studio and device exit
-gates remain pending.**
+repeating town normal-night cycle, a first pair of crafting recipes, a
+first pair of consumable gear effects, and a first set of silent quest
+milestones implemented; Studio and device exit gates remain pending.**
 
 The repository currently contains:
 
@@ -35,7 +35,7 @@ The repository currently contains:
   a known-good fallback, beacon entry, route progress, and expedition fall recovery;
 - four active optional Bramblewake events with 13 shared interaction steps,
   timeout-safe routes, durable unbanked rewards, kill switch, and telemetry;
-- save-schema-v6 inventory/profession/story/town-night/gear migration,
+- save-schema-v7 inventory/profession/story/town-night/gear/quest migration,
   run-specific reward tombstones, Wayhome extraction, atomic banking,
   retry-safe settlement, and town return streaming;
 - server-owned health, six distinct readable enemy attacks, 30-second downed crawl,
@@ -62,6 +62,10 @@ The repository currently contains:
   shield and an instant stamina restore — that consume exactly one owned
   item, check their own preconditions before spending it, and are usable
   through dedicated keyboard, gamepad, and touch bindings;
+- a first set of three silent quest milestones that auto-claim a material
+  reward the moment their already-tracked objective (nights survived,
+  items crafted, expeditions settled) is met, with no quest giver or
+  accept step;
 - persistent free-town selection for Scout, Warden, Engineer, and Medic, with
   server-owned reveal/slow, guard, lantern-repair, and area-heal abilities;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
@@ -72,7 +76,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 160 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 172 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -114,6 +118,9 @@ crafting recipes are in
 The consumable-effect authority, atomicity, composability, and input-parity
 gates for the first gear effects are in
 [the gear effects runbook](docs/MILESTONE_3_GEAR_EFFECTS.md).
+The claim-authority, idempotence, and no-progress-loss gates for the first
+quest milestones are in
+[the quests runbook](docs/MILESTONE_3_QUESTS.md).
 
 The current UI direction is documented in the
 [Last Light mobile gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create).

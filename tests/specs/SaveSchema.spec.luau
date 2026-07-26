@@ -10,7 +10,7 @@ return {
             name = "creates a safe first-session profile",
             run = function()
                 local profile = SaveSchema.default(100)
-                TestRunner.equal(profile.schemaVersion, 6)
+                TestRunner.equal(profile.schemaVersion, 7)
                 TestRunner.equal(profile.tutorial.stage, "arrive")
                 TestRunner.equal(profile.tutorial.complete, false)
                 TestRunner.equal(profile.revision, 0)
@@ -52,7 +52,7 @@ return {
                 TestRunner.equal(profile.tutorial.stage, "build")
                 TestRunner.equal(profile.tutorial.selectedTool, "hammer")
                 TestRunner.equal(profile.revision, 4)
-                TestRunner.equal(profile.schemaVersion, 6)
+                TestRunner.equal(profile.schemaVersion, 7)
             end,
         },
         {
@@ -68,7 +68,7 @@ return {
                         complete = true,
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 6)
+                TestRunner.equal(profile.schemaVersion, 7)
                 TestRunner.equal(profile.revision, 7)
                 TestRunner.equal(profile.tutorial.complete, true)
                 TestRunner.equal(SaveSchema.expeditionPending(profile).count, 0)
@@ -154,7 +154,7 @@ return {
                         selectedId = "profession_hacker",
                     },
                 }, 300)
-                TestRunner.equal(migrated.schemaVersion, 6)
+                TestRunner.equal(migrated.schemaVersion, 7)
                 TestRunner.equal(migrated.profession.selectedId, nil)
 
                 local selected = SaveSchema.withProfession(migrated, "profession_medic", 320)
@@ -176,7 +176,7 @@ return {
                         },
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 6)
+                TestRunner.equal(profile.schemaVersion, 7)
                 TestRunner.equal(profile.story.chapterOne.status, "unresolved")
                 TestRunner.equal(profile.story.chapterOne.decision, nil)
             end,
@@ -224,7 +224,7 @@ return {
                     revision = 3,
                     tutorial = { stage = "reveal", complete = false },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 6)
+                TestRunner.equal(profile.schemaVersion, 7)
                 TestRunner.equal(profile.town.nightNumber, 1)
             end,
         },
@@ -284,7 +284,7 @@ return {
                     schemaVersion = 5,
                     town = { nightNumber = 3 },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 6)
+                TestRunner.equal(profile.schemaVersion, 7)
                 TestRunner.equal(next(profile.gear), nil)
             end,
         },
@@ -356,6 +356,68 @@ return {
                 TestRunner.equal(rejectedResult.applied, false)
                 TestRunner.equal(rejectedResult.reason, "not_owned")
                 TestRunner.equal(rejected, used)
+            end,
+        },
+        {
+            name = "migrates a schema six profile with no quests field into an empty claimed set",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    schemaVersion = 6,
+                    gear = { gear_meadow_satchel = 1 },
+                }, 300)
+                TestRunner.equal(profile.schemaVersion, 7)
+                TestRunner.equal(next(profile.quests.claimed), nil)
+            end,
+        },
+        {
+            name = "restores a valid claimed-quest set and rejects unknown or invalid entries",
+            run = function()
+                local restored = SaveSchema.normalize({
+                    schemaVersion = 7,
+                    quests = { claimed = { quest_first_craft = true } },
+                }, 300)
+                TestRunner.equal(restored.quests.claimed.quest_first_craft, true)
+
+                local rejected = SaveSchema.normalize({
+                    schemaVersion = 7,
+                    quests = { claimed = { quest_forged = true, quest_first_craft = false } },
+                }, 300)
+                TestRunner.equal(next(rejected.quests.claimed), nil)
+            end,
+        },
+        {
+            name = "checkAndClaimQuests claims a satisfiable quest exactly once and grants its reward",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    gear = { gear_meadow_satchel = 1 },
+                }, 100)
+                local claimed, results = SaveSchema.checkAndClaimQuests(profile, 200)
+                TestRunner.equal(#results, 1)
+                TestRunner.equal(results[1].questId, "quest_first_craft")
+                TestRunner.equal(claimed.quests.claimed.quest_first_craft, true)
+                TestRunner.equal(claimed.inventory.materials.material_amber_sap, 3)
+                TestRunner.equal(claimed.revision, profile.revision + 1)
+
+                local unchanged, secondResults = SaveSchema.checkAndClaimQuests(claimed, 300)
+                TestRunner.equal(#secondResults, 0)
+                TestRunner.equal(unchanged, claimed)
+            end,
+        },
+        {
+            name = "questSnapshot reports progress, threshold, and claimed state for every quest",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    town = { nightNumber = 4 },
+                }, 100)
+                local snapshot = SaveSchema.questSnapshot(profile)
+                local byId = {}
+                for _, quest in snapshot do
+                    byId[quest.id] = quest
+                end
+                TestRunner.equal(byId.quest_survive_three_nights.progress, 3)
+                TestRunner.equal(byId.quest_survive_three_nights.threshold, 3)
+                TestRunner.equal(byId.quest_survive_three_nights.complete, true)
+                TestRunner.equal(byId.quest_survive_three_nights.claimed, false)
             end,
         },
     },

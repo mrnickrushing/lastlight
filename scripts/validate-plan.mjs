@@ -60,6 +60,8 @@ const requiredFiles = [
   "src/shared/TownNightSchedule.luau",
   "src/shared/CraftingCatalog.luau",
   "src/shared/Crafting.luau",
+  "src/shared/QuestCatalog.luau",
+  "src/shared/Quests.luau",
   "src/server/init.server.luau",
   "src/server/Services/NetworkService.luau",
   "src/server/Services/ProfileService.luau",
