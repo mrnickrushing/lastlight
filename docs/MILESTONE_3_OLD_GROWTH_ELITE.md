@@ -120,7 +120,7 @@ there is no per-frame NPC physics or pathfinding cost.
 
 1. Synchronize `main`, run `npm run bootstrap`, then run `npm test`.
 2. Open `build/LastLightTest.rbxlx`, start one server/player, and require
-   `[Last Light] PASS FoundationIntegration`, build `0.11.0`, `services=13`,
+   `[Last Light] PASS FoundationIntegration`, build `0.12.0`, `services=14`,
    and no red errors.
 3. Open `build/LastLight.rbxlx` or connect Rojo. Complete First Light, enter
    Bramblewake, and follow the route to Old Growth Approach.

@@ -18,6 +18,7 @@ local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local ExpeditionRewardLedger = require(root.ExpeditionRewardLedger)
 local NightSchedule = require(root.NightSchedule)
 local OldGrowthEncounter = require(root.OldGrowthEncounter)
+local WardenStagEncounter = require(root.WardenStagEncounter)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local ProfessionState = require(root.ProfessionState)
 local RateLimiter = require(root.RateLimiter)
@@ -37,6 +38,7 @@ local Logger = require(script.Services.Logger)
 local FeatureFlagService = require(script.Services.FeatureFlagService)
 local NetworkService = require(script.Services.NetworkService)
 local OldGrowthService = require(script.Services.OldGrowthService)
+local WardenStagService = require(script.Services.WardenStagService)
 local PhaseService = require(script.Services.PhaseService)
 local ProfileService = require(script.Services.ProfileService)
 local PlayerSurvivalService = require(script.Services.PlayerSurvivalService)
@@ -47,6 +49,7 @@ local WorldService = require(script.Services.WorldService)
 local ServiceRegistry = require(script.ServiceRegistry)
 local BramblewakeEnemyBuilder = require(script.World.BramblewakeEnemyBuilder)
 local OldGrowthBuilder = require(script.World.OldGrowthBuilder)
+local WardenStagBuilder = require(script.World.WardenStagBuilder)
 
 local environment, environmentError = Environment.resolve({
     isStudio = RunService:IsStudio(),
@@ -134,6 +137,22 @@ local oldGrowthService = OldGrowthService.new(
     featureFlags
 )
 enemyService:setEliteService(oldGrowthService)
+local wardenStagService = WardenStagService.new(
+    logger,
+    worldService,
+    expeditionService,
+    survivalService,
+    combatService,
+    professionService,
+    oldGrowthService,
+    WardenStagEncounter,
+    EnemyAttackFlow,
+    EnemyCombatRules,
+    WardenStagBuilder,
+    analyticsService,
+    featureFlags
+)
+enemyService:setBossService(wardenStagService)
 local phaseService = PhaseService.new(
     logger,
     worldService,
@@ -171,6 +190,7 @@ local tutorialService = TutorialService.new(
     phaseService,
     expeditionService,
     oldGrowthService,
+    wardenStagService,
     analyticsService
 )
 
@@ -193,6 +213,7 @@ services:register(combatService)
 services:register(professionService)
 services:register(enemyService)
 services:register(oldGrowthService)
+services:register(wardenStagService)
 services:register(phaseService)
 services:register(tutorialService)
 services:initialize()

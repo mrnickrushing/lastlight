@@ -210,7 +210,9 @@ function ExpeditionService.grantEncounterReward(
     transactionId: string,
     reward: any
 ): boolean
-    if string.sub(encounterId, 1, 6) ~= "elite_" then
+    local validEncounter = string.sub(encounterId, 1, 6) == "elite_"
+        or string.sub(encounterId, 1, 5) == "boss_"
+    if not validEncounter then
         self._logger:warn("expedition_encounter_reward_rejected", {
             encounter = encounterId,
             reason = "invalid_encounter_id",

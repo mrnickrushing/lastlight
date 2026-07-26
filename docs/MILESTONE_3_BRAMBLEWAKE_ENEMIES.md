@@ -89,7 +89,7 @@ animation loop, and a bounded 20 Hz server movement step.
 
 1. Synchronize `main`, run `npm run bootstrap`, then run `npm test`.
 2. Open `build/LastLightTest.rbxlx` and require
-   `[Last Light] PASS FoundationIntegration`, build `0.11.0`, `services=13`, and
+   `[Last Light] PASS FoundationIntegration`, build `0.12.0`, `services=14`, and
    no red errors.
 3. Open `build/LastLight.rbxlx` or connect Rojo and complete First Light to dusk.
 4. For each enemy, capture the silhouette, targeted threat card, world shape,

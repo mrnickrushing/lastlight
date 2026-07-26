@@ -3,13 +3,12 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local OldGrowthService = {}
-OldGrowthService.__index = OldGrowthService
-OldGrowthService.Name = "OldGrowthService"
+local WardenStagService = {}
+WardenStagService.__index = WardenStagService
+WardenStagService.Name = "WardenStagService"
 
 export type Logger = {
     info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
-    warn: (self: Logger, event: string, fields: { [string]: any }?) -> (),
 }
 
 type AttackVisual = {
@@ -25,7 +24,7 @@ type Attack = {
     visual: AttackVisual,
 }
 
-export type OldGrowthService = typeof(setmetatable(
+export type WardenStagService = typeof(setmetatable(
     {} :: {
         Name: string,
         _logger: Logger,
@@ -34,6 +33,7 @@ export type OldGrowthService = typeof(setmetatable(
         _survivalService: any,
         _combatService: any,
         _professionService: any,
+        _oldGrowthService: any,
         _encounter: any,
         _enemyAttackFlow: any,
         _enemyCombatRules: any,
@@ -50,12 +50,12 @@ export type OldGrowthService = typeof(setmetatable(
         _onChanged: ((string?) -> ())?,
         _heartbeat: RBXScriptConnection?,
     },
-    OldGrowthService
+    WardenStagService
 ))
 
-local ACTIVATION_RADIUS = 28
-local ENCOUNTER_RADIUS = 58
-local STRIKE_RANGE = 14
+local ACTIVATION_RADIUS = 27
+local ENCOUNTER_RADIUS = 56
+local STRIKE_RANGE = 15
 
 local function rootPart(player: Player): BasePart?
     local character = player.Character
@@ -64,7 +64,7 @@ local function rootPart(player: Player): BasePart?
 end
 
 local function weakPoint(model: Model): BasePart?
-    local heart = model:FindFirstChild("AmberHeart")
+    local heart = model:FindFirstChild("MemoryHeart")
     return if heart ~= nil
             and heart:IsA("BasePart")
             and heart:GetAttribute("WeakPoint") == true
@@ -72,28 +72,30 @@ local function weakPoint(model: Model): BasePart?
         else nil
 end
 
-function OldGrowthService.new(
+function WardenStagService.new(
     logger: Logger,
     worldService: any,
     expeditionService: any,
     survivalService: any,
     combatService: any,
     professionService: any,
+    oldGrowthService: any,
     encounter: any,
     enemyAttackFlow: any,
     enemyCombatRules: any,
     builder: any,
     analyticsService: any,
     featureFlags: any
-): OldGrowthService
+): WardenStagService
     return setmetatable({
-        Name = OldGrowthService.Name,
+        Name = WardenStagService.Name,
         _logger = logger,
         _worldService = worldService,
         _expeditionService = expeditionService,
         _survivalService = survivalService,
         _combatService = combatService,
         _professionService = professionService,
+        _oldGrowthService = oldGrowthService,
         _encounter = encounter,
         _enemyAttackFlow = enemyAttackFlow,
         _enemyCombatRules = enemyCombatRules,
@@ -109,21 +111,21 @@ function OldGrowthService.new(
         _markedUntil = 0,
         _onChanged = nil,
         _heartbeat = nil,
-    }, OldGrowthService)
+    }, WardenStagService)
 end
 
-function OldGrowthService.Init(self: OldGrowthService, _context: any)
+function WardenStagService.Init(self: WardenStagService, _context: any)
     local manifest = assert(self._expeditionService:manifest(), "expedition manifest unavailable")
-    self._arena = assert(self._worldService:oldGrowthArena(), "Old Growth arena unavailable")
+    self._arena = assert(self._worldService:wardenStagArena(), "Warden Stag arena unavailable")
     self._state = self._encounter.create(
         self._expeditionService:runId(),
         manifest.hash,
-        self._featureFlags:isEnabled("old_growth_elite_enabled")
+        self._featureFlags:isEnabled("warden_stag_boss_enabled")
     )
-    self._worldService:setOldGrowthPresentation(self._state.status)
+    self._worldService:setWardenStagPresentation(self._state)
 end
 
-function OldGrowthService.Start(self: OldGrowthService)
+function WardenStagService.Start(self: WardenStagService)
     local accumulator = 0
     self._heartbeat = RunService.Heartbeat:Connect(function(deltaTime: number)
         accumulator += deltaTime
@@ -133,25 +135,29 @@ function OldGrowthService.Start(self: OldGrowthService)
         accumulator = 0
         self:_step(workspace:GetServerTimeNow())
     end)
-    self._logger:info("old_growth_ready", {
+    self._logger:info("warden_stag_ready", {
+        boss = self._encounter.Id,
         enabled = self._state.status ~= "disabled",
-        elite = self._encounter.Id,
         manifest = self._state.manifestHash,
     })
 end
 
-function OldGrowthService.setChangedHandler(self: OldGrowthService, callback: (string?) -> ())
+function WardenStagService.setChangedHandler(self: WardenStagService, callback: (string?) -> ())
     self._onChanged = callback
 end
 
-function OldGrowthService._notify(self: OldGrowthService, toast: string?)
+function WardenStagService._notify(self: WardenStagService, toast: string?)
     local callback = self._onChanged
     if callback ~= nil then
         callback(toast)
     end
 end
 
-function OldGrowthService._inArena(self: OldGrowthService, player: Player, radius: number): boolean
+function WardenStagService._inArena(
+    self: WardenStagService,
+    player: Player,
+    radius: number
+): boolean
     if player:GetAttribute("LastLightInExpedition") ~= true then
         return false
     end
@@ -159,7 +165,7 @@ function OldGrowthService._inArena(self: OldGrowthService, player: Player, radiu
     return root ~= nil and (root.Position - self._arena.center).Magnitude <= radius
 end
 
-function OldGrowthService._spawnModel(self: OldGrowthService, target: Player)
+function WardenStagService._spawnModel(self: WardenStagService, target: Player)
     if self._model ~= nil and self._model.Parent ~= nil then
         return
     end
@@ -168,13 +174,26 @@ function OldGrowthService._spawnModel(self: OldGrowthService, target: Player)
         then self._arena.center + Vector3.new(0, 0, -10)
         else targetRoot.Position
     local model = self._builder.build(self._arena.center, lookAt, self._encounter.MaxHealth)
-    model.Parent =
-        assert(self._arena.fireSource.Parent, "Old Growth arena lost its streamed module")
+    model.Parent = self._arena.model
     self._model = model
-    self._builder.setState(model, self._state.health, false, false)
+    self:_syncModel()
 end
 
-function OldGrowthService._clearAttack(self: OldGrowthService)
+function WardenStagService._syncModel(self: WardenStagService)
+    if self._model == nil then
+        return
+    end
+    self._builder.setState(
+        self._model,
+        self._state.health,
+        self._state.status,
+        workspace:GetServerTimeNow() < self._markedUntil,
+        self._state.brokenAntlers,
+        self._state.outcome
+    )
+end
+
+function WardenStagService._clearAttack(self: WardenStagService)
     local attack = self._attack
     if attack == nil then
         return
@@ -185,7 +204,7 @@ function OldGrowthService._clearAttack(self: OldGrowthService)
     self._attack = nil
 end
 
-function OldGrowthService._groundPosition(self: OldGrowthService, targetRoot: BasePart): Vector3
+function WardenStagService._groundPosition(self: WardenStagService, targetRoot: BasePart): Vector3
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     local excluded = { targetRoot.Parent :: Model }
@@ -203,8 +222,8 @@ function OldGrowthService._groundPosition(self: OldGrowthService, targetRoot: Ba
         else result.Position + Vector3.new(0, 0.14, 0)
 end
 
-function OldGrowthService._attackArea(
-    self: OldGrowthService,
+function WardenStagService._attackArea(
+    self: WardenStagService,
     definition: any,
     targetRoot: BasePart
 ): CFrame
@@ -223,23 +242,23 @@ function OldGrowthService._attackArea(
     return CFrame.lookAt(center, center + direction)
 end
 
-function OldGrowthService._createAttackVisual(
-    _self: OldGrowthService,
+function WardenStagService._createAttackVisual(
+    self: WardenStagService,
     definition: any,
     areaCFrame: CFrame
 ): AttackVisual
     local marker = Instance.new("Part")
-    marker.Name = "OldGrowthAttackWarning"
+    marker.Name = "WardenStagAttackWarning"
     marker.Anchored = true
     marker.CanCollide = false
     marker.CanQuery = false
     marker.CanTouch = false
     marker.CastShadow = false
     marker.Color = if definition.shape == "lane"
-        then Color3.fromRGB(101, 187, 112)
-        else Color3.fromRGB(255, 148, 82)
+        then Color3.fromRGB(105, 200, 148)
+        else Color3.fromRGB(255, 157, 91)
     marker.Material = Enum.Material.Neon
-    marker.Transparency = 0.5
+    marker.Transparency = 0.48
     if definition.shape == "lane" then
         marker.Size = Vector3.new(definition.width, 0.2, definition.length)
         marker.CFrame = areaCFrame
@@ -248,22 +267,22 @@ function OldGrowthService._createAttackVisual(
         marker.Size = Vector3.new(0.2, definition.radius * 2, definition.radius * 2)
         marker.CFrame = areaCFrame * CFrame.Angles(0, 0, math.rad(90))
     end
-    marker.Parent = workspace
+    marker.Parent = self._arena.model
 
     local billboard = Instance.new("BillboardGui")
-    billboard.Name = "OldGrowthAttackLabel"
+    billboard.Name = "WardenStagAttackLabel"
     billboard.Adornee = marker
     billboard.AlwaysOnTop = true
     billboard.LightInfluence = 0
     billboard.MaxDistance = 120
-    billboard.Size = UDim2.fromOffset(270, 68)
-    billboard.StudsOffsetWorldSpace = Vector3.new(0, 3.4, 0)
+    billboard.Size = UDim2.fromOffset(300, 72)
+    billboard.StudsOffsetWorldSpace = Vector3.new(0, 3.5, 0)
     billboard.Parent = marker
 
     local label = Instance.new("TextLabel")
     label.Name = "Warning"
-    label.BackgroundColor3 = Color3.fromRGB(26, 38, 29)
-    label.BackgroundTransparency = 0.08
+    label.BackgroundColor3 = Color3.fromRGB(23, 36, 29)
+    label.BackgroundTransparency = 0.06
     label.BorderSizePixel = 0
     label.Font = Enum.Font.GothamBold
     label.Size = UDim2.fromScale(1, 1)
@@ -275,24 +294,24 @@ function OldGrowthService._createAttackVisual(
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 12)
     corner.Parent = label
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = marker.Color
-    stroke.Thickness = 2
-    stroke.Transparency = 0.08
-    stroke.Parent = label
+    local outline = Instance.new("UIStroke")
+    outline.Color = marker.Color
+    outline.Thickness = 2
+    outline.Transparency = 0.08
+    outline.Parent = label
     return {
         label = label,
         marker = marker,
     }
 end
 
-function OldGrowthService._startAttack(self: OldGrowthService, target: Player, now: number)
+function WardenStagService._startAttack(self: WardenStagService, target: Player, now: number)
     local targetRoot = rootPart(target)
     if targetRoot == nil then
         return
     end
     self._attackIndex += 1
-    local definition = self._encounter.attack(self._attackIndex, self._state.shieldIndex)
+    local definition = self._encounter.attack(self._attackIndex, self._state.phase)
     local areaCFrame = self:_attackArea(definition, targetRoot)
     self._attack = {
         areaCFrame = areaCFrame,
@@ -302,7 +321,7 @@ function OldGrowthService._startAttack(self: OldGrowthService, target: Player, n
         visual = self:_createAttackVisual(definition, areaCFrame),
     }
     self._lastAttackAt = now
-    self._analyticsService:eliteAttackTelegraphed(
+    self._analyticsService:bossAttackTelegraphed(
         target,
         self._encounter.Id,
         definition.attackId,
@@ -312,7 +331,7 @@ function OldGrowthService._startAttack(self: OldGrowthService, target: Player, n
     self:_notify(nil)
 end
 
-function OldGrowthService._clearPath(self: OldGrowthService, target: Player): boolean
+function WardenStagService._clearPath(self: WardenStagService, target: Player): boolean
     local model = self._model
     local root = rootPart(target)
     local character = target.Character
@@ -330,8 +349,8 @@ function OldGrowthService._clearPath(self: OldGrowthService, target: Player): bo
     return result == nil or result.Instance:IsDescendantOf(character)
 end
 
-function OldGrowthService._insideAttack(
-    self: OldGrowthService,
+function WardenStagService._insideAttack(
+    self: WardenStagService,
     attack: Attack,
     targetRoot: BasePart
 ): boolean
@@ -346,7 +365,7 @@ function OldGrowthService._insideAttack(
     )
 end
 
-function OldGrowthService._stepAttack(self: OldGrowthService, now: number)
+function WardenStagService._stepAttack(self: WardenStagService, now: number)
     local attack = self._attack
     if attack == nil then
         return
@@ -376,7 +395,7 @@ function OldGrowthService._stepAttack(self: OldGrowthService, now: number)
     local definition = attack.definition
     self:_clearAttack()
     if decision.status == "cancel" or decision.status == "miss" then
-        self._analyticsService:eliteAttackResult(
+        self._analyticsService:bossAttackResult(
             target,
             self._encounter.Id,
             definition.attackId,
@@ -386,7 +405,7 @@ function OldGrowthService._stepAttack(self: OldGrowthService, now: number)
         return
     end
     if self._combatService:avoidsDamage(target, now) then
-        self._analyticsService:eliteAttackResult(
+        self._analyticsService:bossAttackResult(
             target,
             self._encounter.Id,
             definition.attackId,
@@ -399,14 +418,14 @@ function OldGrowthService._stepAttack(self: OldGrowthService, now: number)
     local damage, guarded =
         self._professionService:mitigateIncomingDamage(target, definition.damage, now)
     local result = self._survivalService:damage(target, damage, self._encounter.Id)
-    if result.applied and definition.attackId == "old_growth_root_lane" then
+    if result.applied and definition.rootedDuration ~= nil then
         self._combatService:applyRooted(
             target,
             definition.rootedDuration,
             definition.rootedMultiplier
         )
     end
-    self._analyticsService:eliteAttackResult(
+    self._analyticsService:bossAttackResult(
         target,
         self._encounter.Id,
         definition.attackId,
@@ -421,30 +440,7 @@ function OldGrowthService._stepAttack(self: OldGrowthService, now: number)
     end
 end
 
-function OldGrowthService._syncCarrierVisuals(self: OldGrowthService, now: number)
-    for _, player in Players:GetPlayers() do
-        local snapshot = self._encounter.snapshot(self._state, player.UserId, now)
-        player:SetAttribute("LastLightCarryingOldGrowthFire", snapshot.carryingFire)
-        player:SetAttribute("LastLightOldGrowthFireExpiresAt", snapshot.fireExpiresAt)
-        local root = rootPart(player)
-        if root ~= nil then
-            local light = root:FindFirstChild("OldGrowthCarryLight")
-            if snapshot.carryingFire and light == nil then
-                local pointLight = Instance.new("PointLight")
-                pointLight.Name = "OldGrowthCarryLight"
-                pointLight.Color = Color3.fromRGB(255, 181, 76)
-                pointLight.Brightness = 2.2
-                pointLight.Range = 18
-                pointLight.Shadows = false
-                pointLight.Parent = root
-            elseif not snapshot.carryingFire and light ~= nil then
-                light:Destroy()
-            end
-        end
-    end
-end
-
-function OldGrowthService._playersInArena(self: OldGrowthService): { Player }
+function WardenStagService._playersInArena(self: WardenStagService): { Player }
     local players = {}
     for _, player in Players:GetPlayers() do
         if self:_inArena(player, ENCOUNTER_RADIUS) and self._survivalService:canAct(player) then
@@ -454,7 +450,7 @@ function OldGrowthService._playersInArena(self: OldGrowthService): { Player }
     return players
 end
 
-function OldGrowthService._nearestPlayer(self: OldGrowthService, players: { Player }): Player?
+function WardenStagService._nearestPlayer(self: WardenStagService, players: { Player }): Player?
     local anchor = self._arena.center
     if self._model ~= nil and self._model.PrimaryPart ~= nil then
         anchor = self._model.PrimaryPart.Position
@@ -474,14 +470,15 @@ function OldGrowthService._nearestPlayer(self: OldGrowthService, players: { Play
     return nearest
 end
 
-function OldGrowthService._step(self: OldGrowthService, now: number)
-    local previousRevision = self._state.revision
-    self._state = self._encounter.expire(self._state, now)
-    if self._state.revision ~= previousRevision then
-        self:_syncCarrierVisuals(now)
-        self:_notify("LANTERN FIRE FADED — TAKE ANOTHER FLAME")
+function WardenStagService._step(self: WardenStagService, now: number)
+    if self._state.status == "locked" and self._oldGrowthService:isComplete() then
+        local nextState, result = self._encounter.unlock(self._state)
+        if result.accepted then
+            self._state = nextState
+            self._worldService:setWardenStagPresentation(self._state)
+            self:_notify("THE WARDEN'S SEAL OPENS BEYOND OLD GROWTH")
+        end
     end
-
     if self._state.status == "dormant" then
         for _, player in Players:GetPlayers() do
             if
@@ -492,20 +489,27 @@ function OldGrowthService._step(self: OldGrowthService, now: number)
                     self._state = nextState
                     self:_spawnModel(player)
                     self._lastAttackAt = now
-                    self._worldService:setOldGrowthPresentation(self._state.status)
-                    self._analyticsService:eliteStarted(
+                    self._worldService:setWardenStagPresentation(self._state)
+                    self._analyticsService:bossStarted(
                         player,
                         self._encounter.Id,
                         self._state.manifestHash
                     )
-                    self:_notify("OLD GROWTH AWAKENS — STRIKE THE AMBER HEART")
+                    self._analyticsService:bossPhase(
+                        player,
+                        self._encounter.Id,
+                        self._state.phase,
+                        "cleansing_started",
+                        self._state.antlersBroken
+                    )
+                    self:_notify("WARDEN STAG AWAKENS — CLEANSE THE LIVING ROOTS")
                 end
                 break
             end
         end
         return
     end
-    if self._state.status ~= "vulnerable" and self._state.status ~= "shielded" then
+    if not self:combatActive() then
         return
     end
 
@@ -521,14 +525,7 @@ function OldGrowthService._step(self: OldGrowthService, now: number)
     end
     if self._markedUntil > 0 and now >= self._markedUntil then
         self._markedUntil = 0
-        if self._model ~= nil then
-            self._builder.setState(
-                self._model,
-                self._state.health,
-                self._state.status == "shielded",
-                false
-            )
-        end
+        self:_syncModel()
         self:_notify(nil)
     end
     if self._attack ~= nil then
@@ -540,8 +537,8 @@ function OldGrowthService._step(self: OldGrowthService, now: number)
         return
     end
     local tuning = self._encounter.Tuning
-    local cooldown = if self._state.status == "shielded"
-        then tuning.shieldedAttackCooldownSeconds
+    local cooldown = if self._state.status == "cleansing"
+        then tuning.cleansingAttackCooldownSeconds
         else tuning.attackCooldownSeconds
     if now < self._markedUntil then
         cooldown *= tuning.markedAttackCooldownMultiplier
@@ -551,67 +548,85 @@ function OldGrowthService._step(self: OldGrowthService, now: number)
     end
 end
 
-function OldGrowthService.interact(
-    self: OldGrowthService,
+function WardenStagService.interact(
+    self: WardenStagService,
     player: Player,
     prompt: ProximityPrompt
 ): any
     if not self:_inArena(player, ENCOUNTER_RADIUS) or not self._survivalService:canAct(player) then
         return {
             accepted = false,
-            message = "ENTER THE OLD GROWTH ARENA WHILE ACTIVE",
+            message = "ENTER THE WARDEN'S SEAL WHILE ACTIVE",
             reason = "player_unavailable",
         }
     end
-    local promptParent = prompt.Parent
-    local interaction = if promptParent == nil
-        then nil
-        else promptParent:GetAttribute("EliteInteraction")
-    local now = workspace:GetServerTimeNow()
+    local target = prompt.Parent
+    local interaction = if target == nil then nil else target:GetAttribute("BossInteraction")
     local nextState, result
-    if interaction == "fire_source" then
-        nextState, result = self._encounter.takeFire(self._state, player.UserId, now)
-    elseif interaction == "root_heart" then
-        nextState, result = self._encounter.burnHeart(self._state, player.UserId, now)
+    if interaction == "cleanse_root" then
+        nextState, result = self._encounter.cleanseRoot(
+            self._state,
+            player.UserId,
+            tostring(target:GetAttribute("BossNodeId"))
+        )
+    elseif interaction == "break_antler" then
+        nextState, result = self._encounter.breakAntler(
+            self._state,
+            player.UserId,
+            tostring(target:GetAttribute("BossAntlerId"))
+        )
     else
         return {
             accepted = false,
-            message = "THAT ELITE INTERACTION IS INVALID",
+            message = "THAT WARDEN INTERACTION IS INVALID",
             reason = "invalid_interaction",
         }
     end
     if not result.accepted then
-        result.message = if result.reason == "fire_required"
-            then "TAKE LANTERN FIRE BEFORE TOUCHING THE ROOT HEART"
-            elseif result.reason == "fire_claimed" then "AN ALLY ALREADY CARRIES THE FIRE"
-            else "THE ROOT SHIELD IS NOT CALLING FOR FIRE"
+        result.message = if result.reason == "already_cleansed"
+            then "THAT LIVING ROOT IS ALREADY CLEAN"
+            elseif
+                result.reason == "antler_already_broken"
+                or result.reason == "phase_antler_already_broken"
+            then "THAT ANTLER SHORTCUT IS NO LONGER AVAILABLE"
+            elseif
+                self._state.status == "vulnerable"
+            then "THE MEMORY HEART IS EXPOSED — STRIKE NOW"
+            else "THE WARDEN IS NOT CALLING FOR THAT CHOICE"
         return result
     end
 
     self._state = nextState
-    self._worldService:setOldGrowthPresentation(self._state.status)
-    self:_syncCarrierVisuals(now)
-    if result.reason == "fire_taken" then
-        result.message = "LANTERN FIRE HELD — REACH THE ROOT HEART"
-        self:_notify(result.message)
-    else
-        result.message = "ROOT SHIELD BURNED — AMBER HEART EXPOSED"
-        if self._model ~= nil then
-            self._builder.setState(self._model, self._state.health, false, now < self._markedUntil)
-        end
-        self._analyticsService:elitePhase(
+    self._worldService:setWardenStagPresentation(self._state)
+    self:_syncModel()
+    if result.reason == "antler_broken" then
+        result.message = "ANTLER BROKEN — THE FOREST WILL REMEMBER THIS HARM"
+        self._analyticsService:bossPhase(
             player,
             self._encounter.Id,
-            self._state.shieldIndex + 1,
-            "shield_burned"
+            self._state.phase,
+            "antler_shortcut",
+            self._state.antlersBroken
         )
-        self:_notify(result.message)
+    elseif result.exposed then
+        result.message = "LIVING ROOTS CLEANSED — MEMORY HEART EXPOSED"
+        self._analyticsService:bossPhase(
+            player,
+            self._encounter.Id,
+            self._state.phase,
+            "heart_exposed",
+            self._state.antlersBroken
+        )
+    else
+        result.message =
+            string.format("LIVING ROOT CLEANSED — %d / %d", result.cleansed, result.required)
     end
+    self:_notify(result.message)
     return result
 end
 
-function OldGrowthService._lineOfSight(
-    _self: OldGrowthService,
+function WardenStagService._lineOfSight(
+    _self: WardenStagService,
     player: Player,
     model: Model
 ): boolean
@@ -628,24 +643,27 @@ function OldGrowthService._lineOfSight(
     return result ~= nil and result.Instance == heart
 end
 
-function OldGrowthService.damageNearest(self: OldGrowthService, player: Player): (boolean, string)
-    if self._state.status ~= "vulnerable" and self._state.status ~= "shielded" then
-        return false, "No elite threat is active."
+function WardenStagService.damageNearest(self: WardenStagService, player: Player): (boolean, string)
+    if self._state.status ~= "vulnerable" and self._state.status ~= "cleansing" then
+        return false, "No Warden Stag threat is active."
+    end
+    if self._state.status == "cleansing" then
+        return false, "CLEANSE LIVING ROOTS OR ACCEPT THE ANTLER CONSEQUENCE"
     end
     if not self:_inArena(player, ENCOUNTER_RADIUS) or not self._survivalService:canAct(player) then
-        return false, "Enter the Old Growth arena to strike."
+        return false, "Enter the Warden's Seal to strike."
     end
     local model = self._model
     local root = rootPart(player)
     local heart = if model == nil then nil else weakPoint(model)
     if model == nil or root == nil or heart == nil then
-        return false, "Old Growth is still taking shape."
+        return false, "The Warden Stag is still taking shape."
     end
     if (root.Position - heart.Position).Magnitude > STRIKE_RANGE then
-        return false, "Move closer to the amber heart."
+        return false, "Move closer to the memory heart."
     end
     if not self:_lineOfSight(player, model) then
-        return false, "The amber heart is behind the trunk."
+        return false, "The memory heart is hidden behind the Warden."
     end
 
     local tuning = self._encounter.Tuning
@@ -654,19 +672,11 @@ function OldGrowthService.damageNearest(self: OldGrowthService, player: Player):
         else tuning.strikeDamage
     local nextState, result = self._encounter.strike(self._state, player.UserId, amount)
     if not result.accepted then
-        if result.reason == "shielded" then
-            return false, "ROOT SHIELD — MOVE LANTERN FIRE TO THE HEART"
-        end
-        return false, "Old Growth cannot be struck right now."
+        return false, "The Warden Stag cannot be struck right now."
     end
     self._state = nextState
-    self._builder.setState(
-        model,
-        self._state.health,
-        self._state.status == "shielded",
-        workspace:GetServerTimeNow() < self._markedUntil
-    )
-    self._worldService:setOldGrowthPresentation(self._state.status)
+    self._worldService:setWardenStagPresentation(self._state)
+    self:_syncModel()
     if result.completed then
         self:_clearAttack()
         for participantId in self._state.participants do
@@ -680,34 +690,41 @@ function OldGrowthService.damageNearest(self: OldGrowthService, player: Player):
                 )
             end
         end
-        self:_syncCarrierVisuals(workspace:GetServerTimeNow())
-        self._analyticsService:eliteCompleted(
+        self._analyticsService:bossResult(
             player,
             self._encounter.Id,
             self._state.manifestHash,
-            self._state.shieldIndex,
+            self._state.outcome,
+            self._state.antlersBroken,
             self:_participantCount()
         )
-        self:_notify("OLD GROWTH CLEANSED — +3 AMBER SAP UNBANKED")
-        return true, "Old Growth cleansed. Amber Sap added to the expedition pouch."
+        local message = if self._state.outcome == "preserved"
+            then "WARDEN STAG CALMED — FOREST ALLY PRESERVED · +5 AMBER SAP"
+            elseif
+                self._state.outcome == "harmed"
+            then "WARDEN STAG DEFEATED — FOREST HARMED · +5 AMBER SAP"
+            else "WARDEN STAG DEFEATED — FOREST SCARRED · +5 AMBER SAP"
+        self:_notify(message)
+        return true, message
     end
-    if result.shieldStarted then
-        self._analyticsService:elitePhase(
+    if result.phaseFinished then
+        self._analyticsService:bossPhase(
             player,
             self._encounter.Id,
-            self._state.shieldIndex,
-            "shield_started"
+            self._state.phase,
+            "cleansing_started",
+            self._state.antlersBroken
         )
-        self:_notify("ROOT SHIELD — TAKE LANTERN FIRE TO THE HEART")
-        return true, "A root shield closes around the amber heart."
+        self:_notify(string.format("PHASE %d/3 — CLEANSE THE LIVING ROOTS", self._state.phase))
+        return true, "The memory heart closes. Cleanse the next root pattern."
     end
     self:_notify(
-        string.format("HIT — OLD GROWTH %d / %d", self._state.health, self._encounter.MaxHealth)
+        string.format("HIT — WARDEN STAG %d / %d", self._state.health, self._encounter.MaxHealth)
     )
-    return true, "Your tool strikes the amber heart."
+    return true, "Your tool strikes the exposed memory heart."
 end
 
-function OldGrowthService._participantCount(self: OldGrowthService): number
+function WardenStagService._participantCount(self: WardenStagService): number
     local count = 0
     for _ in self._state.participants do
         count += 1
@@ -715,8 +732,8 @@ function OldGrowthService._participantCount(self: OldGrowthService): number
     return count
 end
 
-function OldGrowthService.canMarkNearest(
-    self: OldGrowthService,
+function WardenStagService.canMarkNearest(
+    self: WardenStagService,
     player: Player,
     range: number
 ): (boolean, string)
@@ -730,19 +747,16 @@ function OldGrowthService.canMarkNearest(
         or not self:_inArena(player, ENCOUNTER_RADIUS)
         or not self._survivalService:canAct(player)
     then
-        return false, "NO ELITE THREAT CAN BE MARKED"
+        return false, "NO BOSS THREAT CAN BE MARKED"
     end
     if (root.Position - model.PrimaryPart.Position).Magnitude > range then
-        return false, "MOVE CLOSER TO MARK OLD GROWTH"
-    end
-    if not self:_lineOfSight(player, model) then
-        return false, "OLD GROWTH IS HIDDEN BY THE TRUNK"
+        return false, "MOVE CLOSER TO MARK THE WARDEN STAG"
     end
     return true, "FOXFIRE MARK READY"
 end
 
-function OldGrowthService.markNearest(
-    self: OldGrowthService,
+function WardenStagService.markNearest(
+    self: WardenStagService,
     player: Player,
     range: number,
     duration: number
@@ -752,20 +766,13 @@ function OldGrowthService.markNearest(
         return false, reason
     end
     self._markedUntil = workspace:GetServerTimeNow() + duration
-    if self._model ~= nil then
-        self._builder.setState(
-            self._model,
-            self._state.health,
-            self._state.status == "shielded",
-            true
-        )
-    end
-    local message = "FOXFIRE MARK — OLD GROWTH TELEGRAPHS SLOWED"
+    self:_syncModel()
+    local message = "FOXFIRE MARK — WARDEN STAG TELEGRAPHS SLOWED"
     self:_notify(message)
     return true, message
 end
 
-function OldGrowthService.threatSnapshot(self: OldGrowthService, viewer: Player): any
+function WardenStagService.threatSnapshot(self: WardenStagService, viewer: Player): any
     local attack = self._attack
     if attack == nil or attack.target ~= viewer then
         return nil
@@ -774,31 +781,29 @@ function OldGrowthService.threatSnapshot(self: OldGrowthService, viewer: Player)
         attackId = attack.definition.attackId,
         displayName = attack.definition.attackName,
         enemyId = self._encounter.Id,
-        enemyName = "OLD GROWTH",
+        enemyName = "WARDEN STAG",
         instruction = attack.definition.instruction,
         resolvesAt = attack.flow.endsAt,
         shape = attack.definition.shape,
     }
 end
 
-function OldGrowthService.snapshot(self: OldGrowthService, player: Player): any
+function WardenStagService.snapshot(self: WardenStagService, player: Player): any
     if player:GetAttribute("LastLightInExpedition") ~= true then
         return nil
     end
-    local snapshot =
-        self._encounter.snapshot(self._state, player.UserId, workspace:GetServerTimeNow())
-    if not self:_inArena(player, ENCOUNTER_RADIUS + 18) and not snapshot.carryingFire then
+    if not self:_inArena(player, ENCOUNTER_RADIUS + 20) then
         return nil
     end
-    return snapshot
+    return self._encounter.snapshot(self._state, player.UserId)
 end
 
-function OldGrowthService.combatActive(self: OldGrowthService): boolean
-    return self._state.status == "vulnerable" or self._state.status == "shielded"
+function WardenStagService.combatActive(self: WardenStagService): boolean
+    return self._state.status == "cleansing" or self._state.status == "vulnerable"
 end
 
-function OldGrowthService.isComplete(self: OldGrowthService): boolean
+function WardenStagService.isComplete(self: WardenStagService): boolean
     return self._state.status == "complete"
 end
 
-return table.freeze(OldGrowthService)
+return table.freeze(WardenStagService)

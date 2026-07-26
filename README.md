@@ -17,7 +17,8 @@ playable game exists.
 **Milestone 2 source implemented; Milestone 3 Bramblewake expedition foundation,
 four active events, durable extraction settlement, player rescue, combat
 mobility, six-enemy first-night roster, four basic profession kits, and the Old
-Growth elite implemented; Studio and device exit gates remain pending.**
+Growth elite and Warden Stag boss implemented; Studio and device exit gates
+remain pending.**
 
 The repository currently contains:
 
@@ -41,6 +42,9 @@ The repository currently contains:
 - an original procedural Old Growth elite with three exposed phases, two
   lantern-fire shield breaks, lane roots, canopy-fall pressure, rooted movement,
   contextual mobile HUD, and idempotent shared Amber Sap rewards;
+- an original three-phase Warden Stag boss gated behind Old Growth, with living
+  root cleansing, an explicit harmful antler shortcut, preserved/scarred/harmed
+  outcomes, recoverable pressure, and idempotent shared rewards;
 - persistent free-town selection for Scout, Warden, Engineer, and Medic, with
   server-owned reveal/slow, guard, lantern-repair, and area-heal abilities;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
@@ -51,7 +55,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 110 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 119 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -78,6 +82,9 @@ The six-enemy sequence, mechanic, readability, solo-balance, and device gates ar
 [the Bramblewake enemy-roster runbook](docs/MILESTONE_3_BRAMBLEWAKE_ENEMIES.md).
 The three-phase elite, carried-fire, reward, accessibility, and abuse gates are in
 [the Old Growth elite runbook](docs/MILESTONE_3_OLD_GROWTH_ELITE.md).
+The three-phase boss, root/antler choice, reward, recovery, mobile, and abuse
+gates are in
+[the Warden Stag boss runbook](docs/MILESTONE_3_WARDEN_STAG_BOSS.md).
 
 The current UI direction is documented in the
 [Last Light mobile gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create).
@@ -93,6 +100,9 @@ The six-enemy telegraph hierarchy is grounded in the
 [Bramblewake Mobile Combat Callouts report](https://www.lazyweb.com/report/lazyweb/094ebe85-c65a-4a8a-908f-b1b209ecc935/?source=create).
 The contextual elite health, phase, shield, and carried-fire layer is grounded in the
 [Old Growth Elite Mobile HUD report](https://www.lazyweb.com/report/lazyweb/51156fc2-18a7-4cf0-be1b-3de54ccf33b3/?source=create).
+The Warden Stag phase, root progress, consequence, and attack event layer is
+grounded in the
+[Warden Stag Mobile Boss Layer report](https://www.lazyweb.com/report/lazyweb/d5a79e5a-8f10-46e0-b0ed-8e6e09b2dccb/?source=create).
 The recommended default is a context-sensitive survival HUD. A compact HUD is
 the accessibility and low-effects fallback, while the dramatic living-world HUD
 is reserved for Blackouts and bosses.
@@ -304,6 +314,11 @@ npm run bootstrap
 Bootstrap installs the exact versions in `rokit.toml`, validates the blueprint,
 formats/lints/type-checks the Luau foundation, runs pure tests, and builds
 `build/LastLight.rbxlx` plus `build/LastLightTest.rbxlx`.
+
+For Windows testing without command-line tools, download and extract the
+repository ZIP from GitHub, then open `build/LastLight.rbxlx` directly in Roblox
+Studio. Open `build/LastLightTest.rbxlx` and press Play for the automated Studio
+assertions. Both files are regenerated and committed with every completed phase.
 
 For the live source-to-Studio loop:
 

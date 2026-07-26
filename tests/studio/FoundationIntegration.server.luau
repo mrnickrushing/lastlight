@@ -19,6 +19,7 @@ local EnemyCombatRules = require(root.EnemyCombatRules)
 local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local OldGrowthEncounter = require(root.OldGrowthEncounter)
+local WardenStagEncounter = require(root.WardenStagEncounter)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local ProfessionState = require(root.ProfessionState)
 local ReviveFlow = require(root.ReviveFlow)
@@ -29,10 +30,11 @@ local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
 local ServiceRegistry = require(serverRoot.ServiceRegistry)
 local OldGrowthBuilder = require(serverRoot.World.OldGrowthBuilder)
+local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 3, "unexpected save schema version")
-assert(Config.BuildVersion == "0.11.0", "unexpected build version")
+assert(Config.BuildVersion == "0.12.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -82,6 +84,7 @@ assert(
     "profession selection action ID changed"
 )
 assert(RuntimeIds.Actions.OldGrowthFire == "old_growth_fire", "Old Growth action ID changed")
+assert(RuntimeIds.Actions.WardenStagChoice == "warden_stag_choice", "Warden Stag action ID changed")
 
 local combat = CombatState.create(200)
 local sprinting = CombatState.setSprint(combat, true, 200, true)
@@ -162,6 +165,50 @@ assert(
 )
 oldGrowthModel:Destroy()
 
+local wardenStag = WardenStagEncounter.create("studio_run", "studio_manifest", true)
+wardenStag = WardenStagEncounter.unlock(wardenStag)
+wardenStag = WardenStagEncounter.activate(wardenStag, 10)
+for _, nodeId in { "root_node_north", "root_node_east" } do
+    wardenStag = WardenStagEncounter.cleanseRoot(wardenStag, 10, nodeId)
+end
+assert(wardenStag.status == "vulnerable", "Warden Stag roots did not expose phase one")
+for _ = 1, 4 do
+    wardenStag = WardenStagEncounter.strike(wardenStag, 10, 40)
+end
+for _, nodeId in { "root_node_north", "root_node_east", "root_node_south" } do
+    wardenStag = WardenStagEncounter.cleanseRoot(wardenStag, 10, nodeId)
+end
+for _ = 1, 4 do
+    wardenStag = WardenStagEncounter.strike(wardenStag, 10, 40)
+end
+for _, nodeId in
+    {
+        "root_node_north",
+        "root_node_east",
+        "root_node_south",
+        "root_node_west",
+    }
+do
+    wardenStag = WardenStagEncounter.cleanseRoot(wardenStag, 10, nodeId)
+end
+for _ = 1, 4 do
+    wardenStag = WardenStagEncounter.strike(wardenStag, 10, 40)
+end
+assert(wardenStag.status == "complete", "Warden Stag completion contract failed")
+assert(wardenStag.outcome == "preserved", "clean Warden Stag route did not preserve the forest")
+assert(
+    WardenStagEncounter.rewardTransactionId(wardenStag, 10)
+        == "boss_warden_stag:studio_run:studio_manifest:10",
+    "Warden Stag reward transaction is not stable"
+)
+local wardenModel = WardenStagBuilder.build(Vector3.new(0, 0, 0), Vector3.new(0, 0, -10), 480)
+assert(wardenModel.PrimaryPart ~= nil, "Warden Stag model has no primary part")
+assert(
+    wardenModel:GetAttribute("BossId") == "boss_warden_stag",
+    "Warden Stag model is missing its stable ID"
+)
+wardenModel:Destroy()
+
 local profession =
     ProfessionState.create(ProfessionCatalog.Ids.Warden, workspace:GetServerTimeNow())
 local professionDecision = ProfessionState.canUse(profession, workspace:GetServerTimeNow(), true)
@@ -187,7 +234,7 @@ local world = workspace:WaitForChild(RuntimeIds.WorldName, 8)
 assert(world ~= nil and world:IsA("Model"), "first-ten-minutes world did not build")
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "old-growth-elite-v4",
+    world:GetAttribute("WorldVersion") == "warden-stag-boss-v5",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -215,6 +262,7 @@ assert(
     expedition:GetAttribute("EventInteractionCount") == BramblewakeExpedition.EventInteractionCount,
     "Bramblewake event interaction count is incorrect"
 )
+assert(expedition:GetAttribute("BossArenaReady") == true, "Warden Stag arena is not ready")
 local expectedManifest = ExpeditionGenerator.generate(Config.BramblewakePreviewSeed)
 assert(
     expedition:GetAttribute("ManifestHash") == expectedManifest.hash,
@@ -224,14 +272,15 @@ local generatedPartCount = expedition:GetAttribute("GeneratedPartCount")
 assert(
     type(generatedPartCount) == "number"
         and generatedPartCount >= 200
-        and generatedPartCount <= BramblewakeExpedition.PartBudget,
+        and generatedPartCount
+            <= BramblewakeExpedition.PartBudget + BramblewakeExpedition.BossArenaPartBudget,
     "Bramblewake preview is outside its detailed mobile part budget"
 )
 
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
-    #tagged == 11 + BramblewakeExpedition.EventInteractionCount,
-    "expected tutorial, event, elite, and extraction interaction prompts"
+    #tagged == 17 + BramblewakeExpedition.EventInteractionCount,
+    "expected tutorial, event, elite, boss, and extraction interaction prompts"
 )
 assert(
     #CollectionService:GetTagged(RuntimeIds.PlayerDownedTag) == 0,
@@ -307,6 +356,23 @@ for _, target in eliteTargets do
     assert(
         prompt:GetAttribute("ActionId") == RuntimeIds.Actions.OldGrowthFire,
         "Old Growth prompt does not route to its server action"
+    )
+end
+local bossArena = expedition:FindFirstChild("WardenSealAnnex")
+assert(bossArena ~= nil and bossArena:IsA("Model"), "Warden Stag arena model is missing")
+assert(
+    bossArena.ModelStreamingMode == Enum.ModelStreamingMode.Atomic,
+    "Warden Stag arena must stream atomically"
+)
+local bossTargets = CollectionService:GetTagged(RuntimeIds.ExpeditionBossTag)
+assert(#bossTargets == 6, "expected four Warden roots and two antler choices")
+for _, target in bossTargets do
+    assert(target:GetAttribute("BossId") == "boss_warden_stag", "boss target ID changed")
+    local prompt = target:FindFirstChildOfClass("ProximityPrompt")
+    assert(prompt ~= nil and not prompt.Enabled, "Warden Stag prompts must begin locked")
+    assert(
+        prompt:GetAttribute("ActionId") == RuntimeIds.Actions.WardenStagChoice,
+        "Warden Stag prompt does not route to its server action"
     )
 end
 local extractionTargets = CollectionService:GetTagged(RuntimeIds.ExpeditionExtractionTag)

@@ -44,6 +44,10 @@ assert(
     sharedRoot:FindFirstChild("ExpeditionInventory") ~= nil,
     "game build is missing ExpeditionInventory"
 )
+assert(
+    sharedRoot:FindFirstChild("WardenStagEncounter") ~= nil,
+    "game build is missing WardenStagEncounter"
+)
 local contentDefinitions = assert(
     sharedRoot:FindFirstChild("Content"),
     "game build is missing Content"
@@ -75,6 +79,7 @@ for _, serviceName in
         "ProfessionService",
         "ProfileService",
         "TutorialService",
+        "WardenStagService",
         "WorldService",
     }
 do
@@ -88,6 +93,10 @@ assert(worldBuilders ~= nil, "game build is missing world builders")
 assert(
     worldBuilders:FindFirstChild("BramblewakeBuilder") ~= nil,
     "game build is missing BramblewakeBuilder"
+)
+assert(
+    worldBuilders:FindFirstChild("WardenStagBuilder") ~= nil,
+    "game build is missing WardenStagBuilder"
 )
 assert(gamePlace:GetService("Workspace").StreamingEnabled, "streaming must remain enabled")
 local inputActionRollout =

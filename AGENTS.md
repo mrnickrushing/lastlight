@@ -12,9 +12,12 @@ third-party games.
 2. Create an `agent/*` branch for every completed change.
 3. Keep commits scoped and exclude unrelated local files.
 4. Run `npm test` plus the milestone-specific checks.
-5. Push the branch and open a pull request to `main`.
-6. Inspect the actual GitHub check rollup.
-7. Merge after required checks pass, then synchronize local `main`.
+5. Commit the freshly generated `build/LastLight.rbxlx` and
+   `build/LastLightTest.rbxlx` from that exact validated source revision so a
+   Windows tester can download the GitHub ZIP and open either place directly.
+6. Push the branch and open a pull request to `main`.
+7. Inspect the actual GitHub check rollup.
+8. Merge after required checks pass, then synchronize local `main`.
 
 Do not push implementation commits directly to `main`.
 
@@ -38,4 +41,3 @@ Do not push implementation commits directly to `main`.
 Start with [README.md](README.md), then follow the linked design documents. If
 code and plans disagree, record a decision in [docs/DECISIONS.md](docs/DECISIONS.md)
 before changing scope.
-

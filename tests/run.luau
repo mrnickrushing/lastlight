@@ -25,4 +25,5 @@ TestRunner.run({
     require("./specs/SurvivalState.spec"),
     require("./specs/StatusEffectState.spec"),
     require("./specs/TutorialFlow.spec"),
+    require("./specs/WardenStagEncounter.spec"),
 })

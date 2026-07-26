@@ -1229,37 +1229,66 @@ function HUDController._updateClock(self: HUDController)
     self:_updateCombatClock()
     self:_updateProfessionClock()
 
+    local boss = state.boss
     local elite = state.elite
-    if type(elite) == "table" and not self._playerDowned then
-        local health = math.max(0, tonumber(elite.health) or 0)
-        local maxHealth = math.max(1, tonumber(elite.maxHealth) or 1)
-        local elitePhase = math.clamp(tonumber(elite.phase) or 1, 1, 3)
-        self._eliteTitle.Text =
-            string.format("OLD GROWTH · PHASE %d/3 · %d/%d", elitePhase, health, maxHealth)
+    local apex = if type(boss) == "table"
+            and (boss.active == true or boss.complete == true)
+        then boss
+        else elite
+    local bossView = apex == boss and type(boss) == "table"
+    if type(apex) == "table" and not self._playerDowned then
+        local health = math.max(0, tonumber(apex.health) or 0)
+        local maxHealth = math.max(1, tonumber(apex.maxHealth) or 1)
+        local apexPhase = math.clamp(tonumber(apex.phase) or 1, 1, 3)
+        self._eliteTitle.Text = string.format(
+            "%s · PHASE %d/3 · %d/%d",
+            if bossView then "WARDEN STAG" else "OLD GROWTH",
+            apexPhase,
+            health,
+            maxHealth
+        )
         self._eliteFill.Size = UDim2.fromScale(math.clamp(health / maxHealth, 0, 1), 1)
-        self._eliteFill.BackgroundColor3 = if elite.complete
+        self._eliteFill.BackgroundColor3 = if apex.complete
             then COLORS.green
-            elseif elite.shielded then COLORS.danger
+            elseif bossView and apex.exposed ~= true then COLORS.blue
+            elseif apex.shielded then COLORS.danger
             else COLORS.amber
-        if elite.complete then
-            self._eliteDetail.Text = if elite.rewardEligible
-                then "CLEANSED · +3 AMBER SAP UNBANKED"
+        if apex.complete then
+            self._eliteDetail.Text = if bossView
+                then if apex.outcome == "preserved"
+                    then "CALMED · FOREST ALLY PRESERVED · +5 AMBER SAP"
+                    elseif apex.outcome == "harmed" then "DEFEATED · FOREST HARMED · +5 AMBER SAP"
+                    else "DEFEATED · FOREST SCARRED · +5 AMBER SAP"
+                elseif apex.rewardEligible then "CLEANSED · +3 AMBER SAP UNBANKED"
                 else "CLEANSED · CONTINUE TO WAYHOME"
             self._eliteDetail.TextColor3 = COLORS.green
-        elseif elite.carryingFire then
+        elseif bossView and apex.exposed then
+            self._eliteDetail.Text = "HEART EXPOSED · STRIKE THE MEMORY SEAL"
+            self._eliteDetail.TextColor3 = COLORS.amber
+        elseif bossView then
+            self._eliteDetail.Text = string.format(
+                "ROOTS %d/%d · PRESERVE: CLEANSE · ANTLERS %d/2",
+                tonumber(apex.cleansedNodes) or 0,
+                tonumber(apex.rootNodesRequired) or 0,
+                tonumber(apex.antlersBroken) or 0
+            )
+            self._eliteDetail.TextColor3 = if (tonumber(apex.antlersBroken) or 0) > 0
+                then COLORS.danger
+                else COLORS.blue
+        elseif apex.carryingFire then
             local fireRemaining =
-                math.max(0, (tonumber(elite.fireExpiresAt) or 0) - workspace:GetServerTimeNow())
+                math.max(0, (tonumber(apex.fireExpiresAt) or 0) - workspace:GetServerTimeNow())
             self._eliteDetail.Text =
                 string.format("FIRE %.1fs · REACH THE ROOT HEART", fireRemaining)
             self._eliteDetail.TextColor3 = COLORS.amber
-        elseif elite.shielded then
+        elseif apex.shielded then
             self._eliteDetail.Text = "SHIELDED · TAKE LANTERN FIRE"
             self._eliteDetail.TextColor3 = COLORS.danger
         else
             self._eliteDetail.Text = "EXPOSED · STRIKE THE AMBER HEART"
             self._eliteDetail.TextColor3 = COLORS.amber
         end
-        self._eliteFrame.Visible = elite.active == true or elite.complete == true
+        self._eliteFrame.Visible = apex.active == true or apex.complete == true
     else
         self._eliteFrame.Visible = false
     end
@@ -1334,8 +1363,13 @@ function HUDController.update(self: HUDController, state: any)
     local selfSurvival = if type(survival) == "table" then survival.self else nil
     self._playerDowned = type(selfSurvival) == "table" and selfSurvival.downed == true
     local elite = state.elite
+    local boss = state.boss
     local eliteActive = type(elite) == "table" and elite.active == true
-    self._combatContext = state.nightActive == true or state.expeditionActive == true or eliteActive
+    local bossActive = type(boss) == "table" and boss.active == true
+    self._combatContext = state.nightActive == true
+        or state.expeditionActive == true
+        or eliteActive
+        or bossActive
     local ally = if type(survival) == "table" then survival.ally else nil
     self._downedFrame.Visible = self._playerDowned
     self._allyFrame.Visible = type(ally) == "table" and not self._playerDowned
@@ -1370,14 +1404,14 @@ function HUDController.update(self: HUDController, state: any)
     self._health.Visible = not self._playerDowned and (nightActive or health < maxHealth)
     self._resource.Visible = not nightActive
         and ((tonumber(state.resources) or 0) > 0 or state.selectedTool ~= nil)
-    self._tool.Visible = (nightActive or eliteActive) and not self._playerDowned
+    self._tool.Visible = (nightActive or eliteActive or bossActive) and not self._playerDowned
     self._sprint.Visible = self._inputMode == "touch" and not self._playerDowned
     self._dodge.Visible = not self._playerDowned
         and (self._inputMode == "touch" or self._combatContext)
     self:_updateProfessionClock()
-    local eliteVisible = type(elite) == "table"
-        and (elite.active == true or elite.complete == true)
-        and not self._playerDowned
+    local eliteVisible = (type(boss) == "table" and (boss.active == true or boss.complete == true))
+        or (type(elite) == "table" and (elite.active == true or elite.complete == true))
+    eliteVisible = eliteVisible and not self._playerDowned
     self._eliteFrame.Visible = eliteVisible
     self._lanternFrame.Visible = nightActive and not eliteVisible
     local lanternHealth = math.clamp(tonumber(state.lanternHealth) or 100, 0, 100)

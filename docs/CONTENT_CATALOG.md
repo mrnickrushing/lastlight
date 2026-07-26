@@ -167,6 +167,16 @@ profession or premium item. The other 13 elite IDs remain catalog targets.
 | boss_ash_regent | Ash Regent | 4 | expose authentic memories, break false statues |
 | boss_nameless_night | Nameless Night | 5 scenes | defend, pursue, rescue, witness, choose |
 
+Build `0.12.0` implements `boss_warden_stag` in a streamed Warden's Seal annex
+unlocked by cleansing Old Growth. Its three phases require two, three, and four
+distinct living-root cleanses before 480 shared health can cross the 320, 160,
+and zero gates. Each cleansing phase also presents an explicit antler-breaking
+shortcut: zero breaks preserves the future forest ally, one scars the outcome,
+and two harm it. The encounter remains solo-passable, has bounded lane/ring
+telegraphs, grants five unbanked Amber Sap per participant exactly once, and has
+a kill switch. The Bramblewake Blackout schedule, permanent saved chapter
+decision, final animation, audio, and VFX remain open integration work.
+
 Boss completion gates:
 
 - solo, 2-player, 4-player, and 8-player balance passes;
