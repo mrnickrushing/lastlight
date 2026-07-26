@@ -1,0 +1,373 @@
+# Launch content catalog
+
+## Purpose and ID rules
+
+This is the committed launch inventory. It prevents “complete” from becoming an
+undefined moving target.
+
+- IDs are lowercase snake case and unique across their content type.
+- A shipped ID is never reused for a different meaning.
+- Deleted content leaves a migration alias or tombstone.
+- Content definitions declare region, tier, tags, dependencies, localization
+  keys, analytics key, asset bundle, and feature flag.
+- Counts below are launch gates. Cosmetic variants do not substitute for missing
+  functional content.
+
+## Regions and chapters
+
+| ID | Region | Chapter | Modules | POIs | Events |
+|---|---|---:|---:|---:|---:|
+| region_bramblewake | Bramblewake Woods | 1 | 30 | 12 | 8 |
+| region_ironroot | Ironroot Delve | 2 | 30 | 12 | 8 |
+| region_mireglass | Mireglass Fen | 3 | 30 | 12 | 8 |
+| region_tempest | Tempest Reach | 4 | 30 | 12 | 8 |
+| region_frostmere | Frostmere Vale | 5 | 30 | 12 | 8 |
+| region_cinderfall | Cinderfall Crown | 6 | 30 | 12 | 8 |
+| region_hollow | The Hollow Below | 7 | authored finale | 7 | authored |
+
+Each surface-region module set includes:
+
+- 6 safe connectors;
+- 6 traversal modules;
+- 5 resource modules;
+- 4 combat arenas;
+- 3 rescue or story modules;
+- 3 puzzle modules;
+- 2 extraction variants;
+- 1 landmark approach.
+
+Modules can serve multiple tags but the final generated path must satisfy the
+required distribution. Visual transforms do not count as unique modules unless
+geometry and gameplay affordances differ.
+
+## Standard enemies
+
+### Bramblewake
+
+| ID | Name | Combat purpose |
+|---|---|---|
+| enemy_rootling | Rootling | basic melee pressure with clear lunge |
+| enemy_briarback | Briarback | shielded front encourages flanking |
+| enemy_pollen_wisp | Pollen Wisp | sleep cloud and visibility pressure |
+| enemy_hollow_crow | Hollow Crow | steals loose unbanked resource bundles |
+| enemy_snapvine | Snapvine | stationary route denial, cut or distract |
+| enemy_bark_ram | Bark Ram | telegraphed structure charge |
+
+### Ironroot
+
+| ID | Name | Combat purpose |
+|---|---|---|
+| enemy_cinder_mite | Cinder Mite | swarm pressure near heat |
+| enemy_rail_hound | Rail Hound | uses tracks for fast lane attacks |
+| enemy_slag_spitter | Slag Spitter | persistent hot zones |
+| enemy_shift_echo | Shift Echo | repeats a worker action as attack |
+| enemy_crank_guard | Crank Guard | slow armor with exposed mechanism |
+| enemy_gas_bloomer | Gas Bloomer | hazard source that can be redirected |
+
+### Mireglass
+
+| ID | Name | Combat purpose |
+|---|---|---|
+| enemy_reed_lurker | Reed Lurker | ambush silhouette in shallow water |
+| enemy_mirrorling | Mirrorling | copies last basic attack with delay |
+| enemy_mire_leech | Mire Leech | stamina drain, removable by ally |
+| enemy_false_friend | False Friend | mimics resident call, visual tells |
+| enemy_glass_heron | Glass Heron | precise ranged line attack |
+| enemy_bog_bell | Bog Bell | summons until interrupted |
+
+### Tempest
+
+| ID | Name | Combat purpose |
+|---|---|---|
+| enemy_gale_imp | Gale Imp | lateral wind projectile |
+| enemy_wreck_crawler | Wreck Crawler | climbs defenses and rigging |
+| enemy_storm_ray | Storm Ray | aerial charge passed through grounding |
+| enemy_salt_husk | Salt Husk | reforms near water unless dried |
+| enemy_rigging_snare | Rigging Snare | pulls player toward hazard |
+| enemy_breaker | Breaker | wave-shaped structure pressure |
+
+### Frostmere
+
+| ID | Name | Combat purpose |
+|---|---|---|
+| enemy_hush_pup | Hush Pup | tracks noise and isolated players |
+| enemy_rime_shell | Rime Shell | armor melts inside warmth |
+| enemy_bell_moth | Bell Moth | creates misleading sound cues |
+| enemy_snowbound | Snowbound | buried grab with visible trail |
+| enemy_cold_echo | Cold Echo | freezes recently used ability briefly |
+| enemy_ice_borer | Ice Borer | undermines floors and walls |
+
+### Cinderfall
+
+| ID | Name | Combat purpose |
+|---|---|---|
+| enemy_ash_extra | Ash Extra | common actor repeating ceremonial attack |
+| enemy_glass_knight | Glass Knight | reflects frontal projectiles |
+| enemy_kiln_worm | Kiln Worm | tunnels between heat sources |
+| enemy_crown_spark | Crown Spark | empowers nearby constructs |
+| enemy_parade_giant | Parade Giant | slow crowd divider |
+| enemy_false_citizen | False Citizen | repairs enemy props until revealed |
+
+### The Hollow Below
+
+| ID | Name | Combat purpose |
+|---|---|---|
+| enemy_name_eater | Name Eater | temporarily obscures labels, never controls |
+| enemy_seal_shade | Seal Shade | adopts one regional hazard |
+| enemy_regret_loop | Regret Loop | repeats an avoidable past hit pattern |
+| enemy_lantern_inverse | Lantern Inverse | creates dark safety and light danger |
+| enemy_keeper_fragment | Keeper Fragment | puzzle-combat memory projection |
+| enemy_hollow_hand | Hollow Hand | separates party with moving barriers |
+
+## Elites
+
+| ID | Name | Region | Signature |
+|---|---|---|---|
+| elite_old_growth | Old Growth | Bramblewake | roots entire lane, movable fire response |
+| elite_harvest_mare | Harvest Mare | Bramblewake | carries Rootlings and breaks formations |
+| elite_foreman_echo | Foreman Echo | Ironroot | commands machinery and marks unsafe zones |
+| elite_iron_widow | Iron Widow | Ironroot | rail-web network and cart ambush |
+| elite_many_face | The Many-Face | Mireglass | cycles visible copied profession |
+| elite_drowned_caller | Drowned Caller | Mireglass | summons through reflected pools |
+| elite_lighthouse_eater | Lighthouse Eater | Tempest | extinguishes beams and hides in storm wall |
+| elite_admiral_wreck | Admiral Wreck | Tempest | commands moving ship-debris cover |
+| elite_abbey_silence | Abbey Silence | Frostmere | suppresses sound cues, preserves visual cues |
+| elite_aurora_hart | Aurora Hart | Frostmere | splits warmth zones with light antlers |
+| elite_lead_actor | Lead Actor | Cinderfall | forces readable stage-pattern sequence |
+| elite_glass_bailiff | Glass Bailiff | Cinderfall | marks and sentences one structure |
+| elite_unspoken | The Unspoken | Hollow | disables one HUD label with icon fallback |
+| elite_last_regret | Last Regret | Hollow | remixes one prior boss mechanic at lower scope |
+
+## Chapter bosses
+
+| ID | Boss | Required phases | Non-profession solution |
+|---|---|---:|---|
+| boss_warden_stag | Warden Stag | 3 | cleanse root nodes, then expose heart |
+| boss_bellows_maw | Bellows Maw | 3 | reroute carts, vent pressure, strike core |
+| boss_lantern_witch | Lantern Witch | 4 | identify tells, use copies, consent seal |
+| boss_tidebound_titan | Tidebound Titan | 3 | climb wrecks, ground lightning, lower tide |
+| boss_white_howler | White Howler | 3 | manage noise, share warmth, track aurora |
+| boss_ash_regent | Ash Regent | 4 | expose authentic memories, break false statues |
+| boss_nameless_night | Nameless Night | 5 scenes | defend, pursue, rescue, witness, choose |
+
+Boss completion gates:
+
+- solo, 2-player, 4-player, and 8-player balance passes;
+- every attack has animation, shape, sound, and minimum telegraph timing;
+- recovery after one down is possible;
+- no profession or premium item is required;
+- disconnect and late-join behavior is defined;
+- skip/cinematic recap behavior is defined;
+- reward grants are idempotent.
+
+## Companions
+
+| ID | Companion | Region | Utility |
+|---|---|---|---|
+| companion_moss_fox | Moss Fox | Bramblewake | finds hidden plant cache |
+| companion_bark_beetle | Bark Beetle | Bramblewake | carries one construction stack |
+| companion_lantern_moth | Lantern Moth | Bramblewake | points toward safe return landmark |
+| companion_rail_mouse | Rail Mouse | Ironroot | detects active machinery |
+| companion_cinder_mole | Cinder Mole | Ironroot | reveals one ore seam |
+| companion_bell_bat | Bell Bat | Ironroot | sonar marks hollow wall |
+| companion_mirror_frog | Mirror Frog | Mireglass | identifies false ground |
+| companion_reed_otter | Reed Otter | Mireglass | retrieves one dropped common bundle |
+| companion_wisp_eel | Wisp Eel | Mireglass | powers one dormant rune socket |
+| companion_storm_gull | Storm Gull | Tempest | warns of lightning direction |
+| companion_rope_crab | Rope Crab | Tempest | anchors one temporary climb line |
+| companion_tide_newt | Tide Newt | Tempest | predicts next tide transition |
+| companion_hush_hare | Hush Hare | Frostmere | reduces noise while walking |
+| companion_ember_yak | Ember Yak | Frostmere | expands warmth radius while stationary |
+| companion_aurora_owl | Aurora Owl | Frostmere | highlights recent tracks |
+| companion_ash_cat | Ash Cat | Cinderfall | distinguishes real resident echoes |
+| companion_glass_gecko | Glass Gecko | Cinderfall | safely crosses one fragile surface |
+| companion_kiln_toad | Kiln Toad | Cinderfall | stores and releases one heat charge |
+
+Companion skins may be premium. Companion capabilities, bonding, and discovery
+are earned only through play.
+
+## Buildings
+
+| ID | Building | District | Functional purpose |
+|---|---|---|---|
+| building_first_lantern | First Lantern | Lantern Square | phase anchor, story, town integrity |
+| building_archive | Memory Archive | Lantern Square | codex, recap, mysteries, consent controls |
+| building_town_board | Town Board | Lantern Square | contracts and readiness vote |
+| building_celebration_stage | Celebration Stage | Lantern Square | events, endings, social emotes |
+| building_workbench | Lantern Workbench | Builder's Row | basic tools and structures |
+| building_sawmill | Sawmill | Builder's Row | wood refinement and modules |
+| building_forge | Union Forge | Builder's Row | weapons, armor, repair |
+| building_engineer_yard | Engineer Yard | Builder's Row | traps, mechanisms, testing |
+| building_inn | Wayfarer Inn | Hearthmarket | party formation and resident recovery |
+| building_kitchen | Common Kitchen | Hearthmarket | expedition food sidegrades |
+| building_market | Hearthmarket Stalls | Hearthmarket | rotating earned goods and cosmetics entry |
+| building_trade_post | Trade Post | Hearthmarket | restricted safe player exchange |
+| building_garden | Memory Garden | Greenward | plants and resident scenes |
+| building_apothecary | Apothecary | Greenward | medicine and alchemy |
+| building_waterworks | Waterworks | Greenward | fire response and town recovery |
+| building_companion_habitat | Companion Habitat | Greenward | bonding and utility loadout |
+| building_library | Quill Library | Scholar's Rise | recipes, lore, profession research |
+| building_observatory | Storm Observatory | Scholar's Rise | weather and seed forecast |
+| building_rune_lab | Rune Laboratory | Scholar's Rise | runes and memory traits |
+| building_map_room | Wayfarer Map Room | Scholar's Rise | region and route planning |
+| building_stables | Trail Stables | Beast Yard | companion care and region travel |
+| building_training_ground | Training Ground | Beast Yard | combat practice and mastery trials |
+| building_rescue_pens | Rescue Pens | Beast Yard | injured creature events |
+| building_trail_gate | Trail Gate | Beast Yard | expedition entry and reconnect |
+| building_guardhouse | Guardhouse | Watch Ring | resident defenders and one recovery |
+| building_watchtower | Watchtower | Watch Ring | lane warning and ranged support |
+| building_trapworks | Trapworks | Watch Ring | defense placement presets |
+| building_deep_gate | Deep Gate | Deep Gate | finale access and postgame network |
+
+Each building has three gameplay tiers, a damaged state, a repair state, resident
+interactions, day and night animation sets, and at least three earned visual sets.
+
+## Resource catalog
+
+| Region | Five primary resources |
+|---|---|
+| Bramblewake | heartwood, amber sap, meadow fiber, brightcap, spring clay |
+| Ironroot | ironroot ore, coalglass, glow fungus, machine oil, echo crystal |
+| Mireglass | mirror reed, bog iron, witchlight pollen, eel oil, blackwater herb |
+| Tempest | storm copper, salt crystal, sailcloth, coral bone, charged glass |
+| Frostmere | frostglass, wool moss, blue salt, ember lichen, aurora thread |
+| Cinderfall | cindersteel, memory glass, ash silk, kiln pearl, crown coal |
+
+Shared resources are food, clean water, scrap, cloth, stone, resin, and lantern
+oil. Finale components are bound story items and cannot be traded or purchased.
+
+Resource nodes require an interaction decision or traversal context; they are not
+idle-click props. Regional common resources have at least three sources so one
+event cannot block progression.
+
+## Equipment families
+
+### Weapons
+
+| ID | Family | Identity |
+|---|---|---|
+| weapon_blade | Blade | balanced combo, guard, precise counter |
+| weapon_hammer | Hammer | structure damage, stagger, slow commitment |
+| weapon_spear | Spear | reach, lane control, brace |
+| weapon_bow | Bow | weak-point setup, retrieval, line of sight |
+| weapon_sling | Sling | mobile ranged utility and status payload |
+| weapon_lantern_staff | Lantern Staff | runes, wards, support, lower physical damage |
+
+### Tools
+
+| ID | Family | Primary uses |
+|---|---|---|
+| tool_axe | Axe | wood, vines, emergency wedge |
+| tool_pick | Pick | ore, breakable stone, armor crack |
+| tool_hammer | Builder Hammer | build, repair, mechanism reset |
+| tool_sickle | Sickle | plants, reeds, snare removal |
+| tool_lantern | Field Lantern | darkness, signals, rune sockets |
+| tool_fishing | Fishing Kit | food, salvage, water events |
+| tool_climbing | Climbing Kit | anchors, ropes, vertical routes |
+| tool_survey | Survey Kit | map, weather, secrets, safe route |
+
+### Crafting target
+
+The 180 launch recipes are allocated as:
+
+- 36 weapons and weapon variants;
+- 32 tools and tool variants;
+- 28 armor or wearable sidegrades;
+- 30 food and medicine recipes;
+- 24 traps and defense devices;
+- 18 town project components;
+- 12 companion and exploration utilities.
+
+No recipe may be a strict paid upgrade. Each recipe declares source, station,
+region, town tier, mastery requirement, ingredients, output, analytics ID,
+salvage result, and migration version.
+
+## Dynamic events
+
+Each surface region ships eight event templates:
+
+### Bramblewake
+
+`event_bw_moving_hedge`, `event_bw_lost_wagon`, `event_bw_pollen_storm`,
+`event_bw_root_bridge`, `event_bw_hungry_homestead`, `event_bw_foxlight_trail`,
+`event_bw_stag_tracks`, `event_bw_wildfire_choice`.
+
+### Ironroot
+
+`event_ir_runaway_cart`, `event_ir_gas_leak`, `event_ir_shift_change`,
+`event_ir_cave_rescue`, `event_ir_machine_vote`, `event_ir_lost_lunchbox`,
+`event_ir_fungus_bloom`, `event_ir_bell_warning`.
+
+### Mireglass
+
+`event_mg_mirror_party`, `event_mg_sinking_house`, `event_mg_ferry_bargain`,
+`event_mg_false_rescue`, `event_mg_eel_migration`, `event_mg_reed_fire`,
+`event_mg_three_answers`, `event_mg_drowned_market`.
+
+### Tempest
+
+`event_tr_signal_chain`, `event_tr_sudden_tide`, `event_tr_wreck_survivor`,
+`event_tr_lightning_map`, `event_tr_sail_lift`, `event_tr_storm_eye`,
+`event_tr_gull_delivery`, `event_tr_broken_beacon`.
+
+### Frostmere
+
+`event_fv_warmth_split`, `event_fv_abbey_bell`, `event_fv_thin_ice`,
+`event_fv_aurora_tracks`, `event_fv_frozen_letter`, `event_fv_whiteout_camp`,
+`event_fv_quiet_hunt`, `event_fv_thaw_choice`.
+
+### Cinderfall
+
+`event_cc_parade_loop`, `event_cc_glass_family`, `event_cc_kiln_restart`,
+`event_cc_actor_rescue`, `event_cc_ash_storm`, `event_cc_false_shop`,
+`event_cc_cooling_channel`, `event_cc_empty_applause`.
+
+Every event defines start conditions, incompatible events, minimum route space,
+solo and group variants, failure resolution, reward transaction, NPC aftermath,
+localization, analytics, and a kill switch.
+
+## Points of interest
+
+Each region's 12 POIs consist of:
+
+- 4 story or resident locations;
+- 2 traversal challenges;
+- 2 puzzles or mysteries;
+- 2 resource-risk sites;
+- 1 elite arena;
+- 1 hidden sanctuary.
+
+At least four POIs per region change after chapter completion. POIs do not all
+spawn in one expedition; the seed history system reduces immediate repetition.
+
+## Quest inventory
+
+| Quest family | Launch count | Requirement |
+|---|---:|---|
+| Prologue | 1 arc / 7 beats | authored first-session path |
+| Chapter | 7 arcs / 56 missions | critical story and boss path |
+| Resident | 24 arcs / 72+ missions | minimum three steps each |
+| Profession mastery | 21 trials | three signature trials per profession |
+| Region mysteries | 42 | six per surface region, six finale echoes |
+| Contract templates | 36 | parameterized, validated, non-repetitive |
+| Crisis templates | 18 | based on damage, injury, relationships, weather |
+| Postgame | 9 | three ending follow-ups plus region restoration |
+
+Quest steps use stable IDs and idempotent completion. A player can always recover
+from disconnect between objective completion and reward.
+
+## Cosmetics and expression
+
+Earned and premium catalogs may include:
+
+- avatar-compatible outfits and accessories;
+- tool and weapon appearances;
+- lantern shells, light trails, and emotes;
+- companion skins;
+- building facades, signs, furniture, banners, plants, and weather-safe decorations;
+- celebration poses, profile frames, titles, and town arrival effects.
+
+All effects have intensity caps and reduced-effects alternatives. Cosmetics cannot
+imitate hazard colors, enemy telegraphs, moderation/admin indicators, rarity beams,
+or another player's interaction prompts.
+
