@@ -22,6 +22,8 @@ export type NetworkService = typeof(setmetatable(
         _actionHandler: ((Player, any) -> ())?,
         _snapshotProvider: ((Player) -> any)?,
         _snapshotCache: { [Player]: { at: number, value: any } },
+        _lastActionAt: { [Player]: number },
+        _lastStateAt: { [Player]: number },
     },
     NetworkService
 ))
@@ -37,7 +39,41 @@ function NetworkService.new(logger: Logger): NetworkService
         _actionHandler = nil,
         _snapshotProvider = nil,
         _snapshotCache = {},
+        _lastActionAt = {},
+        _lastStateAt = {},
     }, NetworkService)
+end
+
+local function isValidActionPayload(payload: any): boolean
+    if type(payload) ~= "table" or payload.schemaVersion ~= 1 then
+        return false
+    end
+
+    local kind = payload.kind
+    if type(kind) ~= "string" or #kind == 0 or #kind > 32 then
+        return false
+    end
+
+    local fieldCount = 0
+    for key, value in payload do
+        fieldCount += 1
+        if fieldCount > 6 or type(key) ~= "string" then
+            return false
+        end
+        local valueType = type(value)
+        if valueType == "string" then
+            if #value > 128 then
+                return false
+            end
+        elseif valueType == "number" then
+            if value ~= value or value == math.huge or value == -math.huge then
+                return false
+            end
+        elseif valueType ~= "boolean" and valueType ~= "number" then
+            return false
+        end
+    end
+    return true
 end
 
 local function makeRemote(className: string, name: string, parent: Instance): Instance
@@ -74,6 +110,18 @@ function NetworkService.Start(self: NetworkService)
     local getState = assert(self._getState, "state function unavailable")
 
     actionRequest.OnServerEvent:Connect(function(player: Player, payload: any)
+        if type(payload) ~= "table" then
+            return
+        end
+        if not isValidActionPayload(payload) then
+            return
+        end
+        local now = os.clock()
+        local lastActionAt = self._lastActionAt[player]
+        if lastActionAt ~= nil and os.clock() - lastActionAt < 0.05 then
+            return
+        end
+        self._lastActionAt[player] = now
         local handler = self._actionHandler
         if handler ~= nil then
             handler(player, payload)
@@ -81,6 +129,14 @@ function NetworkService.Start(self: NetworkService)
     end)
 
     getState.OnServerInvoke = function(player: Player)
+        if typeof(player) ~= "Instance" or not player:IsA("Player") then
+            return nil
+        end
+        local lastStateAt = self._lastStateAt[player]
+        if lastStateAt ~= nil and os.clock() - lastStateAt < 0.1 then
+            return nil
+        end
+        self._lastStateAt[player] = os.clock()
         local provider = self._snapshotProvider
         if provider == nil then
             return nil
@@ -100,6 +156,8 @@ function NetworkService.Start(self: NetworkService)
     end
     Players.PlayerRemoving:Connect(function(player: Player)
         self._snapshotCache[player] = nil
+        self._lastActionAt[player] = nil
+        self._lastStateAt[player] = nil
     end)
 
     self._logger:info("network_started", { schemaVersion = 1 })

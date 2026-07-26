@@ -174,6 +174,7 @@ function TownNightService._runCycle(self: TownNightService)
         if onNightCompleted ~= nil then
             onNightCompleted(activeNight + 1)
         end
+        task.wait(0)
     end
 end
 

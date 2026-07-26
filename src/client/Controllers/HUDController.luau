@@ -887,7 +887,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     professionClose.Activated:Connect(function()
         self:setProfessionMenuOpen(false)
     end)
-    for professionId, card in professionCards do
+    local function bindProfessionCard(professionId: string, card: TextButton)
         card.Activated:Connect(function()
             if not self._professionSwitchable then
                 return
@@ -898,6 +898,9 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
             end
             self:setProfessionMenuOpen(false)
         end)
+    end
+    for professionId, card in professionCards do
+        bindProfessionCard(professionId, card)
     end
 
     local viewportConnection: RBXScriptConnection? = nil
