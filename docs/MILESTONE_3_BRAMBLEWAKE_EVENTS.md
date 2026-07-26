@@ -4,7 +4,7 @@
 
 This increment activates the four representative event sockets in the current
 Bramblewake route. It does not mark the vertical slice complete. The complete
-eight-event regional catalog, persistent inventory settlement, professions,
+eight-event regional catalog, full inventory/crafting, professions,
 combat roster, boss, nights, town tier, and final production art remain later
 Milestone 3 work.
 
@@ -14,8 +14,8 @@ Implemented in source:
   failed, and disabled states;
 - 13 stable interaction steps distributed across the four events;
 - shared solo/group contributions with duplicate-delivery idempotency;
-- deterministic reward transaction IDs derived from manifest hash and event ID;
-- a server-session unbanked material ledger for contributing players;
+- deterministic reward transaction IDs derived from run, manifest, and event IDs;
+- a durable unbanked profile pouch plus server-session fallback ledger;
 - event start, completion, failure, rejection, and reward-grant telemetry;
 - server distance, expedition-state, payload-shape, and global rate validation;
 - an event-layer kill switch that disables prompts without invalidating a seed;
@@ -24,10 +24,9 @@ Implemented in source:
 - distinct event props and readable completed/failed world states;
 - pure lifecycle tests and Studio DataModel contract assertions.
 
-The unbanked event ledger is intentionally session-only in this increment.
-Persistent inventory banking, reconnect settlement, and recovery caches arrive
-with the inventory/extraction slice. The HUD calls these rewards unbanked, and
-the game must not claim they are saved yet.
+The follow-on [inventory and extraction increment](MILESTONE_3_INVENTORY_EXTRACTION.md)
+persists this pouch, migrates schema-1 profiles, and banks it at Wayhome Gate.
+Recovery caches and the full inventory/crafting interface remain later work.
 
 ## Event contracts
 
@@ -54,12 +53,11 @@ Each step can commit once. Duplicate delivery returns the existing result and
 cannot advance progress or grant again. Completion creates one transaction ID:
 
 ```text
-event_reward:<manifest hash>:<event ID>
+event_reward:<run ID>:<manifest hash>:<event ID>
 ```
 
-Each contributing user can receive that transaction once in the server-session
-ledger. This is the idempotency boundary until persistent inventory settlement
-is implemented.
+Each contributing user can receive that transaction once. Profile persistence
+and the server-session fallback share the same stable transaction ID.
 
 ## Windows Studio journey
 

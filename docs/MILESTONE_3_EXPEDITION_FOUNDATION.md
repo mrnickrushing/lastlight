@@ -27,8 +27,8 @@ Implemented:
 
 Not implemented by this increment:
 
-- persistent event reward settlement or the remaining four Bramblewake events;
-- profession kits, full inventory, crafting, quests, or extraction settlement;
+- recovery caches or the remaining four Bramblewake events;
+- profession kits, full inventory UI/capacity, crafting, or quests;
 - the complete enemy roster, elite, boss, normal night, or Blackout;
 - final module art, audio, VFX, navigation bake, or device evidence;
 - Milestone 2's still-open ten-new-tester and device gate.

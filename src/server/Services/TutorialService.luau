@@ -272,6 +272,12 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self:_publishAll()
         return
     end
+    if actionId == self._runtimeIds.Actions.Extract then
+        local result = self._expeditionService:extract(player)
+        self:_setToast(player, result.message)
+        self:_publishAll()
+        return
+    end
 
     if actionId == self._runtimeIds.Actions.Build and session.resources < 3 then
         self:_setToast(player, "YOU NEED 3 HEARTWOOD")
@@ -464,7 +470,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         progress = expedition.moduleIndex
         total = expedition.moduleTotal
         objective = if expedition.moduleIndex == expedition.moduleTotal
-            then "REACH THE WAYHOME GATE"
+            then "BANK REWARDS AT THE WAYHOME GATE"
             else "FOLLOW THE FOXFIRE TRAIL"
         local discovery = expedition.pointOfInterestName or expedition.eventName
         detail = if discovery == nil
@@ -535,6 +541,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             then nil
             else expedition.event.total,
         unbankedExpeditionRewards = expedition.unbankedRewards,
+        bankedMaterials = expedition.bankedMaterials,
     }
 end
 

@@ -68,11 +68,13 @@ full DataModel. The first engine integration test is intentionally separate:
    [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md).
 9. Complete and deliberately expire events using
    [MILESTONE_3_BRAMBLEWAKE_EVENTS.md](MILESTONE_3_BRAMBLEWAKE_EVENTS.md).
-10. Stop immediately if any assertion errors.
+10. Bank rewards and return through Wayhome using
+    [MILESTONE_3_INVENTORY_EXTRACTION.md](MILESTONE_3_INVENTORY_EXTRACTION.md).
+11. Stop immediately if any assertion errors.
 
 The test verifies the real Rojo tree, shared module replication, seven-region
-registry, save-schema constant, eight tutorial interactions, 13 active event
-interactions, runtime remotes,
+registry, save-schema-v2 constant, eight tutorial interactions, 13 active event
+interactions, one extraction interaction, runtime remotes,
 Input Action System rollout, world readiness, arrival collision, deterministic
 Bramblewake replay, 12 streamed modules, four POIs, four event state contracts,
 mobile part budget, and service initialization/start lifecycle. Human play is still

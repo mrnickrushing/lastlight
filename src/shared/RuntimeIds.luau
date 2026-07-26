@@ -10,6 +10,7 @@ local RuntimeIds = {
     ExpeditionPointOfInterestTag = "LastLightExpeditionPOI",
     ExpeditionEventTag = "LastLightExpeditionEvent",
     ExpeditionEventStepTag = "LastLightExpeditionEventStep",
+    ExpeditionExtractionTag = "LastLightExpeditionExtraction",
     eventInteractionId = ExpeditionEventFlow.interactionId,
     Remotes = table.freeze({
         ActionRequest = "ActionRequest",
@@ -28,6 +29,7 @@ local RuntimeIds = {
         Sprint = "sprint",
         CompactHud = "compact_hud",
         ExpeditionEvent = "expedition_event",
+        Extract = "extract",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -38,6 +40,7 @@ local RuntimeIds = {
         Barricade = "barricade_build",
         Lantern = "first_lantern_prepare",
         Beacon = "bramblewake_reveal",
+        Wayhome = "bramblewake_wayhome",
     }),
 }
 

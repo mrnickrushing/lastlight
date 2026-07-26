@@ -564,6 +564,7 @@ function BramblewakeBuilder.build(
     local centers: { Vector3 } = {}
     local eventInteractions = {}
     local eventSockets: { [string]: BasePart } = {}
+    local extractionTarget: BasePart? = nil
     for _, placement in manifest.modules do
         centers[placement.index] = ORIGIN
             + Vector3.new(placement.cellX * catalog.CellSize, 0, placement.cellZ * catalog.CellSize)
@@ -614,6 +615,17 @@ function BramblewakeBuilder.build(
             tree(module, center + Vector3.new(x, 0, z), 0.62 + (cornerIndex % 2) * 0.08)
         end
         buildModuleVisual(module, definition.visual, center)
+        if definition.role == "extraction" then
+            local target = module:FindFirstChild("WayhomeLight")
+            assert(
+                target ~= nil and target:IsA("BasePart"),
+                "Wayhome Gate is missing its extraction target"
+            )
+            target:SetAttribute("ContentId", placement.moduleId)
+            target:SetAttribute("ExtractionId", "extraction_bw_wayhome")
+            CollectionService:AddTag(target, runtimeIds.ExpeditionExtractionTag)
+            extractionTarget = target
+        end
 
         if placement.poiId ~= nil then
             buildPointOfInterest(
@@ -662,6 +674,7 @@ function BramblewakeBuilder.build(
     expedition:SetAttribute("PointOfInterestCount", catalog.PointOfInterestCount)
     expedition:SetAttribute("EventCount", catalog.EventCount)
     expedition:SetAttribute("EventInteractionCount", #eventInteractions)
+    expedition:SetAttribute("ExtractionReady", extractionTarget ~= nil)
     expedition:SetAttribute("Ready", true)
 
     local moduleCenters = {}
@@ -675,6 +688,7 @@ function BramblewakeBuilder.build(
     return {
         model = expedition,
         entryCFrame = CFrame.new(centers[1] + Vector3.new(0, 5, 0)),
+        extractionTarget = assert(extractionTarget, "Bramblewake extraction target is missing"),
         eventInteractions = eventInteractions,
         eventSockets = eventSockets,
         moduleCenters = moduleCenters,

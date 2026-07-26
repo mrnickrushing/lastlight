@@ -1,6 +1,7 @@
 --!strict
 
 local TutorialFlow = require("./TutorialFlow")
+local ExpeditionInventory = require("./ExpeditionInventory")
 
 local SaveSchema = {}
 
@@ -17,11 +18,12 @@ export type Profile = {
     updatedAt: number,
     revision: number,
     tutorial: Tutorial,
+    inventory: any,
 }
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 1,
+        schemaVersion = 2,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -31,6 +33,7 @@ function SaveSchema.default(now: number): Profile
             selectedTool = nil,
             completedAt = nil,
         },
+        inventory = ExpeditionInventory.default(),
     }
 end
 
@@ -78,7 +81,8 @@ function SaveSchema.normalize(value: any, now: number): Profile
         end
     end
 
-    profile.schemaVersion = 1
+    profile.inventory = ExpeditionInventory.normalize(value.inventory)
+    profile.schemaVersion = 2
     return profile
 end
 
@@ -103,6 +107,72 @@ function SaveSchema.withTutorial(
     nextProfile.updatedAt = now
     nextProfile.revision += 1
     return nextProfile
+end
+
+function SaveSchema.withUnbankedExpeditionReward(
+    profile: Profile,
+    transactionId: string,
+    manifestHash: string,
+    reward: any,
+    now: number
+): (Profile, any)
+    local nextInventory, result =
+        ExpeditionInventory.addUnbanked(profile.inventory, transactionId, manifestHash, reward, now)
+    if not result.applied then
+        return profile, result
+    end
+
+    local nextProfile = table.clone(profile)
+    nextProfile.inventory = nextInventory
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.expeditionPending(profile: Profile): any
+    return ExpeditionInventory.pending(profile.inventory)
+end
+
+function SaveSchema.expeditionSettlementId(
+    runId: string,
+    userId: number,
+    pendingFingerprint: string
+): string
+    return ExpeditionInventory.settlementId(runId, userId, pendingFingerprint)
+end
+
+function SaveSchema.withExpeditionSettlement(
+    profile: Profile,
+    settlementId: string,
+    manifestHash: string,
+    now: number
+): (Profile, any)
+    local nextInventory, result =
+        ExpeditionInventory.settle(profile.inventory, settlementId, manifestHash, now)
+    if not result.applied then
+        return profile, result
+    end
+
+    local nextProfile = table.clone(profile)
+    nextProfile.inventory = nextInventory
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.hasExpeditionSettlement(profile: Profile, settlementId: string): boolean
+    return ExpeditionInventory.hasSettlement(profile.inventory, settlementId)
+end
+
+function SaveSchema.hasExpeditionReward(profile: Profile, transactionId: string): boolean
+    return ExpeditionInventory.hasReward(profile.inventory, transactionId)
+end
+
+function SaveSchema.findExpeditionSettlementForRewards(
+    profile: Profile,
+    rewardTransactionIds: { string }
+): (string?, any?)
+    return ExpeditionInventory.findSettlementForRewards(profile.inventory, rewardTransactionIds)
 end
 
 return table.freeze(SaveSchema)
