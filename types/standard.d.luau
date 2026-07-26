@@ -1,0 +1,2 @@
+-- Engine-independent modules use Luau's standard platform definitions.
+-- This named definitions file keeps standalone analysis explicit and warning-free.

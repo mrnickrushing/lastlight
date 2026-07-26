@@ -1,5 +1,9 @@
 --!strict
 
--- Milestone 0 bootstrap only. Input and HUD controllers arrive in the vertical slice.
-print("[Last Light] Client scaffold loaded")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
+local root = ReplicatedStorage:WaitForChild("LastLight", 8)
+assert(root ~= nil, "Last Light shared root did not replicate before client bootstrap timeout")
+
+local Config = require(root.Config)
+print(string.format("[Last Light] Client boot %s", Config.BuildVersion))

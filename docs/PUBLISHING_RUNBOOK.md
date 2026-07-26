@@ -1,0 +1,91 @@
+# Roblox publishing runbook
+
+## Purpose
+
+This runbook moves a verified Last Light source revision into private Roblox
+places without making binary Studio files the source of truth. Public release
+remains gated by the roadmap and [RELEASE_GATES.md](RELEASE_GATES.md).
+
+## One-time universe setup
+
+1. Create the **Last Light** experience in the intended owner/group.
+2. Keep access private while implementation is incomplete.
+3. Create an Emberhollow start place and an internal test place.
+4. Do not create expedition/finale places until the topology decision gate says
+   their operational cost is justified.
+5. Record universe and place ownership outside source control; IDs are not
+   secrets, but production changes still require review.
+6. Add only approved production place IDs to `Config.ProductionPlaceIds` through
+   a reviewed PR.
+7. Configure age/content disclosures, localization ownership, moderation,
+   private servers, API access, and products only when their milestone is ready.
+
+Never commit Roblox cookies, Open Cloud API keys, `.ROBLOSECURITY`, secrets,
+downloaded place binaries, or production datastore exports.
+
+## Local/private build
+
+```bash
+git switch main
+git pull --ff-only origin main
+npm run bootstrap
+npm run build
+```
+
+Use `build/LastLight.rbxlx` for a private Studio inspection or connect the Rojo
+plugin to:
+
+```bash
+rojo serve default.project.json
+```
+
+Before publishing, run the Studio integration test in
+`build/LastLightTest.rbxlx` and retain the tested Git commit in the release
+notes.
+
+## Private publish checklist
+
+- GitHub `main` is clean and matches the tested local commit.
+- `npm test` passes from that commit.
+- Studio integration output shows its PASS marker with no boot warnings.
+- The target is the intended private universe and place.
+- `LastLightEnvironment` is not set to `production` on an unregistered place.
+- Streaming settings match `default.project.json`.
+- No Toolbox or third-party assets lack provenance.
+- No product, entitlement, or persistent-data path is enabled unintentionally.
+- Feature flags expose only the current milestone.
+
+Publish from Studio to the private target, then restart a fresh private server.
+Do not treat a local Play session as published verification.
+
+## Published verification
+
+For the current foundation milestone:
+
+1. Join with a fresh test account.
+2. Confirm the client and server boot versions match the Git commit's package
+   version.
+3. Confirm the environment is `staging`, not production.
+4. Confirm the seven-region registry loads and only Bramblewake's feature flag
+   defaults on.
+5. Confirm no infinite-yield, boot-error, or full-world-loading message appears.
+6. Confirm the private server can be shut down and rejoined.
+
+Milestone-specific journey, device, data, commerce, performance, and rollback
+checks are additive; this foundation checklist never replaces them.
+
+## Promotion and rollback
+
+Public promotion is forbidden until the launch-candidate and staged-rollout
+gates pass. Every published change records:
+
+- Git commit and merged PR;
+- target universe/place and version;
+- active flags;
+- validation and device evidence;
+- data/schema impact;
+- rollback version and kill switches.
+
+If boot, data, security, or content validation fails, stop promotion, disable
+the affected flag, revert to the last known-good place version, preserve logs,
+and repair through a new reviewed branch and PR.

@@ -8,20 +8,27 @@ professions, rebuild a persistent lantern town, and defend it from creatures tha
 arrive after sunset. Every seventh defense is a rule-changing **Blackout** that
 advances the central mystery beneath the town.
 
-This repository begins with a full production blueprint and a Rojo-ready source
-scaffold. It does **not** yet claim that the complete playable game exists.
+This repository begins with a full production blueprint and is now moving
+through implementation milestones. It does **not** yet claim that the complete
+playable game exists.
 
 ## Current status
 
-**Pre-production blueprint complete; implementation not started.**
+**Milestone 1 executable foundation implemented; Studio integration playtest pending.**
 
 The repository currently contains:
 
 - the complete launch vision, world, story, systems, content targets, and economy;
 - a milestone-by-milestone implementation and release plan;
 - mobile, accessibility, performance, security, analytics, and QA gates;
-- a Rojo project scaffold and automated documentation validation;
+- a pinned Rokit toolchain and reproducible game/test-place builds;
+- typed environment, logging, feature-flag, service-lifecycle, and content-registry foundations;
+- pure Luau tests plus a dedicated Studio integration-test place;
+- automated documentation, format, lint, type, test, and build validation;
 - a hosted visual direction report for the gameplay HUD.
+
+The next player-visible milestone is the graybox first ten minutes: a safe arrival,
+gathering, rescue, construction, one enemy, and the first authored night.
 
 The current UI direction is documented in the
 [Last Light mobile gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create).
@@ -204,35 +211,48 @@ The launch is done only when all of the following are true:
   mobile, performance, save, commerce, exploit, and rollout validation.
 - [Release gates](docs/RELEASE_GATES.md) — numeric beta, canary, promotion,
   pause, and rollback criteria.
+- [Development guide](docs/DEVELOPMENT.md) — pinned tools, setup, commands,
+  test layers, environments, service patterns, and upgrades.
+- [Publishing runbook](docs/PUBLISHING_RUNBOOK.md) — safe universe/place setup,
+  private publishing, verification, promotion, and rollback.
 - [Decision log](docs/DECISIONS.md) — durable product and architecture decisions.
 
 ## Repository layout
 
 ```text
-src/                 Rojo-mapped Luau source
-docs/                Complete production blueprint
-scripts/             Repository validation
+src/                 Rojo-mapped runtime Luau source
+tests/               Pure Luau and Studio integration tests
+docs/                Production blueprint and runbooks
+scripts/             Bootstrap, build, type, and blueprint validation
 .github/workflows/   Pull-request and main-branch checks
-default.project.json Rojo data-model mapping and streaming defaults
+rokit.toml           Exact Roblox development-tool versions
+*.project.json       Game and integration-test DataModel mappings
 ```
 
 ## Getting started
 
-Planning validation needs Node.js 20 or newer:
+Install [Rokit](https://github.com/rojo-rbx/rokit#installation), then trust the
+five reviewed tool sources once and bootstrap:
 
 ```bash
-npm test
+rokit trust rojo-rbx/rojo johnnymorganz/stylua kampfkarren/selene lune-org/lune johnnymorganz/luau-lsp
+npm run bootstrap
 ```
 
-Once the implementation toolchain is pinned, install Rojo and the Luau
-formatting/linting tools listed by that milestone, then:
+Bootstrap installs the exact versions in `rokit.toml`, validates the blueprint,
+formats/lints/type-checks the Luau foundation, runs pure tests, and builds
+`build/LastLight.rbxlx` plus `build/LastLightTest.rbxlx`.
+
+For the live source-to-Studio loop:
 
 ```bash
 rojo serve default.project.json
 ```
 
-Connect the Rojo Studio plugin to `localhost:34872`. The scaffold currently
-prints boot messages; it is not yet a game.
+Connect the Rojo Studio plugin to `localhost:34872`. For the current Studio
+integration test, open `build/LastLightTest.rbxlx`, press Play, and confirm the
+server output contains `[Last Light] PASS FoundationIntegration`. Full setup and
+Windows instructions are in [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 ## Delivery workflow
 

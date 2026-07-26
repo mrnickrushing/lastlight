@@ -8,6 +8,8 @@ const requiredFiles = [
   "AGENTS.md",
   "CONTRIBUTING.md",
   "default.project.json",
+  "test.project.json",
+  "rokit.toml",
   "docs/GAME_DESIGN_DOCUMENT.md",
   "docs/WORLD_BIBLE.md",
   "docs/CONTENT_CATALOG.md",
@@ -19,11 +21,24 @@ const requiredFiles = [
   "docs/PRODUCTION_ROADMAP.md",
   "docs/QA_RELEASE_PLAN.md",
   "docs/RELEASE_GATES.md",
+  "docs/DEVELOPMENT.md",
+  "docs/PUBLISHING_RUNBOOK.md",
   "docs/DECISIONS.md",
+  "src/shared/Environment.luau",
+  "src/shared/Content/ContentId.luau",
+  "src/shared/Content/Registry.luau",
+  "src/shared/Content/Definitions/Regions.luau",
+  "src/server/ServiceRegistry.luau",
+  "src/server/Services/FeatureFlagService.luau",
+  "src/server/Services/Logger.luau",
   "src/shared/Config.luau",
   "src/server/init.server.luau",
   "src/client/init.client.luau",
-  "src/first/init.client.luau"
+  "src/first/init.client.luau",
+  "tests/run.luau",
+  "tests/studio/FoundationIntegration.server.luau",
+  "scripts/verify-build.luau",
+  "types/standard.d.luau"
 ];
 
 const failures = [];
@@ -34,11 +49,22 @@ for (const file of requiredFiles) {
   }
 }
 
-for (const jsonFile of ["package.json", "default.project.json"]) {
+for (const jsonFile of ["package.json", "default.project.json", "test.project.json"]) {
   try {
     JSON.parse(readFileSync(join(root, jsonFile), "utf8"));
   } catch (error) {
     failures.push(`invalid JSON in ${jsonFile}: ${error.message}`);
+  }
+}
+
+const rokitPath = join(root, "rokit.toml");
+if (existsSync(rokitPath)) {
+  const rokit = readFileSync(rokitPath, "utf8");
+  for (const tool of ["rojo", "stylua", "selene", "lune", "luau-lsp"]) {
+    const exactPin = new RegExp(`^${tool} = "[^"]+@\\d+\\.\\d+\\.\\d+"$`, "m");
+    if (!exactPin.test(rokit)) {
+      failures.push(`rokit.toml must exactly pin ${tool}`);
+    }
   }
 }
 
