@@ -3,11 +3,13 @@
 local TestRunner = require("./TestRunner")
 
 TestRunner.run({
+    require("./specs/BramblewakeEnemies.spec"),
     require("./specs/CombatState.spec"),
     require("./specs/ContentId.spec"),
     require("./specs/ContentRegistry.spec"),
     require("./specs/Environment.spec"),
     require("./specs/EnemyAttackFlow.spec"),
+    require("./specs/EnemyCombatRules.spec"),
     require("./specs/ExpeditionEventFlow.spec"),
     require("./specs/ExpeditionGenerator.spec"),
     require("./specs/ExpeditionInventory.spec"),
@@ -20,5 +22,6 @@ TestRunner.run({
     require("./specs/SaveSchema.spec"),
     require("./specs/ServiceRegistry.spec"),
     require("./specs/SurvivalState.spec"),
+    require("./specs/StatusEffectState.spec"),
     require("./specs/TutorialFlow.spec"),
 })

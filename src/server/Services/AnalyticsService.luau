@@ -253,15 +253,23 @@ function AnalyticsService.combatAction(
     end
 end
 
-function AnalyticsService.enemyAttackResult(self: AnalyticsService, player: Player, result: string)
+function AnalyticsService.enemyAttackResult(
+    self: AnalyticsService,
+    player: Player,
+    result: string,
+    enemyId: string?
+)
+    local resolvedEnemyId = string.sub(enemyId or "enemy_unknown", 1, 48)
     self._logger:info("enemy_attack_result", {
-        enemy = "enemy_bramblewake_rootling",
+        enemy = resolvedEnemyId,
         player = player.UserId,
         result = result,
     })
     if result == "dodged" and not RunService:IsStudio() then
         pcall(function()
-            RobloxAnalytics:LogCustomEvent(player, "RootlingAttackDodged", 1, {})
+            RobloxAnalytics:LogCustomEvent(player, "EnemyAttackDodged", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = resolvedEnemyId,
+            })
         end)
     end
 end

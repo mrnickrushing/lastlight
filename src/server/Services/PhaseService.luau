@@ -112,7 +112,7 @@ function PhaseService.startFirstNight(self: PhaseService): boolean
                 return
             end
             if beat.kind == "spawn" then
-                self._enemyService:spawn()
+                self._enemyService:spawn(beat.enemyId)
             elseif beat.kind == "breach" then
                 self._enemyService:setBreach()
             elseif beat.kind == "warning" then

@@ -69,7 +69,7 @@ this milestone to complete from CI alone.
 - touch, keyboard/mouse, and controller movement/actions;
 - one gather node, one rescue, one tool choice, one construction plot;
 - Mara's tutorial behavior;
-- one enemy and one two-minute authored night;
+- one six-enemy sequence and one two-minute authored night;
 - first reveal and persistent tutorial completion;
 - context-sensitive HUD prototype plus compact fallback;
 - basic analytics funnel.
@@ -86,18 +86,20 @@ this milestone to complete from CI alone.
 
 **Increment status (2026-07-26):** the expedition foundation, first active
 event layer, durable extraction settlement, player rescue loop, combat
-mobility/telegraph foundation, and four basic profession kits are
+mobility/telegraph foundation, the complete standard Bramblewake enemy roster,
+and four basic profession kits are
 implemented in source. The slice now has 12 representative modules, four POIs,
 four active events with 13 shared steps, deterministic assembly, a known-good
 fallback, 1,000-seed invariants, streamed preview geometry, beacon entry,
 fall recovery, timeout-safe optional routes, schema-v3 unbanked/banked materials
 and profession choice,
 run-specific reward and settlement tombstones, Wayhome return, kill switch,
-telemetry, HUD progress, server-owned health, Rootling contact damage, downed
+telemetry, HUD progress, server-owned health, six distinct enemy attacks, downed
 crawl, interruption-safe revive, bleedout-safe retreat, server stamina,
-sprint/dodge timing, a Rootling swipe telegraph, Scout mark/slow, Warden guard,
-Engineer lantern repair, Medic area heal, and role-aware telemetry/HUD.
-Profession mastery/specializations, full inventory/crafting/quests, the remaining enemies, elite,
+sprint/dodge timing, circle/lane telegraphs, flank defense, drowsy and light-theft
+pressure, Scout mark/slow, Warden guard, Engineer lantern repair, Medic area heal,
+and role-aware telemetry/HUD.
+Profession mastery/specializations, full inventory/crafting/quests, elite,
 boss, normal night, Blackout, town tier, final art/audio, and all
 Studio/device/group evidence remain open. See
 [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md) and
@@ -105,7 +107,8 @@ Studio/device/group evidence remain open. See
 [MILESTONE_3_INVENTORY_EXTRACTION.md](MILESTONE_3_INVENTORY_EXTRACTION.md), and
 [MILESTONE_3_PLAYER_SURVIVAL.md](MILESTONE_3_PLAYER_SURVIVAL.md), and
 [MILESTONE_3_COMBAT_MOBILITY.md](MILESTONE_3_COMBAT_MOBILITY.md), and
-[MILESTONE_3_PROFESSION_KITS.md](MILESTONE_3_PROFESSION_KITS.md).
+[MILESTONE_3_PROFESSION_KITS.md](MILESTONE_3_PROFESSION_KITS.md), and
+[MILESTONE_3_BRAMBLEWAKE_ENEMIES.md](MILESTONE_3_BRAMBLEWAKE_ENEMIES.md).
 
 ### Deliverables
 

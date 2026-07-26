@@ -5,14 +5,18 @@ local NightSchedule = {}
 export type Beat = {
     at: number,
     kind: "spawn" | "warning" | "breach",
+    enemyId: string?,
 }
 
 local BEATS: { Beat } = {
-    { at = 0, kind = "warning" },
-    { at = 4, kind = "spawn" },
-    { at = 38, kind = "spawn" },
-    { at = 72, kind = "breach" },
-    { at = 76, kind = "spawn" },
+    { at = 0, kind = "warning", enemyId = nil },
+    { at = 4, kind = "spawn", enemyId = "enemy_rootling" },
+    { at = 22, kind = "spawn", enemyId = "enemy_briarback" },
+    { at = 40, kind = "spawn", enemyId = "enemy_pollen_wisp" },
+    { at = 56, kind = "breach", enemyId = nil },
+    { at = 58, kind = "spawn", enemyId = "enemy_hollow_crow" },
+    { at = 76, kind = "spawn", enemyId = "enemy_snapvine" },
+    { at = 94, kind = "spawn", enemyId = "enemy_bark_ram" },
 }
 
 function NightSchedule.beats(duration: number): { Beat }

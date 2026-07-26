@@ -59,6 +59,11 @@ geometry and gameplay affordances differ.
 | enemy_snapvine | Snapvine | stationary route denial, cut or distract |
 | enemy_bark_ram | Bark Ram | telegraphed structure charge |
 
+Build `0.10.0` implements all six stable Bramblewake IDs in the authored
+first-night sequence. Hollow Crow currently steals temporary First Lantern light
+instead of durable inventory; physical loose-bundle theft remains a later
+expedition encounter integration.
+
 ### Ironroot
 
 | ID | Name | Combat purpose |
@@ -304,7 +309,7 @@ salvage result, and migration version.
 
 Each surface region ships eight event templates:
 
-Build `0.9.0` retains the first four representative Bramblewake templates
+Build `0.10.0` retains the first four representative Bramblewake templates
 listed below: Moving Hedge, Lost Wagon, Root Bridge, and Foxlight Trail. The
 remaining Bramblewake templates and all later-region events are catalog targets,
 not implemented runtime content yet.
