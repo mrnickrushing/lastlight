@@ -301,9 +301,9 @@ Feature- and content-complete, not necessarily tuned or launch-polished.
 
 ### Exit gate
 
-- onboarding and first-night guardrails meet target;
-- D1/D7 direction is healthy enough for staged launch;
-- no platform/device segment has unacceptable crash, performance, or completion gap;
+- the closed-beta measurement window, cohort minimums, onboarding, first-night,
+  retention, reliability, device-segment, generation, and commerce thresholds
+  in [RELEASE_GATES.md](RELEASE_GATES.md) all pass;
 - moderation, customer support, incident, rollback, and communication drills pass.
 
 ## Milestone 14 — Launch candidate
@@ -337,12 +337,9 @@ Feature- and content-complete, not necessarily tuned or launch-polished.
 
 ### Rollback triggers
 
-- confirmed save loss or widespread failed load;
-- duplicate or missing purchase grants;
-- crash/disconnect spike;
-- severe exploit affecting economy or progression;
-- critical platform policy or safety issue;
-- onboarding blocker or impossible critical-path seed.
+- any immediate rollback trigger or sustained critical-threshold breach defined
+  in [RELEASE_GATES.md](RELEASE_GATES.md);
+- severe exploit affecting economy, progression, policy, or safety.
 
 Rollback means disable affected content/system, revert to known-good version, stop
 promotion, communicate status, preserve evidence, repair/migrate, and only then
@@ -383,4 +380,3 @@ needs ownership for:
 A smaller team can build it by holding the milestone gates and reducing concurrent
 content production. It cannot make the same scope safe merely by skipping QA,
 mobile work, data architecture, or content polish.
-

@@ -185,10 +185,15 @@ production-shaped data.
 - client disconnect;
 - pending mailbox delivery;
 - product disabled during prompt;
+- archived receipt replay after hot-ledger compaction;
 - cosmetic preview/equip and low-effects behavior.
 
-Expected result is either no charge/grant or exactly one durable grant. UI must
-never declare success before authoritative receipt processing.
+A canceled platform prompt produces no receipt and no grant. A completed
+platform purchase remains pending with `NotProcessedYet` until it produces
+exactly one durable grant and an archived `PurchaseId` tombstone. Duplicate
+delivery, cross-server retry, shutdown, full inventory, and archive replay must
+return the original result without a second grant. UI must never declare success
+before authoritative receipt processing.
 
 ## Security tests
 
@@ -331,7 +336,10 @@ not replace lived experience.
 
 ## Staged rollout
 
-Release to progressively larger cohorts. At each stage review:
+Release to progressively larger cohorts. The shared measurement window,
+minimum sample sizes, promotion thresholds, pause rules, and immediate rollback
+triggers are defined in [RELEASE_GATES.md](RELEASE_GATES.md) and are the
+authoritative release decision. At each stage also review:
 
 - join and save health;
 - crash/disconnect and performance by platform;
@@ -342,8 +350,11 @@ Release to progressively larger cohorts. At each stage review:
 - difficulty and solo/group gaps;
 - player reports.
 
-Promotion pauses if quality is uncertain. A smaller healthy audience is preferable
-to amplifying a save, purchase, performance, or onboarding failure.
+Promote only after every applicable gate has passed for the complete measurement
+window. Pause expansion when any non-zero-tolerance gate fails or lacks its
+minimum sample. Immediately rollback or disable the affected system for any
+zero-tolerance failure. A smaller healthy audience is preferable to amplifying a
+save, purchase, performance, or onboarding failure.
 
 ## Incident response
 
@@ -355,4 +366,3 @@ to amplifying a save, purchase, performance, or onboarding failure.
 6. Migrate/restore affected players idempotently.
 7. Canary the fix.
 8. Publish incident summary and prevention action.
-

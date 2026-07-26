@@ -30,9 +30,12 @@ below. The player arrives carrying the eighth seal without knowing why.
 ## Emberhollow
 
 Emberhollow begins as a damaged camp around a stone lantern tower and becomes a
-layered town. Its silhouette must remain recognizable at every tier: central
-lantern, rising ring walls, seven district lights, and the dark mountain opening
-behind it.
+layered town. Its silhouette must remain recognizable at every tier: the central
+First Lantern, rising ring walls, six surrounding civic district lights, and the
+dark mountain opening behind it. Those elements read as seven visible town
+lights before the finale. Deep Gate is the eighth district, intentionally unlit
+until the ending restores its network light; it is never counted as a seventh
+surrounding lantern before that moment.
 
 ### Town tiers
 
@@ -312,4 +315,3 @@ injury behavior, ending state, and dialogue coverage matrix.
   dialogue plus archive, or mechanics plus recap.
 - Repeated expeditions show changed aftermath rather than resetting every story set.
 - Player construction never erases a resident's essential access route.
-

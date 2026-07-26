@@ -3,7 +3,6 @@
 *.rbxlx
 *.rbxm
 *.rbxmx
-*.lock
 /build/
 /dist/
 
@@ -30,4 +29,3 @@ Thumbs.db
 .env
 .env.*
 !.env.example
-

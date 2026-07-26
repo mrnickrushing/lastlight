@@ -173,7 +173,9 @@ experiments
 - A save failure puts affected transactions into a clear retry/pending state.
 - Never grant a purchase from a client purchase-finished event; use receipt
   processing and return the correct decision only after durable idempotent grant.
-- Keep a bounded processed-receipt ledger and a durable entitlement truth source.
+- Keep a bounded hot receipt ledger plus a non-expiring archive/tombstone keyed
+  by platform `PurchaseId`; compaction must never make a completed purchase
+  eligible to grant again.
 - Backups and export tooling are required before migrations that alter inventory
   or commerce.
 
@@ -191,6 +193,26 @@ For crafting, rewards, building, trades, and purchases:
 8. return the authoritative result.
 
 Retries return the original result rather than duplicating output.
+
+### Durable purchase receipt state machine
+
+Every developer-product receipt follows one server-owned state machine:
+
+1. **Received** — validate the product and use platform `PurchaseId` as the
+   durable transaction key.
+2. **PendingProfile** — the profile is unavailable or locked; return
+   `NotProcessedYet` and retry without granting.
+3. **PendingGrant** — prepare the entitlement or mailbox delivery in the same
+   durable transaction boundary.
+4. **Granted** — persist the entitlement/output, audit event, and completed
+   purchase tombstone exactly once before returning `PurchaseGranted`.
+5. **Archived** — compact hot receipt details only after the durable tombstone
+   and entitlement truth are independently queryable.
+
+A completed platform purchase is never classified as “no charge/no grant.”
+Failures remain pending and return `NotProcessedYet` until exactly one durable
+grant succeeds. Duplicate delivery, cross-server retry, shutdown, full
+inventory, and hot-ledger eviction all converge on the original stored result.
 
 ## Expedition generation
 
@@ -386,4 +408,3 @@ Studio integration covers:
 
 Production canaries verify real data, teleport, scale, analytics, and commerce
 without exposing unfinished content broadly.
-

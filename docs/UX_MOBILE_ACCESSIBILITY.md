@@ -5,8 +5,10 @@
 Last Light is designed for landscape mobile first, then adapted to keyboard/mouse
 and controller without changing the underlying gameplay verbs.
 
-The visual UI recommendation is documented in the
-[hosted gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create):
+The visual UI recommendation and local reference images are preserved in
+[UI_DESIGN_DIRECTION.md](UI_DESIGN_DIRECTION.md). The
+[hosted gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create)
+remains linked as research provenance:
 
 1. **Default:** context-sensitive survival HUD with one dominant current action.
 2. **Fallback:** compact corner HUD for low effects, accessibility, and players
@@ -89,6 +91,15 @@ No gameplay-critical state lives only inside a full-screen menu.
 - Full menus pause local input intent but do not pause a multiplayer server.
 
 ## Cross-platform actions
+
+All rows bind to stable Roblox Input Action System action IDs rather than
+platform-specific gameplay code. The required contract is:
+`action_sprint`, `action_context`, `action_primary`, `action_alternate`,
+`action_dodge`, `action_profession`, `action_companion`, `action_ping`, and
+`action_hotbar`. Touch buttons, keyboard/mouse keys, and controller inputs are
+bindings to those same IDs. UI labels, glyphs, button visibility, and the active
+binding set derive from the action binding and `PreferredInput`; no prompt
+hardcodes a key name.
 
 | Action | Touch | Keyboard/mouse | Controller |
 |---|---|---|---|
@@ -310,4 +321,3 @@ A screen cannot ship until:
 - network delay, rejection, duplicate request, and reconnect states are understandable;
 - opening/closing the screen does not duplicate connections or leak memory;
 - the baseline phone maintains performance with the screen open.
-

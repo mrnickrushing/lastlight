@@ -78,7 +78,7 @@ The finished launch target contains:
 | Named villagers | 24 recruitable residents with jobs, bonds, quests, and crises |
 | Buildings | 28 functional structures plus cosmetic variants |
 | Enemy roster | 42 standard enemies, 14 elites, 7 chapter bosses |
-| Expedition content | 180 modular tiles, 72 points of interest, 48 dynamic events |
+| Expedition content | 180 modular tiles, 79 points of interest (72 surface + 7 finale), 48 surface dynamic events |
 | Gear and crafting | 8 tool families, 6 weapon families, 180 recipes |
 | Companions | 18 discoverable creatures with utility-focused traits |
 | Quests | 7 chapter arcs, 24 villager arcs, contracts, mysteries, and events |
@@ -192,6 +192,8 @@ The launch is done only when all of the following are true:
   authority, data, networking, streaming, observability, and exploit resistance.
 - [Mobile UX and accessibility](docs/UX_MOBILE_ACCESSIBILITY.md) — HUD, input,
   safe areas, responsive behavior, text, motion, sound, and device testing.
+- [UI design direction](docs/UI_DESIGN_DIRECTION.md) — durable gameplay-HUD
+  research findings, implementation rules, and locally archived visual targets.
 - [Art and audio direction](docs/ART_AUDIO_DIRECTION.md) — visual language,
   biomes, lighting, VFX readability, animation, music, ambience, and asset budgets.
 - [Monetization, live ops, and analytics](docs/MONETIZATION_LIVEOPS_ANALYTICS.md)
@@ -200,6 +202,8 @@ The launch is done only when all of the following are true:
   dependencies, deliverables, and acceptance gates.
 - [QA and release plan](docs/QA_RELEASE_PLAN.md) — automated, multiplayer,
   mobile, performance, save, commerce, exploit, and rollout validation.
+- [Release gates](docs/RELEASE_GATES.md) — numeric beta, canary, promotion,
+  pause, and rollback criteria.
 - [Decision log](docs/DECISIONS.md) — durable product and architecture decisions.
 
 ## Repository layout

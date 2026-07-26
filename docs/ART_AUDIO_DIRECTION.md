@@ -14,6 +14,11 @@ The target is polished stylized Roblox, not imitation realism and not a generic
 simulator. Strong silhouettes, restrained materials, authored lighting, layered
 backgrounds, and readable movement take priority over raw part count.
 
+The durable gameplay-HUD visual targets and implementation rules live in
+[UI_DESIGN_DIRECTION.md](UI_DESIGN_DIRECTION.md). Its locally archived images
+are the source of truth if the linked external research report becomes
+unavailable.
+
 ## Shape language
 
 - **Emberhollow:** upright lantern rectangles, circles of shelter, patched
@@ -274,4 +279,3 @@ An asset cannot be approved only from a static render. It passes:
 - color/shape accessibility;
 - animation cancellation and replication;
 - original-IP and license provenance.
-

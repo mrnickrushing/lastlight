@@ -25,6 +25,12 @@ undefined moving target.
 | region_cinderfall | Cinderfall Crown | 6 | 30 | 12 | 8 |
 | region_hollow | The Hollow Below | 7 | authored finale | 7 | authored |
 
+The launch inventory therefore contains 180 reusable surface modules, 79 POIs
+(72 surface POIs plus 7 authored finale POIs), and 48 surface event templates.
+The Hollow Below is an authored finale rather than a procedural surface region,
+so its scenes and encounters are validated as a fixed sequence instead of being
+miscounted as surface modules or event templates.
+
 Each surface-region module set includes:
 
 - 6 safe connectors;
@@ -270,13 +276,15 @@ event cannot block progression.
 
 The 180 launch recipes are allocated as:
 
-- 36 weapons and weapon variants;
-- 32 tools and tool variants;
-- 28 armor or wearable sidegrades;
-- 30 food and medicine recipes;
-- 24 traps and defense devices;
-- 18 town project components;
-- 12 companion and exploration utilities.
+| ID | Recipe group | Count |
+|---|---|---:|
+| recipe_group_weapons | Weapons and weapon variants | 36 |
+| recipe_group_tools | Tools and tool variants | 32 |
+| recipe_group_wearables | Armor and wearable sidegrades | 28 |
+| recipe_group_consumables | Food and medicine | 30 |
+| recipe_group_defenses | Traps and defense devices | 24 |
+| recipe_group_town | Town project components | 18 |
+| recipe_group_exploration | Companion and exploration utilities | 12 |
 
 No recipe may be a strict paid upgrade. Each recipe declares source, station,
 region, town tier, mastery requirement, ingredients, output, analytics ID,
@@ -328,7 +336,7 @@ localization, analytics, and a kill switch.
 
 ## Points of interest
 
-Each region's 12 POIs consist of:
+Each of the six surface regions has 12 POIs consisting of:
 
 - 4 story or resident locations;
 - 2 traversal challenges;
@@ -337,21 +345,23 @@ Each region's 12 POIs consist of:
 - 1 elite arena;
 - 1 hidden sanctuary.
 
-At least four POIs per region change after chapter completion. POIs do not all
-spawn in one expedition; the seed history system reduces immediate repetition.
+At least four surface POIs per region change after chapter completion. The
+Hollow Below instead has seven authored finale POIs—one for each final scene—
+whose order and transitions are fixed and tested. Surface POIs do not all spawn
+in one expedition; the seed history system reduces immediate repetition.
 
 ## Quest inventory
 
-| Quest family | Launch count | Requirement |
-|---|---:|---|
-| Prologue | 1 arc / 7 beats | authored first-session path |
-| Chapter | 7 arcs / 56 missions | critical story and boss path |
-| Resident | 24 arcs / 72+ missions | minimum three steps each |
-| Profession mastery | 21 trials | three signature trials per profession |
-| Region mysteries | 42 | six per surface region, six finale echoes |
-| Contract templates | 36 | parameterized, validated, non-repetitive |
-| Crisis templates | 18 | based on damage, injury, relationships, weather |
-| Postgame | 9 | three ending follow-ups plus region restoration |
+| ID | Quest family | Structure count | Playable count | Requirement |
+|---|---|---:|---:|---|
+| quest_group_prologue | Prologue arc | 1 | 7 | authored first-session beats |
+| quest_group_chapter | Chapter arcs | 7 | 56 | critical story and boss missions |
+| quest_group_resident | Resident arcs | 24 | 72 | minimum three missions each |
+| quest_group_mastery | Profession mastery tracks | 7 | 21 | three signature trials per profession |
+| quest_group_mystery | Region mystery groups | 7 | 42 | six per surface region and six finale echoes |
+| quest_group_contract | Contract templates | 36 | 36 | parameterized, validated, non-repetitive |
+| quest_group_crisis | Crisis templates | 18 | 18 | damage, injury, relationship, and weather variants |
+| quest_group_postgame | Postgame groups | 3 | 9 | three follow-ups for each ending direction |
 
 Quest steps use stable IDs and idempotent completion. A player can always recover
 from disconnect between objective completion and reward.
@@ -370,4 +380,3 @@ Earned and premium catalogs may include:
 All effects have intensity caps and reduced-effects alternatives. Cosmetics cannot
 imitate hazard colors, enemy telegraphs, moderation/admin indicators, rarity beams,
 or another player's interaction prompts.
-
