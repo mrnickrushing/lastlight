@@ -127,21 +127,25 @@ function TownNightService._runCycle(self: TownNightService)
         self._phaseEndsAt = nightStartedAt + self._nightSeconds
         self._worldService:setNight(true)
         self._enemyService:startNight()
-        local blackoutDue = self:_isBlackoutDue()
+        -- Frozen for the rest of this night: a higher number from a veteran
+        -- who joins mid-night (ensureStarted always raises self._nightNumber
+        -- to the max seen) must not retroactively change the wave schedule,
+        -- toasts, or completion bookkeeping already committed to for this
+        -- specific night — only self._nightNumber (read again below, after
+        -- this night ends) picks it up, for the *next* night onward.
+        local activeNight = self._nightNumber
+        local blackoutDue = self:_isBlackoutDue(activeNight)
         self:_notify(
             if blackoutDue
-                then string.format(
-                    "NIGHT %d — THE BLACKOUT LOOMS IN BRAMBLEWAKE",
-                    self._nightNumber
-                )
-                else string.format("NIGHT %d HAS ARRIVED", self._nightNumber)
+                then string.format("NIGHT %d — THE BLACKOUT LOOMS IN BRAMBLEWAKE", activeNight)
+                else string.format("NIGHT %d HAS ARRIVED", activeNight)
         )
         self._logger:info("town_night_started", {
             blackoutDue = blackoutDue,
-            night = self._nightNumber,
+            night = activeNight,
         })
 
-        for _, beat in self._townNightSchedule.beats(self._nightSeconds, self._nightNumber) do
+        for _, beat in self._townNightSchedule.beats(self._nightSeconds, activeNight) do
             waitUntilTime(nightStartedAt + beat.at)
             if beat.kind == "spawn" then
                 self._enemyService:spawn(beat.enemyId)
@@ -160,18 +164,21 @@ function TownNightService._runCycle(self: TownNightService)
         waitUntilTime(self._phaseEndsAt)
         self._enemyService:stopNight()
         self._worldService:setNight(false)
-        self:_notify(string.format("DAWN BREAKS — NIGHT %d SURVIVED", self._nightNumber))
-        self._logger:info("town_night_completed", { night = self._nightNumber })
-        self._nightNumber += 1
+        self:_notify(string.format("DAWN BREAKS — NIGHT %d SURVIVED", activeNight))
+        self._logger:info("town_night_completed", { night = activeNight })
+        -- Adopt whichever is higher: the honest next night after the one
+        -- that just actually ran, or a veteran's still-pending higher seed
+        -- from ensureStarted. Either way this can only advance.
+        self._nightNumber = math.max(self._nightNumber, activeNight + 1)
         local onNightCompleted = self._onNightCompleted
         if onNightCompleted ~= nil then
-            onNightCompleted(self._nightNumber)
+            onNightCompleted(activeNight + 1)
         end
     end
 end
 
-function TownNightService._isBlackoutDue(self: TownNightService): boolean
-    return self._nightNumber % self._blackoutInterval == 0
+function TownNightService._isBlackoutDue(self: TownNightService, nightNumber: number?): boolean
+    return (nightNumber or self._nightNumber) % self._blackoutInterval == 0
 end
 
 function TownNightService.isNightActive(self: TownNightService): boolean
