@@ -5,6 +5,8 @@ local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local BramblewakeBuilder = require(script.Parent.Parent.World.BramblewakeBuilder)
+
 local WorldService = {}
 WorldService.__index = WorldService
 WorldService.Name = "WorldService"
@@ -26,6 +28,9 @@ export type WorldService = typeof(setmetatable(
         _beacon: BasePart?,
         _barricadeBuilt: boolean,
         _night: boolean,
+        _expeditionEntry: CFrame?,
+        _expeditionManifest: any,
+        _expeditionModuleCenters: { any },
     },
     WorldService
 ))
@@ -194,6 +199,9 @@ function WorldService.new(logger: Logger): WorldService
         _beacon = nil,
         _barricadeBuilt = false,
         _night = false,
+        _expeditionEntry = nil,
+        _expeditionManifest = nil,
+        _expeditionModuleCenters = {},
     }, WorldService)
 end
 
@@ -616,7 +624,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "first-light-v1")
+    world:SetAttribute("WorldVersion", "bramblewake-foundation-v1")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -642,6 +650,19 @@ function WorldService.Init(self: WorldService, context: any)
 end
 
 function WorldService.Start(self: WorldService)
+    local function bindPlayer(player: Player)
+        player:SetAttribute("LastLightInExpedition", false)
+        player:SetAttribute("LastLightExpeditionTransition", false)
+        player.CharacterAdded:Connect(function()
+            player:SetAttribute("LastLightInExpedition", false)
+            player:SetAttribute("LastLightExpeditionTransition", false)
+        end)
+    end
+    Players.PlayerAdded:Connect(bindPlayer)
+    for _, player in Players:GetPlayers() do
+        bindPlayer(player)
+    end
+
     local accumulator = 0
     RunService.Heartbeat:Connect(function(deltaTime: number)
         accumulator += deltaTime
@@ -656,14 +677,18 @@ function WorldService.Start(self: WorldService)
                 then nil
                 else character:FindFirstChild("HumanoidRootPart")
             if root ~= nil and root:IsA("BasePart") and root.Position.Y < -18 then
-                character:PivotTo(self:spawnCFrame())
+                local recovery = if player:GetAttribute("LastLightInExpedition") == true
+                        and self._expeditionEntry ~= nil
+                    then self._expeditionEntry
+                    else self:spawnCFrame()
+                character:PivotTo(recovery :: CFrame)
             end
         end
     end)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "first-light-v1",
+        worldVersion = "bramblewake-foundation-v1",
     })
 end
 
@@ -760,6 +785,97 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
         light.Parent = beacon
         addBillboard(beacon, "THE BRAMBLEWAKE REMEMBERS", CREAM)
     end
+end
+
+function WorldService.buildBramblewake(
+    self: WorldService,
+    manifest: any,
+    generator: any,
+    catalog: any
+): any
+    local world = assert(self._world, "world service has not initialized")
+    local result = BramblewakeBuilder.build(world, manifest, generator, catalog, self._runtimeIds)
+    self._expeditionEntry = result.entryCFrame
+    self._expeditionManifest = manifest
+    self._expeditionModuleCenters = result.moduleCenters
+    world:SetAttribute("ExpeditionReady", true)
+    world:SetAttribute("ExpeditionManifestHash", manifest.hash)
+    return result
+end
+
+function WorldService.enterBramblewake(self: WorldService, player: Player): boolean
+    local entry = self._expeditionEntry
+    local character = player.Character
+    if entry == nil or character == nil then
+        return false
+    end
+    if player:GetAttribute("LastLightExpeditionTransition") == true then
+        return true
+    end
+
+    player:SetAttribute("LastLightInExpedition", true)
+    player:SetAttribute("LastLightExpeditionTransition", true)
+    task.spawn(function()
+        local streamFinished = false
+        task.spawn(function()
+            pcall(function()
+                player:RequestStreamAroundAsync(entry.Position)
+            end)
+            streamFinished = true
+        end)
+
+        local deadline = os.clock() + 5
+        while not streamFinished and os.clock() < deadline and player.Parent ~= nil do
+            task.wait(0.1)
+        end
+
+        local activeCharacter = player.Character
+        if
+            player.Parent ~= nil
+            and player:GetAttribute("LastLightInExpedition") == true
+            and activeCharacter ~= nil
+        then
+            activeCharacter:PivotTo(entry)
+        end
+        player:SetAttribute("LastLightExpeditionTransition", false)
+    end)
+    return true
+end
+
+function WorldService.expeditionSnapshot(self: WorldService, player: Player): any
+    local manifest = self._expeditionManifest
+    if manifest == nil or player:GetAttribute("LastLightInExpedition") ~= true then
+        return {
+            active = false,
+        }
+    end
+
+    local character = player.Character
+    local root = if character == nil then nil else character:FindFirstChild("HumanoidRootPart")
+    local closestIndex = 1
+    local closestDistance = math.huge
+    if root ~= nil and root:IsA("BasePart") then
+        for _, moduleCenter in self._expeditionModuleCenters do
+            local distance = (root.Position - moduleCenter.position).Magnitude
+            if distance < closestDistance then
+                closestDistance = distance
+                closestIndex = moduleCenter.index
+            end
+        end
+    end
+
+    local placement = manifest.modules[closestIndex]
+    return {
+        active = true,
+        eventId = placement.eventId,
+        manifestHash = manifest.hash,
+        moduleId = placement.moduleId,
+        moduleIndex = closestIndex,
+        moduleTotal = #manifest.modules,
+        poiId = placement.poiId,
+        seed = manifest.seed,
+        source = manifest.source,
+    }
 end
 
 function WorldService.setNight(self: WorldService, enabled: boolean)

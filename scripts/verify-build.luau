@@ -20,6 +20,19 @@ assert(sharedRoot:FindFirstChild("TutorialFlow") ~= nil, "game build is missing 
 assert(sharedRoot:FindFirstChild("SaveSchema") ~= nil, "game build is missing SaveSchema")
 assert(sharedRoot:FindFirstChild("RuntimeIds") ~= nil, "game build is missing RuntimeIds")
 assert(
+    sharedRoot:FindFirstChild("ExpeditionGenerator") ~= nil,
+    "game build is missing ExpeditionGenerator"
+)
+local contentDefinitions = assert(
+    sharedRoot:FindFirstChild("Content"),
+    "game build is missing Content"
+):FindFirstChild("Definitions")
+assert(contentDefinitions ~= nil, "game build is missing content definitions")
+assert(
+    contentDefinitions:FindFirstChild("BramblewakeExpedition") ~= nil,
+    "game build is missing the Bramblewake expedition catalog"
+)
+assert(
     serverScriptService:FindFirstChild("LastLightServer") ~= nil,
     "game build is missing LastLightServer"
 )
@@ -31,6 +44,7 @@ for _, serviceName in
     {
         "AnalyticsService",
         "EnemyService",
+        "ExpeditionService",
         "FeatureFlagService",
         "Logger",
         "NetworkService",
@@ -45,6 +59,12 @@ do
         "game build is missing service " .. serviceName
     )
 end
+local worldBuilders = serverRoot:FindFirstChild("World")
+assert(worldBuilders ~= nil, "game build is missing world builders")
+assert(
+    worldBuilders:FindFirstChild("BramblewakeBuilder") ~= nil,
+    "game build is missing BramblewakeBuilder"
+)
 assert(gamePlace:GetService("Workspace").StreamingEnabled, "streaming must remain enabled")
 local inputActionRollout =
     tostring(gamePlace:GetService("Workspace").PlayerScriptsUseInputActionSystem)

@@ -502,7 +502,8 @@ function HUDController.update(self: HUDController, state: any)
     self._objective.Text = tostring(state.objective or "")
     self._detail.Text = tostring(state.detail or "")
     self._progress.Text = string.format(
-        "FIRST LIGHT · %d / %d",
+        "%s · %d / %d",
+        tostring(state.trailName or "FIRST LIGHT"),
         tonumber(state.progress) or 0,
         tonumber(state.progressTotal) or 8
     )

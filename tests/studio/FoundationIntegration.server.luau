@@ -2,6 +2,7 @@
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerScriptService = game:GetService("ServerScriptService")
+local CollectionService = game:GetService("CollectionService")
 
 local root = ReplicatedStorage:WaitForChild("LastLight", 8)
 assert(root ~= nil, "shared root unavailable in Studio integration test")
@@ -10,6 +11,8 @@ local serverRoot = ServerScriptService:WaitForChild("LastLightServer", 8)
 assert(serverRoot ~= nil, "server root unavailable in Studio integration test")
 
 local Config = require(root.Config)
+local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
+local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local RuntimeIds = require(root.RuntimeIds)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
@@ -59,8 +62,65 @@ assert(world:FindFirstChild("HeartwoodStump", true) ~= nil, "gather node is miss
 assert(world:FindFirstChild("ConstructionPlot", true) ~= nil, "construction plot is missing")
 assert(world:FindFirstChild("FirstLantern", true) ~= nil, "First Lantern is missing")
 
-local tagged = game:GetService("CollectionService"):GetTagged(RuntimeIds.InteractionTag)
+local expedition = world:FindFirstChild("BramblewakeExpedition")
+assert(expedition ~= nil and expedition:IsA("Model"), "Bramblewake expedition is missing")
+assert(expedition:GetAttribute("Ready") == true, "Bramblewake expedition is not ready")
+assert(
+    expedition:GetAttribute("ModuleCount") == BramblewakeExpedition.ModuleCount,
+    "Bramblewake module count is incorrect"
+)
+assert(
+    expedition:GetAttribute("PointOfInterestCount") == BramblewakeExpedition.PointOfInterestCount,
+    "Bramblewake POI count is incorrect"
+)
+assert(
+    expedition:GetAttribute("EventCount") == BramblewakeExpedition.EventCount,
+    "Bramblewake event count is incorrect"
+)
+local expectedManifest = ExpeditionGenerator.generate(Config.BramblewakePreviewSeed)
+assert(
+    expedition:GetAttribute("ManifestHash") == expectedManifest.hash,
+    "Bramblewake manifest does not replay deterministically"
+)
+local generatedPartCount = expedition:GetAttribute("GeneratedPartCount")
+assert(
+    type(generatedPartCount) == "number"
+        and generatedPartCount >= 200
+        and generatedPartCount <= BramblewakeExpedition.PartBudget,
+    "Bramblewake preview is outside its detailed mobile part budget"
+)
+
+local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(#tagged == 8, "expected eight tutorial interaction prompts")
+local expeditionModules = CollectionService:GetTagged(RuntimeIds.ExpeditionModuleTag)
+assert(
+    #expeditionModules == BramblewakeExpedition.ModuleCount,
+    "expected twelve streamed expedition modules"
+)
+for _, module in expeditionModules do
+    assert(module:IsA("Model"), "expedition module tag must only target models")
+    assert(
+        module.ModelStreamingMode == Enum.ModelStreamingMode.Atomic,
+        "expedition modules must stream atomically"
+    )
+    assert(
+        module:FindFirstChild("StreamingCellCollision") ~= nil,
+        "expedition module is missing collision"
+    )
+    assert(
+        module:FindFirstChild("CriticalPath") ~= nil,
+        "expedition module is missing its connected critical path"
+    )
+end
+assert(
+    #CollectionService:GetTagged(RuntimeIds.ExpeditionPointOfInterestTag)
+        == BramblewakeExpedition.PointOfInterestCount,
+    "expected four Bramblewake points of interest"
+)
+assert(
+    #CollectionService:GetTagged(RuntimeIds.ExpeditionEventTag) == BramblewakeExpedition.EventCount,
+    "expected four Bramblewake event sockets"
+)
 assert(
     workspace.PlayerScriptsUseInputActionSystem == Enum.RolloutState.Enabled,
     "Input Action System must be enabled"
