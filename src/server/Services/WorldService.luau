@@ -634,7 +634,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-extraction-v3")
+    world:SetAttribute("WorldVersion", "old-growth-elite-v4")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world

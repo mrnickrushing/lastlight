@@ -116,6 +116,21 @@ return {
                     "elite_old_growth:run_1:manifest_1:42"
                 )
                 TestRunner.equal(OldGrowthEncounter.Reward.materialId, "material_amber_sap")
+                TestRunner.equal(OldGrowthEncounter.Reward.amount, 3)
+                TestRunner.equal(OldGrowthEncounter.snapshot(state, 42, 0).rewardEligible, false)
+                state = OldGrowthEncounter.activate(state, 42)
+                TestRunner.equal(OldGrowthEncounter.snapshot(state, 42, 0).rewardEligible, true)
+                TestRunner.equal(OldGrowthEncounter.snapshot(state, 43, 0).rewardEligible, false)
+            end,
+        },
+        {
+            name = "centralizes bounded encounter tuning",
+            run = function()
+                TestRunner.equal(OldGrowthEncounter.Tuning.strikeDamage, 34)
+                TestRunner.equal(OldGrowthEncounter.Tuning.markedStrikeDamage, 40)
+                TestRunner.equal(OldGrowthEncounter.Tuning.attackCooldownSeconds, 3)
+                TestRunner.equal(OldGrowthEncounter.Tuning.shieldedAttackCooldownSeconds, 4.2)
+                TestRunner.truthy(OldGrowthEncounter.Tuning.markedAttackCooldownMultiplier > 1)
             end,
         },
         {

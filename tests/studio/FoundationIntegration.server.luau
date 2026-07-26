@@ -132,6 +132,28 @@ assert(
 oldGrowth = OldGrowthEncounter.takeFire(oldGrowth, 10, 400)
 oldGrowth = OldGrowthEncounter.burnHeart(oldGrowth, 10, 401)
 assert(oldGrowth.status == "vulnerable", "Old Growth fire break did not expose the heart")
+for _ = 1, 4 do
+    oldGrowth = OldGrowthEncounter.strike(oldGrowth, 10, 34)
+end
+assert(
+    oldGrowth.status == "shielded" and oldGrowth.health == 120,
+    "Old Growth second shield contract failed"
+)
+oldGrowth = OldGrowthEncounter.takeFire(oldGrowth, 10, 410)
+oldGrowth = OldGrowthEncounter.burnHeart(oldGrowth, 10, 411)
+for _ = 1, 4 do
+    oldGrowth = OldGrowthEncounter.strike(oldGrowth, 10, 34)
+end
+local oldGrowthWinner = OldGrowthEncounter.snapshot(oldGrowth, 10, 412)
+local oldGrowthLateArrival = OldGrowthEncounter.snapshot(oldGrowth, 20, 412)
+assert(oldGrowth.status == "complete", "Old Growth completion contract failed")
+assert(oldGrowthWinner.rewardEligible, "Old Growth participant lost reward eligibility")
+assert(not oldGrowthLateArrival.rewardEligible, "late arrival received false reward eligibility")
+assert(
+    OldGrowthEncounter.rewardTransactionId(oldGrowth, 10)
+        == "elite_old_growth:studio_run:studio_manifest:10",
+    "Old Growth reward transaction is not stable"
+)
 local oldGrowthModel = OldGrowthBuilder.build(Vector3.new(0, 0, 0), Vector3.new(0, 0, -10), 360)
 assert(oldGrowthModel.PrimaryPart ~= nil, "Old Growth model has no primary part")
 assert(
@@ -164,6 +186,10 @@ assert(getState ~= nil and getState:IsA("RemoteFunction"), "missing state functi
 local world = workspace:WaitForChild(RuntimeIds.WorldName, 8)
 assert(world ~= nil and world:IsA("Model"), "first-ten-minutes world did not build")
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
+assert(
+    world:GetAttribute("WorldVersion") == "old-growth-elite-v4",
+    "world model version does not match the current build"
+)
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
 assert(world:FindFirstChild("Mara", true) ~= nil, "Mara is missing")
 assert(world:FindFirstChild("HeartwoodStump", true) ~= nil, "gather node is missing")

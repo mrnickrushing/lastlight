@@ -982,7 +982,7 @@ function HUDController._updateCombatClock(self: HUDController)
 
     self._staminaFill.Size = UDim2.new(math.clamp(stamina / maxStamina, 0, 1), -8, 1, -8)
     self._staminaFill.BackgroundColor3 = if rooted
-        then COLORS.green
+        then COLORS.amber
         elseif drowsy then COLORS.amber
         elseif stamina < dodgeCost then COLORS.danger
         elseif stamina < maxStamina * 0.55 then COLORS.amber
@@ -1242,7 +1242,9 @@ function HUDController._updateClock(self: HUDController)
             elseif elite.shielded then COLORS.danger
             else COLORS.amber
         if elite.complete then
-            self._eliteDetail.Text = "CLEANSED · +3 AMBER SAP UNBANKED"
+            self._eliteDetail.Text = if elite.rewardEligible
+                then "CLEANSED · +3 AMBER SAP UNBANKED"
+                else "CLEANSED · CONTINUE TO WAYHOME"
             self._eliteDetail.TextColor3 = COLORS.green
         elseif elite.carryingFire then
             local fireRemaining =
@@ -1261,6 +1263,7 @@ function HUDController._updateClock(self: HUDController)
     else
         self._eliteFrame.Visible = false
     end
+    self._lanternFrame.Visible = state.nightActive == true and not self._eliteFrame.Visible
 
     local threat = state.threat
     if type(threat) == "table" and not self._playerDowned then
@@ -1372,15 +1375,16 @@ function HUDController.update(self: HUDController, state: any)
     self._dodge.Visible = not self._playerDowned
         and (self._inputMode == "touch" or self._combatContext)
     self:_updateProfessionClock()
-    self._lanternFrame.Visible = nightActive
+    local eliteVisible = type(elite) == "table"
+        and (elite.active == true or elite.complete == true)
+        and not self._playerDowned
+    self._eliteFrame.Visible = eliteVisible
+    self._lanternFrame.Visible = nightActive and not eliteVisible
     local lanternHealth = math.clamp(tonumber(state.lanternHealth) or 100, 0, 100)
     self._lanternFill.Size = UDim2.new(lanternHealth / 100, -8, 1, -8)
     self._lanternFill.BackgroundColor3 = if lanternHealth <= 35 then COLORS.danger else COLORS.amber
     self._lanternText.Text = string.format("LIGHT · %d%%", lanternHealth)
     self._lanternText.TextColor3 = if lanternHealth <= 55 then COLORS.cream else COLORS.ink
-    self._eliteFrame.Visible = type(elite) == "table"
-        and (elite.active == true or elite.complete == true)
-        and not self._playerDowned
 
     if state.compactHud ~= nil and state.compactHud ~= self._compactEnabled then
         self._compactEnabled = state.compactHud == true

@@ -305,6 +305,11 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
             issue(string.format("manifest does not meet the %s module minimum", tag))
         end
     end
+    for _, moduleId in Catalog.RequiredModuleIds do
+        if not seenModules[moduleId] then
+            issue("manifest is missing required module " .. moduleId)
+        end
+    end
     if totalParts > Catalog.PartBudget then
         issue("manifest exceeds the regional part budget")
     end
