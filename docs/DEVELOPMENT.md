@@ -59,13 +59,18 @@ full DataModel. The first engine integration test is intentionally separate:
 2. Open `build/LastLightTest.rbxlx` in Roblox Studio.
 3. Start a server with one player.
 4. Confirm server output contains `[Last Light] PASS FoundationIntegration`.
-5. Confirm `server_boot_complete` appears without an infinite-yield warning.
-6. Stop immediately if either assertion errors.
+5. Confirm `server_boot_complete` reports eight services without an
+   infinite-yield warning.
+6. Confirm the loader leaves the player at `ArrivalSpawn` on solid ground and
+   the first objective is `FREE MARA`.
+7. Complete the journey in [MILESTONE_2_PLAYTEST.md](MILESTONE_2_PLAYTEST.md).
+8. Stop immediately if any assertion errors.
 
 The test verifies the real Rojo tree, shared module replication, seven-region
-registry, save-schema constant, and service initialization/start lifecycle.
-Milestone 2 expands this place with spawn, collision, input, and bounded-loader
-journeys.
+registry, save-schema constant, eight tutorial interactions, runtime remotes,
+Input Action System rollout, world readiness, arrival collision, and service
+initialization/start lifecycle. Human play is still required for physics,
+streaming, device layout, input switching, timing, and usability.
 
 ## Runtime boundaries
 

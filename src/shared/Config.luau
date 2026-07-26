@@ -2,7 +2,7 @@
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.2.0",
+    BuildVersion = "0.3.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -11,9 +11,18 @@ return table.freeze({
     BlackoutInterval = 7,
     SaveSchemaVersion = 1,
     BootstrapTimeoutSeconds = 8,
+    FirstNightDuskSeconds = 15,
+    FirstNightSeconds = 120,
+    BaseWalkSpeed = 16,
+    SprintWalkSpeed = 24,
+    InteractionDistance = 14,
+    ActionRatePerSecond = 8,
     ProductionPlaceIds = table.freeze({}),
     FeatureFlags = table.freeze({
         bounded_join = true,
+        first_ten_minutes = true,
+        input_action_system = true,
+        tutorial_persistence = true,
         content_registry = true,
         region_bramblewake_enabled = true,
         region_ironroot_enabled = false,

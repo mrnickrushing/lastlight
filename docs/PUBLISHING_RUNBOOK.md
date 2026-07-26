@@ -6,6 +6,13 @@ This runbook moves a verified Last Light source revision into private Roblox
 places without making binary Studio files the source of truth. Public release
 remains gated by the roadmap and [RELEASE_GATES.md](RELEASE_GATES.md).
 
+The First Light tutorial persists only in published staging/production places.
+An unregistered published place intentionally resolves to staging, while Studio
+local/test intentionally avoids persistent player writes. Before production,
+add the real place ID to `Config.ProductionPlaceIds` through a reviewed change
+and pass the reconnect row in
+[MILESTONE_2_PLAYTEST.md](MILESTONE_2_PLAYTEST.md).
+
 ## One-time universe setup
 
 1. Create the **Last Light** experience in the intended owner/group.

@@ -8,6 +8,13 @@ research generated on 2026-07-25 PDT (2026-07-26 UTC). The
 contains the full source exploration; this committed snapshot remains usable if
 that external page changes or disappears.
 
+The focused
+[First-Ten-Minutes mobile HUD report](https://www.lazyweb.com/report/lazyweb/a34ce67d-041e-434b-acb6-0afd4ccf7ef4/?source=create)
+refines that broad system for rescue, gathering, tool choice, building, and the
+first two-minute night. Its evidence was directional: 9 selected mobile
+references from 77 deduplicated results, with three lower-coverage
+function-level searches called out in the hosted report.
+
 ## Chosen system
 
 The default is a **context-sensitive survival HUD**:
@@ -26,6 +33,14 @@ The **compact corner HUD** is the stable low-effects/accessibility alternative.
 The **living-world HUD** is an event layer reserved for Blackouts, bosses, and
 major breaches; it must always retain explicit text/icon backups.
 
+For the first session, the chosen composition is **One Active Trail**:
+
+- one phase/time capsule;
+- one active objective with honest step progress;
+- one input-aware contextual action in the safe thumb zone;
+- compact dialogue and resource feedback only when relevant;
+- the same hierarchy transformed, not replaced, when night becomes urgent.
+
 ## Visual targets
 
 ### Default context-sensitive survival HUD
@@ -39,6 +54,18 @@ major breaches; it must always retain explicit text/icon backups.
 ### Blackout and boss event layer
 
 ![Living-world event HUD target](assets/hud/prototype-living-world-hud.webp)
+
+### First Light default
+
+![One Active Trail onboarding target](assets/hud/prototype-first-light-one-active-trail.webp)
+
+### Optional expanded tutorial
+
+![Mission Stack onboarding alternative](assets/hud/prototype-first-light-mission-stack.webp)
+
+### First authored night
+
+![Lantern Pulse night target](assets/hud/prototype-first-light-lantern-pulse.webp)
 
 These generated images are composition targets, not shippable UI assets. Their
 illustrative labels, icons, and imagery must be rebuilt with production-safe
@@ -55,3 +82,7 @@ Roblox UI, tested action bindings, localized copy, and original final assets.
   reconnect, and store-disabled states.
 - Make the current primary action understandable in motion without relying on
   color, audio, or a small icon alone.
+- Keep Mission Stack as an optional expanded/help state; do not leave the
+  three-row checklist over normal play.
+- Anchor light health to the First Lantern during night only when explicit
+  text, compact, low-effects, and occlusion-safe fallbacks remain available.

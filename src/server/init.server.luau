@@ -8,11 +8,23 @@ assert(root ~= nil, "Last Light shared root did not replicate before bootstrap t
 
 local Config = require(root.Config)
 local Environment = require(root.Environment)
+local NightSchedule = require(root.NightSchedule)
+local RateLimiter = require(root.RateLimiter)
+local RuntimeIds = require(root.RuntimeIds)
+local SaveSchema = require(root.SaveSchema)
+local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
 
+local AnalyticsService = require(script.Services.AnalyticsService)
+local EnemyService = require(script.Services.EnemyService)
 local Logger = require(script.Services.Logger)
 local FeatureFlagService = require(script.Services.FeatureFlagService)
+local NetworkService = require(script.Services.NetworkService)
+local PhaseService = require(script.Services.PhaseService)
+local ProfileService = require(script.Services.ProfileService)
+local TutorialService = require(script.Services.TutorialService)
+local WorldService = require(script.Services.WorldService)
 local ServiceRegistry = require(script.ServiceRegistry)
 
 local environment, environmentError = Environment.resolve({
@@ -28,14 +40,49 @@ local logger = Logger.new(environment, environmentConfig.LogLevel)
 local featureFlags =
     FeatureFlagService.new(Config.FeatureFlags, environmentConfig.AllowFlagOverrides, logger)
 local content = Registry.new(Regions)
+local networkService = NetworkService.new(logger)
+local profileService = ProfileService.new(logger, environmentConfig.UsePersistentData)
+local analyticsService = AnalyticsService.new(logger)
+local worldService = WorldService.new(logger)
+local enemyService = EnemyService.new(logger, worldService)
+local phaseService = PhaseService.new(
+    logger,
+    worldService,
+    enemyService,
+    NightSchedule,
+    Config.FirstNightDuskSeconds,
+    Config.FirstNightSeconds
+)
+local tutorialService = TutorialService.new(
+    logger,
+    Config,
+    RuntimeIds,
+    TutorialFlow,
+    RateLimiter,
+    networkService,
+    profileService,
+    worldService,
+    enemyService,
+    phaseService,
+    analyticsService
+)
 
 local services = ServiceRegistry.new({
     environment = environment,
     logger = logger,
     featureFlags = featureFlags,
     content = content,
+    runtimeIds = RuntimeIds,
+    saveSchema = SaveSchema,
 })
 services:register(featureFlags)
+services:register(networkService)
+services:register(profileService)
+services:register(analyticsService)
+services:register(worldService)
+services:register(enemyService)
+services:register(phaseService)
+services:register(tutorialService)
 services:initialize()
 services:start()
 
@@ -43,5 +90,5 @@ logger:info("server_boot_complete", {
     build = Config.BuildVersion,
     contentDefinitions = content:count(),
     environment = environment,
-    services = 1,
+    services = 8,
 })

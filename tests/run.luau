@@ -7,5 +7,9 @@ TestRunner.run({
     require("./specs/ContentRegistry.spec"),
     require("./specs/Environment.spec"),
     require("./specs/FeatureFlagService.spec"),
+    require("./specs/NightSchedule.spec"),
+    require("./specs/RateLimiter.spec"),
+    require("./specs/SaveSchema.spec"),
     require("./specs/ServiceRegistry.spec"),
+    require("./specs/TutorialFlow.spec"),
 })

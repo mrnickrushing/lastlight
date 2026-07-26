@@ -14,7 +14,7 @@ playable game exists.
 
 ## Current status
 
-**Milestone 1 executable foundation implemented; Studio integration playtest pending.**
+**Milestone 2 first-ten-minutes slice implemented; Studio and device exit gate pending.**
 
 The repository currently contains:
 
@@ -22,16 +22,32 @@ The repository currently contains:
 - a milestone-by-milestone implementation and release plan;
 - mobile, accessibility, performance, security, analytics, and QA gates;
 - a pinned Rokit toolchain and reproducible game/test-place builds;
-- typed environment, logging, feature-flag, service-lifecycle, and content-registry foundations;
-- pure Luau tests plus a dedicated Studio integration-test place;
+- a bounded mobile loader and safe streamed arrival clearing with fall recovery;
+- Mara, Heartwood gathering, three starter tools, a construction plot, barricade,
+  First Lantern, Rootling enemy, two-minute authored night, and Bramblewake reveal;
+- server-owned tutorial ordering, input validation, sprint, combat, building,
+  analytics, save normalization, and published-place tutorial persistence;
+- mobile, keyboard/mouse, and controller actions through Roblox's Input Action
+  System, with input-aware prompts and a fallback path;
+- a context-sensitive safe-area HUD, thumb-sized controls, local compact mode,
+  phase countdown, lantern health, dialogue, progress, and pickup feedback;
+- typed environment, logging, feature-flag, service-lifecycle, content-registry,
+  networking, save-schema, rate-limit, tutorial, and phase foundations;
+- 28 pure Luau tests plus an expanded Studio integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
-- a hosted visual direction report for the gameplay HUD.
+- hosted visual direction reports for the general gameplay HUD and the focused
+  first-session mobile HUD.
 
-The next player-visible milestone is the graybox first ten minutes: a safe arrival,
-gathering, rescue, construction, one enemy, and the first authored night.
+Milestone 2 is not marked complete until the real engine/device exit gate passes:
+ten new testers must finish without verbal help, input switching and rejoin must
+survive, the baseline phone must meet the performance target, and largest text
+must leave every required control usable. Follow
+[the Milestone 2 playtest runbook](docs/MILESTONE_2_PLAYTEST.md).
 
 The current UI direction is documented in the
 [Last Light mobile gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create).
+The implementation-specific onboarding refinement is in the
+[First-Ten-Minutes mobile HUD report](https://www.lazyweb.com/report/lazyweb/a34ce67d-041e-434b-acb6-0afd4ccf7ef4/?source=create).
 The recommended default is a context-sensitive survival HUD. A compact HUD is
 the accessibility and low-effects fallback, while the dramatic living-world HUD
 is reserved for Blackouts and bosses.
@@ -141,7 +157,8 @@ The project is intentionally built through playable gates:
 1. **Foundation** — repository, Rojo, test harness, content IDs, networking,
    save schema, feature flags, and bounded join flow.
 2. **Graybox first ten minutes** — move, interact, gather, rescue, build one
-   structure, survive one authored night, receive a reveal.
+   structure, survive one authored night, receive a reveal. Implemented in
+   source; Studio, device, and ten-tester exit evidence remains.
 3. **Vertical slice** — Bramblewake, four professions, one town tier, one normal
    night, one Blackout, one boss, mobile/PC/controller.
 4. **Persistent town** — saves, villagers, jobs, districts, visiting, recovery,

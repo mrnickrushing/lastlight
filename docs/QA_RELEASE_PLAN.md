@@ -119,6 +119,9 @@ For every critical flow:
 Test screen insets, Roblox menu overlap, thumb reach, back/cancel, double tap,
 hold cancel, menu reopening, selection persistence, and network rejection.
 
+The executable first-session checks and evidence table are in
+[MILESTONE_2_PLAYTEST.md](MILESTONE_2_PLAYTEST.md).
+
 ## Gameplay completion matrix
 
 Every chapter requires:
