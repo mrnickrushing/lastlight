@@ -113,6 +113,8 @@ function PlayerCombatService._syncPlayer(self: PlayerCombatService, player: Play
     player:SetAttribute("LastLightDrowsyUntil", status.drowsyUntil)
     player:SetAttribute("LastLightRooted", status.rooted)
     player:SetAttribute("LastLightRootedUntil", status.rootedUntil)
+    player:SetAttribute("LastLightShielded", status.shielded)
+    player:SetAttribute("LastLightShieldUntil", status.shieldUntil)
 
     local activeHumanoid = humanoid(player)
     if activeHumanoid ~= nil then
@@ -284,6 +286,67 @@ function PlayerCombatService.applyDrowsy(
     return true
 end
 
+function PlayerCombatService.applyShield(
+    self: PlayerCombatService,
+    player: Player,
+    duration: number,
+    multiplier: number
+): boolean
+    local statusState = self._statusStates[player]
+    if statusState == nil or not self._survivalService:canAct(player) then
+        return false
+    end
+    local now = workspace:GetServerTimeNow()
+    self._statusStates[player] =
+        self._statusEffectState.applyShield(statusState, now, duration, multiplier)
+    self:_syncPlayer(player)
+    return true
+end
+
+function PlayerCombatService.restoreStamina(
+    self: PlayerCombatService,
+    player: Player,
+    amount: number
+): any
+    local state = self._states[player]
+    if state == nil then
+        return {
+            applied = false,
+            reason = "player_loading",
+        }
+    end
+    local now = workspace:GetServerTimeNow()
+    local nextState, result =
+        self._combatState.restoreStamina(state, now, amount, self._survivalService:canAct(player))
+    self._states[player] = nextState
+    self:_syncPlayer(player)
+    self:_markPublished(player, now)
+    if result.applied then
+        self:_notify(player, nil)
+    end
+    return result
+end
+
+-- Independent of ProfessionService.mitigateIncomingDamage (Warden's guard):
+-- the two are checked separately at each damage call site so an item-granted
+-- shield stacks with a profession's own mitigation instead of overriding it.
+function PlayerCombatService.mitigateShieldedDamage(
+    self: PlayerCombatService,
+    player: Player,
+    amount: number,
+    now: number
+): (number, boolean)
+    local statusState = self._statusStates[player]
+    if statusState == nil then
+        return amount, false
+    end
+    local status = self._statusEffectState.snapshot(statusState, now)
+    if not status.shielded then
+        return amount, false
+    end
+    return math.max(1, math.ceil(amount * status.damageMultiplier)), true
+end
+
 function PlayerCombatService.setSprint(
     self: PlayerCombatService,
     player: Player,
@@ -420,6 +483,8 @@ function PlayerCombatService.snapshot(self: PlayerCombatService, player: Player)
     snapshot.rooted = status.rooted
     snapshot.rootedUntil = status.rootedUntil
     snapshot.movementMultiplier = status.movementMultiplier
+    snapshot.shielded = status.shielded
+    snapshot.shieldUntil = status.shieldUntil
     return snapshot
 end
 

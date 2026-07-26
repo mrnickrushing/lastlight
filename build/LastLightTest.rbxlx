@@ -1051,6 +1051,42 @@ function CombatState.dodge(state: State, now: number, canAct: boolean): (State, 
     }
 end
 
+-- Instant, non-time-based restore (a consumed item's effect, not regen), so
+-- it still routes through advance() first to settle any pending drain/regen
+-- up to `now` before adding the flat amount, the same way dodge and
+-- setSprint never mutate stamina without advancing state first.
+function CombatState.restoreStamina(
+    state: State,
+    now: number,
+    amount: number,
+    canAct: boolean
+): (State, TransitionResult)
+    local nextState = CombatState.advance(state, now, canAct)
+    if not canAct then
+        return nextState,
+            {
+                applied = false,
+                reason = "player_cannot_act",
+                stamina = nextState.stamina,
+            }
+    end
+    local stamina = math.min(MAX_STAMINA, nextState.stamina + math.max(0, amount))
+    if stamina == nextState.stamina then
+        return nextState,
+            {
+                applied = false,
+                reason = "stamina_full",
+                stamina = nextState.stamina,
+            }
+    end
+    nextState.stamina = stamina
+    nextState.revision += 1
+    return nextState, {
+        applied = true,
+        stamina = nextState.stamina,
+    }
+end
+
 function CombatState.avoidsDamage(state: State, now: number): boolean
     return now < state.dodgeInvulnerableUntil
 end
@@ -1091,7 +1127,7 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.16.0",
+    BuildVersion = "0.17.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -2098,6 +2134,36 @@ function Crafting.craft(
             itemId = recipe.outputItemId,
             recipeId = recipeId,
         }
+end
+
+-- Consumes exactly one owned unit of a crafted item, or leaves gear
+-- untouched if the item ID is unknown or none are owned. Deliberately
+-- doesn't know what using the item does — that effect lives in whichever
+-- service applies it — this only owns the atomic decrement.
+function Crafting.useItem(gear: { [string]: number }, itemId: any): ({ [string]: number }, any)
+    if not CraftingCatalog.isKnownOutputItem(itemId) then
+        return gear, {
+            applied = false,
+            reason = "unknown_item",
+        }
+    end
+
+    local owned = gear[itemId] or 0
+    if owned < 1 then
+        return gear,
+            {
+                applied = false,
+                itemId = itemId,
+                reason = "not_owned",
+            }
+    end
+
+    local nextGear = table.clone(gear)
+    nextGear[itemId] = owned - 1
+    return nextGear, {
+        applied = true,
+        itemId = itemId,
+    }
 end
 
 return table.freeze(Crafting)
@@ -4406,6 +4472,7 @@ local RuntimeIds = {
         Extract = "extract",
         Revive = "revive",
         CraftItem = "craft_item",
+        UseGear = "use_gear",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -4809,6 +4876,19 @@ function SaveSchema.gearSnapshot(profile: Profile): { [string]: number }
     return table.clone(profile.gear)
 end
 
+function SaveSchema.withUsedGearItem(profile: Profile, itemId: string, now: number): (Profile, any)
+    local nextGear, result = Crafting.useItem(profile.gear, itemId)
+    if not result.applied then
+        return profile, result
+    end
+
+    local nextProfile = table.clone(profile)
+    nextProfile.gear = nextGear
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
 return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
@@ -4825,6 +4905,8 @@ export type State = {
     drowsyMultiplier: number,
     rootedUntil: number,
     rootedMultiplier: number,
+    shieldUntil: number,
+    shieldMultiplier: number,
 }
 
 export type Snapshot = {
@@ -4833,6 +4915,9 @@ export type Snapshot = {
     movementMultiplier: number,
     rooted: boolean,
     rootedUntil: number,
+    shielded: boolean,
+    shieldUntil: number,
+    damageMultiplier: number,
 }
 
 function StatusEffectState.create(): State
@@ -4841,6 +4926,8 @@ function StatusEffectState.create(): State
         drowsyMultiplier = 1,
         rootedUntil = 0,
         rootedMultiplier = 1,
+        shieldUntil = 0,
+        shieldMultiplier = 1,
     }
 end
 
@@ -4874,6 +4961,26 @@ function StatusEffectState.applyRooted(
     return nextState
 end
 
+-- Reduces incoming damage for a short window, the same duration+multiplier
+-- shape applyDrowsy/applyRooted already use for movement, just applied to
+-- damage instead. Kept independent of ProfessionService's Warden-only
+-- mitigateIncomingDamage so an item-granted shield can stack with (rather
+-- than replace) a profession's own guard ability.
+function StatusEffectState.applyShield(
+    state: State,
+    now: number,
+    duration: number,
+    multiplier: number
+): State
+    local nextState = table.clone(state)
+    local untilTime = now + math.max(0, duration)
+    if untilTime >= state.shieldUntil then
+        nextState.shieldUntil = untilTime
+        nextState.shieldMultiplier = math.clamp(multiplier, 0.1, 1)
+    end
+    return nextState
+end
+
 function StatusEffectState.clear(_state: State): State
     return StatusEffectState.create()
 end
@@ -4881,6 +4988,7 @@ end
 function StatusEffectState.snapshot(state: State, now: number): Snapshot
     local active = now < state.drowsyUntil
     local rooted = now < state.rootedUntil
+    local shielded = now < state.shieldUntil
     local movementMultiplier = 1
     if active then
         movementMultiplier = math.min(movementMultiplier, state.drowsyMultiplier)
@@ -4894,6 +5002,9 @@ function StatusEffectState.snapshot(state: State, now: number): Snapshot
         movementMultiplier = movementMultiplier,
         rooted = rooted,
         rootedUntil = if rooted then state.rootedUntil else 0,
+        shielded = shielded,
+        shieldUntil = if shielded then state.shieldUntil else 0,
+        damageMultiplier = if shielded then state.shieldMultiplier else 1,
     }
 end
 
@@ -6523,6 +6634,28 @@ function AnalyticsService.crafted(
     end
 end
 
+function AnalyticsService.usedGear(
+    self: AnalyticsService,
+    player: Player,
+    itemId: string,
+    accepted: boolean,
+    reason: string?
+)
+    self._logger:info("gear_used", {
+        accepted = accepted,
+        item = string.sub(itemId, 1, 32),
+        player = player.UserId,
+        reason = reason or "accepted",
+    })
+    if accepted and not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "GearUsed", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = itemId,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.eliteStarted(
     self: AnalyticsService,
     player: Player,
@@ -7816,6 +7949,7 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
     if self._professionService ~= nil then
         damage, guarded = self._professionService:mitigateIncomingDamage(target, damage, now)
     end
+    damage = self._combatService:mitigateShieldedDamage(target, damage, now)
     local result = self._survivalService:damage(target, damage, enemyId)
     if result.applied and enemy.definition.statusEffect == "drowsy" then
         self._combatService:applyDrowsy(
@@ -9479,6 +9613,7 @@ function OldGrowthService._stepAttack(self: OldGrowthService, now: number)
 
     local damage, guarded =
         self._professionService:mitigateIncomingDamage(target, definition.damage, now)
+    damage = self._combatService:mitigateShieldedDamage(target, damage, now)
     local result = self._survivalService:damage(target, damage, self._encounter.Id)
     if result.applied and definition.attackId == "old_growth_root_lane" then
         self._combatService:applyRooted(
@@ -10189,6 +10324,8 @@ function PlayerCombatService._syncPlayer(self: PlayerCombatService, player: Play
     player:SetAttribute("LastLightDrowsyUntil", status.drowsyUntil)
     player:SetAttribute("LastLightRooted", status.rooted)
     player:SetAttribute("LastLightRootedUntil", status.rootedUntil)
+    player:SetAttribute("LastLightShielded", status.shielded)
+    player:SetAttribute("LastLightShieldUntil", status.shieldUntil)
 
     local activeHumanoid = humanoid(player)
     if activeHumanoid ~= nil then
@@ -10360,6 +10497,67 @@ function PlayerCombatService.applyDrowsy(
     return true
 end
 
+function PlayerCombatService.applyShield(
+    self: PlayerCombatService,
+    player: Player,
+    duration: number,
+    multiplier: number
+): boolean
+    local statusState = self._statusStates[player]
+    if statusState == nil or not self._survivalService:canAct(player) then
+        return false
+    end
+    local now = workspace:GetServerTimeNow()
+    self._statusStates[player] =
+        self._statusEffectState.applyShield(statusState, now, duration, multiplier)
+    self:_syncPlayer(player)
+    return true
+end
+
+function PlayerCombatService.restoreStamina(
+    self: PlayerCombatService,
+    player: Player,
+    amount: number
+): any
+    local state = self._states[player]
+    if state == nil then
+        return {
+            applied = false,
+            reason = "player_loading",
+        }
+    end
+    local now = workspace:GetServerTimeNow()
+    local nextState, result =
+        self._combatState.restoreStamina(state, now, amount, self._survivalService:canAct(player))
+    self._states[player] = nextState
+    self:_syncPlayer(player)
+    self:_markPublished(player, now)
+    if result.applied then
+        self:_notify(player, nil)
+    end
+    return result
+end
+
+-- Independent of ProfessionService.mitigateIncomingDamage (Warden's guard):
+-- the two are checked separately at each damage call site so an item-granted
+-- shield stacks with a profession's own mitigation instead of overriding it.
+function PlayerCombatService.mitigateShieldedDamage(
+    self: PlayerCombatService,
+    player: Player,
+    amount: number,
+    now: number
+): (number, boolean)
+    local statusState = self._statusStates[player]
+    if statusState == nil then
+        return amount, false
+    end
+    local status = self._statusEffectState.snapshot(statusState, now)
+    if not status.shielded then
+        return amount, false
+    end
+    return math.max(1, math.ceil(amount * status.damageMultiplier)), true
+end
+
 function PlayerCombatService.setSprint(
     self: PlayerCombatService,
     player: Player,
@@ -10496,6 +10694,8 @@ function PlayerCombatService.snapshot(self: PlayerCombatService, player: Player)
     snapshot.rooted = status.rooted
     snapshot.rootedUntil = status.rootedUntil
     snapshot.movementMultiplier = status.movementMultiplier
+    snapshot.shielded = status.shielded
+    snapshot.shieldUntil = status.shieldUntil
     return snapshot
 end
 
@@ -11952,6 +12152,39 @@ function ProfileService.craftItem(self: ProfileService, player: Player, recipeId
     }
 end
 
+function ProfileService.useGearItem(self: ProfileService, player: Player, itemId: string): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {
+            accepted = false,
+            reason = "profile_loading",
+        }
+    end
+    if not self:isWritable(player) then
+        return {
+            accepted = false,
+            reason = "profile_read_only",
+        }
+    end
+
+    local nextProfile, result = self._saveSchema.withUsedGearItem(profile, itemId, os.time())
+    if not result.applied then
+        return {
+            accepted = false,
+            reason = result.reason,
+        }
+    end
+
+    self._profiles[player] = nextProfile
+    if self._persistent and self._writable[player] == true then
+        self._dirty[player] = true
+    end
+    return {
+        accepted = true,
+        itemId = result.itemId,
+    }
+end
+
 function ProfileService.gearSnapshot(self: ProfileService, player: Player): { [string]: number }
     local profile = self._profiles[player]
     if profile == nil then
@@ -13048,6 +13281,50 @@ function TutorialService._nightComplete(self: TutorialService)
     self:_publishAll()
 end
 
+-- Consumable one-time buffs, not equipment: each craftable item is checked
+-- for its own effect's preconditions before the item is spent, so a player
+-- never loses one to a no-op (already full stamina, or unable to act).
+function TutorialService._useGear(self: TutorialService, player: Player, itemId: string)
+    local session = self._sessions[player]
+    if session == nil or session.stage ~= "complete" then
+        self:_setToast(player, "FINISH FIRST LIGHT TO USE GEAR")
+        self:_publish(player)
+        return
+    end
+    if not self._survivalService:canAct(player) then
+        self:_setToast(player, "YOU CANNOT USE GEAR WHILE DOWNED")
+        self:_publish(player)
+        return
+    end
+    if itemId == "gear_meadow_satchel" then
+        local combat = self._combatService:snapshot(player)
+        if combat.stamina >= combat.maxStamina then
+            self:_setToast(player, "STAMINA ALREADY FULL")
+            self:_publish(player)
+            return
+        end
+    elseif itemId ~= "gear_amber_charm" then
+        return
+    end
+
+    local result = self._profileService:useGearItem(player, itemId)
+    self._analyticsService:usedGear(player, itemId, result.accepted, result.reason)
+    if not result.accepted then
+        self:_setToast(player, "YOU DON'T HAVE THAT ITEM")
+        self:_publish(player)
+        return
+    end
+
+    if itemId == "gear_amber_charm" then
+        self._combatService:applyShield(player, 5, 0.6)
+        self:_setToast(player, "AMBER CHARM — SHIELDED")
+    else
+        self._combatService:restoreStamina(player, 50)
+        self:_setToast(player, "MEADOW SATCHEL — STAMINA RESTORED")
+    end
+    self:_publish(player)
+end
+
 function TutorialService._handleAction(self: TutorialService, player: Player, payload: any)
     if type(payload) ~= "table" or payload.schemaVersion ~= 1 then
         return
@@ -13065,6 +13342,8 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         allowedFields.interactionId = true
     elseif kind == self._runtimeIds.Actions.SelectProfession then
         allowedFields.professionId = true
+    elseif kind == self._runtimeIds.Actions.UseGear then
+        allowedFields.itemId = true
     elseif
         kind == self._runtimeIds.Actions.Sprint
         or kind == self._runtimeIds.Actions.CompactHud
@@ -13123,6 +13402,11 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
                 self:_setToast(player, result.message)
                 self:_publish(player)
             end
+        end
+    elseif kind == self._runtimeIds.Actions.UseGear then
+        local itemId = payload.itemId
+        if type(itemId) == "string" and #itemId <= 32 then
+            self:_useGear(player, itemId)
         end
     elseif kind == self._runtimeIds.Actions.CompactHud and type(payload.enabled) == "boolean" then
         local session = self._sessions[player]
@@ -13783,6 +14067,7 @@ function WardenStagService._stepAttack(self: WardenStagService, now: number)
 
     local damage, guarded =
         self._professionService:mitigateIncomingDamage(target, definition.damage, now)
+    damage = self._combatService:mitigateShieldedDamage(target, damage, now)
     local result = self._survivalService:damage(target, damage, self._encounter.Id)
     if result.applied and definition.rootedDuration ~= nil then
         self._combatService:applyRooted(
@@ -17519,7 +17804,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 6, "unexpected save schema version")
-assert(Config.BuildVersion == "0.16.0", "unexpected build version")
+assert(Config.BuildVersion == "0.17.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -18015,6 +18300,10 @@ end, function()
     send(RuntimeIds.Actions.ProfessionAbility)
 end, function()
     hud:setProfessionMenuOpen(true)
+end, function()
+    send(RuntimeIds.Actions.UseGear, { itemId = "gear_amber_charm" })
+end, function()
+    send(RuntimeIds.Actions.UseGear, { itemId = "gear_meadow_satchel" })
 end)
 
 hud:setCompactHandler(function(enabled: boolean)
@@ -18182,6 +18471,8 @@ export type HUDController = typeof(setmetatable(
         _ability: TextButton,
         _compact: TextButton,
         _professionButton: TextButton,
+        _useCharm: TextButton,
+        _useSatchel: TextButton,
         _professionOverlay: Frame,
         _professionPanel: Frame,
         _professionCards: { [string]: TextButton },
@@ -18750,6 +19041,40 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     corner(professionButton, 12)
     stroke(professionButton, COLORS.amber, 0.42)
 
+    local useCharm = Instance.new("TextButton")
+    useCharm.Name = "UseAmberCharm"
+    useCharm.AnchorPoint = Vector2.new(1, 0)
+    useCharm.Position = UDim2.new(1, -18, 0, 110)
+    useCharm.Size = UDim2.fromOffset(118, 42)
+    useCharm.BackgroundColor3 = COLORS.panel
+    useCharm.BackgroundTransparency = 0.08
+    useCharm.Font = Enum.Font.GothamBold
+    useCharm.Text = "CHARM"
+    useCharm.TextColor3 = COLORS.amber
+    useCharm.TextSize = 12
+    useCharm.Visible = false
+    useCharm.ZIndex = 10
+    useCharm.Parent = canvas
+    corner(useCharm, 12)
+    stroke(useCharm, COLORS.amber, 0.42)
+
+    local useSatchel = Instance.new("TextButton")
+    useSatchel.Name = "UseMeadowSatchel"
+    useSatchel.AnchorPoint = Vector2.new(1, 0)
+    useSatchel.Position = UDim2.new(1, -18, 0, 156)
+    useSatchel.Size = UDim2.fromOffset(118, 42)
+    useSatchel.BackgroundColor3 = COLORS.panel
+    useSatchel.BackgroundTransparency = 0.08
+    useSatchel.Font = Enum.Font.GothamBold
+    useSatchel.Text = "SATCHEL"
+    useSatchel.TextColor3 = Color3.fromRGB(133, 176, 108)
+    useSatchel.TextSize = 12
+    useSatchel.Visible = false
+    useSatchel.ZIndex = 10
+    useSatchel.Parent = canvas
+    corner(useSatchel, 12)
+    stroke(useSatchel, Color3.fromRGB(133, 176, 108), 0.42)
+
     local professionOverlay = Instance.new("Frame")
     professionOverlay.Name = "ProfessionOverlay"
     professionOverlay.Size = UDim2.fromScale(1, 1)
@@ -18907,6 +19232,8 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _ability = ability,
         _compact = compact,
         _professionButton = professionButton,
+        _useCharm = useCharm,
+        _useSatchel = useSatchel,
         _professionOverlay = professionOverlay,
         _professionPanel = professionPanel,
         _professionCards = professionCards,
@@ -19010,6 +19337,14 @@ end
 
 function HUDController.professionButton(self: HUDController): TextButton
     return self._professionButton
+end
+
+function HUDController.useCharmButton(self: HUDController): TextButton
+    return self._useCharm
+end
+
+function HUDController.useSatchelButton(self: HUDController): TextButton
+    return self._useSatchel
 end
 
 function HUDController.setCompactHandler(self: HUDController, callback: (boolean) -> ())
@@ -19229,6 +19564,22 @@ function HUDController._updateProfessionClock(self: HUDController)
         else prefix .. compactAbilityName
 end
 
+-- Each craftable item gets its own fixed button rather than a picker, the
+-- same one-button-one-outcome choice the crafting benches themselves use;
+-- a button simply disappears once its item count reaches zero.
+function HUDController._updateGear(self: HUDController)
+    local state = self._currentState
+    local gear = if type(state) == "table" and type(state.gear) == "table" then state.gear else nil
+    local tutorialComplete = type(state) == "table" and state.tutorialComplete == true
+    local charmCount = if gear ~= nil then tonumber(gear.gear_amber_charm) or 0 else 0
+    local satchelCount = if gear ~= nil then tonumber(gear.gear_meadow_satchel) or 0 else 0
+
+    self._useCharm.Visible = tutorialComplete and not self._playerDowned and charmCount > 0
+    self._useCharm.Text = string.format("CHARM ×%d", charmCount)
+    self._useSatchel.Visible = tutorialComplete and not self._playerDowned and satchelCount > 0
+    self._useSatchel.Text = string.format("SATCHEL ×%d", satchelCount)
+end
+
 function HUDController.setInteraction(self: HUDController, label: string?, available: boolean)
     self._interactionLabel = label
     self._interactionAvailable = available
@@ -19303,8 +19654,10 @@ function HUDController._layout(self: HUDController)
         )
         self._threatFrame.Size = UDim2.new(1, -36, 0, 66)
         self._downedFrame.Size = UDim2.new(1, -36, 0, 90)
-        self._professionButton.Position =
-            UDim2.new(1, -18, 0, if self._compactEnabled then 158 else 218)
+        local professionY = if self._compactEnabled then 158 else 218
+        self._professionButton.Position = UDim2.new(1, -18, 0, professionY)
+        self._useCharm.Position = UDim2.new(1, -18, 0, professionY + 46)
+        self._useSatchel.Position = UDim2.new(1, -18, 0, professionY + 92)
         self._professionPanel.Size = UDim2.new(1, -24, 0, 440)
         self._ability.Position = UDim2.new(1, -158, 1, -138)
     else
@@ -19336,6 +19689,8 @@ function HUDController._layout(self: HUDController)
         self._threatFrame.Size = UDim2.fromOffset(330, 66)
         self._downedFrame.Size = UDim2.fromOffset(540, 90)
         self._professionButton.Position = UDim2.new(1, -18, 0, 64)
+        self._useCharm.Position = UDim2.new(1, -18, 0, 110)
+        self._useSatchel.Position = UDim2.new(1, -18, 0, 156)
         self._professionPanel.Size = UDim2.fromOffset(640, 440)
         self._ability.Position = UDim2.new(1, -346, 1, -40)
     end
@@ -19622,6 +19977,7 @@ function HUDController.update(self: HUDController, state: any)
     self._dodge.Visible = not self._playerDowned
         and (self._inputMode == "touch" or self._combatContext)
     self:_updateProfessionClock()
+    self:_updateGear()
     local eliteVisible = (type(boss) == "table" and (boss.active == true or boss.complete == true))
         or (type(elite) == "table" and (elite.active == true or elite.complete == true))
     eliteVisible = eliteVisible and not self._playerDowned
@@ -19726,7 +20082,9 @@ function InputController.new(
     onSprint: (boolean) -> (),
     onDodge: () -> (),
     onProfessionAbility: () -> (),
-    onProfessionMenu: () -> ()
+    onProfessionMenu: () -> (),
+    onUseCharm: () -> (),
+    onUseSatchel: () -> ()
 ): InputController
     local self = setmetatable({
         _hud = hud,
@@ -19767,6 +20125,14 @@ function InputController.new(
             { name = "Keyboard", key = Enum.KeyCode.P },
             { name = "Gamepad", key = Enum.KeyCode.DPadUp },
         }, hud:professionButton())
+        local useCharm = createBoolAction(context, "UseAmberCharm", {
+            { name = "Keyboard", key = Enum.KeyCode.C },
+            { name = "Gamepad", key = Enum.KeyCode.ButtonY },
+        }, hud:useCharmButton())
+        local useSatchel = createBoolAction(context, "UseMeadowSatchel", {
+            { name = "Keyboard", key = Enum.KeyCode.V },
+            { name = "Gamepad", key = Enum.KeyCode.DPadDown },
+        }, hud:useSatchelButton())
 
         table.insert(
             self._connections,
@@ -19813,6 +20179,22 @@ function InputController.new(
         table.insert(self._connections, (professionMenu :: any).Pressed:Connect(onProfessionMenu))
         table.insert(
             self._connections,
+            (useCharm :: any).Pressed:Connect(function()
+                if not hud:isProfessionMenuOpen() then
+                    onUseCharm()
+                end
+            end)
+        )
+        table.insert(
+            self._connections,
+            (useSatchel :: any).Pressed:Connect(function()
+                if not hud:isProfessionMenuOpen() then
+                    onUseSatchel()
+                end
+            end)
+        )
+        table.insert(
+            self._connections,
             (sprint :: any).Released:Connect(function()
                 onSprint(false)
             end)
@@ -19834,7 +20216,9 @@ function InputController.new(
             onSprint,
             onDodge,
             onProfessionAbility,
-            onProfessionMenu
+            onProfessionMenu,
+            onUseCharm,
+            onUseSatchel
         )
     end
 
@@ -19870,7 +20254,9 @@ function InputController._installFallback(
     onSprint: (boolean) -> (),
     onDodge: () -> (),
     onProfessionAbility: () -> (),
-    onProfessionMenu: () -> ()
+    onProfessionMenu: () -> (),
+    onUseCharm: () -> (),
+    onUseSatchel: () -> ()
 )
     table.insert(self._connections, self._hud:primaryButton().Activated:Connect(onInteract))
     table.insert(self._connections, self._hud:toolButton().Activated:Connect(onUseTool))
@@ -19883,6 +20269,8 @@ function InputController._installFallback(
         self._connections,
         self._hud:professionButton().Activated:Connect(onProfessionMenu)
     )
+    table.insert(self._connections, self._hud:useCharmButton().Activated:Connect(onUseCharm))
+    table.insert(self._connections, self._hud:useSatchelButton().Activated:Connect(onUseSatchel))
     table.insert(
         self._connections,
         self._hud:sprintButton().MouseButton1Down:Connect(function()
@@ -19928,6 +20316,10 @@ function InputController._installFallback(
                 onProfessionAbility()
             elseif input.KeyCode == Enum.KeyCode.P or input.KeyCode == Enum.KeyCode.DPadUp then
                 onProfessionMenu()
+            elseif input.KeyCode == Enum.KeyCode.C or input.KeyCode == Enum.KeyCode.ButtonY then
+                onUseCharm()
+            elseif input.KeyCode == Enum.KeyCode.V or input.KeyCode == Enum.KeyCode.DPadDown then
+                onUseSatchel()
             end
         end)
     )

@@ -283,6 +283,39 @@ function ProfileService.craftItem(self: ProfileService, player: Player, recipeId
     }
 end
 
+function ProfileService.useGearItem(self: ProfileService, player: Player, itemId: string): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {
+            accepted = false,
+            reason = "profile_loading",
+        }
+    end
+    if not self:isWritable(player) then
+        return {
+            accepted = false,
+            reason = "profile_read_only",
+        }
+    end
+
+    local nextProfile, result = self._saveSchema.withUsedGearItem(profile, itemId, os.time())
+    if not result.applied then
+        return {
+            accepted = false,
+            reason = result.reason,
+        }
+    end
+
+    self._profiles[player] = nextProfile
+    if self._persistent and self._writable[player] == true then
+        self._dirty[player] = true
+    end
+    return {
+        accepted = true,
+        itemId = result.itemId,
+    }
+end
+
 function ProfileService.gearSnapshot(self: ProfileService, player: Player): { [string]: number }
     local profile = self._profiles[player]
     if profile == nil then

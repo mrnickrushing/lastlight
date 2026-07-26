@@ -99,5 +99,31 @@ return {
                 TestRunner.equal(CombatState.snapshot(unchanged, 4).lowStamina, true)
             end,
         },
+        {
+            name = "restoreStamina adds a flat amount clamped to the max",
+            run = function()
+                local state = CombatState.create(0)
+                state = CombatState.dodge(state, 0, true)
+                local restored, result = CombatState.restoreStamina(state, 1, 50, true)
+                TestRunner.equal(result.applied, true)
+                TestRunner.equal(CombatState.snapshot(restored, 1).stamina, 100)
+
+                local overflowed, overflowResult = CombatState.restoreStamina(restored, 1, 10, true)
+                TestRunner.equal(overflowResult.applied, false)
+                TestRunner.equal(overflowResult.reason, "stamina_full")
+                TestRunner.equal(CombatState.snapshot(overflowed, 1).stamina, 100)
+            end,
+        },
+        {
+            name = "restoreStamina rejects a player who cannot act without mutating stamina",
+            run = function()
+                local state = CombatState.create(0)
+                state = CombatState.dodge(state, 0, true)
+                local unchanged, result = CombatState.restoreStamina(state, 1, 50, false)
+                TestRunner.equal(result.applied, false)
+                TestRunner.equal(result.reason, "player_cannot_act")
+                TestRunner.equal(CombatState.snapshot(unchanged, 1).stamina, 65)
+            end,
+        },
     },
 }

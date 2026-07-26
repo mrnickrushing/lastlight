@@ -54,5 +54,29 @@ return {
                 TestRunner.equal(afterRoot.movementMultiplier, 0.65)
             end,
         },
+        {
+            name = "applies and expires a bounded damage shield independently of movement",
+            run = function()
+                local state = StatusEffectState.applyShield(StatusEffectState.create(), 10, 5, 0.6)
+                local active = StatusEffectState.snapshot(state, 11)
+                TestRunner.truthy(active.shielded)
+                TestRunner.equal(active.shieldUntil, 15)
+                TestRunner.equal(active.damageMultiplier, 0.6)
+                TestRunner.equal(active.movementMultiplier, 1)
+                local expired = StatusEffectState.snapshot(state, 15)
+                TestRunner.equal(expired.shielded, false)
+                TestRunner.equal(expired.damageMultiplier, 1)
+            end,
+        },
+        {
+            name = "shield clamps an unsafe multiplier and only extends toward a later expiry",
+            run = function()
+                local first = StatusEffectState.applyShield(StatusEffectState.create(), 5, 5, 0.6)
+                local shorter = StatusEffectState.applyShield(first, 6, 1, 0)
+                TestRunner.equal(StatusEffectState.snapshot(shorter, 6).shieldUntil, 10)
+                local longer = StatusEffectState.applyShield(first, 6, 8, 0)
+                TestRunner.equal(StatusEffectState.snapshot(longer, 6).damageMultiplier, 0.1)
+            end,
+        },
     },
 }

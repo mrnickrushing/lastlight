@@ -536,6 +536,50 @@ function TutorialService._nightComplete(self: TutorialService)
     self:_publishAll()
 end
 
+-- Consumable one-time buffs, not equipment: each craftable item is checked
+-- for its own effect's preconditions before the item is spent, so a player
+-- never loses one to a no-op (already full stamina, or unable to act).
+function TutorialService._useGear(self: TutorialService, player: Player, itemId: string)
+    local session = self._sessions[player]
+    if session == nil or session.stage ~= "complete" then
+        self:_setToast(player, "FINISH FIRST LIGHT TO USE GEAR")
+        self:_publish(player)
+        return
+    end
+    if not self._survivalService:canAct(player) then
+        self:_setToast(player, "YOU CANNOT USE GEAR WHILE DOWNED")
+        self:_publish(player)
+        return
+    end
+    if itemId == "gear_meadow_satchel" then
+        local combat = self._combatService:snapshot(player)
+        if combat.stamina >= combat.maxStamina then
+            self:_setToast(player, "STAMINA ALREADY FULL")
+            self:_publish(player)
+            return
+        end
+    elseif itemId ~= "gear_amber_charm" then
+        return
+    end
+
+    local result = self._profileService:useGearItem(player, itemId)
+    self._analyticsService:usedGear(player, itemId, result.accepted, result.reason)
+    if not result.accepted then
+        self:_setToast(player, "YOU DON'T HAVE THAT ITEM")
+        self:_publish(player)
+        return
+    end
+
+    if itemId == "gear_amber_charm" then
+        self._combatService:applyShield(player, 5, 0.6)
+        self:_setToast(player, "AMBER CHARM — SHIELDED")
+    else
+        self._combatService:restoreStamina(player, 50)
+        self:_setToast(player, "MEADOW SATCHEL — STAMINA RESTORED")
+    end
+    self:_publish(player)
+end
+
 function TutorialService._handleAction(self: TutorialService, player: Player, payload: any)
     if type(payload) ~= "table" or payload.schemaVersion ~= 1 then
         return
@@ -553,6 +597,8 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         allowedFields.interactionId = true
     elseif kind == self._runtimeIds.Actions.SelectProfession then
         allowedFields.professionId = true
+    elseif kind == self._runtimeIds.Actions.UseGear then
+        allowedFields.itemId = true
     elseif
         kind == self._runtimeIds.Actions.Sprint
         or kind == self._runtimeIds.Actions.CompactHud
@@ -611,6 +657,11 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
                 self:_setToast(player, result.message)
                 self:_publish(player)
             end
+        end
+    elseif kind == self._runtimeIds.Actions.UseGear then
+        local itemId = payload.itemId
+        if type(itemId) == "string" and #itemId <= 32 then
+            self:_useGear(player, itemId)
         end
     elseif kind == self._runtimeIds.Actions.CompactHud and type(payload.enabled) == "boolean" then
         local session = self._sessions[player]

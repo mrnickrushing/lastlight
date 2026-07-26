@@ -486,6 +486,7 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
     if self._professionService ~= nil then
         damage, guarded = self._professionService:mitigateIncomingDamage(target, damage, now)
     end
+    damage = self._combatService:mitigateShieldedDamage(target, damage, now)
     local result = self._survivalService:damage(target, damage, enemyId)
     if result.applied and enemy.definition.statusEffect == "drowsy" then
         self._combatService:applyDrowsy(

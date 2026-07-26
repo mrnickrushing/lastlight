@@ -342,6 +342,28 @@ function AnalyticsService.crafted(
     end
 end
 
+function AnalyticsService.usedGear(
+    self: AnalyticsService,
+    player: Player,
+    itemId: string,
+    accepted: boolean,
+    reason: string?
+)
+    self._logger:info("gear_used", {
+        accepted = accepted,
+        item = string.sub(itemId, 1, 32),
+        player = player.UserId,
+        reason = reason or "accepted",
+    })
+    if accepted and not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "GearUsed", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = itemId,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.eliteStarted(
     self: AnalyticsService,
     player: Player,

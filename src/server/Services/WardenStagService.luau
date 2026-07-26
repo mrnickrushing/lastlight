@@ -423,6 +423,7 @@ function WardenStagService._stepAttack(self: WardenStagService, now: number)
 
     local damage, guarded =
         self._professionService:mitigateIncomingDamage(target, definition.damage, now)
+    damage = self._combatService:mitigateShieldedDamage(target, damage, now)
     local result = self._survivalService:damage(target, damage, self._encounter.Id)
     if result.applied and definition.rootedDuration ~= nil then
         self._combatService:applyRooted(

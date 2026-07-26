@@ -42,6 +42,7 @@ local RuntimeIds = {
         Extract = "extract",
         Revive = "revive",
         CraftItem = "craft_item",
+        UseGear = "use_gear",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",

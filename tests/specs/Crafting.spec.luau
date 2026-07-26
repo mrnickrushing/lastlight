@@ -85,5 +85,41 @@ return {
                 TestRunner.equal(next(gear), nil)
             end,
         },
+        {
+            name = "useItem consumes exactly one owned unit",
+            run = function()
+                local gear = { gear_amber_charm = 2 }
+                local nextGear, result = Crafting.useItem(gear, "gear_amber_charm")
+                TestRunner.equal(result.applied, true)
+                TestRunner.equal(result.itemId, "gear_amber_charm")
+                TestRunner.equal(nextGear.gear_amber_charm, 1)
+                TestRunner.equal(gear.gear_amber_charm, 2)
+            end,
+        },
+        {
+            name = "useItem rejects an item with none owned without mutating gear",
+            run = function()
+                local gear = { gear_amber_charm = 0 }
+                local nextGear, result = Crafting.useItem(gear, "gear_amber_charm")
+                TestRunner.equal(result.applied, false)
+                TestRunner.equal(result.reason, "not_owned")
+                TestRunner.equal(nextGear, gear)
+
+                local emptyGear = Crafting.default()
+                local stillEmpty, missingResult = Crafting.useItem(emptyGear, "gear_meadow_satchel")
+                TestRunner.equal(missingResult.reason, "not_owned")
+                TestRunner.equal(stillEmpty, emptyGear)
+            end,
+        },
+        {
+            name = "useItem rejects an unknown item ID without mutating gear",
+            run = function()
+                local gear = { gear_amber_charm = 3 }
+                local nextGear, result = Crafting.useItem(gear, "gear_does_not_exist")
+                TestRunner.equal(result.applied, false)
+                TestRunner.equal(result.reason, "unknown_item")
+                TestRunner.equal(nextGear, gear)
+            end,
+        },
     },
 }

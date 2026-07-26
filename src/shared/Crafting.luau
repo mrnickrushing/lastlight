@@ -73,4 +73,34 @@ function Crafting.craft(
         }
 end
 
+-- Consumes exactly one owned unit of a crafted item, or leaves gear
+-- untouched if the item ID is unknown or none are owned. Deliberately
+-- doesn't know what using the item does — that effect lives in whichever
+-- service applies it — this only owns the atomic decrement.
+function Crafting.useItem(gear: { [string]: number }, itemId: any): ({ [string]: number }, any)
+    if not CraftingCatalog.isKnownOutputItem(itemId) then
+        return gear, {
+            applied = false,
+            reason = "unknown_item",
+        }
+    end
+
+    local owned = gear[itemId] or 0
+    if owned < 1 then
+        return gear,
+            {
+                applied = false,
+                itemId = itemId,
+                reason = "not_owned",
+            }
+    end
+
+    local nextGear = table.clone(gear)
+    nextGear[itemId] = owned - 1
+    return nextGear, {
+        applied = true,
+        itemId = itemId,
+    }
+end
+
 return table.freeze(Crafting)
