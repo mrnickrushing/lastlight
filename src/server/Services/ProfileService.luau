@@ -316,6 +316,35 @@ function ProfileService.useGearItem(self: ProfileService, player: Player, itemId
     }
 end
 
+-- Safe to call after any action, whether or not it moved a quest signal:
+-- returns an empty list and touches nothing when there's nothing newly
+-- claimable.
+function ProfileService.checkQuests(self: ProfileService, player: Player): { any }
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return {}
+    end
+
+    local nextProfile, claimedResults = self._saveSchema.checkAndClaimQuests(profile, os.time())
+    if #claimedResults == 0 then
+        return claimedResults
+    end
+
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    return claimedResults
+end
+
+function ProfileService.questSnapshot(self: ProfileService, player: Player): { any }
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {}
+    end
+    return self._saveSchema.questSnapshot(profile)
+end
+
 function ProfileService.gearSnapshot(self: ProfileService, player: Player): { [string]: number }
     local profile = self._profiles[player]
     if profile == nil then

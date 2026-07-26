@@ -4,6 +4,7 @@ local TutorialFlow = require("./TutorialFlow")
 local ExpeditionInventory = require("./ExpeditionInventory")
 local ProfessionCatalog = require("./ProfessionCatalog")
 local Crafting = require("./Crafting")
+local Quests = require("./Quests")
 
 local SaveSchema = {}
 
@@ -37,6 +38,9 @@ export type Profile = {
         nightNumber: number,
     },
     gear: { [string]: number },
+    quests: {
+        claimed: { [string]: boolean },
+    },
 }
 
 local MAX_NIGHT_NUMBER = 1_000_000
@@ -54,7 +58,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 6,
+        schemaVersion = 7,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -81,6 +85,9 @@ function SaveSchema.default(now: number): Profile
             nightNumber = 1,
         },
         gear = Crafting.default(),
+        quests = {
+            claimed = Quests.default(),
+        },
     }
 end
 
@@ -165,8 +172,11 @@ function SaveSchema.normalize(value: any, now: number): Profile
         profile.town.nightNumber = town.nightNumber
     end
     profile.gear = Crafting.normalizeGear(value.gear)
+    local quests = value.quests
+    profile.quests.claimed =
+        Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 6
+    profile.schemaVersion = 7
     return profile
 end
 
@@ -374,6 +384,47 @@ function SaveSchema.withUsedGearItem(profile: Profile, itemId: string, now: numb
     nextProfile.updatedAt = now
     nextProfile.revision += 1
     return nextProfile, result
+end
+
+local function questSignals(profile: Profile): Quests.Signals
+    local craftedItems = 0
+    for _, count in profile.gear do
+        craftedItems += count
+    end
+    return {
+        bramblewakeSettlements = #profile.inventory.settlementOrder,
+        craftedItems = craftedItems,
+        nightsSurvived = math.max(0, profile.town.nightNumber - 1),
+    }
+end
+
+-- Opportunistic, not event-driven: call this after any action that could
+-- move a quest signal (a night completing, a craft succeeding, an
+-- expedition settling). Safe to call anytime, including when nothing is
+-- newly claimable — it just returns an empty result list and the same
+-- profile reference.
+function SaveSchema.checkAndClaimQuests(profile: Profile, now: number): (Profile, { any })
+    local nextClaimed, nextMaterials, claimedResults = Quests.checkAndClaim(
+        profile.quests.claimed,
+        profile.inventory.materials,
+        questSignals(profile)
+    )
+    if #claimedResults == 0 then
+        return profile, claimedResults
+    end
+
+    local nextProfile = table.clone(profile)
+    nextProfile.quests = table.clone(profile.quests)
+    nextProfile.quests.claimed = nextClaimed
+    nextProfile.inventory = table.clone(profile.inventory)
+    nextProfile.inventory.materials = nextMaterials
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, claimedResults
+end
+
+function SaveSchema.questSnapshot(profile: Profile): { any }
+    return Quests.snapshot(profile.quests.claimed, questSignals(profile))
 end
 
 return table.freeze(SaveSchema)

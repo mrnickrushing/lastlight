@@ -151,7 +151,12 @@ function TutorialService.Init(self: TutorialService, _context: any)
     self._townNightService:setNightCompletedHandler(function(nightNumber: number)
         for player in self._sessions do
             self._profileService:setNightNumber(player, nightNumber)
+            local questSuffix = self:_questToastSuffix(player)
+            if questSuffix ~= nil then
+                self:_setToast(player, questSuffix)
+            end
         end
+        self:_publishAll()
     end)
     self._enemyService:setChangedHandler(function(toast: string?)
         if toast ~= nil then
@@ -325,6 +330,24 @@ function TutorialService._setToast(self: TutorialService, player: Player, messag
     session.toastRevision += 1
 end
 
+-- Quests have no quest board or accept step: this opportunistically claims
+-- anything newly satisfiable and returns a toast fragment to fold into
+-- whatever toast the caller was already about to show (a single session
+-- only ever carries one pending toast, so the caller must combine rather
+-- than set two in a row and lose the first).
+function TutorialService._questToastSuffix(self: TutorialService, player: Player): string?
+    local claimed = self._profileService:checkQuests(player)
+    if #claimed == 0 then
+        return nil
+    end
+    local parts = {}
+    for _, quest in claimed do
+        self._analyticsService:questClaimed(player, quest.questId)
+        table.insert(parts, string.format("QUEST COMPLETE: %s", quest.displayName))
+    end
+    return table.concat(parts, " · ")
+end
+
 function TutorialService._advance(
     self: TutorialService,
     player: Player,
@@ -406,7 +429,14 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
     end
     if actionId == self._runtimeIds.Actions.Extract then
         local result = self._expeditionService:extract(player)
-        self:_setToast(player, result.message)
+        local toast = result.message
+        if result.accepted then
+            local questSuffix = self:_questToastSuffix(player)
+            if questSuffix ~= nil then
+                toast = toast .. " · " .. questSuffix
+            end
+        end
+        self:_setToast(player, toast)
         self:_publishAll()
         return
     end
@@ -422,13 +452,19 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         end
         local result = self._profileService:craftItem(player, recipeId)
         self._analyticsService:crafted(player, recipeId, result.accepted, result.reason)
+        local toast: string
         if result.accepted then
-            self:_setToast(player, string.format("CRAFTED %s", prompt.ObjectText))
+            toast = string.format("CRAFTED %s", prompt.ObjectText)
+            local questSuffix = self:_questToastSuffix(player)
+            if questSuffix ~= nil then
+                toast = toast .. " · " .. questSuffix
+            end
         elseif result.reason == "insufficient_materials" then
-            self:_setToast(player, "NOT ENOUGH MATERIALS")
+            toast = "NOT ENOUGH MATERIALS"
         else
-            self:_setToast(player, "CRAFTING UNAVAILABLE")
+            toast = "CRAFTING UNAVAILABLE"
         end
+        self:_setToast(player, toast)
         self:_publish(player)
         return
     end
@@ -870,6 +906,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         unbankedExpeditionRewards = expedition.unbankedRewards,
         bankedMaterials = expedition.bankedMaterials,
         gear = self._profileService:gearSnapshot(player),
+        quests = self._profileService:questSnapshot(player),
         combat = self._combatService:snapshot(player),
         profession = self._professionService:snapshot(player),
         elite = elite,

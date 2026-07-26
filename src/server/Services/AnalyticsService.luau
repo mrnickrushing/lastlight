@@ -364,6 +364,20 @@ function AnalyticsService.usedGear(
     end
 end
 
+function AnalyticsService.questClaimed(self: AnalyticsService, player: Player, questId: string)
+    self._logger:info("quest_claimed", {
+        player = player.UserId,
+        quest = string.sub(questId, 1, 48),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "QuestClaimed", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = questId,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.eliteStarted(
     self: AnalyticsService,
     player: Player,

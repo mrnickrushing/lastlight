@@ -384,3 +384,24 @@ a Warden's guard and a charm mutually exclusive for no reason. Keeping them
 as two independent checks costs one extra line at each of the three
 existing damage call sites and keeps a charm equally useful regardless of
 profession.
+
+## 2026-07-26 — First quests are silent milestones, not a quest board
+
+**Decision:** Quests have no quest giver, no accept step, and no browsing
+UI. The server opportunistically checks every not-yet-claimed quest's
+objective after any action that could satisfy it (a night completing, a
+craft succeeding, a settlement completing) and auto-claims anything newly
+met, granting its reward immediately. Only the claimed set persists;
+progress is always recomputed live from existing profile fields
+(`town.nightNumber`, `gear`, `inventory.settlementOrder`), never stored
+separately.
+
+**Reason:** No NPC/dialogue/quest-board UI exists anywhere in this
+codebase yet, and every objective this increment needs is already
+derivable from state the game tracks for other reasons. Building an
+accept/track UI before there's anywhere to put it, or a new progress-
+counter mechanism when the existing counters already say everything
+needed, would be scope invented for its own sake. Reading progress live
+rather than storing it also means a quest can never be permanently lost to
+a later regression (e.g. crafting an item and then using it up) — once
+satisfied at any check, it's claimed for good.
