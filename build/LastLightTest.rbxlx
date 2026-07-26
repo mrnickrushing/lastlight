@@ -20097,7 +20097,7 @@ function HUDController._updateClock(self: HUDController)
                 else "VOTE RECORDED · WAITING FOR ACTIVE TRAVELERS"
         else
             local decision = string.upper(
-                string.gsub(tostring(blackout.decision or "chapter resolved"), "_", " ")
+                (string.gsub(tostring(blackout.decision or "chapter resolved"), "_", " "))
             )
             local outcome = string.upper(tostring(blackout.wardenOutcome or "remembered"))
             self._blackoutDetail.Text = decision .. " · FOREST " .. outcome
