@@ -14,13 +14,13 @@ export type TownNightService = typeof(setmetatable(
         _logger: Logger,
         _worldService: any,
         _enemyService: any,
-        _phaseService: any,
         _townNightSchedule: any,
         _daySeconds: number,
         _duskSeconds: number,
         _nightSeconds: number,
         _blackoutInterval: number,
         _enabled: boolean,
+        _started: boolean,
         _nightNumber: number,
         _phase: string,
         _phaseEndsAt: number,
@@ -35,7 +35,6 @@ function TownNightService.new(
     worldService: any,
     enemyService: any,
     townNightSchedule: any,
-    phaseService: any,
     featureFlags: any
 ): TownNightService
     return setmetatable({
@@ -43,13 +42,13 @@ function TownNightService.new(
         _logger = logger,
         _worldService = worldService,
         _enemyService = enemyService,
-        _phaseService = phaseService,
         _townNightSchedule = townNightSchedule,
         _daySeconds = config.NormalDaySeconds,
         _duskSeconds = config.DuskSeconds,
         _nightSeconds = config.NormalNightSeconds,
         _blackoutInterval = config.BlackoutInterval,
         _enabled = featureFlags:isEnabled("town_night_cycle_enabled"),
+        _started = false,
         _nightNumber = 1,
         _phase = "dormant",
         _phaseEndsAt = 0,
@@ -58,6 +57,8 @@ function TownNightService.new(
 end
 
 function TownNightService.Init(_self: TownNightService, _context: any) end
+
+function TownNightService.Start(_self: TownNightService) end
 
 function TownNightService.setChangedHandler(self: TownNightService, callback: (string?) -> ())
     self._onChanged = callback
@@ -76,19 +77,19 @@ local function waitUntilTime(target: number)
     end
 end
 
--- Disabling this leaves the tutorial's authored First Night, Bramblewake
--- expeditions, and manual Blackout entry untouched — only the repeating town
--- day/dusk/night loop that runs after First Light stops advancing.
-function TownNightService.Start(self: TownNightService)
-    if not self._enabled then
-        self._logger:info("town_night_cycle_disabled")
+-- Called once the first player in this server session is known to be past
+-- First Light — either a fresh player who just finished it, or a returning
+-- player whose saved profile already had it complete. Idempotent and safe to
+-- call from either path; only the first call starts the loop. Disabling the
+-- kill switch leaves the tutorial's authored First Night, Bramblewake
+-- expeditions, and manual Blackout entry untouched — only this repeating
+-- town day/dusk/night loop stops advancing.
+function TownNightService.ensureStarted(self: TownNightService)
+    if not self._enabled or self._started then
         return
     end
-
+    self._started = true
     task.spawn(function()
-        while not self._phaseService:hasCompletedFirstNight() do
-            task.wait(0.5)
-        end
         self:_runCycle()
     end)
 end
@@ -131,7 +132,12 @@ function TownNightService._runCycle(self: TownNightService)
                 self._enemyService:spawn(beat.enemyId)
             elseif beat.kind == "breach" then
                 self._enemyService:setBreach()
-            elseif beat.kind == "warning" then
+            elseif beat.kind == "warning" and beat.at > 0 then
+                -- The schedule's opening warning beat always lands at at=0,
+                -- immediately after the arrival toast above (which already
+                -- carries the seventh-night Blackout telegraph on the nights
+                -- that matter) — publishing it too would replace that toast
+                -- before a player could read it.
                 self:_notify("THE FOREST GOES QUIET")
             end
         end

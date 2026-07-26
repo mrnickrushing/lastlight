@@ -536,7 +536,12 @@ function EnemyService._closestPlayer(self: EnemyService, enemy: Enemy): (Player?
     end
     for _, player in Players:GetPlayers() do
         local root = rootPart(player)
-        if root ~= nil and self._survivalService:canAct(player) then
+        if
+            root ~= nil
+            and self._survivalService:canAct(player)
+            and player:GetAttribute("LastLightTutorialSurvivalReady") == true
+            and player:GetAttribute("LastLightInExpedition") ~= true
+        then
             local distance = (root.Position - primary.Position).Magnitude
             if distance < closestDistance then
                 closestDistance = distance
@@ -674,11 +679,13 @@ function EnemyService.canMarkNearest(
     player: Player,
     range: number
 ): (boolean, string)
-    if not self._nightActive then
-        local encounterService = self:_activeEncounterService()
-        if encounterService ~= nil then
-            return encounterService:canMarkNearest(player, range)
-        end
+    -- Checked before (not instead of) the town-night branch below: a normal
+    -- town night and an active Old Growth/Warden Stag encounter can now run
+    -- concurrently (the town cycle repeats independently of Bramblewake), so
+    -- _nightActive can no longer be used to infer "no encounter is active."
+    local encounterService = self:_activeEncounterService()
+    if encounterService ~= nil then
+        return encounterService:canMarkNearest(player, range)
     end
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
@@ -693,11 +700,9 @@ function EnemyService.markNearest(
     range: number,
     duration: number
 ): (boolean, string)
-    if not self._nightActive then
-        local encounterService = self:_activeEncounterService()
-        if encounterService ~= nil then
-            return encounterService:markNearest(player, range, duration)
-        end
+    local encounterService = self:_activeEncounterService()
+    if encounterService ~= nil then
+        return encounterService:markNearest(player, range, duration)
     end
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
@@ -752,11 +757,11 @@ function EnemyService.repairLantern(
 end
 
 function EnemyService.damageNearest(self: EnemyService, player: Player): (boolean, string)
+    local encounterService = self:_activeEncounterService()
+    if encounterService ~= nil then
+        return encounterService:damageNearest(player)
+    end
     if not self._nightActive then
-        local encounterService = self:_activeEncounterService()
-        if encounterService ~= nil then
-            return encounterService:damageNearest(player)
-        end
         return false, "The tool is calm in daylight."
     end
     if not self._survivalService:canAct(player) then

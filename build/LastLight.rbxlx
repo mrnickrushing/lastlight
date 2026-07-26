@@ -5767,7 +5767,6 @@ local townNightService = TownNightService.new(
     worldService,
     enemyService,
     TownNightSchedule,
-    phaseService,
     featureFlags
 )
 professionService:setSwitchProvider(function(player: Player): (boolean, string?)
@@ -7610,7 +7609,12 @@ function EnemyService._closestPlayer(self: EnemyService, enemy: Enemy): (Player?
     end
     for _, player in Players:GetPlayers() do
         local root = rootPart(player)
-        if root ~= nil and self._survivalService:canAct(player) then
+        if
+            root ~= nil
+            and self._survivalService:canAct(player)
+            and player:GetAttribute("LastLightTutorialSurvivalReady") == true
+            and player:GetAttribute("LastLightInExpedition") ~= true
+        then
             local distance = (root.Position - primary.Position).Magnitude
             if distance < closestDistance then
                 closestDistance = distance
@@ -7748,11 +7752,13 @@ function EnemyService.canMarkNearest(
     player: Player,
     range: number
 ): (boolean, string)
-    if not self._nightActive then
-        local encounterService = self:_activeEncounterService()
-        if encounterService ~= nil then
-            return encounterService:canMarkNearest(player, range)
-        end
+    -- Checked before (not instead of) the town-night branch below: a normal
+    -- town night and an active Old Growth/Warden Stag encounter can now run
+    -- concurrently (the town cycle repeats independently of Bramblewake), so
+    -- _nightActive can no longer be used to infer "no encounter is active."
+    local encounterService = self:_activeEncounterService()
+    if encounterService ~= nil then
+        return encounterService:canMarkNearest(player, range)
     end
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
@@ -7767,11 +7773,9 @@ function EnemyService.markNearest(
     range: number,
     duration: number
 ): (boolean, string)
-    if not self._nightActive then
-        local encounterService = self:_activeEncounterService()
-        if encounterService ~= nil then
-            return encounterService:markNearest(player, range, duration)
-        end
+    local encounterService = self:_activeEncounterService()
+    if encounterService ~= nil then
+        return encounterService:markNearest(player, range, duration)
     end
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
@@ -7826,11 +7830,11 @@ function EnemyService.repairLantern(
 end
 
 function EnemyService.damageNearest(self: EnemyService, player: Player): (boolean, string)
+    local encounterService = self:_activeEncounterService()
+    if encounterService ~= nil then
+        return encounterService:damageNearest(player)
+    end
     if not self._nightActive then
-        local encounterService = self:_activeEncounterService()
-        if encounterService ~= nil then
-            return encounterService:damageNearest(player)
-        end
         return false, "The tool is calm in daylight."
     end
     if not self._survivalService:canAct(player) then
@@ -11933,13 +11937,13 @@ export type TownNightService = typeof(setmetatable(
         _logger: Logger,
         _worldService: any,
         _enemyService: any,
-        _phaseService: any,
         _townNightSchedule: any,
         _daySeconds: number,
         _duskSeconds: number,
         _nightSeconds: number,
         _blackoutInterval: number,
         _enabled: boolean,
+        _started: boolean,
         _nightNumber: number,
         _phase: string,
         _phaseEndsAt: number,
@@ -11954,7 +11958,6 @@ function TownNightService.new(
     worldService: any,
     enemyService: any,
     townNightSchedule: any,
-    phaseService: any,
     featureFlags: any
 ): TownNightService
     return setmetatable({
@@ -11962,13 +11965,13 @@ function TownNightService.new(
         _logger = logger,
         _worldService = worldService,
         _enemyService = enemyService,
-        _phaseService = phaseService,
         _townNightSchedule = townNightSchedule,
         _daySeconds = config.NormalDaySeconds,
         _duskSeconds = config.DuskSeconds,
         _nightSeconds = config.NormalNightSeconds,
         _blackoutInterval = config.BlackoutInterval,
         _enabled = featureFlags:isEnabled("town_night_cycle_enabled"),
+        _started = false,
         _nightNumber = 1,
         _phase = "dormant",
         _phaseEndsAt = 0,
@@ -11977,6 +11980,8 @@ function TownNightService.new(
 end
 
 function TownNightService.Init(_self: TownNightService, _context: any) end
+
+function TownNightService.Start(_self: TownNightService) end
 
 function TownNightService.setChangedHandler(self: TownNightService, callback: (string?) -> ())
     self._onChanged = callback
@@ -11995,19 +12000,19 @@ local function waitUntilTime(target: number)
     end
 end
 
--- Disabling this leaves the tutorial's authored First Night, Bramblewake
--- expeditions, and manual Blackout entry untouched — only the repeating town
--- day/dusk/night loop that runs after First Light stops advancing.
-function TownNightService.Start(self: TownNightService)
-    if not self._enabled then
-        self._logger:info("town_night_cycle_disabled")
+-- Called once the first player in this server session is known to be past
+-- First Light — either a fresh player who just finished it, or a returning
+-- player whose saved profile already had it complete. Idempotent and safe to
+-- call from either path; only the first call starts the loop. Disabling the
+-- kill switch leaves the tutorial's authored First Night, Bramblewake
+-- expeditions, and manual Blackout entry untouched — only this repeating
+-- town day/dusk/night loop stops advancing.
+function TownNightService.ensureStarted(self: TownNightService)
+    if not self._enabled or self._started then
         return
     end
-
+    self._started = true
     task.spawn(function()
-        while not self._phaseService:hasCompletedFirstNight() do
-            task.wait(0.5)
-        end
         self:_runCycle()
     end)
 end
@@ -12050,7 +12055,12 @@ function TownNightService._runCycle(self: TownNightService)
                 self._enemyService:spawn(beat.enemyId)
             elseif beat.kind == "breach" then
                 self._enemyService:setBreach()
-            elseif beat.kind == "warning" then
+            elseif beat.kind == "warning" and beat.at > 0 then
+                -- The schedule's opening warning beat always lands at at=0,
+                -- immediately after the arrival toast above (which already
+                -- carries the seventh-night Blackout telegraph on the nights
+                -- that matter) — publishing it too would replace that toast
+                -- before a player could read it.
                 self:_notify("THE FOREST GOES QUIET")
             end
         end
@@ -12100,6 +12110,16 @@ local RunService = game:GetService("RunService")
 local TutorialService = {}
 TutorialService.__index = TutorialService
 TutorialService.Name = "TutorialService"
+
+-- Mirrors the earliest stage the authored First Night can target a player
+-- (TutorialFlow only reaches "survive" once a player has a barricade, a
+-- tool, and the First Lantern prepared). EnemyService reads this attribute
+-- so the recurring town night cycle can't target a player still gathering,
+-- choosing a tool, or building, the same way the one-time first night never
+-- could before it existed.
+local function isCombatEligibleStage(stage: string): boolean
+    return stage == "survive" or stage == "reveal" or stage == "complete"
+end
 
 type Session = {
     stage: string,
@@ -12352,6 +12372,7 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     end
 
     local stage = profile.tutorial.stage
+    player:SetAttribute("LastLightTutorialSurvivalReady", isCombatEligibleStage(stage))
     local session: Session = {
         stage = stage,
         resources = if stage == "gather"
@@ -12385,6 +12406,7 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
         end
     elseif stage == "reveal" or stage == "complete" then
         self._worldService:setBeaconVisible(true)
+        self._townNightService:ensureStarted()
     end
 
     local currentStage = session.stage
@@ -12418,6 +12440,7 @@ function TutorialService._advance(
     end
 
     session.stage = nextStage
+    player:SetAttribute("LastLightTutorialSurvivalReady", isCombatEligibleStage(nextStage))
     self._profileService:setTutorial(player, nextStage, session.selectedTool)
     local definition = self._tutorialFlow.definition(nextStage)
     self._analyticsService:stage(player, definition.index, nextStage)
@@ -12586,6 +12609,7 @@ function TutorialService._nightComplete(self: TutorialService)
     for player, session in self._sessions do
         self:_advanceSurvivorToReveal(player, session)
     end
+    self._townNightService:ensureStarted()
     self:_publishAll()
 end
 
@@ -13761,6 +13785,7 @@ export type WorldService = typeof(setmetatable(
         _beacon: BasePart?,
         _barricadeBuilt: boolean,
         _night: boolean,
+        _blackoutLightingActive: boolean,
         _expeditionEntry: CFrame?,
         _expeditionManifest: any,
         _expeditionModuleCenters: { any },
@@ -13939,6 +13964,7 @@ function WorldService.new(logger: Logger): WorldService
         _beacon = nil,
         _barricadeBuilt = false,
         _night = false,
+        _blackoutLightingActive = false,
         _expeditionEntry = nil,
         _expeditionManifest = nil,
         _expeditionModuleCenters = {},
@@ -14734,6 +14760,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
 end
 
 function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
+    self._blackoutLightingActive = active
     local world = self._world
     if world ~= nil then
         world:SetAttribute("BlackoutLighting", active)
@@ -14743,9 +14770,10 @@ function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
         if effect ~= nil then
             effect:Destroy()
         end
-        if not self._night then
-            Lighting.Ambient = DAY_AMBIENT
-        end
+        -- Restore whichever of day/night is actually current -- the town
+        -- cycle may have ticked past this Blackout's own start/end while it
+        -- ran and setNight() skipped applying it (see setNight above).
+        self:_applyTownLighting(self._night)
         return
     end
     Lighting.Ambient = Color3.fromRGB(18, 28, 35)
@@ -15020,9 +15048,11 @@ function WorldService.expeditionSnapshot(self: WorldService, player: Player): an
     }
 end
 
-function WorldService.setNight(self: WorldService, enabled: boolean)
-    self._night = enabled
-    if enabled then
+-- Raw property application shared by setNight and setBlackoutLighting's
+-- restore path, so the two never disagree about what "town day" or "town
+-- night" actually looks like.
+function WorldService._applyTownLighting(_self: WorldService, night: boolean)
+    if night then
         Lighting.ClockTime = 0.2
         Lighting.Brightness = 1.25
         Lighting.Ambient = NIGHT_AMBIENT
@@ -15035,6 +15065,21 @@ function WorldService.setNight(self: WorldService, enabled: boolean)
         Lighting.OutdoorAmbient = Color3.fromRGB(102, 120, 110)
         Lighting.ExposureCompensation = 0
     end
+end
+
+function WorldService.setNight(self: WorldService, enabled: boolean)
+    self._night = enabled
+    -- The recurring town cycle and the Blackout are timed independently and
+    -- can now be active at once (an earlier decision deliberately keeps
+    -- Bramblewake entry unblocked regardless of the town's night count).
+    -- Let the Blackout's own dramatic presentation own shared Lighting while
+    -- it's active instead of the two fighting over the same properties every
+    -- time either one ticks; setBlackoutLighting(false) restores whichever
+    -- of these this flag says is current once it ends.
+    if self._blackoutLightingActive then
+        return
+    end
+    self:_applyTownLighting(enabled)
 end
 
 function WorldService.spawnCFrame(self: WorldService): CFrame

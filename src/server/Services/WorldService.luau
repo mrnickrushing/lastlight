@@ -28,6 +28,7 @@ export type WorldService = typeof(setmetatable(
         _beacon: BasePart?,
         _barricadeBuilt: boolean,
         _night: boolean,
+        _blackoutLightingActive: boolean,
         _expeditionEntry: CFrame?,
         _expeditionManifest: any,
         _expeditionModuleCenters: { any },
@@ -206,6 +207,7 @@ function WorldService.new(logger: Logger): WorldService
         _beacon = nil,
         _barricadeBuilt = false,
         _night = false,
+        _blackoutLightingActive = false,
         _expeditionEntry = nil,
         _expeditionManifest = nil,
         _expeditionModuleCenters = {},
@@ -1001,6 +1003,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
 end
 
 function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
+    self._blackoutLightingActive = active
     local world = self._world
     if world ~= nil then
         world:SetAttribute("BlackoutLighting", active)
@@ -1010,9 +1013,10 @@ function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
         if effect ~= nil then
             effect:Destroy()
         end
-        if not self._night then
-            Lighting.Ambient = DAY_AMBIENT
-        end
+        -- Restore whichever of day/night is actually current -- the town
+        -- cycle may have ticked past this Blackout's own start/end while it
+        -- ran and setNight() skipped applying it (see setNight above).
+        self:_applyTownLighting(self._night)
         return
     end
     Lighting.Ambient = Color3.fromRGB(18, 28, 35)
@@ -1287,9 +1291,11 @@ function WorldService.expeditionSnapshot(self: WorldService, player: Player): an
     }
 end
 
-function WorldService.setNight(self: WorldService, enabled: boolean)
-    self._night = enabled
-    if enabled then
+-- Raw property application shared by setNight and setBlackoutLighting's
+-- restore path, so the two never disagree about what "town day" or "town
+-- night" actually looks like.
+function WorldService._applyTownLighting(_self: WorldService, night: boolean)
+    if night then
         Lighting.ClockTime = 0.2
         Lighting.Brightness = 1.25
         Lighting.Ambient = NIGHT_AMBIENT
@@ -1302,6 +1308,21 @@ function WorldService.setNight(self: WorldService, enabled: boolean)
         Lighting.OutdoorAmbient = Color3.fromRGB(102, 120, 110)
         Lighting.ExposureCompensation = 0
     end
+end
+
+function WorldService.setNight(self: WorldService, enabled: boolean)
+    self._night = enabled
+    -- The recurring town cycle and the Blackout are timed independently and
+    -- can now be active at once (an earlier decision deliberately keeps
+    -- Bramblewake entry unblocked regardless of the town's night count).
+    -- Let the Blackout's own dramatic presentation own shared Lighting while
+    -- it's active instead of the two fighting over the same properties every
+    -- time either one ticks; setBlackoutLighting(false) restores whichever
+    -- of these this flag says is current once it ends.
+    if self._blackoutLightingActive then
+        return
+    end
+    self:_applyTownLighting(enabled)
 end
 
 function WorldService.spawnCFrame(self: WorldService): CFrame

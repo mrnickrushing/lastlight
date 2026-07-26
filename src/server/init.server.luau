@@ -190,7 +190,6 @@ local townNightService = TownNightService.new(
     worldService,
     enemyService,
     TownNightSchedule,
-    phaseService,
     featureFlags
 )
 professionService:setSwitchProvider(function(player: Player): (boolean, string?)

@@ -7,6 +7,16 @@ local TutorialService = {}
 TutorialService.__index = TutorialService
 TutorialService.Name = "TutorialService"
 
+-- Mirrors the earliest stage the authored First Night can target a player
+-- (TutorialFlow only reaches "survive" once a player has a barricade, a
+-- tool, and the First Lantern prepared). EnemyService reads this attribute
+-- so the recurring town night cycle can't target a player still gathering,
+-- choosing a tool, or building, the same way the one-time first night never
+-- could before it existed.
+local function isCombatEligibleStage(stage: string): boolean
+    return stage == "survive" or stage == "reveal" or stage == "complete"
+end
+
 type Session = {
     stage: string,
     resources: number,
@@ -258,6 +268,7 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     end
 
     local stage = profile.tutorial.stage
+    player:SetAttribute("LastLightTutorialSurvivalReady", isCombatEligibleStage(stage))
     local session: Session = {
         stage = stage,
         resources = if stage == "gather"
@@ -291,6 +302,7 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
         end
     elseif stage == "reveal" or stage == "complete" then
         self._worldService:setBeaconVisible(true)
+        self._townNightService:ensureStarted()
     end
 
     local currentStage = session.stage
@@ -324,6 +336,7 @@ function TutorialService._advance(
     end
 
     session.stage = nextStage
+    player:SetAttribute("LastLightTutorialSurvivalReady", isCombatEligibleStage(nextStage))
     self._profileService:setTutorial(player, nextStage, session.selectedTool)
     local definition = self._tutorialFlow.definition(nextStage)
     self._analyticsService:stage(player, definition.index, nextStage)
@@ -492,6 +505,7 @@ function TutorialService._nightComplete(self: TutorialService)
     for player, session in self._sessions do
         self:_advanceSurvivorToReveal(player, session)
     end
+    self._townNightService:ensureStarted()
     self:_publishAll()
 end
 
