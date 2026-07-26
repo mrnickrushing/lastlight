@@ -87,7 +87,7 @@ this milestone to complete from CI alone.
 **Increment status (2026-07-26):** the expedition foundation, first active
 event layer, durable extraction settlement, player rescue loop, combat
 mobility/telegraph foundation, the complete standard Bramblewake enemy roster,
-four basic profession kits, and the Old Growth elite are
+four basic profession kits, the Old Growth elite, and the Warden Stag boss are
 implemented in source. The slice now has 12 representative modules, four POIs,
 four active events with 13 shared steps, deterministic assembly, a known-good
 fallback, 1,000-seed invariants, streamed preview geometry, beacon entry,
@@ -99,9 +99,12 @@ crawl, interruption-safe revive, bleedout-safe retreat, server stamina,
 sprint/dodge timing, circle/lane telegraphs, flank defense, drowsy and light-theft
 pressure, Scout mark/slow, Warden guard, Engineer lantern repair, Medic area heal,
 role-aware telemetry/HUD, a three-phase 360-health elite, two carried-fire
-shield breaks, lane root and canopy attacks, and idempotent shared Amber Sap.
-Profession mastery/specializations, full inventory/crafting/quests, boss, normal
-night, Blackout, town tier, final art/audio, and all
+shield breaks, lane root and canopy attacks, a three-phase 480-health boss,
+two/three/four living-root patterns, an explicit antler consequence shortcut,
+preserved/scarred/harmed outcomes, and idempotent shared Amber Sap.
+Profession mastery/specializations, full inventory/crafting/quests, normal
+night, Blackout integration, permanent chapter resolution, town tier, final
+art/audio, and all
 Studio/device/group evidence remain open. See
 [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md) and
 [MILESTONE_3_BRAMBLEWAKE_EVENTS.md](MILESTONE_3_BRAMBLEWAKE_EVENTS.md), and
@@ -110,7 +113,8 @@ Studio/device/group evidence remain open. See
 [MILESTONE_3_COMBAT_MOBILITY.md](MILESTONE_3_COMBAT_MOBILITY.md), and
 [MILESTONE_3_PROFESSION_KITS.md](MILESTONE_3_PROFESSION_KITS.md), and
 [MILESTONE_3_BRAMBLEWAKE_ENEMIES.md](MILESTONE_3_BRAMBLEWAKE_ENEMIES.md), and
-[MILESTONE_3_OLD_GROWTH_ELITE.md](MILESTONE_3_OLD_GROWTH_ELITE.md).
+[MILESTONE_3_OLD_GROWTH_ELITE.md](MILESTONE_3_OLD_GROWTH_ELITE.md), and
+[MILESTONE_3_WARDEN_STAG_BOSS.md](MILESTONE_3_WARDEN_STAG_BOSS.md).
 
 ### Deliverables
 

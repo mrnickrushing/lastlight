@@ -540,6 +540,211 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 })
     end
 end
 
+local function isOccupied(center: Vector3, centers: { Vector3 }): boolean
+    for _, existing in centers do
+        if (existing - center).Magnitude < 1 then
+            return true
+        end
+    end
+    return false
+end
+
+local function annexCenter(
+    oldGrowthCenter: Vector3,
+    centers: { Vector3 },
+    cellSize: number
+): Vector3
+    for _, direction in
+        {
+            Vector3.new(1, 0, 0),
+            Vector3.new(0, 0, 1),
+            Vector3.new(-1, 0, 0),
+            Vector3.new(0, 0, -1),
+        }
+    do
+        local candidate = oldGrowthCenter + direction * cellSize
+        if not isOccupied(candidate, centers) then
+            return candidate
+        end
+    end
+    error("Old Growth has no free neighbor for the Warden's Seal")
+end
+
+local function buildWardenSeal(
+    parent: Instance,
+    oldGrowthCenter: Vector3,
+    centers: { Vector3 },
+    cellSize: number,
+    runtimeIds: any
+): any
+    local center = annexCenter(oldGrowthCenter, centers, cellSize)
+    local arena = Instance.new("Model")
+    arena.Name = "WardenSealAnnex"
+    arena:SetAttribute("BossId", "boss_warden_stag")
+    arena:SetAttribute("ContentId", "arena_bw_warden_seal")
+    arena.Parent = parent
+    pcall(function()
+        arena.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+    end)
+
+    pathArm(arena, oldGrowthCenter, center)
+    pathArm(arena, center, oldGrowthCenter)
+    part(
+        arena,
+        "WardenSealGround",
+        Vector3.new(66, 5, 66),
+        CFrame.new(center + Vector3.new(0, -2.5, 0)),
+        Color3.fromRGB(38, 68, 48),
+        Enum.Material.Grass
+    )
+    part(
+        arena,
+        "MemorySeal",
+        Vector3.new(38, 1.1, 38),
+        CFrame.new(center + Vector3.new(0, 0.15, 0)),
+        STONE,
+        Enum.Material.Slate
+    )
+
+    local seal = orb(
+        arena,
+        "WardenMemorySeal",
+        center + Vector3.new(0, 1.5, 0),
+        7,
+        Color3.fromRGB(87, 119, 101),
+        Enum.Material.SmoothPlastic
+    )
+    seal.Transparency = 0.52
+    billboard(seal, "WARDEN'S SEAL · CLEANSE OLD GROWTH", CREAM)
+
+    local nodeDefinitions = {
+        {
+            direction = Vector3.new(0, 0, -1),
+            interactionId = runtimeIds.InteractionIds.WardenStagRootNorth,
+            nodeId = "root_node_north",
+            suffix = "North",
+        },
+        {
+            direction = Vector3.new(1, 0, 0),
+            interactionId = runtimeIds.InteractionIds.WardenStagRootEast,
+            nodeId = "root_node_east",
+            suffix = "East",
+        },
+        {
+            direction = Vector3.new(0, 0, 1),
+            interactionId = runtimeIds.InteractionIds.WardenStagRootSouth,
+            nodeId = "root_node_south",
+            suffix = "South",
+        },
+        {
+            direction = Vector3.new(-1, 0, 0),
+            interactionId = runtimeIds.InteractionIds.WardenStagRootWest,
+            nodeId = "root_node_west",
+            suffix = "West",
+        },
+    }
+    local nodes = {}
+    local interactions = {}
+    for _, definition in nodeDefinitions do
+        local node = orb(
+            arena,
+            "LivingRootNode" .. definition.suffix,
+            center + definition.direction * 22 + Vector3.new(0, 3, 0),
+            5,
+            Color3.fromRGB(80, 116, 83),
+            Enum.Material.SmoothPlastic
+        )
+        node.Transparency = 0.34
+        node:SetAttribute("BossId", "boss_warden_stag")
+        node:SetAttribute("BossInteraction", "cleanse_root")
+        node:SetAttribute("BossNodeId", definition.nodeId)
+        CollectionService:AddTag(node, runtimeIds.ExpeditionBossTag)
+        billboard(node, string.upper(string.gsub(definition.nodeId, "_", " ")), CREAM)
+        nodes[definition.nodeId] = node
+        table.insert(interactions, {
+            actionText = "CLEANSE ROOT",
+            holdDuration = 0.6,
+            interactionId = definition.interactionId,
+            objectText = "Living Root Node",
+            target = node,
+        })
+    end
+
+    local antlers = {}
+    for _, definition in
+        {
+            {
+                antlerId = "antler_left",
+                interactionId = runtimeIds.InteractionIds.WardenStagAntlerLeft,
+                side = -1,
+            },
+            {
+                antlerId = "antler_right",
+                interactionId = runtimeIds.InteractionIds.WardenStagAntlerRight,
+                side = 1,
+            },
+        }
+    do
+        local target = part(
+            arena,
+            if definition.side < 0 then "MemoryAntlerLeft" else "MemoryAntlerRight",
+            Vector3.new(2.2, 9, 2.2),
+            CFrame.new(center + Vector3.new(definition.side * 12, 4.5, 8))
+                * CFrame.Angles(0, 0, math.rad(definition.side * 24)),
+            Color3.fromRGB(194, 199, 173),
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        target.Transparency = 0.2
+        target:SetAttribute("BossId", "boss_warden_stag")
+        target:SetAttribute("BossInteraction", "break_antler")
+        target:SetAttribute("BossAntlerId", definition.antlerId)
+        CollectionService:AddTag(target, runtimeIds.ExpeditionBossTag)
+        billboard(target, "BREAK ANTLER · CHANGES FOREST", Color3.fromRGB(255, 166, 106))
+        antlers[definition.antlerId] = target
+        table.insert(interactions, {
+            actionText = "BREAK ANTLER",
+            holdDuration = 1.1,
+            interactionId = definition.interactionId,
+            objectText = "Harmful Shortcut",
+            target = target,
+        })
+    end
+
+    for index = 1, 10 do
+        local angle = (index / 10) * math.pi * 2
+        if math.abs(math.sin(angle)) > 0.32 then
+            part(
+                arena,
+                "SealRootPillar",
+                Vector3.new(3, 18 + (index % 3) * 4, 3),
+                CFrame.new(
+                    center
+                        + Vector3.new(
+                            math.cos(angle) * 31,
+                            8 + (index % 3) * 2,
+                            math.sin(angle) * 31
+                        )
+                ) * CFrame.Angles(math.rad(9), 0, -angle),
+                if index % 2 == 0 then BARK else DARK_BARK,
+                Enum.Material.Wood
+            )
+        end
+    end
+    for side = -1, 1, 2 do
+        tree(arena, center + Vector3.new(side * 27, 0, -27), 1.25)
+    end
+
+    return {
+        antlers = antlers,
+        center = center,
+        interactions = interactions,
+        model = arena,
+        nodes = nodes,
+        seal = seal,
+    }
+end
+
 function BramblewakeBuilder.build(
     parent: Instance,
     manifest: any,
@@ -565,6 +770,7 @@ function BramblewakeBuilder.build(
     local eventInteractions = {}
     local eventSockets: { [string]: BasePart } = {}
     local eliteArena = nil
+    local oldGrowthCenter: Vector3? = nil
     local extractionTarget: BasePart? = nil
     for _, placement in manifest.modules do
         centers[placement.index] = ORIGIN
@@ -617,6 +823,7 @@ function BramblewakeBuilder.build(
         end
         buildModuleVisual(module, definition.visual, center)
         if definition.eliteId == "elite_old_growth" then
+            oldGrowthCenter = center
             local fireSource = orb(
                 module,
                 "OldGrowthFireSource",
@@ -696,6 +903,13 @@ function BramblewakeBuilder.build(
         end
     end
 
+    local bossArena = buildWardenSeal(
+        expedition,
+        assert(oldGrowthCenter, "Old Growth center is missing"),
+        centers,
+        catalog.CellSize,
+        runtimeIds
+    )
     buildBackdrop(expedition, centers)
 
     local generatedParts = 0
@@ -710,6 +924,7 @@ function BramblewakeBuilder.build(
     expedition:SetAttribute("EventCount", catalog.EventCount)
     expedition:SetAttribute("EventInteractionCount", #eventInteractions)
     expedition:SetAttribute("ExtractionReady", extractionTarget ~= nil)
+    expedition:SetAttribute("BossArenaReady", bossArena ~= nil)
     expedition:SetAttribute("Ready", true)
 
     local moduleCenters = {}
@@ -727,6 +942,7 @@ function BramblewakeBuilder.build(
         eventInteractions = eventInteractions,
         eventSockets = eventSockets,
         eliteArena = assert(eliteArena, "Old Growth elite arena is missing"),
+        bossArena = bossArena,
         moduleCenters = moduleCenters,
         partCount = generatedParts,
     }

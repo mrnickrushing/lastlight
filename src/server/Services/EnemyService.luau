@@ -47,6 +47,7 @@ export type EnemyService = typeof(setmetatable(
         _analyticsService: any,
         _professionService: any,
         _eliteService: any,
+        _bossService: any,
         _active: Enemy?,
         _queue: { string },
         _nextSpawnAt: number,
@@ -91,6 +92,7 @@ function EnemyService.new(
         _analyticsService = analyticsService,
         _professionService = nil,
         _eliteService = nil,
+        _bossService = nil,
         _active = nil,
         _queue = {},
         _nextSpawnAt = 0,
@@ -127,6 +129,20 @@ end
 
 function EnemyService.setEliteService(self: EnemyService, eliteService: any)
     self._eliteService = eliteService
+end
+
+function EnemyService.setBossService(self: EnemyService, bossService: any)
+    self._bossService = bossService
+end
+
+function EnemyService._activeEncounterService(self: EnemyService): any
+    if self._bossService ~= nil and self._bossService:combatActive() then
+        return self._bossService
+    end
+    if self._eliteService ~= nil and self._eliteService:combatActive() then
+        return self._eliteService
+    end
+    return nil
 end
 
 function EnemyService._notify(self: EnemyService, toast: string?)
@@ -658,8 +674,11 @@ function EnemyService.canMarkNearest(
     player: Player,
     range: number
 ): (boolean, string)
-    if not self._nightActive and self._eliteService ~= nil then
-        return self._eliteService:canMarkNearest(player, range)
+    if not self._nightActive then
+        local encounterService = self:_activeEncounterService()
+        if encounterService ~= nil then
+            return encounterService:canMarkNearest(player, range)
+        end
     end
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
@@ -674,8 +693,11 @@ function EnemyService.markNearest(
     range: number,
     duration: number
 ): (boolean, string)
-    if not self._nightActive and self._eliteService ~= nil then
-        return self._eliteService:markNearest(player, range, duration)
+    if not self._nightActive then
+        local encounterService = self:_activeEncounterService()
+        if encounterService ~= nil then
+            return encounterService:markNearest(player, range, duration)
+        end
     end
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
@@ -731,8 +753,9 @@ end
 
 function EnemyService.damageNearest(self: EnemyService, player: Player): (boolean, string)
     if not self._nightActive then
-        if self._eliteService ~= nil then
-            return self._eliteService:damageNearest(player)
+        local encounterService = self:_activeEncounterService()
+        if encounterService ~= nil then
+            return encounterService:damageNearest(player)
         end
         return false, "The tool is calm in daylight."
     end
@@ -796,7 +819,8 @@ function EnemyService.threatSnapshot(self: EnemyService, viewer: Player): any
     local enemy = self._active
     local attack = if enemy == nil then nil else enemy.attack
     if enemy == nil or attack == nil or attack.target ~= viewer then
-        return if self._eliteService == nil then nil else self._eliteService:threatSnapshot(viewer)
+        local encounterService = self:_activeEncounterService()
+        return if encounterService == nil then nil else encounterService:threatSnapshot(viewer)
     end
     return {
         attackId = enemy.definition.attackId,
@@ -823,8 +847,7 @@ function EnemyService.activeCount(self: EnemyService): number
 end
 
 function EnemyService.combatActive(self: EnemyService): boolean
-    return (self._nightActive and self._active ~= nil)
-        or (self._eliteService ~= nil and self._eliteService:combatActive())
+    return (self._nightActive and self._active ~= nil) or self:_activeEncounterService() ~= nil
 end
 
 return table.freeze(EnemyService)

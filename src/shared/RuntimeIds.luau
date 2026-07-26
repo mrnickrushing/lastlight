@@ -12,6 +12,7 @@ local RuntimeIds = {
     ExpeditionEventStepTag = "LastLightExpeditionEventStep",
     ExpeditionExtractionTag = "LastLightExpeditionExtraction",
     ExpeditionEliteTag = "LastLightExpeditionElite",
+    ExpeditionBossTag = "LastLightExpeditionBoss",
     PlayerDownedTag = "LastLightPlayerDowned",
     eventInteractionId = ExpeditionEventFlow.interactionId,
     Remotes = table.freeze({
@@ -35,6 +36,7 @@ local RuntimeIds = {
         CompactHud = "compact_hud",
         ExpeditionEvent = "expedition_event",
         OldGrowthFire = "old_growth_fire",
+        WardenStagChoice = "warden_stag_choice",
         Extract = "extract",
         Revive = "revive",
     }),
@@ -50,6 +52,12 @@ local RuntimeIds = {
         Wayhome = "bramblewake_wayhome",
         OldGrowthFireSource = "old_growth_fire_source",
         OldGrowthHeart = "old_growth_root_heart",
+        WardenStagRootNorth = "warden_stag_root_node_north",
+        WardenStagRootEast = "warden_stag_root_node_east",
+        WardenStagRootSouth = "warden_stag_root_node_south",
+        WardenStagRootWest = "warden_stag_root_node_west",
+        WardenStagAntlerLeft = "warden_stag_antler_left",
+        WardenStagAntlerRight = "warden_stag_antler_right",
     }),
 }
 

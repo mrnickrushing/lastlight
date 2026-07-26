@@ -39,6 +39,7 @@ export type TutorialService = typeof(setmetatable(
         _phaseService: any,
         _expeditionService: any,
         _oldGrowthService: any,
+        _wardenStagService: any,
         _analyticsService: any,
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -65,6 +66,7 @@ function TutorialService.new(
     phaseService: any,
     expeditionService: any,
     oldGrowthService: any,
+    wardenStagService: any,
     analyticsService: any
 ): TutorialService
     return setmetatable({
@@ -84,6 +86,7 @@ function TutorialService.new(
         _phaseService = phaseService,
         _expeditionService = expeditionService,
         _oldGrowthService = oldGrowthService,
+        _wardenStagService = wardenStagService,
         _analyticsService = analyticsService,
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -133,6 +136,17 @@ function TutorialService.Init(self: TutorialService, _context: any)
         if toast ~= nil then
             for player, session in self._sessions do
                 if self._oldGrowthService:snapshot(player) ~= nil then
+                    session.toast = toast
+                    session.toastRevision += 1
+                end
+            end
+        end
+        self:_publishAll()
+    end)
+    self._wardenStagService:setChangedHandler(function(toast: string?)
+        if toast ~= nil then
+            for player, session in self._sessions do
+                if self._wardenStagService:snapshot(player) ~= nil then
                     session.toast = toast
                     session.toastRevision += 1
                 end
@@ -328,6 +342,12 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
     end
     if actionId == self._runtimeIds.Actions.OldGrowthFire then
         local result = self._oldGrowthService:interact(player, prompt)
+        self:_setToast(player, result.message)
+        self:_publishAll()
+        return
+    end
+    if actionId == self._runtimeIds.Actions.WardenStagChoice then
+        local result = self._wardenStagService:interact(player, prompt)
         self:_setToast(player, result.message)
         self:_publishAll()
         return
@@ -605,6 +625,43 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
                 else "The oldest roots were cleansed before you arrived."
         end
     end
+    local boss = self._wardenStagService:snapshot(player)
+    if boss ~= nil then
+        trailName = "WARDEN'S SEAL"
+        progress = boss.phase
+        total = 3
+        if boss.active then
+            objective = boss.instruction
+            detail = if boss.exposed
+                then string.format(
+                    "WARDEN STAG · PHASE %d/3 · %d/%d",
+                    boss.phase,
+                    boss.health,
+                    boss.maxHealth
+                )
+                else string.format(
+                    "LIVING ROOTS · %d/%d · ANTLERS BROKEN %d/2",
+                    boss.cleansedNodes,
+                    boss.rootNodesRequired,
+                    boss.antlersBroken
+                )
+            mara = if boss.exposed
+                then "Its memory heart is open. Strike before the roots close again."
+                else "Cleanse living roots to preserve the forest. Breaking antlers is faster, but permanent."
+        elseif boss.complete then
+            objective = boss.instruction
+            detail = if boss.rewardEligible
+                then "+5 AMBER SAP UNBANKED"
+                else "THE WARDEN'S CHOICE WAS SETTLED BEFORE YOU ARRIVED"
+            mara = if boss.outcome == "preserved"
+                then "The Warden remembers mercy. A future forest path remains possible."
+                else "The forest remembers what was broken. The chapter can continue, but changed."
+        elseif boss.status == "locked" then
+            objective = boss.instruction
+            detail = "THE MEMORY SEAL REMAINS ROOTED"
+            mara = "The oldest growth guards the way to the Warden."
+        end
+    end
     return {
         schemaVersion = 1,
         status = "ready",
@@ -645,6 +702,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         combat = self._combatService:snapshot(player),
         profession = self._professionService:snapshot(player),
         elite = elite,
+        boss = boss,
         threat = self._enemyService:threatSnapshot(player),
         survival = survival,
     }

@@ -28,6 +28,15 @@ the implementation applies its hierarchy guidance to Last Light's existing HUD:
 one contextual stamina rail, one large dodge action, and one targeted attack
 warning backed by a world-space impact zone.
 
+The
+[Warden Stag Mobile Boss Layer report](https://www.lazyweb.com/report/lazyweb/d5a79e5a-8f10-46e0-b0ed-8e6e09b2dccb/?source=create)
+grounds the first chapter-boss layer. The quick-search corpus had weak exact
+raid-HUD coverage, so its adjacent event-progress examples are not treated as
+direct genre evidence. The screenshot-grounded report is applied as one
+contextual boss rail with exact phase/health, root progress, explicit
+preserve-versus-break consequence language, and the existing higher-priority
+targeted attack card.
+
 ## Chosen system
 
 The default is a **context-sensitive survival HUD**:

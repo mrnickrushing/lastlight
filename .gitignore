@@ -3,7 +3,9 @@
 *.rbxlx
 *.rbxm
 *.rbxmx
-/build/
+/build/*
+!/build/LastLight.rbxlx
+!/build/LastLightTest.rbxlx
 /dist/
 /sourcemap.json
 

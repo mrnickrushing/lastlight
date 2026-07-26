@@ -210,6 +210,29 @@ mobile presentation without adding permanent HUD clutter or multiplying active
 NPCs. The single carrier makes the objective readable and bounds replicated
 effects on baseline phones.
 
+## 2026-07-26 — Warden Stag mechanics before Blackout integration
+
+**Decision:** Implement `boss_warden_stag` as a server-run three-phase encounter
+in a streamed Warden's Seal annex unlocked by completing Old Growth. Each phase
+cleanses two, three, then four distinct living roots before the shared memory
+heart is exposed. Breaking either of two antlers is an explicit harmful shortcut
+that exposes the current phase and records preserved, scarred, or harmed outcome
+state. The Bramblewake Blackout schedule and permanent chapter save consume this
+encounter later rather than being simulated now.
+
+**Reward and failure:** Every active-arena participant receives one stable
+five-Amber-Sap unbanked transaction. Shared health, phase, root, antler, and
+participant state survive routine downs, retreat, and same-server disconnect;
+no profession, paid item, paid revive, or client-reported damage is required or
+trusted.
+
+**Evidence:** [Warden Stag Mobile Boss Layer report](https://www.lazyweb.com/report/lazyweb/d5a79e5a-8f10-46e0-b0ed-8e6e09b2dccb/?source=create).
+
+**Reason:** The roadmap lists the boss and Blackout as separate Milestone 3
+deliverables. Isolating the authored boss first makes phase, choice, authority,
+recovery, reward, mobile HUD, and performance testable without falsely claiming
+the nine-minute chapter flow or permanent story consequence is finished.
+
 ## 2026-07-25 — Recoverable failure
 
 **Decision:** Routine defeat damages temporary state and unbanked value but never
@@ -223,11 +246,23 @@ rescue pressure.
 
 **Decision:** Use Rokit with exact Rojo, StyLua, Selene, Lune, and Luau LSP pins.
 Build the runtime and a separate Studio integration-test place from filesystem
-source; do not commit generated place binaries.
+source. The project mappings and Luau remain authoritative.
 
 **Reason:** Every developer and CI must validate the same source with the same
 tools. Pure Luau tests provide fast feedback, while Studio tests remain necessary
 for the real DataModel, streaming, physics, replication, and engine behavior.
+
+## 2026-07-26 — Commit validated Studio places for Windows testing
+
+**Decision:** After every completed phase, regenerate and commit
+`build/LastLight.rbxlx` and `build/LastLightTest.rbxlx` from the exact validated
+source revision. Never hand-edit the generated places.
+
+**Reason:** The primary Windows tester downloads GitHub ZIP snapshots and needs a
+playable Studio file without installing Node, Rokit, Rojo, or the rest of the
+command-line toolchain. Keeping both small generated places in GitHub makes each
+merged phase directly testable while source, project mappings, and automated
+build verification prevent binary drift.
 
 ## 2026-07-25 — Fail-closed runtime environments
 

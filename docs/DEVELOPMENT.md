@@ -47,8 +47,16 @@ npm run verify:build # inspect the generated DataModel trees
 rojo serve default.project.json
 ```
 
-Generated `.rbxlx` files live under ignored `build/`. They are test and local
-publishing artifacts, never source of truth.
+Generated `.rbxlx` files live under `build/`. Source and project mappings remain
+the source of truth, but the two current outputs are committed after every
+completed milestone so Windows testers can download the GitHub ZIP and open
+Studio without installing the command-line toolchain:
+
+- `build/LastLight.rbxlx` — playable game place;
+- `build/LastLightTest.rbxlx` — automated Studio integration place.
+
+Do not hand-edit either place. Regenerate both with `npm test` from the exact
+source revision before committing.
 
 ## Studio integration test
 
@@ -59,7 +67,7 @@ full DataModel. The first engine integration test is intentionally separate:
 2. Open `build/LastLightTest.rbxlx` in Roblox Studio.
 3. Start a server with one player.
 4. Confirm server output contains `[Last Light] PASS FoundationIntegration`.
-5. Confirm `server_boot_complete` reports thirteen services without an
+5. Confirm `server_boot_complete` reports fourteen services without an
    infinite-yield warning.
 6. Confirm the loader leaves the player at `ArrivalSpawn` on solid ground and
    the first objective is `FREE MARA`.
@@ -83,16 +91,21 @@ full DataModel. The first engine integration test is intentionally separate:
 15. Validate the Old Growth activation, attacks, shield fire, rewards, mobile
     HUD, kill switch, and cleanup using
     [MILESTONE_3_OLD_GROWTH_ELITE.md](MILESTONE_3_OLD_GROWTH_ELITE.md).
-16. Stop immediately if any assertion errors.
+16. Validate the Warden Stag unlock, three phases, roots, antler consequence,
+    attacks, recovery, rewards, mobile HUD, kill switch, and cleanup using
+    [MILESTONE_3_WARDEN_STAG_BOSS.md](MILESTONE_3_WARDEN_STAG_BOSS.md).
+17. Stop immediately if any assertion errors.
 
 The test verifies the real Rojo tree, shared module replication, seven-region
 registry, save-schema-v3 constant, eight tutorial interactions, 13 active event
-interactions, two dormant elite interactions, one extraction interaction, runtime remotes,
+interactions, two dormant elite interactions, six locked boss interactions, one
+extraction interaction, runtime remotes,
 Input Action System rollout, world readiness, arrival collision, deterministic
 Bramblewake replay, 12 streamed modules, four POIs, four event state contracts,
 mobile part budget, shared survival/revive, six-enemy combat/telegraph,
-profession contracts, Old Growth shield/fire/rooted/model contracts, and service
-initialization/start lifecycle. Human play is still required for physics,
+profession contracts, Old Growth shield/fire/rooted/model contracts, Warden Stag
+phase/root/choice/model contracts, and service initialization/start lifecycle.
+Human play is still required for physics,
 streaming, device layout, input switching, multiplayer revive timing, and
 usability.
 

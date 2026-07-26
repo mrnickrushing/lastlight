@@ -437,6 +437,7 @@ return table.freeze({
     EventCount = 4,
     EventInteractionCount = eventInteractionCount,
     PartBudget = 480,
+    BossArenaPartBudget = 40,
     LightBudget = 32,
     EffectBudget = 32,
     RequiredTags = table.freeze({

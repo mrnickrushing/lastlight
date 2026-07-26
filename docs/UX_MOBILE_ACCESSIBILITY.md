@@ -32,6 +32,12 @@ as hierarchy guidance: role selection is available only in safe town through a
 four-card controller-selectable layer, while one labeled cooldown action remains
 visible during play without replacing urgent survival information.
 
+The Warden Stag state uses the
+[Warden Stag Mobile Boss Layer report](https://www.lazyweb.com/report/lazyweb/d5a79e5a-8f10-46e0-b0ed-8e6e09b2dccb/?source=create)
+as hierarchy guidance: one contextual rail reports exact phase and health,
+living-root progress, antler consequence, and outcome, while the existing
+world-space shape plus targeted warning card owns immediate attack urgency.
+
 The design follows current Roblox guidance for
 [mobile input](https://create.roblox.com/docs/input/mobile),
 [reserved mobile control zones](https://create.roblox.com/docs/building-and-visuals/ui/positioning-and-sizing-guiobjects),

@@ -416,6 +416,107 @@ function AnalyticsService.eliteCompleted(
     end
 end
 
+function AnalyticsService.bossStarted(
+    self: AnalyticsService,
+    player: Player,
+    bossId: string,
+    manifestHash: string
+)
+    self._logger:info("boss_started", {
+        boss = string.sub(bossId, 1, 48),
+        hash = manifestHash,
+        player = player.UserId,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "BossEncounterStarted", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = bossId,
+            })
+        end)
+    end
+end
+
+function AnalyticsService.bossAttackTelegraphed(
+    self: AnalyticsService,
+    player: Player,
+    bossId: string,
+    attackId: string,
+    shape: string,
+    windup: number
+)
+    self._logger:info("boss_attack_telegraphed", {
+        attack = string.sub(attackId, 1, 48),
+        boss = string.sub(bossId, 1, 48),
+        player = player.UserId,
+        shape = shape,
+        windup = windup,
+    })
+end
+
+function AnalyticsService.bossAttackResult(
+    self: AnalyticsService,
+    player: Player,
+    bossId: string,
+    attackId: string,
+    result: string
+)
+    self._logger:info("boss_attack_result", {
+        attack = string.sub(attackId, 1, 48),
+        boss = string.sub(bossId, 1, 48),
+        player = player.UserId,
+        result = string.sub(result, 1, 32),
+    })
+end
+
+function AnalyticsService.bossPhase(
+    self: AnalyticsService,
+    player: Player,
+    bossId: string,
+    phase: number,
+    result: string,
+    antlersBroken: number
+)
+    self._logger:info("boss_phase", {
+        antlersBroken = antlersBroken,
+        boss = string.sub(bossId, 1, 48),
+        phase = phase,
+        player = player.UserId,
+        result = string.sub(result, 1, 32),
+    })
+end
+
+function AnalyticsService.bossResult(
+    self: AnalyticsService,
+    player: Player,
+    bossId: string,
+    manifestHash: string,
+    outcome: string?,
+    antlersBroken: number,
+    participantCount: number
+)
+    self._logger:info("boss_result", {
+        antlersBroken = antlersBroken,
+        boss = string.sub(bossId, 1, 48),
+        hash = manifestHash,
+        outcome = string.sub(outcome or "unknown", 1, 32),
+        participantCount = participantCount,
+        player = player.UserId,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(
+                player,
+                "BossEncounterCompleted",
+                math.max(1, participantCount),
+                {
+                    [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = bossId,
+                    [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = outcome or "unknown",
+                }
+            )
+        end)
+    end
+end
+
 function AnalyticsService.clear(self: AnalyticsService, player: Player)
     self._startedAt[player] = nil
     self._expeditionStarted[player] = nil

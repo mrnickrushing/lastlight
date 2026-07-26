@@ -35,6 +35,7 @@ export type WorldService = typeof(setmetatable(
         _eventTargets: { [string]: { [string]: BasePart } },
         _eventsEnabled: boolean,
         _oldGrowthArena: any,
+        _wardenStagArena: any,
     },
     WorldService
 ))
@@ -211,6 +212,7 @@ function WorldService.new(logger: Logger): WorldService
         _eventTargets = {},
         _eventsEnabled = true,
         _oldGrowthArena = nil,
+        _wardenStagArena = nil,
     }, WorldService)
 end
 
@@ -634,7 +636,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "old-growth-elite-v4")
+    world:SetAttribute("WorldVersion", "warden-stag-boss-v5")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -698,7 +700,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "old-growth-elite-v4",
+        worldVersion = "warden-stag-boss-v5",
     })
 end
 
@@ -810,6 +812,7 @@ function WorldService.buildBramblewake(
             actionId == self._runtimeIds.Actions.ExpeditionEvent
             or actionId == self._runtimeIds.Actions.Extract
             or actionId == self._runtimeIds.Actions.OldGrowthFire
+            or actionId == self._runtimeIds.Actions.WardenStagChoice
         then
             self._interactions[interactionId] = nil
         end
@@ -817,6 +820,7 @@ function WorldService.buildBramblewake(
     self._eventSockets = {}
     self._eventTargets = {}
     self._oldGrowthArena = nil
+    self._wardenStagArena = nil
 
     local result = BramblewakeBuilder.build(world, manifest, generator, catalog, self._runtimeIds)
     self._expeditionEntry = result.entryCFrame
@@ -824,6 +828,7 @@ function WorldService.buildBramblewake(
     self._expeditionModuleCenters = result.moduleCenters
     self._eventSockets = result.eventSockets
     self._oldGrowthArena = result.eliteArena
+    self._wardenStagArena = result.bossArena
     self:_registerInteraction(
         result.extractionTarget,
         self._runtimeIds.InteractionIds.Wayhome,
@@ -872,6 +877,22 @@ function WorldService.buildBramblewake(
         nil
     )
     self:setOldGrowthPresentation("dormant")
+    for _, descriptor in result.bossArena.interactions do
+        self:_registerInteraction(
+            descriptor.target,
+            descriptor.interactionId,
+            self._runtimeIds.Actions.WardenStagChoice,
+            descriptor.actionText,
+            descriptor.objectText,
+            nil,
+            descriptor.holdDuration
+        )
+    end
+    self:setWardenStagPresentation({
+        brokenAntlers = {},
+        cleansedNodes = {},
+        status = "locked",
+    })
     world:SetAttribute("ExpeditionReady", true)
     world:SetAttribute("ExpeditionManifestHash", manifest.hash)
     world:SetAttribute("ExpeditionEventInteractions", #result.eventInteractions)
@@ -908,6 +929,72 @@ function WorldService.setOldGrowthPresentation(self: WorldService, status: strin
     end
     if heartPrompt ~= nil then
         heartPrompt.Enabled = shielded
+    end
+end
+
+function WorldService.wardenStagArena(self: WorldService): any
+    return self._wardenStagArena
+end
+
+function WorldService.setWardenStagPresentation(self: WorldService, state: any)
+    local arena = self._wardenStagArena
+    if arena == nil then
+        return
+    end
+    local status = tostring(state.status)
+    local cleansing = status == "cleansing"
+    local vulnerable = status == "vulnerable"
+    local complete = status == "complete"
+    local enabled = status ~= "disabled"
+    local cleansedNodes = if type(state.cleansedNodes) == "table" then state.cleansedNodes else {}
+    local brokenAntlers = if type(state.brokenAntlers) == "table" then state.brokenAntlers else {}
+
+    arena.seal.Color = if complete
+        then FOXFIRE
+        elseif vulnerable then AMBER
+        elseif cleansing then Color3.fromRGB(132, 186, 126)
+        elseif status == "dormant" then Color3.fromRGB(94, 154, 133)
+        else Color3.fromRGB(77, 88, 79)
+    arena.seal.Material = if complete
+            or vulnerable
+            or cleansing
+        then Enum.Material.Neon
+        else Enum.Material.SmoothPlastic
+    arena.seal.Transparency = if enabled then 0.24 else 0.72
+
+    for nodeId, target in arena.nodes do
+        local cleansed = cleansedNodes[nodeId] == true
+        target.Color = if cleansed
+            then FOXFIRE
+            elseif cleansing then AMBER
+            else Color3.fromRGB(80, 99, 82)
+        target.Material = if cleansed or cleansing
+            then Enum.Material.Neon
+            else Enum.Material.SmoothPlastic
+        target.Transparency = if cleansed then 0.46 elseif cleansing then 0.12 else 0.56
+        local interactionId = target:GetAttribute("InteractionId")
+        local prompt = if type(interactionId) == "string"
+            then self._interactions[interactionId]
+            else target:FindFirstChildOfClass("ProximityPrompt")
+        if prompt ~= nil then
+            prompt.Enabled = cleansing and not cleansed
+        end
+    end
+
+    for antlerId, target in arena.antlers do
+        local broken = brokenAntlers[antlerId] == true
+        target.Color = if broken
+            then Color3.fromRGB(91, 78, 67)
+            elseif cleansing then Color3.fromRGB(255, 166, 106)
+            else Color3.fromRGB(145, 145, 126)
+        target.Material = if cleansing and not broken
+            then Enum.Material.Neon
+            else Enum.Material.SmoothPlastic
+        target.Transparency = if broken then 0.78 elseif cleansing then 0.14 else 0.58
+        local prompt = target:FindFirstChildOfClass("ProximityPrompt")
+        if prompt ~= nil then
+            prompt.Enabled = cleansing and not broken
+        end
     end
 end
 
