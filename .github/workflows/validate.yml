@@ -1,4 +1,4 @@
-name: Validate planning and scaffold
+name: Validate Last Light
 
 on:
   pull_request:
@@ -12,13 +12,32 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Validate blueprint
+
+      - name: Cache Rokit tools
+        uses: actions/cache@v4
+        with:
+          path: ~/.rokit
+          key: rokit-${{ runner.os }}-${{ hashFiles('rokit.toml') }}
+
+      - name: Install Rokit
+        shell: bash
+        run: |
+          if [[ ! -x "$HOME/.rokit/bin/rokit" ]]; then
+            curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/v1.2.0/scripts/install.sh | bash
+          fi
+          echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
+
+      - name: Install pinned Roblox tools
+        run: rokit install --no-trust-check
+
+      - name: Validate, test, and build
         run: npm test

@@ -89,3 +89,21 @@ residents.
 **Reason:** Failure should create stories and recovery goals, not churn or paid
 rescue pressure.
 
+## 2026-07-25 — Reproducible external Roblox toolchain
+
+**Decision:** Use Rokit with exact Rojo, StyLua, Selene, Lune, and Luau LSP pins.
+Build the runtime and a separate Studio integration-test place from filesystem
+source; do not commit generated place binaries.
+
+**Reason:** Every developer and CI must validate the same source with the same
+tools. Pure Luau tests provide fast feedback, while Studio tests remain necessary
+for the real DataModel, streaming, physics, replication, and engine behavior.
+
+## 2026-07-25 — Fail-closed runtime environments
+
+**Decision:** Studio resolves to local/test, unregistered published places resolve
+to staging, and production requires an explicitly registered place ID.
+
+**Reason:** A new or copied place must not silently gain production data, commerce,
+or feature behavior. Promoting a place is an intentional reviewed configuration
+change.

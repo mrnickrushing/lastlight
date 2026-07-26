@@ -1,0 +1,28 @@
+{
+  "name": "LastLightTest",
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedStorage": {
+      "LastLight": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "LastLightServer": {
+        "$path": "src/server"
+      },
+      "LastLightTests": {
+        "$path": "tests/studio"
+      }
+    },
+    "Workspace": {
+      "$properties": {
+        "StreamingEnabled": true,
+        "StreamingIntegrityMode": "PauseOutsideLoadedArea",
+        "ModelStreamingBehavior": "Improved",
+        "StreamingMinRadius": 64,
+        "StreamingTargetRadius": 1024
+      }
+    }
+  }
+}

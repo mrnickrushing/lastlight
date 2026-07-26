@@ -1,9 +1,8 @@
 --!strict
 
--- This is intentionally a scaffold, not a claim that the game is implemented.
--- Runtime constants move here only after their milestone is approved and tested.
 return table.freeze({
     GameName = "Last Light",
+    BuildVersion = "0.2.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -11,5 +10,39 @@ return table.freeze({
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
     SaveSchemaVersion = 1,
+    BootstrapTimeoutSeconds = 8,
+    ProductionPlaceIds = table.freeze({}),
+    FeatureFlags = table.freeze({
+        bounded_join = true,
+        content_registry = true,
+        region_bramblewake_enabled = true,
+        region_ironroot_enabled = false,
+        region_mireglass_enabled = false,
+        region_tempest_enabled = false,
+        region_frostmere_enabled = false,
+        region_cinderfall_enabled = false,
+        region_hollow_enabled = false,
+    }),
+    Environments = table.freeze({
+        ["local"] = table.freeze({
+            LogLevel = "debug",
+            AllowFlagOverrides = true,
+            UsePersistentData = false,
+        }),
+        test = table.freeze({
+            LogLevel = "debug",
+            AllowFlagOverrides = true,
+            UsePersistentData = false,
+        }),
+        staging = table.freeze({
+            LogLevel = "info",
+            AllowFlagOverrides = true,
+            UsePersistentData = true,
+        }),
+        production = table.freeze({
+            LogLevel = "info",
+            AllowFlagOverrides = false,
+            UsePersistentData = true,
+        }),
+    }),
 })
-

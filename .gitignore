@@ -5,6 +5,7 @@
 *.rbxmx
 /build/
 /dist/
+/sourcemap.json
 
 # Tool caches
 /.aftman/
