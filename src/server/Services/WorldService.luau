@@ -38,6 +38,7 @@ export type WorldService = typeof(setmetatable(
         _oldGrowthArena: any,
         _wardenStagArena: any,
         _blackoutArena: any,
+        _characterRoots: { [Player]: BasePart? },
     },
     WorldService
 ))
@@ -217,6 +218,7 @@ function WorldService.new(logger: Logger): WorldService
         _oldGrowthArena = nil,
         _wardenStagArena = nil,
         _blackoutArena = nil,
+        _characterRoots = {},
     }, WorldService)
 end
 
@@ -669,15 +671,34 @@ function WorldService.Start(self: WorldService)
     local function bindPlayer(player: Player)
         player:SetAttribute("LastLightInExpedition", false)
         player:SetAttribute("LastLightExpeditionTransition", false)
-        player.CharacterAdded:Connect(function()
+        self._characterRoots[player] = nil
+        local function bindCharacter(character: Model)
+            self._characterRoots[player] = nil
+            task.defer(function()
+                local root = character:WaitForChild("HumanoidRootPart", 5)
+                if player.Character == character and root:IsA("BasePart") then
+                    self._characterRoots[player] = root
+                end
+            end)
+        end
+        player.CharacterAdded:Connect(function(character: Model)
             player:SetAttribute("LastLightInExpedition", false)
             player:SetAttribute("LastLightExpeditionTransition", false)
+            bindCharacter(character)
         end)
+        local character = player.Character
+        if character ~= nil then
+            bindCharacter(character)
+        end
     end
     Players.PlayerAdded:Connect(bindPlayer)
     for _, player in Players:GetPlayers() do
         bindPlayer(player)
     end
+
+    Players.PlayerRemoving:Connect(function(player: Player)
+        self._characterRoots[player] = nil
+    end)
 
     local accumulator = 0
     RunService.Heartbeat:Connect(function(deltaTime: number)
@@ -689,10 +710,13 @@ function WorldService.Start(self: WorldService)
 
         for _, player in Players:GetPlayers() do
             local character = player.Character
-            local root = if character == nil
-                then nil
-                else character:FindFirstChild("HumanoidRootPart")
-            if root ~= nil and root:IsA("BasePart") and root.Position.Y < -18 then
+            local root = self._characterRoots[player]
+            if
+                character ~= nil
+                and root ~= nil
+                and root.Parent ~= nil
+                and root.Position.Y < -18
+            then
                 local recovery = if player:GetAttribute("LastLightInExpedition") == true
                         and self._expeditionEntry ~= nil
                     then self._expeditionEntry
