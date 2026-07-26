@@ -2,6 +2,9 @@
   "name": "LastLightTest",
   "tree": {
     "$className": "DataModel",
+    "ReplicatedFirst": {
+      "$path": "src/first"
+    },
     "ReplicatedStorage": {
       "LastLight": {
         "$path": "src/shared"
@@ -15,13 +18,22 @@
         "$path": "tests/studio"
       }
     },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "LastLightClient": {
+          "$path": "src/client"
+        }
+      }
+    },
     "Workspace": {
       "$properties": {
         "StreamingEnabled": true,
         "StreamingIntegrityMode": "PauseOutsideLoadedArea",
         "ModelStreamingBehavior": "Improved",
         "StreamingMinRadius": 64,
-        "StreamingTargetRadius": 1024
+        "StreamingTargetRadius": 1024,
+        "PlayerScriptsUseInputActionSystem": "Enabled",
+        "FallenPartsDestroyHeight": -80
       }
     }
   }

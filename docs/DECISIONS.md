@@ -29,6 +29,19 @@ handcrafted modules with validated seeds, not fully procedural terrain.
 variety without sacrificing authored landmarks, navigation, art quality, or
 impossible-layout prevention.
 
+## 2026-07-25 — One Active Trail onboarding HUD
+
+**Decision:** Implement the first session with one phase capsule, one active
+objective card, and one input-aware contextual action. Keep the expanded Mission
+Stack as a future help state, not the default overlay. During night, add lantern
+health and threat urgency without replacing the hierarchy.
+
+**Evidence:** [Focused First-Ten-Minutes HUD report](https://www.lazyweb.com/report/lazyweb/a34ce67d-041e-434b-acb6-0afd4ccf7ef4/?source=create).
+
+**Reason:** The onboarding must teach sequence while leaving the detailed forest,
+Mara, the current interactable, threats, and Roblox movement zones visible on a
+phone.
+
 ## 2026-07-25 — Context-sensitive mobile HUD
 
 **Decision:** Default to a world-dominant context-sensitive survival HUD. Offer a

@@ -56,6 +56,13 @@ Every milestone closes with:
 
 ## Milestone 2 — Graybox first ten minutes
 
+**Implementation status (2026-07-25):** source, automated tests, game/test-place
+builds, and DataModel verification are implemented. The exit gate remains open
+until the Windows Studio, real-device, reconnect, accessibility, performance,
+and ten-new-tester evidence in
+[MILESTONE_2_PLAYTEST.md](MILESTONE_2_PLAYTEST.md) is recorded. Do not promote
+this milestone to complete from CI alone.
+
 ### Deliverables
 
 - arrival area and bounded loader;

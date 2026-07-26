@@ -29,9 +29,10 @@
         "StreamingIntegrityMode": "PauseOutsideLoadedArea",
         "ModelStreamingBehavior": "Improved",
         "StreamingMinRadius": 64,
-        "StreamingTargetRadius": 1024
+        "StreamingTargetRadius": 1024,
+        "PlayerScriptsUseInputActionSystem": "Enabled",
+        "FallenPartsDestroyHeight": -80
       }
     }
   }
 }
-
