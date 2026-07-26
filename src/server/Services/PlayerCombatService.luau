@@ -303,6 +303,22 @@ function PlayerCombatService.applyShield(
     return true
 end
 
+-- snapshot() reads the stored stamina as of the last periodic advance (up
+-- to ~0.1s stale, see PlayerCombatService._step), while restoreStamina
+-- advances fresh before mutating. A caller that gates on snapshot()'s
+-- value and only later calls restoreStamina can see stamina go from
+-- "not full" to "full" in that gap — this advances (without persisting)
+-- so a precondition check sees exactly what restoreStamina is about to see.
+function PlayerCombatService.peekStamina(self: PlayerCombatService, player: Player): number?
+    local state = self._states[player]
+    if state == nil then
+        return nil
+    end
+    local now = workspace:GetServerTimeNow()
+    local advanced = self._combatState.advance(state, now, self._survivalService:canAct(player))
+    return self._combatState.snapshot(advanced, now).stamina
+end
+
 function PlayerCombatService.restoreStamina(
     self: PlayerCombatService,
     player: Player,

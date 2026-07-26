@@ -578,23 +578,31 @@ end
 function TutorialService._useGear(self: TutorialService, player: Player, itemId: string)
     local session = self._sessions[player]
     if session == nil or session.stage ~= "complete" then
+        self._analyticsService:usedGear(player, itemId, false, "tutorial_incomplete")
         self:_setToast(player, "FINISH FIRST LIGHT TO USE GEAR")
         self:_publish(player)
         return
     end
     if not self._survivalService:canAct(player) then
+        self._analyticsService:usedGear(player, itemId, false, "player_downed")
         self:_setToast(player, "YOU CANNOT USE GEAR WHILE DOWNED")
         self:_publish(player)
         return
     end
     if itemId == "gear_meadow_satchel" then
-        local combat = self._combatService:snapshot(player)
-        if combat.stamina >= combat.maxStamina then
+        -- Uses the same freshly-advanced stamina restoreStamina itself
+        -- computes below, not the possibly-stale snapshot() value, so this
+        -- check can't pass on stale data only for the real restore to find
+        -- stamina already full after the item has been consumed.
+        local staminaNow = self._combatService:peekStamina(player)
+        if staminaNow == nil or staminaNow >= self._config.MaxStamina then
+            self._analyticsService:usedGear(player, itemId, false, "stamina_full")
             self:_setToast(player, "STAMINA ALREADY FULL")
             self:_publish(player)
             return
         end
     elseif itemId ~= "gear_amber_charm" then
+        self._analyticsService:usedGear(player, itemId, false, "unknown_item")
         return
     end
 
@@ -610,8 +618,13 @@ function TutorialService._useGear(self: TutorialService, player: Player, itemId:
         self._combatService:applyShield(player, 5, 0.6)
         self:_setToast(player, "AMBER CHARM — SHIELDED")
     else
-        self._combatService:restoreStamina(player, 50)
-        self:_setToast(player, "MEADOW SATCHEL — STAMINA RESTORED")
+        local staminaResult = self._combatService:restoreStamina(player, 50)
+        self:_setToast(
+            player,
+            if staminaResult.applied
+                then "MEADOW SATCHEL — STAMINA RESTORED"
+                else "MEADOW SATCHEL USED"
+        )
     end
     self:_publish(player)
 end
