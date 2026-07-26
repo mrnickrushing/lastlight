@@ -410,6 +410,28 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self:_publishAll()
         return
     end
+    if actionId == self._runtimeIds.Actions.CraftItem then
+        if session.stage ~= "complete" then
+            self:_setToast(player, "FINISH FIRST LIGHT TO CRAFT")
+            self:_publish(player)
+            return
+        end
+        local recipeId = prompt:GetAttribute("Payload")
+        if type(recipeId) ~= "string" then
+            return
+        end
+        local result = self._profileService:craftItem(player, recipeId)
+        self._analyticsService:crafted(player, recipeId, result.accepted, result.reason)
+        if result.accepted then
+            self:_setToast(player, string.format("CRAFTED %s", prompt.ObjectText))
+        elseif result.reason == "insufficient_materials" then
+            self:_setToast(player, "NOT ENOUGH MATERIALS")
+        else
+            self:_setToast(player, "CRAFTING UNAVAILABLE")
+        end
+        self:_publish(player)
+        return
+    end
 
     if actionId == self._runtimeIds.Actions.Build and session.resources < 3 then
         self:_setToast(player, "YOU NEED 3 HEARTWOOD")
@@ -796,6 +818,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             else expedition.event.total,
         unbankedExpeditionRewards = expedition.unbankedRewards,
         bankedMaterials = expedition.bankedMaterials,
+        gear = self._profileService:gearSnapshot(player),
         combat = self._combatService:snapshot(player),
         profession = self._professionService:snapshot(player),
         elite = elite,

@@ -320,6 +320,28 @@ function AnalyticsService.professionAbility(
     end
 end
 
+function AnalyticsService.crafted(
+    self: AnalyticsService,
+    player: Player,
+    recipeId: string,
+    accepted: boolean,
+    reason: string?
+)
+    self._logger:info("item_crafted", {
+        accepted = accepted,
+        player = player.UserId,
+        reason = reason or "accepted",
+        recipe = string.sub(recipeId, 1, 32),
+    })
+    if accepted and not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "ItemCrafted", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = recipeId,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.eliteStarted(
     self: AnalyticsService,
     player: Player,

@@ -333,3 +333,21 @@ experienced returning member restores keeps this consistent with every other
 piece of per-player state already shipped (chapter one, inventory,
 profession), and costs nothing to migrate later: a single field can move from
 a player profile into a future town profile without changing its meaning.
+
+## 2026-07-26 — First crafting recipes are a fixed-output bench, not a picker UI
+
+**Decision:** Each crafting bench interactable is bound to exactly one
+recipe ID, baked into its `ProximityPrompt`'s `Payload` attribute at world
+build time, and the server resolves and validates that recipe entirely from
+its own catalog. The client sends the same generic `interact` action every
+other world object already uses; it never sends a recipe ID, a material
+amount, or an item ID.
+
+**Reason:** The tutorial already uses exactly this one-object-one-outcome
+pattern for tool selection (`ToolAxe`/`ToolHammer`/`ToolTorch`, each its own
+pedestal). Reusing it for crafting avoids inventing a new remote payload
+shape, a client-side recipe list, or a picker UI before the game has more
+than two recipes to choose between — and keeps every trust boundary the same
+one already covered by the existing interaction-validation tests. A real
+recipe-browsing UI remains open work once the catalog is large enough to
+need one.

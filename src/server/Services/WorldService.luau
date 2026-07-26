@@ -627,6 +627,52 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     )
     local beaconPrompt = self._interactions[self._runtimeIds.InteractionIds.Beacon]
     beaconPrompt.Enabled = false
+
+    local craftingBenches = {
+        {
+            id = self._runtimeIds.InteractionIds.CraftMeadowSatchel,
+            recipeId = "recipe_meadow_satchel",
+            label = "MEADOW SATCHEL",
+            x = -16,
+            color = Color3.fromRGB(133, 176, 108),
+        },
+        {
+            id = self._runtimeIds.InteractionIds.CraftAmberCharm,
+            recipeId = "recipe_amber_charm",
+            label = "AMBER CHARM",
+            x = 16,
+            color = AMBER,
+        },
+    }
+    for _, definition in craftingBenches do
+        local bench = part(
+            interactables,
+            "CraftingBench_" .. definition.recipeId,
+            Vector3.new(6, 2.6, 6),
+            CFrame.new(definition.x, 1.3, -130),
+            Color3.fromRGB(66, 70, 65),
+            Enum.Material.Slate
+        )
+        local marker = part(
+            interactables,
+            "CraftingBenchGlow",
+            Vector3.new(2, 3.4, 2),
+            CFrame.new(definition.x, 4.3, -130),
+            definition.color,
+            Enum.Material.Neon,
+            false
+        )
+        marker.Shape = Enum.PartType.Ball
+        addBillboard(marker, definition.label, definition.color)
+        self:_registerInteraction(
+            bench,
+            definition.id,
+            self._runtimeIds.Actions.CraftItem,
+            "CRAFT",
+            definition.label,
+            definition.recipeId
+        )
+    end
 end
 
 function WorldService.Init(self: WorldService, context: any)

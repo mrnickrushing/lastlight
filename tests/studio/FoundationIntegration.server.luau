@@ -35,8 +35,8 @@ local OldGrowthBuilder = require(serverRoot.World.OldGrowthBuilder)
 local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
-assert(Config.SaveSchemaVersion == 5, "unexpected save schema version")
-assert(Config.BuildVersion == "0.15.0", "unexpected build version")
+assert(Config.SaveSchemaVersion == 6, "unexpected save schema version")
+assert(Config.BuildVersion == "0.16.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -323,8 +323,8 @@ assert(
 
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
-    #tagged == 24 + BramblewakeExpedition.EventInteractionCount,
-    "expected tutorial, event, elite, boss, and extraction interaction prompts"
+    #tagged == 26 + BramblewakeExpedition.EventInteractionCount,
+    "expected tutorial, event, elite, boss, extraction, and crafting-bench interaction prompts"
 )
 assert(
     #CollectionService:GetTagged(RuntimeIds.PlayerDownedTag) == 0,

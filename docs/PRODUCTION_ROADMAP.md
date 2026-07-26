@@ -108,9 +108,13 @@ present-participant Greenward vote with deterministic tie handling, an
 immutable per-player chapter transaction, and a repeating server-owned town
 day/dusk/night cycle with an escalating six-enemy wave schedule, a
 seventh-night telegraph that is deliberately decoupled from Blackout access,
-and a save-schema-v5 night count that persists per player and resumes from
-whoever's record is highest across a server restart.
-Profession mastery/specializations, full inventory/crafting/quests, per-night
+and a save-schema-v6 night count that persists per player and resumes from
+whoever's record is highest across a server restart, plus a first pair of
+crafting recipes that convert banked expedition materials into named gear
+recorded on a player's own profile through a server-owned, all-or-nothing
+transaction.
+Profession mastery/specializations, equipping or using crafted gear, a
+recipe-browsing UI, the full recipe/inventory/quest catalog, per-night
 content differentiation, consequences visibly changing future town/region
 content, town tier, final art/audio, and all Studio/device/group evidence
 remain open.
@@ -124,7 +128,8 @@ See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md)
 [MILESTONE_3_OLD_GROWTH_ELITE.md](MILESTONE_3_OLD_GROWTH_ELITE.md), and
 [MILESTONE_3_WARDEN_STAG_BOSS.md](MILESTONE_3_WARDEN_STAG_BOSS.md), and
 [MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md](MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md), and
-[MILESTONE_3_NORMAL_NIGHT.md](MILESTONE_3_NORMAL_NIGHT.md).
+[MILESTONE_3_NORMAL_NIGHT.md](MILESTONE_3_NORMAL_NIGHT.md), and
+[MILESTONE_3_CRAFTING.md](MILESTONE_3_CRAFTING.md).
 
 ### Deliverables
 

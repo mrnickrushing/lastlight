@@ -41,6 +41,7 @@ local RuntimeIds = {
         BramblewakeBlackout = "bramblewake_blackout",
         Extract = "extract",
         Revive = "revive",
+        CraftItem = "craft_item",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -67,6 +68,8 @@ local RuntimeIds = {
         BlackoutDecisionFarmland = "blackout_decision_farmland",
         BlackoutDecisionWild = "blackout_decision_wild",
         BlackoutDecisionShared = "blackout_decision_shared",
+        CraftMeadowSatchel = "craft_meadow_satchel_bench",
+        CraftAmberCharm = "craft_amber_charm_bench",
     }),
 }
 

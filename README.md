@@ -17,9 +17,9 @@ playable game exists.
 **Milestone 2 source implemented; Milestone 3 Bramblewake expedition foundation,
 four active events, durable extraction settlement, player rescue, combat
 mobility, six-enemy first-night roster, four basic profession kits, Old Growth,
-the Warden Stag, the Bramblewake Blackout, permanent chapter-one resolution,
-and a repeating town normal-night cycle implemented; Studio and device exit
-gates remain pending.**
+the Warden Stag, the Bramblewake Blackout, permanent chapter-one resolution, a
+repeating town normal-night cycle, and a first pair of crafting recipes
+implemented; Studio and device exit gates remain pending.**
 
 The repository currently contains:
 
@@ -34,9 +34,9 @@ The repository currently contains:
   a known-good fallback, beacon entry, route progress, and expedition fall recovery;
 - four active optional Bramblewake events with 13 shared interaction steps,
   timeout-safe routes, durable unbanked rewards, kill switch, and telemetry;
-- save-schema-v5 inventory/profession/story/town-night migration, run-specific
-  reward tombstones, Wayhome extraction, atomic banking, retry-safe
-  settlement, and town return streaming;
+- save-schema-v6 inventory/profession/story/town-night/gear migration,
+  run-specific reward tombstones, Wayhome extraction, atomic banking,
+  retry-safe settlement, and town return streaming;
 - server-owned health, six distinct readable enemy attacks, 30-second downed crawl,
   interruption-safe ally revive, and bleedout-safe town retreat;
 - server-owned stamina sprint/dodge, cooldown and protection validation, plus
@@ -54,6 +54,9 @@ The repository currently contains:
   escalating six-enemy wave schedule, a seventh-night telegraph deliberately
   decoupled from Blackout access, a feature kill switch, and a per-player
   night count that survives a server restart;
+- a first pair of town crafting recipes that atomically convert banked
+  expedition materials into named gear recorded on a player's own profile,
+  gated to server-owned benches once First Light is complete;
 - persistent free-town selection for Scout, Warden, Engineer, and Medic, with
   server-owned reveal/slow, guard, lantern-repair, and area-heal abilities;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
@@ -64,7 +67,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 142 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 152 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -100,6 +103,9 @@ abuse gates are in
 The wave-escalation, determinism, kill-switch, and Blackout-independence gates
 for the repeating town cycle are in
 [the Normal Night runbook](docs/MILESTONE_3_NORMAL_NIGHT.md).
+The recipe authority, atomicity, gating, and persistence gates for the first
+crafting recipes are in
+[the crafting runbook](docs/MILESTONE_3_CRAFTING.md).
 
 The current UI direction is documented in the
 [Last Light mobile gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create).
