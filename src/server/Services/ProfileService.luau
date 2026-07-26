@@ -250,6 +250,47 @@ function ProfileService.nightNumber(self: ProfileService, player: Player): numbe
     return self._saveSchema.nightNumber(profile)
 end
 
+function ProfileService.craftItem(self: ProfileService, player: Player, recipeId: string): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {
+            accepted = false,
+            reason = "profile_loading",
+        }
+    end
+    if not self:isWritable(player) then
+        return {
+            accepted = false,
+            reason = "profile_read_only",
+        }
+    end
+
+    local nextProfile, result = self._saveSchema.withCraftedItem(profile, recipeId, os.time())
+    if not result.applied then
+        return {
+            accepted = false,
+            reason = result.reason,
+        }
+    end
+
+    self._profiles[player] = nextProfile
+    if self._persistent and self._writable[player] == true then
+        self._dirty[player] = true
+    end
+    return {
+        accepted = true,
+        itemId = result.itemId,
+    }
+end
+
+function ProfileService.gearSnapshot(self: ProfileService, player: Player): { [string]: number }
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {}
+    end
+    return self._saveSchema.gearSnapshot(profile)
+end
+
 function ProfileService.grantUnbankedExpeditionReward(
     self: ProfileService,
     player: Player,

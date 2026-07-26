@@ -7,6 +7,7 @@ TestRunner.run({
     require("./specs/CombatState.spec"),
     require("./specs/ContentId.spec"),
     require("./specs/ContentRegistry.spec"),
+    require("./specs/Crafting.spec"),
     require("./specs/Environment.spec"),
     require("./specs/EnemyAttackFlow.spec"),
     require("./specs/EnemyCombatRules.spec"),

@@ -3,6 +3,7 @@
 local TutorialFlow = require("./TutorialFlow")
 local ExpeditionInventory = require("./ExpeditionInventory")
 local ProfessionCatalog = require("./ProfessionCatalog")
+local Crafting = require("./Crafting")
 
 local SaveSchema = {}
 
@@ -35,6 +36,7 @@ export type Profile = {
     town: {
         nightNumber: number,
     },
+    gear: { [string]: number },
 }
 
 local MAX_NIGHT_NUMBER = 1_000_000
@@ -52,7 +54,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 5,
+        schemaVersion = 6,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -78,6 +80,7 @@ function SaveSchema.default(now: number): Profile
         town = {
             nightNumber = 1,
         },
+        gear = Crafting.default(),
     }
 end
 
@@ -161,8 +164,9 @@ function SaveSchema.normalize(value: any, now: number): Profile
     then
         profile.town.nightNumber = town.nightNumber
     end
+    profile.gear = Crafting.normalizeGear(value.gear)
 
-    profile.schemaVersion = 5
+    profile.schemaVersion = 6
     return profile
 end
 
@@ -337,6 +341,26 @@ end
 
 function SaveSchema.nightNumber(profile: Profile): number
     return profile.town.nightNumber
+end
+
+function SaveSchema.withCraftedItem(profile: Profile, recipeId: string, now: number): (Profile, any)
+    local nextMaterials, nextGear, result =
+        Crafting.craft(profile.inventory.materials, profile.gear, recipeId)
+    if not result.applied then
+        return profile, result
+    end
+
+    local nextProfile = table.clone(profile)
+    nextProfile.inventory = table.clone(profile.inventory)
+    nextProfile.inventory.materials = nextMaterials
+    nextProfile.gear = nextGear
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.gearSnapshot(profile: Profile): { [string]: number }
+    return table.clone(profile.gear)
 end
 
 return table.freeze(SaveSchema)

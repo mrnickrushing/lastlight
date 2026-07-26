@@ -10,7 +10,7 @@ return {
             name = "creates a safe first-session profile",
             run = function()
                 local profile = SaveSchema.default(100)
-                TestRunner.equal(profile.schemaVersion, 5)
+                TestRunner.equal(profile.schemaVersion, 6)
                 TestRunner.equal(profile.tutorial.stage, "arrive")
                 TestRunner.equal(profile.tutorial.complete, false)
                 TestRunner.equal(profile.revision, 0)
@@ -52,7 +52,7 @@ return {
                 TestRunner.equal(profile.tutorial.stage, "build")
                 TestRunner.equal(profile.tutorial.selectedTool, "hammer")
                 TestRunner.equal(profile.revision, 4)
-                TestRunner.equal(profile.schemaVersion, 5)
+                TestRunner.equal(profile.schemaVersion, 6)
             end,
         },
         {
@@ -68,7 +68,7 @@ return {
                         complete = true,
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 5)
+                TestRunner.equal(profile.schemaVersion, 6)
                 TestRunner.equal(profile.revision, 7)
                 TestRunner.equal(profile.tutorial.complete, true)
                 TestRunner.equal(SaveSchema.expeditionPending(profile).count, 0)
@@ -154,7 +154,7 @@ return {
                         selectedId = "profession_hacker",
                     },
                 }, 300)
-                TestRunner.equal(migrated.schemaVersion, 5)
+                TestRunner.equal(migrated.schemaVersion, 6)
                 TestRunner.equal(migrated.profession.selectedId, nil)
 
                 local selected = SaveSchema.withProfession(migrated, "profession_medic", 320)
@@ -176,7 +176,7 @@ return {
                         },
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 5)
+                TestRunner.equal(profile.schemaVersion, 6)
                 TestRunner.equal(profile.story.chapterOne.status, "unresolved")
                 TestRunner.equal(profile.story.chapterOne.decision, nil)
             end,
@@ -224,7 +224,7 @@ return {
                     revision = 3,
                     tutorial = { stage = "reveal", complete = false },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 5)
+                TestRunner.equal(profile.schemaVersion, 6)
                 TestRunner.equal(profile.town.nightNumber, 1)
             end,
         },
@@ -275,6 +275,68 @@ return {
             run = function()
                 local profile = SaveSchema.withNightNumber(SaveSchema.default(100), 9, 200)
                 TestRunner.equal(SaveSchema.nightNumber(profile), 9)
+            end,
+        },
+        {
+            name = "migrates a schema five profile with no gear field into an empty crafted-item map",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    schemaVersion = 5,
+                    town = { nightNumber = 3 },
+                }, 300)
+                TestRunner.equal(profile.schemaVersion, 6)
+                TestRunner.equal(next(profile.gear), nil)
+            end,
+        },
+        {
+            name = "restores a valid persisted gear map and rejects unknown or invalid entries",
+            run = function()
+                local restored = SaveSchema.normalize({
+                    schemaVersion = 6,
+                    gear = { gear_meadow_satchel = 2 },
+                }, 300)
+                TestRunner.equal(restored.gear.gear_meadow_satchel, 2)
+
+                local rejected = SaveSchema.normalize({
+                    schemaVersion = 6,
+                    gear = { gear_forged_item = 99, gear_amber_charm = -1 },
+                }, 300)
+                TestRunner.equal(next(rejected.gear), nil)
+            end,
+        },
+        {
+            name = "withCraftedItem deducts materials and grants the recipe's item exactly once affordable",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    inventory = {
+                        materials = { material_meadow_fiber = 3, material_heartwood = 2 },
+                    },
+                }, 100)
+                local crafted, result =
+                    SaveSchema.withCraftedItem(profile, "recipe_meadow_satchel", 200)
+                TestRunner.equal(result.applied, true)
+                TestRunner.equal(crafted.gear.gear_meadow_satchel, 1)
+                TestRunner.equal(crafted.inventory.materials.material_meadow_fiber, 0)
+                TestRunner.equal(crafted.revision, profile.revision + 1)
+
+                local rejected, rejectedResult =
+                    SaveSchema.withCraftedItem(crafted, "recipe_meadow_satchel", 300)
+                TestRunner.equal(rejectedResult.applied, false)
+                TestRunner.equal(rejectedResult.reason, "insufficient_materials")
+                TestRunner.equal(rejected, crafted)
+            end,
+        },
+        {
+            name = "gearSnapshot reads the current persisted value",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    inventory = {
+                        materials = { material_amber_sap = 2, material_brightcap = 2 },
+                    },
+                }, 100)
+                local crafted = SaveSchema.withCraftedItem(profile, "recipe_amber_charm", 200)
+                TestRunner.equal(SaveSchema.gearSnapshot(crafted).gear_amber_charm, 1)
+                TestRunner.equal(next(SaveSchema.gearSnapshot(profile)), nil)
             end,
         },
     },
