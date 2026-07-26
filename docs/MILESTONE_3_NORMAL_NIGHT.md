@@ -2,9 +2,9 @@
 
 ## Scope
 
-Build `0.14.0` gives the town a repeating day/dusk/night cycle once First Light
+Build `0.15.0` gives the town a repeating day/dusk/night cycle once First Light
 completes, instead of stopping forever at the tutorial's single authored
-night:
+night, and now survives a server restart:
 
 ```text
 First Light completes
@@ -39,12 +39,15 @@ The increment includes:
   needs no changes to render the repeating cycle;
 - the existing "return to daylight before switching profession" rule extended
   to also cover a normal night, not just the first night;
+- save-schema-v5 `town.nightNumber` on every player's own profile, updated
+  whenever a night completes and restored — as the highest value among
+  present players — the next time a server starts, so the count survives a
+  restart without inventing a new town-wide save;
 - pure Luau tests for the wave schedule's escalation, bounds, roster coverage,
-  and determinism.
+  determinism, and the night-number migration/persistence contract.
 
-Persistent night-count storage across server restarts, content
-differentiation between nights, town-tier growth, resident schedules, and all
-Studio/device evidence remain open — see the Scope honesty row below.
+Content differentiation between nights, town-tier growth, resident schedules,
+and all Studio/device evidence remain open — see the Scope honesty row below.
 
 ## Flow and authority
 
@@ -86,11 +89,33 @@ becomes available, or auto-starts, on an actually-survived seventh night) is
 explicitly future work, once the town cycle itself has Studio/device evidence
 and the recurring cadence is the tested default rather than a parallel system.
 
+## Persistence
+
+No town-wide save exists anywhere in this codebase — every server rebuilds
+the same generic Emberhollow from scratch, and only player profiles persist.
+Night count follows that pattern rather than inventing a new one: it lives as
+`town.nightNumber` on each player's own save-schema-v5 profile, the same
+DataStore/profile mechanism already used for `story.chapterOne`, inventory,
+and profession. This is a recorded decision — see
+[DECISIONS.md](DECISIONS.md).
+
+`TownNightService:ensureStarted(nightNumber)` is called once per player,
+either when a fresh player finishes First Light this session or when a
+returning player's already-complete profile loads, each passing that
+player's own stored `nightNumber`. The service takes the highest value seen
+via `SaveSchema.withNightNumber`'s monotonic update — it only ever advances,
+never regresses, so a returning veteran's progress is preserved even in a
+party of newcomers. Whenever a night completes, every currently connected
+player's profile is updated to the new count, regardless of who was present
+when that night started. A bump after the loop has already started only
+affects nights that haven't begun their wave schedule yet, so it never
+retroactively changes a night already in progress.
+
 ## Windows Studio journey
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open `build/LastLightTest.rbxlx`, press Play, and require
-   `[Last Light] PASS FoundationIntegration`, build `0.14.0`, schema `4`, and
+   `[Last Light] PASS FoundationIntegration`, build `0.15.0`, schema `5`, and
    no red errors.
 3. Open `build/LastLight.rbxlx`, finish First Light, and require the phase
    capsule to read `DAY` with a counting-down clock instead of freezing on the
@@ -112,10 +137,14 @@ and the recurring cadence is the tested default rather than a parallel system.
 8. Disable `town_night_cycle_enabled`. Require the town to remain frozen at
    the post-tutorial reveal state (matching pre-`0.14.0` behavior) while First
    Light, Bramblewake, events, and the Blackout stay fully available.
-9. Repeat with a server restart mid-cycle. Because the night count is
-   server-session state (not yet part of the persistent profile — see Scope
-   honesty), require the count to restart at night 1 rather than claiming a
-   false continuation; this is expected today, not a regression.
+9. Survive at least one night, then stop the server and start a fresh one
+   with the same player. Require the cycle to resume from the persisted
+   `nightNumber` (visible in the wave count and the dusk/night toasts)
+   instead of restarting at night 1.
+10. Repeat step 9 with two players who have different saved night counts.
+    Require the server to resume at the higher of the two, and require the
+    lower player's own profile to catch up once the next night completes
+    rather than staying behind.
 
 ## Exit and abuse gate
 
@@ -129,10 +158,12 @@ and the recurring cadence is the tested default rather than a parallel system.
 | Kill switch | disabling `town_night_cycle_enabled` leaves First Light, Bramblewake, events, and the Blackout fully available |
 | Independence | night count and `blackoutDue` never gate, block, or auto-start Bramblewake/Blackout access |
 | Readability | phase, countdown, and lantern health reuse the existing HUD fields without requiring new client code |
-| Scope honesty | persistent night-count storage across restarts, per-night content differentiation, town-tier growth, resident schedules, recurring multi-chapter Blackouts, and all Studio/device evidence stay open |
+| Persistence | night count survives a server restart, resumes from the highest present player's record, and never regresses |
+| Scope honesty | per-night content differentiation, town-tier growth, resident schedules, recurring multi-chapter Blackouts, and all Studio/device evidence stay open |
 
 Automated checks establish the wave schedule's escalation, bounds, roster
-coverage, and determinism as pure Luau tests. Only recorded Studio,
-multiplayer, and real-device runs (multi-night pacing, latency, reconnect
-mid-night, and mobile performance across a long-running server) can close the
-rest of this milestone's exit gate.
+coverage, determinism, and the night-number migration/persistence contract as
+pure Luau tests. Only recorded Studio, multiplayer, and real-device runs
+(multi-night pacing, latency, reconnect mid-night, and mobile performance
+across a long-running server) can close the rest of this milestone's exit
+gate.

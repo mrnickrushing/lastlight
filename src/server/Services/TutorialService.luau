@@ -148,6 +148,11 @@ function TutorialService.Init(self: TutorialService, _context: any)
         end
         self:_publishAll()
     end)
+    self._townNightService:setNightCompletedHandler(function(nightNumber: number)
+        for player in self._sessions do
+            self._profileService:setNightNumber(player, nightNumber)
+        end
+    end)
     self._enemyService:setChangedHandler(function(toast: string?)
         if toast ~= nil then
             for _, session in self._sessions do
@@ -302,7 +307,7 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
         end
     elseif stage == "reveal" or stage == "complete" then
         self._worldService:setBeaconVisible(true)
-        self._townNightService:ensureStarted()
+        self._townNightService:ensureStarted(profile.town.nightNumber)
     end
 
     local currentStage = session.stage
@@ -504,8 +509,8 @@ end
 function TutorialService._nightComplete(self: TutorialService)
     for player, session in self._sessions do
         self:_advanceSurvivorToReveal(player, session)
+        self._townNightService:ensureStarted(self._profileService:nightNumber(player))
     end
-    self._townNightService:ensureStarted()
     self:_publishAll()
 end
 

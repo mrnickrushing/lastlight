@@ -225,6 +225,31 @@ function ProfileService.setProfession(
     return true
 end
 
+function ProfileService.setNightNumber(
+    self: ProfileService,
+    player: Player,
+    nightNumber: number
+): boolean
+    local profile = self._profiles[player]
+    if profile == nil then
+        return false
+    end
+
+    self._profiles[player] = self._saveSchema.withNightNumber(profile, nightNumber, os.time())
+    if self._persistent and self._writable[player] == true then
+        self._dirty[player] = true
+    end
+    return true
+end
+
+function ProfileService.nightNumber(self: ProfileService, player: Player): number
+    local profile = self._profiles[player]
+    if profile == nil then
+        return 1
+    end
+    return self._saveSchema.nightNumber(profile)
+end
+
 function ProfileService.grantUnbankedExpeditionReward(
     self: ProfileService,
     player: Player,
