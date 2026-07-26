@@ -16,9 +16,9 @@ playable game exists.
 
 **Milestone 2 source implemented; Milestone 3 Bramblewake expedition foundation,
 four active events, durable extraction settlement, player rescue, combat
-mobility, six-enemy first-night roster, four basic profession kits, and the Old
-Growth elite and Warden Stag boss implemented; Studio and device exit gates
-remain pending.**
+mobility, six-enemy first-night roster, four basic profession kits, Old Growth,
+the Warden Stag, the Bramblewake Blackout, and permanent chapter-one resolution
+implemented; Studio and device exit gates remain pending.**
 
 The repository currently contains:
 
@@ -33,8 +33,9 @@ The repository currently contains:
   a known-good fallback, beacon entry, route progress, and expedition fall recovery;
 - four active optional Bramblewake events with 13 shared interaction steps,
   timeout-safe routes, durable unbanked rewards, kill switch, and telemetry;
-- save-schema-v3 inventory/profession migration, run-specific reward tombstones,
-  Wayhome extraction, atomic banking, retry-safe settlement, and town return streaming;
+- save-schema-v4 inventory/profession/story migration, run-specific reward
+  tombstones, Wayhome extraction, atomic banking, retry-safe settlement, and
+  town return streaming;
 - server-owned health, six distinct readable enemy attacks, 30-second downed crawl,
   interruption-safe ally revive, and bleedout-safe town retreat;
 - server-owned stamina sprint/dodge, cooldown and protection validation, plus
@@ -45,6 +46,9 @@ The repository currently contains:
 - an original three-phase Warden Stag boss gated behind Old Growth, with living
   root cleansing, an explicit harmful antler shortcut, preserved/scarred/harmed
   outcomes, recoverable pressure, and idempotent shared rewards;
+- a server-owned Bramblewake Blackout with a recoverable nine-minute target,
+  chained rootfire relays, elite/boss integration, present-party Greenward vote,
+  and immutable chapter-one outcome persistence;
 - persistent free-town selection for Scout, Warden, Engineer, and Medic, with
   server-owned reveal/slow, guard, lantern-repair, and area-heal abilities;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
@@ -55,7 +59,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 119 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 129 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -85,6 +89,9 @@ The three-phase elite, carried-fire, reward, accessibility, and abuse gates are 
 The three-phase boss, root/antler choice, reward, recovery, mobile, and abuse
 gates are in
 [the Warden Stag boss runbook](docs/MILESTONE_3_WARDEN_STAG_BOSS.md).
+The rootfire relay, overtime recovery, chapter vote, persistence, mobile, and
+abuse gates are in
+[the Bramblewake Blackout runbook](docs/MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md).
 
 The current UI direction is documented in the
 [Last Light mobile gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create).
@@ -103,6 +110,9 @@ The contextual elite health, phase, shield, and carried-fire layer is grounded i
 The Warden Stag phase, root progress, consequence, and attack event layer is
 grounded in the
 [Warden Stag Mobile Boss Layer report](https://www.lazyweb.com/report/lazyweb/d5a79e5a-8f10-46e0-b0ed-8e6e09b2dccb/?source=create).
+The separate Blackout clock, relay, encounter, and chapter-vote rail is grounded
+in the
+[Bramblewake Mobile Blackout Event Layer report](https://www.lazyweb.com/report/lazyweb/558b7278-8455-4639-bf62-bd4ebb97a034/?source=create).
 The recommended default is a context-sensitive survival HUD. A compact HUD is
 the accessibility and low-effects fallback, while the dramatic living-world HUD
 is reserved for Blackouts and bosses.

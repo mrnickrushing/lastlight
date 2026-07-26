@@ -175,7 +175,16 @@ shortcut: zero breaks preserves the future forest ally, one scars the outcome,
 and two harm it. The encounter remains solo-passable, has bounded lane/ring
 telegraphs, grants five unbanked Amber Sap per participant exactly once, and has
 a kill switch. The Bramblewake Blackout schedule, permanent saved chapter
-decision, final animation, audio, and VFX remain open integration work.
+decision, final animation, audio, and VFX were open integration work in that
+increment.
+
+Build `0.13.0` integrates that encounter into the Bramblewake Blackout. The
+server begins one vertical-slice preview for the first unresolved chapter-one
+participant, preserves relay and encounter progress after the nine-minute target
+as recoverable overtime, resolves a present-participant Greenward vote, and
+stores the Warden outcome plus land decision as one immutable save-schema-v4
+transaction. The recurring seven-night scheduler, visible future-region/town
+consequences, and final animation, audio, and VFX remain open.
 
 Boss completion gates:
 

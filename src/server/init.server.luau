@@ -19,6 +19,7 @@ local ExpeditionRewardLedger = require(root.ExpeditionRewardLedger)
 local NightSchedule = require(root.NightSchedule)
 local OldGrowthEncounter = require(root.OldGrowthEncounter)
 local WardenStagEncounter = require(root.WardenStagEncounter)
+local BramblewakeBlackout = require(root.BramblewakeBlackout)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local ProfessionState = require(root.ProfessionState)
 local RateLimiter = require(root.RateLimiter)
@@ -39,6 +40,7 @@ local FeatureFlagService = require(script.Services.FeatureFlagService)
 local NetworkService = require(script.Services.NetworkService)
 local OldGrowthService = require(script.Services.OldGrowthService)
 local WardenStagService = require(script.Services.WardenStagService)
+local BramblewakeBlackoutService = require(script.Services.BramblewakeBlackoutService)
 local PhaseService = require(script.Services.PhaseService)
 local ProfileService = require(script.Services.ProfileService)
 local PlayerSurvivalService = require(script.Services.PlayerSurvivalService)
@@ -153,6 +155,25 @@ local wardenStagService = WardenStagService.new(
     featureFlags
 )
 enemyService:setBossService(wardenStagService)
+local blackoutService = BramblewakeBlackoutService.new(
+    logger,
+    Config,
+    worldService,
+    expeditionService,
+    profileService,
+    survivalService,
+    oldGrowthService,
+    wardenStagService,
+    BramblewakeBlackout,
+    analyticsService,
+    featureFlags
+)
+oldGrowthService:setActivationGate(function(): boolean
+    return blackoutService:allowsOldGrowth()
+end)
+wardenStagService:setUnlockGate(function(): boolean
+    return blackoutService:allowsWarden()
+end)
 local phaseService = PhaseService.new(
     logger,
     worldService,
@@ -191,6 +212,7 @@ local tutorialService = TutorialService.new(
     expeditionService,
     oldGrowthService,
     wardenStagService,
+    blackoutService,
     analyticsService
 )
 
@@ -214,6 +236,7 @@ services:register(professionService)
 services:register(enemyService)
 services:register(oldGrowthService)
 services:register(wardenStagService)
+services:register(blackoutService)
 services:register(phaseService)
 services:register(tutorialService)
 services:initialize()

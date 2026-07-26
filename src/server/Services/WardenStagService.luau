@@ -49,6 +49,7 @@ export type WardenStagService = typeof(setmetatable(
         _markedUntil: number,
         _onChanged: ((string?) -> ())?,
         _heartbeat: RBXScriptConnection?,
+        _unlockGate: (() -> boolean)?,
     },
     WardenStagService
 ))
@@ -111,7 +112,12 @@ function WardenStagService.new(
         _markedUntil = 0,
         _onChanged = nil,
         _heartbeat = nil,
+        _unlockGate = nil,
     }, WardenStagService)
+end
+
+function WardenStagService.setUnlockGate(self: WardenStagService, gate: (() -> boolean)?)
+    self._unlockGate = gate
 end
 
 function WardenStagService.Init(self: WardenStagService, _context: any)
@@ -471,7 +477,11 @@ function WardenStagService._nearestPlayer(self: WardenStagService, players: { Pl
 end
 
 function WardenStagService._step(self: WardenStagService, now: number)
-    if self._state.status == "locked" and self._oldGrowthService:isComplete() then
+    if
+        self._state.status == "locked"
+        and self._oldGrowthService:isComplete()
+        and (self._unlockGate == nil or (self._unlockGate :: () -> boolean)())
+    then
         local nextState, result = self._encounter.unlock(self._state)
         if result.accepted then
             self._state = nextState
@@ -804,6 +814,14 @@ end
 
 function WardenStagService.isComplete(self: WardenStagService): boolean
     return self._state.status == "complete"
+end
+
+function WardenStagService.outcome(self: WardenStagService): string?
+    return self._state.outcome
+end
+
+function WardenStagService.enabled(self: WardenStagService): boolean
+    return self._state.status ~= "disabled"
 end
 
 return table.freeze(WardenStagService)

@@ -87,12 +87,13 @@ this milestone to complete from CI alone.
 **Increment status (2026-07-26):** the expedition foundation, first active
 event layer, durable extraction settlement, player rescue loop, combat
 mobility/telegraph foundation, the complete standard Bramblewake enemy roster,
-four basic profession kits, the Old Growth elite, and the Warden Stag boss are
-implemented in source. The slice now has 12 representative modules, four POIs,
+four basic profession kits, the Old Growth elite, the Warden Stag boss, and the
+Bramblewake Blackout through permanent chapter-one resolution are implemented
+in source. The slice now has 12 representative modules, four POIs,
 four active events with 13 shared steps, deterministic assembly, a known-good
 fallback, 1,000-seed invariants, streamed preview geometry, beacon entry,
-fall recovery, timeout-safe optional routes, schema-v3 unbanked/banked materials
-and profession choice,
+fall recovery, timeout-safe optional routes, schema-v4 unbanked/banked
+materials, profession choice, and chapter-one story state,
 run-specific reward and settlement tombstones, Wayhome return, kill switch,
 telemetry, HUD progress, server-owned health, six distinct enemy attacks, downed
 crawl, interruption-safe revive, bleedout-safe retreat, server stamina,
@@ -101,10 +102,13 @@ pressure, Scout mark/slow, Warden guard, Engineer lantern repair, Medic area hea
 role-aware telemetry/HUD, a three-phase 360-health elite, two carried-fire
 shield breaks, lane root and canopy attacks, a three-phase 480-health boss,
 two/three/four living-root patterns, an explicit antler consequence shortcut,
-preserved/scarred/harmed outcomes, and idempotent shared Amber Sap.
+preserved/scarred/harmed outcomes, idempotent shared Amber Sap, a chained
+three-node rootfire relay, a recoverable nine-minute Blackout target, a
+present-participant Greenward vote with deterministic tie handling, and an
+immutable per-player chapter transaction.
 Profession mastery/specializations, full inventory/crafting/quests, normal
-night, Blackout integration, permanent chapter resolution, town tier, final
-art/audio, and all
+night, recurring seven-night scheduling, consequences visibly changing future
+town/region content, town tier, final art/audio, and all
 Studio/device/group evidence remain open. See
 [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md) and
 [MILESTONE_3_BRAMBLEWAKE_EVENTS.md](MILESTONE_3_BRAMBLEWAKE_EVENTS.md), and
@@ -114,7 +118,8 @@ Studio/device/group evidence remain open. See
 [MILESTONE_3_PROFESSION_KITS.md](MILESTONE_3_PROFESSION_KITS.md), and
 [MILESTONE_3_BRAMBLEWAKE_ENEMIES.md](MILESTONE_3_BRAMBLEWAKE_ENEMIES.md), and
 [MILESTONE_3_OLD_GROWTH_ELITE.md](MILESTONE_3_OLD_GROWTH_ELITE.md), and
-[MILESTONE_3_WARDEN_STAG_BOSS.md](MILESTONE_3_WARDEN_STAG_BOSS.md).
+[MILESTONE_3_WARDEN_STAG_BOSS.md](MILESTONE_3_WARDEN_STAG_BOSS.md), and
+[MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md](MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md).
 
 ### Deliverables
 

@@ -233,6 +233,30 @@ deliverables. Isolating the authored boss first makes phase, choice, authority,
 recovery, reward, mobile HUD, and performance testable without falsely claiming
 the nine-minute chapter flow or permanent story consequence is finished.
 
+## 2026-07-26 — Bramblewake Blackout preview and immutable chapter result
+
+**Decision:** In the vertical slice, automatically start the first unresolved
+Bramblewake Blackout when a player enters the expedition after First Light. A
+nine-minute target clock becomes recoverable overtime instead of erasing
+progress. Players carry rootfire through three ordered relays, with every lit
+relay becoming the next fire source, then complete Old Growth and the Warden
+Stag. Present participants vote between restoring farmland, wild regrowth, and a
+shared agroforest; a unique plurality wins and ties resolve to the shared
+agroforest. The server persists the Warden outcome and land decision together
+through one immutable, idempotent save-schema-v4 transaction per player.
+
+**Scope:** This preview proves the complete chapter-one critical path without
+claiming the production seven-night scheduler. Recurring cadence, visible town
+and expedition consequences, ally traversal behavior, cinematic presentation,
+and final art/audio/VFX remain open.
+
+**Evidence:** [Bramblewake Mobile Blackout Event Layer report](https://www.lazyweb.com/report/lazyweb/558b7278-8455-4639-bf62-bd4ebb97a034/?source=create).
+
+**Reason:** A recoverable clock and chained fire sources make the authored route
+challenging without creating an impossible run after one miss or a long
+backtrack. Present-party voting is bounded and deterministic, while committing
+the boss result and land decision atomically prevents contradictory story saves.
+
 ## 2026-07-25 — Recoverable failure
 
 **Decision:** Routine defeat damages temporary state and unbanked value but never

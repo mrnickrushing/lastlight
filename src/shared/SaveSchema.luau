@@ -23,11 +23,31 @@ export type Profile = {
     profession: {
         selectedId: string?,
     },
+    story: {
+        chapterOne: {
+            completedAt: number?,
+            decision: string?,
+            status: string,
+            transactionId: string?,
+            wardenOutcome: string?,
+        },
+    },
 }
+
+local CHAPTER_ONE_DECISIONS = table.freeze({
+    restore_farmland = true,
+    wild_regrowth = true,
+    shared_agroforest = true,
+})
+local WARDEN_OUTCOMES = table.freeze({
+    preserved = true,
+    scarred = true,
+    harmed = true,
+})
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 3,
+        schemaVersion = 4,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -40,6 +60,15 @@ function SaveSchema.default(now: number): Profile
         inventory = ExpeditionInventory.default(),
         profession = {
             selectedId = nil,
+        },
+        story = {
+            chapterOne = {
+                completedAt = nil,
+                decision = nil,
+                status = "unresolved",
+                transactionId = nil,
+                wardenOutcome = nil,
+            },
         },
     }
 end
@@ -93,7 +122,28 @@ function SaveSchema.normalize(value: any, now: number): Profile
     if type(profession) == "table" and ProfessionCatalog.isValid(profession.selectedId) then
         profile.profession.selectedId = profession.selectedId
     end
-    profile.schemaVersion = 3
+    local story = value.story
+    local chapterOne = if type(story) == "table" then story.chapterOne else nil
+    if
+        type(chapterOne) == "table"
+        and chapterOne.status == "complete"
+        and CHAPTER_ONE_DECISIONS[chapterOne.decision] == true
+        and WARDEN_OUTCOMES[chapterOne.wardenOutcome] == true
+        and type(chapterOne.transactionId) == "string"
+        and chapterOne.transactionId ~= ""
+        and #chapterOne.transactionId <= 160
+        and type(chapterOne.completedAt) == "number"
+        and chapterOne.completedAt > 0
+    then
+        profile.story.chapterOne = {
+            completedAt = chapterOne.completedAt,
+            decision = chapterOne.decision,
+            status = "complete",
+            transactionId = chapterOne.transactionId,
+            wardenOutcome = chapterOne.wardenOutcome,
+        }
+    end
+    profile.schemaVersion = 4
     return profile
 end
 
@@ -194,6 +244,53 @@ function SaveSchema.findExpeditionSettlementForRewards(
     rewardTransactionIds: { string }
 ): (string?, any?)
     return ExpeditionInventory.findSettlementForRewards(profile.inventory, rewardTransactionIds)
+end
+
+function SaveSchema.withChapterOneResolution(
+    profile: Profile,
+    transactionId: string,
+    decision: string,
+    wardenOutcome: string,
+    now: number
+): (Profile, any)
+    assert(transactionId ~= "" and #transactionId <= 160, "chapter transaction ID is invalid")
+    assert(CHAPTER_ONE_DECISIONS[decision] == true, "chapter decision is invalid")
+    assert(WARDEN_OUTCOMES[wardenOutcome] == true, "Warden outcome is invalid")
+    local current = profile.story.chapterOne
+    if current.status == "complete" then
+        return profile,
+            {
+                applied = false,
+                duplicate = current.transactionId == transactionId,
+                reason = if current.transactionId == transactionId
+                    then "duplicate"
+                    else "chapter_already_resolved",
+                record = table.clone(current),
+            }
+    end
+
+    local nextProfile = table.clone(profile)
+    nextProfile.story = table.clone(profile.story)
+    nextProfile.story.chapterOne = {
+        completedAt = now,
+        decision = decision,
+        status = "complete",
+        transactionId = transactionId,
+        wardenOutcome = wardenOutcome,
+    }
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile,
+        {
+            applied = true,
+            duplicate = false,
+            reason = "resolved",
+            record = table.clone(nextProfile.story.chapterOne),
+        }
+end
+
+function SaveSchema.chapterOne(profile: Profile): any
+    return table.clone(profile.story.chapterOne)
 end
 
 return table.freeze(SaveSchema)

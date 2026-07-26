@@ -745,6 +745,162 @@ local function buildWardenSeal(
     }
 end
 
+local function buildBlackoutLayer(
+    parent: Instance,
+    centers: { Vector3 },
+    bossCenter: Vector3,
+    runtimeIds: any
+): any
+    local layer = Instance.new("Model")
+    layer.Name = "BramblewakeBlackoutLayer"
+    layer:SetAttribute("BlackoutId", "blackout_bramblewake")
+    layer:SetAttribute("ContentId", "blackout_bw_rootfire_relay")
+    layer.Parent = parent
+    pcall(function()
+        layer.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+    end)
+
+    local sourceCenter = assert(centers[1], "Blackout fire source center is missing")
+    local fireSource = orb(
+        layer,
+        "BlackoutLanternFire",
+        sourceCenter + Vector3.new(13, 4, 13),
+        5,
+        Color3.fromRGB(94, 83, 64),
+        Enum.Material.SmoothPlastic
+    )
+    fireSource.Transparency = 0.48
+    fireSource:SetAttribute("BlackoutInteraction", "take_fire")
+    CollectionService:AddTag(fireSource, runtimeIds.ExpeditionBlackoutTag)
+    billboard(fireSource, "BLACKOUT FIRE · CARRY TO LIVING ROOTS", CREAM)
+
+    local interactions = {
+        {
+            actionText = "TAKE ROOTFIRE",
+            holdDuration = 0.45,
+            interactionId = runtimeIds.InteractionIds.BlackoutFireSource,
+            objectText = "Blackout Lantern",
+            target = fireSource,
+        },
+    }
+    local relayNodes = {}
+    for _, definition in
+        {
+            {
+                center = assert(centers[3], "Blackout farm relay center is missing"),
+                interactionId = runtimeIds.InteractionIds.BlackoutRootFarm,
+                label = "FARM ROOT",
+                nodeId = "blackout_root_farm",
+            },
+            {
+                center = assert(centers[7], "Blackout mill relay center is missing"),
+                interactionId = runtimeIds.InteractionIds.BlackoutRootMill,
+                label = "MILL ROOT",
+                nodeId = "blackout_root_mill",
+            },
+            {
+                center = assert(centers[10], "Blackout cathedral relay center is missing"),
+                interactionId = runtimeIds.InteractionIds.BlackoutRootCathedral,
+                label = "CATHEDRAL ROOT",
+                nodeId = "blackout_root_cathedral",
+            },
+        }
+    do
+        local node = orb(
+            layer,
+            "BlackoutRelay_" .. definition.label,
+            definition.center + Vector3.new(-14, 3.5, -12),
+            6,
+            Color3.fromRGB(70, 91, 72),
+            Enum.Material.SmoothPlastic
+        )
+        node.Transparency = 0.5
+        node:SetAttribute("BlackoutInteraction", "deliver_fire")
+        node:SetAttribute("BlackoutNodeId", definition.nodeId)
+        CollectionService:AddTag(node, runtimeIds.ExpeditionBlackoutTag)
+        billboard(node, definition.label .. " · NEEDS CARRIED FIRE", CREAM)
+        relayNodes[definition.nodeId] = node
+        table.insert(interactions, {
+            actionText = "DELIVER ROOTFIRE",
+            holdDuration = 0.7,
+            interactionId = definition.interactionId,
+            objectText = definition.label,
+            target = node,
+        })
+
+        for rootIndex = -1, 1 do
+            local rootedWall = part(
+                layer,
+                "RootedWall",
+                Vector3.new(3.5, 14 + (rootIndex + 1) * 2, 3.5),
+                CFrame.new(node.Position + Vector3.new(rootIndex * 5.5, 5 + (rootIndex + 1), 4.5))
+                    * CFrame.Angles(math.rad(rootIndex * 8), 0, math.rad(rootIndex * 10)),
+                DARK_BARK,
+                Enum.Material.Wood,
+                true
+            )
+            rootedWall:SetAttribute("BlackoutNodeId", definition.nodeId)
+        end
+    end
+
+    local decisions = {}
+    for _, definition in
+        {
+            {
+                color = MEADOW,
+                decisionId = "restore_farmland",
+                interactionId = runtimeIds.InteractionIds.BlackoutDecisionFarmland,
+                label = "RESTORE FARMLAND",
+                offset = Vector3.new(-16, 2.5, 16),
+            },
+            {
+                color = Color3.fromRGB(71, 139, 84),
+                decisionId = "wild_regrowth",
+                interactionId = runtimeIds.InteractionIds.BlackoutDecisionWild,
+                label = "ALLOW WILD REGROWTH",
+                offset = Vector3.new(0, 2.5, 20),
+            },
+            {
+                color = FOXFIRE,
+                decisionId = "shared_agroforest",
+                interactionId = runtimeIds.InteractionIds.BlackoutDecisionShared,
+                label = "CREATE SHARED AGROFOREST",
+                offset = Vector3.new(16, 2.5, 16),
+            },
+        }
+    do
+        local seedling = orb(
+            layer,
+            "GreenwardChoice_" .. definition.decisionId,
+            bossCenter + definition.offset,
+            5,
+            definition.color,
+            Enum.Material.SmoothPlastic
+        )
+        seedling.Transparency = 0.58
+        seedling:SetAttribute("BlackoutInteraction", "chapter_decision")
+        seedling:SetAttribute("BlackoutDecisionId", definition.decisionId)
+        CollectionService:AddTag(seedling, runtimeIds.ExpeditionBlackoutTag)
+        billboard(seedling, definition.label, CREAM)
+        decisions[definition.decisionId] = seedling
+        table.insert(interactions, {
+            actionText = "VOTE " .. definition.label,
+            holdDuration = 1.1,
+            interactionId = definition.interactionId,
+            objectText = "Permanent Greenward Choice",
+            target = seedling,
+        })
+    end
+
+    return {
+        decisions = decisions,
+        fireSource = fireSource,
+        interactions = interactions,
+        model = layer,
+        relayNodes = relayNodes,
+    }
+end
+
 function BramblewakeBuilder.build(
     parent: Instance,
     manifest: any,
@@ -910,6 +1066,7 @@ function BramblewakeBuilder.build(
         catalog.CellSize,
         runtimeIds
     )
+    local blackout = buildBlackoutLayer(expedition, centers, bossArena.center, runtimeIds)
     buildBackdrop(expedition, centers)
 
     local generatedParts = 0
@@ -925,6 +1082,7 @@ function BramblewakeBuilder.build(
     expedition:SetAttribute("EventInteractionCount", #eventInteractions)
     expedition:SetAttribute("ExtractionReady", extractionTarget ~= nil)
     expedition:SetAttribute("BossArenaReady", bossArena ~= nil)
+    expedition:SetAttribute("BlackoutLayerReady", blackout ~= nil)
     expedition:SetAttribute("Ready", true)
 
     local moduleCenters = {}
@@ -943,6 +1101,7 @@ function BramblewakeBuilder.build(
         eventSockets = eventSockets,
         eliteArena = assert(eliteArena, "Old Growth elite arena is missing"),
         bossArena = bossArena,
+        blackout = blackout,
         moduleCenters = moduleCenters,
         partCount = generatedParts,
     }

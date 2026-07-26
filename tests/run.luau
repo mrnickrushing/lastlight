@@ -26,4 +26,5 @@ TestRunner.run({
     require("./specs/StatusEffectState.spec"),
     require("./specs/TutorialFlow.spec"),
     require("./specs/WardenStagEncounter.spec"),
+    require("./specs/BramblewakeBlackout.spec"),
 })

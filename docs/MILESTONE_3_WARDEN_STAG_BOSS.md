@@ -27,11 +27,13 @@ This increment includes:
 - a six-target streamed arena, automated pure tests, Studio DataModel
   assertions, and build verification.
 
-The nine-minute Bramblewake Blackout schedule, permanent saved chapter choice,
-future traversal-ally behavior, chapter-resolution scene, final rig animation,
-audio, captions, and production VFX remain later integration work. The encounter
-is exposed after Old Growth now so its mechanics can be tested independently
-without claiming the complete Blackout chapter flow.
+Build `0.13.0` now consumes this encounter inside the first Bramblewake Blackout
+preview and saves its outcome with the permanent chapter choice. Future
+traversal-ally behavior, recurring seven-night scheduling, visible world-state
+consequences, chapter-resolution cinematics, final rig animation, audio,
+captions, and production VFX remain later work. This document still isolates
+the boss mechanics; the integrated journey is specified in
+[MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md](MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md).
 
 ## Encounter flow
 
@@ -75,9 +77,9 @@ preserved outcome. The alternate antler prompt:
 - records the shared server outcome without increasing the reward.
 
 The shortcut is not stronger monetized power. It trades future story state for
-speed, uses no Robux, and grants the same five Amber Sap. The permanent chapter
-save is not claimed until the later Blackout integration persists and consumes
-the outcome.
+speed, uses no Robux, and grants the same five Amber Sap. Build `0.13.0`
+persists that outcome together with the Greenward land decision only after the
+Blackout vote resolves.
 
 ## Attack and recovery contract
 
@@ -124,8 +126,8 @@ physics-driven NPC movement.
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open the committed `build/LastLightTest.rbxlx` in Roblox Studio, press Play,
-   and require `[Last Light] PASS FoundationIntegration`, build `0.12.0`,
-   `services=14`, world `warden-stag-boss-v5`, and no red errors.
+   and require `[Last Light] PASS FoundationIntegration`, build `0.13.0`,
+   `services=15`, world `bramblewake-blackout-v6`, and no red errors.
 3. Open the committed `build/LastLight.rbxlx`, press Play, complete First Light,
    enter Bramblewake, and follow the route to Old Growth Approach.
 4. Before Old Growth is complete, approach the adjacent Warden's Seal. Require
@@ -174,7 +176,7 @@ physics-driven NPC movement.
 | Authority | forged health, damage, phase, node, antler, participant, outcome, reward, target, or attack state is rejected |
 | Kill switch | disabling the boss removes all interaction and value without breaking Old Growth, route traversal, or extraction |
 | Performance | one boss, one marker, anchored arena geometry, and 20 Hz stepping stay inside the baseline-phone budget |
-| Scope honesty | Blackout timing, permanent chapter save, ally traversal, final art/audio/VFX, and cinematic remain listed as open |
+| Scope honesty | recurring Blackout cadence, visible saved consequences, ally traversal, final art/audio/VFX, and cinematic remain listed as open |
 
 Automated checks establish source, pure-state, build-tree, tag, interaction,
 stable-ID, and model invariants. Only recorded Studio, multiplayer, and real

@@ -10,7 +10,7 @@ return {
             name = "creates a safe first-session profile",
             run = function()
                 local profile = SaveSchema.default(100)
-                TestRunner.equal(profile.schemaVersion, 3)
+                TestRunner.equal(profile.schemaVersion, 4)
                 TestRunner.equal(profile.tutorial.stage, "arrive")
                 TestRunner.equal(profile.tutorial.complete, false)
                 TestRunner.equal(profile.revision, 0)
@@ -51,7 +51,7 @@ return {
                 TestRunner.equal(profile.tutorial.stage, "build")
                 TestRunner.equal(profile.tutorial.selectedTool, "hammer")
                 TestRunner.equal(profile.revision, 4)
-                TestRunner.equal(profile.schemaVersion, 3)
+                TestRunner.equal(profile.schemaVersion, 4)
             end,
         },
         {
@@ -67,7 +67,7 @@ return {
                         complete = true,
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 3)
+                TestRunner.equal(profile.schemaVersion, 4)
                 TestRunner.equal(profile.revision, 7)
                 TestRunner.equal(profile.tutorial.complete, true)
                 TestRunner.equal(SaveSchema.expeditionPending(profile).count, 0)
@@ -153,13 +153,66 @@ return {
                         selectedId = "profession_hacker",
                     },
                 }, 300)
-                TestRunner.equal(migrated.schemaVersion, 3)
+                TestRunner.equal(migrated.schemaVersion, 4)
                 TestRunner.equal(migrated.profession.selectedId, nil)
 
                 local selected = SaveSchema.withProfession(migrated, "profession_medic", 320)
                 TestRunner.equal(selected.profession.selectedId, "profession_medic")
                 TestRunner.equal(selected.revision, migrated.revision + 1)
                 TestRunner.equal(migrated.profession.selectedId, nil)
+            end,
+        },
+        {
+            name = "migrates a safe unresolved chapter one story",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    schemaVersion = 3,
+                    story = {
+                        chapterOne = {
+                            status = "complete",
+                            decision = "destroy_everything",
+                            wardenOutcome = "cheated",
+                        },
+                    },
+                }, 300)
+                TestRunner.equal(profile.schemaVersion, 4)
+                TestRunner.equal(profile.story.chapterOne.status, "unresolved")
+                TestRunner.equal(profile.story.chapterOne.decision, nil)
+            end,
+        },
+        {
+            name = "persists chapter one once without allowing rewrites",
+            run = function()
+                local profile = SaveSchema.default(100)
+                local resolved, result = SaveSchema.withChapterOneResolution(
+                    profile,
+                    "chapter_1:run:hash:42",
+                    "shared_agroforest",
+                    "preserved",
+                    500
+                )
+                TestRunner.equal(result.applied, true)
+                TestRunner.equal(resolved.story.chapterOne.status, "complete")
+                TestRunner.equal(resolved.story.chapterOne.completedAt, 500)
+                TestRunner.equal(resolved.revision, 1)
+                local duplicate, duplicateResult = SaveSchema.withChapterOneResolution(
+                    resolved,
+                    "chapter_1:run:hash:42",
+                    "shared_agroforest",
+                    "preserved",
+                    600
+                )
+                TestRunner.equal(duplicate, resolved)
+                TestRunner.equal(duplicateResult.duplicate, true)
+                local conflict, conflictResult = SaveSchema.withChapterOneResolution(
+                    resolved,
+                    "chapter_1:other:hash:42",
+                    "wild_regrowth",
+                    "harmed",
+                    700
+                )
+                TestRunner.equal(conflict, resolved)
+                TestRunner.equal(conflictResult.reason, "chapter_already_resolved")
             end,
         },
     },

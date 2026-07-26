@@ -81,7 +81,7 @@ recovery, or reward.
 The transaction format binds `elite_old_growth`, server run ID, deterministic
 manifest hash, and participant user ID. Repeated completion delivery cannot
 duplicate the grant. A connected participant is also persisted into the
-save-schema-v3 unbanked pouch; the server-session ledger remains the fallback
+save-schema-v4 unbanked pouch; the server-session ledger remains the fallback
 when a profile write is unavailable. Wayhome performs the same atomic banking
 and tombstone flow used by event rewards.
 
@@ -120,7 +120,7 @@ there is no per-frame NPC physics or pathfinding cost.
 
 1. Synchronize `main`, run `npm run bootstrap`, then run `npm test`.
 2. Open `build/LastLightTest.rbxlx`, start one server/player, and require
-   `[Last Light] PASS FoundationIntegration`, build `0.12.0`, `services=14`,
+   `[Last Light] PASS FoundationIntegration`, build `0.13.0`, `services=15`,
    and no red errors.
 3. Open `build/LastLight.rbxlx` or connect Rojo. Complete First Light, enter
    Bramblewake, and follow the route to Old Growth Approach.

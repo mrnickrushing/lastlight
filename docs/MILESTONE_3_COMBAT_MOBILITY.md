@@ -95,7 +95,7 @@ thumbstick, top-bar, safe-inset, and preferred-text interactions.
 1. Run `npm test`.
 2. Open `build/LastLightTest.rbxlx` in Roblox Studio.
 3. Start one player and require `[Last Light] PASS FoundationIntegration`,
-   build `0.12.0`, `services=14`, and no red errors.
+   build `0.13.0`, `services=15`, and no red errors.
 4. Reach the authored night and hold RUN/Shift/left-stick click.
 5. Confirm the stamina rail drains smoothly, speed returns to normal at zero,
    and regeneration begins only after release and the short delay.
