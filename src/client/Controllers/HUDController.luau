@@ -658,9 +658,10 @@ function HUDController._updateClock(self: HUDController)
     if type(selfState) == "table" and selfState.downed == true then
         local bleedoutAt = tonumber(selfState.bleedoutAt) or 0
         local remaining = math.max(0, math.ceil(bleedoutAt - workspace:GetServerTimeNow()))
+        local downedDuration = math.max(1, tonumber(selfState.downedDuration) or remaining)
         self._downedTimer.Text =
             string.format("%02d:%02d", math.floor(remaining / 60), remaining % 60)
-        self._downedFill.Size = UDim2.fromScale(math.clamp(remaining / 30, 0, 1), 1)
+        self._downedFill.Size = UDim2.fromScale(math.clamp(remaining / downedDuration, 0, 1), 1)
         local nearest = selfState.nearestAlly
         self._downedAlly.Text = if type(nearest) == "table"
             then string.format(

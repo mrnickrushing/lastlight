@@ -200,7 +200,7 @@ function AnalyticsService.playerDowned(self: AnalyticsService, player: Player, s
     if not RunService:IsStudio() then
         pcall(function()
             RobloxAnalytics:LogCustomEvent(player, "PlayerDowned", 1, {
-                source = source,
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = source,
             })
         end)
     end

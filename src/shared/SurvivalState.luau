@@ -1,19 +1,49 @@
 --!strict
 
+local Config = require("./Config")
+
 local SurvivalState = {}
 
-local MAX_HEALTH = 100
-local DOWNED_SECONDS = 30
-local REVIVE_HEALTH = 35
-local RECOVERY_HEALTH = 50
-local REVIVE_INVULNERABILITY_SECONDS = 3
-local RECOVERY_INVULNERABILITY_SECONDS = 5
+export type Status = "active" | "downed"
+export type State = {
+    bleedoutAt: number?,
+    downedAt: number?,
+    health: number,
+    invulnerableUntil: number,
+    maxHealth: number,
+    revision: number,
+    status: Status,
+}
+export type TransitionResult = {
+    applied: boolean,
+    damage: number?,
+    downed: boolean?,
+    health: number?,
+    reason: string?,
+}
+export type Snapshot = {
+    bleedoutAt: number?,
+    downed: boolean,
+    downedDuration: number,
+    health: number,
+    invulnerable: boolean,
+    maxHealth: number,
+    revision: number,
+    timeRemaining: number,
+}
+
+local MAX_HEALTH = Config.MaxHealth
+local DOWNED_SECONDS = Config.DownedSeconds
+local REVIVE_HEALTH = Config.ReviveHealth
+local RECOVERY_HEALTH = Config.RecoveryHealth
+local REVIVE_INVULNERABILITY_SECONDS = Config.ReviveInvulnerabilitySeconds
+local RECOVERY_INVULNERABILITY_SECONDS = Config.RecoveryInvulnerabilitySeconds
 
 local function validNumber(value: any): boolean
     return type(value) == "number" and value == value and value > -math.huge and value < math.huge
 end
 
-function SurvivalState.create(now: number): any
+function SurvivalState.create(now: number): State
     assert(validNumber(now), "survival state time is invalid")
     return {
         health = MAX_HEALTH,
@@ -26,7 +56,7 @@ function SurvivalState.create(now: number): any
     }
 end
 
-function SurvivalState.damage(state: any, amount: number, now: number): (any, any)
+function SurvivalState.damage(state: State, amount: number, now: number): (State, TransitionResult)
     if not validNumber(amount) or amount <= 0 or amount ~= math.floor(amount) then
         return state,
             {
@@ -47,7 +77,7 @@ function SurvivalState.damage(state: any, amount: number, now: number): (any, an
         }
     end
 
-    local nextState: any = table.clone(state)
+    local nextState: State = table.clone(state)
     nextState.health = math.max(0, state.health - amount)
     nextState.revision += 1
     local downed = nextState.health == 0
@@ -64,7 +94,7 @@ function SurvivalState.damage(state: any, amount: number, now: number): (any, an
         }
 end
 
-function SurvivalState.revive(state: any, now: number): (any, any)
+function SurvivalState.revive(state: State, now: number): (State, TransitionResult)
     if state.status ~= "downed" then
         return state,
             {
@@ -80,7 +110,7 @@ function SurvivalState.revive(state: any, now: number): (any, any)
             }
     end
 
-    local nextState: any = table.clone(state)
+    local nextState: State = table.clone(state)
     nextState.health = REVIVE_HEALTH
     nextState.status = "active"
     nextState.downedAt = nil
@@ -93,7 +123,7 @@ function SurvivalState.revive(state: any, now: number): (any, any)
     }
 end
 
-function SurvivalState.recover(state: any, now: number): (any, any)
+function SurvivalState.recover(state: State, now: number): (State, TransitionResult)
     if state.status ~= "downed" then
         return state,
             {
@@ -109,7 +139,7 @@ function SurvivalState.recover(state: any, now: number): (any, any)
             }
     end
 
-    local nextState: any = table.clone(state)
+    local nextState: State = table.clone(state)
     nextState.health = RECOVERY_HEALTH
     nextState.status = "active"
     nextState.downedAt = nil
@@ -122,7 +152,7 @@ function SurvivalState.recover(state: any, now: number): (any, any)
     }
 end
 
-function SurvivalState.safeRetreat(state: any, now: number): (any, any)
+function SurvivalState.safeRetreat(state: State, now: number): (State, TransitionResult)
     if state.status ~= "downed" then
         return state,
             {
@@ -131,7 +161,7 @@ function SurvivalState.safeRetreat(state: any, now: number): (any, any)
             }
     end
 
-    local nextState: any = table.clone(state)
+    local nextState: State = table.clone(state)
     nextState.health = RECOVERY_HEALTH
     nextState.status = "active"
     nextState.downedAt = nil
@@ -144,8 +174,8 @@ function SurvivalState.safeRetreat(state: any, now: number): (any, any)
     }
 end
 
-function SurvivalState.respawn(state: any, now: number): any
-    local nextState: any = table.clone(state)
+function SurvivalState.respawn(state: State, now: number): State
+    local nextState: State = table.clone(state)
     nextState.health = RECOVERY_HEALTH
     nextState.status = "active"
     nextState.downedAt = nil
@@ -155,15 +185,16 @@ function SurvivalState.respawn(state: any, now: number): any
     return nextState
 end
 
-function SurvivalState.canAct(state: any): boolean
+function SurvivalState.canAct(state: State): boolean
     return state.status == "active" and state.health > 0
 end
 
-function SurvivalState.snapshot(state: any, now: number): any
+function SurvivalState.snapshot(state: State, now: number): Snapshot
     local bleedoutAt = if type(state.bleedoutAt) == "number" then state.bleedoutAt else nil
     return {
         bleedoutAt = bleedoutAt,
         downed = state.status == "downed",
+        downedDuration = DOWNED_SECONDS,
         health = state.health,
         invulnerable = now < state.invulnerableUntil,
         maxHealth = state.maxHealth,

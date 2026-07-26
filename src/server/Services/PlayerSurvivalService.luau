@@ -328,10 +328,10 @@ function PlayerSurvivalService.Start(self: PlayerSurvivalService)
         self:_bindPlayer(player)
     end)
     Players.PlayerRemoving:Connect(function(player: Player)
+        self:_cancelChannel(player, "target_left")
         self:_clearVisual(player)
         self._states[player] = nil
         self._spawned[player] = nil
-        self._channels[player] = nil
         for target, channel in self._channels do
             if channel.reviver == player then
                 self:_cancelChannel(target, "reviver_left")

@@ -2,6 +2,29 @@
 
 local ReviveFlow = {}
 
+export type Channel = {
+    endsAt: number,
+    reviverRevision: number,
+    reviverUserId: number,
+    startedAt: number,
+    targetUserId: number,
+}
+export type Conditions = {
+    reachable: boolean,
+    reviverCanAct: boolean,
+    reviverPresent: boolean,
+    reviverRevision: number,
+    targetDowned: boolean,
+    targetPresent: boolean,
+}
+export type DecisionStatus = "cancel" | "complete" | "pending"
+export type Decision = {
+    elapsed: number?,
+    reason: string?,
+    remaining: number?,
+    status: DecisionStatus,
+}
+
 local function finiteNumber(value: any): boolean
     return type(value) == "number" and value == value and value > -math.huge and value < math.huge
 end
@@ -16,7 +39,7 @@ function ReviveFlow.create(
     reviverRevision: number,
     now: number,
     duration: number
-): any
+): Channel
     assert(wholeNonNegative(targetUserId), "target user ID is invalid")
     assert(wholeNonNegative(reviverUserId), "reviver user ID is invalid")
     assert(targetUserId ~= reviverUserId, "players cannot revive themselves")
@@ -33,7 +56,7 @@ function ReviveFlow.create(
     })
 end
 
-function ReviveFlow.evaluate(channel: any, now: number, conditions: any): any
+function ReviveFlow.evaluate(channel: Channel, now: number, conditions: Conditions): Decision
     assert(finiteNumber(now), "revive evaluation time is invalid")
     if conditions.targetPresent ~= true then
         return {
