@@ -165,4 +165,8 @@ function PhaseService.isNightActive(self: PhaseService): boolean
     return self._active and self._phase == "night"
 end
 
+function PhaseService.hasCompletedFirstNight(self: PhaseService): boolean
+    return self._phase == "reveal"
+end
+
 return table.freeze(PhaseService)

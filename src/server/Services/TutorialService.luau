@@ -140,8 +140,9 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
             else 0,
         selectedTool = profile.tutorial.selectedTool,
         compactHud = false,
-        toast = if stage == "complete"
-            then "WELCOME BACK TO EMBERHOLLOW"
+        toast = if not self._profileService:isWritable(player)
+            then "PROFILE OFFLINE — PROGRESS WILL NOT SAVE"
+            elseif stage == "complete" then "WELCOME BACK TO EMBERHOLLOW"
             else "FOLLOW THE LANTERN TRAIL",
         toastRevision = 1,
     }
@@ -157,13 +158,18 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
         self._worldService:buildBarricade()
     end
     if stage == "survive" then
-        self._phaseService:ensureFirstNight()
+        if self._phaseService:hasCompletedFirstNight() then
+            self:_advanceSurvivorToReveal(player, session)
+        else
+            self._phaseService:ensureFirstNight()
+        end
     elseif stage == "reveal" or stage == "complete" then
         self._worldService:setBeaconVisible(true)
     end
 
-    local definition = self._tutorialFlow.definition(stage)
-    self._analyticsService:stage(player, definition.index, stage)
+    local currentStage = session.stage
+    local definition = self._tutorialFlow.definition(currentStage)
+    self._analyticsService:stage(player, definition.index, currentStage)
     self:_publish(player)
 end
 
@@ -256,7 +262,6 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
     elseif actionId == self._runtimeIds.Actions.Build then
         session.resources -= 3
         self._worldService:buildBarricade()
-        self._worldService:moveMara(Vector3.new(-18, 1.1, -104))
         self:_setToast(player, "BARRICADE COMPLETE")
     elseif actionId == self._runtimeIds.Actions.Prepare then
         self:_setToast(player, "THE FIRST LANTERN BURNS")
@@ -269,22 +274,35 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
     self:_publishAll()
 end
 
+function TutorialService._advanceSurvivorToReveal(
+    self: TutorialService,
+    player: Player,
+    session: Session
+): boolean
+    if session.stage ~= "survive" then
+        return false
+    end
+
+    local nextStage = self._tutorialFlow.advanceSystem(session.stage)
+    if nextStage == nil then
+        return false
+    end
+
+    session.stage = nextStage
+    session.toast = "DAWN BREAKS — FOLLOW THE BEACON"
+    session.toastRevision += 1
+    self._profileService:setTutorial(player, nextStage, session.selectedTool)
+    local definition = self._tutorialFlow.definition(nextStage)
+    self._analyticsService:stage(player, definition.index, nextStage)
+    task.spawn(function()
+        self._profileService:save(player)
+    end)
+    return true
+end
+
 function TutorialService._nightComplete(self: TutorialService)
     for player, session in self._sessions do
-        if session.stage == "survive" then
-            local nextStage = self._tutorialFlow.advanceSystem(session.stage)
-            if nextStage ~= nil then
-                session.stage = nextStage
-                session.toast = "DAWN BREAKS — FOLLOW THE BEACON"
-                session.toastRevision += 1
-                self._profileService:setTutorial(player, nextStage, session.selectedTool)
-                local definition = self._tutorialFlow.definition(nextStage)
-                self._analyticsService:stage(player, definition.index, nextStage)
-                task.spawn(function()
-                    self._profileService:save(player)
-                end)
-            end
-        end
+        self:_advanceSurvivorToReveal(player, session)
     end
     self:_publishAll()
 end

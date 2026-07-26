@@ -18,6 +18,7 @@ export type ProfileService = typeof(setmetatable(
         _logger: Logger,
         _persistent: boolean,
         _profiles: { [Player]: any },
+        _writable: { [Player]: boolean },
         _loading: { [Player]: boolean },
         _loadedEvent: BindableEvent,
         _saveSchema: any,
@@ -32,6 +33,7 @@ function ProfileService.new(logger: Logger, persistent: boolean): ProfileService
         _logger = logger,
         _persistent = persistent,
         _profiles = {},
+        _writable = {},
         _loading = {},
         _loadedEvent = Instance.new("BindableEvent"),
         _saveSchema = nil,
@@ -55,6 +57,7 @@ function ProfileService._load(self: ProfileService, player: Player)
     local now = os.time()
     local profile = self._saveSchema.default(now)
     local source = "fallback"
+    local writable = not self._persistent
 
     if self._persistent and self._store ~= nil then
         local finished = false
@@ -78,12 +81,15 @@ function ProfileService._load(self: ProfileService, player: Player)
         if finished and ok then
             profile = self._saveSchema.normalize(result, now)
             source = result == nil and "new" or "datastore"
+            writable = true
         elseif finished then
+            source = "read_only"
             self._logger:warn("profile_load_failed", {
                 player = player.UserId,
                 reason = tostring(result),
             })
         else
+            source = "read_only"
             self._logger:warn("profile_load_timed_out", { player = player.UserId })
         end
     else
@@ -96,6 +102,7 @@ function ProfileService._load(self: ProfileService, player: Player)
     end
 
     self._profiles[player] = profile
+    self._writable[player] = writable
     self._loading[player] = nil
     self._loadedEvent:Fire(player, profile)
     self._logger:info("profile_loaded", {
@@ -115,6 +122,7 @@ function ProfileService.Start(self: ProfileService)
     Players.PlayerRemoving:Connect(function(player: Player)
         self:save(player)
         self._profiles[player] = nil
+        self._writable[player] = nil
         self._loading[player] = nil
     end)
 
@@ -156,6 +164,11 @@ function ProfileService.isLoaded(self: ProfileService, player: Player): boolean
     return self._profiles[player] ~= nil
 end
 
+function ProfileService.isWritable(self: ProfileService, player: Player): boolean
+    return self._profiles[player] ~= nil
+        and (not self._persistent or self._writable[player] == true)
+end
+
 function ProfileService.setTutorial(
     self: ProfileService,
     player: Player,
@@ -173,8 +186,17 @@ end
 
 function ProfileService.save(self: ProfileService, player: Player): boolean
     local profile = self._profiles[player]
-    if profile == nil or not self._persistent or self._store == nil then
-        return profile ~= nil
+    if profile == nil then
+        return false
+    end
+    if not self._persistent then
+        return true
+    end
+    if self._store == nil or self._writable[player] ~= true then
+        self._logger:warn("profile_save_skipped_read_only", {
+            player = player.UserId,
+        })
+        return false
     end
 
     local ok, message = pcall(function()

@@ -45,7 +45,7 @@ Start from a reset profile and record screen/video plus elapsed time.
 | Step | Player action | Required result |
 |---|---|---|
 | Join | Press Play once | bounded custom loader exits; player stands on solid ground; no sky fall |
-| Rescue | follow the lit trail and free Mara | objective advances once; Mara moves; toast confirms safety |
+| Rescue | follow the lit trail and free Mara | objective advances once; Mara moves a few steps but remains available to late joiners; toast confirms safety |
 | Gather | gather the glowing Heartwood stump | exactly 3 Heartwood appears; objective advances once |
 | Tool | choose axe, hammer, or torch | selected tool is named; choice is not described as permanent |
 | Build | use the marked construction plot | 3 Heartwood is consumed; a solid barricade appears |
