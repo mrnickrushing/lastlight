@@ -311,3 +311,25 @@ a "seventh night" gate this increment has no Studio/device evidence for yet.
 Building the counting-and-defense half of the seven-night structure first, and
 wiring it to the Blackout only once the cycle itself is validated, keeps each
 change reviewable and reversible on its own.
+
+## 2026-07-26 — Night count persists per player, not as a new town save
+
+**Decision:** The town's night count is stored as `town.nightNumber` on each
+player's existing save-schema-v5 profile — the same DataStore/profile
+mechanism already used for `story.chapterOne`, inventory, and profession —
+rather than as a new, independent town-wide save. When a server starts, the
+live cycle resumes from the highest `nightNumber` among the profiles of
+players present, via `SaveSchema.withNightNumber`'s monotonic (never
+decreasing) update. Every connected player's profile is updated whenever a
+night completes, regardless of who was present when it started.
+
+**Reason:** No town-wide save (save-slot key, locking, versioning) exists
+anywhere in this codebase yet — every server rebuilds the same generic
+Emberhollow from scratch, and only player profiles persist. Inventing a
+one-off town DataStore now would almost certainly need migrating once
+Milestone 4's real persistent-town platform lands with its own save-slot
+design. Treating night count as a personal record that a party's most
+experienced returning member restores keeps this consistent with every other
+piece of per-player state already shipped (chapter one, inventory,
+profession), and costs nothing to migrate later: a single field can move from
+a player profile into a future town profile without changing its meaning.

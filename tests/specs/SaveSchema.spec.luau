@@ -10,11 +10,12 @@ return {
             name = "creates a safe first-session profile",
             run = function()
                 local profile = SaveSchema.default(100)
-                TestRunner.equal(profile.schemaVersion, 4)
+                TestRunner.equal(profile.schemaVersion, 5)
                 TestRunner.equal(profile.tutorial.stage, "arrive")
                 TestRunner.equal(profile.tutorial.complete, false)
                 TestRunner.equal(profile.revision, 0)
                 TestRunner.equal(next(profile.inventory.materials), nil)
+                TestRunner.equal(profile.town.nightNumber, 1)
             end,
         },
         {
@@ -51,7 +52,7 @@ return {
                 TestRunner.equal(profile.tutorial.stage, "build")
                 TestRunner.equal(profile.tutorial.selectedTool, "hammer")
                 TestRunner.equal(profile.revision, 4)
-                TestRunner.equal(profile.schemaVersion, 4)
+                TestRunner.equal(profile.schemaVersion, 5)
             end,
         },
         {
@@ -67,7 +68,7 @@ return {
                         complete = true,
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 4)
+                TestRunner.equal(profile.schemaVersion, 5)
                 TestRunner.equal(profile.revision, 7)
                 TestRunner.equal(profile.tutorial.complete, true)
                 TestRunner.equal(SaveSchema.expeditionPending(profile).count, 0)
@@ -153,7 +154,7 @@ return {
                         selectedId = "profession_hacker",
                     },
                 }, 300)
-                TestRunner.equal(migrated.schemaVersion, 4)
+                TestRunner.equal(migrated.schemaVersion, 5)
                 TestRunner.equal(migrated.profession.selectedId, nil)
 
                 local selected = SaveSchema.withProfession(migrated, "profession_medic", 320)
@@ -175,7 +176,7 @@ return {
                         },
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 4)
+                TestRunner.equal(profile.schemaVersion, 5)
                 TestRunner.equal(profile.story.chapterOne.status, "unresolved")
                 TestRunner.equal(profile.story.chapterOne.decision, nil)
             end,
@@ -213,6 +214,67 @@ return {
                 )
                 TestRunner.equal(conflict, resolved)
                 TestRunner.equal(conflictResult.reason, "chapter_already_resolved")
+            end,
+        },
+        {
+            name = "migrates a schema four profile with no town field into night one",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    schemaVersion = 4,
+                    revision = 3,
+                    tutorial = { stage = "reveal", complete = false },
+                }, 300)
+                TestRunner.equal(profile.schemaVersion, 5)
+                TestRunner.equal(profile.town.nightNumber, 1)
+            end,
+        },
+        {
+            name = "restores a valid persisted night number and rejects corrupt values",
+            run = function()
+                local restored = SaveSchema.normalize({
+                    schemaVersion = 5,
+                    town = { nightNumber = 6 },
+                }, 300)
+                TestRunner.equal(restored.town.nightNumber, 6)
+
+                local rejected = SaveSchema.normalize({
+                    schemaVersion = 5,
+                    town = { nightNumber = -2 },
+                }, 300)
+                TestRunner.equal(rejected.town.nightNumber, 1)
+
+                local fractional = SaveSchema.normalize({
+                    schemaVersion = 5,
+                    town = { nightNumber = 3.5 },
+                }, 300)
+                TestRunner.equal(fractional.town.nightNumber, 1)
+            end,
+        },
+        {
+            name = "withNightNumber only ever advances, never regresses",
+            run = function()
+                local profile = SaveSchema.default(100)
+                local advanced = SaveSchema.withNightNumber(profile, 4, 200)
+                TestRunner.equal(advanced.town.nightNumber, 4)
+                TestRunner.equal(advanced.revision, 1)
+                TestRunner.equal(profile.town.nightNumber, 1)
+
+                local unchanged = SaveSchema.withNightNumber(advanced, 2, 300)
+                TestRunner.equal(unchanged, advanced)
+
+                local same = SaveSchema.withNightNumber(advanced, 4, 300)
+                TestRunner.equal(same, advanced)
+
+                TestRunner.throws(function()
+                    SaveSchema.withNightNumber(advanced, 0, 300)
+                end)
+            end,
+        },
+        {
+            name = "nightNumber reads the current persisted value",
+            run = function()
+                local profile = SaveSchema.withNightNumber(SaveSchema.default(100), 9, 200)
+                TestRunner.equal(SaveSchema.nightNumber(profile), 9)
             end,
         },
     },

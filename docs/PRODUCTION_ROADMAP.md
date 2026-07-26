@@ -106,12 +106,14 @@ preserved/scarred/harmed outcomes, idempotent shared Amber Sap, a chained
 three-node rootfire relay, a recoverable nine-minute Blackout target, a
 present-participant Greenward vote with deterministic tie handling, an
 immutable per-player chapter transaction, and a repeating server-owned town
-day/dusk/night cycle with an escalating six-enemy wave schedule and a
-seventh-night telegraph that is deliberately decoupled from Blackout access.
-Profession mastery/specializations, full inventory/crafting/quests,
-persistent night-count storage across restarts, per-night content
-differentiation, consequences visibly changing future town/region content,
-town tier, final art/audio, and all Studio/device/group evidence remain open.
+day/dusk/night cycle with an escalating six-enemy wave schedule, a
+seventh-night telegraph that is deliberately decoupled from Blackout access,
+and a save-schema-v5 night count that persists per player and resumes from
+whoever's record is highest across a server restart.
+Profession mastery/specializations, full inventory/crafting/quests, per-night
+content differentiation, consequences visibly changing future town/region
+content, town tier, final art/audio, and all Studio/device/group evidence
+remain open.
 See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md) and
 [MILESTONE_3_BRAMBLEWAKE_EVENTS.md](MILESTONE_3_BRAMBLEWAKE_EVENTS.md), and
 [MILESTONE_3_INVENTORY_EXTRACTION.md](MILESTONE_3_INVENTORY_EXTRACTION.md), and

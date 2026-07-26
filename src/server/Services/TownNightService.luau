@@ -25,6 +25,7 @@ export type TownNightService = typeof(setmetatable(
         _phase: string,
         _phaseEndsAt: number,
         _onChanged: ((string?) -> ())?,
+        _onNightCompleted: ((number) -> ())?,
     },
     TownNightService
 ))
@@ -53,6 +54,7 @@ function TownNightService.new(
         _phase = "dormant",
         _phaseEndsAt = 0,
         _onChanged = nil,
+        _onNightCompleted = nil,
     }, TownNightService)
 end
 
@@ -62,6 +64,13 @@ function TownNightService.Start(_self: TownNightService) end
 
 function TownNightService.setChangedHandler(self: TownNightService, callback: (string?) -> ())
     self._onChanged = callback
+end
+
+-- Fires once per completed night with the night number that just finished
+-- (i.e. the value every connected player's profile should now record), so
+-- persistence stays owned by whoever is holding the profile, not this loop.
+function TownNightService.setNightCompletedHandler(self: TownNightService, callback: (number) -> ())
+    self._onNightCompleted = callback
 end
 
 function TownNightService._notify(self: TownNightService, toast: string?)
@@ -77,14 +86,20 @@ local function waitUntilTime(target: number)
     end
 end
 
--- Called once the first player in this server session is known to be past
+-- Called once for every player in this server session known to be past
 -- First Light — either a fresh player who just finished it, or a returning
--- player whose saved profile already had it complete. Idempotent and safe to
--- call from either path; only the first call starts the loop. Disabling the
--- kill switch leaves the tutorial's authored First Night, Bramblewake
--- expeditions, and manual Blackout entry untouched — only this repeating
--- town day/dusk/night loop stops advancing.
-function TownNightService.ensureStarted(self: TownNightService)
+-- player whose saved profile already had it complete. `nightNumber` is that
+-- player's own persisted record; the town resumes from the highest one seen
+-- rather than always restarting at night one, so nobody's progress from a
+-- prior session is understated. Safe to call repeatedly and from either
+-- path: only the first call actually starts the loop, but every call still
+-- raises the count if the caller's record is higher (this only affects
+-- nights that haven't started their wave schedule yet — see _runCycle).
+-- Disabling the kill switch leaves the tutorial's authored First Night,
+-- Bramblewake expeditions, and manual Blackout entry untouched — only this
+-- repeating town day/dusk/night loop stops advancing.
+function TownNightService.ensureStarted(self: TownNightService, nightNumber: number)
+    self._nightNumber = math.max(self._nightNumber, math.floor(nightNumber))
     if not self._enabled or self._started then
         return
     end
@@ -112,21 +127,25 @@ function TownNightService._runCycle(self: TownNightService)
         self._phaseEndsAt = nightStartedAt + self._nightSeconds
         self._worldService:setNight(true)
         self._enemyService:startNight()
-        local blackoutDue = self:_isBlackoutDue()
+        -- Frozen for the rest of this night: a higher number from a veteran
+        -- who joins mid-night (ensureStarted always raises self._nightNumber
+        -- to the max seen) must not retroactively change the wave schedule,
+        -- toasts, or completion bookkeeping already committed to for this
+        -- specific night — only self._nightNumber (read again below, after
+        -- this night ends) picks it up, for the *next* night onward.
+        local activeNight = self._nightNumber
+        local blackoutDue = self:_isBlackoutDue(activeNight)
         self:_notify(
             if blackoutDue
-                then string.format(
-                    "NIGHT %d — THE BLACKOUT LOOMS IN BRAMBLEWAKE",
-                    self._nightNumber
-                )
-                else string.format("NIGHT %d HAS ARRIVED", self._nightNumber)
+                then string.format("NIGHT %d — THE BLACKOUT LOOMS IN BRAMBLEWAKE", activeNight)
+                else string.format("NIGHT %d HAS ARRIVED", activeNight)
         )
         self._logger:info("town_night_started", {
             blackoutDue = blackoutDue,
-            night = self._nightNumber,
+            night = activeNight,
         })
 
-        for _, beat in self._townNightSchedule.beats(self._nightSeconds, self._nightNumber) do
+        for _, beat in self._townNightSchedule.beats(self._nightSeconds, activeNight) do
             waitUntilTime(nightStartedAt + beat.at)
             if beat.kind == "spawn" then
                 self._enemyService:spawn(beat.enemyId)
@@ -145,14 +164,21 @@ function TownNightService._runCycle(self: TownNightService)
         waitUntilTime(self._phaseEndsAt)
         self._enemyService:stopNight()
         self._worldService:setNight(false)
-        self:_notify(string.format("DAWN BREAKS — NIGHT %d SURVIVED", self._nightNumber))
-        self._logger:info("town_night_completed", { night = self._nightNumber })
-        self._nightNumber += 1
+        self:_notify(string.format("DAWN BREAKS — NIGHT %d SURVIVED", activeNight))
+        self._logger:info("town_night_completed", { night = activeNight })
+        -- Adopt whichever is higher: the honest next night after the one
+        -- that just actually ran, or a veteran's still-pending higher seed
+        -- from ensureStarted. Either way this can only advance.
+        self._nightNumber = math.max(self._nightNumber, activeNight + 1)
+        local onNightCompleted = self._onNightCompleted
+        if onNightCompleted ~= nil then
+            onNightCompleted(activeNight + 1)
+        end
     end
 end
 
-function TownNightService._isBlackoutDue(self: TownNightService): boolean
-    return self._nightNumber % self._blackoutInterval == 0
+function TownNightService._isBlackoutDue(self: TownNightService, nightNumber: number?): boolean
+    return (nightNumber or self._nightNumber) % self._blackoutInterval == 0
 end
 
 function TownNightService.isNightActive(self: TownNightService): boolean

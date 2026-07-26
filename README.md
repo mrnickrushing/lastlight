@@ -34,9 +34,9 @@ The repository currently contains:
   a known-good fallback, beacon entry, route progress, and expedition fall recovery;
 - four active optional Bramblewake events with 13 shared interaction steps,
   timeout-safe routes, durable unbanked rewards, kill switch, and telemetry;
-- save-schema-v4 inventory/profession/story migration, run-specific reward
-  tombstones, Wayhome extraction, atomic banking, retry-safe settlement, and
-  town return streaming;
+- save-schema-v5 inventory/profession/story/town-night migration, run-specific
+  reward tombstones, Wayhome extraction, atomic banking, retry-safe
+  settlement, and town return streaming;
 - server-owned health, six distinct readable enemy attacks, 30-second downed crawl,
   interruption-safe ally revive, and bleedout-safe town retreat;
 - server-owned stamina sprint/dodge, cooldown and protection validation, plus
@@ -52,7 +52,8 @@ The repository currently contains:
   and immutable chapter-one outcome persistence;
 - a repeating server-owned town day/dusk/night cycle after First Light, with an
   escalating six-enemy wave schedule, a seventh-night telegraph deliberately
-  decoupled from Blackout access, and a feature kill switch;
+  decoupled from Blackout access, a feature kill switch, and a per-player
+  night count that survives a server restart;
 - persistent free-town selection for Scout, Warden, Engineer, and Medic, with
   server-owned reveal/slow, guard, lantern-repair, and area-heal abilities;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
@@ -63,7 +64,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 138 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 142 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused

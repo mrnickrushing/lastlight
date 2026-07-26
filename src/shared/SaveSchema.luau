@@ -32,7 +32,12 @@ export type Profile = {
             wardenOutcome: string?,
         },
     },
+    town: {
+        nightNumber: number,
+    },
 }
+
+local MAX_NIGHT_NUMBER = 1_000_000
 
 local CHAPTER_ONE_DECISIONS = table.freeze({
     restore_farmland = true,
@@ -47,7 +52,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 4,
+        schemaVersion = 5,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -69,6 +74,9 @@ function SaveSchema.default(now: number): Profile
                 transactionId = nil,
                 wardenOutcome = nil,
             },
+        },
+        town = {
+            nightNumber = 1,
         },
     }
 end
@@ -143,7 +151,18 @@ function SaveSchema.normalize(value: any, now: number): Profile
             wardenOutcome = chapterOne.wardenOutcome,
         }
     end
-    profile.schemaVersion = 4
+    local town = value.town
+    if
+        type(town) == "table"
+        and type(town.nightNumber) == "number"
+        and town.nightNumber >= 1
+        and town.nightNumber <= MAX_NIGHT_NUMBER
+        and town.nightNumber == math.floor(town.nightNumber)
+    then
+        profile.town.nightNumber = town.nightNumber
+    end
+
+    profile.schemaVersion = 5
     return profile
 end
 
@@ -291,6 +310,33 @@ end
 
 function SaveSchema.chapterOne(profile: Profile): any
     return table.clone(profile.story.chapterOne)
+end
+
+-- The town's night count is server-session state (see TownNightService) that
+-- gets pushed out to every connected player's own profile whenever a night
+-- completes, so a later server session can resume from whichever returning
+-- player's record is highest instead of always restarting at night one.
+function SaveSchema.withNightNumber(profile: Profile, nightNumber: number, now: number): Profile
+    assert(
+        type(nightNumber) == "number"
+            and nightNumber >= 1
+            and nightNumber <= MAX_NIGHT_NUMBER
+            and nightNumber == math.floor(nightNumber),
+        "night number is invalid"
+    )
+    if nightNumber <= profile.town.nightNumber then
+        return profile
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.town = table.clone(profile.town)
+    nextProfile.town.nightNumber = nightNumber
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile
+end
+
+function SaveSchema.nightNumber(profile: Profile): number
+    return profile.town.nightNumber
 end
 
 return table.freeze(SaveSchema)
