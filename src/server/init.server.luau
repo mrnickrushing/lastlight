@@ -14,8 +14,10 @@ local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local ExpeditionRewardLedger = require(root.ExpeditionRewardLedger)
 local NightSchedule = require(root.NightSchedule)
 local RateLimiter = require(root.RateLimiter)
+local ReviveFlow = require(root.ReviveFlow)
 local RuntimeIds = require(root.RuntimeIds)
 local SaveSchema = require(root.SaveSchema)
+local SurvivalState = require(root.SurvivalState)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
@@ -28,6 +30,7 @@ local FeatureFlagService = require(script.Services.FeatureFlagService)
 local NetworkService = require(script.Services.NetworkService)
 local PhaseService = require(script.Services.PhaseService)
 local ProfileService = require(script.Services.ProfileService)
+local PlayerSurvivalService = require(script.Services.PlayerSurvivalService)
 local TutorialService = require(script.Services.TutorialService)
 local WorldService = require(script.Services.WorldService)
 local ServiceRegistry = require(script.ServiceRegistry)
@@ -61,7 +64,17 @@ local expeditionService = ExpeditionService.new(
     analyticsService,
     Config.BramblewakePreviewSeed
 )
-local enemyService = EnemyService.new(logger, worldService)
+local survivalService = PlayerSurvivalService.new(
+    logger,
+    Config,
+    RuntimeIds,
+    ReviveFlow,
+    SurvivalState,
+    featureFlags,
+    worldService,
+    analyticsService
+)
+local enemyService = EnemyService.new(logger, worldService, survivalService)
 local phaseService = PhaseService.new(
     logger,
     worldService,
@@ -80,6 +93,7 @@ local tutorialService = TutorialService.new(
     profileService,
     worldService,
     enemyService,
+    survivalService,
     phaseService,
     expeditionService,
     analyticsService
@@ -99,6 +113,7 @@ services:register(profileService)
 services:register(analyticsService)
 services:register(worldService)
 services:register(expeditionService)
+services:register(survivalService)
 services:register(enemyService)
 services:register(phaseService)
 services:register(tutorialService)

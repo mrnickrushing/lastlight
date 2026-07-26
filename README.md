@@ -15,8 +15,8 @@ playable game exists.
 ## Current status
 
 **Milestone 2 source implemented; Milestone 3 Bramblewake expedition foundation,
-four active events, and durable extraction settlement implemented; Studio and
-device exit gates remain pending.**
+four active events, durable extraction settlement, and player rescue loop
+implemented; Studio and device exit gates remain pending.**
 
 The repository currently contains:
 
@@ -33,6 +33,8 @@ The repository currently contains:
   timeout-safe routes, durable unbanked rewards, kill switch, and telemetry;
 - save-schema-v2 inventory migration, run-specific reward tombstones, Wayhome
   extraction, atomic banking, retry-safe settlement, and town return streaming;
+- server-owned health, Rootling contact damage, 30-second downed crawl,
+  interruption-safe ally revive, and bleedout-safe town retreat;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
   analytics, save normalization, and published-place tutorial persistence;
 - mobile, keyboard/mouse, and controller actions through Roblox's Input Action
@@ -41,11 +43,11 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 51 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 65 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
-- hosted visual direction reports for the general gameplay HUD and the focused
-  first-session mobile HUD.
+- hosted visual direction reports for the general gameplay, focused
+  first-session, and cooperative rescue mobile HUD states.
 
 Milestone 2 is not marked complete until the real engine/device exit gate passes:
 ten new testers must finish without verbal help, input switching and rejoin must
@@ -58,11 +60,15 @@ The active-event contracts and abuse/device matrix are in
 [the Bramblewake event runbook](docs/MILESTONE_3_BRAMBLEWAKE_EVENTS.md).
 The save migration, banking, reconnect, and Wayhome gates are in
 [the inventory and extraction runbook](docs/MILESTONE_3_INVENTORY_EXTRACTION.md).
+The health, downed-state, revive, safe-retreat, and abuse gates are in
+[the player survival runbook](docs/MILESTONE_3_PLAYER_SURVIVAL.md).
 
 The current UI direction is documented in the
 [Last Light mobile gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create).
 The implementation-specific onboarding refinement is in the
 [First-Ten-Minutes mobile HUD report](https://www.lazyweb.com/report/lazyweb/a34ce67d-041e-434b-acb6-0afd4ccf7ef4/?source=create).
+The non-modal rescue presentation is grounded in the
+[Co-op Rescue HUD report](https://www.lazyweb.com/report/lazyweb/01fb79d9-741c-4685-8786-831be744e372/?source=create).
 The recommended default is a context-sensitive survival HUD. A compact HUD is
 the accessibility and low-effects fallback, while the dramatic living-world HUD
 is reserved for Blackouts and bosses.

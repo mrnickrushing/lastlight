@@ -31,12 +31,14 @@ Open `build/LastLightTest.rbxlx`, start a server with one player, and require al
 of the following in Output:
 
 - `[Last Light] PASS FoundationIntegration`;
-- `server_boot_complete` with build `0.6.0` and `services=9`;
+- `server_boot_complete` with build `0.7.0` and `services=10`;
 - no red errors, infinite yields, or DataStore production writes.
 
 The integration assertion verifies the runtime remotes, world-ready signal,
 arrival spawn, Mara, Heartwood, construction plot, First Lantern, eight
 interactions, streaming, and Input Action System rollout.
+It also exercises the shared down/revive contract; real multiplayer rescue
+behavior remains a separate Milestone 3 playtest gate.
 
 ## Critical solo journey
 

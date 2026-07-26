@@ -15,6 +15,12 @@ first two-minute night. Its evidence was directional: 9 selected mobile
 references from 77 deduplicated results, with three lower-coverage
 function-level searches called out in the hosted report.
 
+The
+[Co-op Rescue HUD report](https://www.lazyweb.com/report/lazyweb/01fb79d9-741c-4685-8786-831be744e372/?source=create)
+grounds the player-survival increment. Its exact real-time co-op coverage was
+limited, so it was used for hierarchy and occlusion guidance rather than copied
+as a genre convention.
+
 ## Chosen system
 
 The default is a **context-sensitive survival HUD**:
@@ -40,6 +46,15 @@ For the first session, the chosen composition is **One Active Trail**:
 - one input-aware contextual action in the safe thumb zone;
 - compact dialogue and resource feedback only when relevant;
 - the same hierarchy transformed, not replaced, when night becomes urgent.
+
+For player rescue, the same system becomes:
+
+- one full-width bottom rail for the downed player, above action controls;
+- one compact top-center alert for the active player's most urgent ally;
+- one in-world outlined target and existing contextual action for the precise
+  revive interaction;
+- text, countdown, direction, distance, and shape in addition to color;
+- no modal, store prompt, or separate tiny help button during the timed state.
 
 ## Visual targets
 

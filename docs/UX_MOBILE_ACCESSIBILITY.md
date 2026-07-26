@@ -16,6 +16,11 @@ remains linked as research provenance:
 3. **Event layer:** living-world signals used only for Blackouts, bosses, and
    major breaches, always with text/icon backups.
 
+The player-down state uses the
+[Co-op Rescue HUD report](https://www.lazyweb.com/report/lazyweb/01fb79d9-741c-4685-8786-831be744e372/?source=create)
+as hierarchy guidance: a non-modal bottom rail for self state, one compact ally
+alert, and a world-bound contextual revive target.
+
 The design follows current Roblox guidance for
 [mobile input](https://create.roblox.com/docs/input/mobile),
 [reserved mobile control zones](https://create.roblox.com/docs/building-and-visuals/ui/positioning-and-sizing-guiobjects),

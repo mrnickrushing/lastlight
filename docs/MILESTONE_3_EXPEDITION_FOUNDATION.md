@@ -27,7 +27,7 @@ Implemented:
 
 Not implemented by this increment:
 
-- recovery caches or the remaining four Bramblewake events;
+- partial-loss recovery caches or the remaining four Bramblewake events;
 - profession kits, full inventory UI/capacity, crafting, or quests;
 - the complete enemy roster, elite, boss, normal night, or Blackout;
 - final module art, audio, VFX, navigation bake, or device evidence;

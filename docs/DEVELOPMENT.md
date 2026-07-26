@@ -59,7 +59,7 @@ full DataModel. The first engine integration test is intentionally separate:
 2. Open `build/LastLightTest.rbxlx` in Roblox Studio.
 3. Start a server with one player.
 4. Confirm server output contains `[Last Light] PASS FoundationIntegration`.
-5. Confirm `server_boot_complete` reports nine services without an
+5. Confirm `server_boot_complete` reports ten services without an
    infinite-yield warning.
 6. Confirm the loader leaves the player at `ArrivalSpawn` on solid ground and
    the first objective is `FREE MARA`.
@@ -70,15 +70,18 @@ full DataModel. The first engine integration test is intentionally separate:
    [MILESTONE_3_BRAMBLEWAKE_EVENTS.md](MILESTONE_3_BRAMBLEWAKE_EVENTS.md).
 10. Bank rewards and return through Wayhome using
     [MILESTONE_3_INVENTORY_EXTRACTION.md](MILESTONE_3_INVENTORY_EXTRACTION.md).
-11. Stop immediately if any assertion errors.
+11. Complete two-player down, revive, interruption, and safe retreat using
+    [MILESTONE_3_PLAYER_SURVIVAL.md](MILESTONE_3_PLAYER_SURVIVAL.md).
+12. Stop immediately if any assertion errors.
 
 The test verifies the real Rojo tree, shared module replication, seven-region
 registry, save-schema-v2 constant, eight tutorial interactions, 13 active event
 interactions, one extraction interaction, runtime remotes,
 Input Action System rollout, world readiness, arrival collision, deterministic
 Bramblewake replay, 12 streamed modules, four POIs, four event state contracts,
-mobile part budget, and service initialization/start lifecycle. Human play is still
-required for physics, streaming, device layout, input switching, timing, and
+mobile part budget, shared survival/revive contracts, and service
+initialization/start lifecycle. Human play is still required for physics,
+streaming, device layout, input switching, multiplayer revive timing, and
 usability.
 
 ## Runtime boundaries

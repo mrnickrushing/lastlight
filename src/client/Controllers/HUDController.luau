@@ -97,10 +97,19 @@ export type HUDController = typeof(setmetatable(
         _progress: TextLabel,
         _mara: TextLabel,
         _resource: TextLabel,
+        _health: TextLabel,
         _toast: TextLabel,
         _lanternFrame: Frame,
         _lanternFill: Frame,
         _lanternText: TextLabel,
+        _allyFrame: Frame,
+        _allyTitle: TextLabel,
+        _allyDetail: TextLabel,
+        _downedFrame: Frame,
+        _downedFill: Frame,
+        _downedTimer: TextLabel,
+        _downedDetail: TextLabel,
+        _downedAlly: TextLabel,
         _primary: TextButton,
         _tool: TextButton,
         _sprint: TextButton,
@@ -110,6 +119,7 @@ export type HUDController = typeof(setmetatable(
         _interactionAvailable: boolean,
         _inputMode: string,
         _compactEnabled: boolean,
+        _playerDowned: boolean,
         _lastToastRevision: number,
         _onCompact: ((boolean) -> ())?,
     },
@@ -238,6 +248,24 @@ function HUDController.new(playerGui: PlayerGui): HUDController
     corner(resource, 20)
     stroke(resource, COLORS.amber, 0.42)
 
+    local health = textLabel(
+        canvas,
+        "HealthPill",
+        "HEALTH · 100 / 100",
+        UDim2.fromOffset(150, 40),
+        UDim2.new(0, 18, 1, -100),
+        13,
+        COLORS.cream,
+        Enum.TextXAlignment.Center
+    )
+    health.AnchorPoint = Vector2.new(0, 1)
+    health.BackgroundColor3 = COLORS.panel
+    health.BackgroundTransparency = 0.08
+    health.Font = Enum.Font.GothamBold
+    health.Visible = false
+    corner(health, 20)
+    stroke(health, COLORS.green, 0.34)
+
     local toast = textLabel(
         canvas,
         "Toast",
@@ -289,6 +317,109 @@ function HUDController.new(playerGui: PlayerGui): HUDController
     lanternText.Font = Enum.Font.GothamBold
     lanternText.ZIndex = 2
 
+    local allyFrame = Instance.new("Frame")
+    allyFrame.Name = "AllyDownAlert"
+    allyFrame.AnchorPoint = Vector2.new(0.5, 0)
+    allyFrame.Position = UDim2.new(0.5, 0, 0, 108)
+    allyFrame.Size = UDim2.fromOffset(330, 64)
+    allyFrame.BackgroundColor3 = Color3.fromRGB(47, 20, 18)
+    allyFrame.BackgroundTransparency = 0.05
+    allyFrame.Visible = false
+    allyFrame.ZIndex = 11
+    allyFrame.Parent = canvas
+    corner(allyFrame, 14)
+    stroke(allyFrame, COLORS.amber, 0.08)
+    local allyTitle = textLabel(
+        allyFrame,
+        "Title",
+        "✚ ALLY DOWN",
+        UDim2.new(1, -24, 0, 27),
+        UDim2.fromOffset(12, 6),
+        15,
+        COLORS.cream,
+        Enum.TextXAlignment.Center
+    )
+    allyTitle.Font = Enum.Font.GothamBold
+    allyTitle.ZIndex = 12
+    local allyDetail = textLabel(
+        allyFrame,
+        "Detail",
+        "AHEAD · 14m · 23s",
+        UDim2.new(1, -24, 0, 24),
+        UDim2.fromOffset(12, 33),
+        13,
+        COLORS.amber,
+        Enum.TextXAlignment.Center
+    )
+    allyDetail.Font = Enum.Font.GothamBold
+    allyDetail.ZIndex = 12
+
+    local downedFrame = Instance.new("Frame")
+    downedFrame.Name = "SelfDownedRail"
+    downedFrame.AnchorPoint = Vector2.new(0.5, 1)
+    downedFrame.Position = UDim2.new(0.5, 0, 1, -156)
+    downedFrame.Size = UDim2.fromOffset(540, 90)
+    downedFrame.BackgroundColor3 = Color3.fromRGB(35, 24, 22)
+    downedFrame.BackgroundTransparency = 0.03
+    downedFrame.Visible = false
+    downedFrame.ZIndex = 11
+    downedFrame.Parent = canvas
+    corner(downedFrame, 14)
+    stroke(downedFrame, COLORS.amber, 0.06)
+
+    local downedTrack = Instance.new("Frame")
+    downedTrack.Name = "BleedoutTrack"
+    downedTrack.Position = UDim2.fromOffset(4, 4)
+    downedTrack.Size = UDim2.new(1, -8, 0, 7)
+    downedTrack.BackgroundColor3 = Color3.fromRGB(66, 48, 43)
+    downedTrack.BorderSizePixel = 0
+    downedTrack.ZIndex = 12
+    downedTrack.Parent = downedFrame
+    corner(downedTrack, 4)
+    local downedFill = Instance.new("Frame")
+    downedFill.Name = "Fill"
+    downedFill.Size = UDim2.fromScale(1, 1)
+    downedFill.BackgroundColor3 = COLORS.amber
+    downedFill.BorderSizePixel = 0
+    downedFill.ZIndex = 13
+    downedFill.Parent = downedTrack
+    corner(downedFill, 4)
+
+    local downedTimer = textLabel(
+        downedFrame,
+        "Timer",
+        "00:30",
+        UDim2.fromOffset(124, 68),
+        UDim2.fromOffset(12, 15),
+        30,
+        COLORS.cream,
+        Enum.TextXAlignment.Center
+    )
+    downedTimer.Font = Enum.Font.GothamBold
+    downedTimer.ZIndex = 12
+    local downedDetail = textLabel(
+        downedFrame,
+        "Detail",
+        "DOWNED · CRAWL TOWARD LIGHT",
+        UDim2.new(1, -168, 0, 30),
+        UDim2.fromOffset(146, 18),
+        15,
+        COLORS.cream
+    )
+    downedDetail.Font = Enum.Font.GothamBold
+    downedDetail.ZIndex = 12
+    local downedAlly = textLabel(
+        downedFrame,
+        "NearestAlly",
+        "HELP SIGNAL ACTIVE · NO ALLY NEARBY",
+        UDim2.new(1, -168, 0, 28),
+        UDim2.fromOffset(146, 48),
+        13,
+        COLORS.amber
+    )
+    downedAlly.Font = Enum.Font.GothamBold
+    downedAlly.ZIndex = 12
+
     local primary = actionButton(
         canvas,
         "PrimaryAction",
@@ -337,10 +468,19 @@ function HUDController.new(playerGui: PlayerGui): HUDController
         _progress = progress,
         _mara = mara,
         _resource = resource,
+        _health = health,
         _toast = toast,
         _lanternFrame = lanternFrame,
         _lanternFill = lanternFill,
         _lanternText = lanternText,
+        _allyFrame = allyFrame,
+        _allyTitle = allyTitle,
+        _allyDetail = allyDetail,
+        _downedFrame = downedFrame,
+        _downedFill = downedFill,
+        _downedTimer = downedTimer,
+        _downedDetail = downedDetail,
+        _downedAlly = downedAlly,
         _primary = primary,
         _tool = tool,
         _sprint = sprint,
@@ -350,6 +490,7 @@ function HUDController.new(playerGui: PlayerGui): HUDController
         _interactionAvailable = false,
         _inputMode = "keyboard",
         _compactEnabled = false,
+        _playerDowned = false,
         _lastToastRevision = 0,
         _onCompact = nil,
     }, HUDController)
@@ -416,7 +557,7 @@ end
 
 function HUDController.setInputMode(self: HUDController, mode: string)
     self._inputMode = mode
-    self._sprint.Visible = mode == "touch"
+    self._sprint.Visible = mode == "touch" and not self._playerDowned
     self:setInteraction(self._interactionLabel, self._interactionAvailable)
     self._tool.Text = if mode == "keyboard"
         then "CLICK\nSTRIKE"
@@ -427,6 +568,14 @@ end
 function HUDController.setInteraction(self: HUDController, label: string?, available: boolean)
     self._interactionLabel = label
     self._interactionAvailable = available
+    if self._playerDowned then
+        self._primary.Active = false
+        self._primary.AutoButtonColor = false
+        self._primary.BackgroundColor3 = Color3.fromRGB(42, 48, 45)
+        self._primary.TextColor3 = COLORS.muted
+        self._primary.Text = "DOWNED"
+        return
+    end
     self._primary.Active = available
     self._primary.AutoButtonColor = available
     self._primary.BackgroundColor3 = if available then COLORS.panel else Color3.fromRGB(42, 48, 45)
@@ -440,7 +589,7 @@ end
 
 function HUDController._applyCompact(self: HUDController)
     self._detail.Visible = not self._compactEnabled
-    self._mara.Visible = not self._compactEnabled
+    self._mara.Visible = not self._compactEnabled and not self._playerDowned
     self._objective.Position = if self._compactEnabled
         then UDim2.fromOffset(14, 31)
         else UDim2.fromOffset(14, 32)
@@ -461,6 +610,10 @@ function HUDController._layout(self: HUDController)
         self._compact.Size = UDim2.fromOffset(44, 38)
         self._compact.Text = if self._compactEnabled then "+" else "−"
         self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 212)
+        self._allyFrame.Position =
+            UDim2.new(0.5, 0, 0, if self._lanternFrame.Visible then 254 else 212)
+        self._allyFrame.Size = UDim2.new(1, -36, 0, 64)
+        self._downedFrame.Size = UDim2.new(1, -36, 0, 90)
     else
         self._objectiveFrame.Position = UDim2.fromOffset(18, 18)
         self._objectiveFrame.Size = if self._compactEnabled
@@ -470,6 +623,10 @@ function HUDController._layout(self: HUDController)
         self._compact.Size = UDim2.fromOffset(118, 38)
         self._compact.Text = if self._compactEnabled then "EXPAND" else "COMPACT"
         self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 66)
+        self._allyFrame.Position =
+            UDim2.new(0.5, 0, 0, if self._lanternFrame.Visible then 108 else 66)
+        self._allyFrame.Size = UDim2.fromOffset(330, 64)
+        self._downedFrame.Size = UDim2.fromOffset(540, 90)
     end
 end
 
@@ -492,6 +649,42 @@ function HUDController._updateClock(self: HUDController)
     if self._phase.Text ~= clockText then
         self._phase.Text = clockText
     end
+
+    local survival = state.survival
+    if type(survival) ~= "table" then
+        return
+    end
+    local selfState = survival.self
+    if type(selfState) == "table" and selfState.downed == true then
+        local bleedoutAt = tonumber(selfState.bleedoutAt) or 0
+        local remaining = math.max(0, math.ceil(bleedoutAt - workspace:GetServerTimeNow()))
+        self._downedTimer.Text =
+            string.format("%02d:%02d", math.floor(remaining / 60), remaining % 60)
+        self._downedFill.Size = UDim2.fromScale(math.clamp(remaining / 30, 0, 1), 1)
+        local nearest = selfState.nearestAlly
+        self._downedAlly.Text = if type(nearest) == "table"
+            then string.format(
+                "HELP ACTIVE · %s %dm · %s",
+                tostring(nearest.direction or "UNKNOWN"),
+                tonumber(nearest.distance) or 0,
+                string.upper(tostring(nearest.displayName or "ALLY"))
+            )
+            else "HELP SIGNAL ACTIVE · NO ALLY NEARBY"
+    end
+    local ally = survival.ally
+    if type(ally) == "table" and not self._playerDowned then
+        local bleedoutAt = tonumber(ally.bleedoutAt) or 0
+        local remaining = math.max(0, math.ceil(bleedoutAt - workspace:GetServerTimeNow()))
+        self._allyTitle.Text = "✚ ALLY DOWN · "
+            .. string.upper(tostring(ally.displayName or "ALLY"))
+        self._allyDetail.Text = string.format(
+            "%s · %dm · %02ds%s",
+            tostring(ally.direction or "UNKNOWN"),
+            tonumber(ally.distance) or 0,
+            remaining,
+            if ally.reviveEndsAt ~= nil then " · REVIVING" else ""
+        )
+    end
 end
 
 function HUDController.update(self: HUDController, state: any)
@@ -499,6 +692,15 @@ function HUDController.update(self: HUDController, state: any)
         return
     end
     self._currentState = state
+    local survival = state.survival
+    local selfSurvival = if type(survival) == "table" then survival.self else nil
+    self._playerDowned = type(selfSurvival) == "table" and selfSurvival.downed == true
+    local ally = if type(survival) == "table" then survival.ally else nil
+    self._downedFrame.Visible = self._playerDowned
+    self._allyFrame.Visible = type(ally) == "table" and not self._playerDowned
+    self._toast.Position = if self._playerDowned
+        then UDim2.new(0.5, 0, 1, -264)
+        else UDim2.new(0.5, 0, 1, -222)
     self._objective.Text = tostring(state.objective or "")
     self._detail.Text = tostring(state.detail or "")
     self._progress.Text = string.format(
@@ -516,9 +718,19 @@ function HUDController.update(self: HUDController, state: any)
             else ""
     )
     local nightActive = state.nightActive == true
+    local health = if type(selfSurvival) == "table"
+        then tonumber(selfSurvival.health) or 100
+        else 100
+    local maxHealth = if type(selfSurvival) == "table"
+        then tonumber(selfSurvival.maxHealth) or 100
+        else 100
+    self._health.Text = string.format("HEALTH · %d / %d", health, maxHealth)
+    self._health.TextColor3 = if health <= 35 then COLORS.danger else COLORS.cream
+    self._health.Visible = not self._playerDowned and (nightActive or health < maxHealth)
     self._resource.Visible = not nightActive
         and ((tonumber(state.resources) or 0) > 0 or state.selectedTool ~= nil)
-    self._tool.Visible = nightActive
+    self._tool.Visible = nightActive and not self._playerDowned
+    self._sprint.Visible = self._inputMode == "touch" and not self._playerDowned
     self._lanternFrame.Visible = nightActive
     local lanternHealth = math.clamp(tonumber(state.lanternHealth) or 100, 0, 100)
     self._lanternFill.Size = UDim2.new(lanternHealth / 100, -8, 1, -8)
@@ -530,6 +742,8 @@ function HUDController.update(self: HUDController, state: any)
         self._compactEnabled = state.compactHud == true
         self:_applyCompact()
     end
+    self._mara.Visible = not self._compactEnabled and not self._playerDowned
+    self:setInteraction(self._interactionLabel, self._interactionAvailable)
     self:_layout()
 
     local revision = tonumber(state.toastRevision) or 0
