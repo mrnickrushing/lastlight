@@ -63,7 +63,13 @@ function InteractionController._select(self: InteractionController)
     if root ~= nil and root:IsA("BasePart") then
         for prompt in self._shown do
             local target = prompt.Parent
-            if prompt.Enabled and target ~= nil and target:IsA("BasePart") then
+            local targetUserId = prompt:GetAttribute("TargetUserId")
+            if
+                prompt.Enabled
+                and target ~= nil
+                and target:IsA("BasePart")
+                and targetUserId ~= player.UserId
+            then
                 local distance = (root.Position - target.Position).Magnitude
                 if distance < closestDistance then
                     closest = prompt

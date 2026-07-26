@@ -192,6 +192,45 @@ function AnalyticsService.expeditionExtractionFailed(
     })
 end
 
+function AnalyticsService.playerDowned(self: AnalyticsService, player: Player, source: string)
+    self._logger:info("player_downed", {
+        player = player.UserId,
+        source = source,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "PlayerDowned", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = source,
+            })
+        end)
+    end
+end
+
+function AnalyticsService.playerRevived(
+    self: AnalyticsService,
+    player: Player,
+    reviver: Player,
+    duration: number
+)
+    self._logger:info("player_revived", {
+        duration = duration,
+        player = player.UserId,
+        reviver = reviver.UserId,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "PlayerRevived", 1, {})
+        end)
+    end
+end
+
+function AnalyticsService.playerRecovered(self: AnalyticsService, player: Player, reason: string)
+    self._logger:info("player_recovered", {
+        player = player.UserId,
+        reason = reason,
+    })
+end
+
 function AnalyticsService.clear(self: AnalyticsService, player: Player)
     self._startedAt[player] = nil
     self._expeditionStarted[player] = nil

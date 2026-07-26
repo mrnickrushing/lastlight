@@ -1,5 +1,6 @@
 --!strict
 
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local EnemyService = {}
@@ -21,6 +22,7 @@ export type EnemyService = typeof(setmetatable(
         Name: string,
         _logger: Logger,
         _worldService: any,
+        _survivalService: any,
         _active: Enemy?,
         _nightActive: boolean,
         _lanternHealth: number,
@@ -55,11 +57,12 @@ local function enemyPart(
     return part
 end
 
-function EnemyService.new(logger: Logger, worldService: any): EnemyService
+function EnemyService.new(logger: Logger, worldService: any, survivalService: any): EnemyService
     return setmetatable({
         Name = EnemyService.Name,
         _logger = logger,
         _worldService = worldService,
+        _survivalService = survivalService,
         _active = nil,
         _nightActive = false,
         _lanternHealth = 100,
@@ -186,6 +189,34 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
     end
 
     local current = enemy.model:GetPivot()
+    local now = os.clock()
+    local closestPlayer = nil
+    local closestDistance = math.huge
+    if enemy.model.PrimaryPart ~= nil then
+        for _, player in Players:GetPlayers() do
+            local root = if player.Character == nil
+                then nil
+                else player.Character:FindFirstChild("HumanoidRootPart")
+            if root ~= nil and root:IsA("BasePart") and self._survivalService:canAct(player) then
+                local distance = (root.Position - enemy.model.PrimaryPart.Position).Magnitude
+                if distance < closestDistance then
+                    closestDistance = distance
+                    closestPlayer = player
+                end
+            end
+        end
+    end
+    if closestPlayer ~= nil and closestDistance <= 8 and now - enemy.lastAttackAt >= 1.5 then
+        enemy.lastAttackAt = now
+        local result = self._survivalService:damage(closestPlayer, 24, "enemy_bramblewake_rootling")
+        if result.downed then
+            self:_notify("ALLY DOWN — ROOTLING STRIKE")
+        elseif result.applied then
+            self:_notify("ROOTLING STRIKE — FIND COVER")
+        end
+        return
+    end
+
     local target = self._worldService:lanternPosition()
     local flatTarget = Vector3.new(target.X, current.Position.Y, target.Z)
     local delta = flatTarget - current.Position
@@ -197,7 +228,6 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
         return
     end
 
-    local now = os.clock()
     if now - enemy.lastAttackAt >= 1.5 then
         enemy.lastAttackAt = now
         self._lanternHealth = math.max(0, self._lanternHealth - 6)
@@ -215,6 +245,9 @@ end
 function EnemyService.damageNearest(self: EnemyService, player: Player): (boolean, string)
     if not self._nightActive then
         return false, "The tool is calm in daylight."
+    end
+    if not self._survivalService:canAct(player) then
+        return false, "You cannot strike while downed."
     end
 
     local enemy = self._active

@@ -11,6 +11,7 @@ local RuntimeIds = {
     ExpeditionEventTag = "LastLightExpeditionEvent",
     ExpeditionEventStepTag = "LastLightExpeditionEventStep",
     ExpeditionExtractionTag = "LastLightExpeditionExtraction",
+    PlayerDownedTag = "LastLightPlayerDowned",
     eventInteractionId = ExpeditionEventFlow.interactionId,
     Remotes = table.freeze({
         ActionRequest = "ActionRequest",
@@ -30,6 +31,7 @@ local RuntimeIds = {
         CompactHud = "compact_hud",
         ExpeditionEvent = "expedition_event",
         Extract = "extract",
+        Revive = "revive",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",

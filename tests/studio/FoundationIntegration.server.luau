@@ -14,13 +14,16 @@ local Config = require(root.Config)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
 local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
+local ReviveFlow = require(root.ReviveFlow)
 local RuntimeIds = require(root.RuntimeIds)
+local SurvivalState = require(root.SurvivalState)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
 local ServiceRegistry = require(serverRoot.ServiceRegistry)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 2, "unexpected save schema version")
+assert(Config.BuildVersion == "0.7.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -42,6 +45,24 @@ services:start()
 
 assert(calls == 2, "service lifecycle did not initialize and start")
 assert(services:state() == "started", "service registry did not reach started state")
+
+local survival = SurvivalState.create(100)
+local downed = SurvivalState.damage(survival, 100, 101)
+assert(downed.status == "downed", "survival contract did not enter downed state")
+assert(downed.bleedoutAt == 131, "survival contract uses the wrong bleedout window")
+local reviveChannel = ReviveFlow.create(10, 20, downed.revision, 102, 2.5)
+local reviveDecision = ReviveFlow.evaluate(reviveChannel, 104.5, {
+    reachable = true,
+    reviverCanAct = true,
+    reviverPresent = true,
+    reviverRevision = downed.revision,
+    targetDowned = true,
+    targetPresent = true,
+})
+assert(reviveDecision.status == "complete", "revive contract did not complete")
+local revived = SurvivalState.revive(downed, 104.5)
+assert(revived.health == 35 and revived.status == "active", "revive health contract failed")
+assert(RuntimeIds.Actions.Revive == "revive", "revive action ID changed")
 
 local runtime = ReplicatedStorage:WaitForChild(RuntimeIds.FolderName, 8)
 assert(runtime ~= nil, "runtime networking folder did not initialize")
@@ -99,6 +120,10 @@ local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
     #tagged == 9 + BramblewakeExpedition.EventInteractionCount,
     "expected tutorial, event, and extraction interaction prompts"
+)
+assert(
+    #CollectionService:GetTagged(RuntimeIds.PlayerDownedTag) == 0,
+    "players must not begin the test downed"
 )
 local expeditionModules = CollectionService:GetTagged(RuntimeIds.ExpeditionModuleTag)
 assert(

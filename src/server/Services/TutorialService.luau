@@ -33,6 +33,7 @@ export type TutorialService = typeof(setmetatable(
         _profileService: any,
         _worldService: any,
         _enemyService: any,
+        _survivalService: any,
         _phaseService: any,
         _expeditionService: any,
         _analyticsService: any,
@@ -55,6 +56,7 @@ function TutorialService.new(
     profileService: any,
     worldService: any,
     enemyService: any,
+    survivalService: any,
     phaseService: any,
     expeditionService: any,
     analyticsService: any
@@ -70,6 +72,7 @@ function TutorialService.new(
         _profileService = profileService,
         _worldService = worldService,
         _enemyService = enemyService,
+        _survivalService = survivalService,
         _phaseService = phaseService,
         _expeditionService = expeditionService,
         _analyticsService = analyticsService,
@@ -114,6 +117,12 @@ function TutorialService.Init(self: TutorialService, _context: any)
                     session.toastRevision += 1
                 end
             end
+        end
+        self:_publishAll()
+    end)
+    self._survivalService:setChangedHandler(function(player: Player?, toast: string?)
+        if player ~= nil and toast ~= nil then
+            self:_setToast(player, toast)
         end
         self:_publishAll()
     end)
@@ -249,6 +258,19 @@ function TutorialService._advance(
 end
 
 function TutorialService._interact(self: TutorialService, player: Player, interactionId: string)
+    local revivePrompt = self._survivalService:interaction(interactionId)
+    if revivePrompt ~= nil then
+        local result = self._survivalService:beginRevive(player, interactionId)
+        self:_setToast(player, result.message)
+        self:_publishAll()
+        return
+    end
+    if not self._survivalService:canAct(player) then
+        self:_setToast(player, "YOU CANNOT INTERACT WHILE DOWNED")
+        self:_publishAll()
+        return
+    end
+
     local prompt = self._worldService:interaction(interactionId)
     if prompt == nil or not prompt.Enabled or not self._worldService:isInRange(player, prompt) then
         self:_setToast(player, "MOVE CLOSER TO THE MARKED OBJECT")
@@ -380,11 +402,16 @@ function TutorialService._nightComplete(self: TutorialService)
 end
 
 function TutorialService._setSprint(self: TutorialService, player: Player, enabled: boolean)
+    local canAct = self._survivalService:canAct(player)
+    if enabled and not canAct then
+        return
+    end
     local character = player.Character
     local humanoid = if character == nil then nil else character:FindFirstChildOfClass("Humanoid")
     if humanoid ~= nil then
-        humanoid.WalkSpeed = if enabled
-            then self._config.SprintWalkSpeed
+        humanoid.WalkSpeed = if not canAct
+            then self._config.DownedWalkSpeed
+            elseif enabled then self._config.SprintWalkSpeed
             else self._config.BaseWalkSpeed
     end
 end
@@ -432,7 +459,11 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         end
     elseif kind == self._runtimeIds.Actions.UseTool then
         local session = self._sessions[player]
-        if session ~= nil and session.stage == "survive" then
+        if
+            session ~= nil
+            and session.stage == "survive"
+            and self._survivalService:canAct(player)
+        then
             local _, message = self._enemyService:damageNearest(player)
             self:_setToast(player, message)
             self:_publishAll()
@@ -505,6 +536,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         end
     end
     local phase = self._phaseService:snapshot()
+    local survival = self._survivalService:snapshot(player)
     return {
         schemaVersion = 1,
         status = "ready",
@@ -542,6 +574,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             else expedition.event.total,
         unbankedExpeditionRewards = expedition.unbankedRewards,
         bankedMaterials = expedition.bankedMaterials,
+        survival = survival,
     }
 end
 

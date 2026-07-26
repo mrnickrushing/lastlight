@@ -64,6 +64,20 @@ inventory interface depends on them. Separating unbanked and banked state also
 preserves recoverable expedition failure without granting clients authority or
 pretending the Milestone 4 persistence platform is complete.
 
+## 2026-07-26 — Server-owned recoverable player rescue
+
+**Decision:** Replace ordinary character death during implemented combat with a
+30-second server-owned downed state, interruption-safe 2.5-second ally revive,
+and bleedout-safe retreat. Keep the unbanked pouch intact until the partial-loss
+and recovery-cache increment can settle it transactionally. Never sell revives.
+
+**Evidence:** [Co-op Rescue HUD report](https://www.lazyweb.com/report/lazyweb/01fb79d9-741c-4685-8786-831be744e372/?source=create).
+
+**Reason:** Enemy and profession work needs a deterministic failure contract
+first. A non-modal rescue rail and automatic help signal keep touch controls and
+the world readable, while server channel validation prevents self, range,
+disconnect, and repeat-request exploits.
+
 ## 2026-07-25 — One Active Trail onboarding HUD
 
 **Decision:** Implement the first session with one phase capsule, one active

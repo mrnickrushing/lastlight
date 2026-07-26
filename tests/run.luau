@@ -13,7 +13,9 @@ TestRunner.run({
     require("./specs/FeatureFlagService.spec"),
     require("./specs/NightSchedule.spec"),
     require("./specs/RateLimiter.spec"),
+    require("./specs/ReviveFlow.spec"),
     require("./specs/SaveSchema.spec"),
     require("./specs/ServiceRegistry.spec"),
+    require("./specs/SurvivalState.spec"),
     require("./specs/TutorialFlow.spec"),
 })
