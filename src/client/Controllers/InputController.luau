@@ -52,7 +52,9 @@ function InputController.new(
     onInteract: () -> (),
     onUseTool: () -> (),
     onSprint: (boolean) -> (),
-    onDodge: () -> ()
+    onDodge: () -> (),
+    onProfessionAbility: () -> (),
+    onProfessionMenu: () -> ()
 ): InputController
     local self = setmetatable({
         _hud = hud,
@@ -85,16 +87,58 @@ function InputController.new(
             { name = "Keyboard", key = Enum.KeyCode.LeftAlt },
             { name = "Gamepad", key = Enum.KeyCode.ButtonB },
         }, hud:dodgeButton())
+        local professionAbility = createBoolAction(context, "ProfessionAbility", {
+            { name = "Keyboard", key = Enum.KeyCode.Q },
+            { name = "Gamepad", key = Enum.KeyCode.ButtonL1 },
+        }, hud:abilityButton())
+        local professionMenu = createBoolAction(context, "ProfessionMenu", {
+            { name = "Keyboard", key = Enum.KeyCode.P },
+            { name = "Gamepad", key = Enum.KeyCode.DPadUp },
+        }, hud:professionButton())
 
-        table.insert(self._connections, (interact :: any).Pressed:Connect(onInteract))
-        table.insert(self._connections, (tool :: any).Pressed:Connect(onUseTool))
+        table.insert(
+            self._connections,
+            (interact :: any).Pressed:Connect(function()
+                if not hud:isProfessionMenuOpen() then
+                    onInteract()
+                end
+            end)
+        )
+        table.insert(
+            self._connections,
+            (tool :: any).Pressed:Connect(function()
+                if not hud:isProfessionMenuOpen() then
+                    onUseTool()
+                end
+            end)
+        )
         table.insert(
             self._connections,
             (sprint :: any).Pressed:Connect(function()
-                onSprint(true)
+                if not hud:isProfessionMenuOpen() then
+                    onSprint(true)
+                end
             end)
         )
-        table.insert(self._connections, (dodge :: any).Pressed:Connect(onDodge))
+        table.insert(
+            self._connections,
+            (dodge :: any).Pressed:Connect(function()
+                if hud:isProfessionMenuOpen() then
+                    hud:setProfessionMenuOpen(false)
+                else
+                    onDodge()
+                end
+            end)
+        )
+        table.insert(
+            self._connections,
+            (professionAbility :: any).Pressed:Connect(function()
+                if not hud:isProfessionMenuOpen() then
+                    onProfessionAbility()
+                end
+            end)
+        )
+        table.insert(self._connections, (professionMenu :: any).Pressed:Connect(onProfessionMenu))
         table.insert(
             self._connections,
             (sprint :: any).Released:Connect(function()
@@ -112,7 +156,14 @@ function InputController.new(
             self._context:Destroy()
             self._context = nil
         end
-        self:_installFallback(onInteract, onUseTool, onSprint, onDodge)
+        self:_installFallback(
+            onInteract,
+            onUseTool,
+            onSprint,
+            onDodge,
+            onProfessionAbility,
+            onProfessionMenu
+        )
     end
 
     local function updateInputMode()
@@ -128,6 +179,14 @@ function InputController.new(
         self._connections,
         UserInputService:GetPropertyChangedSignal("PreferredInput"):Connect(updateInputMode)
     )
+    table.insert(
+        self._connections,
+        UserInputService.InputBegan:Connect(function(input: InputObject, _processed: boolean)
+            if input.KeyCode == Enum.KeyCode.Escape and hud:isProfessionMenuOpen() then
+                hud:setProfessionMenuOpen(false)
+            end
+        end)
+    )
 
     return self
 end
@@ -137,11 +196,21 @@ function InputController._installFallback(
     onInteract: () -> (),
     onUseTool: () -> (),
     onSprint: (boolean) -> (),
-    onDodge: () -> ()
+    onDodge: () -> (),
+    onProfessionAbility: () -> (),
+    onProfessionMenu: () -> ()
 )
     table.insert(self._connections, self._hud:primaryButton().Activated:Connect(onInteract))
     table.insert(self._connections, self._hud:toolButton().Activated:Connect(onUseTool))
     table.insert(self._connections, self._hud:dodgeButton().Activated:Connect(onDodge))
+    table.insert(
+        self._connections,
+        self._hud:abilityButton().Activated:Connect(onProfessionAbility)
+    )
+    table.insert(
+        self._connections,
+        self._hud:professionButton().Activated:Connect(onProfessionMenu)
+    )
     table.insert(
         self._connections,
         self._hud:sprintButton().MouseButton1Down:Connect(function()
@@ -160,7 +229,14 @@ function InputController._installFallback(
             if processed then
                 return
             end
-            if input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
+            if
+                self._hud:isProfessionMenuOpen()
+                and (input.KeyCode == Enum.KeyCode.ButtonB or input.KeyCode == Enum.KeyCode.Escape)
+            then
+                self._hud:setProfessionMenuOpen(false)
+            elseif self._hud:isProfessionMenuOpen() then
+                return
+            elseif input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
                 onInteract()
             elseif
                 input.KeyCode == Enum.KeyCode.LeftShift
@@ -176,6 +252,10 @@ function InputController._installFallback(
                 or input.KeyCode == Enum.KeyCode.ButtonR2
             then
                 onUseTool()
+            elseif input.KeyCode == Enum.KeyCode.Q or input.KeyCode == Enum.KeyCode.ButtonL1 then
+                onProfessionAbility()
+            elseif input.KeyCode == Enum.KeyCode.P or input.KeyCode == Enum.KeyCode.DPadUp then
+                onProfessionMenu()
             end
         end)
     )

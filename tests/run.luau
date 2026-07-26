@@ -14,6 +14,7 @@ TestRunner.run({
     require("./specs/ExpeditionRewardLedger.spec"),
     require("./specs/FeatureFlagService.spec"),
     require("./specs/NightSchedule.spec"),
+    require("./specs/ProfessionState.spec"),
     require("./specs/RateLimiter.spec"),
     require("./specs/ReviveFlow.spec"),
     require("./specs/SaveSchema.spec"),

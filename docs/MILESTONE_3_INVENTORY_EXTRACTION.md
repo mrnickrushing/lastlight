@@ -9,7 +9,8 @@ town platform.
 
 Implemented in source:
 
-- save schema version 2 with a migrated inventory domain;
+- save schema version 2 introduced the migrated inventory domain; current
+  profiles normalize through schema v3 with profession selection;
 - five stable Bramblewake material IDs and bounded normalization;
 - a durable unbanked expedition pouch with reward-transaction tombstones;
 - server-run-specific reward IDs so repeated seeds can reward on later runs;

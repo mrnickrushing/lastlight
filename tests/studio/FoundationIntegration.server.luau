@@ -16,6 +16,8 @@ local CombatState = require(root.CombatState)
 local EnemyAttackFlow = require(root.EnemyAttackFlow)
 local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
+local ProfessionCatalog = require(root.ProfessionCatalog)
+local ProfessionState = require(root.ProfessionState)
 local ReviveFlow = require(root.ReviveFlow)
 local RuntimeIds = require(root.RuntimeIds)
 local SurvivalState = require(root.SurvivalState)
@@ -24,8 +26,8 @@ local Regions = require(root.Content.Definitions.Regions)
 local ServiceRegistry = require(serverRoot.ServiceRegistry)
 
 local content = Registry.new(Regions)
-assert(Config.SaveSchemaVersion == 2, "unexpected save schema version")
-assert(Config.BuildVersion == "0.8.0", "unexpected build version")
+assert(Config.SaveSchemaVersion == 3, "unexpected save schema version")
+assert(Config.BuildVersion == "0.9.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -66,6 +68,14 @@ local revived = SurvivalState.revive(downed, 104.5)
 assert(revived.health == 35 and revived.status == "active", "revive health contract failed")
 assert(RuntimeIds.Actions.Revive == "revive", "revive action ID changed")
 assert(RuntimeIds.Actions.Dodge == "dodge", "dodge action ID changed")
+assert(
+    RuntimeIds.Actions.ProfessionAbility == "profession_ability",
+    "profession ability action ID changed"
+)
+assert(
+    RuntimeIds.Actions.SelectProfession == "select_profession",
+    "profession selection action ID changed"
+)
 
 local combat = CombatState.create(200)
 local sprinting = CombatState.setSprint(combat, true, 200, true)
@@ -82,6 +92,16 @@ local attackDecision = EnemyAttackFlow.evaluate(attack, attack.endsAt, {
     targetPresent = true,
 })
 assert(attackDecision.status == "resolve", "Rootling telegraph contract did not resolve")
+
+local profession =
+    ProfessionState.create(ProfessionCatalog.Ids.Warden, workspace:GetServerTimeNow())
+local professionDecision = ProfessionState.canUse(profession, workspace:GetServerTimeNow(), true)
+assert(professionDecision.accepted, "Warden profession ability should begin ready")
+local guarding = ProfessionState.commitAbility(profession, workspace:GetServerTimeNow())
+assert(
+    ProfessionState.mitigatesDamage(guarding, workspace:GetServerTimeNow()),
+    "Warden profession guard window is missing"
+)
 
 local runtime = ReplicatedStorage:WaitForChild(RuntimeIds.FolderName, 8)
 assert(runtime ~= nil, "runtime networking folder did not initialize")

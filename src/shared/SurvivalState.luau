@@ -17,6 +17,7 @@ export type State = {
 export type TransitionResult = {
     applied: boolean,
     damage: number?,
+    healed: number?,
     downed: boolean?,
     health: number?,
     reason: string?,
@@ -91,6 +92,37 @@ function SurvivalState.damage(state: State, amount: number, now: number): (State
             applied = true,
             damage = math.min(amount, state.health),
             downed = downed,
+        }
+end
+
+function SurvivalState.heal(state: State, amount: number): (State, TransitionResult)
+    if not validNumber(amount) or amount <= 0 or amount ~= math.floor(amount) then
+        return state, {
+            applied = false,
+            reason = "invalid_heal",
+        }
+    end
+    if state.status ~= "active" then
+        return state, {
+            applied = false,
+            reason = "player_downed",
+        }
+    end
+    if state.health >= state.maxHealth then
+        return state, {
+            applied = false,
+            reason = "full_health",
+        }
+    end
+
+    local nextState: State = table.clone(state)
+    nextState.health = math.min(state.maxHealth, state.health + amount)
+    nextState.revision += 1
+    return nextState,
+        {
+            applied = true,
+            healed = nextState.health - state.health,
+            health = nextState.health,
         }
 end
 

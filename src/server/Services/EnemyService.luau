@@ -16,6 +16,7 @@ type Enemy = {
     model: Model,
     health: number,
     lastAttackAt: number,
+    markedUntil: number,
 }
 
 type AttackVisual = {
@@ -40,6 +41,7 @@ export type EnemyService = typeof(setmetatable(
         _combatService: any,
         _enemyAttackFlow: any,
         _analyticsService: any,
+        _professionService: any,
         _active: Enemy?,
         _nightActive: boolean,
         _lanternHealth: number,
@@ -92,6 +94,7 @@ function EnemyService.new(
         _combatService = combatService,
         _enemyAttackFlow = enemyAttackFlow,
         _analyticsService = analyticsService,
+        _professionService = nil,
         _active = nil,
         _nightActive = false,
         _lanternHealth = 100,
@@ -111,6 +114,10 @@ end
 
 function EnemyService.setChangedHandler(self: EnemyService, callback: (string?) -> ())
     self._onChanged = callback
+end
+
+function EnemyService.setProfessionService(self: EnemyService, professionService: any)
+    self._professionService = professionService
 end
 
 function EnemyService._notify(self: EnemyService, toast: string?)
@@ -207,6 +214,7 @@ function EnemyService.spawn(self: EnemyService): boolean
         model = model,
         health = 100,
         lastAttackAt = workspace:GetServerTimeNow(),
+        markedUntil = 0,
     }
     self._logger:info("rootling_spawned")
     self:_notify("A ROOTLING ENTERS THE TRAIL")
@@ -381,12 +389,36 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
         return
     end
 
-    local result = self._survivalService:damage(target, 24, "enemy_bramblewake_rootling")
-    self._analyticsService:enemyAttackResult(target, if result.applied then "hit" else "blocked")
+    local damage = 24
+    local guarded = false
+    if self._professionService ~= nil then
+        damage, guarded = self._professionService:mitigateIncomingDamage(target, damage, now)
+    end
+    local result = self._survivalService:damage(target, damage, "enemy_bramblewake_rootling")
+    self._analyticsService:enemyAttackResult(
+        target,
+        if result.applied then (if guarded then "guarded_hit" else "hit") else "blocked"
+    )
     if result.downed then
         self:_notify("ALLY DOWN — ROOTLING SWIPE")
+    elseif guarded and result.applied then
+        self:_notify("LANTERN GUARD ABSORBS THE ROOTLING SWIPE")
     else
         self:_notify(nil)
+    end
+end
+
+function EnemyService._setMarkedVisual(_self: EnemyService, enemy: Enemy, marked: boolean)
+    enemy.model:SetAttribute("LastLightMarked", marked)
+    local highlight = enemy.model:FindFirstChild("ThreatOutline")
+    if highlight ~= nil and highlight:IsA("Highlight") then
+        highlight.FillColor = if marked
+            then Color3.fromRGB(41, 91, 74)
+            else Color3.fromRGB(80, 29, 29)
+        highlight.FillTransparency = if marked then 0.48 else 0.68
+        highlight.OutlineColor = if marked
+            then Color3.fromRGB(255, 210, 96)
+            else Color3.fromRGB(255, 119, 79)
     end
 end
 
@@ -404,6 +436,11 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
 
     local current = enemy.model:GetPivot()
     local now = workspace:GetServerTimeNow()
+    if enemy.markedUntil > 0 and now >= enemy.markedUntil then
+        enemy.markedUntil = 0
+        self:_setMarkedVisual(enemy, false)
+        self:_notify(nil)
+    end
     if enemy.attack ~= nil then
         self:_stepAttack(enemy, now)
         return
@@ -434,7 +471,8 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
     local delta = flatTarget - current.Position
 
     if delta.Magnitude > 10 then
-        local distance = math.min(delta.Magnitude, self._speed * deltaTime)
+        local speed = if now < enemy.markedUntil then self._speed * 0.65 else self._speed
+        local distance = math.min(delta.Magnitude, speed * deltaTime)
         local nextPosition = current.Position + delta.Unit * distance
         enemy.model:PivotTo(CFrame.lookAt(nextPosition, flatTarget))
         return
@@ -453,6 +491,115 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
             self:_notify(nil)
         end
     end
+end
+
+function EnemyService._enemyInRange(
+    self: EnemyService,
+    player: Player,
+    range: number
+): (Enemy?, string?)
+    if not self._nightActive then
+        return nil, "NO ROOTLING TRAIL IS ACTIVE IN DAYLIGHT"
+    end
+    if not self._survivalService:canAct(player) then
+        return nil, "YOU CANNOT TRACK WHILE DOWNED"
+    end
+    local enemy = self._active
+    local character = player.Character
+    local root = if character == nil then nil else character:FindFirstChild("HumanoidRootPart")
+    if
+        enemy == nil
+        or root == nil
+        or not root:IsA("BasePart")
+        or enemy.model.PrimaryPart == nil
+    then
+        return nil, "NO ROOTLING CAN BE MARKED"
+    end
+    if (root.Position - enemy.model.PrimaryPart.Position).Magnitude > range then
+        return nil, "MOVE CLOSER TO MARK THE ROOTLING"
+    end
+
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = { character :: Model }
+    local result =
+        workspace:Raycast(root.Position, enemy.model.PrimaryPart.Position - root.Position, params)
+    if result ~= nil and not result.Instance:IsDescendantOf(enemy.model) then
+        return nil, "THE ROOTLING IS HIDDEN BEHIND COVER"
+    end
+    return enemy, nil
+end
+
+function EnemyService.canMarkNearest(
+    self: EnemyService,
+    player: Player,
+    range: number
+): (boolean, string)
+    local enemy, reason = self:_enemyInRange(player, range)
+    if enemy == nil then
+        return false, reason or "NO ROOTLING CAN BE MARKED"
+    end
+    return true, "FOXFIRE MARK READY"
+end
+
+function EnemyService.markNearest(
+    self: EnemyService,
+    player: Player,
+    range: number,
+    duration: number
+): (boolean, string)
+    local enemy, reason = self:_enemyInRange(player, range)
+    if enemy == nil then
+        return false, reason or "NO ROOTLING CAN BE MARKED"
+    end
+    enemy.markedUntil = workspace:GetServerTimeNow() + duration
+    self:_setMarkedVisual(enemy, true)
+    self:_notify("FOXFIRE MARK — ROOTLING REVEALED AND SLOWED")
+    return true, "FOXFIRE MARK — ROOTLING REVEALED AND SLOWED"
+end
+
+function EnemyService.canRepairLantern(
+    self: EnemyService,
+    player: Player,
+    range: number
+): (boolean, string)
+    if not self._nightActive then
+        return false, "THE FIRST LANTERN DOES NOT NEED A NIGHT REPAIR"
+    end
+    if not self._survivalService:canAct(player) then
+        return false, "YOU CANNOT REPAIR WHILE DOWNED"
+    end
+    if self._lanternHealth >= 100 then
+        return false, "THE FIRST LANTERN IS ALREADY AT FULL STRENGTH"
+    end
+    local character = player.Character
+    local root = if character == nil then nil else character:FindFirstChild("HumanoidRootPart")
+    if
+        root == nil
+        or not root:IsA("BasePart")
+        or (root.Position - self._worldService:lanternPosition()).Magnitude > range
+    then
+        return false, "MOVE CLOSER TO THE FIRST LANTERN"
+    end
+    return true, "EMERGENCY PATCH READY"
+end
+
+function EnemyService.repairLantern(
+    self: EnemyService,
+    player: Player,
+    range: number,
+    amount: number
+): (boolean, string)
+    local allowed, reason = self:canRepairLantern(player, range)
+    if not allowed then
+        return false, reason
+    end
+    local previous = self._lanternHealth
+    self._lanternHealth = math.min(100, self._lanternHealth + amount)
+    local restored = self._lanternHealth - previous
+    local message = string.format("EMERGENCY PATCH — FIRST LANTERN +%d", restored)
+    self:_notify(message)
+    return true, message
 end
 
 function EnemyService.damageNearest(self: EnemyService, player: Player): (boolean, string)
@@ -531,6 +678,10 @@ end
 
 function EnemyService.activeCount(self: EnemyService): number
     return if self._active == nil then 0 else 1
+end
+
+function EnemyService.combatActive(self: EnemyService): boolean
+    return self._nightActive and self._active ~= nil
 end
 
 return table.freeze(EnemyService)

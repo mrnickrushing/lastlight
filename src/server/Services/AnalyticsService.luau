@@ -266,6 +266,52 @@ function AnalyticsService.enemyAttackResult(self: AnalyticsService, player: Play
     end
 end
 
+function AnalyticsService.professionSelected(
+    self: AnalyticsService,
+    player: Player,
+    professionId: string,
+    accepted: boolean,
+    reason: string?
+)
+    self._logger:info("profession_selected", {
+        accepted = accepted,
+        player = player.UserId,
+        profession = string.sub(professionId, 1, 32),
+        reason = reason or "accepted",
+    })
+    if accepted and not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "ProfessionSelected", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = professionId,
+            })
+        end)
+    end
+end
+
+function AnalyticsService.professionAbility(
+    self: AnalyticsService,
+    player: Player,
+    professionId: string,
+    accepted: boolean,
+    reason: string?,
+    affected: number
+)
+    self._logger:info("profession_ability", {
+        accepted = accepted,
+        affected = affected,
+        player = player.UserId,
+        profession = string.sub(professionId, 1, 32),
+        reason = reason or "accepted",
+    })
+    if accepted and not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "ProfessionAbilityUsed", math.max(1, affected), {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = professionId,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.clear(self: AnalyticsService, player: Player)
     self._startedAt[player] = nil
     self._expeditionStarted[player] = nil

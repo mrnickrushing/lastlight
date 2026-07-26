@@ -22,6 +22,11 @@ assert(sharedRoot:FindFirstChild("RuntimeIds") ~= nil, "game build is missing Ru
 assert(sharedRoot:FindFirstChild("ReviveFlow") ~= nil, "game build is missing ReviveFlow")
 assert(sharedRoot:FindFirstChild("SurvivalState") ~= nil, "game build is missing SurvivalState")
 assert(sharedRoot:FindFirstChild("CombatState") ~= nil, "game build is missing CombatState")
+assert(
+    sharedRoot:FindFirstChild("ProfessionCatalog") ~= nil,
+    "game build is missing ProfessionCatalog"
+)
+assert(sharedRoot:FindFirstChild("ProfessionState") ~= nil, "game build is missing ProfessionState")
 assert(sharedRoot:FindFirstChild("EnemyAttackFlow") ~= nil, "game build is missing EnemyAttackFlow")
 assert(
     sharedRoot:FindFirstChild("ExpeditionGenerator") ~= nil,
@@ -67,6 +72,7 @@ for _, serviceName in
         "PhaseService",
         "PlayerCombatService",
         "PlayerSurvivalService",
+        "ProfessionService",
         "ProfileService",
         "TutorialService",
         "WorldService",

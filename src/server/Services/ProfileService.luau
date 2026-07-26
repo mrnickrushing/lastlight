@@ -208,6 +208,23 @@ function ProfileService.setTutorial(
     return true
 end
 
+function ProfileService.setProfession(
+    self: ProfileService,
+    player: Player,
+    professionId: string
+): boolean
+    local profile = self._profiles[player]
+    if profile == nil then
+        return false
+    end
+
+    self._profiles[player] = self._saveSchema.withProfession(profile, professionId, os.time())
+    if self._persistent and self._writable[player] == true then
+        self._dirty[player] = true
+    end
+    return true
+end
+
 function ProfileService.grantUnbankedExpeditionReward(
     self: ProfileService,
     player: Player,

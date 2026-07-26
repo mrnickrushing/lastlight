@@ -395,6 +395,73 @@ function PlayerSurvivalService.damage(
     return result
 end
 
+function PlayerSurvivalService.canHealInRadius(
+    self: PlayerSurvivalService,
+    source: Player,
+    radius: number
+): (boolean, string)
+    if not self:canAct(source) then
+        return false, "YOU CANNOT HEAL WHILE DOWNED"
+    end
+    local sourceRoot = rootPart(source)
+    if sourceRoot == nil then
+        return false, "YOUR CHARACTER IS STILL LOADING"
+    end
+    for player, state in self._states do
+        local targetRoot = rootPart(player)
+        if
+            state.status == "active"
+            and state.health < state.maxHealth
+            and targetRoot ~= nil
+            and (sourceRoot.Position - targetRoot.Position).Magnitude <= radius
+        then
+            return true, "GUIDING PULSE READY"
+        end
+    end
+    return false, "NO INJURED TRAVELER IS WITHIN THE PULSE"
+end
+
+function PlayerSurvivalService.healInRadius(
+    self: PlayerSurvivalService,
+    source: Player,
+    amount: number,
+    radius: number
+): any
+    local canHeal, reason = self:canHealInRadius(source, radius)
+    if not canHeal then
+        return {
+            affected = 0,
+            healed = 0,
+            reason = reason,
+        }
+    end
+
+    local sourceRoot = assert(rootPart(source), "healing source root disappeared")
+    local affected = 0
+    local totalHealed = 0
+    for player, state in self._states do
+        local targetRoot = rootPart(player)
+        if
+            targetRoot ~= nil
+            and (sourceRoot.Position - targetRoot.Position).Magnitude <= radius
+        then
+            local nextState, result = self._survivalState.heal(state, amount)
+            if result.applied then
+                self._states[player] = nextState
+                affected += 1
+                totalHealed += result.healed or 0
+                self:_syncPlayer(player)
+            end
+        end
+    end
+    self:_notify(nil, nil)
+    return {
+        affected = affected,
+        healed = totalHealed,
+        reason = "healed",
+    }
+end
+
 function PlayerSurvivalService.interaction(
     self: PlayerSurvivalService,
     interactionId: string

@@ -26,6 +26,12 @@ The combat-mobility state uses the
 as hierarchy guidance: context-sensitive stamina, one thumb-safe dodge action,
 and a targeted text warning paired with a world-space impact shape.
 
+The profession state uses the
+[Profession Selector + Ability HUD report](https://www.lazyweb.com/report/lazyweb/73595230-6584-431c-8d84-c7eb06fdeaa5/?source=create)
+as hierarchy guidance: role selection is available only in safe town through a
+four-card controller-selectable layer, while one labeled cooldown action remains
+visible during play without replacing urgent survival information.
+
 The design follows current Roblox guidance for
 [mobile input](https://create.roblox.com/docs/input/mobile),
 [reserved mobile control zones](https://create.roblox.com/docs/building-and-visuals/ui/positioning-and-sizing-guiobjects),
@@ -119,6 +125,7 @@ hardcodes a key name.
 | Alternate/guard | secondary action | mouse 2 | left trigger |
 | Dodge | action button | Left Alt, remappable | B/Circle |
 | Profession ability | labeled cooldown button | Q | bumper |
+| Profession selector | labeled safe-town pill | P | D-pad Up |
 | Companion command | contextual small radial | C | D-pad |
 | Ping | tap marker/radial | middle mouse/G | D-pad |
 | Hotbar | tap/swipe | 1–5/wheel | bumpers/D-pad |
