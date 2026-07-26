@@ -15,8 +15,9 @@ playable game exists.
 ## Current status
 
 **Milestone 2 source implemented; Milestone 3 Bramblewake expedition foundation,
-four active events, durable extraction settlement, and player rescue loop
-implemented; Studio and device exit gates remain pending.**
+four active events, durable extraction settlement, player rescue, and combat
+mobility/telegraph foundations implemented; Studio and device exit gates remain
+pending.**
 
 The repository currently contains:
 
@@ -35,6 +36,8 @@ The repository currently contains:
   extraction, atomic banking, retry-safe settlement, and town return streaming;
 - server-owned health, Rootling contact damage, 30-second downed crawl,
   interruption-safe ally revive, and bleedout-safe town retreat;
+- server-owned stamina sprint/dodge, cooldown and protection validation, plus a
+  locked Rootling swipe zone and readable pre-hit warning;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
   analytics, save normalization, and published-place tutorial persistence;
 - mobile, keyboard/mouse, and controller actions through Roblox's Input Action
@@ -43,7 +46,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 65 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 78 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -62,6 +65,8 @@ The save migration, banking, reconnect, and Wayhome gates are in
 [the inventory and extraction runbook](docs/MILESTONE_3_INVENTORY_EXTRACTION.md).
 The health, downed-state, revive, safe-retreat, and abuse gates are in
 [the player survival runbook](docs/MILESTONE_3_PLAYER_SURVIVAL.md).
+The stamina, dodge, telegraph, input, latency, and device gates are in
+[the combat mobility runbook](docs/MILESTONE_3_COMBAT_MOBILITY.md).
 
 The current UI direction is documented in the
 [Last Light mobile gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create).
@@ -69,6 +74,8 @@ The implementation-specific onboarding refinement is in the
 [First-Ten-Minutes mobile HUD report](https://www.lazyweb.com/report/lazyweb/a34ce67d-041e-434b-acb6-0afd4ccf7ef4/?source=create).
 The non-modal rescue presentation is grounded in the
 [Co-op Rescue HUD report](https://www.lazyweb.com/report/lazyweb/01fb79d9-741c-4685-8786-831be744e372/?source=create).
+The stamina, dodge, and targeted attack-warning layer is grounded in the
+[Mobile Combat Stamina + Dodge report](https://www.lazyweb.com/report/lazyweb/4e46b6e2-7bef-4633-a7b5-ed7a872da2e8/?source=create).
 The recommended default is a context-sensitive survival HUD. A compact HUD is
 the accessibility and low-effects fallback, while the dramatic living-world HUD
 is reserved for Blackouts and bosses.

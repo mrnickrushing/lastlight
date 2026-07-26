@@ -51,7 +51,8 @@ function InputController.new(
     hud: any,
     onInteract: () -> (),
     onUseTool: () -> (),
-    onSprint: (boolean) -> ()
+    onSprint: (boolean) -> (),
+    onDodge: () -> ()
 ): InputController
     local self = setmetatable({
         _hud = hud,
@@ -80,6 +81,10 @@ function InputController.new(
             { name = "Keyboard", key = Enum.KeyCode.LeftShift },
             { name = "Gamepad", key = Enum.KeyCode.ButtonL3 },
         }, hud:sprintButton())
+        local dodge = createBoolAction(context, "Dodge", {
+            { name = "Keyboard", key = Enum.KeyCode.LeftAlt },
+            { name = "Gamepad", key = Enum.KeyCode.ButtonB },
+        }, hud:dodgeButton())
 
         table.insert(self._connections, (interact :: any).Pressed:Connect(onInteract))
         table.insert(self._connections, (tool :: any).Pressed:Connect(onUseTool))
@@ -89,6 +94,7 @@ function InputController.new(
                 onSprint(true)
             end)
         )
+        table.insert(self._connections, (dodge :: any).Pressed:Connect(onDodge))
         table.insert(
             self._connections,
             (sprint :: any).Released:Connect(function()
@@ -106,7 +112,7 @@ function InputController.new(
             self._context:Destroy()
             self._context = nil
         end
-        self:_installFallback(onInteract, onUseTool, onSprint)
+        self:_installFallback(onInteract, onUseTool, onSprint, onDodge)
     end
 
     local function updateInputMode()
@@ -130,10 +136,12 @@ function InputController._installFallback(
     self: InputController,
     onInteract: () -> (),
     onUseTool: () -> (),
-    onSprint: (boolean) -> ()
+    onSprint: (boolean) -> (),
+    onDodge: () -> ()
 )
     table.insert(self._connections, self._hud:primaryButton().Activated:Connect(onInteract))
     table.insert(self._connections, self._hud:toolButton().Activated:Connect(onUseTool))
+    table.insert(self._connections, self._hud:dodgeButton().Activated:Connect(onDodge))
     table.insert(
         self._connections,
         self._hud:sprintButton().MouseButton1Down:Connect(function()
@@ -159,6 +167,10 @@ function InputController._installFallback(
                 or input.KeyCode == Enum.KeyCode.ButtonL3
             then
                 onSprint(true)
+            elseif
+                input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.ButtonB
+            then
+                onDodge()
             elseif
                 input.UserInputType == Enum.UserInputType.MouseButton1
                 or input.KeyCode == Enum.KeyCode.ButtonR2

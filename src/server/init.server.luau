@@ -8,6 +8,8 @@ assert(root ~= nil, "Last Light shared root did not replicate before bootstrap t
 
 local Config = require(root.Config)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
+local CombatState = require(root.CombatState)
+local EnemyAttackFlow = require(root.EnemyAttackFlow)
 local Environment = require(root.Environment)
 local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
@@ -31,6 +33,7 @@ local NetworkService = require(script.Services.NetworkService)
 local PhaseService = require(script.Services.PhaseService)
 local ProfileService = require(script.Services.ProfileService)
 local PlayerSurvivalService = require(script.Services.PlayerSurvivalService)
+local PlayerCombatService = require(script.Services.PlayerCombatService)
 local TutorialService = require(script.Services.TutorialService)
 local WorldService = require(script.Services.WorldService)
 local ServiceRegistry = require(script.ServiceRegistry)
@@ -74,7 +77,23 @@ local survivalService = PlayerSurvivalService.new(
     worldService,
     analyticsService
 )
-local enemyService = EnemyService.new(logger, worldService, survivalService)
+local combatService = PlayerCombatService.new(
+    logger,
+    Config,
+    CombatState,
+    featureFlags,
+    survivalService,
+    analyticsService
+)
+local enemyService = EnemyService.new(
+    logger,
+    Config,
+    worldService,
+    survivalService,
+    combatService,
+    EnemyAttackFlow,
+    analyticsService
+)
 local phaseService = PhaseService.new(
     logger,
     worldService,
@@ -94,6 +113,7 @@ local tutorialService = TutorialService.new(
     worldService,
     enemyService,
     survivalService,
+    combatService,
     phaseService,
     expeditionService,
     analyticsService
@@ -114,6 +134,7 @@ services:register(analyticsService)
 services:register(worldService)
 services:register(expeditionService)
 services:register(survivalService)
+services:register(combatService)
 services:register(enemyService)
 services:register(phaseService)
 services:register(tutorialService)

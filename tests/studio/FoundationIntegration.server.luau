@@ -12,6 +12,8 @@ assert(serverRoot ~= nil, "server root unavailable in Studio integration test")
 
 local Config = require(root.Config)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
+local CombatState = require(root.CombatState)
+local EnemyAttackFlow = require(root.EnemyAttackFlow)
 local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local ReviveFlow = require(root.ReviveFlow)
@@ -23,7 +25,7 @@ local ServiceRegistry = require(serverRoot.ServiceRegistry)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 2, "unexpected save schema version")
-assert(Config.BuildVersion == "0.7.0", "unexpected build version")
+assert(Config.BuildVersion == "0.8.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -63,6 +65,23 @@ assert(reviveDecision.status == "complete", "revive contract did not complete")
 local revived = SurvivalState.revive(downed, 104.5)
 assert(revived.health == 35 and revived.status == "active", "revive health contract failed")
 assert(RuntimeIds.Actions.Revive == "revive", "revive action ID changed")
+assert(RuntimeIds.Actions.Dodge == "dodge", "dodge action ID changed")
+
+local combat = CombatState.create(200)
+local sprinting = CombatState.setSprint(combat, true, 200, true)
+local drained = CombatState.advance(sprinting, 201, true)
+assert(drained.stamina == 82 and drained.sprinting, "server sprint stamina contract failed")
+local dodging = CombatState.dodge(drained, 201, true)
+assert(dodging.stamina == 47, "server dodge cost contract failed")
+assert(CombatState.avoidsDamage(dodging, 201.2), "dodge protection window is missing")
+local attack = EnemyAttackFlow.create(10, 201, Config.RootlingAttackWindupSeconds)
+local attackDecision = EnemyAttackFlow.evaluate(attack, attack.endsAt, {
+    clearPath = true,
+    inImpactArea = true,
+    targetCanAct = true,
+    targetPresent = true,
+})
+assert(attackDecision.status == "resolve", "Rootling telegraph contract did not resolve")
 
 local runtime = ReplicatedStorage:WaitForChild(RuntimeIds.FolderName, 8)
 assert(runtime ~= nil, "runtime networking folder did not initialize")

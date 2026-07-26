@@ -1,0 +1,103 @@
+--!strict
+
+local CombatState = require("../../src/shared/CombatState")
+local TestRunner = require("../TestRunner")
+
+return {
+    name = "CombatState",
+    cases = {
+        {
+            name = "starts ready with full stamina",
+            run = function()
+                local state = CombatState.create(10)
+                local snapshot = CombatState.snapshot(state, 10)
+                TestRunner.equal(snapshot.stamina, 100)
+                TestRunner.equal(snapshot.sprinting, false)
+                TestRunner.equal(snapshot.dodgeActive, false)
+                TestRunner.equal(snapshot.lowStamina, false)
+            end,
+        },
+        {
+            name = "drains sprint using server time without mutating prior state",
+            run = function()
+                local state = CombatState.create(0)
+                local sprinting, result = CombatState.setSprint(state, true, 0, true)
+                local drained = CombatState.advance(sprinting, 2, true)
+                TestRunner.equal(result.applied, true)
+                TestRunner.equal(state.sprinting, false)
+                TestRunner.equal(sprinting.sprinting, true)
+                TestRunner.equal(CombatState.snapshot(drained, 2).stamina, 64)
+            end,
+        },
+        {
+            name = "stops sprint at empty stamina",
+            run = function()
+                local state = CombatState.create(0)
+                state = CombatState.setSprint(state, true, 0, true)
+                state = CombatState.advance(state, 10, true)
+                local snapshot = CombatState.snapshot(state, 10)
+                TestRunner.equal(snapshot.stamina, 0)
+                TestRunner.equal(snapshot.sprinting, false)
+            end,
+        },
+        {
+            name = "regenerates only after the spending delay",
+            run = function()
+                local state = CombatState.create(0)
+                state = CombatState.setSprint(state, true, 0, true)
+                state = CombatState.advance(state, 1, true)
+                state = CombatState.setSprint(state, false, 1, true)
+                local waiting = CombatState.advance(state, 1.5, true)
+                local recovered = CombatState.advance(waiting, 2.5, true)
+                TestRunner.equal(CombatState.snapshot(waiting, 1.5).stamina, 82)
+                TestRunner.equal(CombatState.snapshot(recovered, 2.5).stamina, 100)
+            end,
+        },
+        {
+            name = "spends stamina and grants a bounded dodge window",
+            run = function()
+                local state = CombatState.create(0)
+                local dodging, result = CombatState.dodge(state, 1, true)
+                TestRunner.equal(result.applied, true)
+                TestRunner.equal(CombatState.snapshot(dodging, 1).stamina, 65)
+                TestRunner.equal(CombatState.avoidsDamage(dodging, 1.2), true)
+                TestRunner.equal(CombatState.avoidsDamage(dodging, 1.42), false)
+            end,
+        },
+        {
+            name = "rejects repeated dodge during cooldown",
+            run = function()
+                local state = CombatState.create(0)
+                state = CombatState.dodge(state, 0, true)
+                local unchanged, result = CombatState.dodge(state, 0.5, true)
+                TestRunner.equal(result.applied, false)
+                TestRunner.equal(result.reason, "dodge_cooldown")
+                TestRunner.equal(CombatState.snapshot(unchanged, 0.5).stamina, 65)
+            end,
+        },
+        {
+            name = "rejects sprint and dodge when the player cannot act",
+            run = function()
+                local state = CombatState.create(0)
+                local sprinting, sprintResult = CombatState.setSprint(state, true, 1, false)
+                local dodging, dodgeResult = CombatState.dodge(state, 1, false)
+                TestRunner.equal(sprintResult.reason, "player_cannot_act")
+                TestRunner.equal(dodgeResult.reason, "player_cannot_act")
+                TestRunner.equal(sprinting.sprinting, false)
+                TestRunner.equal(CombatState.snapshot(dodging, 1).stamina, 100)
+            end,
+        },
+        {
+            name = "rejects dodge below its stamina cost",
+            run = function()
+                local state = CombatState.create(0)
+                state = CombatState.setSprint(state, true, 0, true)
+                state = CombatState.advance(state, 4, true)
+                state = CombatState.setSprint(state, false, 4, true)
+                local unchanged, result = CombatState.dodge(state, 4, true)
+                TestRunner.equal(result.reason, "insufficient_stamina")
+                TestRunner.equal(CombatState.snapshot(unchanged, 4).lowStamina, true)
+            end,
+        },
+    },
+}

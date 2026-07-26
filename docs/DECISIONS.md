@@ -78,6 +78,19 @@ first. A non-modal rescue rail and automatic help signal keep touch controls and
 the world readable, while server channel validation prevents self, range,
 disconnect, and repeat-request exploits.
 
+## 2026-07-26 — Shared stamina and readable attack resolution
+
+**Decision:** Introduce one server-owned stamina resource for sprint and dodge
+before profession kits. Rootling player attacks use a locked 0.9-second ground
+zone and server resolution for area, cover, dodge protection, and damage.
+
+**Evidence:** [Mobile Combat Stamina + Dodge report](https://www.lazyweb.com/report/lazyweb/4e46b6e2-7bef-4633-a7b5-ed7a872da2e8/?source=create).
+
+**Reason:** Future attacks and profession abilities need one tested timing and
+resource boundary. Text plus a world shape makes danger readable on mobile and
+without color/audio, while server-owned direction, cooldown, protection, and
+damage prevent client speed or invulnerability claims.
+
 ## 2026-07-25 — One Active Trail onboarding HUD
 
 **Decision:** Implement the first session with one phase capsule, one active

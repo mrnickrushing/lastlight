@@ -34,6 +34,7 @@ export type TutorialService = typeof(setmetatable(
         _worldService: any,
         _enemyService: any,
         _survivalService: any,
+        _combatService: any,
         _phaseService: any,
         _expeditionService: any,
         _analyticsService: any,
@@ -57,6 +58,7 @@ function TutorialService.new(
     worldService: any,
     enemyService: any,
     survivalService: any,
+    combatService: any,
     phaseService: any,
     expeditionService: any,
     analyticsService: any
@@ -73,6 +75,7 @@ function TutorialService.new(
         _worldService = worldService,
         _enemyService = enemyService,
         _survivalService = survivalService,
+        _combatService = combatService,
         _phaseService = phaseService,
         _expeditionService = expeditionService,
         _analyticsService = analyticsService,
@@ -125,6 +128,12 @@ function TutorialService.Init(self: TutorialService, _context: any)
             self:_setToast(player, toast)
         end
         self:_publishAll()
+    end)
+    self._combatService:setChangedHandler(function(player: Player, toast: string?)
+        if toast ~= nil then
+            self:_setToast(player, toast)
+        end
+        self:_publish(player)
     end)
 end
 
@@ -401,21 +410,6 @@ function TutorialService._nightComplete(self: TutorialService)
     self:_publishAll()
 end
 
-function TutorialService._setSprint(self: TutorialService, player: Player, enabled: boolean)
-    local canAct = self._survivalService:canAct(player)
-    if enabled and not canAct then
-        return
-    end
-    local character = player.Character
-    local humanoid = if character == nil then nil else character:FindFirstChildOfClass("Humanoid")
-    if humanoid ~= nil then
-        humanoid.WalkSpeed = if not canAct
-            then self._config.DownedWalkSpeed
-            elseif enabled then self._config.SprintWalkSpeed
-            else self._config.BaseWalkSpeed
-    end
-end
-
 function TutorialService._handleAction(self: TutorialService, player: Player, payload: any)
     if type(payload) ~= "table" or payload.schemaVersion ~= 1 then
         return
@@ -469,7 +463,9 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             self:_publishAll()
         end
     elseif kind == self._runtimeIds.Actions.Sprint and type(payload.enabled) == "boolean" then
-        self:_setSprint(player, payload.enabled)
+        self._combatService:setSprint(player, payload.enabled)
+    elseif kind == self._runtimeIds.Actions.Dodge then
+        self._combatService:dodge(player)
     elseif kind == self._runtimeIds.Actions.CompactHud and type(payload.enabled) == "boolean" then
         local session = self._sessions[player]
         if session ~= nil then
@@ -574,6 +570,8 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             else expedition.event.total,
         unbankedExpeditionRewards = expedition.unbankedRewards,
         bankedMaterials = expedition.bankedMaterials,
+        combat = self._combatService:snapshot(player),
+        threat = self._enemyService:threatSnapshot(player),
         survival = survival,
     }
 end
