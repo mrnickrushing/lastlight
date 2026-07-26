@@ -194,6 +194,42 @@ function CombatState.dodge(state: State, now: number, canAct: boolean): (State, 
     }
 end
 
+-- Instant, non-time-based restore (a consumed item's effect, not regen), so
+-- it still routes through advance() first to settle any pending drain/regen
+-- up to `now` before adding the flat amount, the same way dodge and
+-- setSprint never mutate stamina without advancing state first.
+function CombatState.restoreStamina(
+    state: State,
+    now: number,
+    amount: number,
+    canAct: boolean
+): (State, TransitionResult)
+    local nextState = CombatState.advance(state, now, canAct)
+    if not canAct then
+        return nextState,
+            {
+                applied = false,
+                reason = "player_cannot_act",
+                stamina = nextState.stamina,
+            }
+    end
+    local stamina = math.min(MAX_STAMINA, nextState.stamina + math.max(0, amount))
+    if stamina == nextState.stamina then
+        return nextState,
+            {
+                applied = false,
+                reason = "stamina_full",
+                stamina = nextState.stamina,
+            }
+    end
+    nextState.stamina = stamina
+    nextState.revision += 1
+    return nextState, {
+        applied = true,
+        stamina = nextState.stamina,
+    }
+end
+
 function CombatState.avoidsDamage(state: State, now: number): boolean
     return now < state.dodgeInvulnerableUntil
 end

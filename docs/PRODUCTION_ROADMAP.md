@@ -112,12 +112,14 @@ and a save-schema-v6 night count that persists per player and resumes from
 whoever's record is highest across a server restart, plus a first pair of
 crafting recipes that convert banked expedition materials into named gear
 recorded on a player's own profile through a server-owned, all-or-nothing
-transaction.
-Profession mastery/specializations, equipping or using crafted gear, a
-recipe-browsing UI, the full recipe/inventory/quest catalog, per-night
-content differentiation, consequences visibly changing future town/region
-content, town tier, final art/audio, and all Studio/device/group evidence
-remain open.
+transaction, and a first pair of consumable gear effects (a stacking
+damage-reduction shield and an instant stamina restore) usable through
+dedicated keyboard/gamepad/touch bindings.
+Profession mastery/specializations, equipment slots and permanent passive
+stats, a recipe-browsing UI, the full recipe/inventory/quest catalog,
+per-night content differentiation, consequences visibly changing future
+town/region content, town tier, final art/audio, and all Studio/device/group
+evidence remain open.
 See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md) and
 [MILESTONE_3_BRAMBLEWAKE_EVENTS.md](MILESTONE_3_BRAMBLEWAKE_EVENTS.md), and
 [MILESTONE_3_INVENTORY_EXTRACTION.md](MILESTONE_3_INVENTORY_EXTRACTION.md), and
@@ -129,7 +131,8 @@ See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md)
 [MILESTONE_3_WARDEN_STAG_BOSS.md](MILESTONE_3_WARDEN_STAG_BOSS.md), and
 [MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md](MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md), and
 [MILESTONE_3_NORMAL_NIGHT.md](MILESTONE_3_NORMAL_NIGHT.md), and
-[MILESTONE_3_CRAFTING.md](MILESTONE_3_CRAFTING.md).
+[MILESTONE_3_CRAFTING.md](MILESTONE_3_CRAFTING.md), and
+[MILESTONE_3_GEAR_EFFECTS.md](MILESTONE_3_GEAR_EFFECTS.md).
 
 ### Deliverables
 

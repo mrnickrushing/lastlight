@@ -54,7 +54,9 @@ function InputController.new(
     onSprint: (boolean) -> (),
     onDodge: () -> (),
     onProfessionAbility: () -> (),
-    onProfessionMenu: () -> ()
+    onProfessionMenu: () -> (),
+    onUseCharm: () -> (),
+    onUseSatchel: () -> ()
 ): InputController
     local self = setmetatable({
         _hud = hud,
@@ -95,6 +97,14 @@ function InputController.new(
             { name = "Keyboard", key = Enum.KeyCode.P },
             { name = "Gamepad", key = Enum.KeyCode.DPadUp },
         }, hud:professionButton())
+        local useCharm = createBoolAction(context, "UseAmberCharm", {
+            { name = "Keyboard", key = Enum.KeyCode.C },
+            { name = "Gamepad", key = Enum.KeyCode.ButtonY },
+        }, hud:useCharmButton())
+        local useSatchel = createBoolAction(context, "UseMeadowSatchel", {
+            { name = "Keyboard", key = Enum.KeyCode.V },
+            { name = "Gamepad", key = Enum.KeyCode.DPadDown },
+        }, hud:useSatchelButton())
 
         table.insert(
             self._connections,
@@ -141,6 +151,22 @@ function InputController.new(
         table.insert(self._connections, (professionMenu :: any).Pressed:Connect(onProfessionMenu))
         table.insert(
             self._connections,
+            (useCharm :: any).Pressed:Connect(function()
+                if not hud:isProfessionMenuOpen() then
+                    onUseCharm()
+                end
+            end)
+        )
+        table.insert(
+            self._connections,
+            (useSatchel :: any).Pressed:Connect(function()
+                if not hud:isProfessionMenuOpen() then
+                    onUseSatchel()
+                end
+            end)
+        )
+        table.insert(
+            self._connections,
             (sprint :: any).Released:Connect(function()
                 onSprint(false)
             end)
@@ -162,7 +188,9 @@ function InputController.new(
             onSprint,
             onDodge,
             onProfessionAbility,
-            onProfessionMenu
+            onProfessionMenu,
+            onUseCharm,
+            onUseSatchel
         )
     end
 
@@ -198,7 +226,9 @@ function InputController._installFallback(
     onSprint: (boolean) -> (),
     onDodge: () -> (),
     onProfessionAbility: () -> (),
-    onProfessionMenu: () -> ()
+    onProfessionMenu: () -> (),
+    onUseCharm: () -> (),
+    onUseSatchel: () -> ()
 )
     table.insert(self._connections, self._hud:primaryButton().Activated:Connect(onInteract))
     table.insert(self._connections, self._hud:toolButton().Activated:Connect(onUseTool))
@@ -211,6 +241,8 @@ function InputController._installFallback(
         self._connections,
         self._hud:professionButton().Activated:Connect(onProfessionMenu)
     )
+    table.insert(self._connections, self._hud:useCharmButton().Activated:Connect(onUseCharm))
+    table.insert(self._connections, self._hud:useSatchelButton().Activated:Connect(onUseSatchel))
     table.insert(
         self._connections,
         self._hud:sprintButton().MouseButton1Down:Connect(function()
@@ -256,6 +288,10 @@ function InputController._installFallback(
                 onProfessionAbility()
             elseif input.KeyCode == Enum.KeyCode.P or input.KeyCode == Enum.KeyCode.DPadUp then
                 onProfessionMenu()
+            elseif input.KeyCode == Enum.KeyCode.C or input.KeyCode == Enum.KeyCode.ButtonY then
+                onUseCharm()
+            elseif input.KeyCode == Enum.KeyCode.V or input.KeyCode == Enum.KeyCode.DPadDown then
+                onUseSatchel()
             end
         end)
     )

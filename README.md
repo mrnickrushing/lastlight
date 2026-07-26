@@ -18,8 +18,9 @@ playable game exists.
 four active events, durable extraction settlement, player rescue, combat
 mobility, six-enemy first-night roster, four basic profession kits, Old Growth,
 the Warden Stag, the Bramblewake Blackout, permanent chapter-one resolution, a
-repeating town normal-night cycle, and a first pair of crafting recipes
-implemented; Studio and device exit gates remain pending.**
+repeating town normal-night cycle, a first pair of crafting recipes, and a
+first pair of consumable gear effects implemented; Studio and device exit
+gates remain pending.**
 
 The repository currently contains:
 
@@ -57,6 +58,10 @@ The repository currently contains:
 - a first pair of town crafting recipes that atomically convert banked
   expedition materials into named gear recorded on a player's own profile,
   gated to server-owned benches once First Light is complete;
+- a first pair of consumable gear effects — a stacking damage-reduction
+  shield and an instant stamina restore — that consume exactly one owned
+  item, check their own preconditions before spending it, and are usable
+  through dedicated keyboard, gamepad, and touch bindings;
 - persistent free-town selection for Scout, Warden, Engineer, and Medic, with
   server-owned reveal/slow, guard, lantern-repair, and area-heal abilities;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
@@ -67,7 +72,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 152 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 160 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -106,6 +111,9 @@ for the repeating town cycle are in
 The recipe authority, atomicity, gating, and persistence gates for the first
 crafting recipes are in
 [the crafting runbook](docs/MILESTONE_3_CRAFTING.md).
+The consumable-effect authority, atomicity, composability, and input-parity
+gates for the first gear effects are in
+[the gear effects runbook](docs/MILESTONE_3_GEAR_EFFECTS.md).
 
 The current UI direction is documented in the
 [Last Light mobile gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create).

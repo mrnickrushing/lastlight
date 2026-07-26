@@ -363,4 +363,17 @@ function SaveSchema.gearSnapshot(profile: Profile): { [string]: number }
     return table.clone(profile.gear)
 end
 
+function SaveSchema.withUsedGearItem(profile: Profile, itemId: string, now: number): (Profile, any)
+    local nextGear, result = Crafting.useItem(profile.gear, itemId)
+    if not result.applied then
+        return profile, result
+    end
+
+    local nextProfile = table.clone(profile)
+    nextProfile.gear = nextGear
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
 return table.freeze(SaveSchema)

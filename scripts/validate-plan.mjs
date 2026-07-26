@@ -32,6 +32,7 @@ const requiredFiles = [
   "docs/MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md",
   "docs/MILESTONE_3_NORMAL_NIGHT.md",
   "docs/MILESTONE_3_CRAFTING.md",
+  "docs/MILESTONE_3_GEAR_EFFECTS.md",
   "docs/PUBLISHING_RUNBOOK.md",
   "docs/DECISIONS.md",
   "src/shared/Environment.luau",

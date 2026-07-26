@@ -339,5 +339,24 @@ return {
                 TestRunner.equal(next(SaveSchema.gearSnapshot(profile)), nil)
             end,
         },
+        {
+            name = "withUsedGearItem consumes exactly one owned unit and rejects an empty stack",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    gear = { gear_amber_charm = 1 },
+                }, 100)
+                local used, result = SaveSchema.withUsedGearItem(profile, "gear_amber_charm", 200)
+                TestRunner.equal(result.applied, true)
+                TestRunner.equal(used.gear.gear_amber_charm, 0)
+                TestRunner.equal(used.revision, profile.revision + 1)
+                TestRunner.equal(profile.gear.gear_amber_charm, 1)
+
+                local rejected, rejectedResult =
+                    SaveSchema.withUsedGearItem(used, "gear_amber_charm", 300)
+                TestRunner.equal(rejectedResult.applied, false)
+                TestRunner.equal(rejectedResult.reason, "not_owned")
+                TestRunner.equal(rejected, used)
+            end,
+        },
     },
 }

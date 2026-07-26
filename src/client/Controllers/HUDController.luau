@@ -132,6 +132,8 @@ export type HUDController = typeof(setmetatable(
         _ability: TextButton,
         _compact: TextButton,
         _professionButton: TextButton,
+        _useCharm: TextButton,
+        _useSatchel: TextButton,
         _professionOverlay: Frame,
         _professionPanel: Frame,
         _professionCards: { [string]: TextButton },
@@ -700,6 +702,40 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     corner(professionButton, 12)
     stroke(professionButton, COLORS.amber, 0.42)
 
+    local useCharm = Instance.new("TextButton")
+    useCharm.Name = "UseAmberCharm"
+    useCharm.AnchorPoint = Vector2.new(1, 0)
+    useCharm.Position = UDim2.new(1, -18, 0, 110)
+    useCharm.Size = UDim2.fromOffset(118, 42)
+    useCharm.BackgroundColor3 = COLORS.panel
+    useCharm.BackgroundTransparency = 0.08
+    useCharm.Font = Enum.Font.GothamBold
+    useCharm.Text = "CHARM"
+    useCharm.TextColor3 = COLORS.amber
+    useCharm.TextSize = 12
+    useCharm.Visible = false
+    useCharm.ZIndex = 10
+    useCharm.Parent = canvas
+    corner(useCharm, 12)
+    stroke(useCharm, COLORS.amber, 0.42)
+
+    local useSatchel = Instance.new("TextButton")
+    useSatchel.Name = "UseMeadowSatchel"
+    useSatchel.AnchorPoint = Vector2.new(1, 0)
+    useSatchel.Position = UDim2.new(1, -18, 0, 156)
+    useSatchel.Size = UDim2.fromOffset(118, 42)
+    useSatchel.BackgroundColor3 = COLORS.panel
+    useSatchel.BackgroundTransparency = 0.08
+    useSatchel.Font = Enum.Font.GothamBold
+    useSatchel.Text = "SATCHEL"
+    useSatchel.TextColor3 = Color3.fromRGB(133, 176, 108)
+    useSatchel.TextSize = 12
+    useSatchel.Visible = false
+    useSatchel.ZIndex = 10
+    useSatchel.Parent = canvas
+    corner(useSatchel, 12)
+    stroke(useSatchel, Color3.fromRGB(133, 176, 108), 0.42)
+
     local professionOverlay = Instance.new("Frame")
     professionOverlay.Name = "ProfessionOverlay"
     professionOverlay.Size = UDim2.fromScale(1, 1)
@@ -857,6 +893,8 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _ability = ability,
         _compact = compact,
         _professionButton = professionButton,
+        _useCharm = useCharm,
+        _useSatchel = useSatchel,
         _professionOverlay = professionOverlay,
         _professionPanel = professionPanel,
         _professionCards = professionCards,
@@ -960,6 +998,14 @@ end
 
 function HUDController.professionButton(self: HUDController): TextButton
     return self._professionButton
+end
+
+function HUDController.useCharmButton(self: HUDController): TextButton
+    return self._useCharm
+end
+
+function HUDController.useSatchelButton(self: HUDController): TextButton
+    return self._useSatchel
 end
 
 function HUDController.setCompactHandler(self: HUDController, callback: (boolean) -> ())
@@ -1179,6 +1225,22 @@ function HUDController._updateProfessionClock(self: HUDController)
         else prefix .. compactAbilityName
 end
 
+-- Each craftable item gets its own fixed button rather than a picker, the
+-- same one-button-one-outcome choice the crafting benches themselves use;
+-- a button simply disappears once its item count reaches zero.
+function HUDController._updateGear(self: HUDController)
+    local state = self._currentState
+    local gear = if type(state) == "table" and type(state.gear) == "table" then state.gear else nil
+    local tutorialComplete = type(state) == "table" and state.tutorialComplete == true
+    local charmCount = if gear ~= nil then tonumber(gear.gear_amber_charm) or 0 else 0
+    local satchelCount = if gear ~= nil then tonumber(gear.gear_meadow_satchel) or 0 else 0
+
+    self._useCharm.Visible = tutorialComplete and not self._playerDowned and charmCount > 0
+    self._useCharm.Text = string.format("CHARM ×%d", charmCount)
+    self._useSatchel.Visible = tutorialComplete and not self._playerDowned and satchelCount > 0
+    self._useSatchel.Text = string.format("SATCHEL ×%d", satchelCount)
+end
+
 function HUDController.setInteraction(self: HUDController, label: string?, available: boolean)
     self._interactionLabel = label
     self._interactionAvailable = available
@@ -1253,8 +1315,10 @@ function HUDController._layout(self: HUDController)
         )
         self._threatFrame.Size = UDim2.new(1, -36, 0, 66)
         self._downedFrame.Size = UDim2.new(1, -36, 0, 90)
-        self._professionButton.Position =
-            UDim2.new(1, -18, 0, if self._compactEnabled then 158 else 218)
+        local professionY = if self._compactEnabled then 158 else 218
+        self._professionButton.Position = UDim2.new(1, -18, 0, professionY)
+        self._useCharm.Position = UDim2.new(1, -18, 0, professionY + 46)
+        self._useSatchel.Position = UDim2.new(1, -18, 0, professionY + 92)
         self._professionPanel.Size = UDim2.new(1, -24, 0, 440)
         self._ability.Position = UDim2.new(1, -158, 1, -138)
     else
@@ -1286,6 +1350,8 @@ function HUDController._layout(self: HUDController)
         self._threatFrame.Size = UDim2.fromOffset(330, 66)
         self._downedFrame.Size = UDim2.fromOffset(540, 90)
         self._professionButton.Position = UDim2.new(1, -18, 0, 64)
+        self._useCharm.Position = UDim2.new(1, -18, 0, 110)
+        self._useSatchel.Position = UDim2.new(1, -18, 0, 156)
         self._professionPanel.Size = UDim2.fromOffset(640, 440)
         self._ability.Position = UDim2.new(1, -346, 1, -40)
     end
@@ -1572,6 +1638,7 @@ function HUDController.update(self: HUDController, state: any)
     self._dodge.Visible = not self._playerDowned
         and (self._inputMode == "touch" or self._combatContext)
     self:_updateProfessionClock()
+    self:_updateGear()
     local eliteVisible = (type(boss) == "table" and (boss.active == true or boss.complete == true))
         or (type(elite) == "table" and (elite.active == true or elite.complete == true))
     eliteVisible = eliteVisible and not self._playerDowned

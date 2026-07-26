@@ -351,3 +351,36 @@ than two recipes to choose between — and keeps every trust boundary the same
 one already covered by the existing interaction-validation tests. A real
 recipe-browsing UI remains open work once the catalog is large enough to
 need one.
+
+## 2026-07-26 — Crafted gear starts as consumable buffs, not equipment
+
+**Decision:** Using a crafted item consumes exactly one unit and applies a
+short one-time effect (a damage-reduction shield for the Amber Charm, an
+instant stamina restore for the Meadow Satchel). There is no equip/unequip
+state, no permanent passive stat change, and no new gear visuals — an item
+is either owned or spent.
+
+**Reason:** No equipment/loadout system exists anywhere in this codebase
+yet, and Milestone 6 explicitly owns "equipment traits, repair, loadouts"
+as its own scope. A consumable effect reuses patterns that already exist
+(`StatusEffectState`'s duration+multiplier shape for drowsy/rooted,
+`CombatState`'s advance-then-mutate shape for sprint/dodge) instead of
+inventing a new stat-modifier pipeline, and it gives the crafting economy
+a second, genuine sink (spending an item, not just banking materials into
+one) without committing to a full equipment system's design before that
+system's own milestone.
+
+## 2026-07-26 — An item-granted shield stacks with Warden's own mitigation
+
+**Decision:** `PlayerCombatService.mitigateShieldedDamage` is checked
+independently of `ProfessionService.mitigateIncomingDamage` at every
+damage call site, applied after the profession check, so the two
+reductions compose instead of one replacing the other.
+
+**Reason:** Folding the Amber Charm's effect into `ProfessionState`'s own
+`mitigatesDamage` tracking would couple a universally craftable item to
+state that's designed around a single profession's ability, and would make
+a Warden's guard and a charm mutually exclusive for no reason. Keeping them
+as two independent checks costs one extra line at each of the three
+existing damage call sites and keeps a charm equally useful regardless of
+profession.
