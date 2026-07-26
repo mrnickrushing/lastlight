@@ -31,7 +31,7 @@ Open `build/LastLightTest.rbxlx`, start a server with one player, and require al
 of the following in Output:
 
 - `[Last Light] PASS FoundationIntegration`;
-- `server_boot_complete` with build `0.7.0` and `services=10`;
+- `server_boot_complete` with build `0.8.0` and `services=11`;
 - no red errors, infinite yields, or DataStore production writes.
 
 The integration assertion verifies the runtime remotes, world-ready signal,
@@ -66,9 +66,9 @@ Repeat rescue, gathering, tool choice, build, sprint, and attack with:
 
 | Input | Expected bindings and UI |
 |---|---|
-| Touch | large contextual button; hold RUN button; STRIKE during night; no overlap with thumbstick or jump |
-| Keyboard/mouse | `E` interact, hold `LeftShift` sprint, left mouse attack |
-| Controller | `X` interact, hold left stick click sprint, right trigger attack |
+| Touch | large contextual button; hold RUN; STRIKE and DODGE during combat; no overlap with thumbstick or jump |
+| Keyboard/mouse | `E` interact, hold `LeftShift` sprint, left mouse attack, `LeftAlt` dodge |
+| Controller | `X` interact, hold left stick click sprint, right trigger attack, `B`/Circle dodge |
 | Live switch | connect/use controller after touch or keyboard; prompt labels and touch buttons update without resetting progress |
 
 Roblox's default movement, camera, jump, and reserved menu controls must remain

@@ -21,6 +21,8 @@ assert(sharedRoot:FindFirstChild("SaveSchema") ~= nil, "game build is missing Sa
 assert(sharedRoot:FindFirstChild("RuntimeIds") ~= nil, "game build is missing RuntimeIds")
 assert(sharedRoot:FindFirstChild("ReviveFlow") ~= nil, "game build is missing ReviveFlow")
 assert(sharedRoot:FindFirstChild("SurvivalState") ~= nil, "game build is missing SurvivalState")
+assert(sharedRoot:FindFirstChild("CombatState") ~= nil, "game build is missing CombatState")
+assert(sharedRoot:FindFirstChild("EnemyAttackFlow") ~= nil, "game build is missing EnemyAttackFlow")
 assert(
     sharedRoot:FindFirstChild("ExpeditionGenerator") ~= nil,
     "game build is missing ExpeditionGenerator"
@@ -63,6 +65,7 @@ for _, serviceName in
         "Logger",
         "NetworkService",
         "PhaseService",
+        "PlayerCombatService",
         "PlayerSurvivalService",
         "ProfileService",
         "TutorialService",

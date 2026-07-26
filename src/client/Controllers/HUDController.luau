@@ -98,6 +98,9 @@ export type HUDController = typeof(setmetatable(
         _mara: TextLabel,
         _resource: TextLabel,
         _health: TextLabel,
+        _staminaFrame: Frame,
+        _staminaFill: Frame,
+        _staminaText: TextLabel,
         _toast: TextLabel,
         _lanternFrame: Frame,
         _lanternFill: Frame,
@@ -105,6 +108,9 @@ export type HUDController = typeof(setmetatable(
         _allyFrame: Frame,
         _allyTitle: TextLabel,
         _allyDetail: TextLabel,
+        _threatFrame: Frame,
+        _threatTitle: TextLabel,
+        _threatDetail: TextLabel,
         _downedFrame: Frame,
         _downedFill: Frame,
         _downedTimer: TextLabel,
@@ -113,6 +119,7 @@ export type HUDController = typeof(setmetatable(
         _primary: TextButton,
         _tool: TextButton,
         _sprint: TextButton,
+        _dodge: TextButton,
         _compact: TextButton,
         _currentState: any,
         _interactionLabel: string?,
@@ -120,6 +127,7 @@ export type HUDController = typeof(setmetatable(
         _inputMode: string,
         _compactEnabled: boolean,
         _playerDowned: boolean,
+        _combatContext: boolean,
         _lastToastRevision: number,
         _onCompact: ((boolean) -> ())?,
     },
@@ -266,6 +274,39 @@ function HUDController.new(playerGui: PlayerGui): HUDController
     corner(health, 20)
     stroke(health, COLORS.green, 0.34)
 
+    local staminaFrame = Instance.new("Frame")
+    staminaFrame.Name = "StaminaRail"
+    staminaFrame.AnchorPoint = Vector2.new(0, 1)
+    staminaFrame.Position = UDim2.new(0, 18, 1, -148)
+    staminaFrame.Size = UDim2.fromOffset(220, 34)
+    staminaFrame.BackgroundColor3 = COLORS.ink
+    staminaFrame.BackgroundTransparency = 0.08
+    staminaFrame.Visible = false
+    staminaFrame.Parent = canvas
+    corner(staminaFrame, 17)
+    stroke(staminaFrame, COLORS.blue, 0.36)
+
+    local staminaFill = Instance.new("Frame")
+    staminaFill.Name = "Fill"
+    staminaFill.Position = UDim2.fromOffset(4, 4)
+    staminaFill.Size = UDim2.new(1, -8, 1, -8)
+    staminaFill.BackgroundColor3 = COLORS.blue
+    staminaFill.BorderSizePixel = 0
+    staminaFill.Parent = staminaFrame
+    corner(staminaFill, 13)
+    local staminaText = textLabel(
+        staminaFrame,
+        "Text",
+        "STAMINA · 100",
+        UDim2.fromScale(1, 1),
+        UDim2.fromScale(0, 0),
+        13,
+        COLORS.ink,
+        Enum.TextXAlignment.Center
+    )
+    staminaText.Font = Enum.Font.GothamBold
+    staminaText.ZIndex = 2
+
     local toast = textLabel(
         canvas,
         "Toast",
@@ -353,6 +394,43 @@ function HUDController.new(playerGui: PlayerGui): HUDController
     )
     allyDetail.Font = Enum.Font.GothamBold
     allyDetail.ZIndex = 12
+
+    local threatFrame = Instance.new("Frame")
+    threatFrame.Name = "ThreatWarning"
+    threatFrame.AnchorPoint = Vector2.new(0.5, 0)
+    threatFrame.Position = UDim2.fromScale(0.5, 0.32)
+    threatFrame.Size = UDim2.fromOffset(330, 66)
+    threatFrame.BackgroundColor3 = Color3.fromRGB(47, 20, 18)
+    threatFrame.BackgroundTransparency = 0.04
+    threatFrame.Visible = false
+    threatFrame.ZIndex = 14
+    threatFrame.Parent = canvas
+    corner(threatFrame, 14)
+    stroke(threatFrame, COLORS.danger, 0.04)
+    local threatTitle = textLabel(
+        threatFrame,
+        "Title",
+        "!! ROOTLING SWIPE",
+        UDim2.new(1, -24, 0, 30),
+        UDim2.fromOffset(12, 5),
+        17,
+        COLORS.cream,
+        Enum.TextXAlignment.Center
+    )
+    threatTitle.Font = Enum.Font.GothamBold
+    threatTitle.ZIndex = 15
+    local threatDetail = textLabel(
+        threatFrame,
+        "Detail",
+        "DODGE OUT OF THE RING · 0.9s",
+        UDim2.new(1, -24, 0, 25),
+        UDim2.fromOffset(12, 34),
+        13,
+        COLORS.amber,
+        Enum.TextXAlignment.Center
+    )
+    threatDetail.Font = Enum.Font.GothamBold
+    threatDetail.ZIndex = 15
 
     local downedFrame = Instance.new("Frame")
     downedFrame.Name = "SelfDownedRail"
@@ -442,6 +520,10 @@ function HUDController.new(playerGui: PlayerGui): HUDController
     )
     sprint.Visible = UserInputService.TouchEnabled
     stroke(sprint, COLORS.blue, 0.2)
+    local dodge =
+        actionButton(canvas, "Dodge", "DODGE", 84, UDim2.new(1, -252, 1, -40), Vector2.new(1, 1))
+    dodge.Visible = false
+    stroke(dodge, COLORS.amber, 0.12)
 
     local compact = Instance.new("TextButton")
     compact.Name = "CompactToggle"
@@ -469,6 +551,9 @@ function HUDController.new(playerGui: PlayerGui): HUDController
         _mara = mara,
         _resource = resource,
         _health = health,
+        _staminaFrame = staminaFrame,
+        _staminaFill = staminaFill,
+        _staminaText = staminaText,
         _toast = toast,
         _lanternFrame = lanternFrame,
         _lanternFill = lanternFill,
@@ -476,6 +561,9 @@ function HUDController.new(playerGui: PlayerGui): HUDController
         _allyFrame = allyFrame,
         _allyTitle = allyTitle,
         _allyDetail = allyDetail,
+        _threatFrame = threatFrame,
+        _threatTitle = threatTitle,
+        _threatDetail = threatDetail,
         _downedFrame = downedFrame,
         _downedFill = downedFill,
         _downedTimer = downedTimer,
@@ -484,6 +572,7 @@ function HUDController.new(playerGui: PlayerGui): HUDController
         _primary = primary,
         _tool = tool,
         _sprint = sprint,
+        _dodge = dodge,
         _compact = compact,
         _currentState = nil,
         _interactionLabel = nil,
@@ -491,6 +580,7 @@ function HUDController.new(playerGui: PlayerGui): HUDController
         _inputMode = "keyboard",
         _compactEnabled = false,
         _playerDowned = false,
+        _combatContext = false,
         _lastToastRevision = 0,
         _onCompact = nil,
     }, HUDController)
@@ -525,7 +615,7 @@ function HUDController.new(playerGui: PlayerGui): HUDController
     local clockAccumulator = 0
     RunService.RenderStepped:Connect(function(deltaTime: number)
         clockAccumulator += deltaTime
-        if clockAccumulator < 1 then
+        if clockAccumulator < 0.1 then
             return
         end
         clockAccumulator = 0
@@ -551,6 +641,10 @@ function HUDController.sprintButton(self: HUDController): TextButton
     return self._sprint
 end
 
+function HUDController.dodgeButton(self: HUDController): TextButton
+    return self._dodge
+end
+
 function HUDController.setCompactHandler(self: HUDController, callback: (boolean) -> ())
     self._onCompact = callback
 end
@@ -558,11 +652,70 @@ end
 function HUDController.setInputMode(self: HUDController, mode: string)
     self._inputMode = mode
     self._sprint.Visible = mode == "touch" and not self._playerDowned
+    self._dodge.Visible = not self._playerDowned and (mode == "touch" or self._combatContext)
     self:setInteraction(self._interactionLabel, self._interactionAvailable)
     self._tool.Text = if mode == "keyboard"
         then "CLICK\nSTRIKE"
         elseif mode == "gamepad" then "RT\nSTRIKE"
         else "STRIKE"
+    self:_updateCombatClock()
+end
+
+function HUDController._updateCombatClock(self: HUDController)
+    local state = self._currentState
+    if state == nil then
+        return
+    end
+    local combat = state.combat
+    if type(combat) ~= "table" then
+        self._staminaFrame.Visible = false
+        self._dodge.Visible = false
+        return
+    end
+
+    local now = workspace:GetServerTimeNow()
+    local stamina = math.max(0, tonumber(combat.stamina) or 0)
+    local maxStamina = math.max(1, tonumber(combat.maxStamina) or 100)
+    local dodgeCost = math.max(1, tonumber(combat.dodgeCost) or 35)
+    local dodgeReadyAt = tonumber(combat.dodgeReadyAt) or 0
+    local dodgeActiveUntil = tonumber(combat.dodgeActiveUntil) or 0
+    local cooldownRemaining = math.max(0, dodgeReadyAt - now)
+    local combatEnabled = combat.enabled ~= false
+    local dodgeActive = combatEnabled and now < dodgeActiveUntil
+    local ready = combatEnabled
+        and not self._playerDowned
+        and cooldownRemaining <= 0
+        and stamina >= dodgeCost
+
+    self._staminaFill.Size = UDim2.new(math.clamp(stamina / maxStamina, 0, 1), -8, 1, -8)
+    self._staminaFill.BackgroundColor3 = if stamina < dodgeCost
+        then COLORS.danger
+        elseif stamina < maxStamina * 0.55 then COLORS.amber
+        else COLORS.blue
+    self._staminaText.Text = if stamina < dodgeCost
+        then string.format("LOW STAMINA · %d", stamina)
+        else string.format("STAMINA · %d", stamina)
+    self._staminaText.TextColor3 = if stamina < maxStamina * 0.45 then COLORS.cream else COLORS.ink
+    self._staminaFrame.Visible = not self._playerDowned
+        and (self._combatContext or stamina < maxStamina or cooldownRemaining > 0)
+
+    self._dodge.Active = ready
+    self._dodge.AutoButtonColor = ready
+    self._dodge.BackgroundColor3 = if dodgeActive
+        then COLORS.green
+        elseif ready then COLORS.panel
+        else Color3.fromRGB(42, 48, 45)
+    self._dodge.TextColor3 = if ready or dodgeActive then COLORS.cream else COLORS.muted
+    local prefix = if self._inputMode == "keyboard"
+        then "ALT\n"
+        elseif self._inputMode == "gamepad" then "B\n"
+        else ""
+    self._dodge.Text = if dodgeActive
+        then "DODGE\nACTIVE"
+        elseif not combatEnabled then "DODGE\nOFF"
+        elseif cooldownRemaining > 0 then string.format("DODGE\n%.1fs", cooldownRemaining)
+        elseif stamina < dodgeCost then "DODGE\nLOW"
+        else prefix .. "DODGE"
 end
 
 function HUDController.setInteraction(self: HUDController, label: string?, available: boolean)
@@ -613,6 +766,9 @@ function HUDController._layout(self: HUDController)
         self._allyFrame.Position =
             UDim2.new(0.5, 0, 0, if self._lanternFrame.Visible then 254 else 212)
         self._allyFrame.Size = UDim2.new(1, -36, 0, 64)
+        self._threatFrame.Position =
+            UDim2.new(0.5, 0, 0, if self._allyFrame.Visible then 326 else 254)
+        self._threatFrame.Size = UDim2.new(1, -36, 0, 66)
         self._downedFrame.Size = UDim2.new(1, -36, 0, 90)
     else
         self._objectiveFrame.Position = UDim2.fromOffset(18, 18)
@@ -626,6 +782,8 @@ function HUDController._layout(self: HUDController)
         self._allyFrame.Position =
             UDim2.new(0.5, 0, 0, if self._lanternFrame.Visible then 108 else 66)
         self._allyFrame.Size = UDim2.fromOffset(330, 64)
+        self._threatFrame.Position = UDim2.fromScale(0.5, 0.32)
+        self._threatFrame.Size = UDim2.fromOffset(330, 66)
         self._downedFrame.Size = UDim2.fromOffset(540, 90)
     end
 end
@@ -648,6 +806,19 @@ function HUDController._updateClock(self: HUDController)
     end
     if self._phase.Text ~= clockText then
         self._phase.Text = clockText
+    end
+    self:_updateCombatClock()
+
+    local threat = state.threat
+    if type(threat) == "table" and not self._playerDowned then
+        local remaining =
+            math.max(0, (tonumber(threat.resolvesAt) or 0) - workspace:GetServerTimeNow())
+        self._threatTitle.Text = "!! " .. tostring(threat.displayName or "THREAT")
+        self._threatDetail.Text =
+            string.format("%s · %.1fs", tostring(threat.instruction or "MOVE"), remaining)
+        self._threatFrame.Visible = remaining > 0
+    else
+        self._threatFrame.Visible = false
     end
 
     local survival = state.survival
@@ -696,6 +867,7 @@ function HUDController.update(self: HUDController, state: any)
     local survival = state.survival
     local selfSurvival = if type(survival) == "table" then survival.self else nil
     self._playerDowned = type(selfSurvival) == "table" and selfSurvival.downed == true
+    self._combatContext = state.nightActive == true or state.expeditionActive == true
     local ally = if type(survival) == "table" then survival.ally else nil
     self._downedFrame.Visible = self._playerDowned
     self._allyFrame.Visible = type(ally) == "table" and not self._playerDowned
@@ -732,6 +904,8 @@ function HUDController.update(self: HUDController, state: any)
         and ((tonumber(state.resources) or 0) > 0 or state.selectedTool ~= nil)
     self._tool.Visible = nightActive and not self._playerDowned
     self._sprint.Visible = self._inputMode == "touch" and not self._playerDowned
+    self._dodge.Visible = not self._playerDowned
+        and (self._inputMode == "touch" or self._combatContext)
     self._lanternFrame.Visible = nightActive
     local lanternHealth = math.clamp(tonumber(state.lanternHealth) or 100, 0, 100)
     self._lanternFill.Size = UDim2.new(lanternHealth / 100, -8, 1, -8)
@@ -746,6 +920,7 @@ function HUDController.update(self: HUDController, state: any)
     self._mara.Visible = not self._compactEnabled and not self._playerDowned
     self:setInteraction(self._interactionLabel, self._interactionAvailable)
     self:_layout()
+    self:_updateCombatClock()
 
     local revision = tonumber(state.toastRevision) or 0
     if revision > self._lastToastRevision and state.toast ~= nil then

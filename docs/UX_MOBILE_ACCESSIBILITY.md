@@ -21,6 +21,11 @@ The player-down state uses the
 as hierarchy guidance: a non-modal bottom rail for self state, one compact ally
 alert, and a world-bound contextual revive target.
 
+The combat-mobility state uses the
+[Mobile Combat Stamina + Dodge report](https://www.lazyweb.com/report/lazyweb/4e46b6e2-7bef-4633-a7b5-ed7a872da2e8/?source=create)
+as hierarchy guidance: context-sensitive stamina, one thumb-safe dodge action,
+and a targeted text warning paired with a world-space impact shape.
+
 The design follows current Roblox guidance for
 [mobile input](https://create.roblox.com/docs/input/mobile),
 [reserved mobile control zones](https://create.roblox.com/docs/building-and-visuals/ui/positioning-and-sizing-guiobjects),
@@ -112,7 +117,7 @@ hardcodes a key name.
 | Context action | large labeled button | E, remappable | X/Square |
 | Primary | right action button | mouse 1 | right trigger |
 | Alternate/guard | secondary action | mouse 2 | left trigger |
-| Dodge | action button | Space/Alt when not jump conflict | B/Circle |
+| Dodge | action button | Left Alt, remappable | B/Circle |
 | Profession ability | labeled cooldown button | Q | bumper |
 | Companion command | contextual small radial | C | D-pad |
 | Ping | tap marker/radial | middle mouse/G | D-pad |

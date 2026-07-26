@@ -85,21 +85,24 @@ this milestone to complete from CI alone.
 ## Milestone 3 — Bramblewake vertical slice
 
 **Increment status (2026-07-26):** the expedition foundation, first active
-event layer, durable extraction settlement, and player rescue loop are
+event layer, durable extraction settlement, player rescue loop, and combat
+mobility/telegraph foundation are
 implemented in source. The slice now has 12 representative modules, four POIs,
 four active events with 13 shared steps, deterministic assembly, a known-good
 fallback, 1,000-seed invariants, streamed preview geometry, beacon entry,
 fall recovery, timeout-safe optional routes, schema-v2 unbanked/banked materials,
 run-specific reward and settlement tombstones, Wayhome return, kill switch,
 telemetry, HUD progress, server-owned health, Rootling contact damage, downed
-crawl, interruption-safe revive, bleedout-safe retreat, and rescue telemetry/HUD.
+crawl, interruption-safe revive, bleedout-safe retreat, server stamina,
+sprint/dodge timing, a Rootling swipe telegraph, and rescue/combat telemetry/HUD.
 Profession kits, full inventory/crafting/quests, the remaining enemies, elite,
 boss, normal night, Blackout, town tier, final art/audio, and all
 Studio/device/group evidence remain open. See
 [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md) and
 [MILESTONE_3_BRAMBLEWAKE_EVENTS.md](MILESTONE_3_BRAMBLEWAKE_EVENTS.md), and
 [MILESTONE_3_INVENTORY_EXTRACTION.md](MILESTONE_3_INVENTORY_EXTRACTION.md), and
-[MILESTONE_3_PLAYER_SURVIVAL.md](MILESTONE_3_PLAYER_SURVIVAL.md).
+[MILESTONE_3_PLAYER_SURVIVAL.md](MILESTONE_3_PLAYER_SURVIVAL.md), and
+[MILESTONE_3_COMBAT_MOBILITY.md](MILESTONE_3_COMBAT_MOBILITY.md).
 
 ### Deliverables
 

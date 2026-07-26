@@ -28,6 +28,7 @@ local RuntimeIds = {
         Interact = "interact",
         UseTool = "use_tool",
         Sprint = "sprint",
+        Dodge = "dodge",
         CompactHud = "compact_hud",
         ExpeditionEvent = "expedition_event",
         Extract = "extract",

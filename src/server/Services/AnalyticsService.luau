@@ -231,6 +231,41 @@ function AnalyticsService.playerRecovered(self: AnalyticsService, player: Player
     })
 end
 
+function AnalyticsService.combatAction(
+    self: AnalyticsService,
+    player: Player,
+    action: string,
+    applied: boolean,
+    reason: string?,
+    stamina: number
+)
+    self._logger:info("combat_action", {
+        action = action,
+        applied = applied,
+        player = player.UserId,
+        reason = reason or "accepted",
+        stamina = math.floor(stamina + 0.5),
+    })
+    if applied and action == "dodge" and not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "CombatDodgeUsed", 1, {})
+        end)
+    end
+end
+
+function AnalyticsService.enemyAttackResult(self: AnalyticsService, player: Player, result: string)
+    self._logger:info("enemy_attack_result", {
+        enemy = "enemy_bramblewake_rootling",
+        player = player.UserId,
+        result = result,
+    })
+    if result == "dodged" and not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "RootlingAttackDodged", 1, {})
+        end)
+    end
+end
+
 function AnalyticsService.clear(self: AnalyticsService, player: Player)
     self._startedAt[player] = nil
     self._expeditionStarted[player] = nil

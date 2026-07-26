@@ -21,6 +21,13 @@ grounds the player-survival increment. Its exact real-time co-op coverage was
 limited, so it was used for hierarchy and occlusion guidance rather than copied
 as a genre convention.
 
+The
+[Mobile Combat Stamina + Dodge report](https://www.lazyweb.com/report/lazyweb/4e46b6e2-7bef-4633-a7b5-ed7a872da2e8/?source=create)
+grounds the combat-mobility layer. Its genre coverage was also directional, so
+the implementation applies its hierarchy guidance to Last Light's existing HUD:
+one contextual stamina rail, one large dodge action, and one targeted attack
+warning backed by a world-space impact zone.
+
 ## Chosen system
 
 The default is a **context-sensitive survival HUD**:
@@ -55,6 +62,15 @@ For player rescue, the same system becomes:
   revive interaction;
 - text, countdown, direction, distance, and shape in addition to color;
 - no modal, store prompt, or separate tiny help button during the timed state.
+
+For combat mobility, the same system becomes:
+
+- stamina visible during combat, spending, recovery, or cooldown rather than as
+  permanent safe-town clutter;
+- one text-labeled dodge action with ready, low, cooldown, and active states;
+- one targeted attack alert only while the server telegraph is active;
+- a locked world zone plus explicit attack name, dodge instruction, and time;
+- no color-only warning or expanded multi-slot action bar.
 
 ## Visual targets
 

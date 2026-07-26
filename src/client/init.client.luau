@@ -48,6 +48,8 @@ end, function()
     send(RuntimeIds.Actions.UseTool)
 end, function(enabled: boolean)
     send(RuntimeIds.Actions.Sprint, { enabled = enabled })
+end, function()
+    send(RuntimeIds.Actions.Dodge)
 end)
 
 hud:setCompactHandler(function(enabled: boolean)

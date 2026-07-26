@@ -3,9 +3,11 @@
 local TestRunner = require("./TestRunner")
 
 TestRunner.run({
+    require("./specs/CombatState.spec"),
     require("./specs/ContentId.spec"),
     require("./specs/ContentRegistry.spec"),
     require("./specs/Environment.spec"),
+    require("./specs/EnemyAttackFlow.spec"),
     require("./specs/ExpeditionEventFlow.spec"),
     require("./specs/ExpeditionGenerator.spec"),
     require("./specs/ExpeditionInventory.spec"),
