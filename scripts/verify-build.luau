@@ -48,6 +48,10 @@ assert(
     sharedRoot:FindFirstChild("WardenStagEncounter") ~= nil,
     "game build is missing WardenStagEncounter"
 )
+assert(
+    sharedRoot:FindFirstChild("BramblewakeBlackout") ~= nil,
+    "game build is missing BramblewakeBlackout"
+)
 local contentDefinitions = assert(
     sharedRoot:FindFirstChild("Content"),
     "game build is missing Content"
@@ -68,6 +72,7 @@ assert(services ~= nil, "game build is missing server services")
 for _, serviceName in
     {
         "AnalyticsService",
+        "BramblewakeBlackoutService",
         "EnemyService",
         "ExpeditionService",
         "FeatureFlagService",

@@ -141,6 +141,455 @@ gui:Destroy()
       </Properties>
       <Item class="ModuleScript" referent="4">
         <Properties>
+          <string name="Name">BramblewakeBlackout</string>
+          <string name="Source"><![CDATA[--!strict
+
+local BramblewakeBlackout = {}
+
+export type Status =
+    "disabled"
+    | "dormant"
+    | "relay"
+    | "old_growth"
+    | "warden"
+    | "resolution"
+    | "complete"
+
+export type State = {
+    carriers: { [string]: number },
+    decision: string?,
+    deliveredNodes: { [string]: boolean },
+    duration: number,
+    manifestHash: string,
+    participants: { [string]: boolean },
+    revision: number,
+    runId: string,
+    startedAt: number?,
+    status: Status,
+    targetEndsAt: number?,
+    votes: { [string]: string },
+    wardenOutcome: string?,
+}
+
+local RELAY_NODE_IDS = table.freeze({
+    blackout_root_farm = true,
+    blackout_root_mill = true,
+    blackout_root_cathedral = true,
+})
+local DECISION_IDS = table.freeze({
+    restore_farmland = true,
+    wild_regrowth = true,
+    shared_agroforest = true,
+})
+local WARDEN_OUTCOMES = table.freeze({
+    preserved = true,
+    scarred = true,
+    harmed = true,
+})
+local STAGE_INDEX = table.freeze({
+    relay = 1,
+    old_growth = 2,
+    warden = 3,
+    resolution = 4,
+    complete = 4,
+})
+local STAGE_LABEL = table.freeze({
+    relay = "ROOTFIRE RELAY",
+    old_growth = "OLD GROWTH",
+    warden = "WARDEN'S SEAL",
+    resolution = "GREENWARD CHOICE",
+    complete = "CHAPTER RESOLVED",
+})
+
+BramblewakeBlackout.Id = "blackout_bramblewake"
+BramblewakeBlackout.RelayNodeIds = RELAY_NODE_IDS
+BramblewakeBlackout.DecisionIds = DECISION_IDS
+BramblewakeBlackout.FireCarrySeconds = 18
+BramblewakeBlackout.StageCount = 4
+
+local function participantKey(userId: number): string
+    assert(userId > 0 and userId == math.floor(userId), "Blackout participant ID is invalid")
+    return tostring(userId)
+end
+
+local function cloneState(state: State): State
+    local nextState = table.clone(state)
+    nextState.carriers = table.clone(state.carriers)
+    nextState.deliveredNodes = table.clone(state.deliveredNodes)
+    nextState.participants = table.clone(state.participants)
+    nextState.votes = table.clone(state.votes)
+    return nextState
+end
+
+local function countTrue(values: { [string]: boolean }): number
+    local count = 0
+    for _, value in values do
+        if value then
+            count += 1
+        end
+    end
+    return count
+end
+
+local function active(status: Status): boolean
+    return status == "relay"
+        or status == "old_growth"
+        or status == "warden"
+        or status == "resolution"
+end
+
+function BramblewakeBlackout.create(
+    runId: string,
+    manifestHash: string,
+    enabled: boolean,
+    duration: number
+): State
+    assert(runId ~= "", "Blackout run ID is required")
+    assert(manifestHash ~= "", "Blackout manifest hash is required")
+    assert(duration >= 60 and duration <= 30 * 60, "Blackout duration is invalid")
+    return {
+        carriers = {},
+        decision = nil,
+        deliveredNodes = {},
+        duration = duration,
+        manifestHash = manifestHash,
+        participants = {},
+        revision = 0,
+        runId = runId,
+        startedAt = nil,
+        status = if enabled then "dormant" else "disabled",
+        targetEndsAt = nil,
+        votes = {},
+        wardenOutcome = nil,
+    }
+end
+
+function BramblewakeBlackout.start(state: State, userId: number, now: number): (State, any)
+    if state.status ~= "dormant" then
+        return state, {
+            accepted = false,
+            reason = state.status,
+        }
+    end
+    local nextState = cloneState(state)
+    nextState.participants[participantKey(userId)] = true
+    nextState.startedAt = now
+    nextState.status = "relay"
+    nextState.targetEndsAt = now + nextState.duration
+    nextState.revision += 1
+    return nextState, {
+        accepted = true,
+        reason = "started",
+    }
+end
+
+function BramblewakeBlackout.join(state: State, userId: number): State
+    if not active(state.status) then
+        return state
+    end
+    local key = participantKey(userId)
+    if state.participants[key] then
+        return state
+    end
+    local nextState = cloneState(state)
+    nextState.participants[key] = true
+    nextState.revision += 1
+    return nextState
+end
+
+function BramblewakeBlackout.takeFire(state: State, userId: number, now: number): (State, any)
+    if state.status ~= "relay" then
+        return state, {
+            accepted = false,
+            reason = state.status,
+        }
+    end
+    local key = participantKey(userId)
+    local nextState = cloneState(state)
+    nextState.carriers[key] = now + BramblewakeBlackout.FireCarrySeconds
+    nextState.participants[key] = true
+    nextState.revision += 1
+    return nextState,
+        {
+            accepted = true,
+            expiresAt = nextState.carriers[key],
+            reason = "fire_taken",
+        }
+end
+
+function BramblewakeBlackout.deliverFire(
+    state: State,
+    userId: number,
+    nodeId: string,
+    now: number
+): (State, any)
+    if state.status ~= "relay" then
+        return state, {
+            accepted = false,
+            reason = state.status,
+        }
+    end
+    if RELAY_NODE_IDS[nodeId] ~= true then
+        return state,
+            {
+                accepted = false,
+                reason = "invalid_relay_node",
+            }
+    end
+    if state.deliveredNodes[nodeId] then
+        return state,
+            {
+                accepted = false,
+                reason = "already_delivered",
+            }
+    end
+    local key = participantKey(userId)
+    local expiresAt = state.carriers[key]
+    if expiresAt == nil or now > expiresAt then
+        return state,
+            {
+                accepted = false,
+                reason = if expiresAt == nil then "fire_required" else "fire_expired",
+            }
+    end
+
+    local nextState = cloneState(state)
+    nextState.carriers[key] = nil
+    nextState.deliveredNodes[nodeId] = true
+    nextState.participants[key] = true
+    local delivered = countTrue(nextState.deliveredNodes)
+    if delivered >= 3 then
+        nextState.status = "old_growth"
+        table.clear(nextState.carriers)
+    end
+    nextState.revision += 1
+    return nextState,
+        {
+            accepted = true,
+            delivered = delivered,
+            reason = if nextState.status == "old_growth"
+                then "relay_complete"
+                else "fire_delivered",
+            relayComplete = nextState.status == "old_growth",
+            required = 3,
+        }
+end
+
+function BramblewakeBlackout.completeOldGrowth(state: State): (State, any)
+    if state.status ~= "old_growth" then
+        return state, {
+            accepted = false,
+            reason = state.status,
+        }
+    end
+    local nextState = cloneState(state)
+    nextState.status = "warden"
+    nextState.revision += 1
+    return nextState, {
+        accepted = true,
+        reason = "old_growth_complete",
+    }
+end
+
+function BramblewakeBlackout.completeWarden(state: State, outcome: string): (State, any)
+    if state.status ~= "warden" then
+        return state, {
+            accepted = false,
+            reason = state.status,
+        }
+    end
+    if WARDEN_OUTCOMES[outcome] ~= true then
+        return state,
+            {
+                accepted = false,
+                reason = "invalid_warden_outcome",
+            }
+    end
+    local nextState = cloneState(state)
+    nextState.status = "resolution"
+    nextState.wardenOutcome = outcome
+    nextState.revision += 1
+    return nextState, {
+        accepted = true,
+        reason = "warden_complete",
+    }
+end
+
+local function resolveVote(votes: { [string]: string }, eligibleUserIds: { number }): string?
+    local counts = {
+        restore_farmland = 0,
+        wild_regrowth = 0,
+        shared_agroforest = 0,
+    }
+    local eligible = 0
+    for _, userId in eligibleUserIds do
+        local vote = votes[participantKey(userId)]
+        if vote == nil then
+            return nil
+        end
+        counts[vote] += 1
+        eligible += 1
+    end
+    if eligible == 0 then
+        return nil
+    end
+    local highest =
+        math.max(counts.restore_farmland, counts.wild_regrowth, counts.shared_agroforest)
+    local winner: string? = nil
+    local winners = 0
+    for _, decision in { "restore_farmland", "wild_regrowth", "shared_agroforest" } do
+        if counts[decision] == highest then
+            winner = decision
+            winners += 1
+        end
+    end
+    return if winners == 1 then winner else "shared_agroforest"
+end
+
+function BramblewakeBlackout.vote(
+    state: State,
+    userId: number,
+    decision: string,
+    eligibleUserIds: { number }
+): (State, any)
+    if state.status ~= "resolution" then
+        return state, {
+            accepted = false,
+            reason = state.status,
+        }
+    end
+    if DECISION_IDS[decision] ~= true then
+        return state,
+            {
+                accepted = false,
+                reason = "invalid_decision",
+            }
+    end
+    local key = participantKey(userId)
+    if state.participants[key] ~= true then
+        return state,
+            {
+                accepted = false,
+                reason = "not_participant",
+            }
+    end
+    local eligible = false
+    for _, eligibleUserId in eligibleUserIds do
+        if eligibleUserId == userId then
+            eligible = true
+            break
+        end
+    end
+    if not eligible then
+        return state, {
+            accepted = false,
+            reason = "not_eligible",
+        }
+    end
+
+    local nextState = cloneState(state)
+    nextState.votes[key] = decision
+    local resolved = resolveVote(nextState.votes, eligibleUserIds)
+    if resolved ~= nil then
+        nextState.decision = resolved
+        nextState.status = "complete"
+    end
+    nextState.revision += 1
+    return nextState,
+        {
+            accepted = true,
+            decision = resolved,
+            reason = if resolved == nil then "vote_recorded" else "resolved",
+            resolved = resolved ~= nil,
+        }
+end
+
+function BramblewakeBlackout.reconcileVote(state: State, eligibleUserIds: { number }): (State, any)
+    if state.status ~= "resolution" then
+        return state,
+            {
+                accepted = false,
+                reason = state.status,
+                resolved = false,
+            }
+    end
+    local resolved = resolveVote(state.votes, eligibleUserIds)
+    if resolved == nil then
+        return state,
+            {
+                accepted = true,
+                reason = "vote_pending",
+                resolved = false,
+            }
+    end
+    local nextState = cloneState(state)
+    nextState.decision = resolved
+    nextState.status = "complete"
+    nextState.revision += 1
+    return nextState,
+        {
+            accepted = true,
+            decision = resolved,
+            reason = "resolved",
+            resolved = true,
+        }
+end
+
+function BramblewakeBlackout.snapshot(state: State, userId: number, now: number): any
+    local key = tostring(userId)
+    local startedAt = state.startedAt
+    local targetEndsAt = state.targetEndsAt
+    local elapsed = if startedAt == nil then 0 else math.max(0, now - startedAt)
+    local remaining = if targetEndsAt == nil
+        then state.duration
+        else math.max(0, targetEndsAt - now)
+    local fireExpiresAt = state.carriers[key]
+    local carryingFire = fireExpiresAt ~= nil and now <= fireExpiresAt
+    local delivered = countTrue(state.deliveredNodes)
+    local instruction = if state.status == "relay"
+        then "CARRY LANTERN FIRE BETWEEN LIVING ROOTS"
+        elseif state.status == "old_growth" then "CLEANSE OLD GROWTH"
+        elseif state.status == "warden" then "ANSWER THE WARDEN'S SEAL"
+        elseif state.status == "resolution" then "CHOOSE THE GREENWARD'S FUTURE"
+        elseif state.status == "complete" then "CHAPTER I RESOLVED"
+        elseif state.status == "dormant" then "ENTER BRAMBLEWAKE TO BEGIN THE BLACKOUT"
+        else "BRAMBLEWAKE BLACKOUT DISABLED"
+    return {
+        active = active(state.status),
+        carryingFire = carryingFire,
+        chapterComplete = state.status == "complete",
+        decision = state.decision,
+        deliveredNodes = delivered,
+        duration = state.duration,
+        elapsed = elapsed,
+        enabled = state.status ~= "disabled",
+        fireExpiresAt = if carryingFire then fireExpiresAt else nil,
+        instruction = instruction,
+        overtime = targetEndsAt ~= nil and now > targetEndsAt,
+        participant = state.participants[key] == true,
+        relayRequired = 3,
+        remaining = remaining,
+        revision = state.revision,
+        stage = STAGE_INDEX[state.status] or 0,
+        stageCount = BramblewakeBlackout.StageCount,
+        stageLabel = STAGE_LABEL[state.status] or "BLACKOUT",
+        status = state.status,
+        targetEndsAt = targetEndsAt,
+        vote = state.votes[key],
+        wardenOutcome = state.wardenOutcome,
+    }
+end
+
+function BramblewakeBlackout.chapterTransactionId(state: State, userId: number): string
+    return string.format("chapter_1:%s:%s:%d", state.runId, state.manifestHash, userId)
+end
+
+return table.freeze(BramblewakeBlackout)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="5">
+        <Properties>
           <string name="Name">BramblewakeEnemies</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -403,7 +852,7 @@ return table.freeze(BramblewakeEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="5">
+      <Item class="ModuleScript" referent="6">
         <Properties>
           <string name="Name">CombatState</string>
           <string name="Source"><![CDATA[--!strict
@@ -635,21 +1084,21 @@ return table.freeze(CombatState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="6">
+      <Item class="ModuleScript" referent="7">
         <Properties>
           <string name="Name">Config</string>
           <string name="Source"><![CDATA[--!strict
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.12.0",
+    BuildVersion = "0.13.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 3,
+    SaveSchemaVersion = 4,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -693,6 +1142,7 @@ return table.freeze({
         bramblewake_events_enabled = true,
         old_growth_elite_enabled = true,
         warden_stag_boss_enabled = true,
+        bramblewake_blackout_enabled = true,
         region_bramblewake_enabled = true,
         region_ironroot_enabled = false,
         region_mireglass_enabled = false,
@@ -727,11 +1177,11 @@ return table.freeze({
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="7">
+      <Item class="Folder" referent="8">
         <Properties>
           <string name="Name">Content</string>
         </Properties>
-        <Item class="ModuleScript" referent="8">
+        <Item class="ModuleScript" referent="9">
           <Properties>
             <string name="Name">ContentId</string>
             <string name="Source"><![CDATA[--!strict
@@ -776,11 +1226,11 @@ return table.freeze(ContentId)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="Folder" referent="9">
+        <Item class="Folder" referent="10">
           <Properties>
             <string name="Name">Definitions</string>
           </Properties>
-          <Item class="ModuleScript" referent="10">
+          <Item class="ModuleScript" referent="11">
             <Properties>
               <string name="Name">BramblewakeExpedition</string>
               <string name="Source"><![CDATA[--!strict
@@ -1223,6 +1673,7 @@ return table.freeze({
     EventInteractionCount = eventInteractionCount,
     PartBudget = 480,
     BossArenaPartBudget = 40,
+    BlackoutPartBudget = 20,
     LightBudget = 32,
     EffectBudget = 32,
     RequiredTags = table.freeze({
@@ -1244,7 +1695,7 @@ return table.freeze({
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="11">
+          <Item class="ModuleScript" referent="12">
             <Properties>
               <string name="Name">Regions</string>
               <string name="Source"><![CDATA[--!strict
@@ -1341,7 +1792,7 @@ return table.freeze(regions)
             </Properties>
           </Item>
         </Item>
-        <Item class="ModuleScript" referent="12">
+        <Item class="ModuleScript" referent="13">
           <Properties>
             <string name="Name">Registry</string>
             <string name="Source"><![CDATA[--!strict
@@ -1570,7 +2021,7 @@ return table.freeze(Registry)
           </Properties>
         </Item>
       </Item>
-      <Item class="ModuleScript" referent="13">
+      <Item class="ModuleScript" referent="14">
         <Properties>
           <string name="Name">EnemyAttackFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -1655,7 +2106,7 @@ return table.freeze(EnemyAttackFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="14">
+      <Item class="ModuleScript" referent="15">
         <Properties>
           <string name="Name">EnemyCombatRules</string>
           <string name="Source"><![CDATA[--!strict
@@ -1696,7 +2147,7 @@ return table.freeze(EnemyCombatRules)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="15">
+      <Item class="ModuleScript" referent="16">
         <Properties>
           <string name="Name">Environment</string>
           <string name="Source"><![CDATA[--!strict
@@ -1775,7 +2226,7 @@ return table.freeze(Environment)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="16">
+      <Item class="ModuleScript" referent="17">
         <Properties>
           <string name="Name">ExpeditionEventFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -2082,7 +2533,7 @@ return table.freeze(ExpeditionEventFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="17">
+      <Item class="ModuleScript" referent="18">
         <Properties>
           <string name="Name">ExpeditionGenerator</string>
           <string name="Source"><![CDATA[--!strict
@@ -2447,7 +2898,7 @@ return table.freeze(ExpeditionGenerator)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="18">
+      <Item class="ModuleScript" referent="19">
         <Properties>
           <string name="Name">ExpeditionInventory</string>
           <string name="Source"><![CDATA[--!strict
@@ -2841,7 +3292,7 @@ return table.freeze(ExpeditionInventory)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="19">
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">ExpeditionRewardLedger</string>
           <string name="Source"><![CDATA[--!strict
@@ -2976,7 +3427,7 @@ return table.freeze(ExpeditionRewardLedger)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">NightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -3024,7 +3475,7 @@ return table.freeze(NightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">OldGrowthEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -3309,7 +3760,7 @@ return table.freeze(OldGrowthEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">ProfessionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -3419,7 +3870,7 @@ return table.freeze(ProfessionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">ProfessionState</string>
           <string name="Source"><![CDATA[--!strict
@@ -3571,7 +4022,7 @@ return table.freeze(ProfessionState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
@@ -3630,7 +4081,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -3745,7 +4196,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -3763,6 +4214,7 @@ local RuntimeIds = {
     ExpeditionExtractionTag = "LastLightExpeditionExtraction",
     ExpeditionEliteTag = "LastLightExpeditionElite",
     ExpeditionBossTag = "LastLightExpeditionBoss",
+    ExpeditionBlackoutTag = "LastLightExpeditionBlackout",
     PlayerDownedTag = "LastLightPlayerDowned",
     eventInteractionId = ExpeditionEventFlow.interactionId,
     Remotes = table.freeze({
@@ -3787,6 +4239,7 @@ local RuntimeIds = {
         ExpeditionEvent = "expedition_event",
         OldGrowthFire = "old_growth_fire",
         WardenStagChoice = "warden_stag_choice",
+        BramblewakeBlackout = "bramblewake_blackout",
         Extract = "extract",
         Revive = "revive",
     }),
@@ -3808,6 +4261,13 @@ local RuntimeIds = {
         WardenStagRootWest = "warden_stag_root_node_west",
         WardenStagAntlerLeft = "warden_stag_antler_left",
         WardenStagAntlerRight = "warden_stag_antler_right",
+        BlackoutFireSource = "blackout_fire_source",
+        BlackoutRootFarm = "blackout_root_farm",
+        BlackoutRootMill = "blackout_root_mill",
+        BlackoutRootCathedral = "blackout_root_cathedral",
+        BlackoutDecisionFarmland = "blackout_decision_farmland",
+        BlackoutDecisionWild = "blackout_decision_wild",
+        BlackoutDecisionShared = "blackout_decision_shared",
     }),
 }
 
@@ -3815,7 +4275,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -3843,11 +4303,31 @@ export type Profile = {
     profession: {
         selectedId: string?,
     },
+    story: {
+        chapterOne: {
+            completedAt: number?,
+            decision: string?,
+            status: string,
+            transactionId: string?,
+            wardenOutcome: string?,
+        },
+    },
 }
+
+local CHAPTER_ONE_DECISIONS = table.freeze({
+    restore_farmland = true,
+    wild_regrowth = true,
+    shared_agroforest = true,
+})
+local WARDEN_OUTCOMES = table.freeze({
+    preserved = true,
+    scarred = true,
+    harmed = true,
+})
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 3,
+        schemaVersion = 4,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -3860,6 +4340,15 @@ function SaveSchema.default(now: number): Profile
         inventory = ExpeditionInventory.default(),
         profession = {
             selectedId = nil,
+        },
+        story = {
+            chapterOne = {
+                completedAt = nil,
+                decision = nil,
+                status = "unresolved",
+                transactionId = nil,
+                wardenOutcome = nil,
+            },
         },
     }
 end
@@ -3913,7 +4402,28 @@ function SaveSchema.normalize(value: any, now: number): Profile
     if type(profession) == "table" and ProfessionCatalog.isValid(profession.selectedId) then
         profile.profession.selectedId = profession.selectedId
     end
-    profile.schemaVersion = 3
+    local story = value.story
+    local chapterOne = if type(story) == "table" then story.chapterOne else nil
+    if
+        type(chapterOne) == "table"
+        and chapterOne.status == "complete"
+        and CHAPTER_ONE_DECISIONS[chapterOne.decision] == true
+        and WARDEN_OUTCOMES[chapterOne.wardenOutcome] == true
+        and type(chapterOne.transactionId) == "string"
+        and chapterOne.transactionId ~= ""
+        and #chapterOne.transactionId <= 160
+        and type(chapterOne.completedAt) == "number"
+        and chapterOne.completedAt > 0
+    then
+        profile.story.chapterOne = {
+            completedAt = chapterOne.completedAt,
+            decision = chapterOne.decision,
+            status = "complete",
+            transactionId = chapterOne.transactionId,
+            wardenOutcome = chapterOne.wardenOutcome,
+        }
+    end
+    profile.schemaVersion = 4
     return profile
 end
 
@@ -4016,11 +4526,58 @@ function SaveSchema.findExpeditionSettlementForRewards(
     return ExpeditionInventory.findSettlementForRewards(profile.inventory, rewardTransactionIds)
 end
 
+function SaveSchema.withChapterOneResolution(
+    profile: Profile,
+    transactionId: string,
+    decision: string,
+    wardenOutcome: string,
+    now: number
+): (Profile, any)
+    assert(transactionId ~= "" and #transactionId <= 160, "chapter transaction ID is invalid")
+    assert(CHAPTER_ONE_DECISIONS[decision] == true, "chapter decision is invalid")
+    assert(WARDEN_OUTCOMES[wardenOutcome] == true, "Warden outcome is invalid")
+    local current = profile.story.chapterOne
+    if current.status == "complete" then
+        return profile,
+            {
+                applied = false,
+                duplicate = current.transactionId == transactionId,
+                reason = if current.transactionId == transactionId
+                    then "duplicate"
+                    else "chapter_already_resolved",
+                record = table.clone(current),
+            }
+    end
+
+    local nextProfile = table.clone(profile)
+    nextProfile.story = table.clone(profile.story)
+    nextProfile.story.chapterOne = {
+        completedAt = now,
+        decision = decision,
+        status = "complete",
+        transactionId = transactionId,
+        wardenOutcome = wardenOutcome,
+    }
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile,
+        {
+            applied = true,
+            duplicate = false,
+            reason = "resolved",
+            record = table.clone(nextProfile.story.chapterOne),
+        }
+end
+
+function SaveSchema.chapterOne(profile: Profile): any
+    return table.clone(profile.story.chapterOne)
+end
+
 return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -4108,7 +4665,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -4359,7 +4916,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -4503,7 +5060,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -4539,7 +5096,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -4923,11 +5480,11 @@ return table.freeze(WardenStagEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="33">
+  <Item class="ServerScriptService" referent="34">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="34">
+    <Item class="Script" referent="35">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -4952,6 +5509,7 @@ local ExpeditionRewardLedger = require(root.ExpeditionRewardLedger)
 local NightSchedule = require(root.NightSchedule)
 local OldGrowthEncounter = require(root.OldGrowthEncounter)
 local WardenStagEncounter = require(root.WardenStagEncounter)
+local BramblewakeBlackout = require(root.BramblewakeBlackout)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local ProfessionState = require(root.ProfessionState)
 local RateLimiter = require(root.RateLimiter)
@@ -4972,6 +5530,7 @@ local FeatureFlagService = require(script.Services.FeatureFlagService)
 local NetworkService = require(script.Services.NetworkService)
 local OldGrowthService = require(script.Services.OldGrowthService)
 local WardenStagService = require(script.Services.WardenStagService)
+local BramblewakeBlackoutService = require(script.Services.BramblewakeBlackoutService)
 local PhaseService = require(script.Services.PhaseService)
 local ProfileService = require(script.Services.ProfileService)
 local PlayerSurvivalService = require(script.Services.PlayerSurvivalService)
@@ -5086,6 +5645,25 @@ local wardenStagService = WardenStagService.new(
     featureFlags
 )
 enemyService:setBossService(wardenStagService)
+local blackoutService = BramblewakeBlackoutService.new(
+    logger,
+    Config,
+    worldService,
+    expeditionService,
+    profileService,
+    survivalService,
+    oldGrowthService,
+    wardenStagService,
+    BramblewakeBlackout,
+    analyticsService,
+    featureFlags
+)
+oldGrowthService:setActivationGate(function(): boolean
+    return blackoutService:allowsOldGrowth()
+end)
+wardenStagService:setUnlockGate(function(): boolean
+    return blackoutService:allowsWarden()
+end)
 local phaseService = PhaseService.new(
     logger,
     worldService,
@@ -5124,6 +5702,7 @@ local tutorialService = TutorialService.new(
     expeditionService,
     oldGrowthService,
     wardenStagService,
+    blackoutService,
     analyticsService
 )
 
@@ -5147,6 +5726,7 @@ services:register(professionService)
 services:register(enemyService)
 services:register(oldGrowthService)
 services:register(wardenStagService)
+services:register(blackoutService)
 services:register(phaseService)
 services:register(tutorialService)
 services:initialize()
@@ -5160,7 +5740,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -5258,11 +5838,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="36">
+      <Item class="Folder" referent="37">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="37">
+        <Item class="ModuleScript" referent="38">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -5784,6 +6364,104 @@ function AnalyticsService.bossResult(
     end
 end
 
+function AnalyticsService.blackoutStarted(
+    self: AnalyticsService,
+    player: Player,
+    blackoutId: string,
+    manifestHash: string,
+    duration: number
+)
+    self._logger:info("blackout_started", {
+        blackout = string.sub(blackoutId, 1, 48),
+        duration = duration,
+        hash = manifestHash,
+        player = player.UserId,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "BramblewakeBlackoutStarted", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = blackoutId,
+            })
+        end)
+    end
+end
+
+function AnalyticsService.blackoutStage(
+    self: AnalyticsService,
+    player: Player,
+    blackoutId: string,
+    stage: string,
+    reason: string,
+    revision: number
+)
+    self._logger:info("blackout_stage", {
+        blackout = string.sub(blackoutId, 1, 48),
+        player = player.UserId,
+        reason = string.sub(reason, 1, 48),
+        revision = revision,
+        stage = string.sub(stage, 1, 32),
+    })
+end
+
+function AnalyticsService.blackoutResult(
+    self: AnalyticsService,
+    player: Player,
+    blackoutId: string,
+    manifestHash: string,
+    decision: string?,
+    wardenOutcome: string?,
+    startedAt: number?,
+    completedAt: number
+)
+    local duration = if startedAt == nil then 0 else math.max(0, completedAt - startedAt)
+    self._logger:info("blackout_result", {
+        blackout = string.sub(blackoutId, 1, 48),
+        decision = string.sub(decision or "unknown", 1, 32),
+        duration = math.floor(duration + 0.5),
+        hash = manifestHash,
+        outcome = string.sub(wardenOutcome or "unknown", 1, 32),
+        player = player.UserId,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(
+                player,
+                "BramblewakeBlackoutCompleted",
+                math.max(1, math.floor(duration + 0.5)),
+                {
+                    [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = decision or "unknown",
+                    [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = wardenOutcome or "unknown",
+                }
+            )
+        end)
+    end
+end
+
+function AnalyticsService.chapterCompleted(
+    self: AnalyticsService,
+    player: Player,
+    chapter: number,
+    decision: string,
+    wardenOutcome: string,
+    transactionId: string
+)
+    self._logger:info("chapter_completed", {
+        chapter = chapter,
+        decision = string.sub(decision, 1, 32),
+        outcome = string.sub(wardenOutcome, 1, 32),
+        player = player.UserId,
+        transaction = string.sub(transactionId, 1, 160),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "ChapterCompleted", chapter, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = decision,
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = wardenOutcome,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.clear(self: AnalyticsService, player: Player)
     self._startedAt[player] = nil
     self._expeditionStarted[player] = nil
@@ -5793,7 +6471,505 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="38">
+        <Item class="ModuleScript" referent="39">
+          <Properties>
+            <string name="Name">BramblewakeBlackoutService</string>
+            <string name="Source"><![CDATA[--!strict
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local BramblewakeBlackoutService = {}
+BramblewakeBlackoutService.__index = BramblewakeBlackoutService
+BramblewakeBlackoutService.Name = "BramblewakeBlackoutService"
+
+export type Logger = {
+    info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+    warn: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+}
+
+export type BramblewakeBlackoutService = typeof(setmetatable(
+    {} :: {
+        Name: string,
+        _logger: Logger,
+        _config: any,
+        _worldService: any,
+        _expeditionService: any,
+        _profileService: any,
+        _survivalService: any,
+        _oldGrowthService: any,
+        _wardenStagService: any,
+        _flow: any,
+        _analyticsService: any,
+        _featureFlags: any,
+        _state: any,
+        _arena: any,
+        _onChanged: ((string?) -> ())?,
+        _heartbeat: RBXScriptConnection?,
+        _lastPublishedSecond: number,
+        _persistedUsers: { [number]: boolean },
+    },
+    BramblewakeBlackoutService
+))
+
+local function rootPart(player: Player): BasePart?
+    local character = player.Character
+    local root = if character == nil then nil else character:FindFirstChild("HumanoidRootPart")
+    return if root ~= nil and root:IsA("BasePart") then root else nil
+end
+
+function BramblewakeBlackoutService.new(
+    logger: Logger,
+    config: any,
+    worldService: any,
+    expeditionService: any,
+    profileService: any,
+    survivalService: any,
+    oldGrowthService: any,
+    wardenStagService: any,
+    flow: any,
+    analyticsService: any,
+    featureFlags: any
+): BramblewakeBlackoutService
+    return setmetatable({
+        Name = BramblewakeBlackoutService.Name,
+        _logger = logger,
+        _config = config,
+        _worldService = worldService,
+        _expeditionService = expeditionService,
+        _profileService = profileService,
+        _survivalService = survivalService,
+        _oldGrowthService = oldGrowthService,
+        _wardenStagService = wardenStagService,
+        _flow = flow,
+        _analyticsService = analyticsService,
+        _featureFlags = featureFlags,
+        _state = nil,
+        _arena = nil,
+        _onChanged = nil,
+        _heartbeat = nil,
+        _lastPublishedSecond = -1,
+        _persistedUsers = {},
+    }, BramblewakeBlackoutService)
+end
+
+function BramblewakeBlackoutService.Init(self: BramblewakeBlackoutService, _context: any)
+    local manifest = assert(self._expeditionService:manifest(), "expedition manifest unavailable")
+    self._arena = assert(self._worldService:blackoutArena(), "Blackout arena unavailable")
+    self._state = self._flow.create(
+        self._expeditionService:runId(),
+        manifest.hash,
+        self._featureFlags:isEnabled("bramblewake_blackout_enabled"),
+        self._config.BlackoutNightSeconds
+    )
+    self._worldService:setBlackoutPresentation(self._state)
+end
+
+function BramblewakeBlackoutService.Start(self: BramblewakeBlackoutService)
+    local accumulator = 0
+    self._heartbeat = RunService.Heartbeat:Connect(function(deltaTime: number)
+        accumulator += deltaTime
+        if accumulator < 0.1 then
+            return
+        end
+        accumulator = 0
+        self:_step(workspace:GetServerTimeNow())
+    end)
+    self._logger:info("bramblewake_blackout_ready", {
+        duration = self._config.BlackoutNightSeconds,
+        enabled = self._state.status ~= "disabled",
+        interval = self._config.BlackoutInterval,
+        manifest = self._state.manifestHash,
+    })
+end
+
+function BramblewakeBlackoutService.setChangedHandler(
+    self: BramblewakeBlackoutService,
+    callback: (string?) -> ()
+)
+    self._onChanged = callback
+end
+
+function BramblewakeBlackoutService._notify(self: BramblewakeBlackoutService, toast: string?)
+    local callback = self._onChanged
+    if callback ~= nil then
+        callback(toast)
+    end
+end
+
+function BramblewakeBlackoutService._syncCarrierVisuals(
+    self: BramblewakeBlackoutService,
+    now: number
+)
+    for _, player in Players:GetPlayers() do
+        local snapshot = self._flow.snapshot(self._state, player.UserId, now)
+        player:SetAttribute("LastLightCarryingBlackoutFire", snapshot.carryingFire)
+        player:SetAttribute("LastLightBlackoutFireExpiresAt", snapshot.fireExpiresAt)
+        local root = rootPart(player)
+        if root ~= nil then
+            local light = root:FindFirstChild("BlackoutCarryLight")
+            if snapshot.carryingFire and light == nil then
+                local pointLight = Instance.new("PointLight")
+                pointLight.Name = "BlackoutCarryLight"
+                pointLight.Color = Color3.fromRGB(255, 146, 78)
+                pointLight.Brightness = 2.4
+                pointLight.Range = 20
+                pointLight.Shadows = false
+                pointLight.Parent = root
+            elseif not snapshot.carryingFire and light ~= nil then
+                light:Destroy()
+            end
+        end
+    end
+end
+
+function BramblewakeBlackoutService._activeParticipantIds(
+    self: BramblewakeBlackoutService
+): { number }
+    local result = {}
+    for _, player in Players:GetPlayers() do
+        if
+            player:GetAttribute("LastLightInExpedition") == true
+            and self._state.participants[tostring(player.UserId)] == true
+        then
+            table.insert(result, player.UserId)
+        end
+    end
+    table.sort(result)
+    return result
+end
+
+function BramblewakeBlackoutService._persistResolution(self: BramblewakeBlackoutService)
+    if
+        self._state.status ~= "complete"
+        or self._state.decision == nil
+        or self._state.wardenOutcome == nil
+    then
+        return
+    end
+    for _, player in Players:GetPlayers() do
+        if
+            self._state.participants[tostring(player.UserId)] == true
+            and self._persistedUsers[player.UserId] ~= true
+        then
+            local transactionId = self._flow.chapterTransactionId(self._state, player.UserId)
+            local result = self._profileService:completeChapterOne(
+                player,
+                transactionId,
+                self._state.decision,
+                self._state.wardenOutcome
+            )
+            if result.accepted and result.applied then
+                self._analyticsService:chapterCompleted(
+                    player,
+                    1,
+                    self._state.decision,
+                    self._state.wardenOutcome,
+                    transactionId
+                )
+                if result.durable then
+                    self._persistedUsers[player.UserId] = true
+                end
+            elseif
+                (result.accepted and result.durable)
+                or (not result.accepted and result.reason == "chapter_already_resolved")
+            then
+                self._persistedUsers[player.UserId] = true
+            elseif not result.accepted and result.reason ~= "profile_loading" then
+                self._logger:warn("chapter_one_resolution_rejected", {
+                    player = player.UserId,
+                    reason = result.reason,
+                    transaction = transactionId,
+                })
+            end
+        end
+    end
+end
+
+function BramblewakeBlackoutService._transition(
+    self: BramblewakeBlackoutService,
+    nextState: any,
+    player: Player?,
+    stageReason: string,
+    toast: string
+)
+    self._state = nextState
+    self._worldService:setBlackoutPresentation(self._state)
+    if player ~= nil then
+        self._analyticsService:blackoutStage(
+            player,
+            self._flow.Id,
+            self._state.status,
+            stageReason,
+            self._state.revision
+        )
+    end
+    self:_notify(toast)
+end
+
+function BramblewakeBlackoutService._representativePlayer(self: BramblewakeBlackoutService): Player?
+    for _, player in Players:GetPlayers() do
+        if self._state.participants[tostring(player.UserId)] == true then
+            return player
+        end
+    end
+    return nil
+end
+
+function BramblewakeBlackoutService._step(self: BramblewakeBlackoutService, now: number)
+    if self._state.status == "old_growth" and self._oldGrowthService:isComplete() then
+        local nextState, result = self._flow.completeOldGrowth(self._state)
+        if result.accepted then
+            self:_transition(
+                nextState,
+                self:_representativePlayer(),
+                "old_growth_complete",
+                "OLD GROWTH RELEASES THE WARDEN'S SEAL"
+            )
+        end
+    elseif self._state.status == "warden" and self._wardenStagService:isComplete() then
+        local outcome = self._wardenStagService:outcome()
+        if outcome ~= nil then
+            local nextState, result = self._flow.completeWarden(self._state, outcome)
+            if result.accepted then
+                self:_transition(
+                    nextState,
+                    self:_representativePlayer(),
+                    "warden_complete",
+                    "THE GREENWARD AWAITS YOUR VOTE"
+                )
+            end
+        end
+    elseif self._state.status == "resolution" then
+        local eligibleUserIds = self:_activeParticipantIds()
+        local nextState, result = self._flow.reconcileVote(self._state, eligibleUserIds)
+        if result.resolved then
+            self._state = nextState
+            self._worldService:setBlackoutPresentation(self._state)
+            self._worldService:setBlackoutLighting(false)
+            self:_persistResolution()
+            local player = Players:GetPlayerByUserId(eligibleUserIds[1])
+            if player ~= nil then
+                self._analyticsService:blackoutResult(
+                    player,
+                    self._flow.Id,
+                    self._state.manifestHash,
+                    self._state.decision,
+                    self._state.wardenOutcome,
+                    self._state.startedAt,
+                    now
+                )
+            end
+            self:_notify("CHAPTER I RESOLVED — " .. string.upper(self._state.decision))
+        end
+    elseif self._state.status == "complete" then
+        self:_persistResolution()
+    end
+
+    self:_syncCarrierVisuals(now)
+    if self._state.status ~= "dormant" and self._state.status ~= "disabled" then
+        local second = math.floor(now)
+        if second ~= self._lastPublishedSecond then
+            self._lastPublishedSecond = second
+            self:_notify(nil)
+        end
+    end
+end
+
+function BramblewakeBlackoutService.participantEntered(
+    self: BramblewakeBlackoutService,
+    player: Player
+): any
+    local story = self._profileService:chapterOneSnapshot(player)
+    if self._state.status == "disabled" then
+        return {
+            accepted = false,
+            message = "BLACKOUT PREVIEW DISABLED — BRAMBLEWAKE REMAINS OPEN",
+            reason = "disabled",
+        }
+    end
+    if not self._oldGrowthService:enabled() or not self._wardenStagService:enabled() then
+        return {
+            accepted = false,
+            message = "BLACKOUT ENCOUNTERS ARE TEMPORARILY UNAVAILABLE",
+            reason = "dependency_disabled",
+        }
+    end
+    if self._state.status == "dormant" then
+        if story ~= nil and story.status == "complete" then
+            return {
+                accepted = true,
+                message = "CHAPTER I ALREADY RESOLVED — EXPEDITION OPEN",
+                reason = "chapter_complete",
+            }
+        end
+        local nextState, result =
+            self._flow.start(self._state, player.UserId, workspace:GetServerTimeNow())
+        if result.accepted then
+            self._state = nextState
+            self._worldService:setBlackoutLighting(true)
+            self._worldService:setBlackoutPresentation(self._state)
+            self._analyticsService:blackoutStarted(
+                player,
+                self._flow.Id,
+                self._state.manifestHash,
+                self._state.duration
+            )
+            self:_notify("BLACKOUT — CARRY ROOTFIRE BETWEEN LIVING ROOTS")
+            return {
+                accepted = true,
+                message = "BLACKOUT — ROOTFIRE RELAY ACTIVE",
+                reason = "started",
+            }
+        end
+    elseif
+        self._state.status == "relay"
+        or self._state.status == "old_growth"
+        or self._state.status == "warden"
+        or self._state.status == "resolution"
+    then
+        self._state = self._flow.join(self._state, player.UserId)
+        self._worldService:setBlackoutPresentation(self._state)
+        self:_notify(nil)
+        return {
+            accepted = true,
+            message = "JOINED THE ACTIVE BRAMBLEWAKE BLACKOUT",
+            reason = "joined",
+        }
+    elseif self._state.status == "complete" then
+        return {
+            accepted = true,
+            message = "BLACKOUT COMPLETE — CHAPTER RESULT RECORDED",
+            reason = "complete",
+        }
+    end
+    return {
+        accepted = false,
+        message = "BLACKOUT COULD NOT START",
+        reason = self._state.status,
+    }
+end
+
+function BramblewakeBlackoutService.interact(
+    self: BramblewakeBlackoutService,
+    player: Player,
+    prompt: ProximityPrompt
+): any
+    if
+        player:GetAttribute("LastLightInExpedition") ~= true
+        or not self._survivalService:canAct(player)
+    then
+        return {
+            accepted = false,
+            message = "ENTER BRAMBLEWAKE WHILE ACTIVE",
+            reason = "player_unavailable",
+        }
+    end
+    local target = prompt.Parent
+    local interaction = if target == nil then nil else target:GetAttribute("BlackoutInteraction")
+    local nextState, result
+    local now = workspace:GetServerTimeNow()
+    if interaction == "take_fire" then
+        nextState, result = self._flow.takeFire(self._state, player.UserId, now)
+    elseif interaction == "deliver_fire" then
+        local nodeId = tostring(target:GetAttribute("BlackoutNodeId"))
+        if self._state.deliveredNodes[nodeId] == true then
+            nextState, result = self._flow.takeFire(self._state, player.UserId, now)
+        else
+            nextState, result = self._flow.deliverFire(self._state, player.UserId, nodeId, now)
+        end
+    elseif interaction == "chapter_decision" then
+        nextState, result = self._flow.vote(
+            self._state,
+            player.UserId,
+            tostring(target:GetAttribute("BlackoutDecisionId")),
+            self:_activeParticipantIds()
+        )
+    else
+        return {
+            accepted = false,
+            message = "INVALID BLACKOUT INTERACTION",
+            reason = "invalid_interaction",
+        }
+    end
+    if not result.accepted then
+        result.message = if result.reason == "fire_required"
+                or result.reason == "fire_expired"
+            then "TAKE FRESH ROOTFIRE FROM THE BLACKOUT LANTERN"
+            elseif result.reason == "already_delivered" then "THAT LIVING ROOT ALREADY HOLDS FIRE"
+            elseif
+                self._state.status == "resolution"
+            then "ONLY ACTIVE BLACKOUT PARTICIPANTS CAN VOTE"
+            else "THAT BLACKOUT STEP IS NOT ACTIVE"
+        return result
+    end
+
+    self._state = nextState
+    self._worldService:setBlackoutPresentation(self._state)
+    self:_syncCarrierVisuals(now)
+    if result.reason == "fire_taken" then
+        result.message = string.format(
+            "ROOTFIRE TAKEN — DELIVER WITHIN %d SECONDS",
+            self._flow.FireCarrySeconds
+        )
+    elseif result.reason == "fire_delivered" then
+        result.message =
+            string.format("LIVING ROOT LIT — %d / %d", result.delivered, result.required)
+    elseif result.reason == "relay_complete" then
+        result.message = "ROOTFIRE RELAY COMPLETE — OLD GROWTH AWAKENS"
+        self._analyticsService:blackoutStage(
+            player,
+            self._flow.Id,
+            self._state.status,
+            "relay_complete",
+            self._state.revision
+        )
+    elseif result.reason == "vote_recorded" then
+        result.message = "GREENWARD VOTE RECORDED — WAITING FOR ACTIVE TRAVELERS"
+    elseif result.reason == "resolved" then
+        result.message = "CHAPTER I RESOLVED — " .. string.upper(self._state.decision)
+        self._worldService:setBlackoutLighting(false)
+        self:_persistResolution()
+        self._analyticsService:blackoutResult(
+            player,
+            self._flow.Id,
+            self._state.manifestHash,
+            self._state.decision,
+            self._state.wardenOutcome,
+            self._state.startedAt,
+            now
+        )
+    else
+        result.message = "BLACKOUT UPDATED"
+    end
+    self:_notify(result.message)
+    return result
+end
+
+function BramblewakeBlackoutService.allowsOldGrowth(self: BramblewakeBlackoutService): boolean
+    return self._state.status == "old_growth"
+end
+
+function BramblewakeBlackoutService.allowsWarden(self: BramblewakeBlackoutService): boolean
+    return self._state.status == "warden"
+        or self._state.status == "resolution"
+        or self._state.status == "complete"
+end
+
+function BramblewakeBlackoutService.snapshot(self: BramblewakeBlackoutService, player: Player): any
+    if player:GetAttribute("LastLightInExpedition") ~= true then
+        return nil
+    end
+    local snapshot = self._flow.snapshot(self._state, player.UserId, workspace:GetServerTimeNow())
+    snapshot.story = self._profileService:chapterOneSnapshot(player)
+    return snapshot
+end
+
+return table.freeze(BramblewakeBlackoutService)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="40">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -6652,7 +7828,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="39">
+        <Item class="ModuleScript" referent="41">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -7122,7 +8298,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="40">
+        <Item class="ModuleScript" referent="42">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -7226,7 +8402,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="41">
+        <Item class="ModuleScript" referent="43">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -7320,7 +8496,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="42">
+        <Item class="ModuleScript" referent="44">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -7475,7 +8651,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -7529,6 +8705,7 @@ export type OldGrowthService = typeof(setmetatable(
         _markedUntil: number,
         _onChanged: ((string?) -> ())?,
         _heartbeat: RBXScriptConnection?,
+        _activationGate: (() -> boolean)?,
     },
     OldGrowthService
 ))
@@ -7589,7 +8766,12 @@ function OldGrowthService.new(
         _markedUntil = 0,
         _onChanged = nil,
         _heartbeat = nil,
+        _activationGate = nil,
     }, OldGrowthService)
+end
+
+function OldGrowthService.setActivationGate(self: OldGrowthService, gate: (() -> boolean)?)
+    self._activationGate = gate
 end
 
 function OldGrowthService.Init(self: OldGrowthService, _context: any)
@@ -7962,7 +9144,10 @@ function OldGrowthService._step(self: OldGrowthService, now: number)
         self:_notify("LANTERN FIRE FADED — TAKE ANOTHER FLAME")
     end
 
-    if self._state.status == "dormant" then
+    if
+        self._state.status == "dormant"
+        and (self._activationGate == nil or (self._activationGate :: () -> boolean)())
+    then
         for _, player in Players:GetPlayers() do
             if
                 self:_inArena(player, ACTIVATION_RADIUS) and self._survivalService:canAct(player)
@@ -8281,11 +9466,15 @@ function OldGrowthService.isComplete(self: OldGrowthService): boolean
     return self._state.status == "complete"
 end
 
+function OldGrowthService.enabled(self: OldGrowthService): boolean
+    return self._state.status ~= "disabled"
+end
+
 return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -8463,7 +9652,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -8895,7 +10084,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9702,7 +10891,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10056,7 +11245,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10466,6 +11655,88 @@ function ProfileService.inventorySnapshot(self: ProfileService, player: Player):
     }
 end
 
+function ProfileService.completeChapterOne(
+    self: ProfileService,
+    player: Player,
+    transactionId: string,
+    decision: string,
+    wardenOutcome: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {
+            accepted = false,
+            durable = false,
+            reason = "profile_loading",
+        }
+    end
+    if not self:isWritable(player) then
+        return {
+            accepted = false,
+            durable = false,
+            reason = "profile_read_only",
+        }
+    end
+    local nextProfile, result = self._saveSchema.withChapterOneResolution(
+        profile,
+        transactionId,
+        decision,
+        wardenOutcome,
+        os.time()
+    )
+    if not result.applied and not result.duplicate then
+        return {
+            accepted = false,
+            durable = true,
+            reason = result.reason,
+        }
+    end
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent then
+            self._dirty[player] = true
+        end
+    end
+    local durable = not self._persistent
+    if self._persistent and result.applied then
+        local saved = self:save(player)
+        local activeProfile = self._profiles[player]
+        local chapter = if activeProfile == nil
+            then nil
+            else self._saveSchema.chapterOne(activeProfile)
+        durable = saved
+            and chapter ~= nil
+            and chapter.status == "complete"
+            and chapter.transactionId == transactionId
+    elseif self._persistent and result.duplicate then
+        local saved = if self._dirty[player] == true then self:save(player) else true
+        local activeProfile = self._profiles[player]
+        local chapter = if activeProfile == nil
+            then nil
+            else self._saveSchema.chapterOne(activeProfile)
+        durable = saved
+            and self._dirty[player] ~= true
+            and chapter ~= nil
+            and chapter.status == "complete"
+            and chapter.transactionId == transactionId
+    end
+    return {
+        accepted = true,
+        applied = result.applied == true,
+        durable = durable,
+        reason = if durable then result.reason else "save_pending",
+        story = result.record,
+    }
+end
+
+function ProfileService.chapterOneSnapshot(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return self._saveSchema.chapterOne(profile)
+end
+
 function ProfileService.save(self: ProfileService, player: Player): boolean
     local profile = self._profiles[player]
     if profile == nil then
@@ -10543,7 +11814,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10588,6 +11859,7 @@ export type TutorialService = typeof(setmetatable(
         _expeditionService: any,
         _oldGrowthService: any,
         _wardenStagService: any,
+        _blackoutService: any,
         _analyticsService: any,
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -10615,6 +11887,7 @@ function TutorialService.new(
     expeditionService: any,
     oldGrowthService: any,
     wardenStagService: any,
+    blackoutService: any,
     analyticsService: any
 ): TutorialService
     return setmetatable({
@@ -10635,6 +11908,7 @@ function TutorialService.new(
         _expeditionService = expeditionService,
         _oldGrowthService = oldGrowthService,
         _wardenStagService = wardenStagService,
+        _blackoutService = blackoutService,
         _analyticsService = analyticsService,
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -10695,6 +11969,17 @@ function TutorialService.Init(self: TutorialService, _context: any)
         if toast ~= nil then
             for player, session in self._sessions do
                 if self._wardenStagService:snapshot(player) ~= nil then
+                    session.toast = toast
+                    session.toastRevision += 1
+                end
+            end
+        end
+        self:_publishAll()
+    end)
+    self._blackoutService:setChangedHandler(function(toast: string?)
+        if toast ~= nil then
+            for player, session in self._sessions do
+                if self._blackoutService:snapshot(player) ~= nil then
                     session.toast = toast
                     session.toastRevision += 1
                 end
@@ -10900,6 +12185,12 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self:_publishAll()
         return
     end
+    if actionId == self._runtimeIds.Actions.BramblewakeBlackout then
+        local result = self._blackoutService:interact(player, prompt)
+        self:_setToast(player, result.message)
+        self:_publishAll()
+        return
+    end
     if actionId == self._runtimeIds.Actions.Extract then
         local result = self._expeditionService:extract(player)
         self:_setToast(player, result.message)
@@ -10915,7 +12206,8 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
 
     if actionId == self._runtimeIds.Actions.Reveal and session.stage == "complete" then
         if self._expeditionService:enter(player) then
-            self:_setToast(player, "ENTERING BRAMBLEWAKE")
+            local blackoutResult = self._blackoutService:participantEntered(player)
+            self:_setToast(player, blackoutResult.message or "ENTERING BRAMBLEWAKE")
             self._analyticsService:expeditionStarted(
                 player,
                 self._expeditionService:snapshot(player)
@@ -10963,7 +12255,8 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self._phaseService:startFirstNight()
     elseif actionId == self._runtimeIds.Actions.Reveal then
         if self._expeditionService:enter(player) then
-            self:_setToast(player, "BRAMBLEWAKE REMEMBERS YOU")
+            local blackoutResult = self._blackoutService:participantEntered(player)
+            self:_setToast(player, blackoutResult.message or "BRAMBLEWAKE REMEMBERS YOU")
             self._analyticsService:expeditionStarted(
                 player,
                 self._expeditionService:snapshot(player)
@@ -11150,8 +12443,44 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
     end
     local phase = self._phaseService:snapshot()
     local survival = self._survivalService:snapshot(player)
+    local blackout = self._blackoutService:snapshot(player)
+    if blackout ~= nil then
+        trailName = "BRAMBLEWAKE BLACKOUT"
+        progress = blackout.stage
+        total = blackout.stageCount
+        objective = blackout.instruction
+        detail = if blackout.status == "relay"
+            then string.format(
+                "ROOTFIRE RELAY · %d/%d%s",
+                blackout.deliveredNodes,
+                blackout.relayRequired,
+                if blackout.carryingFire then " · CARRYING FIRE" else ""
+            )
+            elseif
+                blackout.status == "old_growth"
+            then "STAGE 2/4 · ROOTED WALLS HOLD UNTIL OLD GROWTH FALLS"
+            elseif blackout.status == "warden" then "STAGE 3/4 · THE WARDEN REMEMBERS EVERY ANTLER"
+            elseif
+                blackout.status == "resolution"
+            then "STAGE 4/4 · FARMLAND, WILD REGROWTH, OR SHARED AGROFOREST"
+            elseif blackout.status == "complete" then string.format(
+                "%s · %s",
+                string.upper(tostring(blackout.decision)),
+                string.upper(tostring(blackout.wardenOutcome))
+            )
+            else "THE BLACKOUT HAS NOT BEGUN"
+        mara = if blackout.status == "relay"
+            then "Take rootfire from the Blackout Lantern and carry it to each marked living root."
+            elseif
+                blackout.status == "resolution"
+            then "Every active traveler votes. A tie becomes the shared agroforest."
+            elseif
+                blackout.status == "complete"
+            then "The Greenward will remember this choice when the town grows."
+            else "Keep the living path open. The Blackout clock never erases earned progress."
+    end
     local elite = self._oldGrowthService:snapshot(player)
-    if elite ~= nil then
+    if elite ~= nil and (blackout == nil or blackout.status == "old_growth") then
         if elite.active then
             objective = elite.instruction
             detail = string.format(
@@ -11174,8 +12503,10 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         end
     end
     local boss = self._wardenStagService:snapshot(player)
-    if boss ~= nil then
-        trailName = "WARDEN'S SEAL"
+    if boss ~= nil and (blackout == nil or blackout.status == "warden") then
+        if blackout == nil then
+            trailName = "WARDEN'S SEAL"
+        end
         progress = boss.phase
         total = 3
         if boss.active then
@@ -11251,6 +12582,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         profession = self._professionService:snapshot(player),
         elite = elite,
         boss = boss,
+        blackout = blackout,
         threat = self._enemyService:threatSnapshot(player),
         survival = survival,
     }
@@ -11270,7 +12602,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11324,6 +12656,7 @@ export type WardenStagService = typeof(setmetatable(
         _markedUntil: number,
         _onChanged: ((string?) -> ())?,
         _heartbeat: RBXScriptConnection?,
+        _unlockGate: (() -> boolean)?,
     },
     WardenStagService
 ))
@@ -11386,7 +12719,12 @@ function WardenStagService.new(
         _markedUntil = 0,
         _onChanged = nil,
         _heartbeat = nil,
+        _unlockGate = nil,
     }, WardenStagService)
+end
+
+function WardenStagService.setUnlockGate(self: WardenStagService, gate: (() -> boolean)?)
+    self._unlockGate = gate
 end
 
 function WardenStagService.Init(self: WardenStagService, _context: any)
@@ -11746,7 +13084,11 @@ function WardenStagService._nearestPlayer(self: WardenStagService, players: { Pl
 end
 
 function WardenStagService._step(self: WardenStagService, now: number)
-    if self._state.status == "locked" and self._oldGrowthService:isComplete() then
+    if
+        self._state.status == "locked"
+        and self._oldGrowthService:isComplete()
+        and (self._unlockGate == nil or (self._unlockGate :: () -> boolean)())
+    then
         local nextState, result = self._encounter.unlock(self._state)
         if result.accepted then
             self._state = nextState
@@ -12081,11 +13423,19 @@ function WardenStagService.isComplete(self: WardenStagService): boolean
     return self._state.status == "complete"
 end
 
+function WardenStagService.outcome(self: WardenStagService): string?
+    return self._state.outcome
+end
+
+function WardenStagService.enabled(self: WardenStagService): boolean
+    return self._state.status ~= "disabled"
+end
+
 return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12126,6 +13476,7 @@ export type WorldService = typeof(setmetatable(
         _eventsEnabled: boolean,
         _oldGrowthArena: any,
         _wardenStagArena: any,
+        _blackoutArena: any,
     },
     WorldService
 ))
@@ -12303,6 +13654,7 @@ function WorldService.new(logger: Logger): WorldService
         _eventsEnabled = true,
         _oldGrowthArena = nil,
         _wardenStagArena = nil,
+        _blackoutArena = nil,
     }, WorldService)
 end
 
@@ -12726,7 +14078,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "warden-stag-boss-v5")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v6")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -12790,7 +14142,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "warden-stag-boss-v5",
+        worldVersion = "bramblewake-blackout-v6",
     })
 end
 
@@ -12903,6 +14255,7 @@ function WorldService.buildBramblewake(
             or actionId == self._runtimeIds.Actions.Extract
             or actionId == self._runtimeIds.Actions.OldGrowthFire
             or actionId == self._runtimeIds.Actions.WardenStagChoice
+            or actionId == self._runtimeIds.Actions.BramblewakeBlackout
         then
             self._interactions[interactionId] = nil
         end
@@ -12911,6 +14264,7 @@ function WorldService.buildBramblewake(
     self._eventTargets = {}
     self._oldGrowthArena = nil
     self._wardenStagArena = nil
+    self._blackoutArena = nil
 
     local result = BramblewakeBuilder.build(world, manifest, generator, catalog, self._runtimeIds)
     self._expeditionEntry = result.entryCFrame
@@ -12919,6 +14273,7 @@ function WorldService.buildBramblewake(
     self._eventSockets = result.eventSockets
     self._oldGrowthArena = result.eliteArena
     self._wardenStagArena = result.bossArena
+    self._blackoutArena = result.blackout
     self:_registerInteraction(
         result.extractionTarget,
         self._runtimeIds.InteractionIds.Wayhome,
@@ -12983,10 +14338,133 @@ function WorldService.buildBramblewake(
         cleansedNodes = {},
         status = "locked",
     })
+    for _, descriptor in result.blackout.interactions do
+        self:_registerInteraction(
+            descriptor.target,
+            descriptor.interactionId,
+            self._runtimeIds.Actions.BramblewakeBlackout,
+            descriptor.actionText,
+            descriptor.objectText,
+            nil,
+            descriptor.holdDuration
+        )
+    end
+    self:setBlackoutPresentation({
+        deliveredNodes = {},
+        status = "dormant",
+    })
     world:SetAttribute("ExpeditionReady", true)
     world:SetAttribute("ExpeditionManifestHash", manifest.hash)
     world:SetAttribute("ExpeditionEventInteractions", #result.eventInteractions)
     return result
+end
+
+function WorldService.blackoutArena(self: WorldService): any
+    return self._blackoutArena
+end
+
+function WorldService.setBlackoutPresentation(self: WorldService, state: any)
+    local arena = self._blackoutArena
+    local world = self._world
+    if arena == nil then
+        return
+    end
+    local status = tostring(state.status)
+    local relay = status == "relay"
+    local resolution = status == "resolution"
+    local complete = status == "complete"
+    local deliveredNodes = if type(state.deliveredNodes) == "table"
+        then state.deliveredNodes
+        else {}
+
+    arena.fireSource.Color = if relay then AMBER else Color3.fromRGB(94, 83, 64)
+    arena.fireSource.Material = if relay then Enum.Material.Neon else Enum.Material.SmoothPlastic
+    arena.fireSource.Transparency = if relay then 0.1 else 0.58
+    local firePrompt = self._interactions[self._runtimeIds.InteractionIds.BlackoutFireSource]
+    if firePrompt ~= nil then
+        firePrompt.Enabled = relay
+    end
+
+    for nodeId, target in arena.relayNodes do
+        local delivered = deliveredNodes[nodeId] == true
+        target.Color = if delivered
+            then FOXFIRE
+            elseif relay then Color3.fromRGB(255, 137, 72)
+            else Color3.fromRGB(70, 91, 72)
+        target.Material = if delivered or relay
+            then Enum.Material.Neon
+            else Enum.Material.SmoothPlastic
+        target.Transparency = if delivered then 0.28 elseif relay then 0.12 else 0.58
+        local prompt = target:FindFirstChildOfClass("ProximityPrompt")
+        if prompt ~= nil then
+            prompt.Enabled = relay
+            prompt.ActionText = if delivered then "TAKE ROOTFIRE" else "DELIVER ROOTFIRE"
+            prompt.ObjectText = if delivered then "Lit Living Root" else "Unlit Living Root"
+        end
+        for _, rootedWall in arena.model:GetChildren() do
+            if
+                rootedWall:IsA("BasePart")
+                and rootedWall.Name == "RootedWall"
+                and rootedWall:GetAttribute("BlackoutNodeId") == nodeId
+            then
+                rootedWall.Color = if delivered then Color3.fromRGB(52, 90, 61) else BARK
+                rootedWall.Transparency = if delivered then 0.48 else 0
+            end
+        end
+    end
+
+    for decisionId, target in arena.decisions do
+        target.Material = if resolution or complete
+            then Enum.Material.Neon
+            else Enum.Material.SmoothPlastic
+        target.Transparency = if resolution then 0.08 elseif complete then 0.3 else 0.68
+        local prompt = target:FindFirstChildOfClass("ProximityPrompt")
+        if prompt ~= nil then
+            prompt.Enabled = resolution
+        end
+        if complete then
+            target:SetAttribute("Selected", state.decision == decisionId)
+            if state.decision ~= decisionId then
+                target.Transparency = 0.78
+            end
+        end
+    end
+
+    if world ~= nil then
+        world:SetAttribute(
+            "BlackoutActive",
+            relay or status == "old_growth" or status == "warden" or resolution
+        )
+        world:SetAttribute("BlackoutStatus", status)
+        world:SetAttribute("BlackoutRevision", tonumber(state.revision) or 0)
+    end
+end
+
+function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
+    local world = self._world
+    if world ~= nil then
+        world:SetAttribute("BlackoutLighting", active)
+    end
+    local effect = Lighting:FindFirstChild("LastLightBlackoutColor")
+    if not active then
+        if effect ~= nil then
+            effect:Destroy()
+        end
+        if not self._night then
+            Lighting.Ambient = DAY_AMBIENT
+        end
+        return
+    end
+    Lighting.Ambient = Color3.fromRGB(18, 28, 35)
+    local color = if effect ~= nil and effect:IsA("ColorCorrectionEffect")
+        then effect
+        else Instance.new("ColorCorrectionEffect")
+    color.Name = "LastLightBlackoutColor"
+    color.Brightness = -0.08
+    color.Contrast = 0.14
+    color.Saturation = -0.18
+    color.TintColor = Color3.fromRGB(164, 205, 186)
+    color.Parent = Lighting
 end
 
 function WorldService.oldGrowthArena(self: WorldService): any
@@ -13284,11 +14762,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="52">
+      <Item class="Folder" referent="54">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -14038,6 +15516,162 @@ local function buildWardenSeal(
     }
 end
 
+local function buildBlackoutLayer(
+    parent: Instance,
+    centers: { Vector3 },
+    bossCenter: Vector3,
+    runtimeIds: any
+): any
+    local layer = Instance.new("Model")
+    layer.Name = "BramblewakeBlackoutLayer"
+    layer:SetAttribute("BlackoutId", "blackout_bramblewake")
+    layer:SetAttribute("ContentId", "blackout_bw_rootfire_relay")
+    layer.Parent = parent
+    pcall(function()
+        layer.ModelStreamingMode = Enum.ModelStreamingMode.Atomic
+    end)
+
+    local sourceCenter = assert(centers[1], "Blackout fire source center is missing")
+    local fireSource = orb(
+        layer,
+        "BlackoutLanternFire",
+        sourceCenter + Vector3.new(13, 4, 13),
+        5,
+        Color3.fromRGB(94, 83, 64),
+        Enum.Material.SmoothPlastic
+    )
+    fireSource.Transparency = 0.48
+    fireSource:SetAttribute("BlackoutInteraction", "take_fire")
+    CollectionService:AddTag(fireSource, runtimeIds.ExpeditionBlackoutTag)
+    billboard(fireSource, "BLACKOUT FIRE · CARRY TO LIVING ROOTS", CREAM)
+
+    local interactions = {
+        {
+            actionText = "TAKE ROOTFIRE",
+            holdDuration = 0.45,
+            interactionId = runtimeIds.InteractionIds.BlackoutFireSource,
+            objectText = "Blackout Lantern",
+            target = fireSource,
+        },
+    }
+    local relayNodes = {}
+    for _, definition in
+        {
+            {
+                center = assert(centers[3], "Blackout farm relay center is missing"),
+                interactionId = runtimeIds.InteractionIds.BlackoutRootFarm,
+                label = "FARM ROOT",
+                nodeId = "blackout_root_farm",
+            },
+            {
+                center = assert(centers[7], "Blackout mill relay center is missing"),
+                interactionId = runtimeIds.InteractionIds.BlackoutRootMill,
+                label = "MILL ROOT",
+                nodeId = "blackout_root_mill",
+            },
+            {
+                center = assert(centers[10], "Blackout cathedral relay center is missing"),
+                interactionId = runtimeIds.InteractionIds.BlackoutRootCathedral,
+                label = "CATHEDRAL ROOT",
+                nodeId = "blackout_root_cathedral",
+            },
+        }
+    do
+        local node = orb(
+            layer,
+            "BlackoutRelay_" .. definition.label,
+            definition.center + Vector3.new(-14, 3.5, -12),
+            6,
+            Color3.fromRGB(70, 91, 72),
+            Enum.Material.SmoothPlastic
+        )
+        node.Transparency = 0.5
+        node:SetAttribute("BlackoutInteraction", "deliver_fire")
+        node:SetAttribute("BlackoutNodeId", definition.nodeId)
+        CollectionService:AddTag(node, runtimeIds.ExpeditionBlackoutTag)
+        billboard(node, definition.label .. " · NEEDS CARRIED FIRE", CREAM)
+        relayNodes[definition.nodeId] = node
+        table.insert(interactions, {
+            actionText = "DELIVER ROOTFIRE",
+            holdDuration = 0.7,
+            interactionId = definition.interactionId,
+            objectText = definition.label,
+            target = node,
+        })
+
+        for rootIndex = -1, 1 do
+            local rootedWall = part(
+                layer,
+                "RootedWall",
+                Vector3.new(3.5, 14 + (rootIndex + 1) * 2, 3.5),
+                CFrame.new(node.Position + Vector3.new(rootIndex * 5.5, 5 + (rootIndex + 1), 4.5))
+                    * CFrame.Angles(math.rad(rootIndex * 8), 0, math.rad(rootIndex * 10)),
+                DARK_BARK,
+                Enum.Material.Wood,
+                true
+            )
+            rootedWall:SetAttribute("BlackoutNodeId", definition.nodeId)
+        end
+    end
+
+    local decisions = {}
+    for _, definition in
+        {
+            {
+                color = MEADOW,
+                decisionId = "restore_farmland",
+                interactionId = runtimeIds.InteractionIds.BlackoutDecisionFarmland,
+                label = "RESTORE FARMLAND",
+                offset = Vector3.new(-16, 2.5, 16),
+            },
+            {
+                color = Color3.fromRGB(71, 139, 84),
+                decisionId = "wild_regrowth",
+                interactionId = runtimeIds.InteractionIds.BlackoutDecisionWild,
+                label = "ALLOW WILD REGROWTH",
+                offset = Vector3.new(0, 2.5, 20),
+            },
+            {
+                color = FOXFIRE,
+                decisionId = "shared_agroforest",
+                interactionId = runtimeIds.InteractionIds.BlackoutDecisionShared,
+                label = "CREATE SHARED AGROFOREST",
+                offset = Vector3.new(16, 2.5, 16),
+            },
+        }
+    do
+        local seedling = orb(
+            layer,
+            "GreenwardChoice_" .. definition.decisionId,
+            bossCenter + definition.offset,
+            5,
+            definition.color,
+            Enum.Material.SmoothPlastic
+        )
+        seedling.Transparency = 0.58
+        seedling:SetAttribute("BlackoutInteraction", "chapter_decision")
+        seedling:SetAttribute("BlackoutDecisionId", definition.decisionId)
+        CollectionService:AddTag(seedling, runtimeIds.ExpeditionBlackoutTag)
+        billboard(seedling, definition.label, CREAM)
+        decisions[definition.decisionId] = seedling
+        table.insert(interactions, {
+            actionText = "VOTE " .. definition.label,
+            holdDuration = 1.1,
+            interactionId = definition.interactionId,
+            objectText = "Permanent Greenward Choice",
+            target = seedling,
+        })
+    end
+
+    return {
+        decisions = decisions,
+        fireSource = fireSource,
+        interactions = interactions,
+        model = layer,
+        relayNodes = relayNodes,
+    }
+end
+
 function BramblewakeBuilder.build(
     parent: Instance,
     manifest: any,
@@ -14203,6 +15837,7 @@ function BramblewakeBuilder.build(
         catalog.CellSize,
         runtimeIds
     )
+    local blackout = buildBlackoutLayer(expedition, centers, bossArena.center, runtimeIds)
     buildBackdrop(expedition, centers)
 
     local generatedParts = 0
@@ -14218,6 +15853,7 @@ function BramblewakeBuilder.build(
     expedition:SetAttribute("EventInteractionCount", #eventInteractions)
     expedition:SetAttribute("ExtractionReady", extractionTarget ~= nil)
     expedition:SetAttribute("BossArenaReady", bossArena ~= nil)
+    expedition:SetAttribute("BlackoutLayerReady", blackout ~= nil)
     expedition:SetAttribute("Ready", true)
 
     local moduleCenters = {}
@@ -14236,6 +15872,7 @@ function BramblewakeBuilder.build(
         eventSockets = eventSockets,
         eliteArena = assert(eliteArena, "Old Growth elite arena is missing"),
         bossArena = bossArena,
+        blackout = blackout,
         moduleCenters = moduleCenters,
         partCount = generatedParts,
     }
@@ -14245,7 +15882,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -14634,7 +16271,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -14797,7 +16434,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -14993,15 +16630,15 @@ return table.freeze(WardenStagBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="57">
+  <Item class="StarterPlayer" referent="59">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="58">
+    <Item class="StarterPlayerScripts" referent="60">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="59">
+      <Item class="LocalScript" referent="61">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -15087,11 +16724,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="60">
+        <Item class="Folder" referent="62">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="61">
+          <Item class="ModuleScript" referent="63">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -15202,6 +16839,10 @@ export type HUDController = typeof(setmetatable(
         _lanternFrame: Frame,
         _lanternFill: Frame,
         _lanternText: TextLabel,
+        _blackoutFrame: Frame,
+        _blackoutFill: Frame,
+        _blackoutTitle: TextLabel,
+        _blackoutDetail: TextLabel,
         _eliteFrame: Frame,
         _eliteFill: Frame,
         _eliteTitle: TextLabel,
@@ -15468,6 +17109,63 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     )
     lanternText.Font = Enum.Font.GothamBold
     lanternText.ZIndex = 2
+
+    local blackoutFrame = Instance.new("Frame")
+    blackoutFrame.Name = "BlackoutStatus"
+    blackoutFrame.AnchorPoint = Vector2.new(0.5, 0)
+    blackoutFrame.Position = UDim2.new(0.5, 0, 0, 66)
+    blackoutFrame.Size = UDim2.fromOffset(420, 64)
+    blackoutFrame.BackgroundColor3 = Color3.fromRGB(11, 24, 25)
+    blackoutFrame.BackgroundTransparency = 0.02
+    blackoutFrame.Visible = false
+    blackoutFrame.ZIndex = 11
+    blackoutFrame.Parent = canvas
+    corner(blackoutFrame, 14)
+    stroke(blackoutFrame, COLORS.blue, 0.08)
+
+    local blackoutTrack = Instance.new("Frame")
+    blackoutTrack.Name = "TimeTrack"
+    blackoutTrack.Position = UDim2.fromOffset(10, 48)
+    blackoutTrack.Size = UDim2.new(1, -20, 0, 7)
+    blackoutTrack.BackgroundColor3 = Color3.fromRGB(48, 61, 58)
+    blackoutTrack.BorderSizePixel = 0
+    blackoutTrack.ZIndex = 12
+    blackoutTrack.Parent = blackoutFrame
+    corner(blackoutTrack, 4)
+
+    local blackoutFill = Instance.new("Frame")
+    blackoutFill.Name = "Fill"
+    blackoutFill.Size = UDim2.fromScale(0, 1)
+    blackoutFill.BackgroundColor3 = COLORS.blue
+    blackoutFill.BorderSizePixel = 0
+    blackoutFill.ZIndex = 13
+    blackoutFill.Parent = blackoutTrack
+    corner(blackoutFill, 4)
+
+    local blackoutTitle = textLabel(
+        blackoutFrame,
+        "Title",
+        "BRAMBLEWAKE BLACKOUT · STAGE 1/4",
+        UDim2.new(1, -20, 0, 24),
+        UDim2.fromOffset(10, 4),
+        14,
+        COLORS.cream,
+        Enum.TextXAlignment.Center
+    )
+    blackoutTitle.Font = Enum.Font.GothamBold
+    blackoutTitle.ZIndex = 12
+    local blackoutDetail = textLabel(
+        blackoutFrame,
+        "Detail",
+        "ROOTFIRE RELAY · 0/3",
+        UDim2.new(1, -20, 0, 20),
+        UDim2.fromOffset(10, 27),
+        11,
+        COLORS.blue,
+        Enum.TextXAlignment.Center
+    )
+    blackoutDetail.Font = Enum.Font.GothamBold
+    blackoutDetail.ZIndex = 12
 
     local eliteFrame = Instance.new("Frame")
     eliteFrame.Name = "EliteStatus"
@@ -15866,6 +17564,10 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _lanternFrame = lanternFrame,
         _lanternFill = lanternFill,
         _lanternText = lanternText,
+        _blackoutFrame = blackoutFrame,
+        _blackoutFill = blackoutFill,
+        _blackoutTitle = blackoutTitle,
+        _blackoutDetail = blackoutDetail,
         _eliteFrame = eliteFrame,
         _eliteFill = eliteFill,
         _eliteTitle = eliteTitle,
@@ -16252,13 +17954,20 @@ function HUDController._layout(self: HUDController)
         self._compact.Size = UDim2.fromOffset(44, 38)
         self._compact.Text = if self._compactEnabled then "+" else "−"
         self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 212)
-        self._eliteFrame.Position = UDim2.new(0.5, 0, 0, 212)
+        self._blackoutFrame.Position = UDim2.new(0.5, 0, 0, 212)
+        self._blackoutFrame.Size = UDim2.new(1, -36, 0, 64)
+        self._eliteFrame.Position =
+            UDim2.new(0.5, 0, 0, if self._blackoutFrame.Visible then 284 else 212)
         self._eliteFrame.Size = UDim2.new(1, -36, 0, 70)
         self._allyFrame.Position = UDim2.new(
             0.5,
             0,
             0,
-            if self._eliteFrame.Visible then 290 elseif self._lanternFrame.Visible then 254 else 212
+            if self._eliteFrame.Visible
+                then (if self._blackoutFrame.Visible then 362 else 290)
+                elseif self._blackoutFrame.Visible then 284
+                elseif self._lanternFrame.Visible then 254
+                else 212
         )
         self._allyFrame.Size = UDim2.new(1, -36, 0, 64)
         self._threatFrame.Position = UDim2.new(
@@ -16266,7 +17975,9 @@ function HUDController._layout(self: HUDController)
             0,
             0,
             if self._allyFrame.Visible
-                then (if self._eliteFrame.Visible then 362 else 326)
+                then (if self._blackoutFrame.Visible and self._eliteFrame.Visible then 434 else 362)
+                elseif self._blackoutFrame.Visible and self._eliteFrame.Visible then 362
+                elseif self._blackoutFrame.Visible then 284
                 elseif self._eliteFrame.Visible then 290
                 else 254
         )
@@ -16285,13 +17996,20 @@ function HUDController._layout(self: HUDController)
         self._compact.Size = UDim2.fromOffset(118, 38)
         self._compact.Text = if self._compactEnabled then "EXPAND" else "COMPACT"
         self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 66)
-        self._eliteFrame.Position = UDim2.new(0.5, 0, 0, 66)
+        self._blackoutFrame.Position = UDim2.new(0.5, 0, 0, 66)
+        self._blackoutFrame.Size = UDim2.fromOffset(420, 64)
+        self._eliteFrame.Position =
+            UDim2.new(0.5, 0, 0, if self._blackoutFrame.Visible then 138 else 66)
         self._eliteFrame.Size = UDim2.fromOffset(420, 70)
         self._allyFrame.Position = UDim2.new(
             0.5,
             0,
             0,
-            if self._eliteFrame.Visible then 144 elseif self._lanternFrame.Visible then 108 else 66
+            if self._eliteFrame.Visible
+                then (if self._blackoutFrame.Visible then 216 else 144)
+                elseif self._blackoutFrame.Visible then 138
+                elseif self._lanternFrame.Visible then 108
+                else 66
         )
         self._allyFrame.Size = UDim2.fromOffset(330, 64)
         self._threatFrame.Position = UDim2.fromScale(0.5, 0.32)
@@ -16311,8 +18029,21 @@ function HUDController._updateClock(self: HUDController)
 
     local phase = string.upper(tostring(state.phase or "day"))
     local phaseEndsAt = tonumber(state.phaseEndsAt) or 0
+    local blackout = state.blackout
+    local blackoutVisible = type(blackout) == "table"
+        and blackout.status ~= "dormant"
+        and blackout.status ~= "disabled"
+        and not self._playerDowned
     local clockText: string
-    if phaseEndsAt > 0 then
+    if blackoutVisible and blackout.status ~= "complete" then
+        local targetEndsAt = tonumber(blackout.targetEndsAt) or 0
+        local remaining = math.max(0, math.ceil(targetEndsAt - workspace:GetServerTimeNow()))
+        clockText = if remaining > 0
+            then string.format("BLACKOUT · %02d:%02d", math.floor(remaining / 60), remaining % 60)
+            else "BLACKOUT · OVERTIME"
+    elseif blackoutVisible then
+        clockText = "DAWN · CHAPTER I"
+    elseif phaseEndsAt > 0 then
         local remaining = math.max(0, math.ceil(phaseEndsAt - workspace:GetServerTimeNow()))
         clockText =
             string.format("%s · %02d:%02d", phase, math.floor(remaining / 60), remaining % 60)
@@ -16324,6 +18055,65 @@ function HUDController._updateClock(self: HUDController)
     end
     self:_updateCombatClock()
     self:_updateProfessionClock()
+
+    if blackoutVisible then
+        local duration = math.max(1, tonumber(blackout.duration) or 1)
+        local targetEndsAt = tonumber(blackout.targetEndsAt) or 0
+        local startedAt = targetEndsAt - duration
+        local elapsed = if targetEndsAt <= 0
+            then tonumber(blackout.elapsed) or 0
+            else math.max(0, workspace:GetServerTimeNow() - startedAt)
+        self._blackoutFill.Size = UDim2.fromScale(math.clamp(elapsed / duration, 0, 1), 1)
+        self._blackoutFill.BackgroundColor3 = if blackout.status == "complete"
+            then COLORS.green
+            elseif blackout.overtime then COLORS.danger
+            else COLORS.blue
+        self._blackoutTitle.Text = string.format(
+            "BRAMBLEWAKE BLACKOUT · %s · %d/%d",
+            tostring(blackout.stageLabel or "STAGE"),
+            tonumber(blackout.stage) or 0,
+            tonumber(blackout.stageCount) or 4
+        )
+        if blackout.status == "relay" then
+            if blackout.carryingFire then
+                local fireRemaining = math.max(
+                    0,
+                    (tonumber(blackout.fireExpiresAt) or 0) - workspace:GetServerTimeNow()
+                )
+                self._blackoutDetail.Text = string.format(
+                    "CARRYING ROOTFIRE %.1fs · LIVING ROOTS %d/%d",
+                    fireRemaining,
+                    tonumber(blackout.deliveredNodes) or 0,
+                    tonumber(blackout.relayRequired) or 3
+                )
+            else
+                self._blackoutDetail.Text = string.format(
+                    "TAKE ROOTFIRE · LIVING ROOTS %d/%d",
+                    tonumber(blackout.deliveredNodes) or 0,
+                    tonumber(blackout.relayRequired) or 3
+                )
+            end
+        elseif blackout.status == "old_growth" then
+            self._blackoutDetail.Text = "ROOTED WALLS · CLEANSE OLD GROWTH"
+        elseif blackout.status == "warden" then
+            self._blackoutDetail.Text = "WARDEN'S SEAL · CLEANSE OR BREAK ANTLERS"
+        elseif blackout.status == "resolution" then
+            self._blackoutDetail.Text = if blackout.vote == nil
+                then "VOTE: FARMLAND · WILD · SHARED AGROFOREST"
+                else "VOTE RECORDED · WAITING FOR ACTIVE TRAVELERS"
+        else
+            local decision = string.upper(
+                string.gsub(tostring(blackout.decision or "chapter resolved"), "_", " ")
+            )
+            local outcome = string.upper(tostring(blackout.wardenOutcome or "remembered"))
+            self._blackoutDetail.Text = decision .. " · FOREST " .. outcome
+        end
+        self._blackoutDetail.TextColor3 = if blackout.status == "complete"
+            then COLORS.green
+            elseif blackout.overtime then COLORS.danger
+            else COLORS.blue
+    end
+    self._blackoutFrame.Visible = blackoutVisible
 
     local boss = state.boss
     local elite = state.elite
@@ -16388,7 +18178,9 @@ function HUDController._updateClock(self: HUDController)
     else
         self._eliteFrame.Visible = false
     end
-    self._lanternFrame.Visible = state.nightActive == true and not self._eliteFrame.Visible
+    self._lanternFrame.Visible = state.nightActive == true
+        and not self._eliteFrame.Visible
+        and not blackoutVisible
 
     local threat = state.threat
     if type(threat) == "table" and not self._playerDowned then
@@ -16460,12 +18252,15 @@ function HUDController.update(self: HUDController, state: any)
     self._playerDowned = type(selfSurvival) == "table" and selfSurvival.downed == true
     local elite = state.elite
     local boss = state.boss
+    local blackout = state.blackout
     local eliteActive = type(elite) == "table" and elite.active == true
     local bossActive = type(boss) == "table" and boss.active == true
+    local blackoutActive = type(blackout) == "table" and blackout.active == true
     self._combatContext = state.nightActive == true
         or state.expeditionActive == true
         or eliteActive
         or bossActive
+        or blackoutActive
     local ally = if type(survival) == "table" then survival.ally else nil
     self._downedFrame.Visible = self._playerDowned
     self._allyFrame.Visible = type(ally) == "table" and not self._playerDowned
@@ -16499,8 +18294,10 @@ function HUDController.update(self: HUDController, state: any)
     self._health.TextColor3 = if health <= 35 then COLORS.danger else COLORS.cream
     self._health.Visible = not self._playerDowned and (nightActive or health < maxHealth)
     self._resource.Visible = not nightActive
+        and not blackoutActive
         and ((tonumber(state.resources) or 0) > 0 or state.selectedTool ~= nil)
-    self._tool.Visible = (nightActive or eliteActive or bossActive) and not self._playerDowned
+    self._tool.Visible = (nightActive or eliteActive or bossActive or blackoutActive)
+        and not self._playerDowned
     self._sprint.Visible = self._inputMode == "touch" and not self._playerDowned
     self._dodge.Visible = not self._playerDowned
         and (self._inputMode == "touch" or self._combatContext)
@@ -16509,7 +18306,12 @@ function HUDController.update(self: HUDController, state: any)
         or (type(elite) == "table" and (elite.active == true or elite.complete == true))
     eliteVisible = eliteVisible and not self._playerDowned
     self._eliteFrame.Visible = eliteVisible
-    self._lanternFrame.Visible = nightActive and not eliteVisible
+    local blackoutVisible = type(blackout) == "table"
+        and blackout.status ~= "dormant"
+        and blackout.status ~= "disabled"
+        and not self._playerDowned
+    self._blackoutFrame.Visible = blackoutVisible
+    self._lanternFrame.Visible = nightActive and not eliteVisible and not blackoutVisible
     local lanternHealth = math.clamp(tonumber(state.lanternHealth) or 100, 0, 100)
     self._lanternFill.Size = UDim2.new(lanternHealth / 100, -8, 1, -8)
     self._lanternFill.BackgroundColor3 = if lanternHealth <= 35 then COLORS.danger else COLORS.amber
@@ -16545,7 +18347,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="62">
+          <Item class="ModuleScript" referent="64">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -16826,7 +18628,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="63">
+          <Item class="ModuleScript" referent="65">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -16935,7 +18737,7 @@ return InteractionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="64">
+  <Item class="Workspace" referent="66">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

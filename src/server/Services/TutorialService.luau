@@ -40,6 +40,7 @@ export type TutorialService = typeof(setmetatable(
         _expeditionService: any,
         _oldGrowthService: any,
         _wardenStagService: any,
+        _blackoutService: any,
         _analyticsService: any,
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -67,6 +68,7 @@ function TutorialService.new(
     expeditionService: any,
     oldGrowthService: any,
     wardenStagService: any,
+    blackoutService: any,
     analyticsService: any
 ): TutorialService
     return setmetatable({
@@ -87,6 +89,7 @@ function TutorialService.new(
         _expeditionService = expeditionService,
         _oldGrowthService = oldGrowthService,
         _wardenStagService = wardenStagService,
+        _blackoutService = blackoutService,
         _analyticsService = analyticsService,
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -147,6 +150,17 @@ function TutorialService.Init(self: TutorialService, _context: any)
         if toast ~= nil then
             for player, session in self._sessions do
                 if self._wardenStagService:snapshot(player) ~= nil then
+                    session.toast = toast
+                    session.toastRevision += 1
+                end
+            end
+        end
+        self:_publishAll()
+    end)
+    self._blackoutService:setChangedHandler(function(toast: string?)
+        if toast ~= nil then
+            for player, session in self._sessions do
+                if self._blackoutService:snapshot(player) ~= nil then
                     session.toast = toast
                     session.toastRevision += 1
                 end
@@ -352,6 +366,12 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self:_publishAll()
         return
     end
+    if actionId == self._runtimeIds.Actions.BramblewakeBlackout then
+        local result = self._blackoutService:interact(player, prompt)
+        self:_setToast(player, result.message)
+        self:_publishAll()
+        return
+    end
     if actionId == self._runtimeIds.Actions.Extract then
         local result = self._expeditionService:extract(player)
         self:_setToast(player, result.message)
@@ -367,7 +387,8 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
 
     if actionId == self._runtimeIds.Actions.Reveal and session.stage == "complete" then
         if self._expeditionService:enter(player) then
-            self:_setToast(player, "ENTERING BRAMBLEWAKE")
+            local blackoutResult = self._blackoutService:participantEntered(player)
+            self:_setToast(player, blackoutResult.message or "ENTERING BRAMBLEWAKE")
             self._analyticsService:expeditionStarted(
                 player,
                 self._expeditionService:snapshot(player)
@@ -415,7 +436,8 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self._phaseService:startFirstNight()
     elseif actionId == self._runtimeIds.Actions.Reveal then
         if self._expeditionService:enter(player) then
-            self:_setToast(player, "BRAMBLEWAKE REMEMBERS YOU")
+            local blackoutResult = self._blackoutService:participantEntered(player)
+            self:_setToast(player, blackoutResult.message or "BRAMBLEWAKE REMEMBERS YOU")
             self._analyticsService:expeditionStarted(
                 player,
                 self._expeditionService:snapshot(player)
@@ -602,8 +624,44 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
     end
     local phase = self._phaseService:snapshot()
     local survival = self._survivalService:snapshot(player)
+    local blackout = self._blackoutService:snapshot(player)
+    if blackout ~= nil then
+        trailName = "BRAMBLEWAKE BLACKOUT"
+        progress = blackout.stage
+        total = blackout.stageCount
+        objective = blackout.instruction
+        detail = if blackout.status == "relay"
+            then string.format(
+                "ROOTFIRE RELAY · %d/%d%s",
+                blackout.deliveredNodes,
+                blackout.relayRequired,
+                if blackout.carryingFire then " · CARRYING FIRE" else ""
+            )
+            elseif
+                blackout.status == "old_growth"
+            then "STAGE 2/4 · ROOTED WALLS HOLD UNTIL OLD GROWTH FALLS"
+            elseif blackout.status == "warden" then "STAGE 3/4 · THE WARDEN REMEMBERS EVERY ANTLER"
+            elseif
+                blackout.status == "resolution"
+            then "STAGE 4/4 · FARMLAND, WILD REGROWTH, OR SHARED AGROFOREST"
+            elseif blackout.status == "complete" then string.format(
+                "%s · %s",
+                string.upper(tostring(blackout.decision)),
+                string.upper(tostring(blackout.wardenOutcome))
+            )
+            else "THE BLACKOUT HAS NOT BEGUN"
+        mara = if blackout.status == "relay"
+            then "Take rootfire from the Blackout Lantern and carry it to each marked living root."
+            elseif
+                blackout.status == "resolution"
+            then "Every active traveler votes. A tie becomes the shared agroforest."
+            elseif
+                blackout.status == "complete"
+            then "The Greenward will remember this choice when the town grows."
+            else "Keep the living path open. The Blackout clock never erases earned progress."
+    end
     local elite = self._oldGrowthService:snapshot(player)
-    if elite ~= nil then
+    if elite ~= nil and (blackout == nil or blackout.status == "old_growth") then
         if elite.active then
             objective = elite.instruction
             detail = string.format(
@@ -626,8 +684,10 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         end
     end
     local boss = self._wardenStagService:snapshot(player)
-    if boss ~= nil then
-        trailName = "WARDEN'S SEAL"
+    if boss ~= nil and (blackout == nil or blackout.status == "warden") then
+        if blackout == nil then
+            trailName = "WARDEN'S SEAL"
+        end
         progress = boss.phase
         total = 3
         if boss.active then
@@ -703,6 +763,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         profession = self._professionService:snapshot(player),
         elite = elite,
         boss = boss,
+        blackout = blackout,
         threat = self._enemyService:threatSnapshot(player),
         survival = survival,
     }

@@ -106,6 +106,10 @@ export type HUDController = typeof(setmetatable(
         _lanternFrame: Frame,
         _lanternFill: Frame,
         _lanternText: TextLabel,
+        _blackoutFrame: Frame,
+        _blackoutFill: Frame,
+        _blackoutTitle: TextLabel,
+        _blackoutDetail: TextLabel,
         _eliteFrame: Frame,
         _eliteFill: Frame,
         _eliteTitle: TextLabel,
@@ -372,6 +376,63 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     )
     lanternText.Font = Enum.Font.GothamBold
     lanternText.ZIndex = 2
+
+    local blackoutFrame = Instance.new("Frame")
+    blackoutFrame.Name = "BlackoutStatus"
+    blackoutFrame.AnchorPoint = Vector2.new(0.5, 0)
+    blackoutFrame.Position = UDim2.new(0.5, 0, 0, 66)
+    blackoutFrame.Size = UDim2.fromOffset(420, 64)
+    blackoutFrame.BackgroundColor3 = Color3.fromRGB(11, 24, 25)
+    blackoutFrame.BackgroundTransparency = 0.02
+    blackoutFrame.Visible = false
+    blackoutFrame.ZIndex = 11
+    blackoutFrame.Parent = canvas
+    corner(blackoutFrame, 14)
+    stroke(blackoutFrame, COLORS.blue, 0.08)
+
+    local blackoutTrack = Instance.new("Frame")
+    blackoutTrack.Name = "TimeTrack"
+    blackoutTrack.Position = UDim2.fromOffset(10, 48)
+    blackoutTrack.Size = UDim2.new(1, -20, 0, 7)
+    blackoutTrack.BackgroundColor3 = Color3.fromRGB(48, 61, 58)
+    blackoutTrack.BorderSizePixel = 0
+    blackoutTrack.ZIndex = 12
+    blackoutTrack.Parent = blackoutFrame
+    corner(blackoutTrack, 4)
+
+    local blackoutFill = Instance.new("Frame")
+    blackoutFill.Name = "Fill"
+    blackoutFill.Size = UDim2.fromScale(0, 1)
+    blackoutFill.BackgroundColor3 = COLORS.blue
+    blackoutFill.BorderSizePixel = 0
+    blackoutFill.ZIndex = 13
+    blackoutFill.Parent = blackoutTrack
+    corner(blackoutFill, 4)
+
+    local blackoutTitle = textLabel(
+        blackoutFrame,
+        "Title",
+        "BRAMBLEWAKE BLACKOUT · STAGE 1/4",
+        UDim2.new(1, -20, 0, 24),
+        UDim2.fromOffset(10, 4),
+        14,
+        COLORS.cream,
+        Enum.TextXAlignment.Center
+    )
+    blackoutTitle.Font = Enum.Font.GothamBold
+    blackoutTitle.ZIndex = 12
+    local blackoutDetail = textLabel(
+        blackoutFrame,
+        "Detail",
+        "ROOTFIRE RELAY · 0/3",
+        UDim2.new(1, -20, 0, 20),
+        UDim2.fromOffset(10, 27),
+        11,
+        COLORS.blue,
+        Enum.TextXAlignment.Center
+    )
+    blackoutDetail.Font = Enum.Font.GothamBold
+    blackoutDetail.ZIndex = 12
 
     local eliteFrame = Instance.new("Frame")
     eliteFrame.Name = "EliteStatus"
@@ -770,6 +831,10 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _lanternFrame = lanternFrame,
         _lanternFill = lanternFill,
         _lanternText = lanternText,
+        _blackoutFrame = blackoutFrame,
+        _blackoutFill = blackoutFill,
+        _blackoutTitle = blackoutTitle,
+        _blackoutDetail = blackoutDetail,
         _eliteFrame = eliteFrame,
         _eliteFill = eliteFill,
         _eliteTitle = eliteTitle,
@@ -1156,13 +1221,20 @@ function HUDController._layout(self: HUDController)
         self._compact.Size = UDim2.fromOffset(44, 38)
         self._compact.Text = if self._compactEnabled then "+" else "−"
         self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 212)
-        self._eliteFrame.Position = UDim2.new(0.5, 0, 0, 212)
+        self._blackoutFrame.Position = UDim2.new(0.5, 0, 0, 212)
+        self._blackoutFrame.Size = UDim2.new(1, -36, 0, 64)
+        self._eliteFrame.Position =
+            UDim2.new(0.5, 0, 0, if self._blackoutFrame.Visible then 284 else 212)
         self._eliteFrame.Size = UDim2.new(1, -36, 0, 70)
         self._allyFrame.Position = UDim2.new(
             0.5,
             0,
             0,
-            if self._eliteFrame.Visible then 290 elseif self._lanternFrame.Visible then 254 else 212
+            if self._eliteFrame.Visible
+                then (if self._blackoutFrame.Visible then 362 else 290)
+                elseif self._blackoutFrame.Visible then 284
+                elseif self._lanternFrame.Visible then 254
+                else 212
         )
         self._allyFrame.Size = UDim2.new(1, -36, 0, 64)
         self._threatFrame.Position = UDim2.new(
@@ -1170,7 +1242,9 @@ function HUDController._layout(self: HUDController)
             0,
             0,
             if self._allyFrame.Visible
-                then (if self._eliteFrame.Visible then 362 else 326)
+                then (if self._blackoutFrame.Visible and self._eliteFrame.Visible then 434 else 362)
+                elseif self._blackoutFrame.Visible and self._eliteFrame.Visible then 362
+                elseif self._blackoutFrame.Visible then 284
                 elseif self._eliteFrame.Visible then 290
                 else 254
         )
@@ -1189,13 +1263,20 @@ function HUDController._layout(self: HUDController)
         self._compact.Size = UDim2.fromOffset(118, 38)
         self._compact.Text = if self._compactEnabled then "EXPAND" else "COMPACT"
         self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 66)
-        self._eliteFrame.Position = UDim2.new(0.5, 0, 0, 66)
+        self._blackoutFrame.Position = UDim2.new(0.5, 0, 0, 66)
+        self._blackoutFrame.Size = UDim2.fromOffset(420, 64)
+        self._eliteFrame.Position =
+            UDim2.new(0.5, 0, 0, if self._blackoutFrame.Visible then 138 else 66)
         self._eliteFrame.Size = UDim2.fromOffset(420, 70)
         self._allyFrame.Position = UDim2.new(
             0.5,
             0,
             0,
-            if self._eliteFrame.Visible then 144 elseif self._lanternFrame.Visible then 108 else 66
+            if self._eliteFrame.Visible
+                then (if self._blackoutFrame.Visible then 216 else 144)
+                elseif self._blackoutFrame.Visible then 138
+                elseif self._lanternFrame.Visible then 108
+                else 66
         )
         self._allyFrame.Size = UDim2.fromOffset(330, 64)
         self._threatFrame.Position = UDim2.fromScale(0.5, 0.32)
@@ -1215,8 +1296,21 @@ function HUDController._updateClock(self: HUDController)
 
     local phase = string.upper(tostring(state.phase or "day"))
     local phaseEndsAt = tonumber(state.phaseEndsAt) or 0
+    local blackout = state.blackout
+    local blackoutVisible = type(blackout) == "table"
+        and blackout.status ~= "dormant"
+        and blackout.status ~= "disabled"
+        and not self._playerDowned
     local clockText: string
-    if phaseEndsAt > 0 then
+    if blackoutVisible and blackout.status ~= "complete" then
+        local targetEndsAt = tonumber(blackout.targetEndsAt) or 0
+        local remaining = math.max(0, math.ceil(targetEndsAt - workspace:GetServerTimeNow()))
+        clockText = if remaining > 0
+            then string.format("BLACKOUT · %02d:%02d", math.floor(remaining / 60), remaining % 60)
+            else "BLACKOUT · OVERTIME"
+    elseif blackoutVisible then
+        clockText = "DAWN · CHAPTER I"
+    elseif phaseEndsAt > 0 then
         local remaining = math.max(0, math.ceil(phaseEndsAt - workspace:GetServerTimeNow()))
         clockText =
             string.format("%s · %02d:%02d", phase, math.floor(remaining / 60), remaining % 60)
@@ -1228,6 +1322,65 @@ function HUDController._updateClock(self: HUDController)
     end
     self:_updateCombatClock()
     self:_updateProfessionClock()
+
+    if blackoutVisible then
+        local duration = math.max(1, tonumber(blackout.duration) or 1)
+        local targetEndsAt = tonumber(blackout.targetEndsAt) or 0
+        local startedAt = targetEndsAt - duration
+        local elapsed = if targetEndsAt <= 0
+            then tonumber(blackout.elapsed) or 0
+            else math.max(0, workspace:GetServerTimeNow() - startedAt)
+        self._blackoutFill.Size = UDim2.fromScale(math.clamp(elapsed / duration, 0, 1), 1)
+        self._blackoutFill.BackgroundColor3 = if blackout.status == "complete"
+            then COLORS.green
+            elseif blackout.overtime then COLORS.danger
+            else COLORS.blue
+        self._blackoutTitle.Text = string.format(
+            "BRAMBLEWAKE BLACKOUT · %s · %d/%d",
+            tostring(blackout.stageLabel or "STAGE"),
+            tonumber(blackout.stage) or 0,
+            tonumber(blackout.stageCount) or 4
+        )
+        if blackout.status == "relay" then
+            if blackout.carryingFire then
+                local fireRemaining = math.max(
+                    0,
+                    (tonumber(blackout.fireExpiresAt) or 0) - workspace:GetServerTimeNow()
+                )
+                self._blackoutDetail.Text = string.format(
+                    "CARRYING ROOTFIRE %.1fs · LIVING ROOTS %d/%d",
+                    fireRemaining,
+                    tonumber(blackout.deliveredNodes) or 0,
+                    tonumber(blackout.relayRequired) or 3
+                )
+            else
+                self._blackoutDetail.Text = string.format(
+                    "TAKE ROOTFIRE · LIVING ROOTS %d/%d",
+                    tonumber(blackout.deliveredNodes) or 0,
+                    tonumber(blackout.relayRequired) or 3
+                )
+            end
+        elseif blackout.status == "old_growth" then
+            self._blackoutDetail.Text = "ROOTED WALLS · CLEANSE OLD GROWTH"
+        elseif blackout.status == "warden" then
+            self._blackoutDetail.Text = "WARDEN'S SEAL · CLEANSE OR BREAK ANTLERS"
+        elseif blackout.status == "resolution" then
+            self._blackoutDetail.Text = if blackout.vote == nil
+                then "VOTE: FARMLAND · WILD · SHARED AGROFOREST"
+                else "VOTE RECORDED · WAITING FOR ACTIVE TRAVELERS"
+        else
+            local decision = string.upper(
+                string.gsub(tostring(blackout.decision or "chapter resolved"), "_", " ")
+            )
+            local outcome = string.upper(tostring(blackout.wardenOutcome or "remembered"))
+            self._blackoutDetail.Text = decision .. " · FOREST " .. outcome
+        end
+        self._blackoutDetail.TextColor3 = if blackout.status == "complete"
+            then COLORS.green
+            elseif blackout.overtime then COLORS.danger
+            else COLORS.blue
+    end
+    self._blackoutFrame.Visible = blackoutVisible
 
     local boss = state.boss
     local elite = state.elite
@@ -1292,7 +1445,9 @@ function HUDController._updateClock(self: HUDController)
     else
         self._eliteFrame.Visible = false
     end
-    self._lanternFrame.Visible = state.nightActive == true and not self._eliteFrame.Visible
+    self._lanternFrame.Visible = state.nightActive == true
+        and not self._eliteFrame.Visible
+        and not blackoutVisible
 
     local threat = state.threat
     if type(threat) == "table" and not self._playerDowned then
@@ -1364,12 +1519,15 @@ function HUDController.update(self: HUDController, state: any)
     self._playerDowned = type(selfSurvival) == "table" and selfSurvival.downed == true
     local elite = state.elite
     local boss = state.boss
+    local blackout = state.blackout
     local eliteActive = type(elite) == "table" and elite.active == true
     local bossActive = type(boss) == "table" and boss.active == true
+    local blackoutActive = type(blackout) == "table" and blackout.active == true
     self._combatContext = state.nightActive == true
         or state.expeditionActive == true
         or eliteActive
         or bossActive
+        or blackoutActive
     local ally = if type(survival) == "table" then survival.ally else nil
     self._downedFrame.Visible = self._playerDowned
     self._allyFrame.Visible = type(ally) == "table" and not self._playerDowned
@@ -1403,8 +1561,10 @@ function HUDController.update(self: HUDController, state: any)
     self._health.TextColor3 = if health <= 35 then COLORS.danger else COLORS.cream
     self._health.Visible = not self._playerDowned and (nightActive or health < maxHealth)
     self._resource.Visible = not nightActive
+        and not blackoutActive
         and ((tonumber(state.resources) or 0) > 0 or state.selectedTool ~= nil)
-    self._tool.Visible = (nightActive or eliteActive or bossActive) and not self._playerDowned
+    self._tool.Visible = (nightActive or eliteActive or bossActive or blackoutActive)
+        and not self._playerDowned
     self._sprint.Visible = self._inputMode == "touch" and not self._playerDowned
     self._dodge.Visible = not self._playerDowned
         and (self._inputMode == "touch" or self._combatContext)
@@ -1413,7 +1573,12 @@ function HUDController.update(self: HUDController, state: any)
         or (type(elite) == "table" and (elite.active == true or elite.complete == true))
     eliteVisible = eliteVisible and not self._playerDowned
     self._eliteFrame.Visible = eliteVisible
-    self._lanternFrame.Visible = nightActive and not eliteVisible
+    local blackoutVisible = type(blackout) == "table"
+        and blackout.status ~= "dormant"
+        and blackout.status ~= "disabled"
+        and not self._playerDowned
+    self._blackoutFrame.Visible = blackoutVisible
+    self._lanternFrame.Visible = nightActive and not eliteVisible and not blackoutVisible
     local lanternHealth = math.clamp(tonumber(state.lanternHealth) or 100, 0, 100)
     self._lanternFill.Size = UDim2.new(lanternHealth / 100, -8, 1, -8)
     self._lanternFill.BackgroundColor3 = if lanternHealth <= 35 then COLORS.danger else COLORS.amber

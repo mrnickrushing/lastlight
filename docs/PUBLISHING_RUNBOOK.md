@@ -78,6 +78,9 @@ For the current foundation milestone:
    defaults on.
 5. Confirm no infinite-yield, boot-error, or full-world-loading message appears.
 6. Confirm the private server can be shut down and rejoined.
+7. For build `0.13.0`, use a disposable account to resolve chapter one, rejoin,
+   and confirm save-schema-v4 retains the same Warden outcome, Greenward
+   decision, and transaction ID without allowing a second resolution write.
 
 Milestone-specific journey, device, data, commerce, performance, and rollback
 checks are additive; this foundation checklist never replaces them.

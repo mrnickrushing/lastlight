@@ -38,6 +38,13 @@ as hierarchy guidance: one contextual rail reports exact phase and health,
 living-root progress, antler consequence, and outcome, while the existing
 world-space shape plus targeted warning card owns immediate attack urgency.
 
+The Bramblewake Blackout state uses the
+[Bramblewake Mobile Blackout Event Layer report](https://www.lazyweb.com/report/lazyweb/558b7278-8455-4639-bf62-bd4ebb97a034/?source=create)
+as hierarchy guidance: a compact top-center event rail reports the written
+stage, target clock or overtime, relay progress, carried-fire expiry,
+elite/boss transition, and chapter vote/result while the existing encounter and
+threat rails retain their more immediate jobs.
+
 The design follows current Roblox guidance for
 [mobile input](https://create.roblox.com/docs/input/mobile),
 [reserved mobile control zones](https://create.roblox.com/docs/building-and-visuals/ui/positioning-and-sizing-guiobjects),

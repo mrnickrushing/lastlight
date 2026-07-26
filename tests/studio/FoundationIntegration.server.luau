@@ -20,12 +20,14 @@ local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local OldGrowthEncounter = require(root.OldGrowthEncounter)
 local WardenStagEncounter = require(root.WardenStagEncounter)
+local BramblewakeBlackout = require(root.BramblewakeBlackout)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local ProfessionState = require(root.ProfessionState)
 local ReviveFlow = require(root.ReviveFlow)
 local RuntimeIds = require(root.RuntimeIds)
 local SurvivalState = require(root.SurvivalState)
 local StatusEffectState = require(root.StatusEffectState)
+local SaveSchema = require(root.SaveSchema)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
 local ServiceRegistry = require(serverRoot.ServiceRegistry)
@@ -33,8 +35,8 @@ local OldGrowthBuilder = require(serverRoot.World.OldGrowthBuilder)
 local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
-assert(Config.SaveSchemaVersion == 3, "unexpected save schema version")
-assert(Config.BuildVersion == "0.12.0", "unexpected build version")
+assert(Config.SaveSchemaVersion == 4, "unexpected save schema version")
+assert(Config.BuildVersion == "0.13.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -85,6 +87,10 @@ assert(
 )
 assert(RuntimeIds.Actions.OldGrowthFire == "old_growth_fire", "Old Growth action ID changed")
 assert(RuntimeIds.Actions.WardenStagChoice == "warden_stag_choice", "Warden Stag action ID changed")
+assert(
+    RuntimeIds.Actions.BramblewakeBlackout == "bramblewake_blackout",
+    "Blackout action ID changed"
+)
 
 local combat = CombatState.create(200)
 local sprinting = CombatState.setSprint(combat, true, 200, true)
@@ -209,6 +215,43 @@ assert(
 )
 wardenModel:Destroy()
 
+local blackout = BramblewakeBlackout.create("studio_run", "studio_manifest", true, 540)
+blackout = BramblewakeBlackout.start(blackout, 10, 500)
+for _, nodeId in
+    {
+        "blackout_root_farm",
+        "blackout_root_mill",
+        "blackout_root_cathedral",
+    }
+do
+    blackout = BramblewakeBlackout.takeFire(blackout, 10, 501)
+    blackout = BramblewakeBlackout.deliverFire(blackout, 10, nodeId, 502)
+end
+assert(blackout.status == "old_growth", "Blackout relay did not unlock Old Growth")
+blackout = BramblewakeBlackout.completeOldGrowth(blackout)
+assert(blackout.status == "warden", "Blackout did not advance to the Warden")
+blackout = BramblewakeBlackout.completeWarden(blackout, "preserved")
+blackout = BramblewakeBlackout.vote(blackout, 10, "shared_agroforest", { 10 })
+assert(blackout.status == "complete", "Blackout chapter vote did not resolve")
+assert(
+    BramblewakeBlackout.chapterTransactionId(blackout, 10)
+        == "chapter_1:studio_run:studio_manifest:10",
+    "Blackout chapter transaction is not stable"
+)
+local profile = SaveSchema.default(500)
+local resolvedProfile, chapterResult = SaveSchema.withChapterOneResolution(
+    profile,
+    BramblewakeBlackout.chapterTransactionId(blackout, 10),
+    blackout.decision,
+    blackout.wardenOutcome,
+    600
+)
+assert(chapterResult.applied, "chapter one result did not persist")
+assert(
+    resolvedProfile.story.chapterOne.decision == "shared_agroforest",
+    "chapter one decision changed during persistence"
+)
+
 local profession =
     ProfessionState.create(ProfessionCatalog.Ids.Warden, workspace:GetServerTimeNow())
 local professionDecision = ProfessionState.canUse(profession, workspace:GetServerTimeNow(), true)
@@ -234,7 +277,7 @@ local world = workspace:WaitForChild(RuntimeIds.WorldName, 8)
 assert(world ~= nil and world:IsA("Model"), "first-ten-minutes world did not build")
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "warden-stag-boss-v5",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v6",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -263,6 +306,7 @@ assert(
     "Bramblewake event interaction count is incorrect"
 )
 assert(expedition:GetAttribute("BossArenaReady") == true, "Warden Stag arena is not ready")
+assert(expedition:GetAttribute("BlackoutLayerReady") == true, "Blackout layer is not ready")
 local expectedManifest = ExpeditionGenerator.generate(Config.BramblewakePreviewSeed)
 assert(
     expedition:GetAttribute("ManifestHash") == expectedManifest.hash,
@@ -273,13 +317,13 @@ assert(
     type(generatedPartCount) == "number"
         and generatedPartCount >= 200
         and generatedPartCount
-            <= BramblewakeExpedition.PartBudget + BramblewakeExpedition.BossArenaPartBudget,
+            <= BramblewakeExpedition.PartBudget + BramblewakeExpedition.BossArenaPartBudget + BramblewakeExpedition.BlackoutPartBudget,
     "Bramblewake preview is outside its detailed mobile part budget"
 )
 
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
-    #tagged == 17 + BramblewakeExpedition.EventInteractionCount,
+    #tagged == 24 + BramblewakeExpedition.EventInteractionCount,
     "expected tutorial, event, elite, boss, and extraction interaction prompts"
 )
 assert(
@@ -304,6 +348,23 @@ for _, module in expeditionModules do
     assert(
         module:FindFirstChild("CriticalPath") ~= nil,
         "expedition module is missing its connected critical path"
+    )
+end
+local blackoutLayer = expedition:FindFirstChild("BramblewakeBlackoutLayer")
+assert(blackoutLayer ~= nil and blackoutLayer:IsA("Model"), "Bramblewake Blackout layer is missing")
+assert(
+    blackoutLayer.ModelStreamingMode == Enum.ModelStreamingMode.Atomic,
+    "Bramblewake Blackout layer must stream atomically"
+)
+local blackoutTargets = CollectionService:GetTagged(RuntimeIds.ExpeditionBlackoutTag)
+assert(#blackoutTargets == 7, "expected four relay and three decision targets")
+for _, target in blackoutTargets do
+    assert(target:IsA("BasePart"), "Blackout tags must target BaseParts")
+    local prompt = target:FindFirstChildOfClass("ProximityPrompt")
+    assert(prompt ~= nil and not prompt.Enabled, "Blackout prompts must begin dormant")
+    assert(
+        prompt:GetAttribute("ActionId") == RuntimeIds.Actions.BramblewakeBlackout,
+        "Blackout prompt does not route to its server action"
     )
 end
 assert(

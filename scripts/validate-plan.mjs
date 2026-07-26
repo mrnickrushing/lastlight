@@ -29,6 +29,7 @@ const requiredFiles = [
   "docs/MILESTONE_3_PLAYER_SURVIVAL.md",
   "docs/MILESTONE_3_PROFESSION_KITS.md",
   "docs/MILESTONE_3_WARDEN_STAG_BOSS.md",
+  "docs/MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md",
   "docs/PUBLISHING_RUNBOOK.md",
   "docs/DECISIONS.md",
   "src/shared/Environment.luau",

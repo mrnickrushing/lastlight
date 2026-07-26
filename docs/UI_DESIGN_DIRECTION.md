@@ -37,6 +37,14 @@ contextual boss rail with exact phase/health, root progress, explicit
 preserve-versus-break consequence language, and the existing higher-priority
 targeted attack card.
 
+The
+[Bramblewake Mobile Blackout Event Layer report](https://www.lazyweb.com/report/lazyweb/558b7278-8455-4639-bf62-bd4ebb97a034/?source=create)
+grounds the first chapter event shell. Its source coverage was strongest for
+adjacent mobile live-event and countdown patterns rather than an exact Roblox
+Blackout match, so the implementation uses the hierarchy without copying a
+specific visual: a separate compact clock/stage rail sits above the existing
+elite, boss, ally, and targeted-threat layers.
+
 ## Chosen system
 
 The default is a **context-sensitive survival HUD**:

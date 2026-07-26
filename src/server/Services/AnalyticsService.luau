@@ -517,6 +517,104 @@ function AnalyticsService.bossResult(
     end
 end
 
+function AnalyticsService.blackoutStarted(
+    self: AnalyticsService,
+    player: Player,
+    blackoutId: string,
+    manifestHash: string,
+    duration: number
+)
+    self._logger:info("blackout_started", {
+        blackout = string.sub(blackoutId, 1, 48),
+        duration = duration,
+        hash = manifestHash,
+        player = player.UserId,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "BramblewakeBlackoutStarted", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = blackoutId,
+            })
+        end)
+    end
+end
+
+function AnalyticsService.blackoutStage(
+    self: AnalyticsService,
+    player: Player,
+    blackoutId: string,
+    stage: string,
+    reason: string,
+    revision: number
+)
+    self._logger:info("blackout_stage", {
+        blackout = string.sub(blackoutId, 1, 48),
+        player = player.UserId,
+        reason = string.sub(reason, 1, 48),
+        revision = revision,
+        stage = string.sub(stage, 1, 32),
+    })
+end
+
+function AnalyticsService.blackoutResult(
+    self: AnalyticsService,
+    player: Player,
+    blackoutId: string,
+    manifestHash: string,
+    decision: string?,
+    wardenOutcome: string?,
+    startedAt: number?,
+    completedAt: number
+)
+    local duration = if startedAt == nil then 0 else math.max(0, completedAt - startedAt)
+    self._logger:info("blackout_result", {
+        blackout = string.sub(blackoutId, 1, 48),
+        decision = string.sub(decision or "unknown", 1, 32),
+        duration = math.floor(duration + 0.5),
+        hash = manifestHash,
+        outcome = string.sub(wardenOutcome or "unknown", 1, 32),
+        player = player.UserId,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(
+                player,
+                "BramblewakeBlackoutCompleted",
+                math.max(1, math.floor(duration + 0.5)),
+                {
+                    [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = decision or "unknown",
+                    [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = wardenOutcome or "unknown",
+                }
+            )
+        end)
+    end
+end
+
+function AnalyticsService.chapterCompleted(
+    self: AnalyticsService,
+    player: Player,
+    chapter: number,
+    decision: string,
+    wardenOutcome: string,
+    transactionId: string
+)
+    self._logger:info("chapter_completed", {
+        chapter = chapter,
+        decision = string.sub(decision, 1, 32),
+        outcome = string.sub(wardenOutcome, 1, 32),
+        player = player.UserId,
+        transaction = string.sub(transactionId, 1, 160),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "ChapterCompleted", chapter, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = decision,
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = wardenOutcome,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.clear(self: AnalyticsService, player: Player)
     self._startedAt[player] = nil
     self._expeditionStarted[player] = nil

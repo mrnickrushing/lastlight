@@ -49,6 +49,7 @@ export type OldGrowthService = typeof(setmetatable(
         _markedUntil: number,
         _onChanged: ((string?) -> ())?,
         _heartbeat: RBXScriptConnection?,
+        _activationGate: (() -> boolean)?,
     },
     OldGrowthService
 ))
@@ -109,7 +110,12 @@ function OldGrowthService.new(
         _markedUntil = 0,
         _onChanged = nil,
         _heartbeat = nil,
+        _activationGate = nil,
     }, OldGrowthService)
+end
+
+function OldGrowthService.setActivationGate(self: OldGrowthService, gate: (() -> boolean)?)
+    self._activationGate = gate
 end
 
 function OldGrowthService.Init(self: OldGrowthService, _context: any)
@@ -482,7 +488,10 @@ function OldGrowthService._step(self: OldGrowthService, now: number)
         self:_notify("LANTERN FIRE FADED — TAKE ANOTHER FLAME")
     end
 
-    if self._state.status == "dormant" then
+    if
+        self._state.status == "dormant"
+        and (self._activationGate == nil or (self._activationGate :: () -> boolean)())
+    then
         for _, player in Players:GetPlayers() do
             if
                 self:_inArena(player, ACTIVATION_RADIUS) and self._survivalService:canAct(player)
@@ -799,6 +808,10 @@ end
 
 function OldGrowthService.isComplete(self: OldGrowthService): boolean
     return self._state.status == "complete"
+end
+
+function OldGrowthService.enabled(self: OldGrowthService): boolean
+    return self._state.status ~= "disabled"
 end
 
 return table.freeze(OldGrowthService)

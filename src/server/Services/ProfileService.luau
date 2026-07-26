@@ -405,6 +405,88 @@ function ProfileService.inventorySnapshot(self: ProfileService, player: Player):
     }
 end
 
+function ProfileService.completeChapterOne(
+    self: ProfileService,
+    player: Player,
+    transactionId: string,
+    decision: string,
+    wardenOutcome: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {
+            accepted = false,
+            durable = false,
+            reason = "profile_loading",
+        }
+    end
+    if not self:isWritable(player) then
+        return {
+            accepted = false,
+            durable = false,
+            reason = "profile_read_only",
+        }
+    end
+    local nextProfile, result = self._saveSchema.withChapterOneResolution(
+        profile,
+        transactionId,
+        decision,
+        wardenOutcome,
+        os.time()
+    )
+    if not result.applied and not result.duplicate then
+        return {
+            accepted = false,
+            durable = true,
+            reason = result.reason,
+        }
+    end
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent then
+            self._dirty[player] = true
+        end
+    end
+    local durable = not self._persistent
+    if self._persistent and result.applied then
+        local saved = self:save(player)
+        local activeProfile = self._profiles[player]
+        local chapter = if activeProfile == nil
+            then nil
+            else self._saveSchema.chapterOne(activeProfile)
+        durable = saved
+            and chapter ~= nil
+            and chapter.status == "complete"
+            and chapter.transactionId == transactionId
+    elseif self._persistent and result.duplicate then
+        local saved = if self._dirty[player] == true then self:save(player) else true
+        local activeProfile = self._profiles[player]
+        local chapter = if activeProfile == nil
+            then nil
+            else self._saveSchema.chapterOne(activeProfile)
+        durable = saved
+            and self._dirty[player] ~= true
+            and chapter ~= nil
+            and chapter.status == "complete"
+            and chapter.transactionId == transactionId
+    end
+    return {
+        accepted = true,
+        applied = result.applied == true,
+        durable = durable,
+        reason = if durable then result.reason else "save_pending",
+        story = result.record,
+    }
+end
+
+function ProfileService.chapterOneSnapshot(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return self._saveSchema.chapterOne(profile)
+end
+
 function ProfileService.save(self: ProfileService, player: Player): boolean
     local profile = self._profiles[player]
     if profile == nil then

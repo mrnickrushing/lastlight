@@ -36,6 +36,7 @@ export type WorldService = typeof(setmetatable(
         _eventsEnabled: boolean,
         _oldGrowthArena: any,
         _wardenStagArena: any,
+        _blackoutArena: any,
     },
     WorldService
 ))
@@ -213,6 +214,7 @@ function WorldService.new(logger: Logger): WorldService
         _eventsEnabled = true,
         _oldGrowthArena = nil,
         _wardenStagArena = nil,
+        _blackoutArena = nil,
     }, WorldService)
 end
 
@@ -636,7 +638,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "warden-stag-boss-v5")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v6")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -700,7 +702,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "warden-stag-boss-v5",
+        worldVersion = "bramblewake-blackout-v6",
     })
 end
 
@@ -813,6 +815,7 @@ function WorldService.buildBramblewake(
             or actionId == self._runtimeIds.Actions.Extract
             or actionId == self._runtimeIds.Actions.OldGrowthFire
             or actionId == self._runtimeIds.Actions.WardenStagChoice
+            or actionId == self._runtimeIds.Actions.BramblewakeBlackout
         then
             self._interactions[interactionId] = nil
         end
@@ -821,6 +824,7 @@ function WorldService.buildBramblewake(
     self._eventTargets = {}
     self._oldGrowthArena = nil
     self._wardenStagArena = nil
+    self._blackoutArena = nil
 
     local result = BramblewakeBuilder.build(world, manifest, generator, catalog, self._runtimeIds)
     self._expeditionEntry = result.entryCFrame
@@ -829,6 +833,7 @@ function WorldService.buildBramblewake(
     self._eventSockets = result.eventSockets
     self._oldGrowthArena = result.eliteArena
     self._wardenStagArena = result.bossArena
+    self._blackoutArena = result.blackout
     self:_registerInteraction(
         result.extractionTarget,
         self._runtimeIds.InteractionIds.Wayhome,
@@ -893,10 +898,133 @@ function WorldService.buildBramblewake(
         cleansedNodes = {},
         status = "locked",
     })
+    for _, descriptor in result.blackout.interactions do
+        self:_registerInteraction(
+            descriptor.target,
+            descriptor.interactionId,
+            self._runtimeIds.Actions.BramblewakeBlackout,
+            descriptor.actionText,
+            descriptor.objectText,
+            nil,
+            descriptor.holdDuration
+        )
+    end
+    self:setBlackoutPresentation({
+        deliveredNodes = {},
+        status = "dormant",
+    })
     world:SetAttribute("ExpeditionReady", true)
     world:SetAttribute("ExpeditionManifestHash", manifest.hash)
     world:SetAttribute("ExpeditionEventInteractions", #result.eventInteractions)
     return result
+end
+
+function WorldService.blackoutArena(self: WorldService): any
+    return self._blackoutArena
+end
+
+function WorldService.setBlackoutPresentation(self: WorldService, state: any)
+    local arena = self._blackoutArena
+    local world = self._world
+    if arena == nil then
+        return
+    end
+    local status = tostring(state.status)
+    local relay = status == "relay"
+    local resolution = status == "resolution"
+    local complete = status == "complete"
+    local deliveredNodes = if type(state.deliveredNodes) == "table"
+        then state.deliveredNodes
+        else {}
+
+    arena.fireSource.Color = if relay then AMBER else Color3.fromRGB(94, 83, 64)
+    arena.fireSource.Material = if relay then Enum.Material.Neon else Enum.Material.SmoothPlastic
+    arena.fireSource.Transparency = if relay then 0.1 else 0.58
+    local firePrompt = self._interactions[self._runtimeIds.InteractionIds.BlackoutFireSource]
+    if firePrompt ~= nil then
+        firePrompt.Enabled = relay
+    end
+
+    for nodeId, target in arena.relayNodes do
+        local delivered = deliveredNodes[nodeId] == true
+        target.Color = if delivered
+            then FOXFIRE
+            elseif relay then Color3.fromRGB(255, 137, 72)
+            else Color3.fromRGB(70, 91, 72)
+        target.Material = if delivered or relay
+            then Enum.Material.Neon
+            else Enum.Material.SmoothPlastic
+        target.Transparency = if delivered then 0.28 elseif relay then 0.12 else 0.58
+        local prompt = target:FindFirstChildOfClass("ProximityPrompt")
+        if prompt ~= nil then
+            prompt.Enabled = relay
+            prompt.ActionText = if delivered then "TAKE ROOTFIRE" else "DELIVER ROOTFIRE"
+            prompt.ObjectText = if delivered then "Lit Living Root" else "Unlit Living Root"
+        end
+        for _, rootedWall in arena.model:GetChildren() do
+            if
+                rootedWall:IsA("BasePart")
+                and rootedWall.Name == "RootedWall"
+                and rootedWall:GetAttribute("BlackoutNodeId") == nodeId
+            then
+                rootedWall.Color = if delivered then Color3.fromRGB(52, 90, 61) else BARK
+                rootedWall.Transparency = if delivered then 0.48 else 0
+            end
+        end
+    end
+
+    for decisionId, target in arena.decisions do
+        target.Material = if resolution or complete
+            then Enum.Material.Neon
+            else Enum.Material.SmoothPlastic
+        target.Transparency = if resolution then 0.08 elseif complete then 0.3 else 0.68
+        local prompt = target:FindFirstChildOfClass("ProximityPrompt")
+        if prompt ~= nil then
+            prompt.Enabled = resolution
+        end
+        if complete then
+            target:SetAttribute("Selected", state.decision == decisionId)
+            if state.decision ~= decisionId then
+                target.Transparency = 0.78
+            end
+        end
+    end
+
+    if world ~= nil then
+        world:SetAttribute(
+            "BlackoutActive",
+            relay or status == "old_growth" or status == "warden" or resolution
+        )
+        world:SetAttribute("BlackoutStatus", status)
+        world:SetAttribute("BlackoutRevision", tonumber(state.revision) or 0)
+    end
+end
+
+function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
+    local world = self._world
+    if world ~= nil then
+        world:SetAttribute("BlackoutLighting", active)
+    end
+    local effect = Lighting:FindFirstChild("LastLightBlackoutColor")
+    if not active then
+        if effect ~= nil then
+            effect:Destroy()
+        end
+        if not self._night then
+            Lighting.Ambient = DAY_AMBIENT
+        end
+        return
+    end
+    Lighting.Ambient = Color3.fromRGB(18, 28, 35)
+    local color = if effect ~= nil and effect:IsA("ColorCorrectionEffect")
+        then effect
+        else Instance.new("ColorCorrectionEffect")
+    color.Name = "LastLightBlackoutColor"
+    color.Brightness = -0.08
+    color.Contrast = 0.14
+    color.Saturation = -0.18
+    color.TintColor = Color3.fromRGB(164, 205, 186)
+    color.Parent = Lighting
 end
 
 function WorldService.oldGrowthArena(self: WorldService): any
