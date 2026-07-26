@@ -183,6 +183,57 @@ function ExpeditionService._grantReward(
     return true
 end
 
+function ExpeditionService.grantEncounterReward(
+    self: ExpeditionService,
+    userId: number,
+    encounterId: string,
+    transactionId: string,
+    reward: any
+): boolean
+    if string.sub(encounterId, 1, 6) ~= "elite_" then
+        self._logger:warn("expedition_encounter_reward_rejected", {
+            encounter = encounterId,
+            reason = "invalid_encounter_id",
+            userId = userId,
+        })
+        return false
+    end
+    local manifest = assert(self._manifest, "expedition manifest was not initialized")
+    local granted = self._rewardLedger.grant(
+        self._rewardLedgerState,
+        userId,
+        transactionId,
+        manifest.hash,
+        reward
+    )
+    if not granted then
+        return false
+    end
+    self._logger:info("expedition_encounter_reward_granted", {
+        amount = reward.amount,
+        encounter = encounterId,
+        material = reward.materialId,
+        transaction = transactionId,
+        userId = userId,
+    })
+    local player = Players:GetPlayerByUserId(userId)
+    if player ~= nil then
+        local profileResult = self._profileService:grantUnbankedExpeditionReward(
+            player,
+            transactionId,
+            manifest.hash,
+            reward
+        )
+        self._logger:info("expedition_encounter_reward_persisted", {
+            durable = profileResult.durable == true,
+            encounter = encounterId,
+            player = userId,
+            transaction = transactionId,
+        })
+    end
+    return true
+end
+
 function ExpeditionService.interact(
     self: ExpeditionService,
     player: Player,
@@ -414,6 +465,10 @@ end
 
 function ExpeditionService.manifest(self: ExpeditionService): any
     return self._manifest
+end
+
+function ExpeditionService.runId(self: ExpeditionService): string
+    return self._runId
 end
 
 return table.freeze(ExpeditionService)

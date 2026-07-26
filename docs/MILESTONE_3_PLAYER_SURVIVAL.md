@@ -38,7 +38,8 @@ Not implemented by this increment:
 - a full-party defeat state, spectating, guard recovery, or boss-specific defeat;
 - Medic profession modifiers, consumable healing, armor, status effects, or
   reviving more than one target;
-- enemy navigation, the remaining Bramblewake roster, elite, boss, or Blackout;
+- enemy navigation, boss, or Blackout; the complete standard roster and
+  [Old Growth elite](MILESTONE_3_OLD_GROWTH_ELITE.md) now use this rescue contract;
 - final animation, audio, VFX, localization, or real device/multiplayer evidence.
 
 There is no paid revive, extra life, or loss protection.

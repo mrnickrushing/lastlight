@@ -38,6 +38,7 @@ export type TutorialService = typeof(setmetatable(
         _professionService: any,
         _phaseService: any,
         _expeditionService: any,
+        _oldGrowthService: any,
         _analyticsService: any,
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -63,6 +64,7 @@ function TutorialService.new(
     professionService: any,
     phaseService: any,
     expeditionService: any,
+    oldGrowthService: any,
     analyticsService: any
 ): TutorialService
     return setmetatable({
@@ -81,6 +83,7 @@ function TutorialService.new(
         _professionService = professionService,
         _phaseService = phaseService,
         _expeditionService = expeditionService,
+        _oldGrowthService = oldGrowthService,
         _analyticsService = analyticsService,
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -119,6 +122,17 @@ function TutorialService.Init(self: TutorialService, _context: any)
         if toast ~= nil then
             for _, session in self._sessions do
                 if session.stage == "survive" then
+                    session.toast = toast
+                    session.toastRevision += 1
+                end
+            end
+        end
+        self:_publishAll()
+    end)
+    self._oldGrowthService:setChangedHandler(function(toast: string?)
+        if toast ~= nil then
+            for player, session in self._sessions do
+                if self._oldGrowthService:snapshot(player) ~= nil then
                     session.toast = toast
                     session.toastRevision += 1
                 end
@@ -312,6 +326,12 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self:_publishAll()
         return
     end
+    if actionId == self._runtimeIds.Actions.OldGrowthFire then
+        local result = self._oldGrowthService:interact(player, prompt)
+        self:_setToast(player, result.message)
+        self:_publishAll()
+        return
+    end
     if actionId == self._runtimeIds.Actions.Extract then
         local result = self._expeditionService:extract(player)
         self:_setToast(player, result.message)
@@ -469,8 +489,8 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         local session = self._sessions[player]
         if
             session ~= nil
-            and session.stage == "survive"
             and self._survivalService:canAct(player)
+            and (session.stage == "survive" or player:GetAttribute("LastLightInExpedition") == true)
         then
             local _, message = self._enemyService:damageNearest(player)
             self:_setToast(player, message)
@@ -562,6 +582,25 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
     end
     local phase = self._phaseService:snapshot()
     local survival = self._survivalService:snapshot(player)
+    local elite = self._oldGrowthService:snapshot(player)
+    if elite ~= nil then
+        if elite.active then
+            objective = elite.instruction
+            detail = string.format(
+                "OLD GROWTH · PHASE %d/3 · %d/%d",
+                elite.phase,
+                elite.health,
+                elite.maxHealth
+            )
+            mara = if elite.shielded
+                then "The shield drinks force. Carry lantern fire from the ember to its heart."
+                else "The amber heart is exposed. Strike, then clear the roots when they rise."
+        elseif elite.complete then
+            objective = "OLD GROWTH CLEANSED — CONTINUE TO WAYHOME"
+            detail = "+3 AMBER SAP UNBANKED"
+            mara = "The oldest roots have released the trail."
+        end
+    end
     return {
         schemaVersion = 1,
         status = "ready",
@@ -601,6 +640,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         bankedMaterials = expedition.bankedMaterials,
         combat = self._combatService:snapshot(player),
         profession = self._professionService:snapshot(player),
+        elite = elite,
         threat = self._enemyService:threatSnapshot(player),
         survival = survival,
     }

@@ -18,6 +18,7 @@ local EnemyAttackFlow = require(root.EnemyAttackFlow)
 local EnemyCombatRules = require(root.EnemyCombatRules)
 local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
+local OldGrowthEncounter = require(root.OldGrowthEncounter)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local ProfessionState = require(root.ProfessionState)
 local ReviveFlow = require(root.ReviveFlow)
@@ -27,10 +28,11 @@ local StatusEffectState = require(root.StatusEffectState)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
 local ServiceRegistry = require(serverRoot.ServiceRegistry)
+local OldGrowthBuilder = require(serverRoot.World.OldGrowthBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 3, "unexpected save schema version")
-assert(Config.BuildVersion == "0.10.0", "unexpected build version")
+assert(Config.BuildVersion == "0.11.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -79,6 +81,7 @@ assert(
     RuntimeIds.Actions.SelectProfession == "select_profession",
     "profession selection action ID changed"
 )
+assert(RuntimeIds.Actions.OldGrowthFire == "old_growth_fire", "Old Growth action ID changed")
 
 local combat = CombatState.create(200)
 local sprinting = CombatState.setSprint(combat, true, 200, true)
@@ -111,6 +114,31 @@ assert(
     StatusEffectState.snapshot(drowsy, 301).movementMultiplier == 0.65,
     "Pollen Wisp drowsy contract failed"
 )
+local rooted = StatusEffectState.applyRooted(StatusEffectState.create(), 300, 1.6, 0.35)
+assert(
+    StatusEffectState.snapshot(rooted, 301).movementMultiplier == 0.35,
+    "Old Growth rooted contract failed"
+)
+
+local oldGrowth = OldGrowthEncounter.create("studio_run", "studio_manifest", true)
+oldGrowth = OldGrowthEncounter.activate(oldGrowth, 10)
+for _ = 1, 4 do
+    oldGrowth = OldGrowthEncounter.strike(oldGrowth, 10, 34)
+end
+assert(
+    oldGrowth.status == "shielded" and oldGrowth.health == 240,
+    "Old Growth first shield contract failed"
+)
+oldGrowth = OldGrowthEncounter.takeFire(oldGrowth, 10, 400)
+oldGrowth = OldGrowthEncounter.burnHeart(oldGrowth, 10, 401)
+assert(oldGrowth.status == "vulnerable", "Old Growth fire break did not expose the heart")
+local oldGrowthModel = OldGrowthBuilder.build(Vector3.new(0, 0, 0), Vector3.new(0, 0, -10), 360)
+assert(oldGrowthModel.PrimaryPart ~= nil, "Old Growth model has no primary part")
+assert(
+    oldGrowthModel:GetAttribute("EliteId") == "elite_old_growth",
+    "Old Growth model is missing its stable ID"
+)
+oldGrowthModel:Destroy()
 
 local profession =
     ProfessionState.create(ProfessionCatalog.Ids.Warden, workspace:GetServerTimeNow())
@@ -176,8 +204,8 @@ assert(
 
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
-    #tagged == 9 + BramblewakeExpedition.EventInteractionCount,
-    "expected tutorial, event, and extraction interaction prompts"
+    #tagged == 11 + BramblewakeExpedition.EventInteractionCount,
+    "expected tutorial, event, elite, and extraction interaction prompts"
 )
 assert(
     #CollectionService:GetTagged(RuntimeIds.PlayerDownedTag) == 0,
@@ -242,6 +270,17 @@ for _, socket in CollectionService:GetTagged(RuntimeIds.ExpeditionEventTag) do
     assert(
         socket:GetAttribute("ProgressTotal") >= 2,
         "event must require multiple readable interactions"
+    )
+end
+local eliteTargets = CollectionService:GetTagged(RuntimeIds.ExpeditionEliteTag)
+assert(#eliteTargets == 2, "expected Old Growth fire and root-heart targets")
+for _, target in eliteTargets do
+    assert(target:GetAttribute("EliteId") == "elite_old_growth", "elite target ID changed")
+    local prompt = target:FindFirstChildOfClass("ProximityPrompt")
+    assert(prompt ~= nil and not prompt.Enabled, "Old Growth prompts must begin dormant")
+    assert(
+        prompt:GetAttribute("ActionId") == RuntimeIds.Actions.OldGrowthFire,
+        "Old Growth prompt does not route to its server action"
     )
 end
 local extractionTargets = CollectionService:GetTagged(RuntimeIds.ExpeditionExtractionTag)

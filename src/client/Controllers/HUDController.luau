@@ -106,6 +106,10 @@ export type HUDController = typeof(setmetatable(
         _lanternFrame: Frame,
         _lanternFill: Frame,
         _lanternText: TextLabel,
+        _eliteFrame: Frame,
+        _eliteFill: Frame,
+        _eliteTitle: TextLabel,
+        _eliteDetail: TextLabel,
         _allyFrame: Frame,
         _allyTitle: TextLabel,
         _allyDetail: TextLabel,
@@ -368,6 +372,63 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     )
     lanternText.Font = Enum.Font.GothamBold
     lanternText.ZIndex = 2
+
+    local eliteFrame = Instance.new("Frame")
+    eliteFrame.Name = "EliteStatus"
+    eliteFrame.AnchorPoint = Vector2.new(0.5, 0)
+    eliteFrame.Position = UDim2.new(0.5, 0, 0, 66)
+    eliteFrame.Size = UDim2.fromOffset(420, 70)
+    eliteFrame.BackgroundColor3 = COLORS.ink
+    eliteFrame.BackgroundTransparency = 0.04
+    eliteFrame.Visible = false
+    eliteFrame.ZIndex = 11
+    eliteFrame.Parent = canvas
+    corner(eliteFrame, 14)
+    stroke(eliteFrame, COLORS.amber, 0.14)
+
+    local eliteTrack = Instance.new("Frame")
+    eliteTrack.Name = "HealthTrack"
+    eliteTrack.Position = UDim2.fromOffset(10, 34)
+    eliteTrack.Size = UDim2.new(1, -20, 0, 9)
+    eliteTrack.BackgroundColor3 = Color3.fromRGB(58, 67, 57)
+    eliteTrack.BorderSizePixel = 0
+    eliteTrack.ZIndex = 12
+    eliteTrack.Parent = eliteFrame
+    corner(eliteTrack, 5)
+
+    local eliteFill = Instance.new("Frame")
+    eliteFill.Name = "Fill"
+    eliteFill.Size = UDim2.fromScale(1, 1)
+    eliteFill.BackgroundColor3 = COLORS.amber
+    eliteFill.BorderSizePixel = 0
+    eliteFill.ZIndex = 13
+    eliteFill.Parent = eliteTrack
+    corner(eliteFill, 5)
+
+    local eliteTitle = textLabel(
+        eliteFrame,
+        "Title",
+        "OLD GROWTH · PHASE 1/3",
+        UDim2.new(1, -20, 0, 26),
+        UDim2.fromOffset(10, 5),
+        15,
+        COLORS.cream,
+        Enum.TextXAlignment.Center
+    )
+    eliteTitle.Font = Enum.Font.GothamBold
+    eliteTitle.ZIndex = 12
+    local eliteDetail = textLabel(
+        eliteFrame,
+        "Detail",
+        "EXPOSED · STRIKE THE AMBER HEART",
+        UDim2.new(1, -20, 0, 21),
+        UDim2.fromOffset(10, 45),
+        12,
+        COLORS.amber,
+        Enum.TextXAlignment.Center
+    )
+    eliteDetail.Font = Enum.Font.GothamBold
+    eliteDetail.ZIndex = 12
 
     local allyFrame = Instance.new("Frame")
     allyFrame.Name = "AllyDownAlert"
@@ -709,6 +770,10 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _lanternFrame = lanternFrame,
         _lanternFill = lanternFill,
         _lanternText = lanternText,
+        _eliteFrame = eliteFrame,
+        _eliteFill = eliteFill,
+        _eliteTitle = eliteTitle,
+        _eliteDetail = eliteDetail,
         _allyFrame = allyFrame,
         _allyTitle = allyTitle,
         _allyDetail = allyDetail,
@@ -902,9 +967,12 @@ function HUDController._updateCombatClock(self: HUDController)
     local dodgeReadyAt = tonumber(combat.dodgeReadyAt) or 0
     local dodgeActiveUntil = tonumber(combat.dodgeActiveUntil) or 0
     local drowsyUntil = tonumber(combat.drowsyUntil) or 0
+    local rootedUntil = tonumber(combat.rootedUntil) or 0
     local cooldownRemaining = math.max(0, dodgeReadyAt - now)
     local drowsyRemaining = math.max(0, drowsyUntil - now)
     local drowsy = combat.drowsy == true and drowsyRemaining > 0
+    local rootedRemaining = math.max(0, rootedUntil - now)
+    local rooted = combat.rooted == true and rootedRemaining > 0
     local combatEnabled = combat.enabled ~= false
     local dodgeActive = combatEnabled and now < dodgeActiveUntil
     local ready = combatEnabled
@@ -913,20 +981,34 @@ function HUDController._updateCombatClock(self: HUDController)
         and stamina >= dodgeCost
 
     self._staminaFill.Size = UDim2.new(math.clamp(stamina / maxStamina, 0, 1), -8, 1, -8)
-    self._staminaFill.BackgroundColor3 = if drowsy
-        then COLORS.amber
+    self._staminaFill.BackgroundColor3 = if rooted
+        then COLORS.green
+        elseif drowsy then COLORS.amber
         elseif stamina < dodgeCost then COLORS.danger
         elseif stamina < maxStamina * 0.55 then COLORS.amber
         else COLORS.blue
-    self._staminaText.Text = if drowsy
-        then string.format("DROWSY %.1fs · STAMINA %d", drowsyRemaining, stamina)
+    self._staminaText.Text = if rooted
+        then string.format("ROOTED %.1fs · STAMINA %d", rootedRemaining, stamina)
+        elseif drowsy then string.format(
+            "DROWSY %.1fs · STAMINA %d",
+            drowsyRemaining,
+            stamina
+        )
         elseif stamina < dodgeCost then string.format("LOW STAMINA · %d", stamina)
         else string.format("STAMINA · %d", stamina)
-    self._staminaText.TextColor3 = if drowsy or stamina < maxStamina * 0.45
+    self._staminaText.TextColor3 = if rooted
+            or drowsy
+            or stamina < maxStamina * 0.45
         then COLORS.cream
         else COLORS.ink
     self._staminaFrame.Visible = not self._playerDowned
-        and (self._combatContext or drowsy or stamina < maxStamina or cooldownRemaining > 0)
+        and (
+            self._combatContext
+            or rooted
+            or drowsy
+            or stamina < maxStamina
+            or cooldownRemaining > 0
+        )
 
     self._dodge.Active = ready
     self._dodge.AutoButtonColor = ready
@@ -1074,11 +1156,24 @@ function HUDController._layout(self: HUDController)
         self._compact.Size = UDim2.fromOffset(44, 38)
         self._compact.Text = if self._compactEnabled then "+" else "−"
         self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 212)
-        self._allyFrame.Position =
-            UDim2.new(0.5, 0, 0, if self._lanternFrame.Visible then 254 else 212)
+        self._eliteFrame.Position = UDim2.new(0.5, 0, 0, 212)
+        self._eliteFrame.Size = UDim2.new(1, -36, 0, 70)
+        self._allyFrame.Position = UDim2.new(
+            0.5,
+            0,
+            0,
+            if self._eliteFrame.Visible then 290 elseif self._lanternFrame.Visible then 254 else 212
+        )
         self._allyFrame.Size = UDim2.new(1, -36, 0, 64)
-        self._threatFrame.Position =
-            UDim2.new(0.5, 0, 0, if self._allyFrame.Visible then 326 else 254)
+        self._threatFrame.Position = UDim2.new(
+            0.5,
+            0,
+            0,
+            if self._allyFrame.Visible
+                then (if self._eliteFrame.Visible then 362 else 326)
+                elseif self._eliteFrame.Visible then 290
+                else 254
+        )
         self._threatFrame.Size = UDim2.new(1, -36, 0, 66)
         self._downedFrame.Size = UDim2.new(1, -36, 0, 90)
         self._professionButton.Position =
@@ -1094,8 +1189,14 @@ function HUDController._layout(self: HUDController)
         self._compact.Size = UDim2.fromOffset(118, 38)
         self._compact.Text = if self._compactEnabled then "EXPAND" else "COMPACT"
         self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 66)
-        self._allyFrame.Position =
-            UDim2.new(0.5, 0, 0, if self._lanternFrame.Visible then 108 else 66)
+        self._eliteFrame.Position = UDim2.new(0.5, 0, 0, 66)
+        self._eliteFrame.Size = UDim2.fromOffset(420, 70)
+        self._allyFrame.Position = UDim2.new(
+            0.5,
+            0,
+            0,
+            if self._eliteFrame.Visible then 144 elseif self._lanternFrame.Visible then 108 else 66
+        )
         self._allyFrame.Size = UDim2.fromOffset(330, 64)
         self._threatFrame.Position = UDim2.fromScale(0.5, 0.32)
         self._threatFrame.Size = UDim2.fromOffset(330, 66)
@@ -1127,6 +1228,39 @@ function HUDController._updateClock(self: HUDController)
     end
     self:_updateCombatClock()
     self:_updateProfessionClock()
+
+    local elite = state.elite
+    if type(elite) == "table" and not self._playerDowned then
+        local health = math.max(0, tonumber(elite.health) or 0)
+        local maxHealth = math.max(1, tonumber(elite.maxHealth) or 1)
+        local elitePhase = math.clamp(tonumber(elite.phase) or 1, 1, 3)
+        self._eliteTitle.Text =
+            string.format("OLD GROWTH · PHASE %d/3 · %d/%d", elitePhase, health, maxHealth)
+        self._eliteFill.Size = UDim2.fromScale(math.clamp(health / maxHealth, 0, 1), 1)
+        self._eliteFill.BackgroundColor3 = if elite.complete
+            then COLORS.green
+            elseif elite.shielded then COLORS.danger
+            else COLORS.amber
+        if elite.complete then
+            self._eliteDetail.Text = "CLEANSED · +3 AMBER SAP UNBANKED"
+            self._eliteDetail.TextColor3 = COLORS.green
+        elseif elite.carryingFire then
+            local fireRemaining =
+                math.max(0, (tonumber(elite.fireExpiresAt) or 0) - workspace:GetServerTimeNow())
+            self._eliteDetail.Text =
+                string.format("FIRE %.1fs · REACH THE ROOT HEART", fireRemaining)
+            self._eliteDetail.TextColor3 = COLORS.amber
+        elseif elite.shielded then
+            self._eliteDetail.Text = "SHIELDED · TAKE LANTERN FIRE"
+            self._eliteDetail.TextColor3 = COLORS.danger
+        else
+            self._eliteDetail.Text = "EXPOSED · STRIKE THE AMBER HEART"
+            self._eliteDetail.TextColor3 = COLORS.amber
+        end
+        self._eliteFrame.Visible = elite.active == true or elite.complete == true
+    else
+        self._eliteFrame.Visible = false
+    end
 
     local threat = state.threat
     if type(threat) == "table" and not self._playerDowned then
@@ -1196,7 +1330,9 @@ function HUDController.update(self: HUDController, state: any)
     local survival = state.survival
     local selfSurvival = if type(survival) == "table" then survival.self else nil
     self._playerDowned = type(selfSurvival) == "table" and selfSurvival.downed == true
-    self._combatContext = state.nightActive == true or state.expeditionActive == true
+    local elite = state.elite
+    local eliteActive = type(elite) == "table" and elite.active == true
+    self._combatContext = state.nightActive == true or state.expeditionActive == true or eliteActive
     local ally = if type(survival) == "table" then survival.ally else nil
     self._downedFrame.Visible = self._playerDowned
     self._allyFrame.Visible = type(ally) == "table" and not self._playerDowned
@@ -1231,7 +1367,7 @@ function HUDController.update(self: HUDController, state: any)
     self._health.Visible = not self._playerDowned and (nightActive or health < maxHealth)
     self._resource.Visible = not nightActive
         and ((tonumber(state.resources) or 0) > 0 or state.selectedTool ~= nil)
-    self._tool.Visible = nightActive and not self._playerDowned
+    self._tool.Visible = (nightActive or eliteActive) and not self._playerDowned
     self._sprint.Visible = self._inputMode == "touch" and not self._playerDowned
     self._dodge.Visible = not self._playerDowned
         and (self._inputMode == "touch" or self._combatContext)
@@ -1242,6 +1378,9 @@ function HUDController.update(self: HUDController, state: any)
     self._lanternFill.BackgroundColor3 = if lanternHealth <= 35 then COLORS.danger else COLORS.amber
     self._lanternText.Text = string.format("LIGHT · %d%%", lanternHealth)
     self._lanternText.TextColor3 = if lanternHealth <= 55 then COLORS.cream else COLORS.ink
+    self._eliteFrame.Visible = type(elite) == "table"
+        and (elite.active == true or elite.complete == true)
+        and not self._playerDowned
 
     if state.compactHud ~= nil and state.compactHud ~= self._compactEnabled then
         self._compactEnabled = state.compactHud == true

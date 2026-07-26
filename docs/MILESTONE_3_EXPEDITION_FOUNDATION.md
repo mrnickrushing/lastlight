@@ -29,7 +29,8 @@ Not implemented by this increment:
 
 - partial-loss recovery caches or the remaining four Bramblewake events;
 - profession kits, full inventory UI/capacity, crafting, or quests;
-- the complete enemy roster, elite, boss, normal night, or Blackout;
+- the boss, normal night, or Blackout; the complete standard roster and
+  [Old Growth elite](MILESTONE_3_OLD_GROWTH_ELITE.md) now expand this foundation;
 - final module art, audio, VFX, navigation bake, or device evidence;
 - Milestone 2's still-open ten-new-tester and device gate.
 

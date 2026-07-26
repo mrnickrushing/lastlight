@@ -11,6 +11,7 @@ local RuntimeIds = {
     ExpeditionEventTag = "LastLightExpeditionEvent",
     ExpeditionEventStepTag = "LastLightExpeditionEventStep",
     ExpeditionExtractionTag = "LastLightExpeditionExtraction",
+    ExpeditionEliteTag = "LastLightExpeditionElite",
     PlayerDownedTag = "LastLightPlayerDowned",
     eventInteractionId = ExpeditionEventFlow.interactionId,
     Remotes = table.freeze({
@@ -33,6 +34,7 @@ local RuntimeIds = {
         SelectProfession = "select_profession",
         CompactHud = "compact_hud",
         ExpeditionEvent = "expedition_event",
+        OldGrowthFire = "old_growth_fire",
         Extract = "extract",
         Revive = "revive",
     }),
@@ -46,6 +48,8 @@ local RuntimeIds = {
         Lantern = "first_lantern_prepare",
         Beacon = "bramblewake_reveal",
         Wayhome = "bramblewake_wayhome",
+        OldGrowthFireSource = "old_growth_fire_source",
+        OldGrowthHeart = "old_growth_root_heart",
     }),
 }
 

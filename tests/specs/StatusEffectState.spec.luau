@@ -39,5 +39,20 @@ return {
                 )
             end,
         },
+        {
+            name = "applies a bounded root slow and resolves overlapping effects",
+            run = function()
+                local drowsy =
+                    StatusEffectState.applyDrowsy(StatusEffectState.create(), 10, 4, 0.65)
+                local rooted = StatusEffectState.applyRooted(drowsy, 10, 1.6, 0.35)
+                local overlap = StatusEffectState.snapshot(rooted, 11)
+                TestRunner.truthy(overlap.drowsy)
+                TestRunner.truthy(overlap.rooted)
+                TestRunner.equal(overlap.movementMultiplier, 0.35)
+                local afterRoot = StatusEffectState.snapshot(rooted, 12)
+                TestRunner.equal(afterRoot.rooted, false)
+                TestRunner.equal(afterRoot.movementMultiplier, 0.65)
+            end,
+        },
     },
 }

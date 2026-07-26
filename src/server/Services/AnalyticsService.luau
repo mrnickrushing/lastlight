@@ -320,6 +320,102 @@ function AnalyticsService.professionAbility(
     end
 end
 
+function AnalyticsService.eliteStarted(
+    self: AnalyticsService,
+    player: Player,
+    eliteId: string,
+    manifestHash: string
+)
+    self._logger:info("elite_started", {
+        elite = string.sub(eliteId, 1, 48),
+        hash = manifestHash,
+        player = player.UserId,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "EliteEncounterStarted", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = eliteId,
+            })
+        end)
+    end
+end
+
+function AnalyticsService.eliteAttackTelegraphed(
+    self: AnalyticsService,
+    player: Player,
+    eliteId: string,
+    attackId: string,
+    shape: string,
+    windup: number
+)
+    self._logger:info("elite_attack_telegraphed", {
+        attack = string.sub(attackId, 1, 48),
+        elite = string.sub(eliteId, 1, 48),
+        player = player.UserId,
+        shape = shape,
+        windup = windup,
+    })
+end
+
+function AnalyticsService.eliteAttackResult(
+    self: AnalyticsService,
+    player: Player,
+    eliteId: string,
+    attackId: string,
+    result: string
+)
+    self._logger:info("elite_attack_result", {
+        attack = string.sub(attackId, 1, 48),
+        elite = string.sub(eliteId, 1, 48),
+        player = player.UserId,
+        result = string.sub(result, 1, 32),
+    })
+end
+
+function AnalyticsService.elitePhase(
+    self: AnalyticsService,
+    player: Player,
+    eliteId: string,
+    phase: number,
+    result: string
+)
+    self._logger:info("elite_phase", {
+        elite = string.sub(eliteId, 1, 48),
+        phase = phase,
+        player = player.UserId,
+        result = string.sub(result, 1, 32),
+    })
+end
+
+function AnalyticsService.eliteCompleted(
+    self: AnalyticsService,
+    player: Player,
+    eliteId: string,
+    manifestHash: string,
+    shieldsBurned: number,
+    participantCount: number
+)
+    self._logger:info("elite_completed", {
+        elite = string.sub(eliteId, 1, 48),
+        hash = manifestHash,
+        participantCount = participantCount,
+        player = player.UserId,
+        shieldsBurned = shieldsBurned,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(
+                player,
+                "EliteEncounterCompleted",
+                math.max(1, participantCount),
+                {
+                    [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = eliteId,
+                }
+            )
+        end)
+    end
+end
+
 function AnalyticsService.clear(self: AnalyticsService, player: Player)
     self._startedAt[player] = nil
     self._expeditionStarted[player] = nil
