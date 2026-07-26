@@ -1,0 +1,37 @@
+{
+  "name": "LastLight",
+  "servePort": 34872,
+  "tree": {
+    "$className": "DataModel",
+    "ReplicatedFirst": {
+      "$path": "src/first"
+    },
+    "ReplicatedStorage": {
+      "LastLight": {
+        "$path": "src/shared"
+      }
+    },
+    "ServerScriptService": {
+      "LastLightServer": {
+        "$path": "src/server"
+      }
+    },
+    "StarterPlayer": {
+      "StarterPlayerScripts": {
+        "LastLightClient": {
+          "$path": "src/client"
+        }
+      }
+    },
+    "Workspace": {
+      "$properties": {
+        "StreamingEnabled": true,
+        "StreamingIntegrityMode": "PauseOutsideLoadedArea",
+        "ModelStreamingBehavior": "Improved",
+        "StreamingMinRadius": 64,
+        "StreamingTargetRadius": 1024
+      }
+    }
+  }
+}
+

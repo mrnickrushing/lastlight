@@ -1,0 +1,14 @@
+{
+  "name": "lastlight-planning",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Planning, validation, and Rojo scaffold for the Roblox game Last Light.",
+  "scripts": {
+    "check": "node scripts/validate-plan.mjs",
+    "test": "npm run check"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
+

@@ -1,0 +1,31 @@
+# Roblox Studio / Rojo output
+*.rbxl
+*.rbxlx
+*.rbxm
+*.rbxmx
+/build/
+/dist/
+
+# Tool caches
+/.aftman/
+/.foreman/
+/.pesde/
+/.wally/
+/Packages/
+/ServerPackages/
+/node_modules/
+
+# Local research and generated working files
+/.lazyweb/
+/tmp/
+
+# Editors and operating systems
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local secrets
+.env
+.env.*
+!.env.example
