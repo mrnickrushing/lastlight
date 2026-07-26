@@ -323,8 +323,8 @@ assert(
 
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
-    #tagged == 24 + BramblewakeExpedition.EventInteractionCount,
-    "expected tutorial, event, elite, boss, and extraction interaction prompts"
+    #tagged == 26 + BramblewakeExpedition.EventInteractionCount,
+    "expected tutorial, event, elite, boss, extraction, and crafting-bench interaction prompts"
 )
 assert(
     #CollectionService:GetTagged(RuntimeIds.PlayerDownedTag) == 0,

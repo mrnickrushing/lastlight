@@ -6501,6 +6501,28 @@ function AnalyticsService.professionAbility(
     end
 end
 
+function AnalyticsService.crafted(
+    self: AnalyticsService,
+    player: Player,
+    recipeId: string,
+    accepted: boolean,
+    reason: string?
+)
+    self._logger:info("item_crafted", {
+        accepted = accepted,
+        player = player.UserId,
+        reason = reason or "accepted",
+        recipe = string.sub(recipeId, 1, 32),
+    })
+    if accepted and not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "ItemCrafted", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = recipeId,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.eliteStarted(
     self: AnalyticsService,
     player: Player,
@@ -12852,6 +12874,7 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
             return
         end
         local result = self._profileService:craftItem(player, recipeId)
+        self._analyticsService:crafted(player, recipeId, result.accepted, result.reason)
         if result.accepted then
             self:_setToast(player, string.format("CRAFTED %s", prompt.ObjectText))
         elseif result.reason == "insufficient_materials" then
@@ -17700,8 +17723,8 @@ assert(
 
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
-    #tagged == 24 + BramblewakeExpedition.EventInteractionCount,
-    "expected tutorial, event, elite, boss, and extraction interaction prompts"
+    #tagged == 26 + BramblewakeExpedition.EventInteractionCount,
+    "expected tutorial, event, elite, boss, extraction, and crafting-bench interaction prompts"
 )
 assert(
     #CollectionService:GetTagged(RuntimeIds.PlayerDownedTag) == 0,

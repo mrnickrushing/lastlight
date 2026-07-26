@@ -421,6 +421,7 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
             return
         end
         local result = self._profileService:craftItem(player, recipeId)
+        self._analyticsService:crafted(player, recipeId, result.accepted, result.reason)
         if result.accepted then
             self:_setToast(player, string.format("CRAFTED %s", prompt.ObjectText))
         elseif result.reason == "insufficient_materials" then
