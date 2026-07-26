@@ -31,6 +31,9 @@ export type WorldService = typeof(setmetatable(
         _expeditionEntry: CFrame?,
         _expeditionManifest: any,
         _expeditionModuleCenters: { any },
+        _eventSockets: { [string]: BasePart },
+        _eventTargets: { [string]: { [string]: BasePart } },
+        _eventsEnabled: boolean,
     },
     WorldService
 ))
@@ -38,6 +41,7 @@ export type WorldService = typeof(setmetatable(
 local DAY_AMBIENT = Color3.fromRGB(76, 91, 86)
 local NIGHT_AMBIENT = Color3.fromRGB(22, 31, 49)
 local AMBER = Color3.fromRGB(255, 181, 76)
+local FOXFIRE = Color3.fromRGB(94, 206, 176)
 local CREAM = Color3.fromRGB(244, 230, 197)
 local GREEN = Color3.fromRGB(47, 84, 63)
 local DARK_GREEN = Color3.fromRGB(24, 55, 43)
@@ -202,6 +206,9 @@ function WorldService.new(logger: Logger): WorldService
         _expeditionEntry = nil,
         _expeditionManifest = nil,
         _expeditionModuleCenters = {},
+        _eventSockets = {},
+        _eventTargets = {},
+        _eventsEnabled = true,
     }, WorldService)
 end
 
@@ -212,13 +219,14 @@ function WorldService._registerInteraction(
     actionId: string,
     actionText: string,
     objectText: string,
-    payload: string?
+    payload: string?,
+    holdDuration: number?
 )
     local prompt = Instance.new("ProximityPrompt")
     prompt.Name = interactionId
     prompt.ActionText = actionText
     prompt.ObjectText = objectText
-    prompt.HoldDuration = 0
+    prompt.HoldDuration = holdDuration or 0
     prompt.MaxActivationDistance = 12
     prompt.RequiresLineOfSight = false
     prompt.Style = Enum.ProximityPromptStyle.Custom
@@ -624,7 +632,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-foundation-v1")
+    world:SetAttribute("WorldVersion", "bramblewake-events-v2")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -688,7 +696,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-foundation-v1",
+        worldVersion = "bramblewake-events-v2",
     })
 end
 
@@ -794,13 +802,94 @@ function WorldService.buildBramblewake(
     catalog: any
 ): any
     local world = assert(self._world, "world service has not initialized")
+    for interactionId, prompt in self._interactions do
+        if prompt:GetAttribute("ActionId") == self._runtimeIds.Actions.ExpeditionEvent then
+            self._interactions[interactionId] = nil
+        end
+    end
+    self._eventSockets = {}
+    self._eventTargets = {}
+
     local result = BramblewakeBuilder.build(world, manifest, generator, catalog, self._runtimeIds)
     self._expeditionEntry = result.entryCFrame
     self._expeditionManifest = manifest
     self._expeditionModuleCenters = result.moduleCenters
+    self._eventSockets = result.eventSockets
+    for _, descriptor in result.eventInteractions do
+        self:_registerInteraction(
+            descriptor.target,
+            descriptor.interactionId,
+            self._runtimeIds.Actions.ExpeditionEvent,
+            descriptor.actionText,
+            descriptor.objectText,
+            nil,
+            nil
+        )
+        local prompt = self._interactions[descriptor.interactionId]
+        prompt:SetAttribute("EventId", descriptor.eventId)
+        prompt:SetAttribute("EventStepId", descriptor.stepId)
+        local targets = self._eventTargets[descriptor.eventId]
+        if targets == nil then
+            targets = {}
+            self._eventTargets[descriptor.eventId] = targets
+        end
+        targets[descriptor.stepId] = descriptor.target
+    end
     world:SetAttribute("ExpeditionReady", true)
     world:SetAttribute("ExpeditionManifestHash", manifest.hash)
+    world:SetAttribute("ExpeditionEventInteractions", #result.eventInteractions)
     return result
+end
+
+function WorldService.setExpeditionEventsEnabled(self: WorldService, enabled: boolean)
+    self._eventsEnabled = enabled
+    local world = self._world
+    if world ~= nil then
+        world:SetAttribute("ExpeditionEventsEnabled", enabled)
+    end
+    for _, prompt in self._interactions do
+        if prompt:GetAttribute("ActionId") == self._runtimeIds.Actions.ExpeditionEvent then
+            prompt.Enabled = enabled
+        end
+    end
+end
+
+function WorldService.setExpeditionEventState(self: WorldService, eventId: string, state: any)
+    local socket = self._eventSockets[eventId]
+    if socket ~= nil then
+        socket:SetAttribute("Dormant", state.status == "dormant")
+        socket:SetAttribute("Status", state.status)
+        socket:SetAttribute("Progress", state.progress)
+        socket:SetAttribute("ProgressTotal", state.total)
+        socket:SetAttribute("Revision", state.revision)
+    end
+
+    local targets = self._eventTargets[eventId]
+    if targets == nil then
+        return
+    end
+    local eventCanProgress = self._eventsEnabled
+        and (state.status == "dormant" or state.status == "active")
+    for stepId, target in targets do
+        local complete = state.completedSteps[stepId] == true
+        target:SetAttribute(
+            "EventStepState",
+            if complete then "complete" else if eventCanProgress then "available" else state.status
+        )
+        if complete then
+            target.Color = FOXFIRE
+            target.Material = Enum.Material.Neon
+            target.Transparency = 0.12
+        elseif state.status == "failed" or state.status == "disabled" then
+            target.Color = Color3.fromRGB(83, 91, 83)
+            target.Material = Enum.Material.SmoothPlastic
+            target.Transparency = 0.5
+        end
+        local prompt = target:FindFirstChildOfClass("ProximityPrompt")
+        if prompt ~= nil then
+            prompt.Enabled = eventCanProgress and not complete
+        end
+    end
 end
 
 function WorldService.enterBramblewake(self: WorldService, player: Player): boolean

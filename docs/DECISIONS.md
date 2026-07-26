@@ -40,6 +40,18 @@ scoped increments.
 mobile budgets must be trustworthy before combat, quests, rewards, and authored
 events depend on generated layouts.
 
+## 2026-07-25 — Optional shared Bramblewake events
+
+**Decision:** The first four Bramblewake events use server-owned shared
+interaction steps placed off the critical path. Timeout or kill-switch disable
+can remove an event reward or shortcut, but cannot block extraction. Rewards use
+manifest-derived idempotency keys and remain clearly labeled as unbanked until
+persistent inventory settlement exists.
+
+**Reason:** Dynamic events should encourage nearby players to cooperate without
+turning optional content, disconnects, streaming, or remote retries into
+impossible routes or duplicate value.
+
 ## 2026-07-25 — One Active Trail onboarding HUD
 
 **Decision:** Implement the first session with one phase capsule, one active

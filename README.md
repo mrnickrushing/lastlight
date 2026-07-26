@@ -15,7 +15,7 @@ playable game exists.
 ## Current status
 
 **Milestone 2 source implemented; Milestone 3 Bramblewake expedition foundation
-implemented; Studio and device exit gates remain pending.**
+and four active events implemented; Studio and device exit gates remain pending.**
 
 The repository currently contains:
 
@@ -28,6 +28,8 @@ The repository currently contains:
   First Lantern, Rootling enemy, two-minute authored night, and Bramblewake reveal;
 - 12 deterministic streamed Bramblewake modules, four POIs, four event sockets,
   a known-good fallback, beacon entry, route progress, and expedition fall recovery;
+- four active optional Bramblewake events with 13 shared interaction steps,
+  timeout-safe routes, idempotent session rewards, kill switch, and telemetry;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
   analytics, save normalization, and published-place tutorial persistence;
 - mobile, keyboard/mouse, and controller actions through Roblox's Input Action
@@ -36,7 +38,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 33 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 41 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay HUD and the focused
@@ -49,6 +51,8 @@ must leave every required control usable. Follow
 [the Milestone 2 playtest runbook](docs/MILESTONE_2_PLAYTEST.md).
 The scoped Bramblewake foundation and its Studio/device evidence matrix are in
 [the Milestone 3 expedition runbook](docs/MILESTONE_3_EXPEDITION_FOUNDATION.md).
+The active-event contracts and abuse/device matrix are in
+[the Bramblewake event runbook](docs/MILESTONE_3_BRAMBLEWAKE_EVENTS.md).
 
 The current UI direction is documented in the
 [Last Light mobile gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create).

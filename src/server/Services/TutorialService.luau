@@ -38,6 +38,8 @@ export type TutorialService = typeof(setmetatable(
         _analyticsService: any,
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
+        _expeditionEventRevision: { [Player]: number },
+        _expeditionEventSecond: { [Player]: number },
         _limiter: any,
     },
     TutorialService
@@ -73,6 +75,8 @@ function TutorialService.new(
         _analyticsService = analyticsService,
         _sessions = {},
         _expeditionModuleIndex = {},
+        _expeditionEventRevision = {},
+        _expeditionEventSecond = {},
         _limiter = rateLimiter.new(config.ActionRatePerSecond, config.ActionRatePerSecond * 2),
     }, TutorialService)
 end
@@ -119,6 +123,8 @@ function TutorialService.Start(self: TutorialService)
     Players.PlayerRemoving:Connect(function(player: Player)
         self._sessions[player] = nil
         self._expeditionModuleIndex[player] = nil
+        self._expeditionEventRevision[player] = nil
+        self._expeditionEventSecond[player] = nil
         self._limiter:clear(tostring(player.UserId))
         self._analyticsService:clear(player)
     end)
@@ -141,8 +147,20 @@ function TutorialService.Start(self: TutorialService)
         for player in self._sessions do
             local expedition = self._expeditionService:snapshot(player)
             local moduleIndex = if expedition.active then expedition.moduleIndex else 0
-            if self._expeditionModuleIndex[player] ~= moduleIndex then
+            local eventRevision = if expedition.active then expedition.eventRevision or 0 else 0
+            local eventSecond = if expedition.active
+                    and expedition.event ~= nil
+                    and expedition.event.status == "active"
+                then expedition.event.timeRemaining or 0
+                else -1
+            if
+                self._expeditionModuleIndex[player] ~= moduleIndex
+                or self._expeditionEventRevision[player] ~= eventRevision
+                or self._expeditionEventSecond[player] ~= eventSecond
+            then
                 self._expeditionModuleIndex[player] = moduleIndex
+                self._expeditionEventRevision[player] = eventRevision
+                self._expeditionEventSecond[player] = eventSecond
                 self:_publish(player)
             end
         end
@@ -245,6 +263,13 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
 
     local session = self._sessions[player]
     if session == nil then
+        return
+    end
+
+    if actionId == self._runtimeIds.Actions.ExpeditionEvent then
+        local result = self._expeditionService:interact(player, prompt)
+        self:_setToast(player, result.message)
+        self:_publishAll()
         return
     end
 
@@ -446,6 +471,32 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             then expedition.moduleName
             else string.format("%s · %s", expedition.moduleName, discovery)
         mara = "The roots remember every traveler. Keep to the amber path."
+        local event = expedition.event
+        if event ~= nil then
+            if event.status == "dormant" then
+                objective = event.objective
+                detail = string.format("%s · 0/%d", event.displayName, event.total)
+                mara = event.detail
+            elseif event.status == "active" then
+                objective = event.objective
+                detail = string.format(
+                    "%s · %d/%d · %ds",
+                    event.displayName,
+                    event.progress,
+                    event.total,
+                    event.timeRemaining or 0
+                )
+                mara = event.detail
+            elseif event.status == "completed" then
+                objective = "EVENT COMPLETE — FOLLOW THE FOXFIRE TRAIL"
+                detail = event.completionMessage
+                mara = "Shared expedition rewards are safe for this server run."
+            elseif event.status == "failed" then
+                objective = "EVENT ENDED — FOLLOW THE AMBER PATH"
+                detail = event.failureMessage
+                mara = event.failureResolution
+            end
+        end
     end
     local phase = self._phaseService:snapshot()
     return {
@@ -476,6 +527,14 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         expeditionModuleId = expedition.moduleId,
         expeditionPointOfInterestId = expedition.poiId,
         expeditionEventId = expedition.eventId,
+        expeditionEventStatus = if expedition.event == nil then nil else expedition.event.status,
+        expeditionEventProgress = if expedition.event == nil
+            then nil
+            else expedition.event.progress,
+        expeditionEventProgressTotal = if expedition.event == nil
+            then nil
+            else expedition.event.total,
+        unbankedExpeditionRewards = expedition.unbankedRewards,
     }
 end
 

@@ -1,5 +1,7 @@
 --!strict
 
+local ExpeditionEventFlow = require("./ExpeditionEventFlow")
+
 local RuntimeIds = {
     FolderName = "LastLightRuntime",
     WorldName = "LastLightWorld",
@@ -7,6 +9,8 @@ local RuntimeIds = {
     ExpeditionModuleTag = "LastLightExpeditionModule",
     ExpeditionPointOfInterestTag = "LastLightExpeditionPOI",
     ExpeditionEventTag = "LastLightExpeditionEvent",
+    ExpeditionEventStepTag = "LastLightExpeditionEventStep",
+    eventInteractionId = ExpeditionEventFlow.interactionId,
     Remotes = table.freeze({
         ActionRequest = "ActionRequest",
         StateChanged = "StateChanged",
@@ -23,6 +27,7 @@ local RuntimeIds = {
         UseTool = "use_tool",
         Sprint = "sprint",
         CompactHud = "compact_hud",
+        ExpeditionEvent = "expedition_event",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",

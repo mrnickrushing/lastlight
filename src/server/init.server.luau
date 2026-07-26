@@ -9,7 +9,9 @@ assert(root ~= nil, "Last Light shared root did not replicate before bootstrap t
 local Config = require(root.Config)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
 local Environment = require(root.Environment)
+local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
+local ExpeditionRewardLedger = require(root.ExpeditionRewardLedger)
 local NightSchedule = require(root.NightSchedule)
 local RateLimiter = require(root.RateLimiter)
 local RuntimeIds = require(root.RuntimeIds)
@@ -52,6 +54,10 @@ local expeditionService = ExpeditionService.new(
     worldService,
     ExpeditionGenerator,
     BramblewakeExpedition,
+    featureFlags,
+    ExpeditionEventFlow,
+    ExpeditionRewardLedger,
+    analyticsService,
     Config.BramblewakePreviewSeed
 )
 local enemyService = EnemyService.new(logger, worldService)

@@ -12,6 +12,7 @@ assert(serverRoot ~= nil, "server root unavailable in Studio integration test")
 
 local Config = require(root.Config)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
+local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local RuntimeIds = require(root.RuntimeIds)
 local Registry = require(root.Content.Registry)
@@ -77,6 +78,10 @@ assert(
     expedition:GetAttribute("EventCount") == BramblewakeExpedition.EventCount,
     "Bramblewake event count is incorrect"
 )
+assert(
+    expedition:GetAttribute("EventInteractionCount") == BramblewakeExpedition.EventInteractionCount,
+    "Bramblewake event interaction count is incorrect"
+)
 local expectedManifest = ExpeditionGenerator.generate(Config.BramblewakePreviewSeed)
 assert(
     expedition:GetAttribute("ManifestHash") == expectedManifest.hash,
@@ -91,7 +96,10 @@ assert(
 )
 
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
-assert(#tagged == 8, "expected eight tutorial interaction prompts")
+assert(
+    #tagged == 8 + BramblewakeExpedition.EventInteractionCount,
+    "expected tutorial and expedition event interaction prompts"
+)
 local expeditionModules = CollectionService:GetTagged(RuntimeIds.ExpeditionModuleTag)
 assert(
     #expeditionModules == BramblewakeExpedition.ModuleCount,
@@ -121,6 +129,38 @@ assert(
     #CollectionService:GetTagged(RuntimeIds.ExpeditionEventTag) == BramblewakeExpedition.EventCount,
     "expected four Bramblewake event sockets"
 )
+local eventSteps = CollectionService:GetTagged(RuntimeIds.ExpeditionEventStepTag)
+assert(
+    #eventSteps == BramblewakeExpedition.EventInteractionCount,
+    "expected every Bramblewake event interaction step"
+)
+for _, target in eventSteps do
+    assert(target:IsA("BasePart"), "event step tags must target BaseParts")
+    local eventId = target:GetAttribute("EventId")
+    local stepId = target:GetAttribute("EventStepId")
+    assert(
+        type(eventId) == "string" and type(stepId) == "string",
+        "event step is missing stable IDs"
+    )
+    local prompt = target:FindFirstChildOfClass("ProximityPrompt")
+    assert(prompt ~= nil and prompt.Enabled, "event step must have an enabled interaction")
+    assert(
+        prompt:GetAttribute("InteractionId") == ExpeditionEventFlow.interactionId(eventId, stepId),
+        "event interaction ID does not match its contract"
+    )
+    assert(
+        prompt:GetAttribute("ActionId") == RuntimeIds.Actions.ExpeditionEvent,
+        "event prompt does not route to the server event action"
+    )
+end
+for _, socket in CollectionService:GetTagged(RuntimeIds.ExpeditionEventTag) do
+    assert(socket:GetAttribute("Status") == "dormant", "event must begin dormant")
+    assert(socket:GetAttribute("Progress") == 0, "event must begin without progress")
+    assert(
+        socket:GetAttribute("ProgressTotal") >= 2,
+        "event must require multiple readable interactions"
+    )
+end
 assert(
     workspace.PlayerScriptsUseInputActionSystem == Enum.RolloutState.Enabled,
     "Input Action System must be enabled"

@@ -1,6 +1,7 @@
 --!strict
 
 local Catalog = require("./Content/Definitions/BramblewakeExpedition")
+local ExpeditionEventFlow = require("./ExpeditionEventFlow")
 
 local ExpeditionGenerator = {}
 
@@ -246,14 +247,24 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
             seenPois[placement.poiId] = true
         end
         if placement.eventId ~= nil then
-            if EVENTS_BY_ID[placement.eventId] == nil then
+            local eventDefinition = EVENTS_BY_ID[placement.eventId]
+            if eventDefinition == nil then
                 issue("manifest references an unknown event")
-            elseif EVENTS_BY_ID[placement.eventId].enabled ~= true then
+            elseif eventDefinition.enabled ~= true then
                 issue("manifest contains a disabled event")
             elseif seenEvents[placement.eventId] then
                 issue("event repeats in one expedition")
             elseif definition ~= nil and not definition.eventSocket then
                 issue("event occupies an incompatible module")
+            else
+                local contractValid, contractIssues =
+                    ExpeditionEventFlow.validateDefinition(eventDefinition)
+                if not contractValid then
+                    issue("event contract is invalid: " .. table.concat(contractIssues, ", "))
+                end
+                if eventDefinition.minimumRouteSpace > Catalog.CellSize - 24 then
+                    issue("event route-space requirement exceeds its module clearing")
+                end
             end
             if placement.poiId ~= nil then
                 issue("event and point of interest overlap the same module")
