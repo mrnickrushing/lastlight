@@ -2,7 +2,7 @@
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.13.0",
+    BuildVersion = "0.14.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -54,6 +54,7 @@ return table.freeze({
         old_growth_elite_enabled = true,
         warden_stag_boss_enabled = true,
         bramblewake_blackout_enabled = true,
+        town_night_cycle_enabled = true,
         region_bramblewake_enabled = true,
         region_ironroot_enabled = false,
         region_mireglass_enabled = false,

@@ -28,6 +28,7 @@ local RuntimeIds = require(root.RuntimeIds)
 local SaveSchema = require(root.SaveSchema)
 local StatusEffectState = require(root.StatusEffectState)
 local SurvivalState = require(root.SurvivalState)
+local TownNightSchedule = require(root.TownNightSchedule)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
@@ -43,6 +44,7 @@ local WardenStagService = require(script.Services.WardenStagService)
 local BramblewakeBlackoutService = require(script.Services.BramblewakeBlackoutService)
 local PhaseService = require(script.Services.PhaseService)
 local ProfileService = require(script.Services.ProfileService)
+local TownNightService = require(script.Services.TownNightService)
 local PlayerSurvivalService = require(script.Services.PlayerSurvivalService)
 local PlayerCombatService = require(script.Services.PlayerCombatService)
 local ProfessionService = require(script.Services.ProfessionService)
@@ -182,12 +184,21 @@ local phaseService = PhaseService.new(
     Config.FirstNightDuskSeconds,
     Config.FirstNightSeconds
 )
+local townNightService = TownNightService.new(
+    logger,
+    Config,
+    worldService,
+    enemyService,
+    TownNightSchedule,
+    phaseService,
+    featureFlags
+)
 professionService:setSwitchProvider(function(player: Player): (boolean, string?)
     local profile = profileService:get(player)
     if profile == nil or profile.tutorial.complete ~= true then
         return false, "COMPLETE FIRST LIGHT TO CHOOSE A PROFESSION"
     end
-    if phaseService:snapshot().nightActive then
+    if phaseService:snapshot().nightActive or townNightService:isNightActive() then
         return false, "RETURN TO DAYLIGHT BEFORE SWITCHING PROFESSION"
     end
     if expeditionService:snapshot(player).active then
@@ -209,6 +220,7 @@ local tutorialService = TutorialService.new(
     combatService,
     professionService,
     phaseService,
+    townNightService,
     expeditionService,
     oldGrowthService,
     wardenStagService,
@@ -238,6 +250,7 @@ services:register(oldGrowthService)
 services:register(wardenStagService)
 services:register(blackoutService)
 services:register(phaseService)
+services:register(townNightService)
 services:register(tutorialService)
 services:initialize()
 services:start()

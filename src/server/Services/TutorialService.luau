@@ -37,6 +37,7 @@ export type TutorialService = typeof(setmetatable(
         _combatService: any,
         _professionService: any,
         _phaseService: any,
+        _townNightService: any,
         _expeditionService: any,
         _oldGrowthService: any,
         _wardenStagService: any,
@@ -65,6 +66,7 @@ function TutorialService.new(
     combatService: any,
     professionService: any,
     phaseService: any,
+    townNightService: any,
     expeditionService: any,
     oldGrowthService: any,
     wardenStagService: any,
@@ -86,6 +88,7 @@ function TutorialService.new(
         _combatService = combatService,
         _professionService = professionService,
         _phaseService = phaseService,
+        _townNightService = townNightService,
         _expeditionService = expeditionService,
         _oldGrowthService = oldGrowthService,
         _wardenStagService = wardenStagService,
@@ -123,6 +126,17 @@ function TutorialService.Init(self: TutorialService, _context: any)
     end)
     self._phaseService:setCompleteHandler(function()
         self:_nightComplete()
+    end)
+    self._townNightService:setChangedHandler(function(toast: string?)
+        if toast ~= nil then
+            for player, session in self._sessions do
+                if session.stage == "complete" then
+                    session.toast = toast
+                    session.toastRevision += 1
+                end
+            end
+        end
+        self:_publishAll()
     end)
     self._enemyService:setChangedHandler(function(toast: string?)
         if toast ~= nil then
@@ -622,7 +636,9 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             end
         end
     end
-    local phase = self._phaseService:snapshot()
+    local phase = if self._phaseService:hasCompletedFirstNight()
+        then self._townNightService:snapshot()
+        else self._phaseService:snapshot()
     local survival = self._survivalService:snapshot(player)
     local blackout = self._blackoutService:snapshot(player)
     if blackout ~= nil then
@@ -744,6 +760,8 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         nightActive = phase.nightActive,
         lanternHealth = phase.lanternHealth,
         enemyCount = phase.enemyCount,
+        nightNumber = phase.nightNumber,
+        blackoutDue = phase.blackoutDue,
         expeditionActive = expedition.active,
         expeditionSeed = expedition.seed,
         expeditionManifestHash = expedition.manifestHash,
