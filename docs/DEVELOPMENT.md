@@ -77,14 +77,17 @@ full DataModel. The first engine integration test is intentionally separate:
 13. Validate all four profession kits, persistence, selection gating, cooldowns,
     controller focus, and mobile layout using
     [MILESTONE_3_PROFESSION_KITS.md](MILESTONE_3_PROFESSION_KITS.md).
-14. Stop immediately if any assertion errors.
+14. Validate all six Bramblewake enemies, telegraphs, solo counterplay, queue
+    cleanup, and mobile readability using
+    [MILESTONE_3_BRAMBLEWAKE_ENEMIES.md](MILESTONE_3_BRAMBLEWAKE_ENEMIES.md).
+15. Stop immediately if any assertion errors.
 
 The test verifies the real Rojo tree, shared module replication, seven-region
 registry, save-schema-v3 constant, eight tutorial interactions, 13 active event
 interactions, one extraction interaction, runtime remotes,
 Input Action System rollout, world readiness, arrival collision, deterministic
 Bramblewake replay, 12 streamed modules, four POIs, four event state contracts,
-mobile part budget, shared survival/revive, combat/telegraph, and profession
+mobile part budget, shared survival/revive, six-enemy combat/telegraph, and profession
 contracts, and service initialization/start lifecycle. Human play is still required for physics,
 streaming, device layout, input switching, multiplayer revive timing, and
 usability.

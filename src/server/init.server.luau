@@ -8,8 +8,10 @@ assert(root ~= nil, "Last Light shared root did not replicate before bootstrap t
 
 local Config = require(root.Config)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
+local BramblewakeEnemies = require(root.BramblewakeEnemies)
 local CombatState = require(root.CombatState)
 local EnemyAttackFlow = require(root.EnemyAttackFlow)
+local EnemyCombatRules = require(root.EnemyCombatRules)
 local Environment = require(root.Environment)
 local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
@@ -21,6 +23,7 @@ local RateLimiter = require(root.RateLimiter)
 local ReviveFlow = require(root.ReviveFlow)
 local RuntimeIds = require(root.RuntimeIds)
 local SaveSchema = require(root.SaveSchema)
+local StatusEffectState = require(root.StatusEffectState)
 local SurvivalState = require(root.SurvivalState)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
@@ -40,6 +43,7 @@ local ProfessionService = require(script.Services.ProfessionService)
 local TutorialService = require(script.Services.TutorialService)
 local WorldService = require(script.Services.WorldService)
 local ServiceRegistry = require(script.ServiceRegistry)
+local BramblewakeEnemyBuilder = require(script.World.BramblewakeEnemyBuilder)
 
 local environment, environmentError = Environment.resolve({
     isStudio = RunService:IsStudio(),
@@ -84,6 +88,7 @@ local combatService = PlayerCombatService.new(
     logger,
     Config,
     CombatState,
+    StatusEffectState,
     featureFlags,
     survivalService,
     analyticsService
@@ -104,6 +109,9 @@ local enemyService = EnemyService.new(
     survivalService,
     combatService,
     EnemyAttackFlow,
+    BramblewakeEnemies,
+    EnemyCombatRules,
+    BramblewakeEnemyBuilder,
     analyticsService
 )
 professionService:setEnemyService(enemyService)

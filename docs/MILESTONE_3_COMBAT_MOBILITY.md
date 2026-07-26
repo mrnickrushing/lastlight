@@ -1,4 +1,4 @@
-# Milestone 3 combat mobility and Rootling telegraph
+# Milestone 3 combat mobility and Rootling telegraph foundation
 
 ## Scope
 
@@ -26,11 +26,12 @@ Implemented in source:
 - a kill switch, presentation attributes, 13 new pure tests, Studio assertions,
   and built-place checks.
 
-Not implemented by this increment:
+This foundation is expanded by the
+[six-enemy Bramblewake roster increment](MILESTONE_3_BRAMBLEWAKE_ENEMIES.md).
+Still not implemented across the wider combat roadmap:
 
-- charged attacks, guard/parry, status effects, armor, healing, or weapon combos;
-- Scout, Warden, Engineer, or Medic profession kits;
-- more than one enemy, navigation/pathfinding, an elite, boss, or Blackout;
+- charged attacks, player parry, armor, weapon combos, or a general effect stack;
+- simultaneous multi-enemy navigation/pathfinding, an elite, boss, or Blackout;
 - latency compensation for aimed attacks or final combat balance;
 - final character/enemy animations, audio, VFX, localization, or real-device
   evidence.
@@ -64,6 +65,7 @@ presentation only:
 
 - `LastLightStamina`, `LastLightMaxStamina`, and `LastLightSprinting`;
 - `LastLightDodging`, `LastLightDodgeActiveUntil`, and `LastLightDodgeReadyAt`.
+- `LastLightDrowsy` and `LastLightDrowsyUntil`.
 
 Editing these attributes must never change authoritative state.
 
@@ -91,7 +93,7 @@ thumbstick, top-bar, safe-inset, and preferred-text interactions.
 1. Run `npm test`.
 2. Open `build/LastLightTest.rbxlx` in Roblox Studio.
 3. Start one player and require `[Last Light] PASS FoundationIntegration`,
-   build `0.9.0`, `services=12`, and no red errors.
+   build `0.10.0`, `services=12`, and no red errors.
 4. Reach the authored night and hold RUN/Shift/left-stick click.
 5. Confirm the stamina rail drains smoothly, speed returns to normal at zero,
    and regeneration begins only after release and the short delay.

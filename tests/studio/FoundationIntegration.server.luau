@@ -12,8 +12,10 @@ assert(serverRoot ~= nil, "server root unavailable in Studio integration test")
 
 local Config = require(root.Config)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
+local BramblewakeEnemies = require(root.BramblewakeEnemies)
 local CombatState = require(root.CombatState)
 local EnemyAttackFlow = require(root.EnemyAttackFlow)
+local EnemyCombatRules = require(root.EnemyCombatRules)
 local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local ProfessionCatalog = require(root.ProfessionCatalog)
@@ -21,13 +23,14 @@ local ProfessionState = require(root.ProfessionState)
 local ReviveFlow = require(root.ReviveFlow)
 local RuntimeIds = require(root.RuntimeIds)
 local SurvivalState = require(root.SurvivalState)
+local StatusEffectState = require(root.StatusEffectState)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
 local ServiceRegistry = require(serverRoot.ServiceRegistry)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 3, "unexpected save schema version")
-assert(Config.BuildVersion == "0.9.0", "unexpected build version")
+assert(Config.BuildVersion == "0.10.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -92,6 +95,22 @@ local attackDecision = EnemyAttackFlow.evaluate(attack, attack.endsAt, {
     targetPresent = true,
 })
 assert(attackDecision.status == "resolve", "Rootling telegraph contract did not resolve")
+local enemyOrder = BramblewakeEnemies.order()
+assert(#enemyOrder == 6, "Bramblewake runtime roster must contain six enemies")
+assert(enemyOrder[1] == "enemy_rootling", "Bramblewake runtime roster changed order")
+assert(enemyOrder[6] == "enemy_bark_ram", "Bark Ram is missing from the runtime roster")
+assert(
+    EnemyCombatRules.contains("lane", 0, 4, nil, 6, 12),
+    "lane attack geometry did not include its readable center"
+)
+local briarback = BramblewakeEnemies.require("enemy_briarback")
+local shieldDamage, shieldResult = EnemyCombatRules.strikeDamage(briarback, 0.8)
+assert(shieldDamage == 8 and shieldResult == "shielded", "Briarback shield contract failed")
+local drowsy = StatusEffectState.applyDrowsy(StatusEffectState.create(), 300, 3, 0.65)
+assert(
+    StatusEffectState.snapshot(drowsy, 301).movementMultiplier == 0.65,
+    "Pollen Wisp drowsy contract failed"
+)
 
 local profession =
     ProfessionState.create(ProfessionCatalog.Ids.Warden, workspace:GetServerTimeNow())

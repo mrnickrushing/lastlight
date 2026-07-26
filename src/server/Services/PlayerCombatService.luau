@@ -18,11 +18,14 @@ export type PlayerCombatService = typeof(setmetatable(
         _logger: Logger,
         _config: any,
         _combatState: any,
+        _statusEffectState: any,
         _featureFlags: any,
         _survivalService: any,
         _analyticsService: any,
         _states: { [Player]: any },
+        _statusStates: { [Player]: any },
         _lastPublishedStamina: { [Player]: number },
+        _lastPublishedDrowsy: { [Player]: boolean },
         _lastRejectionAt: { [Player]: number },
         _nextPublishAt: { [Player]: number },
         _onChanged: ((Player, string?) -> ())?,
@@ -46,6 +49,7 @@ function PlayerCombatService.new(
     logger: Logger,
     config: any,
     combatState: any,
+    statusEffectState: any,
     featureFlags: any,
     survivalService: any,
     analyticsService: any
@@ -55,11 +59,14 @@ function PlayerCombatService.new(
         _logger = logger,
         _config = config,
         _combatState = combatState,
+        _statusEffectState = statusEffectState,
         _featureFlags = featureFlags,
         _survivalService = survivalService,
         _analyticsService = analyticsService,
         _states = {},
+        _statusStates = {},
         _lastPublishedStamina = {},
+        _lastPublishedDrowsy = {},
         _lastRejectionAt = {},
         _nextPublishAt = {},
         _onChanged = nil,
@@ -90,6 +97,8 @@ function PlayerCombatService._syncPlayer(self: PlayerCombatService, player: Play
     end
     local now = workspace:GetServerTimeNow()
     local snapshot = self._combatState.snapshot(state, now)
+    local statusState = self._statusStates[player] or self._statusEffectState.create()
+    local status = self._statusEffectState.snapshot(statusState, now)
     local dodgeActive = self._featureFlags:isEnabled("combat_mobility_enabled")
         and snapshot.dodgeActive
     player:SetAttribute("LastLightStamina", snapshot.stamina)
@@ -98,13 +107,15 @@ function PlayerCombatService._syncPlayer(self: PlayerCombatService, player: Play
     player:SetAttribute("LastLightDodging", dodgeActive)
     player:SetAttribute("LastLightDodgeActiveUntil", snapshot.dodgeActiveUntil)
     player:SetAttribute("LastLightDodgeReadyAt", snapshot.dodgeReadyAt)
+    player:SetAttribute("LastLightDrowsy", status.drowsy)
+    player:SetAttribute("LastLightDrowsyUntil", status.drowsyUntil)
 
     local activeHumanoid = humanoid(player)
     if activeHumanoid ~= nil then
         activeHumanoid.WalkSpeed = if not self._survivalService:canAct(player)
             then self._config.DownedWalkSpeed
-            elseif snapshot.sprinting then self._config.SprintWalkSpeed
-            else self._config.BaseWalkSpeed
+            elseif snapshot.sprinting then self._config.SprintWalkSpeed * status.movementMultiplier
+            else self._config.BaseWalkSpeed * status.movementMultiplier
     end
 end
 
@@ -124,13 +135,17 @@ function PlayerCombatService._bindPlayer(self: PlayerCombatService, player: Play
     end
     local now = workspace:GetServerTimeNow()
     self._states[player] = self._combatState.create(now)
+    self._statusStates[player] = self._statusEffectState.create()
     self._lastPublishedStamina[player] = self._config.MaxStamina
+    self._lastPublishedDrowsy[player] = false
     self._nextPublishAt[player] = now
 
     player.CharacterAdded:Connect(function(character: Model)
         local resetAt = workspace:GetServerTimeNow()
         self._states[player] = self._combatState.create(resetAt)
+        self._statusStates[player] = self._statusEffectState.create()
         self._lastPublishedStamina[player] = self._config.MaxStamina
+        self._lastPublishedDrowsy[player] = false
         self._nextPublishAt[player] = resetAt
         task.spawn(function()
             local activeHumanoid = character:WaitForChild("Humanoid", 8)
@@ -153,7 +168,9 @@ function PlayerCombatService.Start(self: PlayerCombatService)
     end)
     Players.PlayerRemoving:Connect(function(player: Player)
         self._states[player] = nil
+        self._statusStates[player] = nil
         self._lastPublishedStamina[player] = nil
+        self._lastPublishedDrowsy[player] = nil
         self._lastRejectionAt[player] = nil
         self._nextPublishAt[player] = nil
     end)
@@ -180,20 +197,53 @@ function PlayerCombatService._step(self: PlayerCombatService, now: number)
         self._states[player] = nextState
 
         local snapshot = self._combatState.snapshot(nextState, now)
+        local statusState = self._statusStates[player] or self._statusEffectState.create()
+        local status = self._statusEffectState.snapshot(statusState, now)
         local lastStamina = self._lastPublishedStamina[player]
         local nextPublishAt = self._nextPublishAt[player] or now
         local resourcePublish = lastStamina ~= snapshot.stamina and now >= nextPublishAt
         local sprintChanged = state.sprinting ~= nextState.sprinting
         local dodgeChanged = player:GetAttribute("LastLightDodging")
             ~= (enabled and snapshot.dodgeActive)
-        if resourcePublish or sprintChanged or dodgeChanged then
+        local drowsyChanged = self._lastPublishedDrowsy[player] ~= status.drowsy
+        if resourcePublish or sprintChanged or dodgeChanged or drowsyChanged then
             self:_syncPlayer(player)
+        end
+        if drowsyChanged then
+            self._lastPublishedDrowsy[player] = status.drowsy
+            self:_notify(
+                player,
+                if status.drowsy then "DROWSY — KEEP MOVING" else "DROWSINESS CLEARED"
+            )
         end
         if resourcePublish then
             self:_markPublished(player, now)
             self:_notify(player, nil)
         end
     end
+end
+
+function PlayerCombatService.applyDrowsy(
+    self: PlayerCombatService,
+    player: Player,
+    duration: number,
+    multiplier: number
+): boolean
+    local state = self._states[player]
+    local statusState = self._statusStates[player]
+    if state == nil or statusState == nil or not self._survivalService:canAct(player) then
+        return false
+    end
+    local now = workspace:GetServerTimeNow()
+    local nextState, _result = self._combatState.setSprint(state, false, now, true)
+    self._states[player] = nextState
+    self._statusStates[player] =
+        self._statusEffectState.applyDrowsy(statusState, now, duration, multiplier)
+    self._lastPublishedDrowsy[player] = true
+    self:_syncPlayer(player)
+    self:_markPublished(player, now)
+    self:_notify(player, "DROWSY — MOVEMENT SLOWED")
+    return true
 end
 
 function PlayerCombatService.setSprint(
@@ -321,10 +371,15 @@ function PlayerCombatService.snapshot(self: PlayerCombatService, player: Player)
     local snapshot = if state == nil
         then self._combatState.snapshot(self._combatState.create(now), now)
         else self._combatState.snapshot(state, now)
+    local statusState = self._statusStates[player] or self._statusEffectState.create()
+    local status = self._statusEffectState.snapshot(statusState, now)
     snapshot.enabled = self._featureFlags:isEnabled("combat_mobility_enabled")
     if not snapshot.enabled then
         snapshot.dodgeActive = false
     end
+    snapshot.drowsy = status.drowsy
+    snapshot.drowsyUntil = status.drowsyUntil
+    snapshot.movementMultiplier = status.movementMultiplier
     return snapshot
 end
 

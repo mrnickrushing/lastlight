@@ -901,7 +901,10 @@ function HUDController._updateCombatClock(self: HUDController)
     local dodgeCost = math.max(1, tonumber(combat.dodgeCost) or 35)
     local dodgeReadyAt = tonumber(combat.dodgeReadyAt) or 0
     local dodgeActiveUntil = tonumber(combat.dodgeActiveUntil) or 0
+    local drowsyUntil = tonumber(combat.drowsyUntil) or 0
     local cooldownRemaining = math.max(0, dodgeReadyAt - now)
+    local drowsyRemaining = math.max(0, drowsyUntil - now)
+    local drowsy = combat.drowsy == true and drowsyRemaining > 0
     local combatEnabled = combat.enabled ~= false
     local dodgeActive = combatEnabled and now < dodgeActiveUntil
     local ready = combatEnabled
@@ -910,16 +913,20 @@ function HUDController._updateCombatClock(self: HUDController)
         and stamina >= dodgeCost
 
     self._staminaFill.Size = UDim2.new(math.clamp(stamina / maxStamina, 0, 1), -8, 1, -8)
-    self._staminaFill.BackgroundColor3 = if stamina < dodgeCost
-        then COLORS.danger
+    self._staminaFill.BackgroundColor3 = if drowsy
+        then COLORS.amber
+        elseif stamina < dodgeCost then COLORS.danger
         elseif stamina < maxStamina * 0.55 then COLORS.amber
         else COLORS.blue
-    self._staminaText.Text = if stamina < dodgeCost
-        then string.format("LOW STAMINA · %d", stamina)
+    self._staminaText.Text = if drowsy
+        then string.format("DROWSY %.1fs · STAMINA %d", drowsyRemaining, stamina)
+        elseif stamina < dodgeCost then string.format("LOW STAMINA · %d", stamina)
         else string.format("STAMINA · %d", stamina)
-    self._staminaText.TextColor3 = if stamina < maxStamina * 0.45 then COLORS.cream else COLORS.ink
+    self._staminaText.TextColor3 = if drowsy or stamina < maxStamina * 0.45
+        then COLORS.cream
+        else COLORS.ink
     self._staminaFrame.Visible = not self._playerDowned
-        and (self._combatContext or stamina < maxStamina or cooldownRemaining > 0)
+        and (self._combatContext or drowsy or stamina < maxStamina or cooldownRemaining > 0)
 
     self._dodge.Active = ready
     self._dodge.AutoButtonColor = ready
@@ -1125,9 +1132,19 @@ function HUDController._updateClock(self: HUDController)
     if type(threat) == "table" and not self._playerDowned then
         local remaining =
             math.max(0, (tonumber(threat.resolvesAt) or 0) - workspace:GetServerTimeNow())
-        self._threatTitle.Text = "!! " .. tostring(threat.displayName or "THREAT")
-        self._threatDetail.Text =
-            string.format("%s · %.1fs", tostring(threat.instruction or "MOVE"), remaining)
+        local enemyName = tostring(threat.enemyName or "THREAT")
+        local attackName = tostring(threat.displayName or "ATTACK")
+        local title = if string.find(attackName, enemyName, 1, true) ~= nil
+            then attackName
+            else enemyName .. " · " .. attackName
+        local shape = if threat.shape == "lane" then "LANE" else "RING"
+        self._threatTitle.Text = "!! " .. title
+        self._threatDetail.Text = string.format(
+            "%s · %s · %.1fs",
+            shape,
+            tostring(threat.instruction or "MOVE"),
+            remaining
+        )
         self._threatFrame.Visible = remaining > 0
     else
         self._threatFrame.Visible = false

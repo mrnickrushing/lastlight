@@ -31,7 +31,7 @@ Open `build/LastLightTest.rbxlx`, start a server with one player, and require al
 of the following in Output:
 
 - `[Last Light] PASS FoundationIntegration`;
-- `server_boot_complete` with build `0.9.0` and `services=12`;
+- `server_boot_complete` with build `0.10.0` and `services=12`;
 - no red errors, infinite yields, or DataStore production writes.
 
 The integration assertion verifies the runtime remotes, world-ready signal,
@@ -52,7 +52,7 @@ Start from a reset profile and record screen/video plus elapsed time.
 | Tool | choose axe, hammer, or torch | selected tool is named; choice is not described as permanent |
 | Build | use the marked construction plot | 3 Heartwood is consumed; a solid barricade appears |
 | Prepare | light the First Lantern | authored dusk begins once and phase countdown is visible |
-| Defend | use the selected tool on Rootlings | server validates range; Rootling takes three hits; distant hits reject safely |
+| Defend | use the selected tool through the authored roster | server validates each enemy's range and mechanic; distant hits reject safely |
 | Survive | remain through the full night | night lasts 120 seconds after dusk; lantern cannot permanently fail |
 | Reveal | follow the dawn beacon | Bramblewake reveal appears; tutorial reaches `complete` |
 | Return | leave and rejoin the published staging place | tutorial remains complete; no duplicate reward or forced replay |

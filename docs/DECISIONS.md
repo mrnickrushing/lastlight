@@ -169,6 +169,24 @@ class locks, paid power, or impossible solo objectives. A single readable
 cooldown action proves the authority, save, input, HUD, and balance seams before
 mastery trees or specializations multiply complexity.
 
+## 2026-07-26 — One-at-a-time Bramblewake mechanic roster
+
+**Decision:** Author all six standard Bramblewake enemies in the first-night
+schedule, but keep only one enemy active at a time. Give every enemy a distinct
+server-owned counter instead of multiplying simultaneous bodies. Use the stable
+catalog ID `enemy_rootling` in runtime and generic enemy-ID analytics.
+
+**Evidence:** [Bramblewake Mobile Combat Callouts report](https://www.lazyweb.com/report/lazyweb/094ebe85-c65a-4a8a-908f-b1b209ecc935/?source=create).
+
+**Reason:** The first defense must teach readable mechanics and remain
+profession-independent, solo-passable, and performant on baseline phones. A
+bounded queue allows the full authored roster without turning the tutorial into
+an unreadable swarm.
+
+**First-night adaptation:** Hollow Crow steals a temporary exposed First Lantern
+spark rather than durable inventory. Physical loose-bundle theft remains a later
+expedition integration; banked value is never deleted by this defense.
+
 ## 2026-07-25 — Recoverable failure
 
 **Decision:** Routine defeat damages temporary state and unbanked value but never
