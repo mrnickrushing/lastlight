@@ -201,12 +201,12 @@ function ProfessionService._abilityPreflight(
     local enemyService = self._enemyService
     if definition.id == self._catalog.Ids.Scout then
         if enemyService == nil then
-            return false, "ROOTLING TRACKING IS STILL LOADING"
+            return false, "THREAT TRACKING IS STILL LOADING"
         end
         return enemyService:canMarkNearest(player, definition.effectRadius)
     elseif definition.id == self._catalog.Ids.Warden then
         if enemyService == nil or not enemyService:combatActive() then
-            return false, "LANTERN GUARD NEEDS AN ACTIVE ROOTLING THREAT"
+            return false, "LANTERN GUARD NEEDS AN ACTIVE THREAT"
         end
         return true, "LANTERN GUARD READY"
     elseif definition.id == self._catalog.Ids.Engineer then
@@ -233,7 +233,7 @@ function ProfessionService._applyAbility(
         )
         return message, 1
     elseif definition.id == self._catalog.Ids.Warden then
-        return "LANTERN GUARD ACTIVE — ROOTLING DAMAGE REDUCED", 1
+        return "LANTERN GUARD ACTIVE — ENEMY DAMAGE REDUCED", 1
     elseif definition.id == self._catalog.Ids.Engineer then
         local _, message = self._enemyService:repairLantern(
             player,

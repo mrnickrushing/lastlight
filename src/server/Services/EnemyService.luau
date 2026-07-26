@@ -46,6 +46,7 @@ export type EnemyService = typeof(setmetatable(
         _enemyBuilder: any,
         _analyticsService: any,
         _professionService: any,
+        _eliteService: any,
         _active: Enemy?,
         _queue: { string },
         _nextSpawnAt: number,
@@ -89,6 +90,7 @@ function EnemyService.new(
         _enemyBuilder = enemyBuilder,
         _analyticsService = analyticsService,
         _professionService = nil,
+        _eliteService = nil,
         _active = nil,
         _queue = {},
         _nextSpawnAt = 0,
@@ -121,6 +123,10 @@ end
 
 function EnemyService.setProfessionService(self: EnemyService, professionService: any)
     self._professionService = professionService
+end
+
+function EnemyService.setEliteService(self: EnemyService, eliteService: any)
+    self._eliteService = eliteService
 end
 
 function EnemyService._notify(self: EnemyService, toast: string?)
@@ -652,6 +658,9 @@ function EnemyService.canMarkNearest(
     player: Player,
     range: number
 ): (boolean, string)
+    if not self._nightActive and self._eliteService ~= nil then
+        return self._eliteService:canMarkNearest(player, range)
+    end
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
         return false, reason or "NO THREAT CAN BE MARKED"
@@ -665,6 +674,9 @@ function EnemyService.markNearest(
     range: number,
     duration: number
 ): (boolean, string)
+    if not self._nightActive and self._eliteService ~= nil then
+        return self._eliteService:markNearest(player, range, duration)
+    end
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
         return false, reason or "NO THREAT CAN BE MARKED"
@@ -719,6 +731,9 @@ end
 
 function EnemyService.damageNearest(self: EnemyService, player: Player): (boolean, string)
     if not self._nightActive then
+        if self._eliteService ~= nil then
+            return self._eliteService:damageNearest(player)
+        end
         return false, "The tool is calm in daylight."
     end
     if not self._survivalService:canAct(player) then
@@ -781,7 +796,7 @@ function EnemyService.threatSnapshot(self: EnemyService, viewer: Player): any
     local enemy = self._active
     local attack = if enemy == nil then nil else enemy.attack
     if enemy == nil or attack == nil or attack.target ~= viewer then
-        return nil
+        return if self._eliteService == nil then nil else self._eliteService:threatSnapshot(viewer)
     end
     return {
         attackId = enemy.definition.attackId,
@@ -808,7 +823,8 @@ function EnemyService.activeCount(self: EnemyService): number
 end
 
 function EnemyService.combatActive(self: EnemyService): boolean
-    return self._nightActive and self._active ~= nil
+    return (self._nightActive and self._active ~= nil)
+        or (self._eliteService ~= nil and self._eliteService:combatActive())
 end
 
 return table.freeze(EnemyService)

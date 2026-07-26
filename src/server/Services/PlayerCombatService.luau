@@ -26,6 +26,7 @@ export type PlayerCombatService = typeof(setmetatable(
         _statusStates: { [Player]: any },
         _lastPublishedStamina: { [Player]: number },
         _lastPublishedDrowsy: { [Player]: boolean },
+        _lastPublishedRooted: { [Player]: boolean },
         _lastRejectionAt: { [Player]: number },
         _nextPublishAt: { [Player]: number },
         _onChanged: ((Player, string?) -> ())?,
@@ -67,6 +68,7 @@ function PlayerCombatService.new(
         _statusStates = {},
         _lastPublishedStamina = {},
         _lastPublishedDrowsy = {},
+        _lastPublishedRooted = {},
         _lastRejectionAt = {},
         _nextPublishAt = {},
         _onChanged = nil,
@@ -109,6 +111,8 @@ function PlayerCombatService._syncPlayer(self: PlayerCombatService, player: Play
     player:SetAttribute("LastLightDodgeReadyAt", snapshot.dodgeReadyAt)
     player:SetAttribute("LastLightDrowsy", status.drowsy)
     player:SetAttribute("LastLightDrowsyUntil", status.drowsyUntil)
+    player:SetAttribute("LastLightRooted", status.rooted)
+    player:SetAttribute("LastLightRootedUntil", status.rootedUntil)
 
     local activeHumanoid = humanoid(player)
     if activeHumanoid ~= nil then
@@ -138,6 +142,7 @@ function PlayerCombatService._bindPlayer(self: PlayerCombatService, player: Play
     self._statusStates[player] = self._statusEffectState.create()
     self._lastPublishedStamina[player] = self._config.MaxStamina
     self._lastPublishedDrowsy[player] = false
+    self._lastPublishedRooted[player] = false
     self._nextPublishAt[player] = now
 
     player.CharacterAdded:Connect(function(character: Model)
@@ -146,6 +151,7 @@ function PlayerCombatService._bindPlayer(self: PlayerCombatService, player: Play
         self._statusStates[player] = self._statusEffectState.create()
         self._lastPublishedStamina[player] = self._config.MaxStamina
         self._lastPublishedDrowsy[player] = false
+        self._lastPublishedRooted[player] = false
         self._nextPublishAt[player] = resetAt
         task.spawn(function()
             local activeHumanoid = character:WaitForChild("Humanoid", 8)
@@ -171,6 +177,7 @@ function PlayerCombatService.Start(self: PlayerCombatService)
         self._statusStates[player] = nil
         self._lastPublishedStamina[player] = nil
         self._lastPublishedDrowsy[player] = nil
+        self._lastPublishedRooted[player] = nil
         self._lastRejectionAt[player] = nil
         self._nextPublishAt[player] = nil
     end)
@@ -206,7 +213,8 @@ function PlayerCombatService._step(self: PlayerCombatService, now: number)
         local dodgeChanged = player:GetAttribute("LastLightDodging")
             ~= (enabled and snapshot.dodgeActive)
         local drowsyChanged = self._lastPublishedDrowsy[player] ~= status.drowsy
-        if resourcePublish or sprintChanged or dodgeChanged or drowsyChanged then
+        local rootedChanged = self._lastPublishedRooted[player] ~= status.rooted
+        if resourcePublish or sprintChanged or dodgeChanged or drowsyChanged or rootedChanged then
             self:_syncPlayer(player)
         end
         if drowsyChanged then
@@ -216,11 +224,41 @@ function PlayerCombatService._step(self: PlayerCombatService, now: number)
                 if status.drowsy then "DROWSY — KEEP MOVING" else "DROWSINESS CLEARED"
             )
         end
+        if rootedChanged then
+            self._lastPublishedRooted[player] = status.rooted
+            self:_notify(
+                player,
+                if status.rooted then "ROOTED — KEEP MOVING" else "ROOTS RELEASED"
+            )
+        end
         if resourcePublish then
             self:_markPublished(player, now)
             self:_notify(player, nil)
         end
     end
+end
+
+function PlayerCombatService.applyRooted(
+    self: PlayerCombatService,
+    player: Player,
+    duration: number,
+    multiplier: number
+): boolean
+    local state = self._states[player]
+    local statusState = self._statusStates[player]
+    if state == nil or statusState == nil or not self._survivalService:canAct(player) then
+        return false
+    end
+    local now = workspace:GetServerTimeNow()
+    local nextState, _result = self._combatState.setSprint(state, false, now, true)
+    self._states[player] = nextState
+    self._statusStates[player] =
+        self._statusEffectState.applyRooted(statusState, now, duration, multiplier)
+    self._lastPublishedRooted[player] = true
+    self:_syncPlayer(player)
+    self:_markPublished(player, now)
+    self:_notify(player, "ROOTED — MOVEMENT SLOWED")
+    return true
 end
 
 function PlayerCombatService.applyDrowsy(
@@ -379,6 +417,8 @@ function PlayerCombatService.snapshot(self: PlayerCombatService, player: Player)
     end
     snapshot.drowsy = status.drowsy
     snapshot.drowsyUntil = status.drowsyUntil
+    snapshot.rooted = status.rooted
+    snapshot.rootedUntil = status.rootedUntil
     snapshot.movementMultiplier = status.movementMultiplier
     return snapshot
 end

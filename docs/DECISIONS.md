@@ -187,6 +187,29 @@ an unreadable swarm.
 spark rather than durable inventory. Physical loose-bundle theft remains a later
 expedition integration; banked value is never deleted by this defense.
 
+## 2026-07-26 — Shared Old Growth with carried-fire shield breaks
+
+**Decision:** Implement one server-run `elite_old_growth` encounter in the
+already-authored Old Growth Approach. It has three exposed-heart phases separated
+by two 15-second lantern-fire shield breaks. One player carries fire at a time,
+but every player who enters the live arena becomes a participant. Normal strikes
+remain sufficient; Scout slows telegraphs, Warden mitigates damage, Medic heals,
+and Engineer remains lantern-specific.
+
+**Reward and failure:** Completion grants each participant three unbanked Amber
+Sap through a stable per-run, per-manifest, per-player transaction. The reward
+uses the existing durable pouch and Wayhome settlement path. Routine downs,
+retreat, and disconnect do not reset shared server-run health; no profession,
+paid item, or paid revive is required.
+
+**Evidence:** [Old Growth Elite Mobile HUD report](https://www.lazyweb.com/report/lazyweb/51156fc2-18a7-4cf0-be1b-3de54ccf33b3/?source=create).
+
+**Reason:** The first elite should prove phase state, cooperative world
+interaction, recoverable failure, shared idempotent rewards, and contextual
+mobile presentation without adding permanent HUD clutter or multiplying active
+NPCs. The single carrier makes the objective readable and bounds replicated
+effects on baseline phones.
+
 ## 2026-07-25 — Recoverable failure
 
 **Decision:** Routine defeat damages temporary state and unbanked value but never

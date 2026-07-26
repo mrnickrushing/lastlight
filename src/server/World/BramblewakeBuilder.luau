@@ -564,6 +564,7 @@ function BramblewakeBuilder.build(
     local centers: { Vector3 } = {}
     local eventInteractions = {}
     local eventSockets: { [string]: BasePart } = {}
+    local eliteArena = nil
     local extractionTarget: BasePart? = nil
     for _, placement in manifest.modules do
         centers[placement.index] = ORIGIN
@@ -615,6 +616,40 @@ function BramblewakeBuilder.build(
             tree(module, center + Vector3.new(x, 0, z), 0.62 + (cornerIndex % 2) * 0.08)
         end
         buildModuleVisual(module, definition.visual, center)
+        if placement.moduleId == "module_bw_old_growth_approach" then
+            local fireSource = orb(
+                module,
+                "OldGrowthFireSource",
+                center + Vector3.new(-20, 3.4, -12),
+                4.2,
+                AMBER,
+                Enum.Material.SmoothPlastic
+            )
+            fireSource.Transparency = 0.48
+            fireSource:SetAttribute("EliteId", "elite_old_growth")
+            fireSource:SetAttribute("EliteInteraction", "fire_source")
+            billboard(fireSource, "LANTERN FIRE", CREAM)
+
+            local rootHeart = orb(
+                module,
+                "OldGrowthRootHeart",
+                center + Vector3.new(20, 4.2, 12),
+                5.2,
+                FOXFIRE,
+                Enum.Material.SmoothPlastic
+            )
+            rootHeart.Transparency = 0.56
+            rootHeart:SetAttribute("EliteId", "elite_old_growth")
+            rootHeart:SetAttribute("EliteInteraction", "root_heart")
+            billboard(rootHeart, "ROOT HEART", CREAM)
+            CollectionService:AddTag(fireSource, runtimeIds.ExpeditionEliteTag)
+            CollectionService:AddTag(rootHeart, runtimeIds.ExpeditionEliteTag)
+            eliteArena = {
+                center = center,
+                fireSource = fireSource,
+                rootHeart = rootHeart,
+            }
+        end
         if definition.role == "extraction" then
             local target = module:FindFirstChild("WayhomeLight")
             assert(
@@ -691,6 +726,7 @@ function BramblewakeBuilder.build(
         extractionTarget = assert(extractionTarget, "Bramblewake extraction target is missing"),
         eventInteractions = eventInteractions,
         eventSockets = eventSockets,
+        eliteArena = assert(eliteArena, "Old Growth elite arena is missing"),
         moduleCenters = moduleCenters,
         partCount = generatedParts,
     }

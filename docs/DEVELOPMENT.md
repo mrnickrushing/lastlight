@@ -59,7 +59,7 @@ full DataModel. The first engine integration test is intentionally separate:
 2. Open `build/LastLightTest.rbxlx` in Roblox Studio.
 3. Start a server with one player.
 4. Confirm server output contains `[Last Light] PASS FoundationIntegration`.
-5. Confirm `server_boot_complete` reports twelve services without an
+5. Confirm `server_boot_complete` reports thirteen services without an
    infinite-yield warning.
 6. Confirm the loader leaves the player at `ArrivalSpawn` on solid ground and
    the first objective is `FREE MARA`.
@@ -80,15 +80,19 @@ full DataModel. The first engine integration test is intentionally separate:
 14. Validate all six Bramblewake enemies, telegraphs, solo counterplay, queue
     cleanup, and mobile readability using
     [MILESTONE_3_BRAMBLEWAKE_ENEMIES.md](MILESTONE_3_BRAMBLEWAKE_ENEMIES.md).
-15. Stop immediately if any assertion errors.
+15. Validate the Old Growth activation, attacks, shield fire, rewards, mobile
+    HUD, kill switch, and cleanup using
+    [MILESTONE_3_OLD_GROWTH_ELITE.md](MILESTONE_3_OLD_GROWTH_ELITE.md).
+16. Stop immediately if any assertion errors.
 
 The test verifies the real Rojo tree, shared module replication, seven-region
 registry, save-schema-v3 constant, eight tutorial interactions, 13 active event
-interactions, one extraction interaction, runtime remotes,
+interactions, two dormant elite interactions, one extraction interaction, runtime remotes,
 Input Action System rollout, world readiness, arrival collision, deterministic
 Bramblewake replay, 12 streamed modules, four POIs, four event state contracts,
-mobile part budget, shared survival/revive, six-enemy combat/telegraph, and profession
-contracts, and service initialization/start lifecycle. Human play is still required for physics,
+mobile part budget, shared survival/revive, six-enemy combat/telegraph,
+profession contracts, Old Growth shield/fire/rooted/model contracts, and service
+initialization/start lifecycle. Human play is still required for physics,
 streaming, device layout, input switching, multiplayer revive timing, and
 usability.
 

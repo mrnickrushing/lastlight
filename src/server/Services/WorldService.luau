@@ -34,6 +34,7 @@ export type WorldService = typeof(setmetatable(
         _eventSockets: { [string]: BasePart },
         _eventTargets: { [string]: { [string]: BasePart } },
         _eventsEnabled: boolean,
+        _oldGrowthArena: any,
     },
     WorldService
 ))
@@ -209,6 +210,7 @@ function WorldService.new(logger: Logger): WorldService
         _eventSockets = {},
         _eventTargets = {},
         _eventsEnabled = true,
+        _oldGrowthArena = nil,
     }, WorldService)
 end
 
@@ -696,7 +698,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-extraction-v3",
+        worldVersion = "old-growth-elite-v4",
     })
 end
 
@@ -807,18 +809,21 @@ function WorldService.buildBramblewake(
         if
             actionId == self._runtimeIds.Actions.ExpeditionEvent
             or actionId == self._runtimeIds.Actions.Extract
+            or actionId == self._runtimeIds.Actions.OldGrowthFire
         then
             self._interactions[interactionId] = nil
         end
     end
     self._eventSockets = {}
     self._eventTargets = {}
+    self._oldGrowthArena = nil
 
     local result = BramblewakeBuilder.build(world, manifest, generator, catalog, self._runtimeIds)
     self._expeditionEntry = result.entryCFrame
     self._expeditionManifest = manifest
     self._expeditionModuleCenters = result.moduleCenters
     self._eventSockets = result.eventSockets
+    self._oldGrowthArena = result.eliteArena
     self:_registerInteraction(
         result.extractionTarget,
         self._runtimeIds.InteractionIds.Wayhome,
@@ -848,10 +853,62 @@ function WorldService.buildBramblewake(
         end
         targets[descriptor.stepId] = descriptor.target
     end
+    self:_registerInteraction(
+        result.eliteArena.fireSource,
+        self._runtimeIds.InteractionIds.OldGrowthFireSource,
+        self._runtimeIds.Actions.OldGrowthFire,
+        "TAKE FIRE",
+        "Lantern Fire",
+        nil,
+        nil
+    )
+    self:_registerInteraction(
+        result.eliteArena.rootHeart,
+        self._runtimeIds.InteractionIds.OldGrowthHeart,
+        self._runtimeIds.Actions.OldGrowthFire,
+        "BURN SHIELD",
+        "Root Heart",
+        nil,
+        nil
+    )
+    self:setOldGrowthPresentation("dormant")
     world:SetAttribute("ExpeditionReady", true)
     world:SetAttribute("ExpeditionManifestHash", manifest.hash)
     world:SetAttribute("ExpeditionEventInteractions", #result.eventInteractions)
     return result
+end
+
+function WorldService.oldGrowthArena(self: WorldService): any
+    return self._oldGrowthArena
+end
+
+function WorldService.setOldGrowthPresentation(self: WorldService, status: string)
+    local arena = self._oldGrowthArena
+    if arena == nil then
+        return
+    end
+    local shielded = status == "shielded"
+    local complete = status == "complete"
+    arena.fireSource.Color = if shielded then AMBER else Color3.fromRGB(96, 87, 68)
+    arena.fireSource.Material = if shielded then Enum.Material.Neon else Enum.Material.SmoothPlastic
+    arena.fireSource.Transparency = if shielded then 0.12 else 0.58
+    arena.rootHeart.Color = if complete
+        then FOXFIRE
+        elseif shielded then Color3.fromRGB(255, 117, 74)
+        else Color3.fromRGB(83, 102, 82)
+    arena.rootHeart.Material = if shielded or complete
+        then Enum.Material.Neon
+        else Enum.Material.SmoothPlastic
+    arena.rootHeart.Transparency = if shielded or complete then 0.14 else 0.58
+
+    local firePrompt = self._interactions[self._runtimeIds.InteractionIds.OldGrowthFireSource]
+    local heartPrompt = self._interactions[self._runtimeIds.InteractionIds.OldGrowthHeart]
+    if firePrompt ~= nil then
+        firePrompt.Enabled = shielded
+    end
+    if heartPrompt ~= nil then
+        heartPrompt.Enabled = shielded
+    end
 end
 
 function WorldService.setExpeditionEventsEnabled(self: WorldService, enabled: boolean)

@@ -149,6 +149,12 @@ expedition encounter integration.
 | elite_unspoken | The Unspoken | Hollow | disables one HUD label with icon fallback |
 | elite_last_regret | Last Regret | Hollow | remixes one prior boss mechanic at lower scope |
 
+Build `0.11.0` implements `elite_old_growth` in its authored expedition arena.
+The encounter has 360 health, shield gates at 240 and 120, a 15-second shared
+lantern-fire carry, readable lane and circle attacks, and three Amber Sap per
+participant as an unbanked idempotent reward. It remains solo-passable without a
+profession or premium item. The other 13 elite IDs remain catalog targets.
+
 ## Chapter bosses
 
 | ID | Boss | Required phases | Non-profession solution |
@@ -309,7 +315,7 @@ salvage result, and migration version.
 
 Each surface region ships eight event templates:
 
-Build `0.10.0` retains the first four representative Bramblewake templates
+Build `0.11.0` retains the first four representative Bramblewake templates
 listed below: Moving Hedge, Lost Wagon, Root Bridge, and Foxlight Trail. The
 remaining Bramblewake templates and all later-region events are catalog targets,
 not implemented runtime content yet.

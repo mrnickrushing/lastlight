@@ -87,7 +87,7 @@ this milestone to complete from CI alone.
 **Increment status (2026-07-26):** the expedition foundation, first active
 event layer, durable extraction settlement, player rescue loop, combat
 mobility/telegraph foundation, the complete standard Bramblewake enemy roster,
-and four basic profession kits are
+four basic profession kits, and the Old Growth elite are
 implemented in source. The slice now has 12 representative modules, four POIs,
 four active events with 13 shared steps, deterministic assembly, a known-good
 fallback, 1,000-seed invariants, streamed preview geometry, beacon entry,
@@ -98,9 +98,10 @@ telemetry, HUD progress, server-owned health, six distinct enemy attacks, downed
 crawl, interruption-safe revive, bleedout-safe retreat, server stamina,
 sprint/dodge timing, circle/lane telegraphs, flank defense, drowsy and light-theft
 pressure, Scout mark/slow, Warden guard, Engineer lantern repair, Medic area heal,
-and role-aware telemetry/HUD.
-Profession mastery/specializations, full inventory/crafting/quests, elite,
-boss, normal night, Blackout, town tier, final art/audio, and all
+role-aware telemetry/HUD, a three-phase 360-health elite, two carried-fire
+shield breaks, lane root and canopy attacks, and idempotent shared Amber Sap.
+Profession mastery/specializations, full inventory/crafting/quests, boss, normal
+night, Blackout, town tier, final art/audio, and all
 Studio/device/group evidence remain open. See
 [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md) and
 [MILESTONE_3_BRAMBLEWAKE_EVENTS.md](MILESTONE_3_BRAMBLEWAKE_EVENTS.md), and
@@ -108,7 +109,8 @@ Studio/device/group evidence remain open. See
 [MILESTONE_3_PLAYER_SURVIVAL.md](MILESTONE_3_PLAYER_SURVIVAL.md), and
 [MILESTONE_3_COMBAT_MOBILITY.md](MILESTONE_3_COMBAT_MOBILITY.md), and
 [MILESTONE_3_PROFESSION_KITS.md](MILESTONE_3_PROFESSION_KITS.md), and
-[MILESTONE_3_BRAMBLEWAKE_ENEMIES.md](MILESTONE_3_BRAMBLEWAKE_ENEMIES.md).
+[MILESTONE_3_BRAMBLEWAKE_ENEMIES.md](MILESTONE_3_BRAMBLEWAKE_ENEMIES.md), and
+[MILESTONE_3_OLD_GROWTH_ELITE.md](MILESTONE_3_OLD_GROWTH_ELITE.md).
 
 ### Deliverables
 

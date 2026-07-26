@@ -16,8 +16,8 @@ playable game exists.
 
 **Milestone 2 source implemented; Milestone 3 Bramblewake expedition foundation,
 four active events, durable extraction settlement, player rescue, combat
-mobility, six-enemy first-night roster, and four basic profession kits
-implemented; Studio and device exit gates remain pending.**
+mobility, six-enemy first-night roster, four basic profession kits, and the Old
+Growth elite implemented; Studio and device exit gates remain pending.**
 
 The repository currently contains:
 
@@ -38,6 +38,9 @@ The repository currently contains:
   interruption-safe ally revive, and bleedout-safe town retreat;
 - server-owned stamina sprint/dodge, cooldown and protection validation, plus
   circle/lane telegraphs, flank defense, temporary drowsy, and light theft;
+- an original procedural Old Growth elite with three exposed phases, two
+  lantern-fire shield breaks, lane roots, canopy-fall pressure, rooted movement,
+  contextual mobile HUD, and idempotent shared Amber Sap rewards;
 - persistent free-town selection for Scout, Warden, Engineer, and Medic, with
   server-owned reveal/slow, guard, lantern-repair, and area-heal abilities;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
@@ -48,7 +51,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 99 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 108 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -73,6 +76,8 @@ The profession selection, authority, balance, persistence, and device gates are 
 [the profession-kit runbook](docs/MILESTONE_3_PROFESSION_KITS.md).
 The six-enemy sequence, mechanic, readability, solo-balance, and device gates are in
 [the Bramblewake enemy-roster runbook](docs/MILESTONE_3_BRAMBLEWAKE_ENEMIES.md).
+The three-phase elite, carried-fire, reward, accessibility, and abuse gates are in
+[the Old Growth elite runbook](docs/MILESTONE_3_OLD_GROWTH_ELITE.md).
 
 The current UI direction is documented in the
 [Last Light mobile gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create).
@@ -86,6 +91,8 @@ The safe-town role selector and in-play ability layer are grounded in the
 [Profession Selector + Ability HUD report](https://www.lazyweb.com/report/lazyweb/73595230-6584-431c-8d84-c7eb06fdeaa5/?source=create).
 The six-enemy telegraph hierarchy is grounded in the
 [Bramblewake Mobile Combat Callouts report](https://www.lazyweb.com/report/lazyweb/094ebe85-c65a-4a8a-908f-b1b209ecc935/?source=create).
+The contextual elite health, phase, shield, and carried-fire layer is grounded in the
+[Old Growth Elite Mobile HUD report](https://www.lazyweb.com/report/lazyweb/51156fc2-18a7-4cf0-be1b-3de54ccf33b3/?source=create).
 The recommended default is a context-sensitive survival HUD. A compact HUD is
 the accessibility and low-effects fallback, while the dramatic living-world HUD
 is reserved for Blackouts and bosses.
