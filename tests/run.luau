@@ -32,4 +32,5 @@ TestRunner.run({
     require("./specs/WardenStagEncounter.spec"),
     require("./specs/BramblewakeBlackout.spec"),
     require("./specs/TownNightSchedule.spec"),
+    require("./specs/TownProgression.spec"),
 })
