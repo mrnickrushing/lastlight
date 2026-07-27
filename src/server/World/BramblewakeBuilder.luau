@@ -146,6 +146,21 @@ local function objectIcon(target: BasePart, kind: string, color: Color3)
     icon.Parent = worldModel
 end
 
+local function destinationRing(parent: Instance, center: Vector3, color: Color3, radius: number)
+    for index = 1, 8 do
+        local angle = (index / 8) * math.pi * 2
+        local marker = orb(
+            parent,
+            "DestinationMarker",
+            center + Vector3.new(math.cos(angle) * radius, 0.35, math.sin(angle) * radius),
+            0.28,
+            color,
+            Enum.Material.Neon
+        )
+        marker.CanQuery = false
+    end
+end
+
 local function tree(parent: Instance, position: Vector3, scale: number)
     part(
         parent,
@@ -668,6 +683,7 @@ local function buildEventSocket(
     CollectionService:AddTag(anchor, runtimeIds.ExpeditionEventTag)
     billboard(anchor, string.upper(definition.displayName), AMBER)
     objectIcon(anchor, "event", AMBER)
+    destinationRing(parent, anchor.Position, AMBER, 5.5)
 
     if definition.visual == "wagon" then
         part(
@@ -724,6 +740,7 @@ local function buildEventSocket(
             )
         end
         target.CastShadow = false
+        objectIcon(target, "step", AMBER)
         target:SetAttribute("EventId", definition.id)
         target:SetAttribute("EventStepId", step.id)
         target:SetAttribute("EventStepState", "available")
@@ -1269,6 +1286,7 @@ function BramblewakeBuilder.build(
             target:SetAttribute("ExtractionId", "extraction_bw_wayhome")
             CollectionService:AddTag(target, runtimeIds.ExpeditionExtractionTag)
             extractionTarget = target
+            destinationRing(module, target.Position, AMBER, 7)
         end
 
         if placement.poiId ~= nil then
