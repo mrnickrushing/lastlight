@@ -139,20 +139,39 @@ local function pine(parent: Instance, position: Vector3, scale: number)
     trunk.CFrame *= CFrame.Angles(0, position.X * 0.01, 0)
 
     for layer = 1, 3 do
-        local foliage = part(
+        local canopyPosition = position + Vector3.new(0, (9.5 + layer * 3.4) * scale, 0)
+        local canopySize = Vector3.new(
+            (11 - layer * 1.7) * scale,
+            (7.5 - layer * 0.9) * scale,
+            (11 - layer * 1.7) * scale
+        )
+        for half = 1, 2 do
+            local foliage = part(
+                parent,
+                "PineNeedles",
+                canopySize,
+                CFrame.new(canopyPosition)
+                    * CFrame.Angles(0, if half == 1 then 0.2 else math.pi + 0.2, 0),
+                if layer == 3 then GREEN else DARK_GREEN,
+                Enum.Material.Grass,
+                false
+            )
+            foliage.Shape = Enum.PartType.Wedge
+            foliage.CanQuery = false
+        end
+    end
+    for side = -1, 1, 2 do
+        local branch = part(
             parent,
-            "PineNeedles",
-            Vector3.new(
-                (10 - layer * 1.4) * scale,
-                (7 - layer * 0.8) * scale,
-                (10 - layer * 1.4) * scale
-            ),
-            CFrame.new(position + Vector3.new(0, (10 + layer * 3.2) * scale, 0)),
-            if layer == 3 then GREEN else DARK_GREEN,
-            Enum.Material.Grass,
+            "PineBranch",
+            Vector3.new(0.7 * scale, 5 * scale, 0.7 * scale),
+            CFrame.new(position + Vector3.new(side * 2.5 * scale, 7.5 * scale, -0.2))
+                * CFrame.Angles(0, 0, math.rad(side * 52)),
+            BARK,
+            Enum.Material.Wood,
             false
         )
-        foliage.Shape = Enum.PartType.Ball
+        branch.CanQuery = false
     end
 end
 
@@ -222,12 +241,38 @@ local function addObjectIcon(partInstance: BasePart, kind: string, accent: Color
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "ObjectIcon"
     billboard.Adornee = partInstance
-    billboard.AlwaysOnTop = false
-    billboard.LightInfluence = 0.1
+    billboard.AlwaysOnTop = true
+    billboard.LightInfluence = 0
     billboard.Size = UDim2.fromOffset(44, 44)
-    billboard.StudsOffsetWorldSpace = Vector3.new(0, 5.2, 0)
-    billboard.MaxDistance = 48
+    billboard.StudsOffsetWorldSpace = Vector3.new(0, 5.8, 0)
+    billboard.MaxDistance = 72
     billboard.Parent = partInstance
+
+    local glyph = Instance.new("TextLabel")
+    glyph.Name = "IconGlyph"
+    glyph.BackgroundColor3 = Color3.fromRGB(10, 21, 19)
+    glyph.BackgroundTransparency = 0.05
+    glyph.BorderSizePixel = 0
+    glyph.Size = UDim2.fromScale(1, 1)
+    glyph.Font = Enum.Font.GothamBold
+    glyph.Text = if kind == "axe"
+        then "⚒"
+        elseif kind == "hammer" then "✚"
+        elseif kind == "torch" or kind == "lantern" then "✦"
+        elseif kind == "heartwood" then "◉"
+        elseif kind == "barricade" then "▰"
+        elseif kind == "satchel" then "▣"
+        elseif kind == "charm" then "◆"
+        elseif kind == "hood" then "⌂"
+        elseif kind == "boots" then "≋"
+        else "✦"
+    glyph.TextColor3 = accent
+    glyph.TextScaled = true
+    glyph.ZIndex = 10
+    glyph.Parent = billboard
+    local glyphCorner = Instance.new("UICorner")
+    glyphCorner.CornerRadius = UDim.new(0, 10)
+    glyphCorner.Parent = glyph
 
     local viewport = Instance.new("ViewportFrame")
     viewport.Name = "IconViewport"
@@ -732,10 +777,15 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         Vector3.new(3.2, 3.2, 3.2),
         CFrame.new(20, 4.2, -48),
         AMBER,
-        Enum.Material.Neon,
+        Enum.Material.Glass,
         false
     )
     heart.Shape = Enum.PartType.Ball
+    local heartLight = Instance.new("PointLight")
+    heartLight.Color = AMBER
+    heartLight.Brightness = 1.1
+    heartLight.Range = 12
+    heartLight.Parent = heart
     addBillboard(heart, "HEARTWOOD", AMBER)
     addObjectIcon(heart, "heartwood", AMBER)
     self:_registerInteraction(

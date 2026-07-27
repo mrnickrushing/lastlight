@@ -105,12 +105,34 @@ local function objectIcon(target: BasePart, kind: string, color: Color3)
     local gui = Instance.new("BillboardGui")
     gui.Name = "ObjectIcon"
     gui.Adornee = target
-    gui.AlwaysOnTop = false
-    gui.LightInfluence = 0.1
+    gui.AlwaysOnTop = true
+    gui.LightInfluence = 0
     gui.Size = UDim2.fromOffset(42, 42)
-    gui.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
-    gui.MaxDistance = 52
+    gui.StudsOffsetWorldSpace = Vector3.new(0, 5.8, 0)
+    gui.MaxDistance = 72
     gui.Parent = target
+
+    local glyph = Instance.new("TextLabel")
+    glyph.Name = "IconGlyph"
+    glyph.BackgroundColor3 = Color3.fromRGB(10, 21, 19)
+    glyph.BackgroundTransparency = 0.05
+    glyph.BorderSizePixel = 0
+    glyph.Size = UDim2.fromScale(1, 1)
+    glyph.Font = Enum.Font.GothamBold
+    glyph.Text = if kind == "rootfire"
+        then "✦"
+        elseif kind == "livingroot" or kind == "root" then "✤"
+        elseif kind == "wayhome" then "⌂"
+        elseif kind == "event" or kind == "step" then "!"
+        elseif kind == "antler" then "♢"
+        else "✦"
+    glyph.TextColor3 = color
+    glyph.TextScaled = true
+    glyph.ZIndex = 10
+    glyph.Parent = gui
+    local glyphCorner = Instance.new("UICorner")
+    glyphCorner.CornerRadius = UDim.new(0, 10)
+    glyphCorner.Parent = glyph
 
     local viewport = Instance.new("ViewportFrame")
     viewport.Size = UDim2.fromScale(1, 1)
@@ -162,7 +184,7 @@ local function destinationRing(parent: Instance, center: Vector3, color: Color3,
 end
 
 local function tree(parent: Instance, position: Vector3, scale: number)
-    part(
+    local trunk = part(
         parent,
         "BrambleTrunk",
         Vector3.new(2.4 * scale, 14 * scale, 2.4 * scale),
@@ -170,17 +192,39 @@ local function tree(parent: Instance, position: Vector3, scale: number)
         BARK,
         Enum.Material.Wood
     )
-    for layer = 1, 2 do
-        local crown = orb(
+    for side = -1, 1, 2 do
+        local branch = part(
             parent,
-            "BrambleCrown",
-            position + Vector3.new(0, (12 + layer * 4) * scale, 0),
-            (10 - layer) * scale,
-            if layer == 1 then DEEP_GRASS else GRASS,
-            Enum.Material.Grass
+            "BrambleBranch",
+            Vector3.new(0.65 * scale, 5 * scale, 0.65 * scale),
+            CFrame.new(position + Vector3.new(side * 2.3 * scale, 7 * scale, 0))
+                * CFrame.Angles(0, 0, math.rad(side * 48)),
+            BARK,
+            Enum.Material.Wood,
+            false
         )
-        crown.CanQuery = false
+        branch.CanQuery = false
     end
+    for layer = 1, 2 do
+        local crownPosition = position + Vector3.new(0, (11 + layer * 4.2) * scale, 0)
+        local crownSize =
+            Vector3.new((11 - layer * 1.5) * scale, (7 - layer) * scale, (11 - layer * 1.5) * scale)
+        for half = 1, 2 do
+            local crown = part(
+                parent,
+                "BrambleCrown",
+                crownSize,
+                CFrame.new(crownPosition)
+                    * CFrame.Angles(0, if half == 1 then 0.15 else math.pi + 0.15, 0),
+                if layer == 1 then DEEP_GRASS else GRASS,
+                Enum.Material.Grass,
+                false
+            )
+            crown.Shape = Enum.PartType.Wedge
+            crown.CanQuery = false
+        end
+    end
+    trunk.CanQuery = false
 end
 
 local function rootArch(parent: Instance, center: Vector3, scale: number)
