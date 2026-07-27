@@ -101,6 +101,51 @@ local function billboard(target: BasePart, text: string, color: Color3)
     corner.Parent = label
 end
 
+local function objectIcon(target: BasePart, kind: string, color: Color3)
+    local gui = Instance.new("BillboardGui")
+    gui.Name = "ObjectIcon"
+    gui.Adornee = target
+    gui.AlwaysOnTop = false
+    gui.LightInfluence = 0.1
+    gui.Size = UDim2.fromOffset(42, 42)
+    gui.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
+    gui.MaxDistance = 52
+    gui.Parent = target
+
+    local viewport = Instance.new("ViewportFrame")
+    viewport.Size = UDim2.fromScale(1, 1)
+    viewport.BackgroundColor3 = Color3.fromRGB(15, 27, 24)
+    viewport.BackgroundTransparency = 0.08
+    viewport.BorderSizePixel = 0
+    viewport.Ambient = Color3.fromRGB(210, 224, 212)
+    viewport.LightColor = Color3.fromRGB(255, 214, 146)
+    viewport.Parent = gui
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = viewport
+    local worldModel = Instance.new("WorldModel")
+    worldModel.Parent = viewport
+    local camera = Instance.new("Camera")
+    camera.CFrame = CFrame.new(0, 0.2, 6)
+    camera.FieldOfView = 28
+    camera.Parent = viewport
+    viewport.CurrentCamera = camera
+
+    local icon = Instance.new("Part")
+    icon.Name = kind .. "Icon"
+    icon.Anchored = true
+    icon.CanCollide = false
+    icon.CanQuery = false
+    icon.Size = if kind == "rootfire"
+        then Vector3.new(1.4, 1.8, 1.4)
+        else Vector3.new(1.8, 1.8, 1.8)
+    icon.Position = Vector3.new(0, 0, 0)
+    icon.Color = color
+    icon.Material = Enum.Material.Neon
+    icon.Shape = if kind == "rootfire" then Enum.PartType.Ball else Enum.PartType.Cylinder
+    icon.Parent = worldModel
+end
+
 local function tree(parent: Instance, position: Vector3, scale: number)
     part(
         parent,
@@ -950,6 +995,7 @@ local function buildBlackoutLayer(
     fireSource:SetAttribute("BlackoutInteraction", "take_fire")
     CollectionService:AddTag(fireSource, runtimeIds.ExpeditionBlackoutTag)
     billboard(fireSource, "BLACKOUT FIRE · CARRY TO LIVING ROOTS", CREAM)
+    objectIcon(fireSource, "rootfire", AMBER)
 
     local interactions = {
         {
@@ -996,6 +1042,7 @@ local function buildBlackoutLayer(
         node:SetAttribute("BlackoutNodeId", definition.nodeId)
         CollectionService:AddTag(node, runtimeIds.ExpeditionBlackoutTag)
         billboard(node, definition.label .. " · NEEDS CARRIED FIRE", CREAM)
+        objectIcon(node, "livingroot", FOXFIRE)
         relayNodes[definition.nodeId] = node
         table.insert(interactions, {
             actionText = "DELIVER ROOTFIRE",
