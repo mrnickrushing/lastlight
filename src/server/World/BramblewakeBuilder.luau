@@ -84,7 +84,13 @@ local function surfaceGrain(target: BasePart, color: Color3, transparency: numbe
     decal.Parent = target
 end
 
-local function groundPatch(parent: Instance, center: Vector3, size: Vector3, color: Color3, material: Enum.Material)
+local function groundPatch(
+    parent: Instance,
+    center: Vector3,
+    size: Vector3,
+    color: Color3,
+    material: Enum.Material
+)
     local patch = part(
         parent,
         "BramblewakeGroundPatch",
@@ -108,7 +114,11 @@ local function fernCluster(parent: Instance, center: Vector3, scale: number)
             Vector3.new(0.32 * scale, 0.18 * scale, 2.9 * scale),
             CFrame.new(
                 center
-                    + Vector3.new(math.cos(angle) * 0.65 * scale, 0.55 * scale, math.sin(angle) * 0.65 * scale)
+                    + Vector3.new(
+                        math.cos(angle) * 0.65 * scale,
+                        0.55 * scale,
+                        math.sin(angle) * 0.65 * scale
+                    )
             ) * CFrame.Angles(math.rad(23), angle, math.rad(math.sin(angle) * 8)),
             if blade % 2 == 0 then MOSS else Color3.fromRGB(35, 69, 43),
             Enum.Material.Grass,
@@ -127,7 +137,14 @@ local function rootTangle(parent: Instance, center: Vector3, scale: number, seed
             parent,
             "ExposedWetRoot",
             Vector3.new(0.7 * scale, length, 0.7 * scale),
-            CFrame.new(center + Vector3.new(math.cos(angle) * 2.2 * scale, 0.65 * scale, math.sin(angle) * 2.2 * scale))
+            CFrame.new(
+                center
+                    + Vector3.new(
+                        math.cos(angle) * 2.2 * scale,
+                        0.65 * scale,
+                        math.sin(angle) * 2.2 * scale
+                    )
+            )
                 * CFrame.Angles(math.rad(84), angle, math.rad(random:NextNumber(-10, 10))),
             if root % 2 == 0 then DARK_BARK else BARK,
             Enum.Material.Wood,
@@ -153,7 +170,14 @@ local function lowMist(parent: Instance, center: Vector3, size: Vector3, transpa
     mist.CanQuery = false
 end
 
-local function fireflyCluster(parent: Instance, center: Vector3, color: Color3, count: number, spread: number, seed: number)
+local function fireflyCluster(
+    parent: Instance,
+    center: Vector3,
+    color: Color3,
+    count: number,
+    spread: number,
+    seed: number
+)
     local random = Random.new(seed)
     for _ = 1, count do
         local mote = orb(
@@ -458,8 +482,20 @@ end
 
 local function moduleDressing(parent: Instance, center: Vector3, seed: number)
     local random = Random.new(seed)
-    groundPatch(parent, center, Vector3.new(42, 0.28, 42), Color3.fromRGB(35, 61, 42), Enum.Material.LeafyGrass)
-    groundPatch(parent, center + Vector3.new(0, 0.02, 0), Vector3.new(25, 0.22, 25), WET_EARTH, Enum.Material.Mud)
+    groundPatch(
+        parent,
+        center,
+        Vector3.new(42, 0.28, 42),
+        Color3.fromRGB(35, 61, 42),
+        Enum.Material.LeafyGrass
+    )
+    groundPatch(
+        parent,
+        center + Vector3.new(0, 0.02, 0),
+        Vector3.new(25, 0.22, 25),
+        WET_EARTH,
+        Enum.Material.Mud
+    )
     lowMist(parent, center, Vector3.new(56, 1.4, 56), 0.84)
     for index = 1, 13 do
         local angle = random:NextNumber(0, math.pi * 2)
@@ -476,7 +512,12 @@ local function moduleDressing(parent: Instance, center: Vector3, seed: number)
         stone.CFrame *= CFrame.Angles(0.15, angle, 0.1)
         stone.CanQuery = false
         if index % 3 == 0 then
-            rootTangle(parent, position + Vector3.new(1, 0, -1), random:NextNumber(0.65, 1.1), seed + index)
+            rootTangle(
+                parent,
+                position + Vector3.new(1, 0, -1),
+                random:NextNumber(0.65, 1.1),
+                seed + index
+            )
         end
     end
     for index = 1, 10 do

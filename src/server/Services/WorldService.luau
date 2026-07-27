@@ -208,7 +208,13 @@ local function grassTuft(parent: Instance, position: Vector3, scale: number, col
     end
 end
 
-local function groundPatch(parent: Instance, position: Vector3, size: Vector3, color: Color3, material: Enum.Material)
+local function groundPatch(
+    parent: Instance,
+    position: Vector3,
+    size: Vector3,
+    color: Color3,
+    material: Enum.Material
+)
     local patch = part(
         parent,
         "WetGroundPatch",
@@ -232,7 +238,11 @@ local function fernCluster(parent: Instance, position: Vector3, scale: number)
             Vector3.new(0.38 * scale, 0.18 * scale, 3.2 * scale),
             CFrame.new(
                 position
-                    + Vector3.new(math.cos(angle) * 0.75 * scale, 0.65 * scale, math.sin(angle) * 0.75 * scale)
+                    + Vector3.new(
+                        math.cos(angle) * 0.75 * scale,
+                        0.65 * scale,
+                        math.sin(angle) * 0.75 * scale
+                    )
             ) * CFrame.Angles(math.rad(22), angle, math.rad(math.sin(angle) * 10)),
             if blade % 2 == 0 then MOSS else Color3.fromRGB(39, 74, 43),
             Enum.Material.Grass,
@@ -259,7 +269,14 @@ local function deadfall(parent: Instance, position: Vector3, scale: number, angl
             parent,
             "BrokenWoodRib",
             Vector3.new(0.55 * scale, 2.7 * scale, 0.55 * scale),
-            CFrame.new(position + Vector3.new(math.cos(angle) * rib * 4.8 * scale, 1.9 * scale, math.sin(angle) * rib * 4.8 * scale))
+            CFrame.new(
+                position
+                    + Vector3.new(
+                        math.cos(angle) * rib * 4.8 * scale,
+                        1.9 * scale,
+                        math.sin(angle) * rib * 4.8 * scale
+                    )
+            )
                 * CFrame.Angles(math.rad(68), angle + math.rad(rib * 12), 0),
             BARK,
             Enum.Material.Wood,
@@ -269,23 +286,28 @@ local function deadfall(parent: Instance, position: Vector3, scale: number, angl
     end
 end
 
-local function mistSheet(parent: Instance, name: string, position: Vector3, size: Vector3, color: Color3, transparency: number)
-    local mist = part(
-        parent,
-        name,
-        size,
-        CFrame.new(position),
-        color,
-        Enum.Material.Glass,
-        false
-    )
+local function mistSheet(
+    parent: Instance,
+    name: string,
+    position: Vector3,
+    size: Vector3,
+    color: Color3,
+    transparency: number
+)
+    local mist = part(parent, name, size, CFrame.new(position), color, Enum.Material.Glass, false)
     mist.Transparency = transparency
     mist.CastShadow = false
     mist.CanQuery = false
     return mist
 end
 
-local function emberDrift(parent: Instance, position: Vector3, color: Color3, count: number, spread: number)
+local function emberDrift(
+    parent: Instance,
+    position: Vector3,
+    color: Color3,
+    count: number,
+    spread: number
+)
     local random = Random.new(math.floor(position.X * 17 + position.Z * 31))
     for _ = 1, count do
         local mote = part(
@@ -310,7 +332,13 @@ local function emberDrift(parent: Instance, position: Vector3, color: Color3, co
     end
 end
 
-local function addFillLight(parent: Instance, position: Vector3, color: Color3, brightness: number, range: number)
+local function addFillLight(
+    parent: Instance,
+    position: Vector3,
+    color: Color3,
+    brightness: number,
+    range: number
+)
     local source = part(
         parent,
         "HiddenAtmosphereLight",
@@ -667,13 +695,15 @@ function WorldService._configureLighting(_self: WorldService)
         Workspace.Terrain.Decoration = true
     end)
 
-    for _, name in {
-        "LastLightAtmosphere",
-        "LastLightBloom",
-        "LastLightRays",
-        "LastLightTone",
-        "LastLightDepth",
-    } do
+    for _, name in
+        {
+            "LastLightAtmosphere",
+            "LastLightBloom",
+            "LastLightRays",
+            "LastLightTone",
+            "LastLightDepth",
+        }
+    do
         local existing = Lighting:FindFirstChild(name)
         if existing ~= nil then
             existing:Destroy()
