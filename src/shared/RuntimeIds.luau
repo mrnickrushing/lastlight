@@ -43,6 +43,8 @@ local RuntimeIds = {
         Revive = "revive",
         CraftItem = "craft_item",
         UseGear = "use_gear",
+        EquipGear = "equip_gear",
+        OpenFieldBook = "open_field_book",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -71,6 +73,9 @@ local RuntimeIds = {
         BlackoutDecisionShared = "blackout_decision_shared",
         CraftMeadowSatchel = "craft_meadow_satchel_bench",
         CraftAmberCharm = "craft_amber_charm_bench",
+        CraftIronrootHood = "craft_ironroot_hood_bench",
+        CraftBrambleBoots = "craft_bramble_boots_bench",
+        QuestBoard = "quest_board",
     }),
 }
 

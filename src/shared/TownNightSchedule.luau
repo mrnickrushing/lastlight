@@ -6,6 +6,7 @@ export type Beat = {
     at: number,
     kind: "spawn" | "warning" | "breach",
     enemyId: string?,
+    theme: string?,
 }
 
 -- The same six-enemy Bramblewake roster the authored first night uses. Normal
@@ -23,6 +24,12 @@ local ROSTER: { string } = {
 
 local MIN_WAVES = 3
 local MAX_WAVES = 8
+local THEMES = table.freeze({ "EMBERFALL", "MIRETIDE", "ROOTMOON", "ASHEN VEIL" })
+
+function TownNightSchedule.theme(nightNumber: number): string
+    assert(nightNumber >= 1 and nightNumber == math.floor(nightNumber), "night number is invalid")
+    return THEMES[(nightNumber - 1) % #THEMES + 1]
+end
 
 function TownNightSchedule.waveCount(nightNumber: number): number
     assert(
@@ -38,7 +45,8 @@ end
 function TownNightSchedule.beats(duration: number, nightNumber: number): { Beat }
     assert(duration > 0, "duration must be positive")
     local waves = TownNightSchedule.waveCount(nightNumber)
-    local result: { Beat } = { { at = 0, kind = "warning", enemyId = nil } }
+    local theme = TownNightSchedule.theme(nightNumber)
+    local result: { Beat } = { { at = 0, kind = "warning", enemyId = nil, theme = theme } }
 
     local windowStart = duration * 0.05
     local windowEnd = duration * 0.85
@@ -51,13 +59,16 @@ function TownNightSchedule.beats(duration: number, nightNumber: number): { Beat 
             then windowStart
             else windowStart + span * (index - 1) / (waves - 1)
         at = math.min(at, lastValidAt)
-        local enemyId = ROSTER[(index - 1) % #ROSTER + 1]
-        table.insert(result, { at = at, kind = "spawn", enemyId = enemyId })
+        local rosterIndex = (index - 1 + nightNumber - 1) % #ROSTER + 1
+        local enemyId = ROSTER[rosterIndex]
+        table.insert(result, { at = at, kind = "spawn", enemyId = enemyId, theme = theme })
         if index == breachAfterWave then
-            table.insert(
-                result,
-                { at = math.min(at + 1, lastValidAt), kind = "breach", enemyId = nil }
-            )
+            table.insert(result, {
+                at = math.min(at + 1, lastValidAt),
+                kind = "breach",
+                enemyId = nil,
+                theme = theme,
+            })
         end
     end
 

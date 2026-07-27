@@ -119,7 +119,13 @@ function TownNightService._runCycle(self: TownNightService)
 
         self._phase = "dusk"
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._duskSeconds
-        self:_notify(string.format("DUSK FALLS — NIGHT %d APPROACHES", self._nightNumber))
+        self:_notify(
+            string.format(
+                "DUSK FALLS — %s NIGHT %d APPROACHES",
+                self._townNightSchedule.theme(self._nightNumber),
+                self._nightNumber
+            )
+        )
         waitUntilTime(self._phaseEndsAt)
 
         self._phase = "night"
@@ -135,10 +141,15 @@ function TownNightService._runCycle(self: TownNightService)
         -- this night ends) picks it up, for the *next* night onward.
         local activeNight = self._nightNumber
         local blackoutDue = self:_isBlackoutDue(activeNight)
+        local theme = self._townNightSchedule.theme(activeNight)
         self:_notify(
             if blackoutDue
-                then string.format("NIGHT %d — THE BLACKOUT LOOMS IN BRAMBLEWAKE", activeNight)
-                else string.format("NIGHT %d HAS ARRIVED", activeNight)
+                then string.format(
+                    "%s NIGHT %d — THE BLACKOUT LOOMS IN BRAMBLEWAKE",
+                    theme,
+                    activeNight
+                )
+                else string.format("%s NIGHT %d HAS ARRIVED", theme, activeNight)
         )
         self._logger:info("town_night_started", {
             blackoutDue = blackoutDue,
@@ -194,6 +205,7 @@ function TownNightService.snapshot(self: TownNightService): any
         lanternHealth = self._enemyService:lanternHealth(),
         nightActive = self:isNightActive(),
         nightNumber = self._nightNumber,
+        theme = self._townNightSchedule.theme(self._nightNumber),
         phase = self._phase,
         phaseEndsAt = self._phaseEndsAt,
     }

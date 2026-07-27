@@ -19,6 +19,8 @@ TestRunner.run({
     require("./specs/NightSchedule.spec"),
     require("./specs/OldGrowthEncounter.spec"),
     require("./specs/ProfessionState.spec"),
+    require("./specs/ProfessionMastery.spec"),
+    require("./specs/Equipment.spec"),
     require("./specs/Quests.spec"),
     require("./specs/RateLimiter.spec"),
     require("./specs/ReviveFlow.spec"),

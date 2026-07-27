@@ -1127,14 +1127,14 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.18.0",
+    BuildVersion = "0.19.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 7,
+    SaveSchemaVersion = 8,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -2188,6 +2188,8 @@ export type Recipe = {
 local ORDER = table.freeze({
     "recipe_meadow_satchel",
     "recipe_amber_charm",
+    "recipe_ironroot_hood",
+    "recipe_bramble_boots",
 })
 
 local DEFINITIONS: { [string]: Recipe } = {
@@ -2209,6 +2211,26 @@ local DEFINITIONS: { [string]: Recipe } = {
         materials = table.freeze({
             material_amber_sap = 2,
             material_brightcap = 2,
+        }),
+    }),
+    recipe_ironroot_hood = table.freeze({
+        id = "recipe_ironroot_hood",
+        displayName = "IRONROOT HOOD",
+        outputItemId = "gear_ironroot_hood",
+        outputDisplayName = "Ironroot Hood",
+        materials = table.freeze({
+            material_heartwood = 5,
+            material_amber_sap = 3,
+        }),
+    }),
+    recipe_bramble_boots = table.freeze({
+        id = "recipe_bramble_boots",
+        displayName = "BRAMBLE BOOTS",
+        outputItemId = "gear_bramble_boots",
+        outputDisplayName = "Bramble Boots",
+        materials = table.freeze({
+            material_meadow_fiber = 5,
+            material_brightcap = 3,
         }),
     }),
 }
@@ -2244,6 +2266,8 @@ end
 CraftingCatalog.Ids = table.freeze({
     MeadowSatchel = "recipe_meadow_satchel",
     AmberCharm = "recipe_amber_charm",
+    IronrootHood = "recipe_ironroot_hood",
+    BrambleBoots = "recipe_bramble_boots",
 })
 
 return table.freeze(CraftingCatalog)
@@ -2456,6 +2480,140 @@ return table.freeze(Environment)
         </Properties>
       </Item>
       <Item class="ModuleScript" referent="19">
+        <Properties>
+          <string name="Name">Equipment</string>
+          <string name="Source"><![CDATA[--!strict
+
+local Equipment = {}
+
+export type Equipped = { [string]: string? }
+
+type Definition = {
+    slot: string,
+    displayName: string,
+    description: string,
+    damageReduction: number,
+    staminaRegenMultiplier: number,
+}
+
+local DEFINITIONS: { [string]: Definition } = {
+    gear_ironroot_hood = table.freeze({
+        slot = "head",
+        displayName = "IRONROOT HOOD",
+        description = "Softens incoming damage by 5%.",
+        damageReduction = 0.05,
+        staminaRegenMultiplier = 1,
+    }),
+    gear_bramble_boots = table.freeze({
+        slot = "feet",
+        displayName = "BRAMBLE BOOTS",
+        description = "Recover stamina 10% faster.",
+        damageReduction = 0,
+        staminaRegenMultiplier = 1.1,
+    }),
+}
+
+function Equipment.default(): Equipped
+    return {}
+end
+
+function Equipment.normalize(value: any): Equipped
+    local result: Equipped = {}
+    if type(value) ~= "table" then
+        return result
+    end
+    for slot, itemId in value do
+        if type(slot) == "string" and type(itemId) == "string" and DEFINITIONS[itemId] ~= nil then
+            local definition = DEFINITIONS[itemId]
+            if definition.slot == slot then
+                result[slot] = itemId
+            end
+        end
+    end
+    return result
+end
+
+function Equipment.get(itemId: any): any
+    return if type(itemId) == "string" then DEFINITIONS[itemId] else nil
+end
+
+function Equipment.isKnown(itemId: any): boolean
+    return type(itemId) == "string" and DEFINITIONS[itemId] ~= nil
+end
+
+function Equipment.equip(
+    gear: { [string]: number },
+    equipped: Equipped,
+    itemId: any
+): (Equipped, any)
+    local definition = Equipment.get(itemId)
+    if definition == nil then
+        return equipped, { applied = false, reason = "unknown_equipment" }
+    end
+    if (gear[itemId] or 0) < 1 then
+        return equipped, { applied = false, reason = "not_owned" }
+    end
+    local nextEquipped = Equipment.normalize(equipped)
+    nextEquipped[definition.slot] = itemId
+    return nextEquipped,
+        {
+            applied = true,
+            itemId = itemId,
+            slot = definition.slot,
+        }
+end
+
+function Equipment.unequip(equipped: Equipped, slot: any): (Equipped, any)
+    if type(slot) ~= "string" then
+        return equipped, { applied = false, reason = "invalid_slot" }
+    end
+    local nextEquipped = Equipment.normalize(equipped)
+    if nextEquipped[slot] == nil then
+        return equipped, { applied = false, reason = "empty_slot" }
+    end
+    nextEquipped[slot] = nil
+    return nextEquipped, { applied = true, slot = slot }
+end
+
+function Equipment.stats(equipped: Equipped): any
+    local damageReduction = 0
+    local staminaRegenMultiplier = 1
+    for _, itemId in Equipment.normalize(equipped) do
+        if type(itemId) == "string" then
+            local definition = DEFINITIONS[itemId]
+            if definition ~= nil then
+                damageReduction += definition.damageReduction
+                staminaRegenMultiplier *= definition.staminaRegenMultiplier
+            end
+        end
+    end
+    return {
+        damageReduction = math.clamp(damageReduction, 0, 0.25),
+        staminaRegenMultiplier = math.clamp(staminaRegenMultiplier, 0.75, 1.5),
+    }
+end
+
+function Equipment.list(): { any }
+    local result = {}
+    for itemId, definition in DEFINITIONS do
+        table.insert(result, {
+            itemId = itemId,
+            slot = definition.slot,
+            displayName = definition.displayName,
+            description = definition.description,
+        })
+    end
+    table.sort(result, function(a, b)
+        return a.itemId < b.itemId
+    end)
+    return result
+end
+
+return table.freeze(Equipment)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="20">
         <Properties>
           <string name="Name">ExpeditionEventFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -2762,7 +2920,7 @@ return table.freeze(ExpeditionEventFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="20">
+      <Item class="ModuleScript" referent="21">
         <Properties>
           <string name="Name">ExpeditionGenerator</string>
           <string name="Source"><![CDATA[--!strict
@@ -3127,7 +3285,7 @@ return table.freeze(ExpeditionGenerator)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="21">
+      <Item class="ModuleScript" referent="22">
         <Properties>
           <string name="Name">ExpeditionInventory</string>
           <string name="Source"><![CDATA[--!strict
@@ -3521,7 +3679,7 @@ return table.freeze(ExpeditionInventory)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">ExpeditionRewardLedger</string>
           <string name="Source"><![CDATA[--!strict
@@ -3656,7 +3814,7 @@ return table.freeze(ExpeditionRewardLedger)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">NightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -3704,7 +3862,7 @@ return table.freeze(NightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">OldGrowthEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -3989,7 +4147,7 @@ return table.freeze(OldGrowthEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">ProfessionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -4099,7 +4257,79 @@ return table.freeze(ProfessionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
+        <Properties>
+          <string name="Name">ProfessionMastery</string>
+          <string name="Source"><![CDATA[--!strict
+
+local ProfessionCatalog = require("./ProfessionCatalog")
+
+local ProfessionMastery = {}
+
+export type Entry = {
+    xp: number,
+    level: number,
+}
+
+export type State = { [string]: Entry }
+
+local MAX_LEVEL = 10
+local XP_PER_LEVEL = 100
+
+function ProfessionMastery.default(): State
+    return {}
+end
+
+function ProfessionMastery.normalize(value: any): State
+    local result: State = {}
+    if type(value) ~= "table" then
+        return result
+    end
+    for _, definition in ProfessionCatalog.list() do
+        local raw = value[definition.id]
+        if type(raw) == "table" then
+            local xp = if type(raw.xp) == "number" then math.max(0, math.floor(raw.xp)) else 0
+            local level = math.clamp(math.floor(xp / XP_PER_LEVEL) + 1, 1, MAX_LEVEL)
+            result[definition.id] = { xp = xp, level = level }
+        end
+    end
+    return result
+end
+
+function ProfessionMastery.award(state: State, professionId: any, amount: number): (State, any)
+    if not ProfessionCatalog.isValid(professionId) or type(amount) ~= "number" or amount <= 0 then
+        return state, { applied = false, reason = "invalid_mastery_award" }
+    end
+    local nextState = ProfessionMastery.normalize(state)
+    local current = nextState[professionId] or {
+        xp = 0,
+        level = 1,
+    }
+    local nextXp = math.min(MAX_LEVEL * XP_PER_LEVEL, current.xp + math.floor(amount))
+    local nextLevel = math.clamp(math.floor(nextXp / XP_PER_LEVEL) + 1, 1, MAX_LEVEL)
+    nextState[professionId] = { xp = nextXp, level = nextLevel }
+    return nextState,
+        {
+            applied = true,
+            professionId = professionId,
+            xp = nextXp,
+            level = nextLevel,
+            leveledUp = nextLevel > current.level,
+        }
+end
+
+function ProfessionMastery.snapshot(state: State): { [string]: Entry }
+    return ProfessionMastery.normalize(state)
+end
+
+ProfessionMastery.MaxLevel = MAX_LEVEL
+ProfessionMastery.XpPerLevel = XP_PER_LEVEL
+
+return table.freeze(ProfessionMastery)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">ProfessionState</string>
           <string name="Source"><![CDATA[--!strict
@@ -4251,7 +4481,7 @@ return table.freeze(ProfessionState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">QuestCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -4322,7 +4552,7 @@ return table.freeze(QuestCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">Quests</string>
           <string name="Source"><![CDATA[--!strict
@@ -4439,7 +4669,7 @@ return table.freeze(Quests)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
@@ -4498,7 +4728,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -4613,7 +4843,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -4661,6 +4891,8 @@ local RuntimeIds = {
         Revive = "revive",
         CraftItem = "craft_item",
         UseGear = "use_gear",
+        EquipGear = "equip_gear",
+        OpenFieldBook = "open_field_book",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -4689,6 +4921,9 @@ local RuntimeIds = {
         BlackoutDecisionShared = "blackout_decision_shared",
         CraftMeadowSatchel = "craft_meadow_satchel_bench",
         CraftAmberCharm = "craft_amber_charm_bench",
+        CraftIronrootHood = "craft_ironroot_hood_bench",
+        CraftBrambleBoots = "craft_bramble_boots_bench",
+        QuestBoard = "quest_board",
     }),
 }
 
@@ -4696,7 +4931,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -4706,6 +4941,8 @@ local ExpeditionInventory = require("./ExpeditionInventory")
 local ProfessionCatalog = require("./ProfessionCatalog")
 local Crafting = require("./Crafting")
 local Quests = require("./Quests")
+local ProfessionMastery = require("./ProfessionMastery")
+local Equipment = require("./Equipment")
 
 local SaveSchema = {}
 
@@ -4725,6 +4962,7 @@ export type Profile = {
     inventory: any,
     profession: {
         selectedId: string?,
+        mastery: ProfessionMastery.State,
     },
     story: {
         chapterOne: {
@@ -4739,6 +4977,7 @@ export type Profile = {
         nightNumber: number,
     },
     gear: { [string]: number },
+    equipped: Equipment.Equipped,
     quests: {
         claimed: { [string]: boolean },
     },
@@ -4759,7 +4998,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 7,
+        schemaVersion = 8,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -4772,6 +5011,7 @@ function SaveSchema.default(now: number): Profile
         inventory = ExpeditionInventory.default(),
         profession = {
             selectedId = nil,
+            mastery = ProfessionMastery.default(),
         },
         story = {
             chapterOne = {
@@ -4786,6 +5026,7 @@ function SaveSchema.default(now: number): Profile
             nightNumber = 1,
         },
         gear = Crafting.default(),
+        equipped = Equipment.default(),
         quests = {
             claimed = Quests.default(),
         },
@@ -4838,8 +5079,11 @@ function SaveSchema.normalize(value: any, now: number): Profile
 
     profile.inventory = ExpeditionInventory.normalize(value.inventory)
     local profession = value.profession
-    if type(profession) == "table" and ProfessionCatalog.isValid(profession.selectedId) then
-        profile.profession.selectedId = profession.selectedId
+    if type(profession) == "table" then
+        if ProfessionCatalog.isValid(profession.selectedId) then
+            profile.profession.selectedId = profession.selectedId
+        end
+        profile.profession.mastery = ProfessionMastery.normalize(profession.mastery)
     end
     local story = value.story
     local chapterOne = if type(story) == "table" then story.chapterOne else nil
@@ -4873,11 +5117,12 @@ function SaveSchema.normalize(value: any, now: number): Profile
         profile.town.nightNumber = town.nightNumber
     end
     profile.gear = Crafting.normalizeGear(value.gear)
+    profile.equipped = Equipment.normalize(value.equipped)
     local quests = value.quests
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 7
+    profile.schemaVersion = 8
     return profile
 end
 
@@ -4912,6 +5157,25 @@ function SaveSchema.withProfession(profile: Profile, professionId: string, now: 
     nextProfile.updatedAt = now
     nextProfile.revision += 1
     return nextProfile
+end
+
+function SaveSchema.withMasteryAward(
+    profile: Profile,
+    professionId: string,
+    amount: number,
+    now: number
+): (Profile, any)
+    local nextMastery, result =
+        ProfessionMastery.award(profile.profession.mastery, professionId, amount)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.profession = table.clone(profile.profession)
+    nextProfile.profession.mastery = nextMastery
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
 end
 
 function SaveSchema.withUnbankedExpeditionReward(
@@ -5074,6 +5338,42 @@ function SaveSchema.gearSnapshot(profile: Profile): { [string]: number }
     return table.clone(profile.gear)
 end
 
+function SaveSchema.masterySnapshot(profile: Profile): ProfessionMastery.State
+    return ProfessionMastery.snapshot(profile.profession.mastery)
+end
+
+function SaveSchema.equippedSnapshot(profile: Profile): Equipment.Equipped
+    return Equipment.normalize(profile.equipped)
+end
+
+function SaveSchema.equipmentStats(profile: Profile): any
+    return Equipment.stats(profile.equipped)
+end
+
+function SaveSchema.withEquippedItem(profile: Profile, itemId: string, now: number): (Profile, any)
+    local nextEquipped, result = Equipment.equip(profile.gear, profile.equipped, itemId)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.equipped = nextEquipped
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.withUnequippedItem(profile: Profile, slot: string, now: number): (Profile, any)
+    local nextEquipped, result = Equipment.unequip(profile.equipped, slot)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.equipped = nextEquipped
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
 function SaveSchema.withUsedGearItem(profile: Profile, itemId: string, now: number): (Profile, any)
     local nextGear, result = Crafting.useItem(profile.gear, itemId)
     if not result.applied then
@@ -5132,7 +5432,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -5251,7 +5551,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -5502,7 +5802,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -5513,6 +5813,7 @@ export type Beat = {
     at: number,
     kind: "spawn" | "warning" | "breach",
     enemyId: string?,
+    theme: string?,
 }
 
 -- The same six-enemy Bramblewake roster the authored first night uses. Normal
@@ -5530,6 +5831,12 @@ local ROSTER: { string } = {
 
 local MIN_WAVES = 3
 local MAX_WAVES = 8
+local THEMES = table.freeze({ "EMBERFALL", "MIRETIDE", "ROOTMOON", "ASHEN VEIL" })
+
+function TownNightSchedule.theme(nightNumber: number): string
+    assert(nightNumber >= 1 and nightNumber == math.floor(nightNumber), "night number is invalid")
+    return THEMES[(nightNumber - 1) % #THEMES + 1]
+end
 
 function TownNightSchedule.waveCount(nightNumber: number): number
     assert(
@@ -5545,7 +5852,8 @@ end
 function TownNightSchedule.beats(duration: number, nightNumber: number): { Beat }
     assert(duration > 0, "duration must be positive")
     local waves = TownNightSchedule.waveCount(nightNumber)
-    local result: { Beat } = { { at = 0, kind = "warning", enemyId = nil } }
+    local theme = TownNightSchedule.theme(nightNumber)
+    local result: { Beat } = { { at = 0, kind = "warning", enemyId = nil, theme = theme } }
 
     local windowStart = duration * 0.05
     local windowEnd = duration * 0.85
@@ -5558,13 +5866,16 @@ function TownNightSchedule.beats(duration: number, nightNumber: number): { Beat 
             then windowStart
             else windowStart + span * (index - 1) / (waves - 1)
         at = math.min(at, lastValidAt)
-        local enemyId = ROSTER[(index - 1) % #ROSTER + 1]
-        table.insert(result, { at = at, kind = "spawn", enemyId = enemyId })
+        local rosterIndex = (index - 1 + nightNumber - 1) % #ROSTER + 1
+        local enemyId = ROSTER[rosterIndex]
+        table.insert(result, { at = at, kind = "spawn", enemyId = enemyId, theme = theme })
         if index == breachAfterWave then
-            table.insert(
-                result,
-                { at = math.min(at + 1, lastValidAt), kind = "breach", enemyId = nil }
-            )
+            table.insert(result, {
+                at = math.min(at + 1, lastValidAt),
+                kind = "breach",
+                enemyId = nil,
+                theme = theme,
+            })
         end
     end
 
@@ -5588,7 +5899,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -5732,7 +6043,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -5768,7 +6079,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -6152,11 +6463,11 @@ return table.freeze(WardenStagEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="39">
+  <Item class="ServerScriptService" referent="41">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="40">
+    <Item class="Script" referent="42">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -6170,6 +6481,8 @@ assert(root ~= nil, "Last Light shared root did not replicate before bootstrap t
 
 local Config = require(root.Config)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
+local CraftingCatalog = require(root.CraftingCatalog)
+local Equipment = require(root.Equipment)
 local BramblewakeEnemies = require(root.BramblewakeEnemies)
 local CombatState = require(root.CombatState)
 local EnemyAttackFlow = require(root.EnemyAttackFlow)
@@ -6386,7 +6699,9 @@ local tutorialService = TutorialService.new(
     oldGrowthService,
     wardenStagService,
     blackoutService,
-    analyticsService
+    analyticsService,
+    CraftingCatalog,
+    Equipment
 )
 
 local services = ServiceRegistry.new({
@@ -6424,7 +6739,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -6522,11 +6837,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="42">
+      <Item class="Folder" referent="44">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="43">
+        <Item class="ModuleScript" referent="45">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -7213,7 +7528,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="44">
+        <Item class="ModuleScript" referent="46">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -7711,7 +8026,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="45">
+        <Item class="ModuleScript" referent="47">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -8576,7 +8891,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="46">
+        <Item class="ModuleScript" referent="48">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9046,7 +9361,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="47">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9150,7 +9465,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -9244,7 +9559,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9457,7 +9772,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10281,7 +10596,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10459,7 +10774,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10972,7 +11287,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11779,7 +12094,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12133,7 +12448,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12363,6 +12678,35 @@ function ProfileService.setProfession(
     return true
 end
 
+function ProfileService.awardMastery(
+    self: ProfileService,
+    player: Player,
+    professionId: string,
+    amount: number
+): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { applied = false, reason = "profile_unavailable" }
+    end
+    local nextProfile, result =
+        self._saveSchema.withMasteryAward(profile, professionId, amount, os.time())
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
+function ProfileService.masterySnapshot(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {}
+    end
+    return self._saveSchema.masterySnapshot(profile)
+end
+
 function ProfileService.setNightNumber(
     self: ProfileService,
     player: Player,
@@ -12452,6 +12796,54 @@ function ProfileService.useGearItem(self: ProfileService, player: Player, itemId
         accepted = true,
         itemId = result.itemId,
     }
+end
+
+function ProfileService.equipItem(self: ProfileService, player: Player, itemId: string): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { accepted = false, reason = "profile_unavailable" }
+    end
+    local nextProfile, result = self._saveSchema.withEquippedItem(profile, itemId, os.time())
+    if not result.applied then
+        return { accepted = false, reason = result.reason }
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    return { accepted = true, itemId = result.itemId, slot = result.slot }
+end
+
+function ProfileService.unequipItem(self: ProfileService, player: Player, slot: string): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { accepted = false, reason = "profile_unavailable" }
+    end
+    local nextProfile, result = self._saveSchema.withUnequippedItem(profile, slot, os.time())
+    if not result.applied then
+        return { accepted = false, reason = result.reason }
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    return { accepted = true, slot = slot }
+end
+
+function ProfileService.equippedSnapshot(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {}
+    end
+    return self._saveSchema.equippedSnapshot(profile)
+end
+
+function ProfileService.equipmentStats(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { damageReduction = 0, staminaRegenMultiplier = 1 }
+    end
+    return self._saveSchema.equipmentStats(profile)
 end
 
 -- Safe to call after any action, whether or not it moved a quest signal:
@@ -12830,7 +13222,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12954,7 +13346,13 @@ function TownNightService._runCycle(self: TownNightService)
 
         self._phase = "dusk"
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._duskSeconds
-        self:_notify(string.format("DUSK FALLS — NIGHT %d APPROACHES", self._nightNumber))
+        self:_notify(
+            string.format(
+                "DUSK FALLS — %s NIGHT %d APPROACHES",
+                self._townNightSchedule.theme(self._nightNumber),
+                self._nightNumber
+            )
+        )
         waitUntilTime(self._phaseEndsAt)
 
         self._phase = "night"
@@ -12970,10 +13368,15 @@ function TownNightService._runCycle(self: TownNightService)
         -- this night ends) picks it up, for the *next* night onward.
         local activeNight = self._nightNumber
         local blackoutDue = self:_isBlackoutDue(activeNight)
+        local theme = self._townNightSchedule.theme(activeNight)
         self:_notify(
             if blackoutDue
-                then string.format("NIGHT %d — THE BLACKOUT LOOMS IN BRAMBLEWAKE", activeNight)
-                else string.format("NIGHT %d HAS ARRIVED", activeNight)
+                then string.format(
+                    "%s NIGHT %d — THE BLACKOUT LOOMS IN BRAMBLEWAKE",
+                    theme,
+                    activeNight
+                )
+                else string.format("%s NIGHT %d HAS ARRIVED", theme, activeNight)
         )
         self._logger:info("town_night_started", {
             blackoutDue = blackoutDue,
@@ -13029,6 +13432,7 @@ function TownNightService.snapshot(self: TownNightService): any
         lanternHealth = self._enemyService:lanternHealth(),
         nightActive = self:isNightActive(),
         nightNumber = self._nightNumber,
+        theme = self._townNightSchedule.theme(self._nightNumber),
         phase = self._phase,
         phaseEndsAt = self._phaseEndsAt,
     }
@@ -13038,7 +13442,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13096,6 +13500,8 @@ export type TutorialService = typeof(setmetatable(
         _wardenStagService: any,
         _blackoutService: any,
         _analyticsService: any,
+        _craftingCatalog: any,
+        _equipmentCatalog: any,
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
         _expeditionEventRevision: { [Player]: number },
@@ -13124,7 +13530,9 @@ function TutorialService.new(
     oldGrowthService: any,
     wardenStagService: any,
     blackoutService: any,
-    analyticsService: any
+    analyticsService: any,
+    craftingCatalog: any,
+    equipmentCatalog: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -13147,6 +13555,8 @@ function TutorialService.new(
         _wardenStagService = wardenStagService,
         _blackoutService = blackoutService,
         _analyticsService = analyticsService,
+        _craftingCatalog = craftingCatalog,
+        _equipmentCatalog = equipmentCatalog,
         _sessions = {},
         _expeditionModuleIndex = {},
         _expeditionEventRevision = {},
@@ -13511,6 +13921,11 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self:_publish(player)
         return
     end
+    if actionId == self._runtimeIds.Actions.OpenFieldBook then
+        self:_setToast(player, "FIELD BOOK UPDATED — CHECK RECIPES, QUESTS, AND MASTERY")
+        self:_publish(player)
+        return
+    end
 
     if actionId == self._runtimeIds.Actions.Build and session.resources < 3 then
         self:_setToast(player, "YOU NEED 3 HEARTWOOD")
@@ -13689,7 +14104,10 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         allowedFields.interactionId = true
     elseif kind == self._runtimeIds.Actions.SelectProfession then
         allowedFields.professionId = true
-    elseif kind == self._runtimeIds.Actions.UseGear then
+    elseif
+        kind == self._runtimeIds.Actions.UseGear
+        or kind == self._runtimeIds.Actions.EquipGear
+    then
         allowedFields.itemId = true
     elseif
         kind == self._runtimeIds.Actions.Sprint
@@ -13737,7 +14155,12 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         self._combatService:dodge(player)
     elseif kind == self._runtimeIds.Actions.ProfessionAbility then
         local result = self._professionService:useAbility(player)
-        if not result.accepted then
+        if result.accepted then
+            local profile = self._profileService:get(player)
+            if profile ~= nil and profile.profession.selectedId ~= nil then
+                self._profileService:awardMastery(player, profile.profession.selectedId, 10)
+            end
+        else
             self:_setToast(player, result.message)
             self:_publish(player)
         end
@@ -13754,6 +14177,16 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         local itemId = payload.itemId
         if type(itemId) == "string" and #itemId <= 32 then
             self:_useGear(player, itemId)
+        end
+    elseif kind == self._runtimeIds.Actions.EquipGear then
+        local itemId = payload.itemId
+        if type(itemId) == "string" and #itemId <= 32 then
+            local result = self._profileService:equipItem(player, itemId)
+            self:_setToast(
+                player,
+                if result.accepted then "EQUIPPED " .. string.upper(itemId) else "CANNOT EQUIP ITEM"
+            )
+            self:_publish(player)
         end
     elseif kind == self._runtimeIds.Actions.CompactHud and type(payload.enabled) == "boolean" then
         local session = self._sessions[player]
@@ -13962,6 +14395,11 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         unbankedExpeditionRewards = expedition.unbankedRewards,
         bankedMaterials = expedition.bankedMaterials,
         gear = self._profileService:gearSnapshot(player),
+        equipped = self._profileService:equippedSnapshot(player),
+        equipmentStats = self._profileService:equipmentStats(player),
+        mastery = self._profileService:masterySnapshot(player),
+        recipes = self._craftingCatalog:list(),
+        equipmentCatalog = self._equipmentCatalog.list(),
         quests = self._profileService:questSnapshot(player),
         combat = self._combatService:snapshot(player),
         profession = self._professionService:snapshot(player),
@@ -13987,7 +14425,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14821,7 +15259,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15471,6 +15909,20 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             x = 16,
             color = AMBER,
         },
+        {
+            id = self._runtimeIds.InteractionIds.CraftIronrootHood,
+            recipeId = "recipe_ironroot_hood",
+            label = "IRONROOT HOOD",
+            x = -28,
+            color = Color3.fromRGB(122, 148, 132),
+        },
+        {
+            id = self._runtimeIds.InteractionIds.CraftBrambleBoots,
+            recipeId = "recipe_bramble_boots",
+            label = "BRAMBLE BOOTS",
+            x = 28,
+            color = Color3.fromRGB(142, 112, 84),
+        },
     }
     for _, definition in craftingBenches do
         local bench = part(
@@ -15501,6 +15953,24 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             definition.recipeId
         )
     end
+
+    local archive = part(
+        interactables,
+        "GreenwardArchive",
+        Vector3.new(9, 6, 1),
+        CFrame.new(0, 3, -154),
+        BARK,
+        Enum.Material.WoodPlanks
+    )
+    addBillboard(archive, "GREENWARD ARCHIVE · FIELD BOOK", CREAM)
+    self:_registerInteraction(
+        archive,
+        self._runtimeIds.InteractionIds.QuestBoard,
+        self._runtimeIds.Actions.OpenFieldBook,
+        "OPEN",
+        "Field Book",
+        nil
+    )
 end
 
 function WorldService.Init(self: WorldService, context: any)
@@ -16239,11 +16709,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="60">
+      <Item class="Folder" referent="62">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -17359,7 +17829,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -17748,7 +18218,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -17911,7 +18381,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -18106,11 +18576,11 @@ return table.freeze(WardenStagBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="65">
+    <Item class="Folder" referent="67">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="66">
+      <Item class="Script" referent="68">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -18151,8 +18621,8 @@ local OldGrowthBuilder = require(serverRoot.World.OldGrowthBuilder)
 local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
-assert(Config.SaveSchemaVersion == 7, "unexpected save schema version")
-assert(Config.BuildVersion == "0.18.0", "unexpected build version")
+assert(Config.SaveSchemaVersion == 8, "unexpected save schema version")
+assert(Config.BuildVersion == "0.19.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -18580,15 +19050,15 @@ print("[Last Light] PASS FoundationIntegration")
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="67">
+  <Item class="StarterPlayer" referent="69">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="68">
+    <Item class="StarterPlayerScripts" referent="70">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="69">
+      <Item class="LocalScript" referent="71">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -18662,6 +19132,10 @@ hud:setProfessionHandler(function(professionId: string)
     send(RuntimeIds.Actions.SelectProfession, { professionId = professionId })
 end)
 
+hud:setEquipHandler(function(itemId: string)
+    send(RuntimeIds.Actions.EquipGear, { itemId = itemId })
+end)
+
 stateChanged.OnClientEvent:Connect(function(snapshot: any)
     hud:update(snapshot)
 end)
@@ -18678,11 +19152,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="70">
+        <Item class="Folder" referent="72">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="71">
+          <Item class="ModuleScript" referent="73">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -18819,6 +19293,7 @@ export type HUDController = typeof(setmetatable(
         _ability: TextButton,
         _compact: TextButton,
         _professionButton: TextButton,
+        _progressButton: TextButton,
         _useCharm: TextButton,
         _useSatchel: TextButton,
         _professionOverlay: Frame,
@@ -18826,6 +19301,9 @@ export type HUDController = typeof(setmetatable(
         _professionCards: { [string]: TextButton },
         _professionOrder: { string },
         _professionClose: TextButton,
+        _progressOverlay: Frame,
+        _progressText: TextLabel,
+        _equipmentButtons: { [string]: TextButton },
         _currentState: any,
         _interactionLabel: string?,
         _interactionAvailable: boolean,
@@ -18838,6 +19316,7 @@ export type HUDController = typeof(setmetatable(
         _lastToastRevision: number,
         _onCompact: ((boolean) -> ())?,
         _onProfessionSelected: ((string) -> ())?,
+        _onEquip: ((string) -> ())?,
     },
     HUDController
 ))
@@ -19389,6 +19868,23 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     corner(professionButton, 12)
     stroke(professionButton, COLORS.amber, 0.42)
 
+    local progressButton = Instance.new("TextButton")
+    progressButton.Name = "ProgressBook"
+    progressButton.AnchorPoint = Vector2.new(1, 0)
+    progressButton.Position = UDim2.new(1, -18, 0, 202)
+    progressButton.Size = UDim2.fromOffset(118, 42)
+    progressButton.BackgroundColor3 = COLORS.panel
+    progressButton.BackgroundTransparency = 0.08
+    progressButton.Font = Enum.Font.GothamBold
+    progressButton.Text = "FIELD BOOK"
+    progressButton.TextColor3 = COLORS.cream
+    progressButton.TextSize = 12
+    progressButton.Visible = false
+    progressButton.ZIndex = 10
+    progressButton.Parent = canvas
+    corner(progressButton, 12)
+    stroke(progressButton, COLORS.cream, 0.42)
+
     local useCharm = Instance.new("TextButton")
     useCharm.Name = "UseAmberCharm"
     useCharm.AnchorPoint = Vector2.new(1, 0)
@@ -19482,6 +19978,87 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     professionClose.Parent = professionPanel
     corner(professionClose, 12)
     stroke(professionClose, COLORS.cream, 0.58)
+
+    local progressOverlay = Instance.new("Frame")
+    progressOverlay.Name = "ProgressOverlay"
+    progressOverlay.Size = UDim2.fromScale(1, 1)
+    progressOverlay.BackgroundColor3 = COLORS.ink
+    progressOverlay.BackgroundTransparency = 0.18
+    progressOverlay.Active = true
+    progressOverlay.Visible = false
+    progressOverlay.ZIndex = 50
+    progressOverlay.Parent = canvas
+
+    local progressPanel = Instance.new("Frame")
+    progressPanel.Name = "ProgressPanel"
+    progressPanel.AnchorPoint = Vector2.new(0.5, 0.5)
+    progressPanel.Position = UDim2.fromScale(0.5, 0.5)
+    progressPanel.Size = UDim2.fromOffset(620, 500)
+    progressPanel.BackgroundColor3 = COLORS.panel
+    progressPanel.ZIndex = 51
+    progressPanel.Parent = progressOverlay
+    corner(progressPanel, 20)
+    stroke(progressPanel, COLORS.cream, 0.2)
+    local progressTitle = textLabel(
+        progressPanel,
+        "Title",
+        "FIELD BOOK · RECIPES · QUESTS · MASTERY",
+        UDim2.new(1, -120, 0, 34),
+        UDim2.fromOffset(20, 18),
+        16,
+        COLORS.amber
+    )
+    progressTitle.Font = Enum.Font.GothamBold
+    progressTitle.ZIndex = 52
+    local progressText = textLabel(
+        progressPanel,
+        "Details",
+        "Loading field notes…",
+        UDim2.new(1, -40, 1, -78),
+        UDim2.fromOffset(20, 66),
+        13,
+        COLORS.cream
+    )
+    progressText.TextWrapped = false
+    progressText.TextYAlignment = Enum.TextYAlignment.Top
+    progressText.ZIndex = 52
+    local equipmentButtons: { [string]: TextButton } = {}
+    for index, item in
+        {
+            { id = "gear_ironroot_hood", label = "EQUIP HOOD" },
+            { id = "gear_bramble_boots", label = "EQUIP BOOTS" },
+        }
+    do
+        local button = Instance.new("TextButton")
+        button.Name = item.id
+        button.Position = UDim2.new(0, 20 + (index - 1) * 190, 1, -58)
+        button.Size = UDim2.fromOffset(176, 38)
+        button.BackgroundColor3 = COLORS.panelSoft
+        button.Font = Enum.Font.GothamBold
+        button.Text = item.label
+        button.TextColor3 = COLORS.cream
+        button.TextSize = 11
+        button.Visible = false
+        button.ZIndex = 52
+        button.Parent = progressPanel
+        corner(button, 10)
+        stroke(button, COLORS.amber, 0.45)
+        equipmentButtons[item.id] = button
+    end
+    local progressClose = Instance.new("TextButton")
+    progressClose.Name = "Close"
+    progressClose.AnchorPoint = Vector2.new(1, 0)
+    progressClose.Position = UDim2.new(1, -18, 0, 18)
+    progressClose.Size = UDim2.fromOffset(72, 42)
+    progressClose.BackgroundColor3 = COLORS.panelSoft
+    progressClose.Font = Enum.Font.GothamBold
+    progressClose.Text = "CLOSE"
+    progressClose.TextColor3 = COLORS.cream
+    progressClose.TextSize = 11
+    progressClose.ZIndex = 52
+    progressClose.Parent = progressPanel
+    corner(progressClose, 12)
+    stroke(progressClose, COLORS.cream, 0.58)
 
     local professionGrid = Instance.new("Frame")
     professionGrid.Name = "ProfessionGrid"
@@ -19580,6 +20157,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _ability = ability,
         _compact = compact,
         _professionButton = professionButton,
+        _progressButton = progressButton,
         _useCharm = useCharm,
         _useSatchel = useSatchel,
         _professionOverlay = professionOverlay,
@@ -19587,6 +20165,9 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _professionCards = professionCards,
         _professionOrder = professionOrder,
         _professionClose = professionClose,
+        _progressOverlay = progressOverlay,
+        _progressText = progressText,
+        _equipmentButtons = equipmentButtons,
         _currentState = nil,
         _interactionLabel = nil,
         _interactionAvailable = false,
@@ -19599,6 +20180,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _lastToastRevision = 0,
         _onCompact = nil,
         _onProfessionSelected = nil,
+        _onEquip = nil,
     }, HUDController)
 
     compact.Activated:Connect(function()
@@ -19612,6 +20194,20 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     professionClose.Activated:Connect(function()
         self:setProfessionMenuOpen(false)
     end)
+    progressButton.Activated:Connect(function()
+        self:setProgressOpen(not self._progressOverlay.Visible)
+    end)
+    progressClose.Activated:Connect(function()
+        self:setProgressOpen(false)
+    end)
+    for itemId, button in equipmentButtons do
+        button.Activated:Connect(function()
+            local callback = self._onEquip
+            if callback ~= nil then
+                callback(itemId)
+            end
+        end)
+    end
     local function bindProfessionCard(professionId: string, card: TextButton)
         card.Activated:Connect(function()
             if not self._professionSwitchable then
@@ -19685,6 +20281,20 @@ end
 
 function HUDController.professionButton(self: HUDController): TextButton
     return self._professionButton
+end
+
+function HUDController.setProgressOpen(self: HUDController, open: boolean)
+    local shouldOpen = open and not self._playerDowned
+    self._progressOverlay.Visible = shouldOpen
+    self._progressButton.AutoButtonColor = not shouldOpen
+end
+
+function HUDController.setEquipHandler(self: HUDController, callback: (string) -> ())
+    self._onEquip = callback
+end
+
+function HUDController.progressButton(self: HUDController): TextButton
+    return self._progressButton
 end
 
 function HUDController.useCharmButton(self: HUDController): TextButton
@@ -19926,6 +20536,70 @@ function HUDController._updateGear(self: HUDController)
     self._useCharm.Text = string.format("CHARM ×%d", charmCount)
     self._useSatchel.Visible = tutorialComplete and not self._playerDowned and satchelCount > 0
     self._useSatchel.Text = string.format("SATCHEL ×%d", satchelCount)
+end
+
+function HUDController._updateProgress(self: HUDController)
+    local state = self._currentState
+    if type(state) ~= "table" then
+        self._progressButton.Visible = false
+        return
+    end
+    local complete = state.tutorialComplete == true
+    self._progressButton.Visible = complete and not self._playerDowned
+    local lines = { "RECIPES" }
+    for _, recipe in state.recipes or {} do
+        local materials = {}
+        for materialId, amount in recipe.materials do
+            table.insert(
+                materials,
+                string.format("%s ×%d", string.gsub(materialId, "material_", ""), amount)
+            )
+        end
+        table.insert(
+            lines,
+            string.format("• %s  [%s]", recipe.displayName, table.concat(materials, ", "))
+        )
+    end
+    table.insert(lines, "")
+    table.insert(lines, "QUESTS")
+    for _, quest in state.quests or {} do
+        local status = if quest.claimed
+            then "CLAIMED"
+            else string.format("%d/%d", quest.progress, quest.threshold)
+        table.insert(lines, string.format("• %s  ·  %s", quest.displayName, status))
+    end
+    table.insert(lines, "")
+    table.insert(lines, "PROFESSION MASTERY")
+    for professionId, mastery in state.mastery or {} do
+        table.insert(
+            lines,
+            string.format(
+                "• %s  ·  RANK %d  ·  %d XP",
+                string.gsub(professionId, "profession_", ""),
+                mastery.level,
+                mastery.xp
+            )
+        )
+    end
+    local equipped = state.equipped or {}
+    table.insert(lines, "")
+    table.insert(
+        lines,
+        string.format(
+            "LOADOUT  ·  HEAD %s  ·  FEET %s",
+            tostring(equipped.head or "EMPTY"),
+            tostring(equipped.feet or "EMPTY")
+        )
+    )
+    self._progressText.Text = table.concat(lines, "\n")
+    local gear = state.gear or {}
+    for itemId, button in self._equipmentButtons do
+        local count = tonumber(gear[itemId]) or 0
+        button.Visible = self._progressOverlay.Visible and count > 0
+        button.Text = if itemId == "gear_ironroot_hood"
+            then string.format("EQUIP HOOD ×%d", count)
+            else string.format("EQUIP BOOTS ×%d", count)
+    end
 end
 
 function HUDController.setInteraction(self: HUDController, label: string?, available: boolean)
@@ -20326,6 +21000,7 @@ function HUDController.update(self: HUDController, state: any)
         and (self._inputMode == "touch" or self._combatContext)
     self:_updateProfessionClock()
     self:_updateGear()
+    self:_updateProgress()
     local eliteVisible = (type(boss) == "table" and (boss.active == true or boss.complete == true))
         or (type(elite) == "table" and (elite.active == true or elite.complete == true))
     eliteVisible = eliteVisible and not self._playerDowned
@@ -20371,7 +21046,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="72">
+          <Item class="ModuleScript" referent="74">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -20688,7 +21363,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="73">
+          <Item class="ModuleScript" referent="75">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -20797,7 +21472,7 @@ return InteractionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="74">
+  <Item class="Workspace" referent="76">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

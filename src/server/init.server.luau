@@ -8,6 +8,8 @@ assert(root ~= nil, "Last Light shared root did not replicate before bootstrap t
 
 local Config = require(root.Config)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
+local CraftingCatalog = require(root.CraftingCatalog)
+local Equipment = require(root.Equipment)
 local BramblewakeEnemies = require(root.BramblewakeEnemies)
 local CombatState = require(root.CombatState)
 local EnemyAttackFlow = require(root.EnemyAttackFlow)
@@ -224,7 +226,9 @@ local tutorialService = TutorialService.new(
     oldGrowthService,
     wardenStagService,
     blackoutService,
-    analyticsService
+    analyticsService,
+    CraftingCatalog,
+    Equipment
 )
 
 local services = ServiceRegistry.new({

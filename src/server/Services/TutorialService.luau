@@ -53,6 +53,8 @@ export type TutorialService = typeof(setmetatable(
         _wardenStagService: any,
         _blackoutService: any,
         _analyticsService: any,
+        _craftingCatalog: any,
+        _equipmentCatalog: any,
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
         _expeditionEventRevision: { [Player]: number },
@@ -81,7 +83,9 @@ function TutorialService.new(
     oldGrowthService: any,
     wardenStagService: any,
     blackoutService: any,
-    analyticsService: any
+    analyticsService: any,
+    craftingCatalog: any,
+    equipmentCatalog: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -104,6 +108,8 @@ function TutorialService.new(
         _wardenStagService = wardenStagService,
         _blackoutService = blackoutService,
         _analyticsService = analyticsService,
+        _craftingCatalog = craftingCatalog,
+        _equipmentCatalog = equipmentCatalog,
         _sessions = {},
         _expeditionModuleIndex = {},
         _expeditionEventRevision = {},
@@ -468,6 +474,11 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self:_publish(player)
         return
     end
+    if actionId == self._runtimeIds.Actions.OpenFieldBook then
+        self:_setToast(player, "FIELD BOOK UPDATED — CHECK RECIPES, QUESTS, AND MASTERY")
+        self:_publish(player)
+        return
+    end
 
     if actionId == self._runtimeIds.Actions.Build and session.resources < 3 then
         self:_setToast(player, "YOU NEED 3 HEARTWOOD")
@@ -646,7 +657,10 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         allowedFields.interactionId = true
     elseif kind == self._runtimeIds.Actions.SelectProfession then
         allowedFields.professionId = true
-    elseif kind == self._runtimeIds.Actions.UseGear then
+    elseif
+        kind == self._runtimeIds.Actions.UseGear
+        or kind == self._runtimeIds.Actions.EquipGear
+    then
         allowedFields.itemId = true
     elseif
         kind == self._runtimeIds.Actions.Sprint
@@ -694,7 +708,12 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         self._combatService:dodge(player)
     elseif kind == self._runtimeIds.Actions.ProfessionAbility then
         local result = self._professionService:useAbility(player)
-        if not result.accepted then
+        if result.accepted then
+            local profile = self._profileService:get(player)
+            if profile ~= nil and profile.profession.selectedId ~= nil then
+                self._profileService:awardMastery(player, profile.profession.selectedId, 10)
+            end
+        else
             self:_setToast(player, result.message)
             self:_publish(player)
         end
@@ -711,6 +730,16 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         local itemId = payload.itemId
         if type(itemId) == "string" and #itemId <= 32 then
             self:_useGear(player, itemId)
+        end
+    elseif kind == self._runtimeIds.Actions.EquipGear then
+        local itemId = payload.itemId
+        if type(itemId) == "string" and #itemId <= 32 then
+            local result = self._profileService:equipItem(player, itemId)
+            self:_setToast(
+                player,
+                if result.accepted then "EQUIPPED " .. string.upper(itemId) else "CANNOT EQUIP ITEM"
+            )
+            self:_publish(player)
         end
     elseif kind == self._runtimeIds.Actions.CompactHud and type(payload.enabled) == "boolean" then
         local session = self._sessions[player]
@@ -919,6 +948,11 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         unbankedExpeditionRewards = expedition.unbankedRewards,
         bankedMaterials = expedition.bankedMaterials,
         gear = self._profileService:gearSnapshot(player),
+        equipped = self._profileService:equippedSnapshot(player),
+        equipmentStats = self._profileService:equipmentStats(player),
+        mastery = self._profileService:masterySnapshot(player),
+        recipes = self._craftingCatalog:list(),
+        equipmentCatalog = self._equipmentCatalog.list(),
         quests = self._profileService:questSnapshot(player),
         combat = self._combatService:snapshot(player),
         profession = self._professionService:snapshot(player),
