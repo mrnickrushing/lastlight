@@ -179,6 +179,38 @@ local function pathArm(parent: Instance, center: Vector3, neighbor: Vector3)
     )
 end
 
+local function moduleDressing(parent: Instance, center: Vector3, seed: number)
+    local random = Random.new(seed)
+    for index = 1, 8 do
+        local angle = random:NextNumber(0, math.pi * 2)
+        local radius = random:NextNumber(14, 28)
+        local position = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+        local stone = orb(
+            parent,
+            "TrailStone",
+            position + Vector3.new(0, 0.55, 0),
+            random:NextNumber(1.2, 2.4),
+            if index % 2 == 0 then STONE else Color3.fromRGB(93, 101, 88),
+            Enum.Material.Slate
+        )
+        stone.CFrame *= CFrame.Angles(0.15, angle, 0.1)
+        stone.CanQuery = false
+    end
+    for index = 1, 5 do
+        local angle = random:NextNumber(0, math.pi * 2)
+        local radius = random:NextNumber(8, 25)
+        local tuft = orb(
+            parent,
+            "MossLight",
+            center + Vector3.new(math.cos(angle) * radius, 0.6, math.sin(angle) * radius),
+            0.5,
+            if index % 2 == 0 then FOXFIRE else AMBER,
+            Enum.Material.Neon
+        )
+        tuft.CanQuery = false
+    end
+end
+
 local function buildFarm(parent: Instance, center: Vector3)
     part(
         parent,
@@ -973,6 +1005,8 @@ function BramblewakeBuilder.build(
         if placement.index < #manifest.modules then
             pathArm(module, center, centers[placement.index + 1])
         end
+
+        moduleDressing(module, center, manifest.seed + placement.index * 97)
 
         for cornerIndex = 1, 4 do
             local x = if cornerIndex == 1 or cornerIndex == 4 then -27 else 27
