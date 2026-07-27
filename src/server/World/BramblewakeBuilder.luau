@@ -434,7 +434,7 @@ local function buildWindmill(parent: Instance, center: Vector3)
         parent,
         "WindmillCap",
         Vector3.new(11, 3, 11),
-        tower.Position + Vector3.new(0, 16, 0),
+        CFrame.new(tower.Position + Vector3.new(0, 16, 0)),
         DARK_BARK,
         Enum.Material.Slate,
         false

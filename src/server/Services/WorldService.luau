@@ -786,6 +786,13 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             Enum.Material.Neon,
             false
         )
+        marker.Material = Enum.Material.SmoothPlastic
+        marker.Transparency = 0.08
+        local markerLight = Instance.new("PointLight")
+        markerLight.Color = definition.color
+        markerLight.Brightness = 0.8
+        markerLight.Range = 10
+        markerLight.Parent = marker
         addBillboard(marker, string.upper(definition.tool), definition.color)
         addObjectIcon(marker, definition.tool, definition.color)
         self:_registerInteraction(
@@ -804,10 +811,11 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         Vector3.new(18, 0.5, 9),
         CFrame.new(-20, 0.25, -88),
         Color3.fromRGB(218, 184, 108),
-        Enum.Material.Neon
+        Enum.Material.Ground
     )
-    plot.Transparency = 0.42
+    plot.Transparency = 0.08
     addBillboard(plot, "BARRICADE PLOT", CREAM)
+    addObjectIcon(plot, "barricade", CREAM)
     self:_registerInteraction(
         plot,
         self._runtimeIds.InteractionIds.Barricade,
@@ -926,6 +934,13 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             false
         )
         marker.Shape = Enum.PartType.Ball
+        marker.Material = Enum.Material.SmoothPlastic
+        marker.Transparency = 0.06
+        local markerLight = Instance.new("PointLight")
+        markerLight.Color = definition.color
+        markerLight.Brightness = 0.75
+        markerLight.Range = 9
+        markerLight.Parent = marker
         addBillboard(marker, definition.label, definition.color)
         addObjectIcon(
             marker,
