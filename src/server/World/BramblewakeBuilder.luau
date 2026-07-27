@@ -4,16 +4,19 @@ local CollectionService = game:GetService("CollectionService")
 
 local BramblewakeBuilder = {}
 
-local GRASS = Color3.fromRGB(48, 82, 55)
-local DEEP_GRASS = Color3.fromRGB(28, 58, 43)
-local PATH = Color3.fromRGB(112, 94, 65)
-local BARK = Color3.fromRGB(75, 48, 34)
-local DARK_BARK = Color3.fromRGB(49, 34, 30)
-local STONE = Color3.fromRGB(76, 85, 79)
+local GRASS = Color3.fromRGB(40, 74, 48)
+local DEEP_GRASS = Color3.fromRGB(18, 45, 34)
+local PATH = Color3.fromRGB(79, 64, 44)
+local BARK = Color3.fromRGB(58, 38, 29)
+local DARK_BARK = Color3.fromRGB(32, 25, 23)
+local STONE = Color3.fromRGB(58, 67, 63)
 local AMBER = Color3.fromRGB(255, 178, 71)
 local FOXFIRE = Color3.fromRGB(94, 206, 176)
-local MEADOW = Color3.fromRGB(189, 161, 76)
+local MEADOW = Color3.fromRGB(151, 123, 59)
 local CREAM = Color3.fromRGB(244, 230, 197)
+local MOSS = Color3.fromRGB(52, 83, 49)
+local WET_EARTH = Color3.fromRGB(61, 50, 36)
+local FOG_GLASS = Color3.fromRGB(119, 149, 143)
 
 local ORIGIN = Vector3.new(1600, 0, -230)
 
@@ -68,8 +71,107 @@ local function light(target: BasePart, color: Color3, brightness: number, range:
     pointLight.Color = color
     pointLight.Brightness = brightness
     pointLight.Range = range
-    pointLight.Shadows = false
+    pointLight.Shadows = true
     pointLight.Parent = target
+end
+
+local function surfaceGrain(target: BasePart, color: Color3, transparency: number)
+    local decal = Instance.new("Decal")
+    decal.Name = "MaterialVariation"
+    decal.Color3 = color
+    decal.Transparency = transparency
+    decal.Face = Enum.NormalId.Top
+    decal.Parent = target
+end
+
+local function groundPatch(parent: Instance, center: Vector3, size: Vector3, color: Color3, material: Enum.Material)
+    local patch = part(
+        parent,
+        "BramblewakeGroundPatch",
+        size,
+        CFrame.new(center + Vector3.new(0, 0.18, 0)) * CFrame.Angles(0, center.X * 0.011, 0),
+        color,
+        material,
+        false
+    )
+    patch.Transparency = 0.07
+    patch.CanQuery = false
+    return patch
+end
+
+local function fernCluster(parent: Instance, center: Vector3, scale: number)
+    for blade = 1, 6 do
+        local angle = (blade / 6) * math.pi * 2
+        local frond = part(
+            parent,
+            "BrambleFern",
+            Vector3.new(0.32 * scale, 0.18 * scale, 2.9 * scale),
+            CFrame.new(
+                center
+                    + Vector3.new(math.cos(angle) * 0.65 * scale, 0.55 * scale, math.sin(angle) * 0.65 * scale)
+            ) * CFrame.Angles(math.rad(23), angle, math.rad(math.sin(angle) * 8)),
+            if blade % 2 == 0 then MOSS else Color3.fromRGB(35, 69, 43),
+            Enum.Material.Grass,
+            false
+        )
+        frond.CanQuery = false
+    end
+end
+
+local function rootTangle(parent: Instance, center: Vector3, scale: number, seed: number)
+    local random = Random.new(seed)
+    for root = 1, 4 do
+        local angle = random:NextNumber(0, math.pi * 2)
+        local length = random:NextNumber(7, 13) * scale
+        local tangle = part(
+            parent,
+            "ExposedWetRoot",
+            Vector3.new(0.7 * scale, length, 0.7 * scale),
+            CFrame.new(center + Vector3.new(math.cos(angle) * 2.2 * scale, 0.65 * scale, math.sin(angle) * 2.2 * scale))
+                * CFrame.Angles(math.rad(84), angle, math.rad(random:NextNumber(-10, 10))),
+            if root % 2 == 0 then DARK_BARK else BARK,
+            Enum.Material.Wood,
+            false
+        )
+        tangle.Shape = Enum.PartType.Cylinder
+        tangle.CanQuery = false
+    end
+end
+
+local function lowMist(parent: Instance, center: Vector3, size: Vector3, transparency: number)
+    local mist = part(
+        parent,
+        "BlueGroundMist",
+        size,
+        CFrame.new(center + Vector3.new(0, 1.2, 0)),
+        FOG_GLASS,
+        Enum.Material.Glass,
+        false
+    )
+    mist.Transparency = transparency
+    mist.CastShadow = false
+    mist.CanQuery = false
+end
+
+local function fireflyCluster(parent: Instance, center: Vector3, color: Color3, count: number, spread: number, seed: number)
+    local random = Random.new(seed)
+    for _ = 1, count do
+        local mote = orb(
+            parent,
+            "BrambleMote",
+            center
+                + Vector3.new(
+                    random:NextNumber(-spread, spread),
+                    random:NextNumber(1.8, 8),
+                    random:NextNumber(-spread, spread)
+                ),
+            random:NextNumber(0.14, 0.32),
+            color,
+            Enum.Material.Neon
+        )
+        mote.Transparency = random:NextNumber(0.05, 0.3)
+        mote.CanQuery = false
+    end
 end
 
 local function billboard(target: BasePart, text: string, color: Color3)
@@ -356,34 +458,47 @@ end
 
 local function moduleDressing(parent: Instance, center: Vector3, seed: number)
     local random = Random.new(seed)
-    for index = 1, 8 do
+    groundPatch(parent, center, Vector3.new(42, 0.28, 42), Color3.fromRGB(35, 61, 42), Enum.Material.LeafyGrass)
+    groundPatch(parent, center + Vector3.new(0, 0.02, 0), Vector3.new(25, 0.22, 25), WET_EARTH, Enum.Material.Mud)
+    lowMist(parent, center, Vector3.new(56, 1.4, 56), 0.84)
+    for index = 1, 13 do
         local angle = random:NextNumber(0, math.pi * 2)
-        local radius = random:NextNumber(14, 28)
+        local radius = random:NextNumber(12, 31)
         local position = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
         local stone = orb(
             parent,
             "TrailStone",
             position + Vector3.new(0, 0.55, 0),
-            random:NextNumber(1.2, 2.4),
-            if index % 2 == 0 then STONE else Color3.fromRGB(93, 101, 88),
+            random:NextNumber(1.2, 2.6),
+            if index % 2 == 0 then STONE else Color3.fromRGB(75, 85, 72),
             Enum.Material.Slate
         )
         stone.CFrame *= CFrame.Angles(0.15, angle, 0.1)
         stone.CanQuery = false
+        if index % 3 == 0 then
+            rootTangle(parent, position + Vector3.new(1, 0, -1), random:NextNumber(0.65, 1.1), seed + index)
+        end
     end
-    for index = 1, 5 do
+    for index = 1, 10 do
         local angle = random:NextNumber(0, math.pi * 2)
-        local radius = random:NextNumber(8, 25)
-        local tuft = orb(
-            parent,
-            "MossLight",
-            center + Vector3.new(math.cos(angle) * radius, 0.6, math.sin(angle) * radius),
-            0.5,
-            if index % 2 == 0 then FOXFIRE else AMBER,
-            Enum.Material.Neon
-        )
-        tuft.CanQuery = false
+        local radius = random:NextNumber(7, 28)
+        local position = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+        if index % 2 == 0 then
+            fernCluster(parent, position, random:NextNumber(0.7, 1.25))
+        else
+            local tuft = orb(
+                parent,
+                "MossLight",
+                position + Vector3.new(0, 0.6, 0),
+                0.42,
+                if index % 3 == 0 then FOXFIRE else AMBER,
+                Enum.Material.Neon
+            )
+            tuft.Transparency = 0.2
+            tuft.CanQuery = false
+        end
     end
+    fireflyCluster(parent, center + Vector3.new(0, 0, 5), FOXFIRE, 5, 24, seed + 1301)
 end
 
 local function buildFarm(parent: Instance, center: Vector3)
@@ -844,25 +959,41 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 })
     end
     average /= #centers
 
-    for index = 1, 12 do
-        local angle = (index / 12) * math.pi * 2
-        local radius = 270 + (index % 3) * 24
-        local height = 54 + (index % 4) * 14
-        part(
-            folder,
-            "DistantRootSpire",
-            Vector3.new(12, height, 12),
-            CFrame.new(
-                average
-                    + Vector3.new(
-                        math.cos(angle) * radius,
-                        height / 2 - 3,
-                        math.sin(angle) * radius
-                    )
-            ) * CFrame.Angles(math.rad(8), 0, -angle),
-            Color3.fromRGB(37, 50, 43),
-            Enum.Material.Wood
-        )
+    lowMist(folder, average + Vector3.new(0, 0, 0), Vector3.new(680, 2.2, 680), 0.88)
+    for ring = 1, 2 do
+        for index = 1, 18 do
+            local angle = (index / 18) * math.pi * 2 + ring * 0.09
+            local radius = 230 + ring * 70 + (index % 4) * 18
+            local height = 52 + (index % 5) * 16 + ring * 8
+            local spire = part(
+                folder,
+                "DistantRootSpire",
+                Vector3.new(10 + ring * 4, height, 10 + ring * 4),
+                CFrame.new(
+                    average
+                        + Vector3.new(
+                            math.cos(angle) * radius,
+                            height / 2 - 3,
+                            math.sin(angle) * radius
+                        )
+                ) * CFrame.Angles(math.rad(8 + ring * 2), 0, -angle),
+                if ring == 1 then Color3.fromRGB(32, 45, 39) else Color3.fromRGB(24, 35, 34),
+                Enum.Material.Wood
+            )
+            spire.Transparency = if ring == 1 then 0.08 else 0.18
+            if index % 6 == 0 then
+                local glow = orb(
+                    folder,
+                    "DistantSapGlow",
+                    spire.Position + Vector3.new(0, height * 0.28, 0),
+                    1.3,
+                    FOXFIRE,
+                    Enum.Material.Neon
+                )
+                glow.Transparency = 0.38
+                glow.CanQuery = false
+            end
+        end
     end
 end
 
@@ -1312,22 +1443,24 @@ function BramblewakeBuilder.build(
         end)
         CollectionService:AddTag(module, runtimeIds.ExpeditionModuleTag)
 
-        part(
+        local cell = part(
             module,
             "StreamingCellCollision",
             Vector3.new(catalog.CellSize, 5, catalog.CellSize),
             CFrame.new(center + Vector3.new(0, -2.5, 0)),
-            if placement.index % 2 == 0 then GRASS else Color3.fromRGB(54, 88, 58),
-            Enum.Material.Grass
+            if placement.index % 2 == 0 then GRASS else Color3.fromRGB(43, 72, 49),
+            Enum.Material.LeafyGrass
         )
-        part(
+        surfaceGrain(cell, Color3.fromRGB(23, 38, 31), 0.82)
+        local clearing = part(
             module,
             "PathClearing",
-            Vector3.new(24, 0.55, 24),
+            Vector3.new(26, 0.55, 26),
             CFrame.new(center + Vector3.new(0, 0.25, 0)),
-            PATH,
-            Enum.Material.Ground
+            WET_EARTH,
+            Enum.Material.Mud
         )
+        clearing.Reflectance = 0.03
         if placement.index > 1 then
             pathArm(module, center, centers[placement.index - 1])
         end
