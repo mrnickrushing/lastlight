@@ -233,7 +233,7 @@ local function addBillboard(partInstance: BasePart, title: string, accent: Color
     corner.Parent = text
 end
 
-local function addObjectIcon(partInstance: BasePart, kind: string, accent: Color3)
+local function _addObjectIcon(partInstance: BasePart, kind: string, accent: Color3)
     local existing = partInstance:FindFirstChild("ObjectIcon")
     if existing ~= nil then
         existing:Destroy()
@@ -787,7 +787,6 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     heartLight.Range = 12
     heartLight.Parent = heart
     addBillboard(heart, "HEARTWOOD", AMBER)
-    addObjectIcon(heart, "heartwood", AMBER)
     self:_registerInteraction(
         stump,
         self._runtimeIds.InteractionIds.Heartwood,
@@ -828,23 +827,64 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         )
         local marker = part(
             interactables,
-            "ToolGlow",
-            Vector3.new(2.4, 4.5, 0.8),
+            "ToolHandle",
+            Vector3.new(0.45, 4.2, 0.45),
             CFrame.new(definition.x, 4.1, -68)
                 * CFrame.Angles(0, 0, if definition.tool == "torch" then 0 else math.rad(28)),
-            definition.color,
-            Enum.Material.Neon,
+            Color3.fromRGB(111, 76, 48),
+            Enum.Material.Wood,
             false
         )
-        marker.Material = Enum.Material.SmoothPlastic
-        marker.Transparency = 0.08
-        local markerLight = Instance.new("PointLight")
-        markerLight.Color = definition.color
-        markerLight.Brightness = 0.8
-        markerLight.Range = 10
-        markerLight.Parent = marker
+        if definition.tool == "axe" then
+            local head = part(
+                interactables,
+                "AxeHead",
+                Vector3.new(2.25, 0.65, 0.38),
+                CFrame.new(definition.x - 0.28, 5.82, -68) * CFrame.Angles(0, 0, math.rad(28)),
+                Color3.fromRGB(154, 169, 174),
+                Enum.Material.Metal,
+                false
+            )
+            head.Shape = Enum.PartType.Wedge
+        elseif definition.tool == "hammer" then
+            local head = part(
+                interactables,
+                "HammerHead",
+                Vector3.new(2.15, 0.78, 0.9),
+                CFrame.new(definition.x, 5.85, -68) * CFrame.Angles(0, 0, math.rad(90)),
+                Color3.fromRGB(123, 132, 137),
+                Enum.Material.Metal,
+                false
+            )
+            head.Shape = Enum.PartType.Cylinder
+        else
+            local cup = part(
+                interactables,
+                "TorchCup",
+                Vector3.new(1.2, 0.72, 1.2),
+                CFrame.new(definition.x, 6.05, -68),
+                Color3.fromRGB(92, 71, 48),
+                Enum.Material.Metal,
+                false
+            )
+            cup.Shape = Enum.PartType.Cylinder
+            local flame = part(
+                interactables,
+                "TorchFlame",
+                Vector3.new(1.15, 1.55, 1.15),
+                CFrame.new(definition.x, 6.95, -68),
+                definition.color,
+                Enum.Material.Neon,
+                false
+            )
+            flame.Shape = Enum.PartType.Ball
+            local flameLight = Instance.new("PointLight")
+            flameLight.Color = definition.color
+            flameLight.Brightness = 1.5
+            flameLight.Range = 12
+            flameLight.Parent = flame
+        end
         addBillboard(marker, string.upper(definition.tool), definition.color)
-        addObjectIcon(marker, definition.tool, definition.color)
         self:_registerInteraction(
             pedestal,
             definition.id,
@@ -865,7 +905,6 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     )
     plot.Transparency = 0.08
     addBillboard(plot, "BARRICADE PLOT", CREAM)
-    addObjectIcon(plot, "barricade", CREAM)
     self:_registerInteraction(
         plot,
         self._runtimeIds.InteractionIds.Barricade,
@@ -900,7 +939,6 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     light.Shadows = true
     light.Parent = flame
     addBillboard(flame, "THE FIRST LANTERN", AMBER)
-    addObjectIcon(flame, "lantern", AMBER)
     self._lantern = flame
     self:_registerInteraction(
         lanternBase,
@@ -983,7 +1021,18 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             Enum.Material.Neon,
             false
         )
-        marker.Shape = Enum.PartType.Ball
+        marker.Shape = if definition.recipeId == "recipe_amber_charm"
+            then Enum.PartType.Ball
+            elseif definition.recipeId == "recipe_ironroot_hood" then Enum.PartType.Wedge
+            else Enum.PartType.Block
+        marker.Size = if definition.recipeId == "recipe_meadow_satchel"
+            then Vector3.new(2.6, 1.7, 1.2)
+            elseif definition.recipeId == "recipe_bramble_boots" then Vector3.new(
+                2.2,
+                1.2,
+                1.8
+            )
+            else Vector3.new(1.8, 1.8, 1.8)
         marker.Material = Enum.Material.SmoothPlastic
         marker.Transparency = 0.06
         local markerLight = Instance.new("PointLight")
@@ -992,15 +1041,6 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         markerLight.Range = 9
         markerLight.Parent = marker
         addBillboard(marker, definition.label, definition.color)
-        addObjectIcon(
-            marker,
-            if definition.recipeId == "recipe_meadow_satchel"
-                then "satchel"
-                elseif definition.recipeId == "recipe_amber_charm" then "charm"
-                elseif definition.recipeId == "recipe_ironroot_hood" then "hood"
-                else "boots",
-            definition.color
-        )
         self:_registerInteraction(
             bench,
             definition.id,
