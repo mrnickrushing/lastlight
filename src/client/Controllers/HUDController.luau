@@ -132,6 +132,7 @@ export type HUDController = typeof(setmetatable(
         _ability: TextButton,
         _compact: TextButton,
         _professionButton: TextButton,
+        _progressButton: TextButton,
         _useCharm: TextButton,
         _useSatchel: TextButton,
         _professionOverlay: Frame,
@@ -139,6 +140,9 @@ export type HUDController = typeof(setmetatable(
         _professionCards: { [string]: TextButton },
         _professionOrder: { string },
         _professionClose: TextButton,
+        _progressOverlay: Frame,
+        _progressText: TextLabel,
+        _equipmentButtons: { [string]: TextButton },
         _currentState: any,
         _interactionLabel: string?,
         _interactionAvailable: boolean,
@@ -151,6 +155,7 @@ export type HUDController = typeof(setmetatable(
         _lastToastRevision: number,
         _onCompact: ((boolean) -> ())?,
         _onProfessionSelected: ((string) -> ())?,
+        _onEquip: ((string) -> ())?,
     },
     HUDController
 ))
@@ -702,6 +707,23 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     corner(professionButton, 12)
     stroke(professionButton, COLORS.amber, 0.42)
 
+    local progressButton = Instance.new("TextButton")
+    progressButton.Name = "ProgressBook"
+    progressButton.AnchorPoint = Vector2.new(1, 0)
+    progressButton.Position = UDim2.new(1, -18, 0, 202)
+    progressButton.Size = UDim2.fromOffset(118, 42)
+    progressButton.BackgroundColor3 = COLORS.panel
+    progressButton.BackgroundTransparency = 0.08
+    progressButton.Font = Enum.Font.GothamBold
+    progressButton.Text = "FIELD BOOK"
+    progressButton.TextColor3 = COLORS.cream
+    progressButton.TextSize = 12
+    progressButton.Visible = false
+    progressButton.ZIndex = 10
+    progressButton.Parent = canvas
+    corner(progressButton, 12)
+    stroke(progressButton, COLORS.cream, 0.42)
+
     local useCharm = Instance.new("TextButton")
     useCharm.Name = "UseAmberCharm"
     useCharm.AnchorPoint = Vector2.new(1, 0)
@@ -795,6 +817,87 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     professionClose.Parent = professionPanel
     corner(professionClose, 12)
     stroke(professionClose, COLORS.cream, 0.58)
+
+    local progressOverlay = Instance.new("Frame")
+    progressOverlay.Name = "ProgressOverlay"
+    progressOverlay.Size = UDim2.fromScale(1, 1)
+    progressOverlay.BackgroundColor3 = COLORS.ink
+    progressOverlay.BackgroundTransparency = 0.18
+    progressOverlay.Active = true
+    progressOverlay.Visible = false
+    progressOverlay.ZIndex = 50
+    progressOverlay.Parent = canvas
+
+    local progressPanel = Instance.new("Frame")
+    progressPanel.Name = "ProgressPanel"
+    progressPanel.AnchorPoint = Vector2.new(0.5, 0.5)
+    progressPanel.Position = UDim2.fromScale(0.5, 0.5)
+    progressPanel.Size = UDim2.fromOffset(620, 500)
+    progressPanel.BackgroundColor3 = COLORS.panel
+    progressPanel.ZIndex = 51
+    progressPanel.Parent = progressOverlay
+    corner(progressPanel, 20)
+    stroke(progressPanel, COLORS.cream, 0.2)
+    local progressTitle = textLabel(
+        progressPanel,
+        "Title",
+        "FIELD BOOK · RECIPES · QUESTS · MASTERY",
+        UDim2.new(1, -120, 0, 34),
+        UDim2.fromOffset(20, 18),
+        16,
+        COLORS.amber
+    )
+    progressTitle.Font = Enum.Font.GothamBold
+    progressTitle.ZIndex = 52
+    local progressText = textLabel(
+        progressPanel,
+        "Details",
+        "Loading field notes…",
+        UDim2.new(1, -40, 1, -78),
+        UDim2.fromOffset(20, 66),
+        13,
+        COLORS.cream
+    )
+    progressText.TextWrapped = false
+    progressText.TextYAlignment = Enum.TextYAlignment.Top
+    progressText.ZIndex = 52
+    local equipmentButtons: { [string]: TextButton } = {}
+    for index, item in
+        {
+            { id = "gear_ironroot_hood", label = "EQUIP HOOD" },
+            { id = "gear_bramble_boots", label = "EQUIP BOOTS" },
+        }
+    do
+        local button = Instance.new("TextButton")
+        button.Name = item.id
+        button.Position = UDim2.new(0, 20 + (index - 1) * 190, 1, -58)
+        button.Size = UDim2.fromOffset(176, 38)
+        button.BackgroundColor3 = COLORS.panelSoft
+        button.Font = Enum.Font.GothamBold
+        button.Text = item.label
+        button.TextColor3 = COLORS.cream
+        button.TextSize = 11
+        button.Visible = false
+        button.ZIndex = 52
+        button.Parent = progressPanel
+        corner(button, 10)
+        stroke(button, COLORS.amber, 0.45)
+        equipmentButtons[item.id] = button
+    end
+    local progressClose = Instance.new("TextButton")
+    progressClose.Name = "Close"
+    progressClose.AnchorPoint = Vector2.new(1, 0)
+    progressClose.Position = UDim2.new(1, -18, 0, 18)
+    progressClose.Size = UDim2.fromOffset(72, 42)
+    progressClose.BackgroundColor3 = COLORS.panelSoft
+    progressClose.Font = Enum.Font.GothamBold
+    progressClose.Text = "CLOSE"
+    progressClose.TextColor3 = COLORS.cream
+    progressClose.TextSize = 11
+    progressClose.ZIndex = 52
+    progressClose.Parent = progressPanel
+    corner(progressClose, 12)
+    stroke(progressClose, COLORS.cream, 0.58)
 
     local professionGrid = Instance.new("Frame")
     professionGrid.Name = "ProfessionGrid"
@@ -893,6 +996,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _ability = ability,
         _compact = compact,
         _professionButton = professionButton,
+        _progressButton = progressButton,
         _useCharm = useCharm,
         _useSatchel = useSatchel,
         _professionOverlay = professionOverlay,
@@ -900,6 +1004,9 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _professionCards = professionCards,
         _professionOrder = professionOrder,
         _professionClose = professionClose,
+        _progressOverlay = progressOverlay,
+        _progressText = progressText,
+        _equipmentButtons = equipmentButtons,
         _currentState = nil,
         _interactionLabel = nil,
         _interactionAvailable = false,
@@ -912,6 +1019,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _lastToastRevision = 0,
         _onCompact = nil,
         _onProfessionSelected = nil,
+        _onEquip = nil,
     }, HUDController)
 
     compact.Activated:Connect(function()
@@ -925,6 +1033,20 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     professionClose.Activated:Connect(function()
         self:setProfessionMenuOpen(false)
     end)
+    progressButton.Activated:Connect(function()
+        self:setProgressOpen(not self._progressOverlay.Visible)
+    end)
+    progressClose.Activated:Connect(function()
+        self:setProgressOpen(false)
+    end)
+    for itemId, button in equipmentButtons do
+        button.Activated:Connect(function()
+            local callback = self._onEquip
+            if callback ~= nil then
+                callback(itemId)
+            end
+        end)
+    end
     local function bindProfessionCard(professionId: string, card: TextButton)
         card.Activated:Connect(function()
             if not self._professionSwitchable then
@@ -998,6 +1120,20 @@ end
 
 function HUDController.professionButton(self: HUDController): TextButton
     return self._professionButton
+end
+
+function HUDController.setProgressOpen(self: HUDController, open: boolean)
+    local shouldOpen = open and not self._playerDowned
+    self._progressOverlay.Visible = shouldOpen
+    self._progressButton.AutoButtonColor = not shouldOpen
+end
+
+function HUDController.setEquipHandler(self: HUDController, callback: (string) -> ())
+    self._onEquip = callback
+end
+
+function HUDController.progressButton(self: HUDController): TextButton
+    return self._progressButton
 end
 
 function HUDController.useCharmButton(self: HUDController): TextButton
@@ -1239,6 +1375,70 @@ function HUDController._updateGear(self: HUDController)
     self._useCharm.Text = string.format("CHARM ×%d", charmCount)
     self._useSatchel.Visible = tutorialComplete and not self._playerDowned and satchelCount > 0
     self._useSatchel.Text = string.format("SATCHEL ×%d", satchelCount)
+end
+
+function HUDController._updateProgress(self: HUDController)
+    local state = self._currentState
+    if type(state) ~= "table" then
+        self._progressButton.Visible = false
+        return
+    end
+    local complete = state.tutorialComplete == true
+    self._progressButton.Visible = complete and not self._playerDowned
+    local lines = { "RECIPES" }
+    for _, recipe in state.recipes or {} do
+        local materials = {}
+        for materialId, amount in recipe.materials do
+            table.insert(
+                materials,
+                string.format("%s ×%d", string.gsub(materialId, "material_", ""), amount)
+            )
+        end
+        table.insert(
+            lines,
+            string.format("• %s  [%s]", recipe.displayName, table.concat(materials, ", "))
+        )
+    end
+    table.insert(lines, "")
+    table.insert(lines, "QUESTS")
+    for _, quest in state.quests or {} do
+        local status = if quest.claimed
+            then "CLAIMED"
+            else string.format("%d/%d", quest.progress, quest.threshold)
+        table.insert(lines, string.format("• %s  ·  %s", quest.displayName, status))
+    end
+    table.insert(lines, "")
+    table.insert(lines, "PROFESSION MASTERY")
+    for professionId, mastery in state.mastery or {} do
+        table.insert(
+            lines,
+            string.format(
+                "• %s  ·  RANK %d  ·  %d XP",
+                string.gsub(professionId, "profession_", ""),
+                mastery.level,
+                mastery.xp
+            )
+        )
+    end
+    local equipped = state.equipped or {}
+    table.insert(lines, "")
+    table.insert(
+        lines,
+        string.format(
+            "LOADOUT  ·  HEAD %s  ·  FEET %s",
+            tostring(equipped.head or "EMPTY"),
+            tostring(equipped.feet or "EMPTY")
+        )
+    )
+    self._progressText.Text = table.concat(lines, "\n")
+    local gear = state.gear or {}
+    for itemId, button in self._equipmentButtons do
+        local count = tonumber(gear[itemId]) or 0
+        button.Visible = self._progressOverlay.Visible and count > 0
+        button.Text = if itemId == "gear_ironroot_hood"
+            then string.format("EQUIP HOOD ×%d", count)
+            else string.format("EQUIP BOOTS ×%d", count)
+    end
 end
 
 function HUDController.setInteraction(self: HUDController, label: string?, available: boolean)
@@ -1639,6 +1839,7 @@ function HUDController.update(self: HUDController, state: any)
         and (self._inputMode == "touch" or self._combatContext)
     self:_updateProfessionClock()
     self:_updateGear()
+    self:_updateProgress()
     local eliteVisible = (type(boss) == "table" and (boss.active == true or boss.complete == true))
         or (type(elite) == "table" and (elite.active == true or elite.complete == true))
     eliteVisible = eliteVisible and not self._playerDowned

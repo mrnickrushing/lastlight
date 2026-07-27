@@ -645,6 +645,20 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             x = 16,
             color = AMBER,
         },
+        {
+            id = self._runtimeIds.InteractionIds.CraftIronrootHood,
+            recipeId = "recipe_ironroot_hood",
+            label = "IRONROOT HOOD",
+            x = -28,
+            color = Color3.fromRGB(122, 148, 132),
+        },
+        {
+            id = self._runtimeIds.InteractionIds.CraftBrambleBoots,
+            recipeId = "recipe_bramble_boots",
+            label = "BRAMBLE BOOTS",
+            x = 28,
+            color = Color3.fromRGB(142, 112, 84),
+        },
     }
     for _, definition in craftingBenches do
         local bench = part(
@@ -675,6 +689,24 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             definition.recipeId
         )
     end
+
+    local archive = part(
+        interactables,
+        "GreenwardArchive",
+        Vector3.new(9, 6, 1),
+        CFrame.new(0, 3, -154),
+        BARK,
+        Enum.Material.WoodPlanks
+    )
+    addBillboard(archive, "GREENWARD ARCHIVE · FIELD BOOK", CREAM)
+    self:_registerInteraction(
+        archive,
+        self._runtimeIds.InteractionIds.QuestBoard,
+        self._runtimeIds.Actions.OpenFieldBook,
+        "OPEN",
+        "Field Book",
+        nil
+    )
 end
 
 function WorldService.Init(self: WorldService, context: any)

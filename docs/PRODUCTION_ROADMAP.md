@@ -108,7 +108,7 @@ present-participant Greenward vote with deterministic tie handling, an
 immutable per-player chapter transaction, and a repeating server-owned town
 day/dusk/night cycle with an escalating six-enemy wave schedule, a
 seventh-night telegraph that is deliberately decoupled from Blackout access,
-and a save-schema-v7 night count that persists per player and resumes from
+and a save-schema-v8 night count, mastery, and equipment loadout that persists per player and resumes from
 whoever's record is highest across a server restart, plus a first pair of
 crafting recipes that convert banked expedition materials into named gear
 recorded on a player's own profile through a server-owned, all-or-nothing

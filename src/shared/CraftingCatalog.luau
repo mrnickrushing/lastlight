@@ -13,6 +13,8 @@ export type Recipe = {
 local ORDER = table.freeze({
     "recipe_meadow_satchel",
     "recipe_amber_charm",
+    "recipe_ironroot_hood",
+    "recipe_bramble_boots",
 })
 
 local DEFINITIONS: { [string]: Recipe } = {
@@ -34,6 +36,26 @@ local DEFINITIONS: { [string]: Recipe } = {
         materials = table.freeze({
             material_amber_sap = 2,
             material_brightcap = 2,
+        }),
+    }),
+    recipe_ironroot_hood = table.freeze({
+        id = "recipe_ironroot_hood",
+        displayName = "IRONROOT HOOD",
+        outputItemId = "gear_ironroot_hood",
+        outputDisplayName = "Ironroot Hood",
+        materials = table.freeze({
+            material_heartwood = 5,
+            material_amber_sap = 3,
+        }),
+    }),
+    recipe_bramble_boots = table.freeze({
+        id = "recipe_bramble_boots",
+        displayName = "BRAMBLE BOOTS",
+        outputItemId = "gear_bramble_boots",
+        outputDisplayName = "Bramble Boots",
+        materials = table.freeze({
+            material_meadow_fiber = 5,
+            material_brightcap = 3,
         }),
     }),
 }
@@ -69,6 +91,8 @@ end
 CraftingCatalog.Ids = table.freeze({
     MeadowSatchel = "recipe_meadow_satchel",
     AmberCharm = "recipe_amber_charm",
+    IronrootHood = "recipe_ironroot_hood",
+    BrambleBoots = "recipe_bramble_boots",
 })
 
 return table.freeze(CraftingCatalog)

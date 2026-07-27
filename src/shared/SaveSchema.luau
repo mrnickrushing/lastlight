@@ -5,6 +5,8 @@ local ExpeditionInventory = require("./ExpeditionInventory")
 local ProfessionCatalog = require("./ProfessionCatalog")
 local Crafting = require("./Crafting")
 local Quests = require("./Quests")
+local ProfessionMastery = require("./ProfessionMastery")
+local Equipment = require("./Equipment")
 
 local SaveSchema = {}
 
@@ -24,6 +26,7 @@ export type Profile = {
     inventory: any,
     profession: {
         selectedId: string?,
+        mastery: ProfessionMastery.State,
     },
     story: {
         chapterOne: {
@@ -38,6 +41,7 @@ export type Profile = {
         nightNumber: number,
     },
     gear: { [string]: number },
+    equipped: Equipment.Equipped,
     quests: {
         claimed: { [string]: boolean },
     },
@@ -58,7 +62,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 7,
+        schemaVersion = 8,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -71,6 +75,7 @@ function SaveSchema.default(now: number): Profile
         inventory = ExpeditionInventory.default(),
         profession = {
             selectedId = nil,
+            mastery = ProfessionMastery.default(),
         },
         story = {
             chapterOne = {
@@ -85,6 +90,7 @@ function SaveSchema.default(now: number): Profile
             nightNumber = 1,
         },
         gear = Crafting.default(),
+        equipped = Equipment.default(),
         quests = {
             claimed = Quests.default(),
         },
@@ -137,8 +143,11 @@ function SaveSchema.normalize(value: any, now: number): Profile
 
     profile.inventory = ExpeditionInventory.normalize(value.inventory)
     local profession = value.profession
-    if type(profession) == "table" and ProfessionCatalog.isValid(profession.selectedId) then
-        profile.profession.selectedId = profession.selectedId
+    if type(profession) == "table" then
+        if ProfessionCatalog.isValid(profession.selectedId) then
+            profile.profession.selectedId = profession.selectedId
+        end
+        profile.profession.mastery = ProfessionMastery.normalize(profession.mastery)
     end
     local story = value.story
     local chapterOne = if type(story) == "table" then story.chapterOne else nil
@@ -172,11 +181,12 @@ function SaveSchema.normalize(value: any, now: number): Profile
         profile.town.nightNumber = town.nightNumber
     end
     profile.gear = Crafting.normalizeGear(value.gear)
+    profile.equipped = Equipment.normalize(value.equipped)
     local quests = value.quests
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 7
+    profile.schemaVersion = 8
     return profile
 end
 
@@ -211,6 +221,25 @@ function SaveSchema.withProfession(profile: Profile, professionId: string, now: 
     nextProfile.updatedAt = now
     nextProfile.revision += 1
     return nextProfile
+end
+
+function SaveSchema.withMasteryAward(
+    profile: Profile,
+    professionId: string,
+    amount: number,
+    now: number
+): (Profile, any)
+    local nextMastery, result =
+        ProfessionMastery.award(profile.profession.mastery, professionId, amount)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.profession = table.clone(profile.profession)
+    nextProfile.profession.mastery = nextMastery
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
 end
 
 function SaveSchema.withUnbankedExpeditionReward(
@@ -371,6 +400,42 @@ end
 
 function SaveSchema.gearSnapshot(profile: Profile): { [string]: number }
     return table.clone(profile.gear)
+end
+
+function SaveSchema.masterySnapshot(profile: Profile): ProfessionMastery.State
+    return ProfessionMastery.snapshot(profile.profession.mastery)
+end
+
+function SaveSchema.equippedSnapshot(profile: Profile): Equipment.Equipped
+    return Equipment.normalize(profile.equipped)
+end
+
+function SaveSchema.equipmentStats(profile: Profile): any
+    return Equipment.stats(profile.equipped)
+end
+
+function SaveSchema.withEquippedItem(profile: Profile, itemId: string, now: number): (Profile, any)
+    local nextEquipped, result = Equipment.equip(profile.gear, profile.equipped, itemId)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.equipped = nextEquipped
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.withUnequippedItem(profile: Profile, slot: string, now: number): (Profile, any)
+    local nextEquipped, result = Equipment.unequip(profile.equipped, slot)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.equipped = nextEquipped
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
 end
 
 function SaveSchema.withUsedGearItem(profile: Profile, itemId: string, now: number): (Profile, any)

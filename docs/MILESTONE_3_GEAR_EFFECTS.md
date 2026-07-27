@@ -2,7 +2,7 @@
 
 ## Scope
 
-Build `0.17.0` gives crafted gear its first real effect: each item can be
+Build `0.19.0` gives crafted gear its first real effect: each item can be
 used for a one-time consumable buff instead of sitting inert in a player's
 profile.
 
@@ -64,7 +64,7 @@ the two damage reductions compose instead of overriding each other.
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open `build/LastLightTest.rbxlx`, press Play, and require
-   `[Last Light] PASS FoundationIntegration`, build `0.17.0`, and no red
+   `[Last Light] PASS FoundationIntegration`, build `0.19.0`, and no red
    errors.
 3. Open `build/LastLight.rbxlx`, finish First Light, craft one Meadow
    Satchel and one Amber Charm. Require both the "CHARM ×1" and

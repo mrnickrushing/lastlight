@@ -225,6 +225,35 @@ function ProfileService.setProfession(
     return true
 end
 
+function ProfileService.awardMastery(
+    self: ProfileService,
+    player: Player,
+    professionId: string,
+    amount: number
+): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { applied = false, reason = "profile_unavailable" }
+    end
+    local nextProfile, result =
+        self._saveSchema.withMasteryAward(profile, professionId, amount, os.time())
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
+function ProfileService.masterySnapshot(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {}
+    end
+    return self._saveSchema.masterySnapshot(profile)
+end
+
 function ProfileService.setNightNumber(
     self: ProfileService,
     player: Player,
@@ -314,6 +343,54 @@ function ProfileService.useGearItem(self: ProfileService, player: Player, itemId
         accepted = true,
         itemId = result.itemId,
     }
+end
+
+function ProfileService.equipItem(self: ProfileService, player: Player, itemId: string): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { accepted = false, reason = "profile_unavailable" }
+    end
+    local nextProfile, result = self._saveSchema.withEquippedItem(profile, itemId, os.time())
+    if not result.applied then
+        return { accepted = false, reason = result.reason }
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    return { accepted = true, itemId = result.itemId, slot = result.slot }
+end
+
+function ProfileService.unequipItem(self: ProfileService, player: Player, slot: string): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { accepted = false, reason = "profile_unavailable" }
+    end
+    local nextProfile, result = self._saveSchema.withUnequippedItem(profile, slot, os.time())
+    if not result.applied then
+        return { accepted = false, reason = result.reason }
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    return { accepted = true, slot = slot }
+end
+
+function ProfileService.equippedSnapshot(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {}
+    end
+    return self._saveSchema.equippedSnapshot(profile)
+end
+
+function ProfileService.equipmentStats(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { damageReduction = 0, staminaRegenMultiplier = 1 }
+    end
+    return self._saveSchema.equipmentStats(profile)
 end
 
 -- Safe to call after any action, whether or not it moved a quest signal:

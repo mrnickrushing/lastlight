@@ -83,6 +83,17 @@ return {
             end,
         },
         {
+            name = "rotates readable themes and roster order by night",
+            run = function()
+                TestRunner.equal(TownNightSchedule.theme(1), "EMBERFALL")
+                TestRunner.equal(TownNightSchedule.theme(5), "EMBERFALL")
+                local nightOne = TownNightSchedule.beats(120, 1)
+                local nightTwo = TownNightSchedule.beats(120, 2)
+                TestRunner.equal(nightOne[2].enemyId, "enemy_rootling")
+                TestRunner.equal(nightTwo[2].enemyId, "enemy_briarback")
+            end,
+        },
+        {
             name = "pending excludes beats already passed",
             run = function()
                 local all = TownNightSchedule.beats(360, 3)

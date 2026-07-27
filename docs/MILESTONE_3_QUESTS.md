@@ -2,7 +2,8 @@
 
 ## Scope
 
-Build `0.18.0` gives the material economy its first quest layer: three
+Build `0.19.0` gives the material economy its first quest layer plus the
+authoritative mastery/equipment progression layer: three
 silent milestones that grant a material reward the moment their objective
 is met.
 
@@ -81,7 +82,7 @@ decisions already made in this codebase.
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open `build/LastLightTest.rbxlx`, press Play, and require
-   `[Last Light] PASS FoundationIntegration`, build `0.18.0`, schema `7`,
+   `[Last Light] PASS FoundationIntegration`, build `0.19.0`, schema `8`,
    and no red errors.
 3. Open `build/LastLight.rbxlx`, finish First Light, craft one item.
    Require a "CRAFTED ... · QUEST COMPLETE: FIRST CRAFT" toast and 3 Amber

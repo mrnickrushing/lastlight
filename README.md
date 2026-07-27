@@ -35,7 +35,7 @@ The repository currently contains:
   a known-good fallback, beacon entry, route progress, and expedition fall recovery;
 - four active optional Bramblewake events with 13 shared interaction steps,
   timeout-safe routes, durable unbanked rewards, kill switch, and telemetry;
-- save-schema-v7 inventory/profession/story/town-night/gear/quest migration,
+- save-schema-v8 inventory/profession/mastery/story/town-night/gear/equipment/quest migration,
   run-specific reward tombstones, Wayhome extraction, atomic banking,
   retry-safe settlement, and town return streaming;
 - server-owned health, six distinct readable enemy attacks, 30-second downed crawl,

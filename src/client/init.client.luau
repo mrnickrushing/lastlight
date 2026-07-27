@@ -69,6 +69,10 @@ hud:setProfessionHandler(function(professionId: string)
     send(RuntimeIds.Actions.SelectProfession, { professionId = professionId })
 end)
 
+hud:setEquipHandler(function(itemId: string)
+    send(RuntimeIds.Actions.EquipGear, { itemId = itemId })
+end)
+
 stateChanged.OnClientEvent:Connect(function(snapshot: any)
     hud:update(snapshot)
 end)
