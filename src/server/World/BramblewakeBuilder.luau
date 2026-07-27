@@ -599,6 +599,7 @@ local function buildModuleVisual(parent: Instance, visual: string, center: Vecto
             orb(parent, "WayhomeLight", center + Vector3.new(0, 8, 0), 6, AMBER, Enum.Material.Neon)
         light(beacon, AMBER, 3, 36)
         billboard(beacon, "WAYHOME GATE", CREAM)
+        objectIcon(beacon, "wayhome", AMBER)
     end
 end
 
@@ -629,6 +630,19 @@ local function buildPointOfInterest(
     )
     light(memory, FOXFIRE, 1.4, 18)
     billboard(memory, string.upper(definition.displayName), FOXFIRE)
+    objectIcon(memory, "memory", FOXFIRE)
+    for index = 1, 6 do
+        local angle = (index / 6) * math.pi * 2
+        local marker = orb(
+            parent,
+            "MemoryRune",
+            anchor.Position + Vector3.new(math.cos(angle) * 5.5, 0.45, math.sin(angle) * 5.5),
+            0.35,
+            FOXFIRE,
+            Enum.Material.Neon
+        )
+        marker.CanQuery = false
+    end
 end
 
 local function buildEventSocket(
@@ -653,6 +667,7 @@ local function buildEventSocket(
     anchor:SetAttribute("ProgressTotal", #definition.steps)
     CollectionService:AddTag(anchor, runtimeIds.ExpeditionEventTag)
     billboard(anchor, string.upper(definition.displayName), AMBER)
+    objectIcon(anchor, "event", AMBER)
 
     if definition.visual == "wagon" then
         part(
@@ -838,6 +853,7 @@ local function buildWardenSeal(
     )
     seal.Transparency = 0.52
     billboard(seal, "WARDEN'S SEAL · CLEANSE OLD GROWTH", CREAM)
+    objectIcon(seal, "seal", FOXFIRE)
 
     local nodeDefinitions = {
         {
@@ -882,6 +898,7 @@ local function buildWardenSeal(
         node:SetAttribute("BossNodeId", definition.nodeId)
         CollectionService:AddTag(node, runtimeIds.ExpeditionBossTag)
         billboard(node, string.upper(string.gsub(definition.nodeId, "_", " ")), CREAM)
+        objectIcon(node, "root", FOXFIRE)
         nodes[definition.nodeId] = node
         table.insert(interactions, {
             actionText = "CLEANSE ROOT",
@@ -923,6 +940,7 @@ local function buildWardenSeal(
         target:SetAttribute("BossAntlerId", definition.antlerId)
         CollectionService:AddTag(target, runtimeIds.ExpeditionBossTag)
         billboard(target, "BREAK ANTLER · CHANGES FOREST", Color3.fromRGB(255, 166, 106))
+        objectIcon(target, "antler", Color3.fromRGB(255, 166, 106))
         antlers[definition.antlerId] = target
         table.insert(interactions, {
             actionText = "BREAK ANTLER",
@@ -1218,6 +1236,7 @@ function BramblewakeBuilder.build(
             fireSource:SetAttribute("EliteId", definition.eliteId)
             fireSource:SetAttribute("EliteInteraction", "fire_source")
             billboard(fireSource, "LANTERN FIRE", CREAM)
+            objectIcon(fireSource, "rootfire", AMBER)
 
             local rootHeart = orb(
                 module,
@@ -1231,6 +1250,7 @@ function BramblewakeBuilder.build(
             rootHeart:SetAttribute("EliteId", definition.eliteId)
             rootHeart:SetAttribute("EliteInteraction", "root_heart")
             billboard(rootHeart, "ROOT HEART", CREAM)
+            objectIcon(rootHeart, "root", FOXFIRE)
             CollectionService:AddTag(fireSource, runtimeIds.ExpeditionEliteTag)
             CollectionService:AddTag(rootHeart, runtimeIds.ExpeditionEliteTag)
             eliteArena = {
