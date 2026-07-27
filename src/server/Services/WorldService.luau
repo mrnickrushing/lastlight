@@ -169,6 +169,22 @@ local function rock(parent: Instance, position: Vector3, scale: number)
     stone.Shape = Enum.PartType.Ball
 end
 
+local function grassTuft(parent: Instance, position: Vector3, scale: number, color: Color3)
+    for blade = 1, 3 do
+        local stalk = part(
+            parent,
+            "GrassBlade",
+            Vector3.new(0.18 * scale, 1.6 * scale, 0.18 * scale),
+            CFrame.new(position + Vector3.new((blade - 2) * 0.28 * scale, 0.8 * scale, 0))
+                * CFrame.Angles(math.rad((blade - 2) * 18), 0, math.rad((blade - 2) * 12)),
+            color,
+            Enum.Material.Grass,
+            false
+        )
+        stalk.CanQuery = false
+    end
+end
+
 local function addBillboard(partInstance: BasePart, title: string, accent: Color3)
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "WorldLabel"
@@ -265,8 +281,11 @@ function WorldService._configureLighting(_self: WorldService)
     Lighting.EnvironmentSpecularScale = 0.3
     Lighting.GlobalShadows = true
     Lighting.ExposureCompensation = -0.1
+    pcall(function()
+        Lighting.Technology = Enum.Technology.Future
+    end)
 
-    for _, name in { "LastLightAtmosphere", "LastLightBloom", "LastLightRays" } do
+    for _, name in { "LastLightAtmosphere", "LastLightBloom", "LastLightRays", "LastLightTone" } do
         local existing = Lighting:FindFirstChild(name)
         if existing ~= nil then
             existing:Destroy()
@@ -277,23 +296,31 @@ function WorldService._configureLighting(_self: WorldService)
     atmosphere.Name = "LastLightAtmosphere"
     atmosphere.Color = Color3.fromRGB(184, 207, 195)
     atmosphere.Decay = Color3.fromRGB(55, 76, 69)
-    atmosphere.Density = 0.32
-    atmosphere.Glare = 0.08
-    atmosphere.Haze = 1.8
+    atmosphere.Density = 0.2
+    atmosphere.Glare = 0.12
+    atmosphere.Haze = 0.75
     atmosphere.Parent = Lighting
 
     local bloom = Instance.new("BloomEffect")
     bloom.Name = "LastLightBloom"
-    bloom.Intensity = 0.35
+    bloom.Intensity = 0.2
     bloom.Size = 36
     bloom.Threshold = 1.1
     bloom.Parent = Lighting
 
     local rays = Instance.new("SunRaysEffect")
     rays.Name = "LastLightRays"
-    rays.Intensity = 0.055
+    rays.Intensity = 0.08
     rays.Spread = 0.82
     rays.Parent = Lighting
+
+    local tone = Instance.new("ColorCorrectionEffect")
+    tone.Name = "LastLightTone"
+    tone.Brightness = 0.02
+    tone.Contrast = 0.12
+    tone.Saturation = 0.08
+    tone.TintColor = Color3.fromRGB(232, 247, 238)
+    tone.Parent = Lighting
 end
 
 function WorldService._buildEnvironment(_self: WorldService, world: Model)
@@ -350,6 +377,14 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 random:NextNumber(0.6, 1.25)
             )
         end
+        if index % 3 == 0 then
+            grassTuft(
+                geometry,
+                position + Vector3.new(random:NextNumber(-5, 5), 0, random:NextNumber(-5, 5)),
+                random:NextNumber(0.7, 1.25),
+                if index % 2 == 0 then Color3.fromRGB(73, 117, 69) else Color3.fromRGB(101, 137, 76)
+            )
+        end
     end
 
     for index = 1, 18 do
@@ -383,6 +418,16 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         )
         glow.Shape = Enum.PartType.Ball
         glow.CanQuery = false
+    end
+
+    for index = 1, 18 do
+        local angle = (index / 18) * math.pi * 2
+        local radius = 54 + (index % 3) * 7
+        rock(
+            geometry,
+            Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius - 70),
+            0.45 + (index % 4) * 0.12
+        )
     end
 
     lantern(geometry, Vector3.new(0, 0, -8), 0.72)
