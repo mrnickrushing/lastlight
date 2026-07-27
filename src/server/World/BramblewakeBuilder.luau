@@ -78,9 +78,9 @@ local function billboard(target: BasePart, text: string, color: Color3)
     gui.Adornee = target
     gui.AlwaysOnTop = false
     gui.LightInfluence = 0.35
-    gui.MaxDistance = 100
-    gui.Size = UDim2.fromOffset(260, 56)
-    gui.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
+    gui.MaxDistance = 55
+    gui.Size = UDim2.fromOffset(190, 40)
+    gui.StudsOffsetWorldSpace = Vector3.new(0, 3.8, 0)
     gui.Parent = target
 
     local label = Instance.new("TextLabel")
@@ -91,7 +91,9 @@ local function billboard(target: BasePart, text: string, color: Color3)
     label.Size = UDim2.fromScale(1, 1)
     label.Text = text
     label.TextColor3 = color
-    label.TextScaled = true
+    label.TextScaled = false
+    label.TextSize = 12
+    label.TextWrapped = true
     label.Parent = gui
 
     local corner = Instance.new("UICorner")

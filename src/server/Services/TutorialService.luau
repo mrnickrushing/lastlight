@@ -819,10 +819,11 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         objective = blackout.instruction
         detail = if blackout.status == "relay"
             then string.format(
-                "ROOTFIRE RELAY · %d/%d%s",
+                "%s · NEXT %s · %d/%d",
+                if blackout.carryingFire then "CARRY ROOTFIRE" else "TAKE ROOTFIRE",
+                tostring(blackout.nextNodeLabel or "ROOT"),
                 blackout.deliveredNodes,
-                blackout.relayRequired,
-                if blackout.carryingFire then " · CARRYING FIRE" else ""
+                blackout.relayRequired
             )
             elseif
                 blackout.status == "old_growth"
@@ -838,7 +839,9 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             )
             else "THE BLACKOUT HAS NOT BEGUN"
         mara = if blackout.status == "relay"
-            then "Take rootfire from the Blackout Lantern and carry it to each marked living root."
+            then if blackout.carryingFire
+                then "Follow the green NEXT ROOT marker and deliver before the flame fades."
+                else "Take rootfire from the Blackout Lantern, then follow the green NEXT ROOT marker."
             elseif
                 blackout.status == "resolution"
             then "Every active traveler votes. A tie becomes the shared agroforest."

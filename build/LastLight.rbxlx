@@ -176,6 +176,16 @@ local RELAY_NODE_IDS = table.freeze({
     blackout_root_mill = true,
     blackout_root_cathedral = true,
 })
+local RELAY_NODE_ORDER = table.freeze({
+    "blackout_root_farm",
+    "blackout_root_mill",
+    "blackout_root_cathedral",
+})
+local RELAY_NODE_LABELS = table.freeze({
+    blackout_root_farm = "FARM ROOT",
+    blackout_root_mill = "MILL ROOT",
+    blackout_root_cathedral = "CATHEDRAL ROOT",
+})
 local DECISION_IDS = table.freeze({
     restore_farmland = true,
     wild_regrowth = true,
@@ -229,6 +239,15 @@ local function countTrue(values: { [string]: boolean }): number
         end
     end
     return count
+end
+
+local function nextRelayNodeId(deliveredNodes: { [string]: boolean }): string?
+    for _, nodeId in RELAY_NODE_ORDER do
+        if deliveredNodes[nodeId] ~= true then
+            return nodeId
+        end
+    end
+    return nil
 end
 
 local function active(status: Status): boolean
@@ -546,8 +565,11 @@ function BramblewakeBlackout.snapshot(state: State, userId: number, now: number)
     local fireExpiresAt = state.carriers[key]
     local carryingFire = fireExpiresAt ~= nil and now <= fireExpiresAt
     local delivered = countTrue(state.deliveredNodes)
+    local nextNodeId = nextRelayNodeId(state.deliveredNodes)
     local instruction = if state.status == "relay"
-        then "CARRY LANTERN FIRE BETWEEN LIVING ROOTS"
+        then if carryingFire
+            then "DELIVER ROOTFIRE TO THE MARKED NEXT ROOT"
+            else "TAKE ROOTFIRE FROM THE BLACKOUT LANTERN"
         elseif state.status == "old_growth" then "CLEANSE OLD GROWTH"
         elseif state.status == "warden" then "ANSWER THE WARDEN'S SEAL"
         elseif state.status == "resolution" then "CHOOSE THE GREENWARD'S FUTURE"
@@ -565,6 +587,8 @@ function BramblewakeBlackout.snapshot(state: State, userId: number, now: number)
         enabled = state.status ~= "disabled",
         fireExpiresAt = if carryingFire then fireExpiresAt else nil,
         instruction = instruction,
+        nextNodeId = nextNodeId,
+        nextNodeLabel = if nextNodeId == nil then nil else RELAY_NODE_LABELS[nextNodeId],
         overtime = targetEndsAt ~= nil and now > targetEndsAt,
         participant = state.participants[key] == true,
         relayRequired = 3,
@@ -14333,10 +14357,11 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         objective = blackout.instruction
         detail = if blackout.status == "relay"
             then string.format(
-                "ROOTFIRE RELAY · %d/%d%s",
+                "%s · NEXT %s · %d/%d",
+                if blackout.carryingFire then "CARRY ROOTFIRE" else "TAKE ROOTFIRE",
+                tostring(blackout.nextNodeLabel or "ROOT"),
                 blackout.deliveredNodes,
-                blackout.relayRequired,
-                if blackout.carryingFire then " · CARRYING FIRE" else ""
+                blackout.relayRequired
             )
             elseif
                 blackout.status == "old_growth"
@@ -14352,7 +14377,9 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             )
             else "THE BLACKOUT HAS NOT BEGUN"
         mara = if blackout.status == "relay"
-            then "Take rootfire from the Blackout Lantern and carry it to each marked living root."
+            then if blackout.carryingFire
+                then "Follow the green NEXT ROOT marker and deliver before the flame fades."
+                else "Take rootfire from the Blackout Lantern, then follow the green NEXT ROOT marker."
             elseif
                 blackout.status == "resolution"
             then "Every active traveler votes. A tie becomes the shared agroforest."
@@ -15508,9 +15535,9 @@ local function addBillboard(partInstance: BasePart, title: string, accent: Color
     billboard.Adornee = partInstance
     billboard.AlwaysOnTop = false
     billboard.LightInfluence = 0.35
-    billboard.Size = UDim2.fromOffset(220, 54)
-    billboard.StudsOffsetWorldSpace = Vector3.new(0, 4.5, 0)
-    billboard.MaxDistance = 45
+    billboard.Size = UDim2.fromOffset(165, 38)
+    billboard.StudsOffsetWorldSpace = Vector3.new(0, 3.6, 0)
+    billboard.MaxDistance = 32
     billboard.Parent = partInstance
 
     local text = Instance.new("TextLabel")
@@ -15521,7 +15548,9 @@ local function addBillboard(partInstance: BasePart, title: string, accent: Color
     text.Font = Enum.Font.GothamBold
     text.Text = title
     text.TextColor3 = accent
-    text.TextScaled = true
+    text.TextScaled = false
+    text.TextSize = 12
+    text.TextWrapped = true
     text.Parent = billboard
 
     local corner = Instance.new("UICorner")
@@ -16426,6 +16455,39 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
             prompt.ActionText = if delivered then "TAKE ROOTFIRE" else "DELIVER ROOTFIRE"
             prompt.ObjectText = if delivered then "Lit Living Root" else "Unlit Living Root"
         end
+        local nextMarker = target:FindFirstChild("BlackoutNextMarker")
+        if nodeId == state.nextNodeId and relay and not delivered then
+            local marker = if nextMarker ~= nil and nextMarker:IsA("BillboardGui")
+                then nextMarker
+                else Instance.new("BillboardGui")
+            marker.Name = "BlackoutNextMarker"
+            marker.Adornee = target
+            marker.AlwaysOnTop = true
+            marker.LightInfluence = 0
+            marker.Size = UDim2.fromOffset(150, 32)
+            marker.StudsOffsetWorldSpace = Vector3.new(0, 4.8, 0)
+            marker.MaxDistance = 70
+            marker.Parent = target
+            local markerText = marker:FindFirstChild("MarkerText")
+            if markerText == nil or not markerText:IsA("TextLabel") then
+                markerText = Instance.new("TextLabel")
+                markerText.Name = "MarkerText"
+                markerText.BackgroundColor3 = Color3.fromRGB(12, 31, 25)
+                markerText.BackgroundTransparency = 0.08
+                markerText.BorderSizePixel = 0
+                markerText.Font = Enum.Font.GothamBold
+                markerText.Size = UDim2.fromScale(1, 1)
+                markerText.TextColor3 = Color3.fromRGB(172, 255, 205)
+                markerText.TextSize = 13
+                markerText.Text = "▼  NEXT ROOT"
+                markerText.Parent = marker
+                local corner = Instance.new("UICorner")
+                corner.CornerRadius = UDim.new(0, 8)
+                corner.Parent = markerText
+            end
+        elseif nextMarker ~= nil then
+            nextMarker:Destroy()
+        end
         for _, rootedWall in arena.model:GetChildren() do
             if
                 rootedWall:IsA("BasePart")
@@ -16482,14 +16544,17 @@ function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
         self:_applyTownLighting(self._night)
         return
     end
-    Lighting.Ambient = Color3.fromRGB(18, 28, 35)
+    Lighting.Brightness = 1.8
+    Lighting.Ambient = Color3.fromRGB(48, 62, 72)
+    Lighting.OutdoorAmbient = Color3.fromRGB(38, 52, 68)
+    Lighting.ExposureCompensation = -0.05
     local color = if effect ~= nil and effect:IsA("ColorCorrectionEffect")
         then effect
         else Instance.new("ColorCorrectionEffect")
     color.Name = "LastLightBlackoutColor"
-    color.Brightness = -0.08
-    color.Contrast = 0.14
-    color.Saturation = -0.18
+    color.Brightness = 0.04
+    color.Contrast = 0.04
+    color.Saturation = -0.05
     color.TintColor = Color3.fromRGB(164, 205, 186)
     color.Parent = Lighting
 end
@@ -16893,9 +16958,9 @@ local function billboard(target: BasePart, text: string, color: Color3)
     gui.Adornee = target
     gui.AlwaysOnTop = false
     gui.LightInfluence = 0.35
-    gui.MaxDistance = 100
-    gui.Size = UDim2.fromOffset(260, 56)
-    gui.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
+    gui.MaxDistance = 55
+    gui.Size = UDim2.fromOffset(190, 40)
+    gui.StudsOffsetWorldSpace = Vector3.new(0, 3.8, 0)
     gui.Parent = target
 
     local label = Instance.new("TextLabel")
@@ -16906,7 +16971,9 @@ local function billboard(target: BasePart, text: string, color: Color3)
     label.Size = UDim2.fromScale(1, 1)
     label.Text = text
     label.TextColor3 = color
-    label.TextScaled = true
+    label.TextScaled = false
+    label.TextSize = 12
+    label.TextWrapped = true
     label.Parent = gui
 
     local corner = Instance.new("UICorner")
@@ -20539,14 +20606,16 @@ function HUDController._updateClock(self: HUDController)
                     (tonumber(blackout.fireExpiresAt) or 0) - workspace:GetServerTimeNow()
                 )
                 self._blackoutDetail.Text = string.format(
-                    "CARRYING ROOTFIRE %.1fs · LIVING ROOTS %d/%d",
+                    "CARRY ROOTFIRE %.1fs → %s · %d/%d",
                     fireRemaining,
+                    tostring(blackout.nextNodeLabel or "NEXT ROOT"),
                     tonumber(blackout.deliveredNodes) or 0,
                     tonumber(blackout.relayRequired) or 3
                 )
             else
                 self._blackoutDetail.Text = string.format(
-                    "TAKE ROOTFIRE · LIVING ROOTS %d/%d",
+                    "TAKE ROOTFIRE → %s · %d/%d",
+                    tostring(blackout.nextNodeLabel or "NEXT ROOT"),
                     tonumber(blackout.deliveredNodes) or 0,
                     tonumber(blackout.relayRequired) or 3
                 )
