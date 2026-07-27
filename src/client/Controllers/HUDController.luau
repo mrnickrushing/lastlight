@@ -1463,6 +1463,38 @@ function HUDController.setInteraction(self: HUDController, label: string?, avail
     self._primary.Text = if available and label ~= nil then prefix .. label else "FIND"
 end
 
+function HUDController.canInteractAction(self: HUDController, actionId: string): boolean
+    local state = self._currentState
+    if type(state) ~= "table" then
+        return false
+    end
+    local stage = state.stage
+    if stage == "complete" then
+        return true
+    end
+    if stage == "arrive" then
+        return actionId == "rescue"
+    elseif stage == "gather" then
+        return actionId == "gather"
+    elseif stage == "choose_tool" then
+        return actionId == "choose_tool"
+    elseif stage == "build" then
+        return actionId == "build"
+    elseif stage == "prepare" then
+        return actionId == "prepare"
+    elseif stage == "reveal" then
+        return actionId == "reveal"
+    end
+    -- During defense, revive and encounter interactions remain valid while
+    -- the tutorial is advanced by the server's phase system.
+    return actionId ~= "rescue"
+        and actionId ~= "gather"
+        and actionId ~= "choose_tool"
+        and actionId ~= "build"
+        and actionId ~= "prepare"
+        and actionId ~= "reveal"
+end
+
 function HUDController._applyCompact(self: HUDController)
     self._detail.Visible = not self._compactEnabled
     self._mara.Visible = not self._compactEnabled and not self._playerDowned
