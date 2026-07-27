@@ -214,6 +214,201 @@ local function addBillboard(partInstance: BasePart, title: string, accent: Color
     corner.Parent = text
 end
 
+local function addObjectIcon(partInstance: BasePart, kind: string, accent: Color3)
+    local existing = partInstance:FindFirstChild("ObjectIcon")
+    if existing ~= nil then
+        existing:Destroy()
+    end
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "ObjectIcon"
+    billboard.Adornee = partInstance
+    billboard.AlwaysOnTop = false
+    billboard.LightInfluence = 0.1
+    billboard.Size = UDim2.fromOffset(44, 44)
+    billboard.StudsOffsetWorldSpace = Vector3.new(0, 5.2, 0)
+    billboard.MaxDistance = 48
+    billboard.Parent = partInstance
+
+    local viewport = Instance.new("ViewportFrame")
+    viewport.Name = "IconViewport"
+    viewport.Size = UDim2.fromScale(1, 1)
+    viewport.BackgroundColor3 = Color3.fromRGB(15, 27, 24)
+    viewport.BackgroundTransparency = 0.08
+    viewport.BorderSizePixel = 0
+    viewport.Ambient = Color3.fromRGB(210, 224, 212)
+    viewport.LightColor = Color3.fromRGB(255, 214, 146)
+    viewport.Parent = billboard
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = viewport
+
+    local worldModel = Instance.new("WorldModel")
+    worldModel.Parent = viewport
+    local camera = Instance.new("Camera")
+    camera.CFrame = CFrame.new(0, 0.2, 6) * CFrame.Angles(0, math.rad(16), 0)
+    camera.FieldOfView = 28
+    camera.Parent = viewport
+    viewport.CurrentCamera = camera
+
+    local function iconPart(
+        name: string,
+        size: Vector3,
+        position: Vector3,
+        color: Color3,
+        material: Enum.Material,
+        shape: Enum.PartType?
+    )
+        local icon = Instance.new("Part")
+        icon.Name = name
+        icon.Anchored = true
+        icon.CanCollide = false
+        icon.CanQuery = false
+        icon.Size = size
+        icon.Position = position
+        icon.Color = color
+        icon.Material = material
+        icon.Shape = shape or Enum.PartType.Block
+        icon.Parent = worldModel
+        return icon
+    end
+
+    if kind == "heartwood" then
+        iconPart(
+            "Trunk",
+            Vector3.new(1.5, 2.5, 1.5),
+            Vector3.new(0, -0.5, 0),
+            BARK,
+            Enum.Material.Wood,
+            Enum.PartType.Cylinder
+        )
+        iconPart(
+            "Core",
+            Vector3.new(1.2, 1.2, 1.2),
+            Vector3.new(0, 0.65, 0),
+            accent,
+            Enum.Material.Neon,
+            Enum.PartType.Ball
+        )
+    elseif kind == "axe" then
+        iconPart(
+            "Handle",
+            Vector3.new(0.25, 2.8, 0.25),
+            Vector3.new(0, -0.1, 0),
+            BARK,
+            Enum.Material.Wood
+        )
+        iconPart(
+            "Blade",
+            Vector3.new(1.25, 0.9, 0.22),
+            Vector3.new(0.35, 0.85, 0),
+            accent,
+            Enum.Material.Metal
+        )
+    elseif kind == "hammer" then
+        iconPart(
+            "Handle",
+            Vector3.new(0.25, 2.6, 0.25),
+            Vector3.new(0, -0.1, 0),
+            BARK,
+            Enum.Material.Wood
+        )
+        iconPart(
+            "Head",
+            Vector3.new(1.6, 0.55, 0.55),
+            Vector3.new(0, 0.95, 0),
+            accent,
+            Enum.Material.Metal
+        )
+    elseif kind == "torch" or kind == "lantern" then
+        iconPart(
+            "Handle",
+            Vector3.new(0.28, 2.1, 0.28),
+            Vector3.new(0, -0.45, 0),
+            BARK,
+            Enum.Material.Wood
+        )
+        iconPart(
+            "Flame",
+            Vector3.new(1.2, 1.5, 1.2),
+            Vector3.new(0, 0.75, 0),
+            accent,
+            Enum.Material.Neon,
+            Enum.PartType.Ball
+        )
+    elseif kind == "satchel" then
+        iconPart(
+            "Bag",
+            Vector3.new(2.1, 1.6, 1.2),
+            Vector3.new(0, -0.15, 0),
+            accent,
+            Enum.Material.Fabric
+        )
+        iconPart(
+            "Strap",
+            Vector3.new(0.22, 2.2, 0.2),
+            Vector3.new(0, 0.15, 0.65),
+            BARK,
+            Enum.Material.Wood
+        )
+    elseif kind == "charm" then
+        iconPart(
+            "Gem",
+            Vector3.new(1.35, 1.35, 1.35),
+            Vector3.new(0, 0, 0),
+            accent,
+            Enum.Material.Neon,
+            Enum.PartType.Ball
+        )
+        iconPart(
+            "Ring",
+            Vector3.new(0.22, 1.9, 1.9),
+            Vector3.new(0, 0, 0),
+            FOXFIRE,
+            Enum.Material.Metal,
+            Enum.PartType.Cylinder
+        )
+    elseif kind == "hood" then
+        iconPart(
+            "Hood",
+            Vector3.new(2.2, 1.7, 1.7),
+            Vector3.new(0, 0.1, 0),
+            accent,
+            Enum.Material.Fabric
+        )
+        iconPart(
+            "Rim",
+            Vector3.new(2.5, 0.25, 1.8),
+            Vector3.new(0, -0.75, -0.1),
+            DARK_GREEN,
+            Enum.Material.Wood
+        )
+    elseif kind == "boots" then
+        iconPart(
+            "LeftBoot",
+            Vector3.new(0.8, 1.45, 1.6),
+            Vector3.new(-0.55, -0.2, 0),
+            accent,
+            Enum.Material.Fabric
+        )
+        iconPart(
+            "RightBoot",
+            Vector3.new(0.8, 1.45, 1.6),
+            Vector3.new(0.55, -0.2, 0),
+            accent,
+            Enum.Material.Fabric
+        )
+    else
+        iconPart(
+            "Marker",
+            Vector3.new(1.4, 1.4, 1.4),
+            Vector3.new(0, 0, 0),
+            accent,
+            Enum.Material.Neon,
+            Enum.PartType.Ball
+        )
+    end
+end
+
 function WorldService.new(logger: Logger): WorldService
     return setmetatable({
         Name = WorldService.Name,
@@ -542,6 +737,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     )
     heart.Shape = Enum.PartType.Ball
     addBillboard(heart, "HEARTWOOD", AMBER)
+    addObjectIcon(heart, "heartwood", AMBER)
     self:_registerInteraction(
         stump,
         self._runtimeIds.InteractionIds.Heartwood,
@@ -591,6 +787,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             false
         )
         addBillboard(marker, string.upper(definition.tool), definition.color)
+        addObjectIcon(marker, definition.tool, definition.color)
         self:_registerInteraction(
             pedestal,
             definition.id,
@@ -645,6 +842,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     light.Shadows = true
     light.Parent = flame
     addBillboard(flame, "THE FIRST LANTERN", AMBER)
+    addObjectIcon(flame, "lantern", AMBER)
     self._lantern = flame
     self:_registerInteraction(
         lanternBase,
@@ -729,6 +927,15 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         )
         marker.Shape = Enum.PartType.Ball
         addBillboard(marker, definition.label, definition.color)
+        addObjectIcon(
+            marker,
+            if definition.recipeId == "recipe_meadow_satchel"
+                then "satchel"
+                elseif definition.recipeId == "recipe_amber_charm" then "charm"
+                elseif definition.recipeId == "recipe_ironroot_hood" then "hood"
+                else "boots",
+            definition.color
+        )
         self:_registerInteraction(
             bench,
             definition.id,
