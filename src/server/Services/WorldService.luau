@@ -4,6 +4,7 @@ local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 
 local BramblewakeBuilder = require(script.Parent.Parent.World.BramblewakeBuilder)
 
@@ -44,14 +45,17 @@ export type WorldService = typeof(setmetatable(
     WorldService
 ))
 
-local DAY_AMBIENT = Color3.fromRGB(76, 91, 86)
-local NIGHT_AMBIENT = Color3.fromRGB(22, 31, 49)
+local DAY_AMBIENT = Color3.fromRGB(50, 63, 58)
+local NIGHT_AMBIENT = Color3.fromRGB(13, 18, 33)
 local AMBER = Color3.fromRGB(255, 181, 76)
 local FOXFIRE = Color3.fromRGB(94, 206, 176)
 local CREAM = Color3.fromRGB(244, 230, 197)
-local GREEN = Color3.fromRGB(47, 84, 63)
-local DARK_GREEN = Color3.fromRGB(24, 55, 43)
-local BARK = Color3.fromRGB(73, 48, 36)
+local GREEN = Color3.fromRGB(42, 77, 51)
+local DARK_GREEN = Color3.fromRGB(18, 42, 32)
+local BARK = Color3.fromRGB(62, 39, 30)
+local WET_BARK = Color3.fromRGB(36, 26, 24)
+local MOSS = Color3.fromRGB(58, 91, 54)
+local WET_EARTH = Color3.fromRGB(67, 55, 39)
 
 local function part(
     parent: Instance,
@@ -202,6 +206,137 @@ local function grassTuft(parent: Instance, position: Vector3, scale: number, col
         )
         stalk.CanQuery = false
     end
+end
+
+local function groundPatch(parent: Instance, position: Vector3, size: Vector3, color: Color3, material: Enum.Material)
+    local patch = part(
+        parent,
+        "WetGroundPatch",
+        size,
+        CFrame.new(position + Vector3.new(0, 0.18, 0)) * CFrame.Angles(0, position.X * 0.017, 0),
+        color,
+        material,
+        false
+    )
+    patch.Transparency = 0.08
+    patch.CanQuery = false
+    return patch
+end
+
+local function fernCluster(parent: Instance, position: Vector3, scale: number)
+    for blade = 1, 7 do
+        local angle = (blade / 7) * math.pi * 2
+        local leaf = part(
+            parent,
+            "FernFrond",
+            Vector3.new(0.38 * scale, 0.18 * scale, 3.2 * scale),
+            CFrame.new(
+                position
+                    + Vector3.new(math.cos(angle) * 0.75 * scale, 0.65 * scale, math.sin(angle) * 0.75 * scale)
+            ) * CFrame.Angles(math.rad(22), angle, math.rad(math.sin(angle) * 10)),
+            if blade % 2 == 0 then MOSS else Color3.fromRGB(39, 74, 43),
+            Enum.Material.Grass,
+            false
+        )
+        leaf.CanQuery = false
+    end
+end
+
+local function deadfall(parent: Instance, position: Vector3, scale: number, angle: number)
+    local log = part(
+        parent,
+        "RainDarkDeadfall",
+        Vector3.new(2.4 * scale, 15 * scale, 2.4 * scale),
+        CFrame.new(position + Vector3.new(0, 1.3 * scale, 0))
+            * CFrame.Angles(math.rad(82), angle, math.rad(5)),
+        WET_BARK,
+        Enum.Material.Wood
+    )
+    log.Shape = Enum.PartType.Cylinder
+    log.CanQuery = false
+    for rib = -1, 1 do
+        local cut = part(
+            parent,
+            "BrokenWoodRib",
+            Vector3.new(0.55 * scale, 2.7 * scale, 0.55 * scale),
+            CFrame.new(position + Vector3.new(math.cos(angle) * rib * 4.8 * scale, 1.9 * scale, math.sin(angle) * rib * 4.8 * scale))
+                * CFrame.Angles(math.rad(68), angle + math.rad(rib * 12), 0),
+            BARK,
+            Enum.Material.Wood,
+            false
+        )
+        cut.CanQuery = false
+    end
+end
+
+local function mistSheet(parent: Instance, name: string, position: Vector3, size: Vector3, color: Color3, transparency: number)
+    local mist = part(
+        parent,
+        name,
+        size,
+        CFrame.new(position),
+        color,
+        Enum.Material.Glass,
+        false
+    )
+    mist.Transparency = transparency
+    mist.CastShadow = false
+    mist.CanQuery = false
+    return mist
+end
+
+local function emberDrift(parent: Instance, position: Vector3, color: Color3, count: number, spread: number)
+    local random = Random.new(math.floor(position.X * 17 + position.Z * 31))
+    for _ = 1, count do
+        local mote = part(
+            parent,
+            "FloatingMote",
+            Vector3.new(0.16, 0.16, 0.16),
+            CFrame.new(
+                position
+                    + Vector3.new(
+                        random:NextNumber(-spread, spread),
+                        random:NextNumber(1.5, 8),
+                        random:NextNumber(-spread, spread)
+                    )
+            ),
+            color,
+            Enum.Material.Neon,
+            false
+        )
+        mote.Shape = Enum.PartType.Ball
+        mote.Transparency = random:NextNumber(0.1, 0.35)
+        mote.CanQuery = false
+    end
+end
+
+local function addFillLight(parent: Instance, position: Vector3, color: Color3, brightness: number, range: number)
+    local source = part(
+        parent,
+        "HiddenAtmosphereLight",
+        Vector3.new(0.4, 0.4, 0.4),
+        CFrame.new(position),
+        color,
+        Enum.Material.Neon,
+        false
+    )
+    source.Transparency = 1
+    source.CanQuery = false
+    local light = Instance.new("PointLight")
+    light.Color = color
+    light.Brightness = brightness
+    light.Range = range
+    light.Shadows = false
+    light.Parent = source
+end
+
+local function addSurfaceGrain(target: BasePart, color: Color3, transparency: number)
+    local decal = Instance.new("Decal")
+    decal.Name = "MaterialVariation"
+    decal.Color3 = color
+    decal.Transparency = transparency
+    decal.Face = Enum.NormalId.Top
+    decal.Parent = target
 end
 
 local function addBillboard(partInstance: BasePart, title: string, accent: Color3)
@@ -513,54 +648,87 @@ function WorldService._registerInteraction(
 end
 
 function WorldService._configureLighting(_self: WorldService)
-    Lighting.ClockTime = 8.2
-    Lighting.Brightness = 2.2
+    Lighting.ClockTime = 6.65
+    Lighting.Brightness = 2.05
     Lighting.Ambient = DAY_AMBIENT
-    Lighting.OutdoorAmbient = Color3.fromRGB(92, 112, 102)
-    Lighting.EnvironmentDiffuseScale = 0.45
-    Lighting.EnvironmentSpecularScale = 0.3
+    Lighting.OutdoorAmbient = Color3.fromRGB(72, 91, 84)
+    Lighting.EnvironmentDiffuseScale = 0.72
+    Lighting.EnvironmentSpecularScale = 0.48
     Lighting.GlobalShadows = true
-    Lighting.ExposureCompensation = -0.1
+    Lighting.ExposureCompensation = -0.18
     pcall(function()
         Lighting.Technology = Enum.Technology.Future
     end)
+    pcall(function()
+        Lighting.ShadowSoftness = 0.42
+        Lighting.GeographicLatitude = 51
+    end)
+    pcall(function()
+        Workspace.Terrain.Decoration = true
+    end)
 
-    for _, name in { "LastLightAtmosphere", "LastLightBloom", "LastLightRays", "LastLightTone" } do
+    for _, name in {
+        "LastLightAtmosphere",
+        "LastLightBloom",
+        "LastLightRays",
+        "LastLightTone",
+        "LastLightDepth",
+    } do
         local existing = Lighting:FindFirstChild(name)
         if existing ~= nil then
             existing:Destroy()
         end
     end
+    local existingClouds = Workspace.Terrain:FindFirstChild("LastLightClouds")
+    if existingClouds ~= nil then
+        existingClouds:Destroy()
+    end
 
     local atmosphere = Instance.new("Atmosphere")
     atmosphere.Name = "LastLightAtmosphere"
-    atmosphere.Color = Color3.fromRGB(184, 207, 195)
-    atmosphere.Decay = Color3.fromRGB(55, 76, 69)
-    atmosphere.Density = 0.2
-    atmosphere.Glare = 0.12
-    atmosphere.Haze = 0.75
+    atmosphere.Color = Color3.fromRGB(166, 185, 174)
+    atmosphere.Decay = Color3.fromRGB(43, 63, 61)
+    atmosphere.Density = 0.34
+    atmosphere.Offset = 0.08
+    atmosphere.Glare = 0.2
+    atmosphere.Haze = 1.9
     atmosphere.Parent = Lighting
 
     local bloom = Instance.new("BloomEffect")
     bloom.Name = "LastLightBloom"
-    bloom.Intensity = 0.2
-    bloom.Size = 36
-    bloom.Threshold = 1.1
+    bloom.Intensity = 0.34
+    bloom.Size = 46
+    bloom.Threshold = 0.82
     bloom.Parent = Lighting
 
     local rays = Instance.new("SunRaysEffect")
     rays.Name = "LastLightRays"
-    rays.Intensity = 0.08
-    rays.Spread = 0.82
+    rays.Intensity = 0.14
+    rays.Spread = 0.72
     rays.Parent = Lighting
 
     local tone = Instance.new("ColorCorrectionEffect")
     tone.Name = "LastLightTone"
-    tone.Brightness = 0.02
-    tone.Contrast = 0.12
-    tone.Saturation = 0.08
-    tone.TintColor = Color3.fromRGB(232, 247, 238)
+    tone.Brightness = -0.03
+    tone.Contrast = 0.24
+    tone.Saturation = -0.04
+    tone.TintColor = Color3.fromRGB(232, 238, 224)
     tone.Parent = Lighting
+
+    local depth = Instance.new("DepthOfFieldEffect")
+    depth.Name = "LastLightDepth"
+    depth.FarIntensity = 0.28
+    depth.FocusDistance = 95
+    depth.InFocusRadius = 70
+    depth.NearIntensity = 0.04
+    depth.Parent = Lighting
+
+    local clouds = Instance.new("Clouds")
+    clouds.Name = "LastLightClouds"
+    clouds.Color = Color3.fromRGB(118, 137, 132)
+    clouds.Cover = 0.68
+    clouds.Density = 0.58
+    clouds.Parent = Workspace.Terrain
 end
 
 function WorldService._buildEnvironment(_self: WorldService, world: Model)
@@ -568,13 +736,30 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     geometry.Name = "Environment"
     geometry.Parent = world
 
-    part(
+    local ground = part(
         geometry,
         "Ground",
         Vector3.new(320, 6, 340),
         CFrame.new(0, -3, -70),
-        Color3.fromRGB(52, 84, 58),
+        Color3.fromRGB(38, 68, 46),
         Enum.Material.Grass
+    )
+    addSurfaceGrain(ground, Color3.fromRGB(28, 42, 34), 0.78)
+
+    groundPatch(
+        geometry,
+        Vector3.new(0, 0, -70),
+        Vector3.new(96, 0.28, 180),
+        Color3.fromRGB(43, 63, 45),
+        Enum.Material.LeafyGrass
+    )
+    mistSheet(
+        geometry,
+        "LowMorningMist",
+        Vector3.new(0, 2.3, -86),
+        Vector3.new(190, 1.4, 250),
+        Color3.fromRGB(132, 158, 151),
+        0.82
     )
 
     local route = {
@@ -593,82 +778,113 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         local delta = finish - start
         local distance = delta.Magnitude
         local midpoint = (start + finish) / 2
-        part(
+        local trail = part(
             geometry,
             "LanternTrail",
-            Vector3.new(10, 0.35, distance + 2),
+            Vector3.new(12, 0.35, distance + 3),
             CFrame.lookAt(midpoint, finish),
-            Color3.fromRGB(104, 91, 65),
-            Enum.Material.Ground
+            WET_EARTH,
+            Enum.Material.Mud
         )
+        trail.Reflectance = 0.04
+        for side = -1, 1, 2 do
+            groundPatch(
+                geometry,
+                midpoint + Vector3.new(side * 7.2, 0.04, 0),
+                Vector3.new(2.4, 0.18, distance * 0.82),
+                Color3.fromRGB(31, 54, 37),
+                Enum.Material.LeafyGrass
+            )
+        end
     end
 
     local random = Random.new(1847)
-    for index = 1, 64 do
+    for index = 1, 92 do
         local angle = random:NextNumber(0, math.pi * 2)
-        local radius = random:NextNumber(68, 148)
+        local radius = random:NextNumber(54, 154)
         local zBias = -70
         local position = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius + zBias)
-        pine(geometry, position, random:NextNumber(0.75, 1.45))
-        if index % 4 == 0 then
+        pine(geometry, position, random:NextNumber(0.82, 1.65))
+        if index % 3 == 0 then
             rock(
                 geometry,
-                position + Vector3.new(random:NextNumber(-9, 9), 0, random:NextNumber(-9, 9)),
-                random:NextNumber(0.6, 1.25)
+                position + Vector3.new(random:NextNumber(-10, 10), 0, random:NextNumber(-10, 10)),
+                random:NextNumber(0.7, 1.45)
             )
         end
-        if index % 3 == 0 then
+        if index % 2 == 0 then
             grassTuft(
                 geometry,
-                position + Vector3.new(random:NextNumber(-5, 5), 0, random:NextNumber(-5, 5)),
-                random:NextNumber(0.7, 1.25),
-                if index % 2 == 0 then Color3.fromRGB(73, 117, 69) else Color3.fromRGB(101, 137, 76)
+                position + Vector3.new(random:NextNumber(-6, 6), 0, random:NextNumber(-6, 6)),
+                random:NextNumber(0.8, 1.5),
+                if index % 4 == 0 then Color3.fromRGB(58, 105, 62) else Color3.fromRGB(83, 116, 68)
+            )
+        end
+        if index % 5 == 0 then
+            fernCluster(
+                geometry,
+                position + Vector3.new(random:NextNumber(-7, 7), 0, random:NextNumber(-7, 7)),
+                random:NextNumber(0.75, 1.35)
+            )
+        end
+        if index % 13 == 0 then
+            deadfall(
+                geometry,
+                position + Vector3.new(random:NextNumber(-8, 8), 0, random:NextNumber(-8, 8)),
+                random:NextNumber(0.65, 1.2),
+                random:NextNumber(0, math.pi * 2)
             )
         end
     end
 
-    for index = 1, 18 do
-        local angle = (index / 18) * math.pi * 2
-        local radius = 158
+    for index = 1, 24 do
+        local angle = (index / 24) * math.pi * 2
+        local radius = 156 + (index % 4) * 6
         local cliff = part(
             geometry,
             "DistantCliff",
-            Vector3.new(28, 44 + (index % 3) * 11, 18),
-            CFrame.new(math.cos(angle) * radius, 17, math.sin(angle) * radius - 70)
-                * CFrame.Angles(0, -angle, 0),
-            Color3.fromRGB(45, 57, 55),
+            Vector3.new(32, 46 + (index % 4) * 13, 22),
+            CFrame.new(math.cos(angle) * radius, 18, math.sin(angle) * radius - 70)
+                * CFrame.Angles(0, -angle, math.rad((index % 3 - 1) * 4)),
+            Color3.fromRGB(34, 47, 47),
             Enum.Material.Rock
         )
         cliff.Shape = Enum.PartType.Ball
+        cliff.Transparency = 0.06
     end
 
-    for _ = 1, 22 do
+    for _ = 1, 34 do
         local glow = part(
             geometry,
             "Firefly",
-            Vector3.new(0.22, 0.22, 0.22),
+            Vector3.new(0.18, 0.18, 0.18),
             CFrame.new(
-                random:NextNumber(-45, 45),
-                random:NextNumber(2, 10),
-                random:NextNumber(-135, -8)
+                random:NextNumber(-52, 52),
+                random:NextNumber(2, 12),
+                random:NextNumber(-142, -8)
             ),
-            AMBER,
+            if random:NextInteger(1, 4) == 1 then FOXFIRE else AMBER,
             Enum.Material.Neon,
             false
         )
         glow.Shape = Enum.PartType.Ball
+        glow.Transparency = random:NextNumber(0.02, 0.28)
         glow.CanQuery = false
     end
 
-    for index = 1, 18 do
-        local angle = (index / 18) * math.pi * 2
-        local radius = 54 + (index % 3) * 7
-        rock(
-            geometry,
-            Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius - 70),
-            0.45 + (index % 4) * 0.12
-        )
+    for index = 1, 24 do
+        local angle = (index / 24) * math.pi * 2
+        local radius = 48 + (index % 4) * 8
+        local position = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius - 70)
+        rock(geometry, position, 0.5 + (index % 5) * 0.13)
+        if index % 2 == 0 then
+            fernCluster(geometry, position + Vector3.new(3, 0, -2), 0.8)
+        end
     end
+
+    addFillLight(geometry, Vector3.new(-46, 12, -96), Color3.fromRGB(54, 103, 95), 0.85, 78)
+    addFillLight(geometry, Vector3.new(38, 10, -28), Color3.fromRGB(255, 177, 88), 0.45, 54)
+    emberDrift(geometry, Vector3.new(0, 0, -112), AMBER, 16, 28)
 
     lantern(geometry, Vector3.new(0, 0, -8), 0.72)
     lantern(geometry, Vector3.new(-9, 0, -62), 0.62)
@@ -1820,18 +2036,65 @@ end
 -- restore path, so the two never disagree about what "town day" or "town
 -- night" actually looks like.
 function WorldService._applyTownLighting(_self: WorldService, night: boolean)
+    local atmosphere = Lighting:FindFirstChild("LastLightAtmosphere")
+    local tone = Lighting:FindFirstChild("LastLightTone")
+    local bloom = Lighting:FindFirstChild("LastLightBloom")
+    local depth = Lighting:FindFirstChild("LastLightDepth")
+
     if night then
-        Lighting.ClockTime = 0.2
-        Lighting.Brightness = 1.25
+        Lighting.ClockTime = 0.15
+        Lighting.Brightness = 0.82
         Lighting.Ambient = NIGHT_AMBIENT
-        Lighting.OutdoorAmbient = Color3.fromRGB(27, 37, 55)
-        Lighting.ExposureCompensation = -0.45
+        Lighting.OutdoorAmbient = Color3.fromRGB(18, 27, 47)
+        Lighting.ExposureCompensation = -0.62
+        if atmosphere ~= nil and atmosphere:IsA("Atmosphere") then
+            atmosphere.Color = Color3.fromRGB(82, 106, 126)
+            atmosphere.Decay = Color3.fromRGB(12, 18, 36)
+            atmosphere.Density = 0.48
+            atmosphere.Haze = 2.35
+            atmosphere.Glare = 0.08
+        end
+        if tone ~= nil and tone:IsA("ColorCorrectionEffect") then
+            tone.Brightness = -0.08
+            tone.Contrast = 0.32
+            tone.Saturation = -0.16
+            tone.TintColor = Color3.fromRGB(183, 205, 231)
+        end
+        if bloom ~= nil and bloom:IsA("BloomEffect") then
+            bloom.Intensity = 0.48
+            bloom.Threshold = 0.72
+        end
+        if depth ~= nil and depth:IsA("DepthOfFieldEffect") then
+            depth.FarIntensity = 0.34
+            depth.FocusDistance = 72
+        end
     else
-        Lighting.ClockTime = 6.8
-        Lighting.Brightness = 2.4
+        Lighting.ClockTime = 6.65
+        Lighting.Brightness = 2.05
         Lighting.Ambient = DAY_AMBIENT
-        Lighting.OutdoorAmbient = Color3.fromRGB(102, 120, 110)
-        Lighting.ExposureCompensation = 0
+        Lighting.OutdoorAmbient = Color3.fromRGB(72, 91, 84)
+        Lighting.ExposureCompensation = -0.18
+        if atmosphere ~= nil and atmosphere:IsA("Atmosphere") then
+            atmosphere.Color = Color3.fromRGB(166, 185, 174)
+            atmosphere.Decay = Color3.fromRGB(43, 63, 61)
+            atmosphere.Density = 0.34
+            atmosphere.Haze = 1.9
+            atmosphere.Glare = 0.2
+        end
+        if tone ~= nil and tone:IsA("ColorCorrectionEffect") then
+            tone.Brightness = -0.03
+            tone.Contrast = 0.24
+            tone.Saturation = -0.04
+            tone.TintColor = Color3.fromRGB(232, 238, 224)
+        end
+        if bloom ~= nil and bloom:IsA("BloomEffect") then
+            bloom.Intensity = 0.34
+            bloom.Threshold = 0.82
+        end
+        if depth ~= nil and depth:IsA("DepthOfFieldEffect") then
+            depth.FarIntensity = 0.28
+            depth.FocusDistance = 95
+        end
     end
 end
 
