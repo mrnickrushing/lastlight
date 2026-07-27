@@ -19265,6 +19265,105 @@ local GuiService = game:GetService("GuiService")
 local HUDController = {}
 HUDController.__index = HUDController
 
+local function createItemIcon(parent: Instance, itemId: string, size: number): ViewportFrame
+    local viewport = Instance.new("ViewportFrame")
+    viewport.Name = "ItemIcon"
+    viewport.Size = UDim2.fromOffset(size, size)
+    viewport.Position = UDim2.fromOffset(6, 5)
+    viewport.BackgroundColor3 = Color3.fromRGB(20, 31, 29)
+    viewport.BackgroundTransparency = 0.12
+    viewport.BorderSizePixel = 0
+    viewport.Ambient = Color3.fromRGB(210, 220, 210)
+    viewport.LightColor = Color3.fromRGB(255, 220, 160)
+    viewport.ZIndex = parent:IsA("GuiObject") and parent.ZIndex + 1 or 1
+    viewport.Parent = parent
+
+    local world = Instance.new("WorldModel")
+    world.Parent = viewport
+    local camera = Instance.new("Camera")
+    camera.CFrame = CFrame.new(0, 0.4, 6) * CFrame.Angles(0, math.rad(18), 0)
+    camera.FieldOfView = 28
+    camera.Parent = viewport
+    viewport.CurrentCamera = camera
+
+    local function shape(name: string, dimensions: Vector3, position: Vector3, color: Color3)
+        local object = Instance.new("Part")
+        object.Name = name
+        object.Anchored = true
+        object.CanCollide = false
+        object.Size = dimensions
+        object.Position = position
+        object.Color = color
+        object.Material = Enum.Material.SmoothPlastic
+        object.Parent = world
+        return object
+    end
+
+    if itemId == "gear_meadow_satchel" then
+        shape(
+            "Bag",
+            Vector3.new(2.5, 1.8, 1.2),
+            Vector3.new(0, 0, 0),
+            Color3.fromRGB(133, 176, 108)
+        )
+        shape(
+            "Flap",
+            Vector3.new(2.1, 0.25, 1.25),
+            Vector3.new(0, 0.95, -0.05),
+            Color3.fromRGB(94, 128, 78)
+        )
+        shape(
+            "Strap",
+            Vector3.new(0.25, 2.6, 0.25),
+            Vector3.new(0, 0.15, 0.7),
+            Color3.fromRGB(73, 48, 36)
+        )
+    elseif itemId == "gear_amber_charm" then
+        local gem = shape(
+            "Amber",
+            Vector3.new(1.4, 1.4, 1.4),
+            Vector3.new(0, 0, 0),
+            Color3.fromRGB(255, 181, 76)
+        )
+        gem.Shape = Enum.PartType.Ball
+        local ring = shape(
+            "Ring",
+            Vector3.new(0.28, 2.2, 2.2),
+            Vector3.new(0, 0, 0),
+            Color3.fromRGB(94, 206, 176)
+        )
+        ring.Shape = Enum.PartType.Cylinder
+        ring.Orientation = Vector3.new(0, 0, 90)
+    elseif itemId == "gear_ironroot_hood" then
+        shape(
+            "Hood",
+            Vector3.new(2.4, 1.8, 1.8),
+            Vector3.new(0, 0.1, 0),
+            Color3.fromRGB(76, 101, 88)
+        )
+        shape(
+            "Rim",
+            Vector3.new(2.6, 0.25, 1.9),
+            Vector3.new(0, -0.82, -0.1),
+            Color3.fromRGB(44, 62, 54)
+        )
+    else
+        shape(
+            "BootLeft",
+            Vector3.new(0.9, 1.7, 1.8),
+            Vector3.new(-0.65, -0.05, 0),
+            Color3.fromRGB(142, 112, 84)
+        )
+        shape(
+            "BootRight",
+            Vector3.new(0.9, 1.7, 1.8),
+            Vector3.new(0.65, -0.05, 0),
+            Color3.fromRGB(116, 86, 63)
+        )
+    end
+    return viewport
+end
+
 local COLORS = {
     ink = Color3.fromRGB(14, 22, 21),
     panel = Color3.fromRGB(20, 31, 29),
@@ -19998,6 +20097,8 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     useCharm.Parent = canvas
     corner(useCharm, 12)
     stroke(useCharm, COLORS.amber, 0.42)
+    createItemIcon(useCharm, "gear_amber_charm", 30)
+    useCharm.TextXAlignment = Enum.TextXAlignment.Right
 
     local useSatchel = Instance.new("TextButton")
     useSatchel.Name = "UseMeadowSatchel"
@@ -20015,6 +20116,8 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     useSatchel.Parent = canvas
     corner(useSatchel, 12)
     stroke(useSatchel, Color3.fromRGB(133, 176, 108), 0.42)
+    createItemIcon(useSatchel, "gear_meadow_satchel", 30)
+    useSatchel.TextXAlignment = Enum.TextXAlignment.Right
 
     local professionOverlay = Instance.new("Frame")
     professionOverlay.Name = "ProfessionOverlay"
@@ -20140,6 +20243,8 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         button.Parent = progressPanel
         corner(button, 10)
         stroke(button, COLORS.amber, 0.45)
+        createItemIcon(button, item.id, 28)
+        button.TextXAlignment = Enum.TextXAlignment.Right
         equipmentButtons[item.id] = button
     end
     local progressClose = Instance.new("TextButton")
