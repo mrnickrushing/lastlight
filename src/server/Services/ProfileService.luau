@@ -393,6 +393,14 @@ function ProfileService.equipmentStats(self: ProfileService, player: Player): an
     return self._saveSchema.equipmentStats(profile)
 end
 
+function ProfileService.townConsequence(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { tier = 0, title = "EMBERHOLLOW AWAKENS", detail = "" }
+    end
+    return self._saveSchema.townConsequence(profile)
+end
+
 -- Safe to call after any action, whether or not it moved a quest signal:
 -- returns an empty list and touches nothing when there's nothing newly
 -- claimable.

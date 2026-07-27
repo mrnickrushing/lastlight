@@ -7,6 +7,7 @@ local Crafting = require("./Crafting")
 local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
+local TownProgression = require("./TownProgression")
 
 local SaveSchema = {}
 
@@ -490,6 +491,10 @@ end
 
 function SaveSchema.questSnapshot(profile: Profile): { any }
     return Quests.snapshot(profile.quests.claimed, questSignals(profile))
+end
+
+function SaveSchema.townConsequence(profile: Profile): TownProgression.Consequence
+    return TownProgression.resolve(profile)
 end
 
 return table.freeze(SaveSchema)

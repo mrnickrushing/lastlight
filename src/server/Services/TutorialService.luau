@@ -300,6 +300,7 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
         toastRevision = 1,
     }
     self._sessions[player] = session
+    self._worldService:setTownConsequence(self._profileService:townConsequence(player))
 
     if
         stage == "build"
@@ -951,6 +952,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         equipped = self._profileService:equippedSnapshot(player),
         equipmentStats = self._profileService:equipmentStats(player),
         mastery = self._profileService:masterySnapshot(player),
+        townConsequence = self._profileService:townConsequence(player),
         recipes = self._craftingCatalog:list(),
         equipmentCatalog = self._equipmentCatalog.list(),
         quests = self._profileService:questSnapshot(player),

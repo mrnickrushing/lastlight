@@ -39,6 +39,7 @@ export type WorldService = typeof(setmetatable(
         _wardenStagArena: any,
         _blackoutArena: any,
         _characterRoots: { [Player]: BasePart? },
+        _townConsequence: any,
     },
     WorldService
 ))
@@ -219,6 +220,7 @@ function WorldService.new(logger: Logger): WorldService
         _wardenStagArena = nil,
         _blackoutArena = nil,
         _characterRoots = {},
+        _townConsequence = nil,
     }, WorldService)
 end
 
@@ -903,6 +905,32 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
         light.Parent = beacon
         addBillboard(beacon, "THE BRAMBLEWAKE REMEMBERS", CREAM)
     end
+end
+
+function WorldService.setTownConsequence(self: WorldService, consequence: any)
+    self._townConsequence = consequence
+    local world = self._world
+    if world == nil or type(consequence) ~= "table" then
+        return
+    end
+    local existing = world:FindFirstChild("TownConsequenceBanner")
+    if existing ~= nil then
+        existing:Destroy()
+    end
+    local banner = part(
+        world,
+        "TownConsequenceBanner",
+        Vector3.new(12, 3.5, 0.6),
+        CFrame.new(0, 6, -8),
+        if consequence.tier >= 2 then Color3.fromRGB(104, 187, 166) else AMBER,
+        Enum.Material.WoodPlanks,
+        false
+    )
+    addBillboard(banner, string.format("TIER %d · %s", consequence.tier, consequence.title), CREAM)
+    banner:SetAttribute("Consequence", consequence.detail)
+    world:SetAttribute("TownTier", consequence.tier)
+    world:SetAttribute("TownDecision", tostring(consequence.decision or "unresolved"))
+    world:SetAttribute("WardenOutcome", tostring(consequence.wardenOutcome or "unresolved"))
 end
 
 function WorldService.buildBramblewake(
