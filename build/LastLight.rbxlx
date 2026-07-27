@@ -17338,7 +17338,7 @@ local function billboard(target: BasePart, text: string, color: Color3)
     corner.Parent = label
 end
 
-local function objectIcon(target: BasePart, kind: string, color: Color3)
+local function _objectIcon(target: BasePart, kind: string, color: Color3)
     local gui = Instance.new("BillboardGui")
     gui.Name = "ObjectIcon"
     gui.Adornee = target
@@ -17404,6 +17404,10 @@ local function objectIcon(target: BasePart, kind: string, color: Color3)
     icon.Shape = if kind == "rootfire" then Enum.PartType.Ball else Enum.PartType.Cylinder
     icon.Parent = worldModel
 end
+
+-- Interactable identity is authored by the physical world prop itself. Keep
+-- this compatibility hook for older callers without adding floating UI cards.
+local function objectIcon(_target: BasePart, _kind: string, _color: Color3) end
 
 local function destinationRing(parent: Instance, center: Vector3, color: Color3, radius: number)
     for index = 1, 8 do
@@ -17997,8 +18001,32 @@ local function buildEventSocket(
             target = orb(parent, "Foxlight_" .. step.id, position, 2.2, FOXFIRE, Enum.Material.Neon)
             target.Transparency = 0.16
             light(target, FOXFIRE, 1.1, 14)
+            part(
+                parent,
+                "FoxlightStem_" .. step.id,
+                Vector3.new(0.35, 2.2, 0.35),
+                CFrame.new(position - Vector3.new(0, 1.4, 0)) * CFrame.Angles(0, 0, math.rad(12)),
+                DARK_BARK,
+                Enum.Material.Wood,
+                false
+            )
         elseif definition.visual == "root_bridge" then
             target = orb(parent, "RootKnot_" .. step.id, position, 2.7, AMBER, Enum.Material.Wood)
+            target.Shape = Enum.PartType.Cylinder
+            target.CFrame *= CFrame.Angles(0, 0, math.rad(90))
+            target.Size = Vector3.new(1.5, 2.7, 1.5)
+            for rootIndex = -1, 1 do
+                part(
+                    parent,
+                    "RootBridgeBranch_" .. step.id,
+                    Vector3.new(0.45, 2.8, 0.45),
+                    CFrame.new(position + Vector3.new(rootIndex * 0.8, 0.4, 0.8))
+                        * CFrame.Angles(math.rad(34), 0, math.rad(rootIndex * 18)),
+                    BARK,
+                    Enum.Material.Wood,
+                    false
+                )
+            end
         elseif definition.visual == "wagon" then
             target = part(
                 parent,
@@ -18149,6 +18177,9 @@ local function buildWardenSeal(
         Color3.fromRGB(87, 119, 101),
         Enum.Material.SmoothPlastic
     )
+    seal.Shape = Enum.PartType.Cylinder
+    seal.CFrame *= CFrame.Angles(0, 0, math.rad(90))
+    seal.Size = Vector3.new(1.2, 7, 7)
     seal.Transparency = 0.52
     billboard(seal, "WARDEN'S SEAL · CLEANSE OLD GROWTH", CREAM)
     objectIcon(seal, "seal", FOXFIRE)
@@ -18190,6 +18221,9 @@ local function buildWardenSeal(
             Color3.fromRGB(80, 116, 83),
             Enum.Material.SmoothPlastic
         )
+        node.Shape = Enum.PartType.Cylinder
+        node.CFrame *= CFrame.Angles(0, 0, math.rad(90))
+        node.Size = Vector3.new(2.6, 4.8, 2.6)
         node.Transparency = 0.34
         node:SetAttribute("BossId", "boss_warden_stag")
         node:SetAttribute("BossInteraction", "cleanse_root")
@@ -18307,7 +18341,20 @@ local function buildBlackoutLayer(
         Color3.fromRGB(94, 83, 64),
         Enum.Material.SmoothPlastic
     )
-    fireSource.Transparency = 0.48
+    fireSource.Shape = Enum.PartType.Cylinder
+    fireSource.CFrame *= CFrame.Angles(0, 0, math.rad(90))
+    fireSource.Size = Vector3.new(2.2, 4.8, 2.2)
+    fireSource.Color = DARK_BARK
+    fireSource.Material = Enum.Material.Wood
+    local sourceFlame = orb(
+        layer,
+        "BlackoutLanternFlame",
+        fireSource.Position + Vector3.new(0, 2.7, 0),
+        2.1,
+        AMBER,
+        Enum.Material.Neon
+    )
+    light(sourceFlame, AMBER, 1.8, 16)
     fireSource:SetAttribute("BlackoutInteraction", "take_fire")
     CollectionService:AddTag(fireSource, runtimeIds.ExpeditionBlackoutTag)
     billboard(fireSource, "BLACKOUT FIRE · CARRY TO LIVING ROOTS", CREAM)
@@ -18353,7 +18400,20 @@ local function buildBlackoutLayer(
             Color3.fromRGB(70, 91, 72),
             Enum.Material.SmoothPlastic
         )
-        node.Transparency = 0.5
+        node.Shape = Enum.PartType.Cylinder
+        node.CFrame *= CFrame.Angles(0, 0, math.rad(90))
+        node.Size = Vector3.new(2.4, 5.8, 2.4)
+        node.Color = DARK_BARK
+        node.Material = Enum.Material.Wood
+        local relayCore = orb(
+            layer,
+            "BlackoutRelayCore_" .. definition.label,
+            node.Position + Vector3.new(0, 3.2, 0),
+            1.8,
+            FOXFIRE,
+            Enum.Material.Neon
+        )
+        light(relayCore, FOXFIRE, 1.1, 12)
         node:SetAttribute("BlackoutInteraction", "deliver_fire")
         node:SetAttribute("BlackoutNodeId", definition.nodeId)
         CollectionService:AddTag(node, runtimeIds.ExpeditionBlackoutTag)
