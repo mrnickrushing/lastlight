@@ -175,9 +175,9 @@ local function addBillboard(partInstance: BasePart, title: string, accent: Color
     billboard.Adornee = partInstance
     billboard.AlwaysOnTop = false
     billboard.LightInfluence = 0.35
-    billboard.Size = UDim2.fromOffset(220, 54)
-    billboard.StudsOffsetWorldSpace = Vector3.new(0, 4.5, 0)
-    billboard.MaxDistance = 45
+    billboard.Size = UDim2.fromOffset(165, 38)
+    billboard.StudsOffsetWorldSpace = Vector3.new(0, 3.6, 0)
+    billboard.MaxDistance = 32
     billboard.Parent = partInstance
 
     local text = Instance.new("TextLabel")
@@ -188,7 +188,9 @@ local function addBillboard(partInstance: BasePart, title: string, accent: Color
     text.Font = Enum.Font.GothamBold
     text.Text = title
     text.TextColor3 = accent
-    text.TextScaled = true
+    text.TextScaled = false
+    text.TextSize = 12
+    text.TextWrapped = true
     text.Parent = billboard
 
     local corner = Instance.new("UICorner")
@@ -1093,6 +1095,39 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
             prompt.ActionText = if delivered then "TAKE ROOTFIRE" else "DELIVER ROOTFIRE"
             prompt.ObjectText = if delivered then "Lit Living Root" else "Unlit Living Root"
         end
+        local nextMarker = target:FindFirstChild("BlackoutNextMarker")
+        if nodeId == state.nextNodeId and relay and not delivered then
+            local marker = if nextMarker ~= nil and nextMarker:IsA("BillboardGui")
+                then nextMarker
+                else Instance.new("BillboardGui")
+            marker.Name = "BlackoutNextMarker"
+            marker.Adornee = target
+            marker.AlwaysOnTop = true
+            marker.LightInfluence = 0
+            marker.Size = UDim2.fromOffset(150, 32)
+            marker.StudsOffsetWorldSpace = Vector3.new(0, 4.8, 0)
+            marker.MaxDistance = 70
+            marker.Parent = target
+            local markerText = marker:FindFirstChild("MarkerText")
+            if markerText == nil or not markerText:IsA("TextLabel") then
+                markerText = Instance.new("TextLabel")
+                markerText.Name = "MarkerText"
+                markerText.BackgroundColor3 = Color3.fromRGB(12, 31, 25)
+                markerText.BackgroundTransparency = 0.08
+                markerText.BorderSizePixel = 0
+                markerText.Font = Enum.Font.GothamBold
+                markerText.Size = UDim2.fromScale(1, 1)
+                markerText.TextColor3 = Color3.fromRGB(172, 255, 205)
+                markerText.TextSize = 13
+                markerText.Text = "▼  NEXT ROOT"
+                markerText.Parent = marker
+                local corner = Instance.new("UICorner")
+                corner.CornerRadius = UDim.new(0, 8)
+                corner.Parent = markerText
+            end
+        elseif nextMarker ~= nil then
+            nextMarker:Destroy()
+        end
         for _, rootedWall in arena.model:GetChildren() do
             if
                 rootedWall:IsA("BasePart")
@@ -1149,14 +1184,17 @@ function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
         self:_applyTownLighting(self._night)
         return
     end
-    Lighting.Ambient = Color3.fromRGB(18, 28, 35)
+    Lighting.Brightness = 1.8
+    Lighting.Ambient = Color3.fromRGB(48, 62, 72)
+    Lighting.OutdoorAmbient = Color3.fromRGB(38, 52, 68)
+    Lighting.ExposureCompensation = -0.05
     local color = if effect ~= nil and effect:IsA("ColorCorrectionEffect")
         then effect
         else Instance.new("ColorCorrectionEffect")
     color.Name = "LastLightBlackoutColor"
-    color.Brightness = -0.08
-    color.Contrast = 0.14
-    color.Saturation = -0.18
+    color.Brightness = 0.04
+    color.Contrast = 0.04
+    color.Saturation = -0.05
     color.TintColor = Color3.fromRGB(164, 205, 186)
     color.Parent = Lighting
 end

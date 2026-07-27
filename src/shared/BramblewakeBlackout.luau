@@ -32,6 +32,16 @@ local RELAY_NODE_IDS = table.freeze({
     blackout_root_mill = true,
     blackout_root_cathedral = true,
 })
+local RELAY_NODE_ORDER = table.freeze({
+    "blackout_root_farm",
+    "blackout_root_mill",
+    "blackout_root_cathedral",
+})
+local RELAY_NODE_LABELS = table.freeze({
+    blackout_root_farm = "FARM ROOT",
+    blackout_root_mill = "MILL ROOT",
+    blackout_root_cathedral = "CATHEDRAL ROOT",
+})
 local DECISION_IDS = table.freeze({
     restore_farmland = true,
     wild_regrowth = true,
@@ -85,6 +95,15 @@ local function countTrue(values: { [string]: boolean }): number
         end
     end
     return count
+end
+
+local function nextRelayNodeId(deliveredNodes: { [string]: boolean }): string?
+    for _, nodeId in RELAY_NODE_ORDER do
+        if deliveredNodes[nodeId] ~= true then
+            return nodeId
+        end
+    end
+    return nil
 end
 
 local function active(status: Status): boolean
@@ -402,8 +421,11 @@ function BramblewakeBlackout.snapshot(state: State, userId: number, now: number)
     local fireExpiresAt = state.carriers[key]
     local carryingFire = fireExpiresAt ~= nil and now <= fireExpiresAt
     local delivered = countTrue(state.deliveredNodes)
+    local nextNodeId = nextRelayNodeId(state.deliveredNodes)
     local instruction = if state.status == "relay"
-        then "CARRY LANTERN FIRE BETWEEN LIVING ROOTS"
+        then if carryingFire
+            then "DELIVER ROOTFIRE TO THE MARKED NEXT ROOT"
+            else "TAKE ROOTFIRE FROM THE BLACKOUT LANTERN"
         elseif state.status == "old_growth" then "CLEANSE OLD GROWTH"
         elseif state.status == "warden" then "ANSWER THE WARDEN'S SEAL"
         elseif state.status == "resolution" then "CHOOSE THE GREENWARD'S FUTURE"
@@ -421,6 +443,8 @@ function BramblewakeBlackout.snapshot(state: State, userId: number, now: number)
         enabled = state.status ~= "disabled",
         fireExpiresAt = if carryingFire then fireExpiresAt else nil,
         instruction = instruction,
+        nextNodeId = nextNodeId,
+        nextNodeLabel = if nextNodeId == nil then nil else RELAY_NODE_LABELS[nextNodeId],
         overtime = targetEndsAt ~= nil and now > targetEndsAt,
         participant = state.participants[key] == true,
         relayRequired = 3,

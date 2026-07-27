@@ -1754,14 +1754,16 @@ function HUDController._updateClock(self: HUDController)
                     (tonumber(blackout.fireExpiresAt) or 0) - workspace:GetServerTimeNow()
                 )
                 self._blackoutDetail.Text = string.format(
-                    "CARRYING ROOTFIRE %.1fs · LIVING ROOTS %d/%d",
+                    "CARRY ROOTFIRE %.1fs → %s · %d/%d",
                     fireRemaining,
+                    tostring(blackout.nextNodeLabel or "NEXT ROOT"),
                     tonumber(blackout.deliveredNodes) or 0,
                     tonumber(blackout.relayRequired) or 3
                 )
             else
                 self._blackoutDetail.Text = string.format(
-                    "TAKE ROOTFIRE · LIVING ROOTS %d/%d",
+                    "TAKE ROOTFIRE → %s · %d/%d",
+                    tostring(blackout.nextNodeLabel or "NEXT ROOT"),
                     tonumber(blackout.deliveredNodes) or 0,
                     tonumber(blackout.relayRequired) or 3
                 )
