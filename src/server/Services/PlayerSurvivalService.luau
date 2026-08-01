@@ -38,6 +38,7 @@ export type PlayerSurvivalService = typeof(setmetatable(
         _featureFlags: any,
         _worldService: any,
         _analyticsService: any,
+        _equipmentStatsProvider: ((Player) -> any)?,
         _states: { [Player]: any },
         _spawned: { [Player]: boolean },
         _channels: { [Player]: ReviveChannel },
@@ -85,6 +86,7 @@ function PlayerSurvivalService.new(
         _featureFlags = featureFlags,
         _worldService = worldService,
         _analyticsService = analyticsService,
+        _equipmentStatsProvider = nil,
         _states = {},
         _spawned = {},
         _channels = {},
@@ -94,6 +96,36 @@ function PlayerSurvivalService.new(
         _onChanged = nil,
         _heartbeat = nil,
     }, PlayerSurvivalService)
+end
+
+function PlayerSurvivalService.setEquipmentStatsProvider(
+    self: PlayerSurvivalService,
+    provider: (Player) -> any
+)
+    self._equipmentStatsProvider = provider
+end
+
+function PlayerSurvivalService._equipmentDamage(
+    self: PlayerSurvivalService,
+    player: Player,
+    amount: number
+): (number, number)
+    if amount ~= amount or amount <= 0 or amount >= math.huge or amount ~= math.floor(amount) then
+        return amount, 0
+    end
+    local provider = self._equipmentStatsProvider
+    if provider == nil then
+        return amount, 0
+    end
+    local stats = provider(player)
+    local reduction = math.clamp(
+        if type(stats) == "table" and type(stats.damageReduction) == "number"
+            then stats.damageReduction
+            else 0,
+        0,
+        0.25
+    )
+    return math.max(1, math.ceil(amount * (1 - reduction))), reduction
 end
 
 function PlayerSurvivalService.Init(_self: PlayerSurvivalService, _context: any) end
@@ -126,6 +158,8 @@ function PlayerSurvivalService._syncPlayer(self: PlayerSurvivalService, player: 
     player:SetAttribute("LastLightMaxHealth", snapshot.maxHealth)
     player:SetAttribute("LastLightDowned", snapshot.downed)
     player:SetAttribute("LastLightBleedoutAt", snapshot.bleedoutAt)
+    local _, equipmentReduction = self:_equipmentDamage(player, 100)
+    player:SetAttribute("LastLightEquipmentDamageReduction", equipmentReduction)
 
     local activeHumanoid = humanoid(player)
     if activeHumanoid ~= nil then
@@ -378,12 +412,15 @@ function PlayerSurvivalService.damage(
         }
     end
     local now = workspace:GetServerTimeNow()
-    local nextState, result = self._survivalState.damage(state, amount, now)
+    local mitigatedAmount, equipmentReduction = self:_equipmentDamage(player, amount)
+    local nextState, result = self._survivalState.damage(state, mitigatedAmount, now)
     if not result.applied then
         return result
     end
 
     self._states[player] = nextState
+    result.rawDamage = amount
+    result.equipmentReduction = equipmentReduction
     self:_syncPlayer(player)
     if result.downed then
         self:_createVisual(player)

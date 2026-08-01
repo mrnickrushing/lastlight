@@ -22,6 +22,7 @@ export type PlayerCombatService = typeof(setmetatable(
         _featureFlags: any,
         _survivalService: any,
         _analyticsService: any,
+        _equipmentStatsProvider: ((Player) -> any)?,
         _states: { [Player]: any },
         _statusStates: { [Player]: any },
         _lastPublishedStamina: { [Player]: number },
@@ -64,6 +65,7 @@ function PlayerCombatService.new(
         _featureFlags = featureFlags,
         _survivalService = survivalService,
         _analyticsService = analyticsService,
+        _equipmentStatsProvider = nil,
         _states = {},
         _statusStates = {},
         _lastPublishedStamina = {},
@@ -74,6 +76,31 @@ function PlayerCombatService.new(
         _onChanged = nil,
         _heartbeat = nil,
     }, PlayerCombatService)
+end
+
+function PlayerCombatService.setEquipmentStatsProvider(
+    self: PlayerCombatService,
+    provider: (Player) -> any
+)
+    self._equipmentStatsProvider = provider
+end
+
+function PlayerCombatService._staminaRegenMultiplier(
+    self: PlayerCombatService,
+    player: Player
+): number
+    local provider = self._equipmentStatsProvider
+    if provider == nil then
+        return 1
+    end
+    local stats = provider(player)
+    return math.clamp(
+        if type(stats) == "table" and type(stats.staminaRegenMultiplier) == "number"
+            then stats.staminaRegenMultiplier
+            else 1,
+        0.75,
+        1.5
+    )
 end
 
 function PlayerCombatService.Init(_self: PlayerCombatService, _context: any) end
@@ -115,6 +142,7 @@ function PlayerCombatService._syncPlayer(self: PlayerCombatService, player: Play
     player:SetAttribute("LastLightRootedUntil", status.rootedUntil)
     player:SetAttribute("LastLightShielded", status.shielded)
     player:SetAttribute("LastLightShieldUntil", status.shieldUntil)
+    player:SetAttribute("LastLightStaminaRegenMultiplier", self:_staminaRegenMultiplier(player))
 
     local activeHumanoid = humanoid(player)
     if activeHumanoid ~= nil then
@@ -201,8 +229,12 @@ end
 function PlayerCombatService._step(self: PlayerCombatService, now: number)
     local enabled = self._featureFlags:isEnabled("combat_mobility_enabled")
     for player, state in self._states do
-        local nextState =
-            self._combatState.advance(state, now, enabled and self._survivalService:canAct(player))
+        local nextState = self._combatState.advance(
+            state,
+            now,
+            enabled and self._survivalService:canAct(player),
+            self:_staminaRegenMultiplier(player)
+        )
         self._states[player] = nextState
 
         local snapshot = self._combatState.snapshot(nextState, now)
@@ -252,7 +284,8 @@ function PlayerCombatService.applyRooted(
         return false
     end
     local now = workspace:GetServerTimeNow()
-    local nextState, _result = self._combatState.setSprint(state, false, now, true)
+    local nextState, _result =
+        self._combatState.setSprint(state, false, now, true, self:_staminaRegenMultiplier(player))
     self._states[player] = nextState
     self._statusStates[player] =
         self._statusEffectState.applyRooted(statusState, now, duration, multiplier)
@@ -275,7 +308,8 @@ function PlayerCombatService.applyDrowsy(
         return false
     end
     local now = workspace:GetServerTimeNow()
-    local nextState, _result = self._combatState.setSprint(state, false, now, true)
+    local nextState, _result =
+        self._combatState.setSprint(state, false, now, true, self:_staminaRegenMultiplier(player))
     self._states[player] = nextState
     self._statusStates[player] =
         self._statusEffectState.applyDrowsy(statusState, now, duration, multiplier)
@@ -315,7 +349,12 @@ function PlayerCombatService.peekStamina(self: PlayerCombatService, player: Play
         return nil
     end
     local now = workspace:GetServerTimeNow()
-    local advanced = self._combatState.advance(state, now, self._survivalService:canAct(player))
+    local advanced = self._combatState.advance(
+        state,
+        now,
+        self._survivalService:canAct(player),
+        self:_staminaRegenMultiplier(player)
+    )
     return self._combatState.snapshot(advanced, now).stamina
 end
 
@@ -332,8 +371,13 @@ function PlayerCombatService.restoreStamina(
         }
     end
     local now = workspace:GetServerTimeNow()
-    local nextState, result =
-        self._combatState.restoreStamina(state, now, amount, self._survivalService:canAct(player))
+    local nextState, result = self._combatState.restoreStamina(
+        state,
+        now,
+        amount,
+        self._survivalService:canAct(player),
+        self:_staminaRegenMultiplier(player)
+    )
     self._states[player] = nextState
     self:_syncPlayer(player)
     self:_markPublished(player, now)
@@ -382,8 +426,13 @@ function PlayerCombatService.setSprint(
         }
     end
     local now = workspace:GetServerTimeNow()
-    local nextState, result =
-        self._combatState.setSprint(state, enabled, now, self._survivalService:canAct(player))
+    local nextState, result = self._combatState.setSprint(
+        state,
+        enabled,
+        now,
+        self._survivalService:canAct(player),
+        self:_staminaRegenMultiplier(player)
+    )
     self._states[player] = nextState
     self:_syncPlayer(player)
     self:_markPublished(player, now)
@@ -426,8 +475,12 @@ function PlayerCombatService.dodge(self: PlayerCombatService, player: Player): a
     end
 
     local now = workspace:GetServerTimeNow()
-    local nextState, result =
-        self._combatState.dodge(state, now, self._survivalService:canAct(player))
+    local nextState, result = self._combatState.dodge(
+        state,
+        now,
+        self._survivalService:canAct(player),
+        self:_staminaRegenMultiplier(player)
+    )
     self._states[player] = nextState
     if result.applied then
         local direction = activeHumanoid.MoveDirection

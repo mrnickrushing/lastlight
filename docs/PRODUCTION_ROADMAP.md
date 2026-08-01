@@ -109,16 +109,17 @@ immutable per-player chapter transaction, and a repeating server-owned town
 day/dusk/night cycle with an escalating six-enemy wave schedule, a
 seventh-night telegraph that is deliberately decoupled from Blackout access,
 and a save-schema-v8 night count, mastery, and equipment loadout that persists per player and resumes from
-whoever's record is highest across a server restart, plus a first pair of
+whoever's record is highest across a server restart, plus four starter
 crafting recipes that convert banked expedition materials into named gear
 recorded on a player's own profile through a server-owned, all-or-nothing
 transaction, a first pair of consumable gear effects (a stacking
 damage-reduction shield and an instant stamina restore) usable through
 dedicated keyboard/gamepad/touch bindings, and a first set of three silent
 quest milestones that auto-claim a material reward the moment their
-already-tracked objective is met.
-Profession mastery/specializations, equipment slots and permanent passive
-stats, a recipe-browsing UI and quest-board UI, quest-giver NPCs, the full
+already-tracked objective is met. Head/feet equipment slots now provide
+server-authoritative damage-reduction and stamina-regeneration passives.
+Profession mastery/specializations, additional equipment families and 3D gear
+visuals, a recipe-browsing UI and quest-board UI, quest-giver NPCs, the full
 recipe/inventory/quest catalog, per-night content differentiation,
 consequences visibly changing future town/region content, town tier, final
 art/audio, and all Studio/device/group evidence remain open.

@@ -108,6 +108,11 @@ local combatService = PlayerCombatService.new(
     survivalService,
     analyticsService
 )
+local function equipmentStats(player: Player): any
+    return profileService:equipmentStats(player)
+end
+survivalService:setEquipmentStatsProvider(equipmentStats)
+combatService:setEquipmentStatsProvider(equipmentStats)
 local professionService = ProfessionService.new(
     logger,
     ProfessionCatalog,

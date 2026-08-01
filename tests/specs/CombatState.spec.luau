@@ -54,6 +54,19 @@ return {
             end,
         },
         {
+            name = "applies a bounded equipment stamina regeneration multiplier",
+            run = function()
+                local state = CombatState.create(0)
+                state.stamina = 40
+                local normal = CombatState.advance(state, 1, true, 1)
+                local equipped = CombatState.advance(state, 1, true, 1.1)
+                local clamped = CombatState.advance(state, 1, true, 99)
+                TestRunner.equal(CombatState.snapshot(normal, 1).stamina, 64)
+                TestRunner.equal(CombatState.snapshot(equipped, 1).stamina, 66)
+                TestRunner.equal(CombatState.snapshot(clamped, 1).stamina, 76)
+            end,
+        },
+        {
             name = "spends stamina and grants a bounded dodge window",
             run = function()
                 local state = CombatState.create(0)
