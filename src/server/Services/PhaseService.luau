@@ -91,6 +91,7 @@ function PhaseService.startFirstNight(self: PhaseService): boolean
     local generation = self._generation
     self._phase = "dusk"
     self._phaseEndsAt = workspace:GetServerTimeNow() + self._duskSeconds
+    self._worldService:setDusk(true)
     self:_notify("DUSK FALLS — PREPARE THE LIGHT")
     self._logger:info("first_night_dusk_started", { duration = self._duskSeconds })
 

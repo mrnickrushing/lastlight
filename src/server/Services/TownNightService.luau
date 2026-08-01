@@ -113,12 +113,14 @@ function TownNightService._runCycle(self: TownNightService)
     while true do
         self._phase = "day"
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._daySeconds
+        self._worldService:setDusk(false)
         self:_notify(nil)
         self._logger:info("town_day_started", { night = self._nightNumber })
         waitUntilTime(self._phaseEndsAt)
 
         self._phase = "dusk"
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._duskSeconds
+        self._worldService:setDusk(true)
         self:_notify(
             string.format(
                 "DUSK FALLS — %s NIGHT %d APPROACHES",

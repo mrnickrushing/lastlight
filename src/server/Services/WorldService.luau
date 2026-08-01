@@ -30,6 +30,8 @@ export type WorldService = typeof(setmetatable(
         _lanternVisualHealth: number,
         _beacon: BasePart?,
         _barricadeBuilt: boolean,
+        _dusk: boolean,
+        _duskSignals: { BasePart },
         _night: boolean,
         _blackoutLightingActive: boolean,
         _expeditionEntry: CFrame?,
@@ -823,6 +825,8 @@ function WorldService.new(logger: Logger): WorldService
         _lanternVisualHealth = 100,
         _beacon = nil,
         _barricadeBuilt = false,
+        _dusk = false,
+        _duskSignals = {},
         _night = false,
         _blackoutLightingActive = false,
         _expeditionEntry = nil,
@@ -1113,6 +1117,62 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     lantern(geometry, Vector3.new(9, 0, -102), 0.62)
     labelSign(geometry, CFrame.new(7, 3, -14) * CFrame.Angles(0, math.pi, 0), "EMBERHOLLOW")
     buildEmberhollowSanctuary(geometry)
+
+    local warningFolder = Instance.new("Folder")
+    warningFolder.Name = "DuskTreelineWarnings"
+    warningFolder.Parent = geometry
+    local warningCenters = {
+        Vector3.new(-44, 3.1, -133),
+        Vector3.new(46, 3.4, -121),
+        Vector3.new(0, 3.2, -174),
+    }
+    for warningIndex, center in warningCenters do
+        local body = part(
+            warningFolder,
+            "DuskThreatSilhouette",
+            Vector3.new(5.2, 6.4, 3.3),
+            CFrame.new(center) * CFrame.Angles(0, math.rad((warningIndex - 2) * 18), 0),
+            Color3.fromRGB(24, 27, 28),
+            Enum.Material.Slate,
+            false
+        )
+        body.Shape = Enum.PartType.Ball
+        body.CastShadow = false
+        body.Transparency = 1
+        body:SetAttribute("DuskTransparency", 0.08)
+        table.insert(_self._duskSignals, body)
+        for side = -1, 1, 2 do
+            local shoulder = part(
+                warningFolder,
+                "DuskThreatRoot",
+                Vector3.new(0.8, 5.4, 0.8),
+                CFrame.new(center + Vector3.new(side * 2.7, 0.2, 0))
+                    * CFrame.Angles(0, 0, math.rad(side * 30)),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+            shoulder.CastShadow = false
+            shoulder.Transparency = 1
+            shoulder:SetAttribute("DuskTransparency", 0.12)
+            table.insert(_self._duskSignals, shoulder)
+
+            local eye = part(
+                warningFolder,
+                "DuskThreatEye",
+                Vector3.new(0.38, 0.38, 0.22),
+                CFrame.new(center + Vector3.new(side * 0.72, 0.65, -1.65)),
+                Color3.fromRGB(255, 137, 82),
+                Enum.Material.Neon,
+                false
+            )
+            eye.Shape = Enum.PartType.Ball
+            eye.CastShadow = false
+            eye.Transparency = 1
+            eye:SetAttribute("DuskTransparency", 0.04)
+            table.insert(_self._duskSignals, eye)
+        end
+    end
 end
 
 function WorldService._buildMara(self: WorldService, world: Model)
@@ -2139,10 +2199,13 @@ function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
         if effect ~= nil then
             effect:Destroy()
         end
-        -- Restore whichever of day/night is actually current -- the town
-        -- cycle may have ticked past this Blackout's own start/end while it
-        -- ran and setNight() skipped applying it (see setNight above).
-        self:_applyTownLighting(self._night)
+        -- Restore the current town phase; the cycle may have advanced while
+        -- the Blackout owned shared Lighting.
+        if self._dusk and not self._night then
+            self:_applyDuskLighting()
+        else
+            self:_applyTownLighting(self._night)
+        end
         return
     end
     Lighting.Brightness = 1.8
@@ -2420,9 +2483,67 @@ function WorldService.expeditionSnapshot(self: WorldService, player: Player): an
     }
 end
 
--- Raw property application shared by setNight and setBlackoutLighting's
--- restore path, so the two never disagree about what "town day" or "town
--- night" actually looks like.
+function WorldService._setDuskSignals(self: WorldService, visible: boolean)
+    for _, signal in self._duskSignals do
+        if signal.Parent ~= nil then
+            TweenService
+                :Create(
+                    signal,
+                    TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    {
+                        Transparency = if visible
+                            then tonumber(signal:GetAttribute("DuskTransparency")) or 0.1
+                            else 1,
+                    }
+                )
+                :Play()
+        end
+    end
+end
+
+function WorldService._applyDuskLighting(_self: WorldService)
+    Lighting.ClockTime = 18.15
+    Lighting.Brightness = 1.42
+    Lighting.Ambient = Color3.fromRGB(49, 46, 52)
+    Lighting.OutdoorAmbient = Color3.fromRGB(72, 61, 65)
+    Lighting.ExposureCompensation = -0.36
+    local atmosphere = Lighting:FindFirstChild("LastLightAtmosphere")
+    if atmosphere ~= nil and atmosphere:IsA("Atmosphere") then
+        atmosphere.Color = Color3.fromRGB(164, 143, 133)
+        atmosphere.Decay = Color3.fromRGB(42, 42, 54)
+        atmosphere.Density = 0.4
+        atmosphere.Haze = 2.15
+        atmosphere.Glare = 0.13
+    end
+    local tone = Lighting:FindFirstChild("LastLightTone")
+    if tone ~= nil and tone:IsA("ColorCorrectionEffect") then
+        tone.Brightness = -0.05
+        tone.Contrast = 0.28
+        tone.Saturation = -0.08
+        tone.TintColor = Color3.fromRGB(237, 205, 188)
+    end
+    local bloom = Lighting:FindFirstChild("LastLightBloom")
+    if bloom ~= nil and bloom:IsA("BloomEffect") then
+        bloom.Intensity = 0.4
+        bloom.Threshold = 0.78
+    end
+end
+
+function WorldService.setDusk(self: WorldService, enabled: boolean)
+    self._dusk = enabled
+    self:_setDuskSignals(enabled)
+    if self._blackoutLightingActive or self._night then
+        return
+    end
+    if enabled then
+        self:_applyDuskLighting()
+    else
+        self:_applyTownLighting(false)
+    end
+end
+
+-- Raw property application shared by the cycle and Blackout restore path, so
+-- day and night always return to the same authored values.
 function WorldService._applyTownLighting(_self: WorldService, night: boolean)
     local atmosphere = Lighting:FindFirstChild("LastLightAtmosphere")
     local tone = Lighting:FindFirstChild("LastLightTone")
@@ -2488,6 +2609,10 @@ end
 
 function WorldService.setNight(self: WorldService, enabled: boolean)
     self._night = enabled
+    if enabled then
+        self._dusk = false
+        self:_setDuskSignals(false)
+    end
     -- The recurring town cycle and the Blackout are timed independently and
     -- can now be active at once (an earlier decision deliberately keeps
     -- Bramblewake entry unblocked regardless of the town's night count).
