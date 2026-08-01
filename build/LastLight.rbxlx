@@ -8338,6 +8338,7 @@ type AttackVisual = {
 
 type Attack = {
     areaCFrame: CFrame,
+    facingPosition: Vector3,
     flow: any,
     target: Player,
     visual: AttackVisual,
@@ -8899,6 +8900,7 @@ function EnemyService._startAttack(self: EnemyService, enemy: Enemy, target: Pla
     enemy.facingPosition = root.Position
     enemy.attack = {
         areaCFrame = areaCFrame,
+        facingPosition = root.Position,
         flow = self._enemyAttackFlow.create(target.UserId, now, enemy.definition.windup),
         target = target,
         visual = self:_createAttackVisual(enemy.definition, areaCFrame),
@@ -8951,9 +8953,11 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
         return
     end
     local root = rootPart(attack.target)
-    if root ~= nil then
-        enemy.facingPosition = root.Position
-    end
+    -- The warning marker and damage area lock when windup begins. Keep the
+    -- creature's readable anticipation on that same lane even if the target
+    -- moves; retargeting only the model would lie about where damage resolves
+    -- and would also rotate Briarback's frontal-shield test mid-attack.
+    enemy.facingPosition = attack.facingPosition
     local attackDuration = math.max(0.01, attack.flow.endsAt - attack.flow.startedAt)
     self:_poseEnemy(
         enemy,
