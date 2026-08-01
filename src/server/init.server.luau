@@ -19,6 +19,7 @@ local Environment = require(root.Environment)
 local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local ExpeditionRewardLedger = require(root.ExpeditionRewardLedger)
+local ExtractionPayoff = require(root.ExtractionPayoff)
 local NightSchedule = require(root.NightSchedule)
 local OldGrowthEncounter = require(root.OldGrowthEncounter)
 local WardenStagEncounter = require(root.WardenStagEncounter)
@@ -74,7 +75,7 @@ local content = Registry.new(Regions)
 local networkService = NetworkService.new(logger)
 local profileService = ProfileService.new(logger, environmentConfig.UsePersistentData)
 local analyticsService = AnalyticsService.new(logger)
-local worldService = WorldService.new(logger)
+local worldService = WorldService.new(logger, ExtractionPayoff)
 local expeditionService = ExpeditionService.new(
     logger,
     worldService,

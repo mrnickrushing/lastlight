@@ -21,6 +21,7 @@ export type WorldService = typeof(setmetatable(
     {} :: {
         Name: string,
         _logger: Logger,
+        _extractionPayoff: any,
         _runtimeIds: any,
         _world: Model?,
         _interactions: { [string]: ProximityPrompt },
@@ -888,10 +889,11 @@ local function _addObjectIcon(partInstance: BasePart, kind: string, accent: Colo
     end
 end
 
-function WorldService.new(logger: Logger): WorldService
+function WorldService.new(logger: Logger, extractionPayoff: any): WorldService
     return setmetatable({
         Name = WorldService.Name,
         _logger = logger,
+        _extractionPayoff = extractionPayoff,
         _runtimeIds = nil,
         _world = nil,
         _interactions = {},
@@ -2357,6 +2359,183 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
     world:SetAttribute("WardenOutcome", tostring(consequence.wardenOutcome or "unresolved"))
 end
 
+function WorldService.showExtractionPayoff(self: WorldService, player: Player, materials: any)
+    local entries, total = self._extractionPayoff.summarize(materials)
+    local world = self._world
+    if world == nil or #entries == 0 or total <= 0 or player.Parent == nil then
+        return
+    end
+
+    local deliveries = world:FindFirstChild("WayhomeDeliveries")
+    if deliveries == nil then
+        deliveries = Instance.new("Folder")
+        deliveries.Name = "WayhomeDeliveries"
+        deliveries.Parent = world
+    end
+    local deliveryName = "WayhomeDelivery_" .. tostring(player.UserId)
+    local existing = deliveries:FindFirstChild(deliveryName)
+    if existing ~= nil then
+        existing:Destroy()
+    end
+
+    local delivery = Instance.new("Model")
+    delivery.Name = deliveryName
+    delivery:SetAttribute("OwnerUserId", player.UserId)
+    delivery:SetAttribute("MaterialCount", total)
+    delivery.Parent = deliveries
+
+    local slot = player.UserId % 4
+    local origin = Vector3.new(-24 + slot * 8, 0, -13)
+    local pallet = part(
+        delivery,
+        "WayhomePallet",
+        Vector3.new(7, 0.65, 5.5),
+        CFrame.new(origin + Vector3.new(0, 0.34, 0)),
+        Color3.fromRGB(91, 63, 43),
+        Enum.Material.WoodPlanks,
+        false
+    )
+    addBillboard(
+        pallet,
+        string.format(
+            "%s · WAYHOME DELIVERY · %d",
+            string.upper(string.sub(player.DisplayName, 1, 18)),
+            total
+        ),
+        AMBER
+    )
+
+    local pieceIndex = 0
+    local function animatePiece(piece: BasePart, targetCFrame: CFrame)
+        pieceIndex += 1
+        piece.CFrame = targetCFrame - Vector3.new(0, 4.5 + pieceIndex * 0.16, 0)
+        task.delay(0.08 * pieceIndex, function()
+            if piece.Parent ~= nil then
+                TweenService
+                    :Create(
+                        piece,
+                        TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+                        { CFrame = targetCFrame }
+                    )
+                    :Play()
+            end
+        end)
+    end
+
+    for entryIndex, entry in entries do
+        local stackCount = math.min(3, math.max(1, math.ceil(entry.amount / 3)))
+        for stackIndex = 1, stackCount do
+            local row = entryIndex - 1
+            local offset = Vector3.new(-2.4 + (stackIndex - 1) * 2.35, 1.2, -1.7 + row * 1.15)
+            local targetCFrame = CFrame.new(origin + offset)
+            local cargo: Part
+            if entry.kind == "heartwood" then
+                cargo = part(
+                    delivery,
+                    "HeartwoodLog",
+                    Vector3.new(1.1, 3.6, 1.1),
+                    targetCFrame * CFrame.Angles(0, 0, math.rad(90)),
+                    BARK,
+                    Enum.Material.Wood,
+                    false
+                )
+                cargo.Shape = Enum.PartType.Cylinder
+                targetCFrame = cargo.CFrame
+            elseif entry.kind == "amber" then
+                cargo = part(
+                    delivery,
+                    "AmberSapVial",
+                    Vector3.new(1.25, 1.55, 1.25),
+                    targetCFrame,
+                    AMBER,
+                    Enum.Material.Glass,
+                    false
+                )
+                cargo.Shape = Enum.PartType.Ball
+                cargo.Transparency = 0.12
+                if stackIndex == 1 then
+                    local cargoLight = Instance.new("PointLight")
+                    cargoLight.Color = AMBER
+                    cargoLight.Brightness = 0.8
+                    cargoLight.Range = 9
+                    cargoLight.Shadows = false
+                    cargoLight.Parent = cargo
+                end
+            elseif entry.kind == "brightcap" then
+                cargo = part(
+                    delivery,
+                    "Brightcap",
+                    Vector3.new(1.8, 0.85, 1.8),
+                    targetCFrame + Vector3.new(0, 0.65, 0),
+                    FOXFIRE,
+                    Enum.Material.Neon,
+                    false
+                )
+                cargo.Shape = Enum.PartType.Ball
+                targetCFrame = cargo.CFrame
+                local stem = part(
+                    delivery,
+                    "BrightcapStem",
+                    Vector3.new(0.55, 1.3, 0.55),
+                    targetCFrame - Vector3.new(0, 0.8, 0),
+                    CREAM,
+                    Enum.Material.Wood,
+                    false
+                )
+                animatePiece(stem, stem.CFrame)
+            elseif entry.kind == "fiber" then
+                cargo = part(
+                    delivery,
+                    "MeadowFiberBundle",
+                    Vector3.new(1.5, 1.1, 2.4),
+                    targetCFrame * CFrame.Angles(0, 0, math.rad(12)),
+                    Color3.fromRGB(169, 139, 67),
+                    Enum.Material.Fabric,
+                    false
+                )
+                targetCFrame = cargo.CFrame
+            else
+                cargo = part(
+                    delivery,
+                    "SpringClayBundle",
+                    Vector3.new(1.6, 1.35, 1.6),
+                    targetCFrame,
+                    Color3.fromRGB(133, 91, 72),
+                    Enum.Material.Ground,
+                    false
+                )
+                cargo.Shape = Enum.PartType.Ball
+            end
+            cargo:SetAttribute("MaterialId", entry.id)
+            cargo:SetAttribute("Amount", entry.amount)
+            animatePiece(cargo, targetCFrame)
+        end
+    end
+
+    local pulse = part(
+        delivery,
+        "WayhomeDeliveryPulse",
+        Vector3.new(0.14, 3, 3),
+        CFrame.new(origin + Vector3.new(0, 0.16, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+        FOXFIRE,
+        Enum.Material.Glass,
+        false
+    )
+    pulse.Shape = Enum.PartType.Cylinder
+    pulse.Transparency = 0.38
+    pulse.CastShadow = false
+    TweenService:Create(
+        pulse,
+        TweenInfo.new(0.85, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { Size = Vector3.new(0.14, 13, 13), Transparency = 1 }
+    ):Play()
+    task.delay(1, function()
+        if pulse.Parent ~= nil then
+            pulse:Destroy()
+        end
+    end)
+end
+
 function WorldService.buildBramblewake(
     self: WorldService,
     manifest: any,
@@ -2813,7 +2992,11 @@ function WorldService.enterBramblewake(self: WorldService, player: Player): bool
     return true
 end
 
-function WorldService.exitBramblewake(self: WorldService, player: Player): boolean
+function WorldService.exitBramblewake(
+    self: WorldService,
+    player: Player,
+    onArrive: (() -> ())?
+): boolean
     local character = player.Character
     if character == nil then
         return false
@@ -2844,6 +3027,9 @@ function WorldService.exitBramblewake(self: WorldService, player: Player): boole
             activeCharacter:PivotTo(destination)
         end
         player:SetAttribute("LastLightExpeditionTransition", false)
+        if player.Parent ~= nil and onArrive ~= nil then
+            task.defer(onArrive)
+        end
     end)
     return true
 end
