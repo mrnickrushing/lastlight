@@ -89,6 +89,24 @@ local ENTRIES: { Entry } = {
         placementBand = "curated_core",
         pbr = false,
     },
+    {
+        id = "mesh_wayfarer_cabin_a",
+        assetId = 108978160303399,
+        targetLongestDimension = 20,
+        maxTriangles = 5000,
+        maxMaterialSlots = 6,
+        placementBand = "curated_core",
+        pbr = false,
+    },
+    {
+        id = "mesh_lantern_post_a",
+        assetId = 129285000481750,
+        targetLongestDimension = 9,
+        maxTriangles = 2200,
+        maxMaterialSlots = 4,
+        placementBand = "curated_core",
+        pbr = false,
+    },
 }
 
 local BY_ID: { [string]: Entry } = {}

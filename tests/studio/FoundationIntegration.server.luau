@@ -41,7 +41,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.31.1", "unexpected build version")
+assert(Config.BuildVersion == "0.32.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -337,7 +337,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v12",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v13",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -345,6 +345,17 @@ assert(world:FindFirstChild("Mara", true) ~= nil, "Mara is missing")
 assert(world:FindFirstChild("HeartwoodStump", true) ~= nil, "gather node is missing")
 assert(world:FindFirstChild("ConstructionPlot", true) ~= nil, "construction plot is missing")
 assert(world:FindFirstChild("FirstLantern", true) ~= nil, "First Lantern is missing")
+local roadSegments = 0
+local roadEdgeStones = 0
+for _, descendant in world:GetDescendants() do
+    if descendant.Name == "EmberhollowRoad" then
+        roadSegments += 1
+    elseif descendant.Name == "RoadEdgeStone" then
+        roadEdgeStones += 1
+    end
+end
+assert(roadSegments == 6, "arrival road must connect every authored route segment")
+assert(roadEdgeStones >= 40, "arrival road needs a repeated visible stone edge")
 assert(world:GetAttribute("TownIntegrity") == 100, "new towns must begin fully repaired")
 assert(world:GetAttribute("TownDamageLevel") == 0, "new towns cannot begin visibly damaged")
 assert(

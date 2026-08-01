@@ -70,6 +70,8 @@ fish -c 'source ~/.secrets/roblox.fish; python3 scripts/upload_mesh_assets.py --
 | `mesh_root_arch_a` | Hero landmark and route gate | 25 studs | Curated core location only |
 | `mesh_fern_cluster_a` | Ground silhouette breakup | 5 studs | Core forest only |
 | `mesh_hollow_lantern_shrine_a` | Walk-through arrival sanctuary | 28 studs | Curated arrival landmark only |
+| `mesh_wayfarer_cabin_a` | Open-front gabled camp shelter | 20 studs | Two arrival shelters |
+| `mesh_lantern_post_a` | Crooked caged safe-route light | 9 studs | Arrival road rhythm |
 
 The hollow lantern shrine starts from the committed original concept in
 `assets/meshes/concepts`, then the deterministic Blender pipeline authors the
@@ -107,6 +109,6 @@ shadow budget where the player cannot inspect the asset.
 - A failed asset request produces the established procedural equivalent.
 - Studio review covers phone, tablet, desktop, low graphics, and maximum
   graphics before the mesh kit replaces additional forest bands.
-- Studio Output reports client build `0.31.1`, world version
-  `bramblewake-blackout-v12`, and an `AuthoredMeshFallbackCount` of zero before
+- Studio Output reports client build `0.32.0`, world version
+  `bramblewake-blackout-v13`, and an `AuthoredMeshFallbackCount` of zero before
   the shrine is accepted as live visual evidence.
