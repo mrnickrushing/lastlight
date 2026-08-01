@@ -7,12 +7,14 @@ local root = ReplicatedStorage:WaitForChild("LastLight", 8)
 assert(root ~= nil, "Last Light shared root did not replicate before client bootstrap timeout")
 
 local Config = require(root.Config)
+local AmbientMotion = require(root.AmbientMotion)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local RuntimeIds = require(root.RuntimeIds)
 local AmbientController = require(script.Controllers.AmbientController)
 local HUDController = require(script.Controllers.HUDController)
 local InputController = require(script.Controllers.InputController)
 local InteractionController = require(script.Controllers.InteractionController)
+local WorldMotionController = require(script.Controllers.WorldMotionController)
 
 local runtime =
     ReplicatedStorage:WaitForChild(RuntimeIds.FolderName, Config.BootstrapTimeoutSeconds)
@@ -33,6 +35,11 @@ assert(playerGui ~= nil and playerGui:IsA("PlayerGui"), "PlayerGui unavailable")
 
 local hud = HUDController.new(playerGui, ProfessionCatalog.list())
 local ambient = AmbientController.new(RuntimeIds.AmbientMoteTag)
+local worldMotion = WorldMotionController.new(
+    RuntimeIds.AmbientMotionTag,
+    RuntimeIds.AmbientLightTag,
+    AmbientMotion
+)
 local interaction = InteractionController.new(RuntimeIds.InteractionTag, hud)
 
 local function send(kind: string, fields: { [string]: any }?)
@@ -78,6 +85,7 @@ end)
 stateChanged.OnClientEvent:Connect(function(snapshot: any)
     hud:update(snapshot)
     ambient:setPhase(tostring(snapshot.phase or "day"))
+    worldMotion:setPhase(tostring(snapshot.phase or "day"))
 end)
 
 task.spawn(function()
@@ -87,6 +95,7 @@ task.spawn(function()
     if ok and snapshot ~= nil then
         hud:update(snapshot)
         ambient:setPhase(tostring(snapshot.phase or "day"))
+        worldMotion:setPhase(tostring(snapshot.phase or "day"))
     end
 end)
 

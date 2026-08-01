@@ -352,7 +352,7 @@ local function buildEmberhollowSanctuary(parent: Instance)
     )
 end
 
-local function lantern(parent: Instance, at: Vector3, scale: number): Part
+local function lantern(parent: Instance, at: Vector3, scale: number, ambientLightTag: string?): Part
     local post = part(
         parent,
         "LanternPost",
@@ -381,6 +381,9 @@ local function lantern(parent: Instance, at: Vector3, scale: number): Part
     -- readable and avoids a wall of competing shadows.
     light.Shadows = false
     light.Parent = glow
+    if ambientLightTag ~= nil then
+        CollectionService:AddTag(glow, ambientLightTag)
+    end
     return post
 end
 
@@ -1174,9 +1177,9 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     addFillLight(geometry, Vector3.new(38, 10, -28), Color3.fromRGB(255, 177, 88), 0.45, 54)
     emberDrift(geometry, Vector3.new(0, 0, -112), AMBER, 16, 28, _self._runtimeIds.AmbientMoteTag)
 
-    lantern(geometry, Vector3.new(0, 0, -8), 0.72)
-    lantern(geometry, Vector3.new(-9, 0, -62), 0.62)
-    lantern(geometry, Vector3.new(9, 0, -102), 0.62)
+    lantern(geometry, Vector3.new(0, 0, -8), 0.72, _self._runtimeIds.AmbientLightTag)
+    lantern(geometry, Vector3.new(-9, 0, -62), 0.62, _self._runtimeIds.AmbientLightTag)
+    lantern(geometry, Vector3.new(9, 0, -102), 0.62, _self._runtimeIds.AmbientLightTag)
     labelSign(geometry, CFrame.new(7, 3, -14) * CFrame.Angles(0, math.pi, 0), "EMBERHOLLOW")
     buildEmberhollowSanctuary(geometry)
 
@@ -1392,6 +1395,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
     handLight.Range = 10
     handLight.Shadows = false
     handLight.Parent = handLantern
+    CollectionService:AddTag(handLantern, self._runtimeIds.AmbientLightTag)
     model.PrimaryPart = root
     model.Parent = world
     addBillboard(head, "MARA · GREENWARD", AMBER)
@@ -1546,6 +1550,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             flameLight.Brightness = 1.5
             flameLight.Range = 12
             flameLight.Parent = flame
+            CollectionService:AddTag(flame, self._runtimeIds.AmbientLightTag)
         end
         addBillboard(marker, string.upper(definition.tool), definition.color)
         self:_registerInteraction(
