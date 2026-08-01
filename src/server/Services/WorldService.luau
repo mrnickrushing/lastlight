@@ -27,6 +27,7 @@ export type WorldService = typeof(setmetatable(
         _spawn: SpawnLocation?,
         _mara: Model?,
         _lantern: BasePart?,
+        _lanternVisualHealth: number,
         _beacon: BasePart?,
         _barricadeBuilt: boolean,
         _night: boolean,
@@ -819,6 +820,7 @@ function WorldService.new(logger: Logger): WorldService
         _spawn = nil,
         _mara = nil,
         _lantern = nil,
+        _lanternVisualHealth = 100,
         _beacon = nil,
         _barricadeBuilt = false,
         _night = false,
@@ -1806,6 +1808,66 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
             end
         end)
     end
+end
+
+function WorldService.setLanternHealth(self: WorldService, health: number)
+    local flame = self._lantern
+    if flame == nil then
+        return
+    end
+    local clamped = math.clamp(health, 0, 100)
+    local previous = self._lanternVisualHealth
+    self._lanternVisualHealth = clamped
+    local strength = clamped / 100
+    local danger = Color3.fromRGB(255, 104, 76)
+    local targetColor = danger:Lerp(AMBER, strength)
+    local targetSize = Vector3.new(1.8, 2.6, 1.8):Lerp(Vector3.new(3.4, 5, 3.4), strength)
+
+    TweenService:Create(
+        flame,
+        TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { Color = targetColor, Size = targetSize }
+    ):Play()
+    local light = flame:FindFirstChildOfClass("PointLight")
+    if light ~= nil then
+        TweenService
+            :Create(light, TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Brightness = 0.7 + strength * 2.3,
+                Color = targetColor,
+                Range = 18 + strength * 24,
+            })
+            :Play()
+    end
+    local world = self._world
+    if world ~= nil then
+        world:SetAttribute("FirstLanternHealth", clamped)
+    end
+
+    if math.abs(previous - clamped) < 1 then
+        return
+    end
+    local pulse = part(
+        assert(flame.Parent, "First Lantern parent is missing"),
+        if clamped < previous then "LanternDamagePulse" else "LanternRepairPulse",
+        targetSize,
+        flame.CFrame,
+        if clamped < previous then danger else FOXFIRE,
+        Enum.Material.Glass,
+        false
+    )
+    pulse.Shape = Enum.PartType.Ball
+    pulse.Transparency = 0.58
+    pulse.CastShadow = false
+    TweenService:Create(
+        pulse,
+        TweenInfo.new(0.42, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { Size = targetSize * 1.65, Transparency = 1 }
+    ):Play()
+    task.delay(0.5, function()
+        if pulse.Parent ~= nil then
+            pulse:Destroy()
+        end
+    end)
 end
 
 function WorldService.setTownConsequence(self: WorldService, consequence: any)
