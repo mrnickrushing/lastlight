@@ -133,8 +133,6 @@ function TownNightService._runCycle(self: TownNightService)
         self._phase = "night"
         local nightStartedAt = workspace:GetServerTimeNow()
         self._phaseEndsAt = nightStartedAt + self._nightSeconds
-        self._worldService:setNight(true)
-        self._enemyService:startNight()
         -- Frozen for the rest of this night: a higher number from a veteran
         -- who joins mid-night (ensureStarted always raises self._nightNumber
         -- to the max seen) must not retroactively change the wave schedule,
@@ -144,6 +142,8 @@ function TownNightService._runCycle(self: TownNightService)
         local activeNight = self._nightNumber
         local blackoutDue = self:_isBlackoutDue(activeNight)
         local theme = self._townNightSchedule.theme(activeNight)
+        self._worldService:setNight(true, theme)
+        self._enemyService:startNight()
         self:_notify(
             if blackoutDue
                 then string.format(
@@ -161,8 +161,10 @@ function TownNightService._runCycle(self: TownNightService)
         for _, beat in self._townNightSchedule.beats(self._nightSeconds, activeNight) do
             waitUntilTime(nightStartedAt + beat.at)
             if beat.kind == "spawn" then
+                self._worldService:signalNightWave(beat.enemyId, beat.wave, theme)
                 self._enemyService:spawn(beat.enemyId)
             elseif beat.kind == "breach" then
+                self._worldService:setTownBreach(true, theme)
                 self._enemyService:setBreach()
             elseif beat.kind == "warning" and beat.at > 0 then
                 -- The schedule's opening warning beat always lands at at=0,
@@ -176,6 +178,7 @@ function TownNightService._runCycle(self: TownNightService)
 
         waitUntilTime(self._phaseEndsAt)
         self._enemyService:stopNight()
+        self._worldService:setTownBreach(false, theme)
         self._worldService:setNight(false)
         self:_notify(string.format("DAWN BREAKS — NIGHT %d SURVIVED", activeNight))
         self._logger:info("town_night_completed", { night = activeNight })

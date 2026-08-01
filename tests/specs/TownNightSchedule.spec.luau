@@ -74,6 +74,19 @@ return {
             end,
         },
         {
+            name = "numbers every spawn beat for readable wave presentation",
+            run = function()
+                local expectedWave = 1
+                for _, beat in TownNightSchedule.beats(360, 5) do
+                    if beat.kind == "spawn" then
+                        TestRunner.equal(beat.wave, expectedWave)
+                        expectedWave += 1
+                    end
+                end
+                TestRunner.equal(expectedWave - 1, TownNightSchedule.waveCount(5))
+            end,
+        },
+        {
             name = "returns beats sorted by ascending time",
             run = function()
                 local beats = TownNightSchedule.beats(360, 5)

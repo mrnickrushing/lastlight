@@ -7,6 +7,7 @@ export type Beat = {
     kind: "spawn" | "warning" | "breach",
     enemyId: string?,
     theme: string?,
+    wave: number?,
 }
 
 -- The same six-enemy Bramblewake roster the authored first night uses. Normal
@@ -46,7 +47,9 @@ function TownNightSchedule.beats(duration: number, nightNumber: number): { Beat 
     assert(duration > 0, "duration must be positive")
     local waves = TownNightSchedule.waveCount(nightNumber)
     local theme = TownNightSchedule.theme(nightNumber)
-    local result: { Beat } = { { at = 0, kind = "warning", enemyId = nil, theme = theme } }
+    local result: { Beat } = {
+        { at = 0, kind = "warning", enemyId = nil, theme = theme, wave = nil },
+    }
 
     local windowStart = duration * 0.05
     local windowEnd = duration * 0.85
@@ -61,13 +64,17 @@ function TownNightSchedule.beats(duration: number, nightNumber: number): { Beat 
         at = math.min(at, lastValidAt)
         local rosterIndex = (index - 1 + nightNumber - 1) % #ROSTER + 1
         local enemyId = ROSTER[rosterIndex]
-        table.insert(result, { at = at, kind = "spawn", enemyId = enemyId, theme = theme })
+        table.insert(
+            result,
+            { at = at, kind = "spawn", enemyId = enemyId, theme = theme, wave = index }
+        )
         if index == breachAfterWave then
             table.insert(result, {
                 at = math.min(at + 1, lastValidAt),
                 kind = "breach",
                 enemyId = nil,
                 theme = theme,
+                wave = index,
             })
         end
     end
