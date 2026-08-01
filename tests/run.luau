@@ -12,6 +12,7 @@ TestRunner.run({
     require("./specs/Environment.spec"),
     require("./specs/MeshAssetRegistry.spec"),
     require("./specs/MeshMaterialPlan.spec"),
+    require("./specs/WorldArtRegistry.spec"),
     require("./specs/EnemyAttackFlow.spec"),
     require("./specs/EnemyCombatRules.spec"),
     require("./specs/EnemyMotion.spec"),

@@ -11,6 +11,7 @@ local BramblewakeBuilder = require(script.Parent.Parent.World.BramblewakeBuilder
 local FoliageBuilder = require(script.Parent.Parent.World.FoliageBuilder)
 local MeshTemplateLoader = require(script.Parent.Parent.World.MeshTemplateLoader)
 local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
+local WorldSignBuilder = require(script.Parent.Parent.World.WorldSignBuilder)
 
 local WorldService = {}
 WorldService.__index = WorldService
@@ -195,23 +196,7 @@ local function part(
 end
 
 local function labelSign(parent: Instance, at: CFrame, text: string)
-    local board =
-        part(parent, "TrailSign", Vector3.new(8, 3, 0.6), at, BARK, Enum.Material.WoodPlanks)
-    local surface = Instance.new("SurfaceGui")
-    surface.Face = Enum.NormalId.Front
-    surface.LightInfluence = 0.5
-    surface.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-    surface.PixelsPerStud = 32
-    surface.Parent = board
-
-    local textLabel = Instance.new("TextLabel")
-    textLabel.BackgroundTransparency = 1
-    textLabel.Size = UDim2.fromScale(1, 1)
-    textLabel.Font = Enum.Font.GothamBold
-    textLabel.Text = text
-    textLabel.TextColor3 = CREAM
-    textLabel.TextScaled = true
-    textLabel.Parent = surface
+    WorldSignBuilder.createDirectionSign(parent, "TrailSign", at, text, CREAM)
 end
 
 local function buildEmberhollowSanctuary(parent: Instance): { Instance }
@@ -2148,7 +2133,12 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         Enum.Material.WoodPlanks,
         false
     )
-    addBillboard(warningBoard, "NIGHT WATCH · HOLD THE LANTERN ROAD", CREAM)
+    WorldSignBuilder.dressBoard(
+        warningBoard,
+        "NIGHT WATCH · HOLD THE LANTERN ROAD",
+        CREAM,
+        "warning"
+    )
 end
 
 -- Rebuilds the same placement from inexpensive geometry when an authored model
@@ -3393,7 +3383,11 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 1.8
             )
             else Vector3.new(1.8, 1.8, 1.8)
-        marker.Material = Enum.Material.SmoothPlastic
+        marker.Material = if definition.recipeId == "recipe_meadow_satchel"
+                or definition.recipeId == "recipe_ironroot_hood"
+            then Enum.Material.Fabric
+            elseif definition.recipeId == "recipe_bramble_boots" then Enum.Material.Leather
+            else Enum.Material.Glass
         marker.Transparency = 0.06
         if definition.recipeId == "recipe_meadow_satchel" then
             part(
@@ -3525,20 +3519,13 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         Enum.Material.Slate,
         false
     )
-    for noticeIndex = -2, 2 do
-        local notice = part(
-            interactables,
-            "ArchiveNotice",
-            Vector3.new(1.35 + (noticeIndex % 2) * 0.25, 1.7, 0.12),
-            CFrame.new(archiveX + noticeIndex * 1.55, 4 + (noticeIndex % 2) * 0.35, archiveZ - 0.58)
-                * CFrame.Angles(0, 0, math.rad(noticeIndex * 3)),
-            if noticeIndex == 0 then CREAM else Color3.fromRGB(186, 168, 130),
-            Enum.Material.SmoothPlastic,
-            false
-        )
-        notice.CastShadow = false
-    end
-    addBillboard(archive, "GREENWARD ARCHIVE · FIELD BOOK", CREAM)
+    WorldSignBuilder.dressNoticeBoard(archive, "GREENWARD ARCHIVE · FIELD BOOK", CREAM, {
+        "field_botany",
+        "evacuation_route",
+        "bramble_hazard",
+        "lantern_maintenance",
+        "supply_inventory",
+    })
     self:_registerInteraction(
         archive,
         self._runtimeIds.InteractionIds.QuestBoard,
@@ -3697,7 +3684,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v22")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v23")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -3797,7 +3784,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v22",
+        worldVersion = "bramblewake-blackout-v23",
     })
 end
 
@@ -4810,7 +4797,12 @@ local function buildTownConsequenceLandscape(parent: Instance, consequence: any)
         Enum.Material.WoodPlanks,
         false
     )
-    addBillboard(sign, string.format("TIER %d · %s", consequence.tier, consequence.title), CREAM)
+    WorldSignBuilder.dressBoard(
+        sign,
+        string.format("TIER %d · %s", consequence.tier, consequence.title),
+        CREAM,
+        "consequence"
+    )
     sign:SetAttribute("Consequence", consequence.detail)
     parent:SetAttribute("LandscapeKind", landscapeKind)
     parent:SetAttribute("MemorialKind", memorialKind)
@@ -4954,7 +4946,7 @@ local function buildTownProgressionBuildings(
             Enum.Material.WoodPlanks,
             false
         )
-        addBillboard(sign, displayName .. " · PLANNED", CREAM)
+        WorldSignBuilder.dressBoard(sign, displayName .. " · PLANNED", CREAM, "construction")
         return model
     end
 
@@ -5071,7 +5063,7 @@ local function buildTownProgressionBuildings(
             Enum.Material.WoodPlanks,
             false
         )
-        addBillboard(sign, displayName, accent)
+        WorldSignBuilder.dressBoard(sign, displayName, accent, "building")
         local lightAnchor = part(
             model,
             "WarmInterior",
@@ -5245,20 +5237,12 @@ local function buildTownProgressionBuildings(
         Enum.Material.WoodPlanks,
         false
     )
-    addBillboard(board, string.format("EMBERHOLLOW · TIER %d", consequence.tier or 0), CREAM)
-    for notice = -1, 1 do
-        local paper = part(
-            boardModel,
-            "TownNotice",
-            Vector3.new(2.5, 2.1, 0.08),
-            CFrame.new(12 + notice * 3.3, 4.6 + math.abs(notice) * 0.35, -86.38)
-                * CFrame.Angles(0, 0, math.rad(notice * 4)),
-            if notice == 0 then Color3.fromRGB(223, 205, 161) else Color3.fromRGB(184, 164, 126),
-            Enum.Material.SmoothPlastic,
-            false
-        )
-        paper.CastShadow = false
-    end
+    WorldSignBuilder.dressNoticeBoard(
+        board,
+        string.format("EMBERHOLLOW · TIER %d", consequence.tier or 0),
+        CREAM,
+        { "community_watch", "lantern_maintenance", "supply_inventory" }
+    )
 
     local innStage = stageFor("building_inn")
     local inn = buildingShell(

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "id": "image_first_world_notice_atlas_v1",
+      "displayName": "Last Light First World Notice Atlas V1",
+      "role": "physical_notice_board_art",
+      "source": "original_openai_image_generation",
+      "provenance": "Original Last Light art generated for this repository from the visual quality standard; no third-party characters, logos, or locations.",
+      "file": "source/first-world-notice-atlas-v1.png",
+      "width": 1254,
+      "height": 1254,
+      "sha256": "1031a6e8dfa18c94595016df5aa5e485624368d48cfcce041d110058233abc3b",
+      "layout": {
+        "columns": 2,
+        "rows": 3,
+        "panels": [
+          "evacuation_route",
+          "lantern_maintenance",
+          "supply_inventory",
+          "bramble_hazard",
+          "field_botany",
+          "community_watch"
+        ]
+      },
+      "robloxAssetId": 83727643922166
+    }
+  ]
+}
