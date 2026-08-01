@@ -24,7 +24,7 @@ milestones, physical town-tier building growth, the four-person Bramblewake
 resident cast with day/night routines, ten-level profession mastery with earned
 ability bonuses, and persistent physical town damage with daylight repair work
 implemented, plus replicated physical visuals for equipped permanent gear and
-mastery-scaled Medic/Warden rescue utility; four rotating physical normal-night
+mastery-scaled Medic/Warden rescue utility; eight rotating physical normal-night
 incidents now interrupt the defense with
 short cooperative town emergencies; failed expeditions now create persistent,
 owner-only recovery satchels for a deterministic half of larger unbanked pouches;
@@ -92,7 +92,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 260 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 262 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -137,7 +137,8 @@ abuse gates are in
 The wave-escalation, determinism, kill-switch, and Blackout-independence gates
 for the repeating town cycle are in
 [the Normal Night runbook](docs/MILESTONE_3_NORMAL_NIGHT.md).
-The rotating cinder, drain, root-anchor, and watchfire objectives are in
+The eight rotating cinder/flue, drain/seep, anchor/snare, and watchfire/bell
+objectives are in
 [the normal-night incidents runbook](docs/MILESTONE_3_NIGHT_INCIDENTS.md).
 The integrity calculation, physical damage states, repair authority, migration,
 and reconciliation gates are in

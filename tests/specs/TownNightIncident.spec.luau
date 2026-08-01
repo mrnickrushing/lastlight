@@ -7,16 +7,40 @@ return {
     name = "TownNightIncident",
     cases = {
         {
-            name = "maps every normal-night theme to a distinct physical incident",
+            name = "maps every normal-night theme to two distinct physical incidents",
             run = function()
                 local seen = {}
-                for _, theme in { "EMBERFALL", "MIRETIDE", "ROOTMOON", "ASHEN VEIL" } do
-                    local definition = TownNightIncident.forTheme(theme)
-                    TestRunner.truthy(definition ~= nil)
-                    TestRunner.equal(seen[definition.id], nil)
-                    TestRunner.equal(#definition.sites, 3)
-                    seen[definition.id] = true
+                for themeIndex, theme in { "EMBERFALL", "MIRETIDE", "ROOTMOON", "ASHEN VEIL" } do
+                    for cycle = 0, 1 do
+                        local definition = TownNightIncident.forTheme(theme, themeIndex + cycle * 4)
+                        TestRunner.truthy(definition ~= nil)
+                        TestRunner.equal(seen[definition.id], nil)
+                        TestRunner.equal(#definition.sites, 3)
+                        seen[definition.id] = true
+                    end
                 end
+                local count = 0
+                for _ in seen do
+                    count += 1
+                end
+                TestRunner.equal(count, 8)
+            end,
+        },
+        {
+            name = "alternates incident families every four-night theme cycle",
+            run = function()
+                local first = TownNightIncident.create("EMBERFALL", 1, 10)
+                local alternate = TownNightIncident.create("EMBERFALL", 5, 10)
+                local repeated = TownNightIncident.create("EMBERFALL", 9, 10)
+                TestRunner.equal(first.definition.id, "incident_emberfall_cinders")
+                TestRunner.equal(alternate.definition.id, "incident_emberfall_flues")
+                TestRunner.equal(repeated.definition.id, first.definition.id)
+            end,
+        },
+        {
+            name = "rejects an unknown incident theme",
+            run = function()
+                TestRunner.equal(TownNightIncident.forTheme("FORGED", 1), nil)
             end,
         },
         {

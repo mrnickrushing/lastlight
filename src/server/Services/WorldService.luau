@@ -4857,6 +4857,38 @@ local function buildIncidentSite(parent: Model, incidentId: string, siteId: stri
             false
         )
         ember.Shape = Enum.PartType.Ball
+    elseif incidentId == "incident_emberfall_flues" then
+        target = part(
+            site,
+            "IncidentCore",
+            Vector3.new(2.8, 3.2, 2.8),
+            CFrame.new(at + Vector3.new(0, 1.25, 0)),
+            Color3.fromRGB(74, 65, 58),
+            Enum.Material.Brick,
+            false
+        )
+        for tier = 1, 3 do
+            part(
+                site,
+                "FlueBrick",
+                Vector3.new(3.4 - tier * 0.35, 0.42, 3.4 - tier * 0.35),
+                CFrame.new(at + Vector3.new(0, 2.75 + tier * 0.35, 0)),
+                Color3.fromRGB(86 - tier * 8, 69 - tier * 6, 59 - tier * 5),
+                Enum.Material.Brick,
+                false
+            )
+        end
+        local cap = part(
+            site,
+            "LooseFlueCap",
+            Vector3.new(3.1, 0.28, 3.1),
+            CFrame.new(at + Vector3.new(0.55, 4.15, 0))
+                * CFrame.Angles(math.rad(8), 0, math.rad(-12)),
+            Color3.fromRGB(58, 56, 53),
+            Enum.Material.Metal,
+            false
+        )
+        cap:SetAttribute("NeedsSecuring", true)
     elseif incidentId == "incident_miretide_clogs" then
         target = part(
             site,
@@ -4893,6 +4925,42 @@ local function buildIncidentSite(parent: Model, incidentId: string, siteId: stri
                 false
             )
         end
+    elseif incidentId == "incident_miretide_seeps" then
+        target = part(
+            site,
+            "IncidentCore",
+            Vector3.new(5.2, 0.32, 4.4),
+            CFrame.new(at - Vector3.new(0, 0.35, 0)),
+            Color3.fromRGB(52, 69, 60),
+            Enum.Material.Ground,
+            false
+        )
+        target.Shape = Enum.PartType.Ball
+        for index = 1, 6 do
+            local angle = math.rad(index * 60)
+            part(
+                site,
+                "SeepStone",
+                Vector3.new(1.25, 0.65, 0.9),
+                CFrame.new(at + Vector3.new(math.cos(angle) * 2.3, 0, math.sin(angle) * 1.9))
+                    * CFrame.Angles(0, angle, math.rad(index % 2 == 0 and 6 or -6)),
+                Color3.fromRGB(83, 91, 81),
+                Enum.Material.Rock,
+                false
+            )
+        end
+        for index = -1, 1, 2 do
+            part(
+                site,
+                "SealStake",
+                Vector3.new(0.45, 2.8, 0.45),
+                CFrame.new(at + Vector3.new(index * 1.3, 0.65, 0.3))
+                    * CFrame.Angles(0, 0, math.rad(index * 12)),
+                BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
     elseif incidentId == "incident_rootmoon_anchors" then
         target = part(
             site,
@@ -4916,7 +4984,44 @@ local function buildIncidentSite(parent: Model, incidentId: string, siteId: stri
                 false
             )
         end
-    else
+    elseif incidentId == "incident_rootmoon_snares" then
+        target = part(
+            site,
+            "IncidentCore",
+            Vector3.new(3.4, 3.4, 3.4),
+            CFrame.new(at + Vector3.new(0, 1.4, 0)),
+            Color3.fromRGB(74, 83, 58),
+            Enum.Material.Ground,
+            false
+        )
+        target.Shape = Enum.PartType.Ball
+        for index = 1, 5 do
+            local angle = math.rad(index * 72)
+            local thorn = part(
+                site,
+                "SnareThorn",
+                Vector3.new(0.5, 2.6, 0.5),
+                CFrame.new(at + Vector3.new(math.cos(angle) * 1.45, 1.5, math.sin(angle) * 1.45))
+                    * CFrame.Angles(math.rad(55), -angle, math.rad(18)),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+            thorn.Shape = Enum.PartType.Cylinder
+        end
+        for loop = -1, 1, 2 do
+            part(
+                site,
+                "SnareVine",
+                Vector3.new(0.38, 5.4, 0.38),
+                CFrame.new(at + Vector3.new(loop * 1.3, 0.4, 0))
+                    * CFrame.Angles(math.rad(90), 0, math.rad(loop * 24)),
+                BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
+    elseif incidentId == "incident_ashen_watchfires" then
         target = part(
             site,
             "IncidentCore",
@@ -4949,6 +5054,55 @@ local function buildIncidentSite(parent: Model, incidentId: string, siteId: stri
                 false
             )
         end
+    else
+        target = part(
+            site,
+            "IncidentCore",
+            Vector3.new(0.7, 4.8, 0.7),
+            CFrame.new(at + Vector3.new(0, 1.65, 0)),
+            Color3.fromRGB(66, 52, 39),
+            Enum.Material.Wood,
+            false
+        )
+        for side = -1, 1, 2 do
+            part(
+                site,
+                "BellFramePost",
+                Vector3.new(0.55, 5.2, 0.55),
+                CFrame.new(at + Vector3.new(side * 1.8, 1.7, 0)),
+                BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
+        part(
+            site,
+            "BellFrameBeam",
+            Vector3.new(4.4, 0.55, 0.55),
+            CFrame.new(at + Vector3.new(0, 4.2, 0)),
+            BARK,
+            Enum.Material.Wood,
+            false
+        )
+        local bell = part(
+            site,
+            "SilentWardBell",
+            Vector3.new(2.2, 2.1, 2.2),
+            CFrame.new(at + Vector3.new(0, 2.75, 0)),
+            Color3.fromRGB(115, 103, 79),
+            Enum.Material.Metal,
+            false
+        )
+        bell.Shape = Enum.PartType.Ball
+        part(
+            site,
+            "BellClapper",
+            Vector3.new(0.38, 1.6, 0.38),
+            CFrame.new(at + Vector3.new(0, 1.45, 0)),
+            Color3.fromRGB(72, 66, 58),
+            Enum.Material.Metal,
+            false
+        )
     end
     target:SetAttribute("IncidentId", incidentId)
     target:SetAttribute("SiteId", siteId)

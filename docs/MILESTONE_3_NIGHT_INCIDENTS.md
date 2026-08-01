@@ -1,18 +1,22 @@
 # Milestone 3 normal-night incidents
 
-Build `0.24.0` adds a short, physical cooperative emergency to every normal
-night. Enemy waves remain active while three incident sites appear around
-Emberhollow, forcing the team to split attention between the First Lantern and
-the town itself.
+Build `0.27.0` expands the short, physical cooperative emergency on every normal
+night from four families to eight. Enemy waves remain active while three
+incident sites appear around Emberhollow, forcing the team to split attention
+between the First Lantern and the town itself.
 
 ## Incident rotation
 
-| Theme | Incident | Required response |
+| Theme | First cycle | Alternate cycle |
 |---|---|---|
-| Emberfall | Rooftop Cinders | smother three charred cinder nests |
-| Miretide | Choked Drains | pull three root clogs from stone drains |
-| Rootmoon | Root Anchors | sever three heavy roots feeding the assault |
-| Ashen Veil | Dark Watchfires | relight three cold metal braziers |
+| Emberfall | Rooftop Cinders | Sparking Flues |
+| Miretide | Choked Drains | Mire Seeps |
+| Rootmoon | Root Anchors | Snare Pods |
+| Ashen Veil | Dark Watchfires | Silenced Bells |
+
+The first four-night theme cycle uses the original family. The next cycle uses
+its alternate, then repeats. The night number is the only selector, so a replay
+is deterministic and reconnecting cannot reroll an easier objective.
 
 Each incident uses the same archive, workshop, and inn coverage triangle, but
 the authored object silhouettes, materials, prompt verbs, labels, and fiction
@@ -51,7 +55,8 @@ existing persistent town-damage calculation at dawn.
 
 ## Automated validation
 
-Pure Luau tests cover all four unique theme mappings, deterministic timing,
+Pure Luau tests cover all eight unique theme mappings, cycle alternation,
+deterministic timing,
 three-distinct-site completion, repeated-site idempotence, deadline failure,
 single bounded penalty, unknown-site rejection, late input, and one incident
 beat per night. The full suite also runs formatting, lint, type checks, 1,000
@@ -60,9 +65,9 @@ verification.
 
 ## Studio, multiplayer, and device exit gate
 
-1. Shorten the day/dusk timers locally and enter each of four consecutive normal
-   nights. Require the correct incident title, prompt verb, and physical object
-   family for that theme.
+1. Shorten the day/dusk timers locally and enter eight consecutive normal
+   nights. Require both incident families for each theme, with the correct
+   title, prompt verb, and physical object silhouette.
 2. Resolve three different sites before the deadline. Require `SECURED` feedback
    per site, one completion toast, no lantern penalty, and full cleanup.
 3. Have two players trigger the same site together. Require exactly one progress

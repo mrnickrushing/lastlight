@@ -107,6 +107,18 @@ finished XP bar. Physical altars preserve world presence and avoid another
 permanent mobile overlay, while narrow bounded effects make paths readable and
 balanceable without selling power or letting clients submit effect values.
 
+## 2026-08-01 — Deterministic alternate normal-night incidents
+
+**Decision:** Every normal-night theme owns two physical three-site incident
+families. The family alternates every four-night theme cycle from the persisted
+night number; reconnecting or restarting cannot reroll it. Timing, failure
+pressure, authority, and profession-independent completion remain shared.
+
+**Reason:** Four repeating incidents make the town defense predictable before
+the wider content catalog exists. Alternate silhouettes and verbs double the
+immediate authored variety while preserving the already-tested co-op window,
+mobile interaction semantics, bounded consequence, and deterministic replay.
+
 ## 2026-07-26 — Shared stamina and readable attack resolution
 
 **Decision:** Introduce one server-owned stamina resource for sprint and dodge
