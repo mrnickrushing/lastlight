@@ -1417,14 +1417,40 @@ function WorldService._configureLighting(_self: WorldService)
         existingClouds:Destroy()
     end
 
+    -- Distant terrain peaks (TerrainBuilder reaches WORLD_EXTENT = 1450 studs)
+    -- were reported washing out to a pale white smear instead of reading as a
+    -- ridgeline. Atmosphere applies aerial perspective: with Haze and Glare
+    -- above 0, the distant hue transitions from Atmosphere.Color toward
+    -- Atmosphere.Decay as fog accumulates with distance. There is no sightline
+    -- in the supplied Place6 reference (a small enclosed camp) anywhere near
+    -- 1450 studs to have exposed this: its own Atmosphere -- Density 0.225,
+    -- Haze 1, Color (199, 199, 199) -- is close to Roblox's stock defaults and
+    -- was never tested at range either.
+    --
+    -- Some fade-to-fog at that distance is correct and even desirable -- it is
+    -- what makes far terrain read as *distant*. The bug is the fade targets:
+    -- Color (166, 185, 174) and Decay (43, 63, 61) both sat pale/washed rather
+    -- than a readable rock tone, so anything far enough to have faded toward
+    -- them read as near-white. Both are now a darker, more saturated
+    -- slate-blue, which keeps the same falloff behavior but fades distant
+    -- peaks toward a moody ridgeline silhouette instead of a blown-out white
+    -- one -- consistent with the style formula's "slate blue-gray stone" and
+    -- "moon cyan: distance" anchors. Density and Haze are also both eased back
+    -- so full fade happens further out, giving mid-distance terrain more room
+    -- to read as rock before it starts blending away.
+    --
+    -- These daytime values are duplicated in _applyTownLighting's `else`
+    -- branch, which re-runs this same Atmosphere on every day/dusk transition
+    -- and overwrites whatever is set here. Change both together or the fix
+    -- reverts the moment a day/night cycle turns over.
     local atmosphere = Instance.new("Atmosphere")
     atmosphere.Name = "LastLightAtmosphere"
-    atmosphere.Color = Color3.fromRGB(166, 185, 174)
-    atmosphere.Decay = Color3.fromRGB(43, 63, 61)
-    atmosphere.Density = 0.34
+    atmosphere.Color = Color3.fromRGB(74, 89, 98)
+    atmosphere.Decay = Color3.fromRGB(38, 52, 58)
+    atmosphere.Density = 0.24
     atmosphere.Offset = 0.08
-    atmosphere.Glare = 0.2
-    atmosphere.Haze = 1.9
+    atmosphere.Glare = 0.15
+    atmosphere.Haze = 1.0
     atmosphere.Parent = Lighting
 
     local bloom = Instance.new("BloomEffect")
@@ -7407,11 +7433,21 @@ function WorldService._applyTownLighting(_self: WorldService, night: boolean)
         Lighting.OutdoorAmbient = Color3.fromRGB(72, 91, 84)
         Lighting.ExposureCompensation = -0.18
         if atmosphere ~= nil and atmosphere:IsA("Atmosphere") then
-            atmosphere.Color = Color3.fromRGB(166, 185, 174)
-            atmosphere.Decay = Color3.fromRGB(43, 63, 61)
-            atmosphere.Density = 0.34
-            atmosphere.Haze = 1.9
-            atmosphere.Glare = 0.2
+            -- Must stay identical to the daytime values _configureLighting
+            -- sets on world build. This function re-runs on every day/dusk
+            -- transition (PhaseService:setNight(false),
+            -- TownNightService:setDusk(false), and the Blackout restore
+            -- path), so the two are effectively the same setting duplicated
+            -- in two places -- if only one is updated, the fix holds until
+            -- the first phase transition and then silently reverts. That is
+            -- exactly what shipped here initially: the pale-sage atmosphere
+            -- that washed distant terrain out to white was fixed in
+            -- _configureLighting but left unchanged here.
+            atmosphere.Color = Color3.fromRGB(74, 89, 98)
+            atmosphere.Decay = Color3.fromRGB(38, 52, 58)
+            atmosphere.Density = 0.24
+            atmosphere.Haze = 1.0
+            atmosphere.Glare = 0.15
         end
         if tone ~= nil and tone:IsA("ColorCorrectionEffect") then
             tone.Brightness = -0.03
