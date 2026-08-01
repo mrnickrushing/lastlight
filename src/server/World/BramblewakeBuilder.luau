@@ -176,7 +176,8 @@ local function fireflyCluster(
     color: Color3,
     count: number,
     spread: number,
-    seed: number
+    seed: number,
+    ambientMoteTag: string?
 )
     local random = Random.new(seed)
     for _ = 1, count do
@@ -195,6 +196,9 @@ local function fireflyCluster(
         )
         mote.Transparency = random:NextNumber(0.05, 0.3)
         mote.CanQuery = false
+        if ambientMoteTag ~= nil then
+            CollectionService:AddTag(mote, ambientMoteTag)
+        end
     end
 end
 
@@ -379,7 +383,7 @@ local function rootArch(parent: Instance, center: Vector3, scale: number)
     )
 end
 
-local function lantern(parent: Instance, position: Vector3, scale: number)
+local function lantern(parent: Instance, position: Vector3, scale: number, ambientLightTag: string?)
     part(
         parent,
         "FoxfirePost",
@@ -397,6 +401,9 @@ local function lantern(parent: Instance, position: Vector3, scale: number)
         Enum.Material.Neon
     )
     light(glow, FOXFIRE, 1.8, 18 * scale)
+    if ambientLightTag ~= nil then
+        CollectionService:AddTag(glow, ambientLightTag)
+    end
 end
 
 local function pathArm(parent: Instance, center: Vector3, neighbor: Vector3)
@@ -480,7 +487,7 @@ local function fence(parent: Instance, start: Vector3, count: number, spacing: n
     end
 end
 
-local function moduleDressing(parent: Instance, center: Vector3, seed: number)
+local function moduleDressing(parent: Instance, center: Vector3, seed: number, runtimeIds: any)
     local random = Random.new(seed)
     groundPatch(
         parent,
@@ -537,9 +544,18 @@ local function moduleDressing(parent: Instance, center: Vector3, seed: number)
             )
             tuft.Transparency = 0.2
             tuft.CanQuery = false
+            CollectionService:AddTag(tuft, runtimeIds.AmbientLightTag)
         end
     end
-    fireflyCluster(parent, center + Vector3.new(0, 0, 5), FOXFIRE, 5, 24, seed + 1301)
+    fireflyCluster(
+        parent,
+        center + Vector3.new(0, 0, 5),
+        FOXFIRE,
+        5,
+        24,
+        seed + 1301,
+        runtimeIds.AmbientMoteTag
+    )
 end
 
 local function buildFarm(parent: Instance, center: Vector3)
@@ -617,7 +633,7 @@ local function buildFarm(parent: Instance, center: Vector3)
     end
 end
 
-local function buildWindmill(parent: Instance, center: Vector3)
+local function buildWindmill(parent: Instance, center: Vector3, ambientMotionTag: string)
     local tower = part(
         parent,
         "WindmillTower",
@@ -657,9 +673,27 @@ local function buildWindmill(parent: Instance, center: Vector3)
             false
         )
     end
+    local rotor = Instance.new("Model")
+    rotor.Name = "WindmillRotor"
+    rotor:SetAttribute("MotionKind", "rotor")
+    rotor:SetAttribute("MotionSpeed", 0.3)
+    rotor.Parent = parent
+    local rotorPivot = part(
+        rotor,
+        "WindmillRotorPivot",
+        Vector3.new(0.2, 0.2, 0.2),
+        CFrame.new(hub.Position),
+        STONE,
+        Enum.Material.SmoothPlastic,
+        false
+    )
+    rotorPivot.Transparency = 1
+    rotorPivot.CanQuery = false
+    rotorPivot.CastShadow = false
+    rotor.PrimaryPart = rotorPivot
     for angle = 0, 3 do
         part(
-            parent,
+            rotor,
             "WindmillSail",
             Vector3.new(2, 19, 0.8),
             CFrame.new(hub.Position) * CFrame.Angles(0, 0, angle * math.pi / 2),
@@ -668,7 +702,7 @@ local function buildWindmill(parent: Instance, center: Vector3)
             false
         )
         part(
-            parent,
+            rotor,
             "WindmillSailArm",
             Vector3.new(0.7, 16, 1.2),
             CFrame.new(hub.Position) * CFrame.Angles(0, 0, angle * math.pi / 2 + math.pi / 4),
@@ -677,13 +711,14 @@ local function buildWindmill(parent: Instance, center: Vector3)
             false
         )
     end
+    CollectionService:AddTag(rotor, ambientMotionTag)
 end
 
-local function buildModuleVisual(parent: Instance, visual: string, center: Vector3)
+local function buildModuleVisual(parent: Instance, visual: string, center: Vector3, runtimeIds: any)
     if visual == "lantern_gate" then
         rootArch(parent, center, 1)
-        lantern(parent, center + Vector3.new(-14, 0, 13), 1)
-        lantern(parent, center + Vector3.new(14, 0, 13), 1)
+        lantern(parent, center + Vector3.new(-14, 0, 13), 1, runtimeIds.AmbientLightTag)
+        lantern(parent, center + Vector3.new(14, 0, 13), 1, runtimeIds.AmbientLightTag)
     elseif visual == "root_arch" then
         rootArch(parent, center + Vector3.new(0, 0, -7), 0.9)
         for offset = -1, 1, 2 do
@@ -753,7 +788,7 @@ local function buildModuleVisual(parent: Instance, visual: string, center: Vecto
             end
         end
     elseif visual == "windmill" then
-        buildWindmill(parent, center)
+        buildWindmill(parent, center, runtimeIds.AmbientMotionTag)
     elseif visual == "bridge" then
         for index = -4, 4 do
             part(
@@ -776,7 +811,7 @@ local function buildModuleVisual(parent: Instance, visual: string, center: Vecto
         )
         for index = 1, 10 do
             local angle = index * 2.4
-            orb(
+            local moth = orb(
                 parent,
                 "LanternMoth",
                 center
@@ -789,6 +824,7 @@ local function buildModuleVisual(parent: Instance, visual: string, center: Vecto
                 FOXFIRE,
                 Enum.Material.Neon
             )
+            CollectionService:AddTag(moth, runtimeIds.AmbientMoteTag)
         end
     elseif visual == "old_growth" then
         part(
@@ -1509,14 +1545,14 @@ function BramblewakeBuilder.build(
             pathArm(module, center, centers[placement.index + 1])
         end
 
-        moduleDressing(module, center, manifest.seed + placement.index * 97)
+        moduleDressing(module, center, manifest.seed + placement.index * 97, runtimeIds)
 
         for cornerIndex = 1, 4 do
             local x = if cornerIndex == 1 or cornerIndex == 4 then -27 else 27
             local z = if cornerIndex <= 2 then -27 else 27
             tree(module, center + Vector3.new(x, 0, z), 0.62 + (cornerIndex % 2) * 0.08)
         end
-        buildModuleVisual(module, definition.visual, center)
+        buildModuleVisual(module, definition.visual, center, runtimeIds)
         if definition.eliteId == "elite_old_growth" then
             oldGrowthCenter = center
             local fireSource = orb(

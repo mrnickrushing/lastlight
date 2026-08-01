@@ -350,6 +350,23 @@ for _, module in expeditionModules do
         "expedition module is missing its connected critical path"
     )
 end
+local ambientMotionTargets = CollectionService:GetTagged(RuntimeIds.AmbientMotionTag)
+assert(#ambientMotionTargets >= 1, "expected at least one living-world motion target")
+for _, target in ambientMotionTargets do
+    assert(target:IsA("Model"), "ambient motion tags must target models")
+    assert(target.PrimaryPart ~= nil, "ambient motion model is missing its pivot")
+    assert(target:GetAttribute("MotionKind") == "rotor", "ambient motion kind changed")
+    assert(
+        (tonumber(target:GetAttribute("MotionSpeed")) or 0) > 0,
+        "ambient motion target must declare a positive speed"
+    )
+end
+local ambientLightTargets = CollectionService:GetTagged(RuntimeIds.AmbientLightTag)
+assert(#ambientLightTargets >= 6, "expected practical town and expedition lights to animate")
+for _, target in ambientLightTargets do
+    assert(target:IsA("BasePart"), "ambient light tags must target BaseParts")
+    assert(not target.CanCollide, "ambient light motion cannot own collision")
+end
 local blackoutLayer = expedition:FindFirstChild("BramblewakeBlackoutLayer")
 assert(blackoutLayer ~= nil and blackoutLayer:IsA("Model"), "Bramblewake Blackout layer is missing")
 assert(

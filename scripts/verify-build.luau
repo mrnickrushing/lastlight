@@ -19,6 +19,7 @@ assert(sharedRoot:FindFirstChild("Content") ~= nil, "game build is missing Conte
 assert(sharedRoot:FindFirstChild("TutorialFlow") ~= nil, "game build is missing TutorialFlow")
 assert(sharedRoot:FindFirstChild("SaveSchema") ~= nil, "game build is missing SaveSchema")
 assert(sharedRoot:FindFirstChild("RuntimeIds") ~= nil, "game build is missing RuntimeIds")
+assert(sharedRoot:FindFirstChild("AmbientMotion") ~= nil, "game build is missing AmbientMotion")
 assert(sharedRoot:FindFirstChild("ReviveFlow") ~= nil, "game build is missing ReviveFlow")
 assert(sharedRoot:FindFirstChild("SurvivalState") ~= nil, "game build is missing SurvivalState")
 assert(sharedRoot:FindFirstChild("CombatState") ~= nil, "game build is missing CombatState")
@@ -119,7 +120,15 @@ local clientRoot =
 assert(clientRoot ~= nil, "game build is missing LastLightClient")
 local controllers = clientRoot:FindFirstChild("Controllers")
 assert(controllers ~= nil, "game build is missing client controllers")
-for _, controllerName in { "HUDController", "InputController", "InteractionController" } do
+for _, controllerName in
+    {
+        "AmbientController",
+        "HUDController",
+        "InputController",
+        "InteractionController",
+        "WorldMotionController",
+    }
+do
     assert(
         controllers:FindFirstChild(controllerName) ~= nil,
         "game build is missing controller " .. controllerName

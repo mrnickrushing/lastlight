@@ -3,6 +3,7 @@
 local TestRunner = require("./TestRunner")
 
 TestRunner.run({
+    require("./specs/AmbientMotion.spec"),
     require("./specs/BramblewakeEnemies.spec"),
     require("./specs/CombatState.spec"),
     require("./specs/ContentId.spec"),
