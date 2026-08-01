@@ -169,6 +169,23 @@ for (const heading of [
   if (!readme.includes(heading)) failures.push(`README is missing heading: ${heading}`);
 }
 
+const terrainBuilderPath = join(root, "src/server/World/TerrainBuilder.luau");
+if (existsSync(terrainBuilderPath)) {
+  const terrainBuilder = readFileSync(terrainBuilderPath, "utf8");
+  if (terrainBuilder.includes(".Decoration")) {
+    failures.push("TerrainBuilder must not access the runtime-incompatible Terrain.Decoration property");
+  }
+  const streamStart = terrainBuilder.indexOf("local function fillStream");
+  const streamEnd = terrainBuilder.indexOf("local SURFACE_PATCH_DEPTH");
+  const streamSource = terrainBuilder.slice(streamStart, streamEnd);
+  if (streamStart < 0 || streamEnd < 0 || streamSource.includes("terrain:FillBall(")) {
+    failures.push("stream and pond water must use flat fills, never spherical fills");
+  }
+  if (!streamSource.includes("Enum.Material.Water") || !streamSource.includes("FillBlock")) {
+    failures.push("stream and pond must retain explicit flat water fills");
+  }
+}
+
 /**
  * Checks both the number and uniqueness of catalog IDs captured by a regex.
  */

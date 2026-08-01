@@ -876,10 +876,6 @@ function WorldService._configureLighting(_self: WorldService)
         Lighting.ShadowSoftness = 0.42
         Lighting.GeographicLatitude = 51
     end)
-    pcall(function()
-        Workspace.Terrain.Decoration = true
-    end)
-
     for _, name in
         {
             "LastLightAtmosphere",
@@ -2425,7 +2421,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v9")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v10")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -2525,7 +2521,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v9",
+        worldVersion = "bramblewake-blackout-v10",
     })
 end
 

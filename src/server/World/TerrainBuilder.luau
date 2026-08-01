@@ -17,8 +17,7 @@
       * an actual horizon line, so the world stops ending in mid-air;
       * elevation the camera can look along, which is what produces depth;
       * material blending at the ground plane instead of one flat colour;
-      * Terrain.Decoration grass, which is free surface detail on every
-        Grass voxel and costs no instances.
+      * blended terrain materials instead of one repeated ground texture.
 
     WHAT IS DELIBERATELY *NOT* SCULPTED
 
@@ -327,33 +326,69 @@ local function fillStream(terrain: Terrain, palette: Palette)
         Vector3.new(342, GROUND_Y, -252),
     }
 
+    local channelDepth = 16
+    local waterDepth = 8
+    local waterSurfaceY = GROUND_Y - 2
+
     for index = 1, #points - 1 do
         local from = points[index]
         local to = points[index + 1]
         local delta = to - from
-        local segments = math.max(1, math.floor(delta.Magnitude / 16))
+        local center = from + delta * 0.5
+        local width = toVoxelSpan(28 + math.sin(index * 1.7) * 4)
+        local length = toVoxelSpan(delta.Magnitude + width)
+        local horizontalTarget = Vector3.new(to.X, GROUND_Y, to.Z)
+        local orientation =
+            CFrame.lookAt(Vector3.new(center.X, GROUND_Y, center.Z), horizontalTarget)
 
-        for step = 0, segments do
-            local at = from + delta * (step / segments)
-            local width = 26 + math.sin(step * 0.7 + index) * 5
-
-            -- Carve the channel, then fill the lower half with water so the
-            -- surface sits below the surrounding ground.
-            terrain:FillBall(Vector3.new(at.X, GROUND_Y + 2, at.Z), width * 0.5, Enum.Material.Air)
-            terrain:FillBall(
-                Vector3.new(at.X, GROUND_Y - 3, at.Z),
-                width * 0.44,
-                Enum.Material.Water
+        -- Repaint two flat bank strips before carving. Their top face remains
+        -- exactly at ground level; unlike a sphere, they cannot create dunes.
+        for side = -1, 1, 2 do
+            terrain:FillBlock(
+                orientation * CFrame.new(side * (width * 0.5 + 5), -4, 0),
+                Vector3.new(10, 8, length),
+                palette.shore
             )
-            terrain:FillBall(Vector3.new(at.X - width * 0.55, GROUND_Y - 1, at.Z), 8, palette.shore)
         end
+
+        -- Both channel and water are blocks aligned along the stream segment.
+        -- The water top is a single flat plane below the banks. Overlapping
+        -- segment ends hide the joints without the above-ground domes produced
+        -- by FillBall water.
+        terrain:FillBlock(
+            orientation * CFrame.new(0, -2, 0),
+            Vector3.new(width + 8, channelDepth, length),
+            Enum.Material.Air
+        )
+        terrain:FillBlock(
+            orientation * CFrame.new(0, waterSurfaceY - waterDepth * 0.5, 0),
+            Vector3.new(width, waterDepth, length),
+            Enum.Material.Water
+        )
     end
 
-    -- The pond the stream empties into, wide enough to catch a reflection of
-    -- the ridgeline behind it.
-    terrain:FillBall(Vector3.new(362, GROUND_Y + 3, -286), 62, Enum.Material.Air)
-    terrain:FillBall(Vector3.new(362, GROUND_Y - 6, -286), 56, Enum.Material.Water)
-    terrain:FillBall(Vector3.new(316, GROUND_Y - 2, -268), 22, palette.shore)
+    -- A flat octagonal pond assembled from voxel-aligned rows. Every row shares
+    -- the same water height, so the lake reads as a surface instead of a bubble.
+    local pondCenter = Vector3.new(362, GROUND_Y, -286)
+    local pondWidths = { 64, 96, 112, 120, 112, 96, 64 }
+    terrain:FillBlock(
+        CFrame.new(pondCenter + Vector3.new(0, -4, 0)),
+        Vector3.new(136, 8, 128),
+        palette.shore
+    )
+    for rowIndex, rowWidth in pondWidths do
+        local zOffset = (rowIndex - 4) * 16
+        terrain:FillBlock(
+            CFrame.new(pondCenter + Vector3.new(0, -2, zOffset)),
+            Vector3.new(rowWidth + 12, channelDepth, 20),
+            Enum.Material.Air
+        )
+        terrain:FillBlock(
+            CFrame.new(pondCenter + Vector3.new(0, waterSurfaceY - waterDepth * 0.5, zOffset)),
+            Vector3.new(rowWidth, waterDepth, 20),
+            Enum.Material.Water
+        )
+    end
 end
 
 -- How deep a surface material patch reaches. Only needs to cover the topmost
@@ -411,7 +446,6 @@ end
 local CORE_RADIUS = 760
 
 local function applyWaterStyle(terrain: Terrain)
-    terrain.Decoration = true
     terrain.WaterColor = Color3.fromRGB(44, 92, 104)
     terrain.WaterReflectance = 0.28
     terrain.WaterTransparency = 0.62
