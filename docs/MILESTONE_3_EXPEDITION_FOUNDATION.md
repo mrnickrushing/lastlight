@@ -15,7 +15,9 @@ Implemented:
 - arrival-to-extraction connectivity, cell-overlap, content-distribution, socket,
   and mobile-budget validation;
 - three bounded generation attempts plus a known-good authored fallback;
-- a visually distinct route with living root arches, farms, foxglove, sapglass,
+- a visually distinct 16-stud-wide Evacuation Road with a contrasting worn
+  center, dual non-color-only edge rails, six physical direction signs, living
+  root arches, farms, foxglove, sapglass,
   a windmill landmark, moth meadow, Old Growth approach, Wayhome Gate, and
   four physical story vignettes for the last harvest, town evacuation, failed
   windmill repair, and a lost bridge crossing, plus a three-layer regional
@@ -61,7 +63,9 @@ catalog version must reproduce the same manifest hash.
 4. Finish First Light and interact with the Bramblewake beacon.
 5. Confirm the character enters Lantern Gate instead of falling or waiting for
    the full route.
-6. Follow the connected amber path through all 12 modules to Wayhome Gate.
+6. Follow the connected Evacuation Road through all 12 modules to Wayhome Gate;
+   confirm the worn center, paired edges, and repeated road signs remain obvious
+   in daylight, darkness, and low graphics.
 7. Confirm module progress changes from `1 / 12` through `12 / 12`.
 8. Fall from three different modules and confirm recovery returns to Lantern
    Gate rather than the town or an infinite death loop.

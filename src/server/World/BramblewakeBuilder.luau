@@ -418,14 +418,71 @@ local function pathArm(parent: Instance, center: Vector3, neighbor: Vector3)
     local delta = neighbor - center
     local target = center + delta.Unit * 38
     local midpoint = (center + target) / 2 + Vector3.new(0, 0.28, 0)
-    part(
+    local roadFrame = CFrame.lookAt(midpoint, target)
+    local road = part(
         parent,
         "CriticalPath",
-        Vector3.new(14, 0.5, (target - center).Magnitude + 4),
-        CFrame.lookAt(midpoint, target),
+        Vector3.new(16, 0.5, (target - center).Magnitude + 4),
+        roadFrame,
         PATH,
         Enum.Material.Ground
     )
+    road.Reflectance = 0.02
+    local wear = part(
+        parent,
+        "EvacuationTrailWear",
+        Vector3.new(5.2, 0.16, (target - center).Magnitude + 3.5),
+        roadFrame * CFrame.new(0, 0.31, 0),
+        Color3.fromRGB(95, 72, 48),
+        Enum.Material.Mud,
+        false
+    )
+    wear.CanQuery = false
+    wear.CastShadow = false
+    for side = -1, 1, 2 do
+        local edge = part(
+            parent,
+            "EvacuationTrailEdge",
+            Vector3.new(0.72, 0.32, (target - center).Magnitude + 3.2),
+            roadFrame * CFrame.new(side * 7.15, 0.34, 0),
+            if side < 0 then DARK_BARK else Color3.fromRGB(82, 91, 58),
+            Enum.Material.Ground,
+            false
+        )
+        edge.CanQuery = false
+    end
+end
+
+local function evacuationRoadMarker(
+    parent: Instance,
+    center: Vector3,
+    neighbor: Vector3,
+    sequenceIndex: number
+)
+    local direction = (neighbor - center).Unit
+    local side = Vector3.new(-direction.Z, 0, direction.X)
+    local base = center + direction * 13 + side * 9
+    local lean = if sequenceIndex % 4 == 1 then math.rad(-4) else math.rad(4)
+    part(
+        parent,
+        "EvacuationRoadMarker",
+        Vector3.new(0.72, 6.2, 0.72),
+        CFrame.new(base + Vector3.new(0, 3.1, 0)) * CFrame.Angles(0, 0, lean),
+        DARK_BARK,
+        Enum.Material.Wood,
+        false
+    )
+    local board = part(
+        parent,
+        "EvacuationRoadSign",
+        Vector3.new(6.4, 2.1, 0.48),
+        CFrame.lookAt(base + Vector3.new(0, 5.4, 0), neighbor),
+        Color3.fromRGB(88, 59, 38),
+        Enum.Material.WoodPlanks,
+        false
+    )
+    board.CanQuery = false
+    billboard(board, "EVACUATION ROAD", CREAM)
 end
 
 local function window(parent: Instance, position: Vector3, rotation: number)
@@ -1936,6 +1993,9 @@ function BramblewakeBuilder.build(
         end
         if placement.index < #manifest.modules then
             pathArm(module, center, centers[placement.index + 1])
+            if placement.index % 2 == 1 then
+                evacuationRoadMarker(module, center, centers[placement.index + 1], placement.index)
+            end
         end
 
         moduleDressing(module, center, manifest.seed + placement.index * 97, runtimeIds)
