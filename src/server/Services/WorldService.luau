@@ -175,10 +175,14 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
     )
     courtyardPatch.Transparency = 0.08
 
-    -- A readable camp silhouette gives the arrival area a destination before
-    -- the player understands the systems. The cabins are fully roofed, with a
-    -- deliberate doorway instead of four floating walls.
+    -- This assembly follows the proven 65-part construction grammar from the
+    -- supplied Place6 reference: raised foundation, segmented walls around real
+    -- openings, four cross rafters, opposing roof wedges, framed windows, stairs,
+    -- an open door, and a full-height stone chimney. Last Light owns the palette,
+    -- props, dimensions, names, and lighting treatment.
     local function cabin(center: Vector3, name: string, accent: Color3): Instance
+        local scale = 0.72
+        center += Vector3.new(0, 2.2, 0)
         local cabinFolder = Instance.new("Folder")
         cabinFolder.Name = name
         cabinFolder.Parent = parent
@@ -187,99 +191,385 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
         shell.Name = "ProceduralCabinShell"
         shell.Parent = cabinFolder
 
-        part(
+        local wallColor = if name == "MARA'S SHELTER"
+            then Color3.fromRGB(69, 85, 66)
+            else Color3.fromRGB(91, 63, 44)
+        local trimColor = if name == "MARA'S SHELTER"
+            then Color3.fromRGB(109, 126, 90)
+            else Color3.fromRGB(137, 99, 61)
+        local roofColor = Color3.fromRGB(48, 54, 49)
+        local stoneColor = Color3.fromRGB(82, 84, 79)
+
+        local function scaledSize(x: number, y: number, z: number): Vector3
+            return Vector3.new(x * scale, y * scale, z * scale)
+        end
+        local function referenceCFrame(x: number, y: number, z: number): CFrame
+            return CFrame.new(center + Vector3.new(x * scale, (y + 7.5) * scale + 0.25, z * scale))
+        end
+        local function referencePart(
+            target: Instance,
+            partName: string,
+            dimensions: Vector3,
+            x: number,
+            y: number,
+            z: number,
+            color: Color3,
+            material: Enum.Material,
+            collidable: boolean?
+        ): Part
+            local created = part(
+                target,
+                partName,
+                scaledSize(dimensions.X, dimensions.Y, dimensions.Z),
+                referenceCFrame(x, y, z),
+                color,
+                material,
+                collidable
+            )
+            if collidable == false then
+                created.CanQuery = false
+            end
+            return created
+        end
+
+        referencePart(
+            shell,
+            "CabinFoundation",
+            Vector3.new(36, 3, 24),
+            0,
+            -9.5,
+            0,
+            Color3.fromRGB(72, 76, 73),
+            Enum.Material.Cobblestone
+        )
+        referencePart(
             shell,
             "CabinFloor",
-            Vector3.new(14, 0.5, 12),
-            CFrame.new(center + Vector3.new(0, 0.25, 0)),
-            Color3.fromRGB(75, 57, 42),
+            Vector3.new(34, 1, 22),
+            0,
+            -7.5,
+            0,
+            trimColor,
             Enum.Material.WoodPlanks
         )
-        part(
-            shell,
-            "CabinBackWall",
-            Vector3.new(14, 8, 0.7),
-            CFrame.new(center + Vector3.new(0, 4.25, 5.65)),
-            BARK,
-            Enum.Material.WoodPlanks
-        )
-        for side = -1, 1, 2 do
-            part(
+
+        local wallPieces = {
+            { 9, 9, 1, -13.5, -3.5, -11.5 },
+            { 7, 5, 1, 0.5, -1.5, -11.5 },
+            { 7, 5, 1, 14.5, -1.5, -11.5 },
+            { 21, 4, 1, 7.5, -6, -11.5 },
+            { 36, 6, 1, 0, 4, -11.5 },
+            { 23, 8, 1, 6.5, -4, 11.5 },
+            { 5, 8, 1, -15.5, -4, 11.5 },
+            { 36, 7, 1, 0, 3.5, 11.5 },
+        }
+        for _, spec in wallPieces do
+            referencePart(
                 shell,
-                "CabinSideWall",
-                Vector3.new(0.7, 8, 12),
-                CFrame.new(center + Vector3.new(side * 6.65, 4.25, 0)),
-                BARK,
+                "CabinWallPanel",
+                Vector3.new(spec[1], spec[2], spec[3]),
+                spec[4],
+                spec[5],
+                spec[6],
+                wallColor,
                 Enum.Material.WoodPlanks
             )
-            part(
+        end
+        for side = -1, 1, 2 do
+            for _, spec in
+                {
+                    { 1, 4, 22, -6, 0 },
+                    { 1, 6, 22, 4, 0 },
+                    { 1, 5, 7, -1.5, -7.5 },
+                    { 1, 5, 8, -1.5, 7 },
+                }
+            do
+                referencePart(
+                    shell,
+                    "CabinSideWallPanel",
+                    Vector3.new(spec[1], spec[2], spec[3]),
+                    side * 17.5,
+                    spec[4],
+                    spec[5],
+                    wallColor,
+                    Enum.Material.WoodPlanks
+                )
+            end
+        end
+
+        for _, z in { -7.5, -2.5, 2.5, 7.5 } do
+            referencePart(
                 shell,
-                "CabinDoorPost",
-                Vector3.new(0.8, 8, 0.8),
-                CFrame.new(center + Vector3.new(side * 5.2, 4.25, -5.65)),
+                "CabinInteriorRafter",
+                Vector3.new(34, 1, 1),
+                0,
+                6.5,
+                z,
                 WET_BARK,
-                Enum.Material.Wood
+                Enum.Material.Wood,
+                false
             )
         end
-        part(
+        for roofSide = -1, 1, 2 do
+            local roof = referencePart(
+                shell,
+                "CabinRoof",
+                Vector3.new(36, 6, 12),
+                0,
+                10,
+                roofSide * 6,
+                roofColor,
+                Enum.Material.Slate
+            )
+            roof.Shape = Enum.PartType.Wedge
+            if roofSide > 0 then
+                roof.CFrame *= CFrame.Angles(0, math.pi, 0)
+            end
+            roof.CastShadow = true
+        end
+        referencePart(
             shell,
-            "CabinFrontBeam",
-            Vector3.new(14, 1, 0.8),
-            CFrame.new(center + Vector3.new(0, 7.8, -5.65)),
+            "CabinRidgeBeam",
+            Vector3.new(36.5, 0.8, 0.8),
+            0,
+            13,
+            0,
             WET_BARK,
-            Enum.Material.Wood
+            Enum.Material.Wood,
+            false
         )
-        for side = -1, 1, 2 do
-            local window = part(
+
+        local function buildWindow(x: number, z: number, frontFacing: boolean)
+            local window = referencePart(
                 cabinFolder,
-                "CabinWindow",
-                Vector3.new(2.7, 2.2, 0.18),
-                CFrame.new(center + Vector3.new(side * 6.3, 4.8, 1.8)),
-                accent,
+                "CabinWindowGlass",
+                if frontFacing then Vector3.new(6.6, 4.6, 0.2) else Vector3.new(0.2, 4.6, 6.6),
+                x,
+                -1.5,
+                z,
+                Color3.fromRGB(118, 156, 157),
                 Enum.Material.Glass,
                 false
             )
-            window.Transparency = 0.22
+            window.Transparency = 0.48
+            if frontFacing then
+                for frameY = -3.9, 0.9, 4.8 do
+                    referencePart(
+                        cabinFolder,
+                        "CabinWindowFrame",
+                        Vector3.new(7, 0.28, 0.72),
+                        x,
+                        frameY,
+                        z - 0.1,
+                        trimColor,
+                        Enum.Material.Wood,
+                        false
+                    )
+                end
+                referencePart(
+                    cabinFolder,
+                    "CabinWindowMullion",
+                    Vector3.new(0.28, 4.6, 0.72),
+                    x,
+                    -1.5,
+                    z - 0.1,
+                    trimColor,
+                    Enum.Material.Wood,
+                    false
+                )
+            else
+                for frameY = -3.9, 0.9, 4.8 do
+                    referencePart(
+                        cabinFolder,
+                        "CabinWindowFrame",
+                        Vector3.new(0.72, 0.28, 7),
+                        x,
+                        frameY,
+                        z,
+                        trimColor,
+                        Enum.Material.Wood,
+                        false
+                    )
+                end
+                referencePart(
+                    cabinFolder,
+                    "CabinWindowMullion",
+                    Vector3.new(0.72, 4.6, 0.28),
+                    x,
+                    -1.5,
+                    z,
+                    trimColor,
+                    Enum.Material.Wood,
+                    false
+                )
+            end
         end
-        local roof = part(
-            shell,
-            "CabinRoof",
-            Vector3.new(16, 0.8, 14),
-            CFrame.new(center + Vector3.new(0, 8.7, 0)) * CFrame.Angles(0, 0, math.rad(2)),
-            Color3.fromRGB(42, 47, 41),
-            Enum.Material.Slate
-        )
-        roof.CastShadow = true
-        local porch = part(
-            shell,
-            "CabinPorch",
-            Vector3.new(10, 0.35, 3),
-            CFrame.new(center + Vector3.new(0, 0.55, -7.1)),
-            Color3.fromRGB(85, 63, 43),
-            Enum.Material.WoodPlanks
-        )
-        porch.CanQuery = false
-        local windowLight = Instance.new("PointLight")
-        windowLight.Color = accent
-        windowLight.Brightness = 0.9
-        windowLight.Range = 14
-        windowLight.Shadows = false
-        windowLight.Parent = cabinFolder
-        local lightAnchor = part(
+        buildWindow(7.5, -11.6, true)
+        buildWindow(-17.6, -0.5, false)
+        buildWindow(17.6, -0.5, false)
+
+        for doorX in { -9.2, -3.2 } do
+            referencePart(
+                cabinFolder,
+                "CabinDoorFrame",
+                Vector3.new(0.65, 8.5, 0.7),
+                doorX,
+                -3,
+                -11.7,
+                trimColor,
+                Enum.Material.Wood,
+                false
+            )
+        end
+        referencePart(
             cabinFolder,
-            "CabinLight",
-            Vector3.new(0.2, 0.2, 0.2),
-            CFrame.new(center + Vector3.new(0, 4.4, 2.8)),
+            "CabinDoorHeader",
+            Vector3.new(6.7, 0.65, 0.7),
+            -6.2,
+            1.25,
+            -11.7,
+            trimColor,
+            Enum.Material.Wood,
+            false
+        )
+        local hinge = referenceCFrame(-9.0, -3, -11.8)
+        local openDoor = part(
+            cabinFolder,
+            "CabinOpenDoor",
+            scaledSize(5.2, 8, 0.6),
+            hinge * CFrame.Angles(0, math.rad(68), 0) * CFrame.new(2.6 * scale, 0, 0),
+            trimColor,
+            Enum.Material.WoodPlanks,
+            false
+        )
+        openDoor.CanQuery = false
+        part(
+            cabinFolder,
+            "CabinDoorBrace",
+            scaledSize(4.4, 0.45, 0.24),
+            openDoor.CFrame * CFrame.Angles(0, 0, math.rad(28)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+        local handle = part(
+            cabinFolder,
+            "CabinDoorHandle",
+            scaledSize(0.45, 0.45, 0.45),
+            openDoor.CFrame * CFrame.new(1.7 * scale, -0.7 * scale, -0.5 * scale),
+            Color3.fromRGB(111, 114, 108),
+            Enum.Material.Metal,
+            false
+        )
+        handle.Shape = Enum.PartType.Ball
+
+        for stepIndex = 1, 4 do
+            referencePart(
+                shell,
+                "CabinStep",
+                Vector3.new(6, 1, 1 + stepIndex),
+                -6,
+                -7.5 - stepIndex,
+                -12.5 - stepIndex * 0.5,
+                Color3.fromRGB(88, 91, 86),
+                Enum.Material.Cobblestone
+            )
+        end
+
+        local fireplace = Instance.new("Model")
+        fireplace.Name = "CabinFireplace"
+        fireplace.Parent = cabinFolder
+        local fireplaceParts = {
+            { "CabinHearth", 8, 2, 2, -9, -6, 10 },
+            { "CabinHearthSide", 1, 7, 1, -12.5, -4.5, 11.5 },
+            { "CabinHearthSide", 1, 7, 1, -5.5, -4.5, 11.5 },
+            { "CabinHearthLintel", 8, 1, 2, -9, -0.5, 11 },
+            { "CabinChimneyBack", 8, 11, 1, -9, -5.5, 14.5 },
+            { "CabinChimneySide", 1, 11, 2, -12.5, -5.5, 13 },
+            { "CabinChimneySide", 1, 11, 2, -5.5, -5.5, 13 },
+            { "CabinChimneyStack", 4, 12, 1, -9, 6, 12.5 },
+            { "CabinChimneyStack", 4, 12, 1, -9, 6, 14.5 },
+            { "CabinChimneyStack", 1, 12, 1, -10.5, 6, 13.5 },
+            { "CabinChimneyStack", 1, 12, 1, -7.5, 6, 13.5 },
+            { "CabinChimneyCap", 5, 0.7, 2.2, -9, 12.2, 13.5 },
+        }
+        for _, spec in fireplaceParts do
+            referencePart(
+                fireplace,
+                spec[1],
+                Vector3.new(spec[2], spec[3], spec[4]),
+                spec[5],
+                spec[6],
+                spec[7],
+                stoneColor,
+                Enum.Material.Cobblestone,
+                false
+            )
+        end
+        referencePart(
+            fireplace,
+            "CabinAshBed",
+            Vector3.new(6, 0.5, 3),
+            -9,
+            -5.5,
+            12.5,
+            Color3.fromRGB(45, 47, 46),
+            Enum.Material.Slate,
+            false
+        )
+        referencePart(
+            fireplace,
+            "CabinBurningWood",
+            Vector3.new(4, 0.65, 0.7),
+            -9,
+            -4.7,
+            12.5,
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+        local hearthFire = referencePart(
+            fireplace,
+            "CabinHearthFire",
+            Vector3.new(1.25, 1.45, 1.05),
+            -9,
+            -3.7,
+            12.2,
             accent,
             Enum.Material.Neon,
             false
         )
+        hearthFire.Shape = Enum.PartType.Ball
+        hearthFire.Transparency = 0.22
+        local hearthLight = Instance.new("PointLight")
+        hearthLight.Color = accent
+        hearthLight.Brightness = 0.45
+        hearthLight.Range = 8
+        hearthLight.Shadows = true
+        hearthLight.Parent = hearthFire
+        CollectionService:AddTag(hearthFire, "LastLightAmbientLight")
+
+        local windowLight = Instance.new("PointLight")
+        windowLight.Color = accent
+        windowLight.Brightness = 0.22
+        windowLight.Range = 10
+        windowLight.Shadows = false
+        local lightAnchor = part(
+            cabinFolder,
+            "CabinLight",
+            Vector3.new(0.2, 0.2, 0.2),
+            CFrame.new(center + Vector3.new(0, 5.4, 2.8)),
+            accent,
+            Enum.Material.Glass,
+            false
+        )
+        lightAnchor.Transparency = 1
         windowLight.Parent = lightAnchor
         local sign = part(
             cabinFolder,
             "CabinSign",
-            Vector3.new(5.5, 1.4, 0.35),
-            CFrame.new(center + Vector3.new(0, 6.8, -6.1)),
+            Vector3.new(6.4, 1.25, 0.35),
+            referenceCFrame(6, 3.3, -12.1),
             WET_BARK,
             Enum.Material.WoodPlanks,
             false
@@ -304,7 +594,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                 cabinFolder,
                 "MaraCot",
                 Vector3.new(5.2, 0.55, 2.7),
-                CFrame.new(center + Vector3.new(-3.2, 0.85, 3.6)),
+                CFrame.new(center + Vector3.new(4.2, 1.0, 3.5)),
                 Color3.fromRGB(96, 112, 83),
                 Enum.Material.Fabric,
                 false
@@ -314,7 +604,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                 cabinFolder,
                 "MaraWorkTable",
                 Vector3.new(4.2, 0.45, 2.5),
-                CFrame.new(center + Vector3.new(3.5, 2.1, 3.5)),
+                CFrame.new(center + Vector3.new(4.5, 2.15, -3.2)),
                 Color3.fromRGB(89, 64, 43),
                 Enum.Material.WoodPlanks,
                 false
@@ -325,7 +615,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                     cabinFolder,
                     "MemoryJar",
                     Vector3.new(0.7, 1.05, 0.7),
-                    CFrame.new(center + Vector3.new(3.5 + jarIndex * 1.1, 2.85, 3.5)),
+                    CFrame.new(center + Vector3.new(4.5 + jarIndex * 1.1, 2.9, -3.2)),
                     if jarIndex == 0 then FOXFIRE else AMBER,
                     Enum.Material.Glass,
                     false
@@ -340,7 +630,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                     cabinFolder,
                     "WayfarerBedroll",
                     Vector3.new(4.8, 0.45, 2.3),
-                    CFrame.new(center + Vector3.new(bedIndex * 3.3, 0.72, 2.7)),
+                    CFrame.new(center + Vector3.new(3.5 + bedIndex * 3.6, 0.95, 3.8)),
                     if bedIndex < 0
                         then Color3.fromRGB(127, 91, 58)
                         else Color3.fromRGB(72, 104, 82),
@@ -353,7 +643,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                 cabinFolder,
                 "WayfarerTrunk",
                 Vector3.new(4.4, 2.3, 2.5),
-                CFrame.new(center + Vector3.new(0, 1.15, 4.25)),
+                CFrame.new(center + Vector3.new(5.2, 1.2, -3.6)),
                 Color3.fromRGB(88, 61, 39),
                 Enum.Material.WoodPlanks,
                 false
@@ -361,29 +651,11 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
             trunk.CanQuery = false
         end
 
-        -- Place6's useful lesson is density through construction layers, not
-        -- expensive meshes. These original Last Light details remain outside
-        -- the replaceable shell so they survive authored-mesh loading and make
-        -- the open front read as an inhabited room from the road.
-        for rafterIndex = -1, 1 do
-            local rafter = part(
-                cabinFolder,
-                "CabinInteriorRafter",
-                Vector3.new(0.48, 0.48, 10.8),
-                CFrame.new(center + Vector3.new(rafterIndex * 4.4, 7.35, 0.1))
-                    * CFrame.Angles(math.rad(2), 0, 0),
-                WET_BARK,
-                Enum.Material.Wood,
-                false
-            )
-            rafter.CanQuery = false
-        end
-
         local rug = part(
             cabinFolder,
             "CabinWovenRug",
             Vector3.new(6.4, 0.12, 3.4),
-            CFrame.new(center + Vector3.new(0, 0.6, -0.1)),
+            CFrame.new(center + Vector3.new(2.5, 0.68, -0.1)),
             if name == "MARA'S SHELTER"
                 then Color3.fromRGB(70, 112, 102)
                 else Color3.fromRGB(132, 88, 54),
@@ -392,50 +664,11 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
         )
         rug.CanQuery = false
 
-        local hearth = part(
-            cabinFolder,
-            "CabinHearth",
-            Vector3.new(3.5, 0.55, 2.2),
-            CFrame.new(center + Vector3.new(4.6, 0.85, 4.1)),
-            Color3.fromRGB(73, 76, 72),
-            Enum.Material.Cobblestone,
-            false
-        )
-        hearth.CanQuery = false
-        part(
-            cabinFolder,
-            "CabinHearthBack",
-            Vector3.new(3.5, 3.8, 0.65),
-            CFrame.new(center + Vector3.new(4.6, 2.45, 5.0)),
-            Color3.fromRGB(68, 72, 69),
-            Enum.Material.Cobblestone,
-            false
-        )
-        local hearthFire = part(
-            cabinFolder,
-            "CabinHearthFire",
-            Vector3.new(1.25, 1.35, 1.05),
-            CFrame.new(center + Vector3.new(4.6, 1.55, 4.25)),
-            accent,
-            Enum.Material.Neon,
-            false
-        )
-        hearthFire.Shape = Enum.PartType.Ball
-        hearthFire.Transparency = 0.08
-        hearthFire.CanQuery = false
-        local hearthLight = Instance.new("PointLight")
-        hearthLight.Color = accent
-        hearthLight.Brightness = 1.15
-        hearthLight.Range = 11
-        hearthLight.Shadows = true
-        hearthLight.Parent = hearthFire
-        CollectionService:AddTag(hearthFire, "LastLightAmbientLight")
-
         local shelf = part(
             cabinFolder,
             "CabinSupplyShelf",
             Vector3.new(4.8, 0.35, 1.15),
-            CFrame.new(center + Vector3.new(-3.2, 4.35, 5.0)),
+            CFrame.new(center + Vector3.new(4.5, 5.15, 7.5)),
             Color3.fromRGB(92, 65, 43),
             Enum.Material.WoodPlanks,
             false
@@ -458,7 +691,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
             cabinFolder,
             "CabinStoolSeat",
             Vector3.new(2.1, 0.35, 2.1),
-            CFrame.new(center + Vector3.new(-4.7, 2.1, -2.1)),
+            CFrame.new(center + Vector3.new(5.2, 1.9, 0.3)),
             Color3.fromRGB(91, 64, 42),
             Enum.Material.WoodPlanks,
             false
@@ -488,7 +721,8 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                 "SplitFirewood",
                 Vector3.new(2.8, 0.65, 0.72),
                 CFrame.new(
-                    center + Vector3.new(-8.4, 0.55 + row * 0.62, 1.4 + ((logIndex - 1) % 3) * 0.78)
+                    center
+                        + Vector3.new(-14.5, -1.45 + row * 0.62, 2.5 + ((logIndex - 1) % 3) * 0.78)
                 )
                     * CFrame.Angles(0, math.rad(4 * logIndex), math.rad((logIndex % 2) * 5)),
                 if logIndex % 2 == 0 then BARK else WET_BARK,
@@ -496,6 +730,14 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                 false
             )
         end
+        local physicalParts = 0
+        for _, descendant in cabinFolder:GetDescendants() do
+            if descendant:IsA("BasePart") then
+                physicalParts += 1
+            end
+        end
+        cabinFolder:SetAttribute("ConstructionPattern", "place6_reference_adapted")
+        cabinFolder:SetAttribute("PhysicalPartCount", physicalParts)
         return shell
     end
 
@@ -1579,21 +1821,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         })
     end
     labelSign(geometry, CFrame.new(7, 3, -14) * CFrame.Angles(0, math.pi, 0), "EMBERHOLLOW")
-    local cabinShells = buildEmberhollowSanctuary(geometry)
-    for index, shell in cabinShells do
-        local position = if index == 1 then Vector3.new(-22, 0, -112) else Vector3.new(22, 0, -112)
-        table.insert(_self._meshPlacements, {
-            assetId = "mesh_wayfarer_cabin_a",
-            fallbackKind = "placeholder",
-            position = position,
-            scale = 1,
-            yaw = 0,
-            seed = 9300 + index,
-            swayTag = nil,
-            parent = geometry,
-            fallbackInstance = shell,
-        })
-    end
+    buildEmberhollowSanctuary(geometry)
 
     local warningFolder = Instance.new("Folder")
     warningFolder.Name = "DuskTreelineWarnings"
@@ -3152,7 +3380,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v17")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v18")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -3252,7 +3480,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v17",
+        worldVersion = "bramblewake-blackout-v18",
     })
 end
 
