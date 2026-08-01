@@ -62,6 +62,22 @@ return {
             end,
         },
         {
+            name = "binds four stable story vignettes to authored modules",
+            run = function()
+                local expected = {
+                    module_bw_sunken_orchard = "last_harvest",
+                    module_bw_hollow_farm = "evacuation_cart",
+                    module_bw_windmill_copse = "last_repair",
+                    module_bw_tangle_bridge = "lost_crossing",
+                }
+                for moduleId, landmark in expected do
+                    local definition = ExpeditionGenerator.moduleDefinition(moduleId)
+                    TestRunner.equal(definition.storyLandmark, landmark)
+                    TestRunner.truthy(type(definition.storyTitle) == "string")
+                end
+            end,
+        },
+        {
             name = "requires the authored Old Growth arena module",
             run = function()
                 local manifest = ExpeditionGenerator.generate(93)

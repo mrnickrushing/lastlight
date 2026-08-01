@@ -722,6 +722,203 @@ local function buildWindmill(parent: Instance, center: Vector3, ambientMotionTag
     CollectionService:AddTag(rotor, ambientMotionTag)
 end
 
+local function buildStoryLandmark(
+    parent: Instance,
+    center: Vector3,
+    kind: string,
+    title: string
+): number
+    local origin = center + Vector3.new(20, 0, 19)
+    local count = 0
+    local function storyPart(
+        name: string,
+        size: Vector3,
+        cframe: CFrame,
+        color: Color3,
+        material: Enum.Material
+    ): Part
+        local artifact = part(parent, name, size, cframe, color, material, false)
+        artifact.CanQuery = false
+        artifact:SetAttribute("StoryLandmark", kind)
+        count += 1
+        return artifact
+    end
+
+    local anchor: BasePart
+    if kind == "last_harvest" then
+        anchor = storyPart(
+            "LastHarvestTable",
+            Vector3.new(8.5, 0.55, 4.2),
+            CFrame.new(origin + Vector3.new(0, 2.6, 0)) * CFrame.Angles(0, 0.18, 0),
+            Color3.fromRGB(96, 68, 43),
+            Enum.Material.WoodPlanks
+        )
+        for x = -1, 1, 2 do
+            for z = -1, 1, 2 do
+                storyPart(
+                    "HarvestTableLeg",
+                    Vector3.new(0.45, 2.5, 0.45),
+                    CFrame.new(origin + Vector3.new(x * 3.2, 1.25, z * 1.25)),
+                    DARK_BARK,
+                    Enum.Material.Wood
+                )
+            end
+        end
+        for basketIndex = -1, 1 do
+            local basket = storyPart(
+                "AbandonedHarvestBasket",
+                Vector3.new(1.8, 1.3, 1.8),
+                CFrame.new(origin + Vector3.new(basketIndex * 2.5, 3.45, 0)),
+                if basketIndex == 0 then MEADOW else Color3.fromRGB(145, 91, 53),
+                Enum.Material.WoodPlanks
+            )
+            basket.Shape = Enum.PartType.Ball
+        end
+        storyPart(
+            "HarvestSickleHandle",
+            Vector3.new(0.35, 3.6, 0.35),
+            CFrame.new(origin + Vector3.new(4.7, 0.9, 1.5)) * CFrame.Angles(0, 0, math.rad(68)),
+            BARK,
+            Enum.Material.Wood
+        )
+        storyPart(
+            "HarvestSickleBlade",
+            Vector3.new(1.8, 0.3, 0.55),
+            CFrame.new(origin + Vector3.new(5.8, 1.9, 1.5)) * CFrame.Angles(0, 0, math.rad(28)),
+            Color3.fromRGB(127, 139, 140),
+            Enum.Material.Metal
+        )
+    elseif kind == "evacuation_cart" then
+        anchor = storyPart(
+            "EvacuationHandcart",
+            Vector3.new(8.5, 2.8, 5.2),
+            CFrame.new(origin + Vector3.new(0, 1.65, 0)) * CFrame.Angles(0.08, 0.35, 0.12),
+            Color3.fromRGB(103, 70, 43),
+            Enum.Material.WoodPlanks
+        )
+        storyPart(
+            "EvacuationCartTongue",
+            Vector3.new(0.7, 0.7, 7.5),
+            anchor.CFrame * CFrame.new(0, -0.35, -5.8) * CFrame.Angles(math.rad(-8), 0, 0),
+            BARK,
+            Enum.Material.Wood
+        )
+        for side = -1, 1, 2 do
+            local wheel = storyPart(
+                "EvacuationCartWheel",
+                Vector3.new(0.65, 4.4, 4.4),
+                anchor.CFrame * CFrame.new(side * 4.55, -0.6, 0),
+                DARK_BARK,
+                Enum.Material.Wood
+            )
+            wheel.Shape = Enum.PartType.Cylinder
+        end
+        for crateIndex = -1, 1 do
+            storyPart(
+                "EvacuationCrate",
+                Vector3.new(2.2, 1.8 + math.abs(crateIndex) * 0.35, 2.2),
+                anchor.CFrame * CFrame.new(crateIndex * 2.4, 2.2, 0),
+                if crateIndex == 0 then Color3.fromRGB(108, 124, 74) else Color3.fromRGB(91, 62, 40),
+                Enum.Material.WoodPlanks
+            )
+        end
+        for trackIndex = 1, 4 do
+            local track = storyPart(
+                "DepartureTrack",
+                Vector3.new(1.2, 0.12, 2.4),
+                CFrame.new(origin + Vector3.new(-5 + trackIndex * 2.1, 0.31, -5 - trackIndex * 2.7))
+                    * CFrame.Angles(0, 0.25, 0),
+                WET_EARTH,
+                Enum.Material.Mud
+            )
+            track.Transparency = 0.12
+        end
+    elseif kind == "last_repair" then
+        anchor = storyPart(
+            "FallenWindmillSpar",
+            Vector3.new(1, 17, 1),
+            CFrame.new(origin + Vector3.new(0, 1.2, 0))
+                * CFrame.Angles(math.rad(88), math.rad(16), 0),
+            BARK,
+            Enum.Material.Wood
+        )
+        for sailIndex = -1, 1, 2 do
+            local sail = storyPart(
+                "TornWindmillSail",
+                Vector3.new(4.2, 0.28, 6.8),
+                CFrame.new(origin + Vector3.new(sailIndex * 3.2, 0.48, sailIndex * 2.1))
+                    * CFrame.Angles(0, math.rad(16 + sailIndex * 8), math.rad(sailIndex * 4)),
+                CREAM,
+                Enum.Material.Fabric
+            )
+            sail.Transparency = 0.12
+        end
+        storyPart(
+            "RepairToolChest",
+            Vector3.new(4.5, 2.1, 2.8),
+            CFrame.new(origin + Vector3.new(6, 1.05, 4)),
+            Color3.fromRGB(90, 61, 41),
+            Enum.Material.WoodPlanks
+        )
+        for toolIndex = -1, 1 do
+            storyPart(
+                "AbandonedRepairTool",
+                Vector3.new(0.35, 3.2, 0.35),
+                CFrame.new(origin + Vector3.new(5.3 + toolIndex * 1.1, 2.75, 4))
+                    * CFrame.Angles(0, 0, math.rad(68 + toolIndex * 9)),
+                if toolIndex == 0 then Color3.fromRGB(131, 144, 146) else BARK,
+                if toolIndex == 0 then Enum.Material.Metal else Enum.Material.Wood
+            )
+        end
+    else
+        anchor = storyPart(
+            "LostCrossingSatchel",
+            Vector3.new(3.1, 2.2, 1.3),
+            CFrame.new(origin + Vector3.new(3.5, 1.2, 1.8)) * CFrame.Angles(0.12, -0.4, 0.2),
+            Color3.fromRGB(118, 78, 49),
+            Enum.Material.Fabric
+        )
+        for plankIndex = -1, 1 do
+            storyPart(
+                "SnappedCrossingPlank",
+                Vector3.new(2.8, 0.45, 7),
+                CFrame.new(origin + Vector3.new(plankIndex * 3.4, 0.55, -1 + plankIndex * 1.4))
+                    * CFrame.Angles(
+                        math.rad(plankIndex * 5),
+                        math.rad(plankIndex * 12),
+                        math.rad(plankIndex * 4)
+                    ),
+                Color3.fromRGB(94, 65, 43),
+                Enum.Material.WoodPlanks
+            )
+        end
+        for railIndex = -1, 1, 2 do
+            storyPart(
+                "BrokenCrossingRail",
+                Vector3.new(0.55, 6.5, 0.55),
+                CFrame.new(origin + Vector3.new(railIndex * 5.2, 1.25, -1))
+                    * CFrame.Angles(math.rad(74), 0, math.rad(railIndex * 12)),
+                DARK_BARK,
+                Enum.Material.Wood
+            )
+        end
+        local lostLantern = storyPart(
+            "ColdTrailLantern",
+            Vector3.new(1.6, 2.1, 1.6),
+            CFrame.new(origin + Vector3.new(-4.7, 1.15, 4.2)),
+            Color3.fromRGB(91, 118, 113),
+            Enum.Material.Glass
+        )
+        lostLantern.Shape = Enum.PartType.Ball
+        lostLantern.Transparency = 0.28
+    end
+    billboard(anchor, title, CREAM)
+    parent:SetAttribute("StoryLandmark", kind)
+    parent:SetAttribute("StoryLandmarkTitle", title)
+    parent:SetAttribute("StoryLandmarkPartCount", count)
+    return count
+end
+
 local function buildModuleVisual(parent: Instance, visual: string, center: Vector3, runtimeIds: any)
     if visual == "lantern_gate" then
         rootArch(parent, center, 1)
@@ -1504,6 +1701,7 @@ function BramblewakeBuilder.build(
     local centers: { Vector3 } = {}
     local eventInteractions = {}
     local eventSockets: { [string]: BasePart } = {}
+    local storyLandmarkCount = 0
     local eliteArena = nil
     local oldGrowthCenter: Vector3? = nil
     local extractionTarget: BasePart? = nil
@@ -1561,6 +1759,13 @@ function BramblewakeBuilder.build(
             tree(module, center + Vector3.new(x, 0, z), 0.62 + (cornerIndex % 2) * 0.08)
         end
         buildModuleVisual(module, definition.visual, center, runtimeIds)
+        if
+            type(definition.storyLandmark) == "string"
+            and type(definition.storyTitle) == "string"
+        then
+            buildStoryLandmark(module, center, definition.storyLandmark, definition.storyTitle)
+            storyLandmarkCount += 1
+        end
         if definition.eliteId == "elite_old_growth" then
             oldGrowthCenter = center
             local fireSource = orb(
@@ -1666,6 +1871,7 @@ function BramblewakeBuilder.build(
     expedition:SetAttribute("PointOfInterestCount", catalog.PointOfInterestCount)
     expedition:SetAttribute("EventCount", catalog.EventCount)
     expedition:SetAttribute("EventInteractionCount", #eventInteractions)
+    expedition:SetAttribute("StoryLandmarkCount", storyLandmarkCount)
     expedition:SetAttribute("ExtractionReady", extractionTarget ~= nil)
     expedition:SetAttribute("BossArenaReady", bossArena ~= nil)
     expedition:SetAttribute("BlackoutLayerReady", blackout ~= nil)

@@ -17,7 +17,9 @@ Implemented:
 - three bounded generation attempts plus a known-good authored fallback;
 - a visually distinct route with living root arches, farms, foxglove, sapglass,
   a windmill landmark, moth meadow, Old Growth approach, Wayhome Gate, and
-  three-layer regional backdrop;
+  four physical story vignettes for the last harvest, town evacuation, failed
+  windmill repair, and a lost bridge crossing, plus a three-layer regional
+  backdrop;
 - beacon entry for new and returning tutorial-complete players;
 - bounded server-side streaming prefetch before movement to the gated expedition zone;
 - fall recovery to the expedition entrance;
