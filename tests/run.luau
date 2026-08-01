@@ -38,4 +38,5 @@ TestRunner.run({
     require("./specs/BramblewakeBlackout.spec"),
     require("./specs/TownNightSchedule.spec"),
     require("./specs/TownProgression.spec"),
+    require("./specs/TownCondition.spec"),
 })

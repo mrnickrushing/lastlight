@@ -35,8 +35,8 @@ local OldGrowthBuilder = require(serverRoot.World.OldGrowthBuilder)
 local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
-assert(Config.SaveSchemaVersion == 8, "unexpected save schema version")
-assert(Config.BuildVersion == "0.20.0", "unexpected build version")
+assert(Config.SaveSchemaVersion == 9, "unexpected save schema version")
+assert(Config.BuildVersion == "0.21.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -85,6 +85,7 @@ assert(
     RuntimeIds.Actions.SelectProfession == "select_profession",
     "profession selection action ID changed"
 )
+assert(RuntimeIds.Actions.RepairTown == "repair_town", "town repair action ID changed")
 assert(RuntimeIds.Actions.OldGrowthFire == "old_growth_fire", "Old Growth action ID changed")
 assert(RuntimeIds.Actions.WardenStagChoice == "warden_stag_choice", "Warden Stag action ID changed")
 assert(
@@ -285,6 +286,12 @@ assert(world:FindFirstChild("Mara", true) ~= nil, "Mara is missing")
 assert(world:FindFirstChild("HeartwoodStump", true) ~= nil, "gather node is missing")
 assert(world:FindFirstChild("ConstructionPlot", true) ~= nil, "construction plot is missing")
 assert(world:FindFirstChild("FirstLantern", true) ~= nil, "First Lantern is missing")
+assert(world:GetAttribute("TownIntegrity") == 100, "new towns must begin fully repaired")
+assert(world:GetAttribute("TownDamageLevel") == 0, "new towns cannot begin visibly damaged")
+assert(
+    world:FindFirstChild("TownDamageConsequences") == nil,
+    "pristine towns cannot build repair debris"
+)
 
 local expedition = world:FindFirstChild("BramblewakeExpedition")
 assert(expedition ~= nil and expedition:IsA("Model"), "Bramblewake expedition is missing")

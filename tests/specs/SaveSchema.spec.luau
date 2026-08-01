@@ -10,7 +10,7 @@ return {
             name = "creates a safe first-session profile",
             run = function()
                 local profile = SaveSchema.default(100)
-                TestRunner.equal(profile.schemaVersion, 8)
+                TestRunner.equal(profile.schemaVersion, 9)
                 TestRunner.equal(profile.tutorial.stage, "arrive")
                 TestRunner.equal(profile.tutorial.complete, false)
                 TestRunner.equal(profile.revision, 0)
@@ -52,7 +52,7 @@ return {
                 TestRunner.equal(profile.tutorial.stage, "build")
                 TestRunner.equal(profile.tutorial.selectedTool, "hammer")
                 TestRunner.equal(profile.revision, 4)
-                TestRunner.equal(profile.schemaVersion, 8)
+                TestRunner.equal(profile.schemaVersion, 9)
             end,
         },
         {
@@ -68,7 +68,7 @@ return {
                         complete = true,
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 8)
+                TestRunner.equal(profile.schemaVersion, 9)
                 TestRunner.equal(profile.revision, 7)
                 TestRunner.equal(profile.tutorial.complete, true)
                 TestRunner.equal(SaveSchema.expeditionPending(profile).count, 0)
@@ -154,7 +154,7 @@ return {
                         selectedId = "profession_hacker",
                     },
                 }, 300)
-                TestRunner.equal(migrated.schemaVersion, 8)
+                TestRunner.equal(migrated.schemaVersion, 9)
                 TestRunner.equal(migrated.profession.selectedId, nil)
 
                 local selected = SaveSchema.withProfession(migrated, "profession_medic", 320)
@@ -176,7 +176,7 @@ return {
                         },
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 8)
+                TestRunner.equal(profile.schemaVersion, 9)
                 TestRunner.equal(profile.story.chapterOne.status, "unresolved")
                 TestRunner.equal(profile.story.chapterOne.decision, nil)
             end,
@@ -224,7 +224,7 @@ return {
                     revision = 3,
                     tutorial = { stage = "reveal", complete = false },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 8)
+                TestRunner.equal(profile.schemaVersion, 9)
                 TestRunner.equal(profile.town.nightNumber, 1)
             end,
         },
@@ -278,13 +278,45 @@ return {
             end,
         },
         {
+            name = "migrates schema eight profiles into an undamaged town condition",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    schemaVersion = 8,
+                    town = { nightNumber = 7 },
+                }, 300)
+                local condition = SaveSchema.townCondition(profile)
+                TestRunner.equal(profile.schemaVersion, 9)
+                TestRunner.equal(condition.integrity, 100)
+                TestRunner.equal(condition.damageLevel, 0)
+                TestRunner.equal(condition.lastNightNumber, 0)
+            end,
+        },
+        {
+            name = "persists normalized town damage and repair state",
+            run = function()
+                local profile = SaveSchema.default(100)
+                local changed = SaveSchema.withTownCondition(profile, {
+                    integrity = 58,
+                    lastNightNumber = 4,
+                    lastDamage = 30,
+                    repairsCompleted = 2,
+                }, 200)
+                local condition = SaveSchema.townCondition(changed)
+                TestRunner.equal(condition.integrity, 58)
+                TestRunner.equal(condition.damageLevel, 2)
+                TestRunner.equal(condition.repairsCompleted, 2)
+                TestRunner.equal(changed.revision, 1)
+                TestRunner.equal(profile.town.condition.integrity, 100)
+            end,
+        },
+        {
             name = "migrates a schema five profile with no gear field into an empty crafted-item map",
             run = function()
                 local profile = SaveSchema.normalize({
                     schemaVersion = 5,
                     town = { nightNumber = 3 },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 8)
+                TestRunner.equal(profile.schemaVersion, 9)
                 TestRunner.equal(next(profile.gear), nil)
             end,
         },
@@ -365,7 +397,7 @@ return {
                     schemaVersion = 6,
                     gear = { gear_meadow_satchel = 1 },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 8)
+                TestRunner.equal(profile.schemaVersion, 9)
                 TestRunner.equal(next(profile.quests.claimed), nil)
             end,
         },

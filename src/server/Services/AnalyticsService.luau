@@ -343,6 +343,42 @@ function AnalyticsService.professionMasteryRank(
     end
 end
 
+function AnalyticsService.townNightConsequence(
+    self: AnalyticsService,
+    nightNumber: number,
+    endingLanternHealth: number,
+    integrity: number,
+    damageLevel: number
+)
+    self._logger:info("town_night_consequence", {
+        damageLevel = damageLevel,
+        endingLanternHealth = endingLanternHealth,
+        integrity = integrity,
+        night = nightNumber,
+    })
+end
+
+function AnalyticsService.townRepaired(
+    self: AnalyticsService,
+    player: Player,
+    integrity: number,
+    repairsRemaining: number
+)
+    self._logger:info("town_repaired", {
+        integrity = integrity,
+        player = player.UserId,
+        repairsRemaining = repairsRemaining,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "TownRepaired", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = tostring(integrity),
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = tostring(repairsRemaining),
+            })
+        end)
+    end
+end
+
 function AnalyticsService.crafted(
     self: AnalyticsService,
     player: Player,

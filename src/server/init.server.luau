@@ -35,6 +35,7 @@ local SaveSchema = require(root.SaveSchema)
 local StatusEffectState = require(root.StatusEffectState)
 local SurvivalState = require(root.SurvivalState)
 local TownNightSchedule = require(root.TownNightSchedule)
+local TownCondition = require(root.TownCondition)
 local TownProgression = require(root.TownProgression)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
@@ -205,6 +206,7 @@ local townNightService = TownNightService.new(
     worldService,
     enemyService,
     TownNightSchedule,
+    TownCondition,
     featureFlags
 )
 professionService:setSwitchProvider(function(player: Player): (boolean, string?)

@@ -271,6 +271,34 @@ function ProfileService.setNightNumber(
     return true
 end
 
+function ProfileService.setTownCondition(
+    self: ProfileService,
+    player: Player,
+    condition: any
+): boolean
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return false
+    end
+    local nextProfile = self._saveSchema.withTownCondition(profile, condition, os.time())
+    if nextProfile == profile then
+        return true
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    return true
+end
+
+function ProfileService.townCondition(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { integrity = 100, damageLevel = 0, repairsRemaining = 0 }
+    end
+    return self._saveSchema.townCondition(profile)
+end
+
 function ProfileService.nightNumber(self: ProfileService, player: Player): number
     local profile = self._profiles[player]
     if profile == nil then

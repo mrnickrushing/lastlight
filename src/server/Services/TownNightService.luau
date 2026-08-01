@@ -15,6 +15,8 @@ export type TownNightService = typeof(setmetatable(
         _worldService: any,
         _enemyService: any,
         _townNightSchedule: any,
+        _townCondition: any,
+        _condition: any,
         _daySeconds: number,
         _duskSeconds: number,
         _nightSeconds: number,
@@ -25,7 +27,7 @@ export type TownNightService = typeof(setmetatable(
         _phase: string,
         _phaseEndsAt: number,
         _onChanged: ((string?) -> ())?,
-        _onNightCompleted: ((number) -> ())?,
+        _onNightCompleted: ((number, number, any) -> ())?,
     },
     TownNightService
 ))
@@ -36,6 +38,7 @@ function TownNightService.new(
     worldService: any,
     enemyService: any,
     townNightSchedule: any,
+    townCondition: any,
     featureFlags: any
 ): TownNightService
     return setmetatable({
@@ -44,6 +47,8 @@ function TownNightService.new(
         _worldService = worldService,
         _enemyService = enemyService,
         _townNightSchedule = townNightSchedule,
+        _townCondition = townCondition,
+        _condition = townCondition.default(),
         _daySeconds = config.NormalDaySeconds,
         _duskSeconds = config.DuskSeconds,
         _nightSeconds = config.NormalNightSeconds,
@@ -69,7 +74,10 @@ end
 -- Fires once per completed night with the night number that just finished
 -- (i.e. the value every connected player's profile should now record), so
 -- persistence stays owned by whoever is holding the profile, not this loop.
-function TownNightService.setNightCompletedHandler(self: TownNightService, callback: (number) -> ())
+function TownNightService.setNightCompletedHandler(
+    self: TownNightService,
+    callback: (number, number, any) -> ()
+)
     self._onNightCompleted = callback
 end
 
@@ -98,8 +106,16 @@ end
 -- Disabling the kill switch leaves the tutorial's authored First Night,
 -- Bramblewake expeditions, and manual Blackout entry untouched — only this
 -- repeating town day/dusk/night loop stops advancing.
-function TownNightService.ensureStarted(self: TownNightService, nightNumber: number)
+function TownNightService.ensureStarted(
+    self: TownNightService,
+    nightNumber: number,
+    condition: any?
+)
     self._nightNumber = math.max(self._nightNumber, math.floor(nightNumber))
+    if condition ~= nil then
+        self._condition = self._townCondition.merge(self._condition, condition)
+        self._worldService:setTownCondition(self:conditionSnapshot())
+    end
     if not self._enabled or self._started then
         return
     end
@@ -114,6 +130,7 @@ function TownNightService._runCycle(self: TownNightService)
         self._phase = "day"
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._daySeconds
         self._worldService:setDusk(false)
+        self._worldService:setTownRepairEnabled(true)
         self:_notify(nil)
         self._logger:info("town_day_started", { night = self._nightNumber })
         waitUntilTime(self._phaseEndsAt)
@@ -121,6 +138,7 @@ function TownNightService._runCycle(self: TownNightService)
         self._phase = "dusk"
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._duskSeconds
         self._worldService:setDusk(true)
+        self._worldService:setTownRepairEnabled(false)
         self:_notify(
             string.format(
                 "DUSK FALLS — %s NIGHT %d APPROACHES",
@@ -183,21 +201,72 @@ function TownNightService._runCycle(self: TownNightService)
         end
 
         waitUntilTime(self._phaseEndsAt)
+        local endingLanternHealth = self._enemyService:lanternHealth()
+        local nextCondition, damageResult =
+            self._townCondition.afterNight(self._condition, endingLanternHealth, activeNight)
+        self._condition = nextCondition
         self._enemyService:stopNight()
         self._worldService:setTownBreach(false, theme)
         self._worldService:setNight(false)
-        self:_notify(string.format("DAWN BREAKS — NIGHT %d SURVIVED", activeNight))
-        self._logger:info("town_night_completed", { night = activeNight })
+        local conditionSnapshot = self:conditionSnapshot()
+        self._worldService:setTownCondition(conditionSnapshot)
+        local damage = tonumber(damageResult.damage) or 0
+        local dawnToast = if damage > 0
+            then string.format(
+                "DAWN BREAKS — TOWN INTEGRITY %d%% · %d REPAIR%s NEEDED",
+                conditionSnapshot.integrity,
+                conditionSnapshot.repairsRemaining,
+                if conditionSnapshot.repairsRemaining == 1 then "" else "S"
+            )
+            else string.format("DAWN BREAKS — NIGHT %d HELD CLEAN", activeNight)
+        self:_notify(dawnToast)
+        self._logger:info("town_night_completed", {
+            damage = damage,
+            endingLanternHealth = endingLanternHealth,
+            integrity = conditionSnapshot.integrity,
+            night = activeNight,
+        })
         -- Adopt whichever is higher: the honest next night after the one
         -- that just actually ran, or a veteran's still-pending higher seed
         -- from ensureStarted. Either way this can only advance.
         self._nightNumber = math.max(self._nightNumber, activeNight + 1)
         local onNightCompleted = self._onNightCompleted
         if onNightCompleted ~= nil then
-            onNightCompleted(activeNight + 1)
+            onNightCompleted(activeNight + 1, endingLanternHealth, self:conditionSnapshot())
         end
         task.wait(0)
     end
+end
+
+function TownNightService.conditionSnapshot(self: TownNightService): any
+    return self._townCondition.snapshot(self._condition)
+end
+
+function TownNightService.repairTown(self: TownNightService): any
+    if self._phase ~= "day" then
+        return { accepted = false, message = "TOWN REPAIRS WAIT FOR DAYLIGHT", reason = "not_day" }
+    end
+    local nextCondition, result = self._townCondition.repair(self._condition)
+    if not result.applied then
+        return {
+            accepted = false,
+            message = "EMBERHOLLOW IS ALREADY FULLY REPAIRED",
+            reason = result.reason,
+        }
+    end
+    self._condition = nextCondition
+    self._worldService:setTownCondition(self:conditionSnapshot())
+    local snapshot = self:conditionSnapshot()
+    return {
+        accepted = true,
+        condition = snapshot,
+        message = string.format(
+            "TOWN REPAIR +%d · INTEGRITY %d%%",
+            result.restored,
+            snapshot.integrity
+        ),
+        reason = result.reason,
+    }
 end
 
 function TownNightService._isBlackoutDue(self: TownNightService, nightNumber: number?): boolean
@@ -214,6 +283,7 @@ function TownNightService.snapshot(self: TownNightService): any
         blackoutInterval = self._blackoutInterval,
         enemyCount = self._enemyService:activeCount(),
         lanternHealth = self._enemyService:lanternHealth(),
+        townCondition = self:conditionSnapshot(),
         nightActive = self:isNightActive(),
         nightNumber = self._nightNumber,
         theme = self._townNightSchedule.theme(self._nightNumber),
