@@ -41,7 +41,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.34.0", "unexpected build version")
+assert(Config.BuildVersion == "0.35.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -337,7 +337,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v15",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v16",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -356,6 +356,40 @@ for _, descendant in world:GetDescendants() do
 end
 assert(roadSegments == 6, "arrival road must connect every authored route segment")
 assert(roadEdgeStones >= 40, "arrival road needs a repeated visible stone edge")
+local cabinRafters = 0
+local cabinHearths = 0
+local cabinFirewood = 0
+local cabinRugs = 0
+local campCommons = 0
+for _, descendant in world:GetDescendants() do
+    if descendant.Name == "CabinInteriorRafter" then
+        cabinRafters += 1
+    elseif descendant.Name == "CabinHearthFire" then
+        cabinHearths += 1
+    elseif descendant.Name == "SplitFirewood" then
+        cabinFirewood += 1
+    elseif descendant.Name == "CabinWovenRug" then
+        cabinRugs += 1
+    elseif descendant.Name == "EmberhollowCampCommons" then
+        campCommons += 1
+    end
+end
+assert(cabinRafters == 6, "both cabins need three visible interior rafters")
+assert(cabinHearths == 2, "both cabins need a practical stone hearth")
+assert(cabinFirewood == 10, "both cabin exteriors need stocked firewood")
+assert(cabinRugs == 2, "both cabins need an inhabited interior floor layer")
+assert(campCommons == 1, "Emberhollow needs one physical communal gathering area")
+local builderMaterialSets = 0
+local completedBuildingFrames = 0
+for _, descendant in world:GetDescendants() do
+    if descendant.Name == "BuilderMaterials" then
+        builderMaterialSets += 1
+    elseif descendant.Name == "BuildingCornerPost" then
+        completedBuildingFrames += 1
+    end
+end
+assert(builderMaterialSets >= 2, "fresh town construction sites need visible material stacks")
+assert(completedBuildingFrames >= 4, "completed town buildings need structural corner framing")
 assert(world:GetAttribute("TownIntegrity") == 100, "new towns must begin fully repaired")
 assert(world:GetAttribute("TownDamageLevel") == 0, "new towns cannot begin visibly damaged")
 assert(
@@ -558,10 +592,29 @@ for _, target in blackoutTargets do
         "Blackout prompt does not route to its server action"
     )
 end
+local poiTargets = CollectionService:GetTagged(RuntimeIds.ExpeditionPointOfInterestTag)
+assert(#poiTargets == BramblewakeExpedition.PointOfInterestCount, "expected four Bramblewake POIs")
+local poiVisuals = {}
+for _, target in poiTargets do
+    assert(target:IsA("BasePart"), "POI tags must target stable anchor parts")
+    local landmark = target.Parent
+    assert(landmark ~= nil and landmark:IsA("Model"), "POI anchor needs a physical landmark model")
+    local visualKind = landmark:GetAttribute("VisualKind")
+    local physicalPartCount = landmark:GetAttribute("PhysicalPartCount")
+    assert(type(visualKind) == "string", "physical POI is missing its visual kind")
+    assert(not poiVisuals[visualKind], "physical POI visual kinds must remain distinct")
+    assert(
+        type(physicalPartCount) == "number" and physicalPartCount >= 10,
+        "every POI needs enough physical geometry to read without its label"
+    )
+    poiVisuals[visualKind] = true
+end
 assert(
-    #CollectionService:GetTagged(RuntimeIds.ExpeditionPointOfInterestTag)
-        == BramblewakeExpedition.PointOfInterestCount,
-    "expected four Bramblewake points of interest"
+    poiVisuals.ruined_homestead
+        and poiVisuals.moth_well
+        and poiVisuals.sap_grove
+        and poiVisuals.root_chapel,
+    "Bramblewake needs four distinct physical POI silhouettes"
 )
 assert(
     #CollectionService:GetTagged(RuntimeIds.ExpeditionEventTag) == BramblewakeExpedition.EventCount,

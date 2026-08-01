@@ -360,6 +360,142 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
             )
             trunk.CanQuery = false
         end
+
+        -- Place6's useful lesson is density through construction layers, not
+        -- expensive meshes. These original Last Light details remain outside
+        -- the replaceable shell so they survive authored-mesh loading and make
+        -- the open front read as an inhabited room from the road.
+        for rafterIndex = -1, 1 do
+            local rafter = part(
+                cabinFolder,
+                "CabinInteriorRafter",
+                Vector3.new(0.48, 0.48, 10.8),
+                CFrame.new(center + Vector3.new(rafterIndex * 4.4, 7.35, 0.1))
+                    * CFrame.Angles(math.rad(2), 0, 0),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+            rafter.CanQuery = false
+        end
+
+        local rug = part(
+            cabinFolder,
+            "CabinWovenRug",
+            Vector3.new(6.4, 0.12, 3.4),
+            CFrame.new(center + Vector3.new(0, 0.6, -0.1)),
+            if name == "MARA'S SHELTER"
+                then Color3.fromRGB(70, 112, 102)
+                else Color3.fromRGB(132, 88, 54),
+            Enum.Material.Fabric,
+            false
+        )
+        rug.CanQuery = false
+
+        local hearth = part(
+            cabinFolder,
+            "CabinHearth",
+            Vector3.new(3.5, 0.55, 2.2),
+            CFrame.new(center + Vector3.new(4.6, 0.85, 4.1)),
+            Color3.fromRGB(73, 76, 72),
+            Enum.Material.Cobblestone,
+            false
+        )
+        hearth.CanQuery = false
+        part(
+            cabinFolder,
+            "CabinHearthBack",
+            Vector3.new(3.5, 3.8, 0.65),
+            CFrame.new(center + Vector3.new(4.6, 2.45, 5.0)),
+            Color3.fromRGB(68, 72, 69),
+            Enum.Material.Cobblestone,
+            false
+        )
+        local hearthFire = part(
+            cabinFolder,
+            "CabinHearthFire",
+            Vector3.new(1.25, 1.35, 1.05),
+            CFrame.new(center + Vector3.new(4.6, 1.55, 4.25)),
+            accent,
+            Enum.Material.Neon,
+            false
+        )
+        hearthFire.Shape = Enum.PartType.Ball
+        hearthFire.Transparency = 0.08
+        hearthFire.CanQuery = false
+        local hearthLight = Instance.new("PointLight")
+        hearthLight.Color = accent
+        hearthLight.Brightness = 1.15
+        hearthLight.Range = 11
+        hearthLight.Shadows = true
+        hearthLight.Parent = hearthFire
+        CollectionService:AddTag(hearthFire, "LastLightAmbientLight")
+
+        local shelf = part(
+            cabinFolder,
+            "CabinSupplyShelf",
+            Vector3.new(4.8, 0.35, 1.15),
+            CFrame.new(center + Vector3.new(-3.2, 4.35, 5.0)),
+            Color3.fromRGB(92, 65, 43),
+            Enum.Material.WoodPlanks,
+            false
+        )
+        shelf.CanQuery = false
+        for supplyIndex = -1, 1 do
+            local supply = part(
+                cabinFolder,
+                if name == "MARA'S SHELTER" then "MaraHerbBundle" else "WayfarerSupply",
+                Vector3.new(0.85, 1.05 + math.abs(supplyIndex) * 0.2, 0.75),
+                shelf.CFrame + Vector3.new(supplyIndex * 1.35, 0.7, 0),
+                if supplyIndex == 0 then accent else Color3.fromRGB(121, 96, 58),
+                if name == "MARA'S SHELTER" then Enum.Material.Grass else Enum.Material.Fabric,
+                false
+            )
+            supply.CanQuery = false
+        end
+
+        local stoolSeat = part(
+            cabinFolder,
+            "CabinStoolSeat",
+            Vector3.new(2.1, 0.35, 2.1),
+            CFrame.new(center + Vector3.new(-4.7, 2.1, -2.1)),
+            Color3.fromRGB(91, 64, 42),
+            Enum.Material.WoodPlanks,
+            false
+        )
+        stoolSeat.CanQuery = false
+        for legX = -1, 1, 2 do
+            for legZ = -1, 1, 2 do
+                part(
+                    cabinFolder,
+                    "CabinStoolLeg",
+                    Vector3.new(0.28, 1.8, 0.28),
+                    stoolSeat.CFrame * CFrame.new(legX * 0.72, -1.0, legZ * 0.72),
+                    WET_BARK,
+                    Enum.Material.Wood,
+                    false
+                )
+            end
+        end
+
+        local woodpile = Instance.new("Model")
+        woodpile.Name = "CabinWoodpile"
+        woodpile.Parent = cabinFolder
+        for logIndex = 1, 5 do
+            local row = math.floor((logIndex - 1) / 3)
+            part(
+                woodpile,
+                "SplitFirewood",
+                Vector3.new(2.8, 0.65, 0.72),
+                CFrame.new(
+                    center + Vector3.new(-8.4, 0.55 + row * 0.62, 1.4 + ((logIndex - 1) % 3) * 0.78)
+                )
+                    * CFrame.Angles(0, math.rad(4 * logIndex), math.rad((logIndex % 2) * 5)),
+                if logIndex % 2 == 0 then BARK else WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
         return shell
     end
 
@@ -367,6 +503,60 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
         cabin(Vector3.new(-22, 0, -112), "WAYFARER CABIN", AMBER),
         cabin(Vector3.new(22, 0, -112), "MARA'S SHELTER", FOXFIRE),
     }
+
+    local commons = Instance.new("Model")
+    commons.Name = "EmberhollowCampCommons"
+    commons.Parent = parent
+    local commonsTable = part(
+        commons,
+        "CampCommonsTable",
+        Vector3.new(10.5, 0.55, 3.6),
+        CFrame.new(-1.5, 2.5, -124.5),
+        Color3.fromRGB(96, 67, 44),
+        Enum.Material.WoodPlanks,
+        false
+    )
+    commonsTable.CanQuery = false
+    for side = -1, 1, 2 do
+        part(
+            commons,
+            "CampCommonsBench",
+            Vector3.new(10, 0.48, 1.25),
+            CFrame.new(-1.5, 1.4, -124.5 + side * 3.2),
+            Color3.fromRGB(84, 60, 42),
+            Enum.Material.WoodPlanks,
+            false
+        )
+    end
+    for legX = -1, 1, 2 do
+        for legZ = -1, 1, 2 do
+            part(
+                commons,
+                "CampCommonsTableLeg",
+                Vector3.new(0.48, 2.2, 0.48),
+                commonsTable.CFrame * CFrame.new(legX * 4.2, -1.28, legZ * 1.15),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
+    end
+    for supplyIndex = 1, 5 do
+        local supply = part(
+            commons,
+            "CampMealSupply",
+            Vector3.new(0.9, 0.7 + (supplyIndex % 2) * 0.35, 0.9),
+            commonsTable.CFrame
+                * CFrame.new(-3.4 + supplyIndex * 1.4, 0.72, (supplyIndex % 2 - 0.5) * 1.1),
+            if supplyIndex % 3 == 0
+                then AMBER
+                elseif supplyIndex % 2 == 0 then Color3.fromRGB(124, 141, 77)
+                else Color3.fromRGB(132, 94, 60),
+            if supplyIndex % 3 == 0 then Enum.Material.Glass else Enum.Material.Fabric,
+            false
+        )
+        supply.CanQuery = false
+    end
 
     for index = 1, 8 do
         local angle = (index / 8) * math.pi * 2
@@ -2547,7 +2737,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v15")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v16")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -2647,7 +2837,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v15",
+        worldVersion = "bramblewake-blackout-v16",
     })
 end
 
@@ -3732,6 +3922,68 @@ local function buildTownProgressionBuildings(
             false
         )
         tarp.Transparency = 0.08
+        local materials = Instance.new("Model")
+        materials.Name = "BuilderMaterials"
+        materials.Parent = model
+        for lumberIndex = 1, 4 do
+            part(
+                materials,
+                "ConstructionLumber",
+                Vector3.new(size.X * 0.38, 0.42, 0.72),
+                CFrame.new(
+                    center + Vector3.new(-size.X * 0.23, 0.55 + lumberIndex * 0.36, size.Z * 0.34)
+                ) * CFrame.Angles(0, math.rad((lumberIndex % 2) * 2), 0),
+                if lumberIndex % 2 == 0 then BARK else WET_BARK,
+                Enum.Material.WoodPlanks,
+                false
+            )
+        end
+        for stoneIndex = 1, 4 do
+            local row = math.floor((stoneIndex - 1) / 2)
+            part(
+                materials,
+                "ConstructionStone",
+                Vector3.new(2.3, 1.05, 1.7),
+                CFrame.new(
+                    center
+                        + Vector3.new(
+                            size.X * 0.3 + ((stoneIndex - 1) % 2) * 2.5,
+                            0.55 + row * 1.05,
+                            size.Z * 0.3
+                        )
+                )
+                    * CFrame.Angles(0, math.rad(stoneIndex * 7), math.rad((stoneIndex % 2) * 2)),
+                if stoneIndex % 2 == 0
+                    then Color3.fromRGB(83, 87, 82)
+                    else Color3.fromRGB(68, 73, 70),
+                Enum.Material.Cobblestone,
+                false
+            )
+        end
+        local sawhorse = part(
+            materials,
+            "BuilderSawhorse",
+            Vector3.new(5.2, 0.5, 1.2),
+            CFrame.new(center + Vector3.new(0, 2.45, -size.Z * 0.3)),
+            Color3.fromRGB(99, 70, 46),
+            Enum.Material.WoodPlanks,
+            false
+        )
+        for side = -1, 1, 2 do
+            for depth = -1, 1, 2 do
+                part(
+                    materials,
+                    "BuilderSawhorseLeg",
+                    Vector3.new(0.35, 2.2, 0.35),
+                    sawhorse.CFrame
+                        * CFrame.new(side * 1.9, -1.15, depth * 0.35)
+                        * CFrame.Angles(0, 0, math.rad(side * 9)),
+                    WET_BARK,
+                    Enum.Material.Wood,
+                    false
+                )
+            end
+        end
         local sign = part(
             model,
             "ConstructionSign",
@@ -3812,6 +4064,26 @@ local function buildTownProgressionBuildings(
             )
             window.Transparency = 0.25
         end
+        for sideX = -1, 1, 2 do
+            for sideZ = -1, 1, 2 do
+                part(
+                    model,
+                    "BuildingCornerPost",
+                    Vector3.new(0.72, wallHeight + 0.5, 0.72),
+                    CFrame.new(
+                        center
+                            + Vector3.new(
+                                sideX * (halfX - 0.2),
+                                wallHeight * 0.5,
+                                sideZ * (halfZ - 0.2)
+                            )
+                    ) * CFrame.Angles(0, 0, math.rad(sideX * sideZ * 1.5)),
+                    WET_BARK,
+                    Enum.Material.Wood,
+                    false
+                )
+            end
+        end
         part(
             model,
             "DoorHeader",
@@ -3855,6 +4127,28 @@ local function buildTownProgressionBuildings(
         light.Range = 12 + stage * 3
         light.Shadows = false
         light.Parent = lightAnchor
+        local interiorCounter = part(
+            model,
+            "BuildingInteriorCounter",
+            Vector3.new(size.X * 0.48, 1.25, 2.4),
+            CFrame.new(center + Vector3.new(0, 1.25, halfZ - 1.8)),
+            Color3.fromRGB(96, 68, 45),
+            Enum.Material.WoodPlanks,
+            false
+        )
+        interiorCounter.CanQuery = false
+        for crateIndex = -1, 1, 2 do
+            local crate = part(
+                model,
+                "BuildingSupplyCrate",
+                Vector3.new(2.4, 1.9, 2.2),
+                CFrame.new(center + Vector3.new(crateIndex * (halfX * 0.52), 0.95, -0.5)),
+                if crateIndex < 0 then Color3.fromRGB(89, 63, 42) else Color3.fromRGB(102, 87, 56),
+                Enum.Material.WoodPlanks,
+                false
+            )
+            crate.CanQuery = false
+        end
         if stage >= 2 then
             local awning = part(
                 model,
