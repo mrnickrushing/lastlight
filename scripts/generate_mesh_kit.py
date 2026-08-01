@@ -80,12 +80,59 @@ def material(name: str) -> bpy.types.Material:
     return mat
 
 
+# Above this angle a face pair reads as a deliberate hard edge (a box corner,
+# a beveled plank end) and should stay faceted. Below it, the pair is meant to
+# approximate one continuous curved surface (a cone's barrel, an icosphere's
+# canopy bump) and should shade smooth. 40 degrees keeps a cube's 90-degree
+# corners crisp while smoothing the ~20-26-degree steps between an 8-9-gon
+# cone's side faces and the ~40-degree steps of a subdivision-1/2 icosphere.
+SMOOTH_ANGLE = math.radians(40)
+
+
+def smooth_by_angle(obj: bpy.types.Object) -> None:
+    """Shade `obj` smooth, splitting normals back apart above SMOOTH_ANGLE.
+
+    Every primitive used to be forced flat-shaded (every polygon got its own
+    normal, so every facet showed a hard edge against its neighbor), which is
+    what "boxy/flat" describes literally: it does not matter how organic the
+    underlying geometry is -- add_branching_trunk's tapered, curving cone
+    segments, irregular_ico's jittered canopy blobs -- if every face is shaded
+    as its own flat plane, the result reads as faceted regardless. That also
+    worked against the style formula's own "softened bevels" language, since
+    box()'s bevel modifier produced a bevel that was itself flat-shaded.
+
+    Angle-based smoothing is the standard middle ground in stylized low-poly
+    art: it keeps genuinely sharp edges sharp (a box corner is 90 degrees,
+    well above SMOOTH_ANGLE) while blending the shallow steps between faces on
+    a surface meant to read as continuously curved. That distinguishes
+    "deliberately faceted" from "cheap primitive."
+
+    Called after consolidate_assets_by_material's join, not per-primitive in
+    register(): auto_smooth_angle is a mesh-datablock property (pre-4.1) and
+    shade_auto_smooth adds an object modifier (4.1+), and bpy.ops.object.join
+    keeps only the *active* object's datablock/modifiers -- every other joined
+    object's smoothing setup would be silently discarded. Applying it once, to
+    the already-joined result, has nothing left to lose.
+    """
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    if hasattr(bpy.ops.object, "shade_auto_smooth"):
+        # Blender 4.1+: adds a "Smooth by Angle" modifier node group.
+        bpy.ops.object.shade_auto_smooth(angle=SMOOTH_ANGLE)
+    else:
+        # Blender < 4.1: shade_smooth() sets the base smooth flag, then the
+        # mesh-level angle threshold splits normals back apart across edges
+        # sharper than SMOOTH_ANGLE.
+        bpy.ops.object.shade_smooth()
+        obj.data.use_auto_smooth = True
+        obj.data.auto_smooth_angle = SMOOTH_ANGLE
+
+
 def register(asset_id: str, obj: bpy.types.Object, mat_name: str) -> bpy.types.Object:
     obj.name = f"{asset_id}__{obj.name}"
     if obj.type == "MESH":
         obj.data.materials.append(material(mat_name))
-        for polygon in obj.data.polygons:
-            polygon.use_smooth = False
     obj["lastLightAssetId"] = asset_id
     ASSETS.setdefault(asset_id, []).append(obj)
     return obj
@@ -694,6 +741,7 @@ def consolidate_assets_by_material() -> None:
             joined = bpy.context.object
             joined.name = f"{asset_id}__{material_name.removeprefix('LL_')}"
             joined["lastLightAssetId"] = asset_id
+            smooth_by_angle(joined)
             consolidated.append(joined)
         ASSETS[asset_id] = consolidated
 
