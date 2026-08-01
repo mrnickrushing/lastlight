@@ -23,6 +23,7 @@ TestRunner.run({
     require("./specs/OldGrowthEncounter.spec"),
     require("./specs/ProfessionState.spec"),
     require("./specs/ProfessionMastery.spec"),
+    require("./specs/ProfessionRescue.spec"),
     require("./specs/Equipment.spec"),
     require("./specs/GearVisualPlan.spec"),
     require("./specs/Quests.spec"),

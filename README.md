@@ -23,7 +23,8 @@ recipes, consumable and authoritative passive gear effects, resident-guided ques
 milestones, physical town-tier building growth, the four-person Bramblewake
 resident cast with day/night routines, ten-level profession mastery with earned
 ability bonuses, and persistent physical town damage with daylight repair work
-implemented, plus replicated physical visuals for equipped permanent gear;
+implemented, plus replicated physical visuals for equipped permanent gear and
+mastery-scaled Medic/Warden rescue utility;
 Studio and device exit gates remain pending.**
 
 The repository currently contains:
@@ -86,7 +87,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 236 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 241 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -111,6 +112,8 @@ The profession selection, authority, balance, persistence, and device gates are 
 [the profession-kit runbook](docs/MILESTONE_3_PROFESSION_KITS.md).
 The mastery ranks, earned bonuses, specialization foundation, and balance gates
 are in [the profession-mastery runbook](docs/MILESTONE_3_PROFESSION_MASTERY.md).
+The Medic rescue-speed/recovery bonuses and Warden recovery-ward support are in
+[the profession rescue runbook](docs/MILESTONE_3_PROFESSION_RESCUE.md).
 The six-enemy sequence, mechanic, readability, solo-balance, and device gates are in
 [the Bramblewake enemy-roster runbook](docs/MILESTONE_3_BRAMBLEWAKE_ENEMIES.md).
 The three-phase elite, carried-fire, reward, accessibility, and abuse gates are in

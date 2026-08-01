@@ -17,6 +17,7 @@ type ReviveChannel = {
     target: Player,
     reviver: Player,
     flow: any,
+    tuning: any,
 }
 
 type DownedVisual = {
@@ -39,6 +40,7 @@ export type PlayerSurvivalService = typeof(setmetatable(
         _worldService: any,
         _analyticsService: any,
         _equipmentStatsProvider: ((Player) -> any)?,
+        _reviveTuningProvider: ((Player) -> any)?,
         _states: { [Player]: any },
         _spawned: { [Player]: boolean },
         _channels: { [Player]: ReviveChannel },
@@ -87,6 +89,7 @@ function PlayerSurvivalService.new(
         _worldService = worldService,
         _analyticsService = analyticsService,
         _equipmentStatsProvider = nil,
+        _reviveTuningProvider = nil,
         _states = {},
         _spawned = {},
         _channels = {},
@@ -103,6 +106,28 @@ function PlayerSurvivalService.setEquipmentStatsProvider(
     provider: (Player) -> any
 )
     self._equipmentStatsProvider = provider
+end
+
+function PlayerSurvivalService.setReviveTuningProvider(
+    self: PlayerSurvivalService,
+    provider: (Player) -> any
+)
+    self._reviveTuningProvider = provider
+end
+
+function PlayerSurvivalService._reviveTuning(self: PlayerSurvivalService, player: Player): any
+    local provider = self._reviveTuningProvider
+    if provider == nil then
+        return {
+            duration = self._config.ReviveChannelSeconds,
+            health = self._config.ReviveHealth,
+            professionId = nil,
+            rescueTitle = "FIELD RESCUE",
+            specialized = false,
+            wardSeconds = self._config.ReviveInvulnerabilitySeconds,
+        }
+    end
+    return provider(player)
 end
 
 function PlayerSurvivalService._equipmentDamage(
@@ -175,6 +200,11 @@ function PlayerSurvivalService._syncPlayer(self: PlayerSurvivalService, player: 
 end
 
 function PlayerSurvivalService._clearVisual(self: PlayerSurvivalService, player: Player)
+    player:SetAttribute("LastLightReviveEndsAt", nil)
+    player:SetAttribute("LastLightReviverUserId", nil)
+    player:SetAttribute("LastLightReviveProfessionId", nil)
+    player:SetAttribute("LastLightReviveHealth", nil)
+    player:SetAttribute("LastLightReviveWardSeconds", nil)
     local visual = self._visuals[player]
     if visual == nil then
         local character = player.Character
@@ -198,8 +228,6 @@ function PlayerSurvivalService._clearVisual(self: PlayerSurvivalService, player:
         CollectionService:RemoveTag(visual.character, self._runtimeIds.PlayerDownedTag)
     end
     self._visuals[player] = nil
-    player:SetAttribute("LastLightReviveEndsAt", nil)
-    player:SetAttribute("LastLightReviverUserId", nil)
 end
 
 function PlayerSurvivalService._createVisual(self: PlayerSurvivalService, player: Player)
@@ -590,25 +618,34 @@ function PlayerSurvivalService.beginRevive(
 
     local reviverState = assert(self._states[reviver], "reviver survival state is missing")
     local now = workspace:GetServerTimeNow()
+    local tuning = self:_reviveTuning(reviver)
     local channel = {
         target = target,
         reviver = reviver,
+        tuning = tuning,
         flow = self._reviveFlow.create(
             target.UserId,
             reviver.UserId,
             reviverState.revision,
             now,
-            self._config.ReviveChannelSeconds
+            tuning.duration
         ),
     }
     self._channels[target] = channel
-    prompt.ActionText = "REVIVING"
+    prompt.ActionText = if tuning.specialized then tuning.rescueTitle else "REVIVING"
     target:SetAttribute("LastLightReviveEndsAt", channel.flow.endsAt)
     target:SetAttribute("LastLightReviverUserId", reviver.UserId)
+    target:SetAttribute("LastLightReviveProfessionId", tuning.professionId)
+    target:SetAttribute("LastLightReviveHealth", tuning.health)
+    target:SetAttribute("LastLightReviveWardSeconds", tuning.wardSeconds)
     self:_notify(nil, nil)
     return {
         accepted = true,
-        message = "REVIVING " .. string.upper(playerLabel(target)) .. " — STAY CLOSE",
+        message = string.format(
+            "%s — %s — STAY CLOSE",
+            tuning.rescueTitle,
+            string.upper(playerLabel(target))
+        ),
         reason = "revive_started",
     }
 end
@@ -625,6 +662,9 @@ function PlayerSurvivalService._cancelChannel(
     self._channels[target] = nil
     target:SetAttribute("LastLightReviveEndsAt", nil)
     target:SetAttribute("LastLightReviverUserId", nil)
+    target:SetAttribute("LastLightReviveProfessionId", nil)
+    target:SetAttribute("LastLightReviveHealth", nil)
+    target:SetAttribute("LastLightReviveWardSeconds", nil)
     local visual = self._visuals[target]
     if visual ~= nil then
         visual.prompt.ActionText = "REVIVE"
@@ -648,7 +688,10 @@ function PlayerSurvivalService._completeRevive(
         self:_cancelChannel(target, "target_left")
         return
     end
-    local nextState, result = self._survivalState.revive(state, now)
+    local nextState, result = self._survivalState.revive(state, now, {
+        health = channel.tuning.health,
+        wardSeconds = channel.tuning.wardSeconds,
+    })
     if not result.applied then
         self:_cancelChannel(target, result.reason)
         return
@@ -663,8 +706,15 @@ function PlayerSurvivalService._completeRevive(
         channel.reviver,
         math.max(0, now - channel.flow.startedAt)
     )
-    self:_notify(target, "BACK ON YOUR FEET — BRIEF LIGHT WARD ACTIVE")
-    self:_notify(channel.reviver, "ALLY REVIVED")
+    self:_notify(
+        target,
+        string.format(
+            "BACK ON YOUR FEET — %d HEALTH · %.1fs LIGHT WARD",
+            result.health,
+            channel.tuning.wardSeconds
+        )
+    )
+    self:_notify(channel.reviver, channel.tuning.rescueTitle .. " COMPLETE")
 end
 
 function PlayerSurvivalService._recover(self: PlayerSurvivalService, player: Player, now: number)

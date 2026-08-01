@@ -54,6 +54,22 @@ return {
             end,
         },
         {
+            name = "applies bounded server revive tuning",
+            run = function()
+                local state = SurvivalState.create(0)
+                state = SurvivalState.damage(state, 100, 1)
+                local revived, result = SurvivalState.revive(state, 2, {
+                    health = 55,
+                    wardSeconds = 4.5,
+                })
+                TestRunner.equal(result.health, 55)
+                TestRunner.equal(revived.health, 55)
+                local protected, damageResult = SurvivalState.damage(revived, 10, 6.4)
+                TestRunner.equal(damageResult.applied, false)
+                TestRunner.equal(protected.health, 55)
+            end,
+        },
+        {
             name = "rejects late revive and safely recovers after bleedout",
             run = function()
                 local state = SurvivalState.create(0)

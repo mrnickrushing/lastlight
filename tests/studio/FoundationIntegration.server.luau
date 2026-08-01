@@ -22,6 +22,7 @@ local OldGrowthEncounter = require(root.OldGrowthEncounter)
 local WardenStagEncounter = require(root.WardenStagEncounter)
 local BramblewakeBlackout = require(root.BramblewakeBlackout)
 local ProfessionCatalog = require(root.ProfessionCatalog)
+local ProfessionRescue = require(root.ProfessionRescue)
 local ProfessionState = require(root.ProfessionState)
 local ReviveFlow = require(root.ReviveFlow)
 local RuntimeIds = require(root.RuntimeIds)
@@ -36,7 +37,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 9, "unexpected save schema version")
-assert(Config.BuildVersion == "0.22.0", "unexpected build version")
+assert(Config.BuildVersion == "0.23.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -86,6 +87,8 @@ assert(
     "profession selection action ID changed"
 )
 assert(RuntimeIds.Actions.RepairTown == "repair_town", "town repair action ID changed")
+local medicRescue = ProfessionRescue.resolve("profession_medic", 1, 2.5, 35, 3)
+assert(medicRescue.duration < 2.5 and medicRescue.health == 45, "Medic rescue tuning is missing")
 assert(RuntimeIds.Actions.OldGrowthFire == "old_growth_fire", "Old Growth action ID changed")
 assert(RuntimeIds.Actions.WardenStagChoice == "warden_stag_choice", "Warden Stag action ID changed")
 assert(

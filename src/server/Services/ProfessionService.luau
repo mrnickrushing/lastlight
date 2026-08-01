@@ -17,6 +17,7 @@ export type ProfessionService = typeof(setmetatable(
         _catalog: any,
         _professionState: any,
         _professionMastery: any,
+        _professionRescue: any,
         _featureFlags: any,
         _profileService: any,
         _survivalService: any,
@@ -34,6 +35,7 @@ function ProfessionService.new(
     catalog: any,
     professionState: any,
     professionMastery: any,
+    professionRescue: any,
     featureFlags: any,
     profileService: any,
     survivalService: any,
@@ -45,6 +47,7 @@ function ProfessionService.new(
         _catalog = catalog,
         _professionState = professionState,
         _professionMastery = professionMastery,
+        _professionRescue = professionRescue,
         _featureFlags = featureFlags,
         _profileService = profileService,
         _survivalService = survivalService,
@@ -365,6 +368,31 @@ function ProfessionService.mitigateIncomingDamage(
     local damageReduction =
         math.clamp((definition.effectAmount + tuning.effectAmountBonus) / 100, 0, 0.8)
     return math.max(1, math.ceil(amount * (1 - damageReduction))), true
+end
+
+function ProfessionService.rescueTuning(
+    self: ProfessionService,
+    player: Player,
+    baseDuration: number,
+    baseHealth: number,
+    baseWardSeconds: number
+): any
+    local state = self._states[player]
+    local now = workspace:GetServerTimeNow()
+    local profession = if state == nil
+        then self._professionState.snapshot(self._professionState.create(nil, now), now)
+        else self._professionState.snapshot(state, now)
+    local mastery = self._professionMastery.tuning(
+        self._profileService:masterySnapshot(player),
+        profession.selectedId
+    )
+    return self._professionRescue.resolve(
+        profession.selectedId,
+        mastery.level,
+        baseDuration,
+        baseHealth,
+        baseWardSeconds
+    )
 end
 
 function ProfessionService.snapshot(self: ProfessionService, player: Player): any
