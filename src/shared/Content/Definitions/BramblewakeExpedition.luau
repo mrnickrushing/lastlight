@@ -22,6 +22,9 @@ local function frozenDefinition(definition: any): any
     if copy.soloVariant ~= nil then
         copy.soloVariant = table.freeze(table.clone(copy.soloVariant))
     end
+    if copy.storyOffset ~= nil then
+        copy.storyOffset = table.freeze(table.clone(copy.storyOffset))
+    end
     if copy.groupVariant ~= nil then
         copy.groupVariant = table.freeze(table.clone(copy.groupVariant))
     end
@@ -71,6 +74,8 @@ local modules = {
         visual = "orchard",
         storyLandmark = "last_harvest",
         storyTitle = "THE LAST HARVEST",
+        storyOffset = { x = 0, z = 22 },
+        storyPartCount = 10,
         tags = { "resource", "story", "farm" },
         poiSocket = true,
         eventSocket = true,
@@ -97,6 +102,8 @@ local modules = {
         visual = "farm",
         storyLandmark = "evacuation_cart",
         storyTitle = "THE ROAD THEY LEFT",
+        storyOffset = { x = 0, z = 22 },
+        storyPartCount = 11,
         tags = { "story", "rescue", "farm" },
         poiSocket = true,
         eventSocket = true,
@@ -135,6 +142,8 @@ local modules = {
         visual = "windmill",
         storyLandmark = "last_repair",
         storyTitle = "THE LAST REPAIR",
+        storyOffset = { x = 3, z = 22 },
+        storyPartCount = 7,
         tags = { "landmark", "story", "navigation" },
         poiSocket = true,
         eventSocket = false,
@@ -149,6 +158,8 @@ local modules = {
         visual = "bridge",
         storyLandmark = "lost_crossing",
         storyTitle = "THE LOST CROSSING",
+        storyOffset = { x = -18, z = 19 },
+        storyPartCount = 7,
         tags = { "traversal", "puzzle", "safe_recovery" },
         poiSocket = false,
         eventSocket = true,
