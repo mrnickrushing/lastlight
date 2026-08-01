@@ -204,37 +204,46 @@ function ProfessionService.selectSpecialization(
     player: Player,
     specializationId: string
 ): any
+    local professionId = self._professionMastery.specializationProfession(specializationId)
+    local analyticsProfessionId = professionId or "unknown_profession"
+    local function reject(message: string, reason: string): any
+        self._analyticsService:professionSpecializationSelected(
+            player,
+            analyticsProfessionId,
+            specializationId,
+            false,
+            reason
+        )
+        return {
+            accepted = false,
+            message = message,
+            reason = reason,
+        }
+    end
+
+    if not self._featureFlags:isEnabled("profession_kits_enabled") then
+        return reject("PROFESSIONS ARE TEMPORARILY UNAVAILABLE", "feature_disabled")
+    end
     local state = self._states[player]
     if state == nil then
-        return {
-            accepted = false,
-            message = "YOUR PROFESSION MASTERY IS STILL LOADING",
-            reason = "player_loading",
-        }
+        return reject("YOUR PROFESSION MASTERY IS STILL LOADING", "player_loading")
     end
     local snapshot = self._professionState.snapshot(state, workspace:GetServerTimeNow())
-    local professionId = self._professionMastery.specializationProfession(specializationId)
     if professionId == nil then
-        return {
-            accepted = false,
-            message = "THAT MASTERY PATH DOES NOT EXIST",
-            reason = "invalid_specialization",
-        }
+        return reject("THAT MASTERY PATH DOES NOT EXIST", "invalid_specialization")
     end
     if snapshot.selectedId ~= professionId then
-        return {
-            accepted = false,
-            message = "EQUIP THE MATCHING PROFESSION BEFORE CHOOSING THIS PATH",
-            reason = "profession_mismatch",
-        }
+        return reject(
+            "EQUIP THE MATCHING PROFESSION BEFORE CHOOSING THIS PATH",
+            "profession_mismatch"
+        )
     end
     local canSwitch, unavailableMessage = self:_switchAvailability(player)
     if not canSwitch then
-        return {
-            accepted = false,
-            message = unavailableMessage or "MASTERY PATHS CAN ONLY CHANGE IN SAFE DAYLIGHT",
-            reason = "switch_unavailable",
-        }
+        return reject(
+            unavailableMessage or "MASTERY PATHS CAN ONLY CHANGE IN SAFE DAYLIGHT",
+            "switch_unavailable"
+        )
     end
     local result =
         self._profileService:selectProfessionSpecialization(player, professionId, specializationId)
@@ -243,16 +252,20 @@ function ProfessionService.selectSpecialization(
         local message = if result.duplicate
             then string.format("%s IS ALREADY YOUR MASTERY PATH", definition.name)
             elseif result.reason == "specialization_locked" then "REACH MASTERY RANK 10 FIRST"
+            elseif
+                result.reason == "profile_unavailable"
+            then "YOUR PROFILE IS STILL LOADING OR READ-ONLY — TRY AGAIN"
             else "THAT MASTERY PATH CANNOT BE CHOSEN"
+        local accepted = result.duplicate == true
         self._analyticsService:professionSpecializationSelected(
             player,
             professionId,
             specializationId,
-            false,
+            accepted,
             result.reason
         )
         return {
-            accepted = result.duplicate == true,
+            accepted = accepted,
             changed = false,
             message = message,
             reason = result.reason,

@@ -38,7 +38,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.27.0", "unexpected build version")
+assert(Config.BuildVersion == "0.27.1", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -374,9 +374,34 @@ assert(
 
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
-    #tagged == 26 + BramblewakeExpedition.EventInteractionCount,
-    "expected tutorial, event, elite, boss, extraction, and crafting-bench interaction prompts"
+    #tagged
+        == 26
+            + BramblewakeExpedition.EventInteractionCount
+            + #RuntimeIds.ProfessionSpecializationInteractionIds,
+    "expected tutorial, event, elite, boss, extraction, crafting, and mastery prompts"
 )
+local taggedByInteractionId = {}
+for _, prompt in tagged do
+    local interactionId = prompt:GetAttribute("InteractionId")
+    if type(interactionId) == "string" then
+        assert(taggedByInteractionId[interactionId] == nil, "duplicate interaction prompt ID")
+        taggedByInteractionId[interactionId] = prompt
+    end
+end
+for specializationId, interactionId in
+    RuntimeIds.ProfessionSpecializationInteractionIdBySpecialization
+do
+    local prompt = taggedByInteractionId[interactionId]
+    assert(prompt ~= nil, "generated mastery prompt is missing: " .. interactionId)
+    assert(
+        prompt:GetAttribute("ActionId") == RuntimeIds.Actions.SelectProfessionSpecialization,
+        "generated mastery prompt routes to the wrong action"
+    )
+    assert(
+        prompt:GetAttribute("Payload") == specializationId,
+        "generated mastery prompt has the wrong specialization payload"
+    )
+end
 assert(
     #CollectionService:GetTagged(RuntimeIds.PlayerDownedTag) == 0,
     "players must not begin the test downed"

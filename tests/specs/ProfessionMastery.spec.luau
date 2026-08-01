@@ -7,6 +7,20 @@ return {
     name = "ProfessionMastery",
     cases = {
         {
+            name = "publishes twelve unique specialization IDs in stable profession order",
+            run = function()
+                local ids = ProfessionMastery.specializationIds()
+                local seen = {}
+                TestRunner.equal(#ids, 12)
+                TestRunner.equal(ids[1], "specialization_pathfinder")
+                TestRunner.equal(ids[12], "specialization_brightcap_herbalist")
+                for _, specializationId in ids do
+                    TestRunner.equal(seen[specializationId], nil)
+                    seen[specializationId] = true
+                end
+            end,
+        },
+        {
             name = "awards XP and levels the selected profession",
             run = function()
                 local state, first = ProfessionMastery.award({}, "profession_scout", 100)
