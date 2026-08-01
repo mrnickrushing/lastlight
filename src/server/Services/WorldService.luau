@@ -8,6 +8,8 @@ local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local BramblewakeBuilder = require(script.Parent.Parent.World.BramblewakeBuilder)
+local FoliageBuilder = require(script.Parent.Parent.World.FoliageBuilder)
+local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
 
 local WorldService = {}
 WorldService.__index = WorldService
@@ -70,6 +72,20 @@ local BARK = Color3.fromRGB(62, 39, 30)
 local WET_BARK = Color3.fromRGB(36, 26, 24)
 local MOSS = Color3.fromRGB(58, 91, 54)
 local WET_EARTH = Color3.fromRGB(67, 55, 39)
+-- Shared palette for the generated forest. Kept next to the existing colour
+-- anchors so the treeline and the town read as the same world.
+local FOLIAGE_TONE: FoliageBuilder.Tone = {
+    bark = Color3.fromRGB(62, 39, 30),
+    barkWet = Color3.fromRGB(36, 26, 24),
+    needle = Color3.fromRGB(42, 77, 51),
+    needleDeep = Color3.fromRGB(18, 42, 32),
+    leaf = Color3.fromRGB(58, 91, 54),
+    leafPale = Color3.fromRGB(112, 128, 79),
+    moss = Color3.fromRGB(58, 91, 54),
+    stone = Color3.fromRGB(75, 83, 79),
+    stoneWarm = Color3.fromRGB(88, 84, 74),
+}
+
 local WAYHOME_DELIVERY_LIFETIME = 180
 local WAYHOME_DELIVERY_ORIGINS = table.freeze({
     Vector3.new(-27, 0, -13),
@@ -408,86 +424,6 @@ local function lantern(parent: Instance, at: Vector3, scale: number, ambientLigh
     return post
 end
 
-local function pine(parent: Instance, position: Vector3, scale: number, ambientSwayTag: string?)
-    local trunk = part(
-        parent,
-        "PineTrunk",
-        Vector3.new(2.2 * scale, 13 * scale, 2.2 * scale),
-        CFrame.new(position + Vector3.new(0, 6.5 * scale, 0)),
-        BARK,
-        Enum.Material.Wood
-    )
-    trunk.CFrame *= CFrame.Angles(0, position.X * 0.01, 0)
-
-    for layer = 1, 3 do
-        local canopyPosition = position + Vector3.new(0, (9.5 + layer * 3.4) * scale, 0)
-        local canopySize = Vector3.new(
-            (11 - layer * 1.7) * scale,
-            (7.5 - layer * 0.9) * scale,
-            (11 - layer * 1.7) * scale
-        )
-        for half = 1, 2 do
-            local foliage = part(
-                parent,
-                "PineNeedles",
-                canopySize,
-                CFrame.new(canopyPosition)
-                    * CFrame.Angles(0, if half == 1 then 0.2 else math.pi + 0.2, 0),
-                if layer == 3 then GREEN else DARK_GREEN,
-                Enum.Material.Grass,
-                false
-            )
-            foliage.Shape = Enum.PartType.Wedge
-            foliage.CanQuery = false
-            if ambientSwayTag ~= nil and half == 2 then
-                CollectionService:AddTag(foliage, ambientSwayTag)
-            end
-        end
-    end
-    for side = -1, 1, 2 do
-        local branch = part(
-            parent,
-            "PineBranch",
-            Vector3.new(0.7 * scale, 5 * scale, 0.7 * scale),
-            CFrame.new(position + Vector3.new(side * 2.5 * scale, 7.5 * scale, -0.2))
-                * CFrame.Angles(0, 0, math.rad(side * 52)),
-            BARK,
-            Enum.Material.Wood,
-            false
-        )
-        branch.CanQuery = false
-    end
-end
-
-local function rock(parent: Instance, position: Vector3, scale: number)
-    local stone = part(
-        parent,
-        "MossRock",
-        Vector3.new(5.5 * scale, 3.2 * scale, 4.2 * scale),
-        CFrame.new(position + Vector3.new(0, 1.4 * scale, 0))
-            * CFrame.Angles(0.1, position.X * 0.03, 0.08),
-        Color3.fromRGB(75, 83, 79),
-        Enum.Material.Slate
-    )
-    stone.Shape = Enum.PartType.Ball
-end
-
-local function grassTuft(parent: Instance, position: Vector3, scale: number, color: Color3)
-    for blade = 1, 3 do
-        local stalk = part(
-            parent,
-            "GrassBlade",
-            Vector3.new(0.18 * scale, 1.6 * scale, 0.18 * scale),
-            CFrame.new(position + Vector3.new((blade - 2) * 0.28 * scale, 0.8 * scale, 0))
-                * CFrame.Angles(math.rad((blade - 2) * 18), 0, math.rad((blade - 2) * 12)),
-            color,
-            Enum.Material.Grass,
-            false
-        )
-        stalk.CanQuery = false
-    end
-end
-
 local function groundPatch(
     parent: Instance,
     position: Vector3,
@@ -507,71 +443,6 @@ local function groundPatch(
     patch.Transparency = 0.08
     patch.CanQuery = false
     return patch
-end
-
-local function fernCluster(
-    parent: Instance,
-    position: Vector3,
-    scale: number,
-    ambientSwayTag: string?
-)
-    for blade = 1, 7 do
-        local angle = (blade / 7) * math.pi * 2
-        local leaf = part(
-            parent,
-            "FernFrond",
-            Vector3.new(0.38 * scale, 0.18 * scale, 3.2 * scale),
-            CFrame.new(
-                position
-                    + Vector3.new(
-                        math.cos(angle) * 0.75 * scale,
-                        0.65 * scale,
-                        math.sin(angle) * 0.75 * scale
-                    )
-            ) * CFrame.Angles(math.rad(22), angle, math.rad(math.sin(angle) * 10)),
-            if blade % 2 == 0 then MOSS else Color3.fromRGB(39, 74, 43),
-            Enum.Material.Grass,
-            false
-        )
-        leaf.CanQuery = false
-        if ambientSwayTag ~= nil and (blade == 2 or blade == 5) then
-            CollectionService:AddTag(leaf, ambientSwayTag)
-        end
-    end
-end
-
-local function deadfall(parent: Instance, position: Vector3, scale: number, angle: number)
-    local log = part(
-        parent,
-        "RainDarkDeadfall",
-        Vector3.new(2.4 * scale, 15 * scale, 2.4 * scale),
-        CFrame.new(position + Vector3.new(0, 1.3 * scale, 0))
-            * CFrame.Angles(math.rad(82), angle, math.rad(5)),
-        WET_BARK,
-        Enum.Material.Wood
-    )
-    log.Shape = Enum.PartType.Cylinder
-    log.CanQuery = false
-    for rib = -1, 1 do
-        local cut = part(
-            parent,
-            "BrokenWoodRib",
-            Vector3.new(0.55 * scale, 2.7 * scale, 0.55 * scale),
-            CFrame.new(
-                position
-                    + Vector3.new(
-                        math.cos(angle) * rib * 4.8 * scale,
-                        1.9 * scale,
-                        math.sin(angle) * rib * 4.8 * scale
-                    )
-            )
-                * CFrame.Angles(math.rad(68), angle + math.rad(rib * 12), 0),
-            BARK,
-            Enum.Material.Wood,
-            false
-        )
-        cut.CanQuery = false
-    end
 end
 
 local function mistSheet(
@@ -648,15 +519,6 @@ local function addFillLight(
     light.Range = range
     light.Shadows = false
     light.Parent = source
-end
-
-local function addSurfaceGrain(target: BasePart, color: Color3, transparency: number)
-    local decal = Instance.new("Decal")
-    decal.Name = "MaterialVariation"
-    decal.Color3 = color
-    decal.Transparency = transparency
-    decal.Face = Enum.NormalId.Top
-    decal.Parent = target
 end
 
 local function addBillboard(partInstance: BasePart, title: string, accent: Color3)
@@ -1073,15 +935,10 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     geometry.Name = "Environment"
     geometry.Parent = world
 
-    local ground = part(
-        geometry,
-        "Ground",
-        Vector3.new(320, 6, 340),
-        CFrame.new(0, -3, -70),
-        Color3.fromRGB(38, 68, 46),
-        Enum.Material.Grass
-    )
-    addSurfaceGrain(ground, Color3.fromRGB(28, 42, 34), 0.78)
+    -- Real sculpted Terrain instead of a 320 x 6 x 340 Part. The valley floor
+    -- every authored coordinate below sits on stays flat at y = 0; all relief
+    -- happens outside it. See TerrainBuilder for why that split matters.
+    TerrainBuilder.build()
 
     groundPatch(
         geometry,
@@ -1135,60 +992,106 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         end
     end
 
-    local random = Random.new(1847)
-    for index = 1, 92 do
-        local angle = random:NextNumber(0, math.pi * 2)
-        local radius = random:NextNumber(54, 154)
-        local zBias = -70
-        local position = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius + zBias)
-        pine(geometry, position, random:NextNumber(0.82, 1.65), _self._runtimeIds.AmbientSwayTag)
-        if index % 3 == 0 then
-            rock(
-                geometry,
-                position + Vector3.new(random:NextNumber(-10, 10), 0, random:NextNumber(-10, 10)),
-                random:NextNumber(0.7, 1.45)
-            )
-        end
-        if index % 2 == 0 then
-            grassTuft(
-                geometry,
-                position + Vector3.new(random:NextNumber(-6, 6), 0, random:NextNumber(-6, 6)),
-                random:NextNumber(0.8, 1.5),
-                if index % 4 == 0 then Color3.fromRGB(58, 105, 62) else Color3.fromRGB(83, 116, 68)
-            )
-        end
-        if index % 5 == 0 then
-            fernCluster(
-                geometry,
-                position + Vector3.new(random:NextNumber(-7, 7), 0, random:NextNumber(-7, 7)),
-                random:NextNumber(0.75, 1.35),
-                _self._runtimeIds.AmbientSwayTag
-            )
-        end
-        if index % 13 == 0 then
-            deadfall(
-                geometry,
-                position + Vector3.new(random:NextNumber(-8, 8), 0, random:NextNumber(-8, 8)),
-                random:NextNumber(0.65, 1.2),
-                random:NextNumber(0, math.pi * 2)
-            )
-        end
-    end
+    -- The forest. Previously 92 identical conifers packed into a 54-154 stud
+    -- ring, which is why the valley read as a yard with a hedge around it: the
+    -- treeline sat almost on top of the route and there was nothing past it.
+    --
+    -- Now the scatter runs to 620 studs in three depth bands, which is the
+    -- layering the art direction asks every background to have -- near framing,
+    -- regional mid-ground, distant silhouette. StreamingTargetRadius is 1024,
+    -- so the far band streams in and out rather than loading at join.
+    local forest = Instance.new("Folder")
+    forest.Name = "Forest"
+    forest.Parent = geometry
 
-    for index = 1, 24 do
-        local angle = (index / 24) * math.pi * 2
-        local radius = 156 + (index % 4) * 6
-        local cliff = part(
-            geometry,
-            "DistantCliff",
-            Vector3.new(32, 46 + (index % 4) * 13, 22),
-            CFrame.new(math.cos(angle) * radius, 18, math.sin(angle) * radius - 70)
-                * CFrame.Angles(0, -angle, math.rad((index % 3 - 1) * 4)),
-            Color3.fromRGB(34, 47, 47),
-            Enum.Material.Rock
-        )
-        cliff.Shape = Enum.PartType.Ball
-        cliff.Transparency = 0.06
+    local random = Random.new(1847)
+    local swayTag = _self._runtimeIds.AmbientSwayTag
+    local ROUTE_HALF_WIDTH = 26
+
+    -- Bands: {inner radius, outer radius, tree count, scale range}. Density
+    -- falls with distance because far trees only contribute silhouette, and
+    -- spending parts on them is what pushes a mobile device over budget.
+    local bands = {
+        { inner = 64, outer = 168, count = 74, minScale = 0.85, maxScale = 1.5 },
+        { inner = 168, outer = 340, count = 86, minScale = 1.1, maxScale = 1.9 },
+        { inner = 340, outer = 620, count = 64, minScale = 1.5, maxScale = 2.6 },
+    }
+
+    local treeSeed = 4100
+    for bandIndex, band in bands do
+        for _ = 1, band.count do
+            local angle = random:NextNumber(0, math.pi * 2)
+            local radius = random:NextNumber(band.inner, band.outer)
+            local position = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius - 70)
+
+            -- Never plant on the walkable route corridor. Trees on the path
+            -- were not a problem when the ring sat outside it; at this density
+            -- they would be.
+            if math.abs(position.X) > ROUTE_HALF_WIDTH or position.Z > 20 or position.Z < -200 then
+                treeSeed += 1
+                local scale = random:NextNumber(band.minScale, band.maxScale)
+                local roll = random:NextNumber()
+
+                if roll < 0.62 then
+                    FoliageBuilder.conifer(forest, position, scale, FOLIAGE_TONE, treeSeed, swayTag)
+                elseif roll < 0.9 then
+                    FoliageBuilder.broadleaf(
+                        forest,
+                        position,
+                        scale,
+                        FOLIAGE_TONE,
+                        treeSeed,
+                        swayTag
+                    )
+                else
+                    FoliageBuilder.snag(forest, position, scale, FOLIAGE_TONE, treeSeed)
+                end
+
+                -- Ground detail only in the near band, where the camera can
+                -- actually resolve it.
+                if bandIndex == 1 then
+                    if treeSeed % 3 == 0 then
+                        FoliageBuilder.boulders(
+                            forest,
+                            position
+                                + Vector3.new(
+                                    random:NextNumber(-12, 12),
+                                    0,
+                                    random:NextNumber(-12, 12)
+                                ),
+                            random:NextNumber(0.7, 1.5),
+                            FOLIAGE_TONE,
+                            treeSeed
+                        )
+                    end
+                    if treeSeed % 4 == 0 then
+                        FoliageBuilder.undergrowth(
+                            forest,
+                            position
+                                + Vector3.new(random:NextNumber(-9, 9), 0, random:NextNumber(-9, 9)),
+                            random:NextNumber(0.8, 1.5),
+                            FOLIAGE_TONE,
+                            treeSeed,
+                            swayTag
+                        )
+                    end
+                    if treeSeed % 11 == 0 then
+                        FoliageBuilder.deadfall(
+                            forest,
+                            position
+                                + Vector3.new(
+                                    random:NextNumber(-10, 10),
+                                    0,
+                                    random:NextNumber(-10, 10)
+                                ),
+                            random:NextNumber(0.7, 1.3),
+                            FOLIAGE_TONE,
+                            treeSeed
+                        )
+                    end
+                end
+            end
+        end
     end
 
     for _ = 1, 34 do
@@ -1211,16 +1114,26 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         CollectionService:AddTag(glow, _self._runtimeIds.AmbientMoteTag)
     end
 
+    -- Near-field ground detail just outside the route, where the camera is
+    -- close enough for it to register.
     for index = 1, 24 do
         local angle = (index / 24) * math.pi * 2
         local radius = 48 + (index % 4) * 8
         local position = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius - 70)
-        rock(geometry, position, 0.5 + (index % 5) * 0.13)
+        FoliageBuilder.boulders(
+            forest,
+            position,
+            0.6 + (index % 5) * 0.16,
+            FOLIAGE_TONE,
+            8300 + index
+        )
         if index % 2 == 0 then
-            fernCluster(
-                geometry,
+            FoliageBuilder.undergrowth(
+                forest,
                 position + Vector3.new(3, 0, -2),
-                0.8,
+                0.9,
+                FOLIAGE_TONE,
+                8400 + index,
                 _self._runtimeIds.AmbientSwayTag
             )
         end
