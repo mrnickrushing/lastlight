@@ -1,5 +1,10 @@
 # Development guide
 
+For cross-project Roblox lessons that are not specific to a Last Light
+milestone, read [ROBLOX_GAME_PLAYBOOK.md](ROBLOX_GAME_PLAYBOOK.md) before
+changing runtime generation, meshes, mobile HUD, moving platforms, remotes,
+commerce, or publishing behavior.
+
 ## Supported toolchain
 
 Last Light uses a project-local [Rokit](https://github.com/rojo-rbx/rokit)

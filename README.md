@@ -308,6 +308,9 @@ The launch is done only when all of the following are true:
   counts for enemies, bosses, buildings, events, resources, and equipment.
 - [Technical architecture](docs/TECHNICAL_ARCHITECTURE.md) — places, services,
   authority, data, networking, streaming, observability, and exploit resistance.
+- [Roblox game engineering playbook](docs/ROBLOX_GAME_PLAYBOOK.md) — practical
+  lessons for source truth, generated places, assets, PBR, mobile, physics,
+  remotes, persistence, commerce, and publishing.
 - [Mobile UX and accessibility](docs/UX_MOBILE_ACCESSIBILITY.md) — HUD, input,
   safe areas, responsive behavior, text, motion, sound, and device testing.
 - [UI design direction](docs/UI_DESIGN_DIRECTION.md) — durable gameplay-HUD
