@@ -1219,7 +1219,7 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.21.0",
+    BuildVersion = "0.22.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -4239,6 +4239,243 @@ return table.freeze(ExtractionPayoff)
       </Item>
       <Item class="ModuleScript" referent="27">
         <Properties>
+          <string name="Name">GearVisualPlan</string>
+          <string name="Source"><![CDATA[--!strict
+
+local GearVisualPlan = {}
+
+export type PartPlan = {
+    name: string,
+    target: string,
+    shape: string,
+    size: { number },
+    offset: { number },
+    rotation: { number },
+    color: { number },
+    material: string,
+}
+
+export type ItemPlan = {
+    itemId: string,
+    slot: string,
+    parts: { PartPlan },
+}
+
+local function part(
+    name: string,
+    target: string,
+    shape: string,
+    size: { number },
+    offset: { number },
+    rotation: { number },
+    color: { number },
+    material: string
+): PartPlan
+    return table.freeze({
+        name = name,
+        target = target,
+        shape = shape,
+        size = table.freeze(size),
+        offset = table.freeze(offset),
+        rotation = table.freeze(rotation),
+        color = table.freeze(table.clone(color)),
+        material = material,
+    })
+end
+
+local hoodCloth = { 42, 58, 43 }
+local hoodShadow = { 27, 35, 29 }
+local ironroot = { 112, 85, 49 }
+local brambleLeather = { 62, 48, 36 }
+local brambleSole = { 31, 28, 24 }
+local livingVine = { 78, 95, 48 }
+
+local DEFINITIONS: { [string]: ItemPlan } = {
+    gear_ironroot_hood = table.freeze({
+        itemId = "gear_ironroot_hood",
+        slot = "head",
+        parts = table.freeze({
+            part(
+                "Crown",
+                "head",
+                "Block",
+                { 2.12, 0.5, 2.08 },
+                { 0, 0.66, 0.04 },
+                { 0, 0, 0 },
+                hoodCloth,
+                "Fabric"
+            ),
+            part(
+                "BackDrape",
+                "head",
+                "Block",
+                { 1.96, 1.52, 0.32 },
+                { 0, -0.24, 0.91 },
+                { -7, 0, 0 },
+                hoodShadow,
+                "Fabric"
+            ),
+            part(
+                "LeftDrape",
+                "head",
+                "Wedge",
+                { 0.38, 1.42, 1.72 },
+                { -0.91, -0.15, 0.12 },
+                { 0, 0, 0 },
+                hoodCloth,
+                "Fabric"
+            ),
+            part(
+                "RightDrape",
+                "head",
+                "Wedge",
+                { 0.38, 1.42, 1.72 },
+                { 0.91, -0.15, 0.12 },
+                { 0, 180, 0 },
+                hoodCloth,
+                "Fabric"
+            ),
+            part(
+                "BrowBand",
+                "head",
+                "Block",
+                { 2.02, 0.25, 0.3 },
+                { 0, 0.25, -0.94 },
+                { 0, 0, 0 },
+                ironroot,
+                "Wood"
+            ),
+            part(
+                "LeftRootPin",
+                "head",
+                "Cylinder",
+                { 0.18, 0.18, 0.52 },
+                { -0.73, 0.32, -1.02 },
+                { 0, 90, 22 },
+                ironroot,
+                "Wood"
+            ),
+            part(
+                "RightRootPin",
+                "head",
+                "Cylinder",
+                { 0.18, 0.18, 0.52 },
+                { 0.73, 0.32, -1.02 },
+                { 0, 90, -22 },
+                ironroot,
+                "Wood"
+            ),
+        }),
+    }),
+    gear_bramble_boots = table.freeze({
+        itemId = "gear_bramble_boots",
+        slot = "feet",
+        parts = table.freeze({
+            part(
+                "LeftBoot",
+                "leftFoot",
+                "Block",
+                { 1.18, 0.72, 1.48 },
+                { 0, 0, -0.08 },
+                { 0, 0, 0 },
+                brambleLeather,
+                "Fabric"
+            ),
+            part(
+                "LeftSole",
+                "leftFoot",
+                "Block",
+                { 1.26, 0.17, 1.58 },
+                { 0, -0.42, -0.08 },
+                { 0, 0, 0 },
+                brambleSole,
+                "Ground"
+            ),
+            part(
+                "LeftCuff",
+                "leftFoot",
+                "Cylinder",
+                { 0.28, 1.34, 1.34 },
+                { 0, 0.42, 0 },
+                { 0, 0, 90 },
+                livingVine,
+                "Wood"
+            ),
+            part(
+                "LeftBramble",
+                "leftFoot",
+                "Block",
+                { 0.17, 0.17, 1.62 },
+                { 0, 0.09, -0.03 },
+                { 0, 0, 31 },
+                livingVine,
+                "Wood"
+            ),
+            part(
+                "RightBoot",
+                "rightFoot",
+                "Block",
+                { 1.18, 0.72, 1.48 },
+                { 0, 0, -0.08 },
+                { 0, 0, 0 },
+                brambleLeather,
+                "Fabric"
+            ),
+            part(
+                "RightSole",
+                "rightFoot",
+                "Block",
+                { 1.26, 0.17, 1.58 },
+                { 0, -0.42, -0.08 },
+                { 0, 0, 0 },
+                brambleSole,
+                "Ground"
+            ),
+            part(
+                "RightCuff",
+                "rightFoot",
+                "Cylinder",
+                { 0.28, 1.34, 1.34 },
+                { 0, 0.42, 0 },
+                { 0, 0, 90 },
+                livingVine,
+                "Wood"
+            ),
+            part(
+                "RightBramble",
+                "rightFoot",
+                "Block",
+                { 0.17, 0.17, 1.62 },
+                { 0, 0.09, -0.03 },
+                { 0, 0, -31 },
+                livingVine,
+                "Wood"
+            ),
+        }),
+    }),
+}
+
+function GearVisualPlan.get(itemId: any): ItemPlan?
+    return if type(itemId) == "string" then DEFINITIONS[itemId] else nil
+end
+
+function GearVisualPlan.list(): { ItemPlan }
+    local result = {}
+    for _, definition in DEFINITIONS do
+        table.insert(result, definition)
+    end
+    table.sort(result, function(a, b)
+        return a.itemId < b.itemId
+    end)
+    return result
+end
+
+return table.freeze(GearVisualPlan)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="28">
+        <Properties>
           <string name="Name">NightSchedule</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -4285,7 +4522,7 @@ return table.freeze(NightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">OldGrowthEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -4570,7 +4807,7 @@ return table.freeze(OldGrowthEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">ProfessionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -4680,7 +4917,7 @@ return table.freeze(ProfessionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">ProfessionMastery</string>
           <string name="Source"><![CDATA[--!strict
@@ -4846,7 +5083,7 @@ return table.freeze(ProfessionMastery)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">ProfessionState</string>
           <string name="Source"><![CDATA[--!strict
@@ -5013,7 +5250,7 @@ return table.freeze(ProfessionState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">QuestCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -5084,7 +5321,7 @@ return table.freeze(QuestCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">Quests</string>
           <string name="Source"><![CDATA[--!strict
@@ -5201,7 +5438,7 @@ return table.freeze(Quests)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
@@ -5260,7 +5497,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
@@ -5377,7 +5614,7 @@ return table.freeze(ResidentDialogue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -5492,7 +5729,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -5596,7 +5833,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -6130,7 +6367,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -6249,7 +6486,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -6500,7 +6737,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -6661,7 +6898,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -6804,7 +7041,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -6981,7 +7218,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -7125,7 +7362,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -7161,7 +7398,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -7543,7 +7780,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -7576,11 +7813,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="48">
+  <Item class="ServerScriptService" referent="49">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="49">
+    <Item class="Script" referent="50">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -7596,6 +7833,7 @@ local Config = require(root.Config)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
 local CraftingCatalog = require(root.CraftingCatalog)
 local Equipment = require(root.Equipment)
+local GearVisualPlan = require(root.GearVisualPlan)
 local BramblewakeEnemies = require(root.BramblewakeEnemies)
 local CombatState = require(root.CombatState)
 local EnemyAttackFlow = require(root.EnemyAttackFlow)
@@ -7632,6 +7870,7 @@ local EnemyService = require(script.Services.EnemyService)
 local ExpeditionService = require(script.Services.ExpeditionService)
 local Logger = require(script.Services.Logger)
 local FeatureFlagService = require(script.Services.FeatureFlagService)
+local GearVisualService = require(script.Services.GearVisualService)
 local NetworkService = require(script.Services.NetworkService)
 local OldGrowthService = require(script.Services.OldGrowthService)
 local WardenStagService = require(script.Services.WardenStagService)
@@ -7664,6 +7903,7 @@ local featureFlags =
 local content = Registry.new(Regions)
 local networkService = NetworkService.new(logger)
 local profileService = ProfileService.new(logger, environmentConfig.UsePersistentData)
+local gearVisualService = GearVisualService.new(logger, profileService, GearVisualPlan)
 local analyticsService = AnalyticsService.new(logger)
 local worldService = WorldService.new(logger, ExtractionPayoff, TownProgression)
 local expeditionService = ExpeditionService.new(
@@ -7844,6 +8084,7 @@ local services = ServiceRegistry.new({
 services:register(featureFlags)
 services:register(networkService)
 services:register(profileService)
+services:register(gearVisualService)
 services:register(analyticsService)
 services:register(worldService)
 services:register(expeditionService)
@@ -7868,7 +8109,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -7966,11 +8207,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="51">
+      <Item class="Folder" referent="52">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -8740,7 +8981,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9238,7 +9479,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10361,7 +10602,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10882,7 +11123,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10986,7 +11227,196 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="58">
+          <Properties>
+            <string name="Name">GearVisualService</string>
+            <string name="Source"><![CDATA[--!strict
+
+local Players = game:GetService("Players")
+
+local GearVisualService = {}
+GearVisualService.__index = GearVisualService
+GearVisualService.Name = "GearVisualService"
+
+local VISUAL_MODEL_NAME = "LastLightEquipmentVisuals"
+
+local MATERIALS = {
+    Fabric = Enum.Material.Fabric,
+    Ground = Enum.Material.Ground,
+    Wood = Enum.Material.Wood,
+}
+
+export type GearVisualService = typeof(setmetatable(
+    {} :: {
+        Name: string,
+        _logger: any,
+        _profileService: any,
+        _gearVisualPlan: any,
+        _connections: { [Player]: RBXScriptConnection },
+    },
+    GearVisualService
+))
+
+function GearVisualService.new(
+    logger: any,
+    profileService: any,
+    gearVisualPlan: any
+): GearVisualService
+    return setmetatable({
+        Name = GearVisualService.Name,
+        _logger = logger,
+        _profileService = profileService,
+        _gearVisualPlan = gearVisualPlan,
+        _connections = {},
+    }, GearVisualService)
+end
+
+local function targetFor(character: Model, targetName: string): BasePart?
+    if targetName == "head" then
+        return character:FindFirstChild("Head") :: BasePart?
+    end
+    local names = if targetName == "leftFoot"
+        then { "LeftFoot", "LeftLowerLeg", "Left Leg" }
+        else { "RightFoot", "RightLowerLeg", "Right Leg" }
+    for _, name in names do
+        local candidate = character:FindFirstChild(name)
+        if candidate ~= nil and candidate:IsA("BasePart") then
+            return candidate
+        end
+    end
+    return nil
+end
+
+local function localFrame(plan: any, target: BasePart): CFrame
+    local y = plan.offset[2]
+    if plan.target ~= "head" and not string.find(target.Name, "Foot", 1, true) then
+        y += -target.Size.Y * 0.5 + 0.42
+    end
+    return CFrame.new(plan.offset[1], y, plan.offset[3])
+        * CFrame.Angles(
+            math.rad(plan.rotation[1]),
+            math.rad(plan.rotation[2]),
+            math.rad(plan.rotation[3])
+        )
+end
+
+local function buildPart(parent: Model, target: BasePart, plan: any): BasePart
+    local visual = if plan.shape == "Wedge" then Instance.new("WedgePart") else Instance.new("Part")
+    visual.Name = plan.name
+    visual.Size = Vector3.new(plan.size[1], plan.size[2], plan.size[3])
+    visual.Color = Color3.fromRGB(plan.color[1], plan.color[2], plan.color[3])
+    visual.Material = MATERIALS[plan.material] or Enum.Material.SmoothPlastic
+    if visual:IsA("Part") then
+        visual.Shape = if plan.shape == "Cylinder"
+            then Enum.PartType.Cylinder
+            elseif plan.shape == "Ball" then Enum.PartType.Ball
+            else Enum.PartType.Block
+    end
+    visual.Anchored = false
+    visual.CanCollide = false
+    visual.CanQuery = false
+    visual.CanTouch = false
+    visual.CastShadow = true
+    visual.Massless = true
+    visual.TopSurface = Enum.SurfaceType.Smooth
+    visual.BottomSurface = Enum.SurfaceType.Smooth
+    visual.CFrame = target.CFrame * localFrame(plan, target)
+    visual.Parent = parent
+
+    local weld = Instance.new("WeldConstraint")
+    weld.Name = "EquipmentWeld"
+    weld.Part0 = target
+    weld.Part1 = visual
+    weld.Parent = visual
+    return visual
+end
+
+function GearVisualService._refresh(self: GearVisualService, player: Player)
+    local character = player.Character
+    if character == nil or character.Parent == nil then
+        return
+    end
+
+    local oldVisuals = character:FindFirstChild(VISUAL_MODEL_NAME)
+    if oldVisuals ~= nil then
+        oldVisuals:Destroy()
+    end
+    if not self._profileService:isLoaded(player) then
+        return
+    end
+
+    local model = Instance.new("Model")
+    model.Name = VISUAL_MODEL_NAME
+    model.Archivable = false
+    local equipped = self._profileService:equippedSnapshot(player)
+    local visualPartCount = 0
+    for slot, itemId in equipped do
+        local itemPlan = self._gearVisualPlan.get(itemId)
+        if itemPlan ~= nil and itemPlan.slot == slot then
+            model:SetAttribute(string.format("%sItemId", slot), itemId)
+            for _, partPlan in itemPlan.parts do
+                local target = targetFor(character, partPlan.target)
+                if target ~= nil then
+                    buildPart(model, target, partPlan)
+                    visualPartCount += 1
+                end
+            end
+        end
+    end
+    model:SetAttribute("VisualPartCount", visualPartCount)
+    model.Parent = character
+end
+
+function GearVisualService._bindPlayer(self: GearVisualService, player: Player)
+    if self._connections[player] ~= nil then
+        return
+    end
+    self._connections[player] = player.CharacterAdded:Connect(function()
+        task.defer(function()
+            self:_refresh(player)
+        end)
+    end)
+    if player.Character ~= nil then
+        task.defer(function()
+            self:_refresh(player)
+        end)
+    end
+end
+
+function GearVisualService.Init(self: GearVisualService)
+    self._profileService:onLoaded(function(player: Player)
+        self:_bindPlayer(player)
+        self:_refresh(player)
+    end)
+    self._profileService:onEquipmentChanged(function(player: Player)
+        self:_refresh(player)
+    end)
+end
+
+function GearVisualService.Start(self: GearVisualService)
+    Players.PlayerAdded:Connect(function(player: Player)
+        self:_bindPlayer(player)
+    end)
+    Players.PlayerRemoving:Connect(function(player: Player)
+        local connection = self._connections[player]
+        if connection ~= nil then
+            connection:Disconnect()
+            self._connections[player] = nil
+        end
+    end)
+    for _, player in Players:GetPlayers() do
+        self:_bindPlayer(player)
+    end
+    self._logger:info("gear_visuals_started", {
+        itemPlans = #self._gearVisualPlan.list(),
+    })
+end
+
+return GearVisualService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -11080,7 +11510,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11293,7 +11723,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12117,7 +12547,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12296,7 +12726,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12862,7 +13292,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13706,7 +14136,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14099,7 +14529,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14127,6 +14557,7 @@ export type ProfileService = typeof(setmetatable(
         _saving: { [Player]: boolean },
         _loading: { [Player]: boolean },
         _loadedEvent: BindableEvent,
+        _equipmentChangedEvent: BindableEvent,
         _saveSchema: any,
         _store: GlobalDataStore?,
     },
@@ -14144,6 +14575,7 @@ function ProfileService.new(logger: Logger, persistent: boolean): ProfileService
         _saving = {},
         _loading = {},
         _loadedEvent = Instance.new("BindableEvent"),
+        _equipmentChangedEvent = Instance.new("BindableEvent"),
         _saveSchema = nil,
         _store = nil,
     }, ProfileService)
@@ -14279,6 +14711,13 @@ function ProfileService.onLoaded(
     callback: (Player, any) -> ()
 ): RBXScriptConnection
     return self._loadedEvent.Event:Connect(callback)
+end
+
+function ProfileService.onEquipmentChanged(
+    self: ProfileService,
+    callback: (Player, any) -> ()
+): RBXScriptConnection
+    return self._equipmentChangedEvent.Event:Connect(callback)
 end
 
 function ProfileService.get(self: ProfileService, player: Player): any
@@ -14490,6 +14929,7 @@ function ProfileService.equipItem(self: ProfileService, player: Player, itemId: 
     if self._persistent then
         self._dirty[player] = true
     end
+    self._equipmentChangedEvent:Fire(player, self._saveSchema.equippedSnapshot(nextProfile))
     return { accepted = true, itemId = result.itemId, slot = result.slot }
 end
 
@@ -14506,6 +14946,7 @@ function ProfileService.unequipItem(self: ProfileService, player: Player, slot: 
     if self._persistent then
         self._dirty[player] = true
     end
+    self._equipmentChangedEvent:Fire(player, self._saveSchema.equippedSnapshot(nextProfile))
     return { accepted = true, slot = slot }
 end
 
@@ -14909,7 +15350,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15215,7 +15656,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16253,7 +16694,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17087,7 +17528,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="68">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21826,11 +22267,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="69">
+      <Item class="Folder" referent="71">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -23901,7 +24342,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="73">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -24290,7 +24731,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="72">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -24453,7 +24894,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -24649,15 +25090,15 @@ return table.freeze(WardenStagBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="74">
+  <Item class="StarterPlayer" referent="76">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="75">
+    <Item class="StarterPlayerScripts" referent="77">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="76">
+      <Item class="LocalScript" referent="78">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -24770,11 +25211,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="77">
+        <Item class="Folder" referent="79">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="78">
+          <Item class="ModuleScript" referent="80">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -24905,7 +25346,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="79">
+          <Item class="ModuleScript" referent="81">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -26978,7 +27419,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="80">
+          <Item class="ModuleScript" referent="82">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -27295,7 +27736,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="81">
+          <Item class="ModuleScript" referent="83">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -27403,7 +27844,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="82">
+          <Item class="ModuleScript" referent="84">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -27535,7 +27976,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="83">
+          <Item class="ModuleScript" referent="85">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -27811,7 +28252,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="84">
+  <Item class="Workspace" referent="86">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

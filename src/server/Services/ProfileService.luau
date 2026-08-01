@@ -23,6 +23,7 @@ export type ProfileService = typeof(setmetatable(
         _saving: { [Player]: boolean },
         _loading: { [Player]: boolean },
         _loadedEvent: BindableEvent,
+        _equipmentChangedEvent: BindableEvent,
         _saveSchema: any,
         _store: GlobalDataStore?,
     },
@@ -40,6 +41,7 @@ function ProfileService.new(logger: Logger, persistent: boolean): ProfileService
         _saving = {},
         _loading = {},
         _loadedEvent = Instance.new("BindableEvent"),
+        _equipmentChangedEvent = Instance.new("BindableEvent"),
         _saveSchema = nil,
         _store = nil,
     }, ProfileService)
@@ -175,6 +177,13 @@ function ProfileService.onLoaded(
     callback: (Player, any) -> ()
 ): RBXScriptConnection
     return self._loadedEvent.Event:Connect(callback)
+end
+
+function ProfileService.onEquipmentChanged(
+    self: ProfileService,
+    callback: (Player, any) -> ()
+): RBXScriptConnection
+    return self._equipmentChangedEvent.Event:Connect(callback)
 end
 
 function ProfileService.get(self: ProfileService, player: Player): any
@@ -386,6 +395,7 @@ function ProfileService.equipItem(self: ProfileService, player: Player, itemId: 
     if self._persistent then
         self._dirty[player] = true
     end
+    self._equipmentChangedEvent:Fire(player, self._saveSchema.equippedSnapshot(nextProfile))
     return { accepted = true, itemId = result.itemId, slot = result.slot }
 end
 
@@ -402,6 +412,7 @@ function ProfileService.unequipItem(self: ProfileService, player: Player, slot: 
     if self._persistent then
         self._dirty[player] = true
     end
+    self._equipmentChangedEvent:Fire(player, self._saveSchema.equippedSnapshot(nextProfile))
     return { accepted = true, slot = slot }
 end
 

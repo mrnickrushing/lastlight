@@ -24,6 +24,7 @@ TestRunner.run({
     require("./specs/ProfessionState.spec"),
     require("./specs/ProfessionMastery.spec"),
     require("./specs/Equipment.spec"),
+    require("./specs/GearVisualPlan.spec"),
     require("./specs/Quests.spec"),
     require("./specs/RateLimiter.spec"),
     require("./specs/ReviveFlow.spec"),
