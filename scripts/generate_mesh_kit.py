@@ -114,12 +114,14 @@ def smooth_by_angle(obj: bpy.types.Object) -> None:
     object's smoothing setup would be silently discarded. Applying it once, to
     the already-joined result, has nothing left to lose.
     """
-    bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.select_all(action="DESELECT")
-    obj.select_set(True)
-    if hasattr(bpy.ops.object, "shade_auto_smooth"):
-        # Blender 4.1+: adds a "Smooth by Angle" modifier node group.
-        bpy.ops.object.shade_auto_smooth(angle=SMOOTH_ANGLE)
+    if hasattr(obj.data, "set_sharp_from_angle"):
+        # Blender 4.1+ stores the result directly on the mesh. Do not use
+        # bpy.ops.object.shade_auto_smooth here: that operator depends on an
+        # optional bundled geometry-node asset which is absent from some
+        # headless Blender distributions. Mesh-native sharp edges export to
+        # glTF without that external asset and survive the Roblox upload.
+        obj.data.shade_smooth()
+        obj.data.set_sharp_from_angle(angle=SMOOTH_ANGLE)
     else:
         # Blender < 4.1: shade_smooth() sets the base smooth flag, then the
         # mesh-level angle threshold splits normals back apart across edges

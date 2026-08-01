@@ -4,8 +4,8 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-blender --background --python scripts/generate_mesh_kit.py
-blender --background --python scripts/prepare_mesh_candidate.py -- \
+blender --background --python-exit-code 1 --python scripts/generate_mesh_kit.py
+blender --background --python-exit-code 1 --python scripts/prepare_mesh_candidate.py -- \
   --input assets/meshes/candidates/mesh_root_arch_tripo.glb \
   --output assets/meshes/generated/mesh_root_arch_a.glb \
   --preview assets/meshes/previews/mesh-root-arch-tripo.png \

@@ -3,6 +3,7 @@
 local InsertService = game:GetService("InsertService")
 
 local MeshAssetRegistry = require(script.Parent.MeshAssetRegistry)
+local MeshMaterialPlan = require(script.Parent.MeshMaterialPlan)
 
 local MeshTemplateLoader = {}
 MeshTemplateLoader.__index = MeshTemplateLoader
@@ -54,6 +55,65 @@ local function longestDimension(size: Vector3): number
     return math.max(size.X, size.Y, size.Z)
 end
 
+local ROBLOX_MATERIALS = table.freeze({
+    Grass = Enum.Material.Grass,
+    Ground = Enum.Material.Ground,
+    LeafyGrass = Enum.Material.LeafyGrass,
+    Metal = Enum.Material.Metal,
+    Neon = Enum.Material.Neon,
+    Slate = Enum.Material.Slate,
+    Wood = Enum.Material.Wood,
+    WoodPlanks = Enum.Material.WoodPlanks,
+})
+
+local function applyBuiltInMaterials(model: Model, customPbr: boolean): (number, number)
+    if customPbr then
+        return 0, 0
+    end
+
+    local styled = 0
+    local unstyled = 0
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("MeshPart") then
+            local style = MeshMaterialPlan.styleForPart(descendant.Name)
+            if style == nil then
+                unstyled += 1
+            else
+                local material = ROBLOX_MATERIALS[style.material]
+                local color = style.color
+                assert(material ~= nil, "unknown built-in mesh material " .. style.material)
+                descendant.Material = material
+                descendant.MaterialVariant = ""
+                descendant.Color = Color3.fromRGB(color[1], color[2], color[3])
+                for _, child in descendant:GetChildren() do
+                    if child:IsA("SurfaceAppearance") then
+                        child:Destroy()
+                    end
+                end
+                styled += 1
+            end
+        end
+    end
+    return styled, unstyled
+end
+
+local function applyProfileScale(model: Model, profileScale: Vector3)
+    if profileScale == Vector3.one then
+        return
+    end
+
+    local pivot = model:GetPivot()
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("BasePart") then
+            local relative = pivot:ToObjectSpace(descendant.CFrame)
+            descendant.Size *= profileScale
+            descendant.CFrame = pivot
+                * CFrame.new(relative.Position * profileScale)
+                * relative.Rotation
+        end
+    end
+end
+
 function MeshTemplateLoader.new(logger: Logger): MeshTemplateLoader
     return setmetatable({
         _logger = logger,
@@ -78,6 +138,11 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
         self._logger:info("mesh_asset_unknown", { assetId = stableId })
         return nil
     end
+    if entry.placementBand == "retired_visual_failure" then
+        self._failed[stableId] = true
+        self._logger:info("mesh_asset_retired", { assetId = stableId })
+        return nil
+    end
 
     local ok, loaded = pcall(InsertService.LoadAsset, InsertService, entry.assetId)
     if not ok or not loaded:IsA("Model") then
@@ -95,6 +160,7 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
 
     loaded.Name = "Template_" .. stableId
     local meshPartCount = sanitize(loaded)
+    local styledParts, unstyledParts = applyBuiltInMaterials(loaded, entry.pbr)
     local _, nativeSize = loaded:GetBoundingBox()
     local nativeLongest = longestDimension(nativeSize)
     local normalizationScale = MeshAssetRegistry.scaleFor(stableId, nativeLongest)
@@ -122,6 +188,8 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
         assetId = stableId,
         robloxAssetId = entry.assetId,
         meshParts = meshPartCount,
+        styledParts = styledParts,
+        unstyledParts = unstyledParts,
         nativeLongestDimension = nativeLongest,
         targetLongestDimension = entry.targetLongestDimension,
     })
@@ -133,7 +201,8 @@ function MeshTemplateLoader.place(
     stableId: string,
     parent: Instance,
     at: CFrame,
-    placementScale: number
+    placementScale: number,
+    profileScale: Vector3?
 ): Model?
     local template = self:_load(stableId)
     local templateScale = self._templateScale[stableId]
@@ -144,9 +213,12 @@ function MeshTemplateLoader.place(
     local clone = template:Clone()
     clone.Name = "Authored_" .. stableId
     clone:ScaleTo(templateScale * placementScale)
+    local resolvedProfileScale = profileScale or Vector3.one
+    applyProfileScale(clone, resolvedProfileScale)
     clone:PivotTo(at)
     clone:SetAttribute("MeshAssetId", stableId)
     clone:SetAttribute("PlacementScale", placementScale)
+    clone:SetAttribute("ProfileScale", resolvedProfileScale)
     clone.Parent = parent
     return clone
 end

@@ -25,7 +25,7 @@
         "LL_stone",
         "LL_stone_dark"
       ],
-      "bytes": 46844
+      "bytes": 23192
     },
     "mesh_broadleaf_hero_a": {
       "boundsMin": [
@@ -52,7 +52,7 @@
         "LL_leaf_dark",
         "LL_leaf_mid"
       ],
-      "bytes": 75620
+      "bytes": 47172
     },
     "mesh_conifer_hero_a": {
       "boundsMin": [
@@ -79,7 +79,7 @@
         "LL_pine_dark",
         "LL_pine_mid"
       ],
-      "bytes": 59392
+      "bytes": 45824
     },
     "mesh_conifer_hero_b": {
       "boundsMin": [
@@ -106,7 +106,7 @@
         "LL_pine_dark",
         "LL_pine_mid"
       ],
-      "bytes": 59396
+      "bytes": 45988
     },
     "mesh_crooked_farmhouse_a": {
       "boundsMin": [
@@ -135,7 +135,7 @@
         "LL_stone",
         "LL_stone_dark"
       ],
-      "bytes": 150484
+      "bytes": 99264
     },
     "mesh_deadfall_a": {
       "boundsMin": [
@@ -163,7 +163,7 @@
         "LL_fungus",
         "LL_moss"
       ],
-      "bytes": 49620
+      "bytes": 42516
     },
     "mesh_fern_cluster_a": {
       "boundsMin": [
@@ -217,7 +217,7 @@
         "LL_moss",
         "LL_stone_dark"
       ],
-      "bytes": 41680
+      "bytes": 34888
     },
     "mesh_hollow_lantern_shrine_a": {
       "boundsMin": [
@@ -247,7 +247,7 @@
         "LL_stone",
         "LL_stone_dark"
       ],
-      "bytes": 75624
+      "bytes": 63136
     },
     "mesh_lantern_post_a": {
       "boundsMin": [
@@ -274,7 +274,7 @@
         "LL_iron",
         "LL_lantern_amber"
       ],
-      "bytes": 28324
+      "bytes": 24804
     },
     "mesh_root_arch_a": {
       "boundsMin": [
@@ -347,7 +347,7 @@
         "LL_stone",
         "LL_stone_dark"
       ],
-      "bytes": 103952
+      "bytes": 68808
     }
   }
 }
