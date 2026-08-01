@@ -49,6 +49,7 @@ local RuntimeIds = {
         UseGear = "use_gear",
         EquipGear = "equip_gear",
         OpenFieldBook = "open_field_book",
+        TalkResident = "talk_resident",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -80,6 +81,11 @@ local RuntimeIds = {
         CraftIronrootHood = "craft_ironroot_hood_bench",
         CraftBrambleBoots = "craft_bramble_boots_bench",
         QuestBoard = "quest_board",
+    }),
+    ResidentInteractionIds = table.freeze({
+        npc_tomas_reed = "resident_tomas_reed",
+        npc_pip_wren = "resident_pip_wren",
+        npc_ena_moss = "resident_ena_moss",
     }),
 }
 

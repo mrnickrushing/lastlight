@@ -3347,6 +3347,8 @@ local function buildTownProgressionBuildings(
         residents[residentId] = {
             model = model,
             dayDuty = definition.dayDuty,
+            displayName = definition.displayName,
+            interactionTarget = head,
         }
     end
 
@@ -3410,6 +3412,13 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
         existing:Destroy()
     end
     local existingBuildings = world:FindFirstChild("TownProgressionBuildings")
+    for _, interactionId in self._runtimeIds.ResidentInteractionIds do
+        local residentPrompt = self._interactions[interactionId]
+        if residentPrompt ~= nil then
+            residentPrompt:Destroy()
+            self._interactions[interactionId] = nil
+        end
+    end
     if existingBuildings ~= nil then
         existingBuildings:Destroy()
     end
@@ -3421,6 +3430,19 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
     buildings.Name = "TownProgressionBuildings"
     buildings.Parent = world
     self._townResidents = buildTownProgressionBuildings(buildings, resolved, self._runtimeIds)
+    for residentId, resident in self._townResidents do
+        local interactionId = self._runtimeIds.ResidentInteractionIds[residentId]
+        if interactionId ~= nil and resident.interactionTarget ~= nil then
+            self:_registerInteraction(
+                resident.interactionTarget,
+                interactionId,
+                self._runtimeIds.Actions.TalkResident,
+                "TALK",
+                resident.displayName,
+                residentId
+            )
+        end
+    end
     self:_setTownResidentRoutine(
         if self._night then "night" elseif self._dusk then "dusk" else "day"
     )

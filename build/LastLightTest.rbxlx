@@ -5050,8 +5050,8 @@ end
 -- Silently claims every not-yet-claimed quest whose objective is currently
 -- met, granting each one's material reward. Called opportunistically after
 -- any action that could move a signal (a night completing, a craft
--- succeeding, an expedition settling) rather than through a quest board —
--- no quest-giver or accept step exists yet, so a quest that's already
+-- succeeding, an expedition settling) rather than through an accept step.
+-- Resident quest-givers surface this progress and its story context, so a quest that's already
 -- satisfiable claims itself the moment it's checked.
 function Quests.checkAndClaim(
     claimed: { [string]: boolean },
@@ -5152,6 +5152,123 @@ return table.freeze(RateLimiter)
         </Properties>
       </Item>
       <Item class="ModuleScript" referent="35">
+        <Properties>
+          <string name="Name">ResidentDialogue</string>
+          <string name="Source"><![CDATA[--!strict
+
+local ResidentDialogue = {}
+
+export type Response = {
+    message: string,
+    questId: string,
+    state: string,
+}
+
+local RESIDENT_QUESTS = table.freeze({
+    npc_tomas_reed = "quest_first_craft",
+    npc_pip_wren = "quest_survive_three_nights",
+    npc_ena_moss = "quest_bramblewake_veteran",
+})
+
+local RESIDENT_NAMES = table.freeze({
+    npc_tomas_reed = "TOMAS",
+    npc_pip_wren = "PIP",
+    npc_ena_moss = "ENA",
+})
+
+local function questById(quests: any, questId: string): any
+    if type(quests) ~= "table" then
+        return nil
+    end
+    for _, quest in quests do
+        if type(quest) == "table" and quest.id == questId then
+            return quest
+        end
+    end
+    return nil
+end
+
+local function completedStory(residentId: string, consequence: any): string
+    local decision = if type(consequence) == "table" then consequence.decision else nil
+    local wardenOutcome = if type(consequence) == "table" then consequence.wardenOutcome else nil
+    if residentId == "npc_tomas_reed" then
+        if decision == "restore_farmland" then
+            return "THE RENEWED FIELDS NEED TOOLS AS MUCH AS SEED. KEEP THE BENCH BUSY."
+        elseif decision == "wild_regrowth" then
+            return "THE WILD GROVE GIVES LESS ON COMMAND, BUT MORE TO THOSE WHO LISTEN."
+        elseif decision == "shared_agroforest" then
+            return "FOREST AND FIELD ARE SHARING ONE TABLE NOW. THAT IS WORTH BUILDING FOR."
+        end
+        return "ONE GOOD TOOL CAN TURN A BAD NIGHT. KEEP MAKING WHAT THE TOWN NEEDS."
+    elseif residentId == "npc_pip_wren" then
+        if wardenOutcome == "preserved" then
+            return "THE WARDEN LEFT OLD TRACKS OPEN. I HAVE MARKED THE SAFEST ONES."
+        elseif wardenOutcome == "scarred" then
+            return "THE SCARRED TRAILS SHIFT AFTER RAIN. FOLLOW THE FRESH AMBER MARKS."
+        elseif wardenOutcome == "harmed" then
+            return "THE FOREST IS WATCHING THE ROAD NOW. TRAVEL WITH LIGHT AND COMPANY."
+        end
+        return "THREE DAWNS PROVE A ROAD CAN HOLD. THE NEXT ONE STILL NEEDS A SCOUT."
+    elseif decision == "restore_farmland" then
+        return "I SAVED BRAMBLEWAKE SEED FOR THESE FURROWS. THE FIRST SHOOTS ARE YOURS TOO."
+    elseif decision == "wild_regrowth" then
+        return "THE GROVE IS CHOOSING ITS OWN SHAPE. WATCH WHERE THE BRIGHTCAPS RETURN."
+    elseif decision == "shared_agroforest" then
+        return "ROOT, CROP, AND LANTERN ARE GROWING TOGETHER. KEEP BRINGING PEOPLE HOME."
+    end
+    return "EVERY SAFE RETURN TEACHES THE GREENWARD HOW TO GROW AROUND US."
+end
+
+function ResidentDialogue.respond(residentId: any, quests: any, consequence: any): Response?
+    if type(residentId) ~= "string" then
+        return nil
+    end
+    local questId = RESIDENT_QUESTS[residentId]
+    local residentName = RESIDENT_NAMES[residentId]
+    if questId == nil or residentName == nil then
+        return nil
+    end
+
+    local quest = questById(quests, questId)
+    if quest == nil then
+        return {
+            message = residentName .. ": CHECK BACK WHEN THE GREENWARD RECORDS ARE READY.",
+            questId = questId,
+            state = "loading",
+        }
+    end
+    if quest.claimed == true then
+        return {
+            message = residentName .. ": " .. completedStory(residentId, consequence),
+            questId = questId,
+            state = "story",
+        }
+    end
+
+    local current = math.max(0, math.floor(tonumber(quest.progress) or 0))
+    local threshold = math.max(1, math.floor(tonumber(quest.threshold) or 1))
+    local guidance = if residentId == "npc_tomas_reed"
+        then "CRAFT ONE USEFUL ITEM AT THE WORKBENCH"
+        elseif residentId == "npc_pip_wren" then "HELP THE LANTERN ROAD SURVIVE THREE NIGHTS"
+        else "RETURN SAFELY FROM BRAMBLEWAKE THREE TIMES"
+    return {
+        message = string.format(
+            "%s: %s — %d/%d. I WILL MARK IT WHEN IT IS DONE.",
+            residentName,
+            guidance,
+            math.min(current, threshold),
+            threshold
+        ),
+        questId = questId,
+        state = if current >= threshold then "ready" else "active",
+    }
+end
+
+return table.freeze(ResidentDialogue)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -5266,7 +5383,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -5320,6 +5437,7 @@ local RuntimeIds = {
         UseGear = "use_gear",
         EquipGear = "equip_gear",
         OpenFieldBook = "open_field_book",
+        TalkResident = "talk_resident",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -5352,13 +5470,18 @@ local RuntimeIds = {
         CraftBrambleBoots = "craft_bramble_boots_bench",
         QuestBoard = "quest_board",
     }),
+    ResidentInteractionIds = table.freeze({
+        npc_tomas_reed = "resident_tomas_reed",
+        npc_pip_wren = "resident_pip_wren",
+        npc_ena_moss = "resident_ena_moss",
+    }),
 }
 
 return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -5864,7 +5987,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -5983,7 +6106,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -6234,7 +6357,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -6377,7 +6500,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -6554,7 +6677,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -6698,7 +6821,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -6734,7 +6857,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -7116,7 +7239,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -7149,11 +7272,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="46">
+  <Item class="ServerScriptService" referent="47">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="47">
+    <Item class="Script" referent="48">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -7186,6 +7309,7 @@ local BramblewakeBlackout = require(root.BramblewakeBlackout)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local ProfessionState = require(root.ProfessionState)
 local RateLimiter = require(root.RateLimiter)
+local ResidentDialogue = require(root.ResidentDialogue)
 local ReviveFlow = require(root.ReviveFlow)
 local RuntimeIds = require(root.RuntimeIds)
 local SaveSchema = require(root.SaveSchema)
@@ -7397,7 +7521,8 @@ local tutorialService = TutorialService.new(
     blackoutService,
     analyticsService,
     CraftingCatalog,
-    Equipment
+    Equipment,
+    ResidentDialogue
 )
 
 local services = ServiceRegistry.new({
@@ -7435,7 +7560,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -7533,11 +7658,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="49">
+      <Item class="Folder" referent="50">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -7920,6 +8045,30 @@ function AnalyticsService.questClaimed(self: AnalyticsService, player: Player, q
     end
 end
 
+function AnalyticsService.residentTalked(
+    self: AnalyticsService,
+    player: Player,
+    residentId: string,
+    questId: string,
+    state: string
+)
+    self._logger:info("resident_talked", {
+        player = player.UserId,
+        quest = string.sub(questId, 1, 48),
+        resident = string.sub(residentId, 1, 48),
+        state = string.sub(state, 1, 24),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "ResidentTalked", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = residentId,
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = questId,
+                [Enum.AnalyticsCustomFieldKeys.CustomField03.Name] = state,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.eliteStarted(
     self: AnalyticsService,
     player: Player,
@@ -8224,7 +8373,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -8722,7 +8871,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9845,7 +9994,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10366,7 +10515,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10470,7 +10619,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -10564,7 +10713,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10777,7 +10926,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11601,7 +11750,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11780,7 +11929,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12346,7 +12495,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13190,7 +13339,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13544,7 +13693,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14326,7 +14475,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14557,7 +14706,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14617,6 +14766,7 @@ export type TutorialService = typeof(setmetatable(
         _analyticsService: any,
         _craftingCatalog: any,
         _equipmentCatalog: any,
+        _residentDialogue: any,
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
         _expeditionEventRevision: { [Player]: number },
@@ -14647,7 +14797,8 @@ function TutorialService.new(
     blackoutService: any,
     analyticsService: any,
     craftingCatalog: any,
-    equipmentCatalog: any
+    equipmentCatalog: any,
+    residentDialogue: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -14672,6 +14823,7 @@ function TutorialService.new(
         _analyticsService = analyticsService,
         _craftingCatalog = craftingCatalog,
         _equipmentCatalog = equipmentCatalog,
+        _residentDialogue = residentDialogue,
         _sessions = {},
         _expeditionModuleIndex = {},
         _expeditionEventRevision = {},
@@ -15033,6 +15185,27 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
     end
     if actionId == self._runtimeIds.Actions.OpenFieldBook then
         self:_setToast(player, "FIELD BOOK UPDATED — CHECK RECIPES, QUESTS, AND MASTERY")
+        self:_publish(player)
+        return
+    end
+    if actionId == self._runtimeIds.Actions.TalkResident then
+        local residentId = prompt:GetAttribute("Payload")
+        local response = self._residentDialogue.respond(
+            residentId,
+            self._profileService:questSnapshot(player),
+            self._profileService:townConsequence(player)
+        )
+        if response == nil then
+            self:_setToast(player, "THE RESIDENT IS BUSY WITH THE NIGHT WATCH")
+        else
+            self:_setToast(player, response.message)
+            self._analyticsService:residentTalked(
+                player,
+                tostring(residentId),
+                response.questId,
+                response.state
+            )
+        end
         self:_publish(player)
         return
     end
@@ -15539,7 +15712,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16373,7 +16546,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19725,6 +19898,8 @@ local function buildTownProgressionBuildings(
         residents[residentId] = {
             model = model,
             dayDuty = definition.dayDuty,
+            displayName = definition.displayName,
+            interactionTarget = head,
         }
     end
 
@@ -19788,6 +19963,13 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
         existing:Destroy()
     end
     local existingBuildings = world:FindFirstChild("TownProgressionBuildings")
+    for _, interactionId in self._runtimeIds.ResidentInteractionIds do
+        local residentPrompt = self._interactions[interactionId]
+        if residentPrompt ~= nil then
+            residentPrompt:Destroy()
+            self._interactions[interactionId] = nil
+        end
+    end
     if existingBuildings ~= nil then
         existingBuildings:Destroy()
     end
@@ -19799,6 +19981,19 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
     buildings.Name = "TownProgressionBuildings"
     buildings.Parent = world
     self._townResidents = buildTownProgressionBuildings(buildings, resolved, self._runtimeIds)
+    for residentId, resident in self._townResidents do
+        local interactionId = self._runtimeIds.ResidentInteractionIds[residentId]
+        if interactionId ~= nil and resident.interactionTarget ~= nil then
+            self:_registerInteraction(
+                resident.interactionTarget,
+                interactionId,
+                self._runtimeIds.Actions.TalkResident,
+                "TALK",
+                resident.displayName,
+                residentId
+            )
+        end
+    end
     self:_setTownResidentRoutine(
         if self._night then "night" elseif self._dusk then "dusk" else "day"
     )
@@ -20975,11 +21170,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="67">
+      <Item class="Folder" referent="68">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="68">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -23050,7 +23245,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -23439,7 +23634,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -23602,7 +23797,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -23797,11 +23992,11 @@ return table.freeze(WardenStagBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="72">
+    <Item class="Folder" referent="73">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="73">
+      <Item class="Script" referent="74">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -24318,15 +24513,15 @@ print("[Last Light] PASS FoundationIntegration")
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="74">
+  <Item class="StarterPlayer" referent="75">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="75">
+    <Item class="StarterPlayerScripts" referent="76">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="76">
+      <Item class="LocalScript" referent="77">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -24439,11 +24634,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="77">
+        <Item class="Folder" referent="78">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="78">
+          <Item class="ModuleScript" referent="79">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -24574,7 +24769,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="79">
+          <Item class="ModuleScript" referent="80">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -26647,7 +26842,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="80">
+          <Item class="ModuleScript" referent="81">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -26964,7 +27159,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="81">
+          <Item class="ModuleScript" referent="82">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -27072,7 +27267,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="82">
+          <Item class="ModuleScript" referent="83">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -27204,7 +27399,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="83">
+          <Item class="ModuleScript" referent="84">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -27480,7 +27675,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="84">
+  <Item class="Workspace" referent="85">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

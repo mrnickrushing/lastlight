@@ -3,9 +3,10 @@
 ## Scope
 
 Build `0.19.0` gives the material economy its first quest layer plus the
-authoritative mastery/equipment progression layer: three
-silent milestones that grant a material reward the moment their objective
-is met.
+authoritative mastery/equipment progression layer: three automatic milestones
+that grant a material reward the moment their objective is met. Tomas, Pip,
+and Ena now surface live progress and become consequence-aware storytellers
+after their linked milestone is complete.
 
 ```text
 a tracked signal changes (a night completes, a craft succeeds, an
@@ -17,13 +18,18 @@ expedition settles)
     action was already about to show
 ```
 
-This is deliberately a silent-milestone system, not a quest board:
+This remains an automatic-milestone system, not an accept-and-track quest board:
 
-- **No quest giver, no accept step, no UI panel.** Every objective this
-  increment defines is derivable from state the game already tracks
+- **No accept step or new UI panel.** Every objective this increment defines
+  is derivable from state the game already tracks
   (`town.nightNumber`, the `gear` map, `inventory.settlementOrder`), so
   there was nothing to gain from inventing a new tracking mechanism before
-  there's a UI or NPC to hang an accept flow on.
+  the residents report progress but do not own or duplicate quest state.
+- **Three physical quest-givers.** Tomas tracks the first craft, Pip tracks
+  three defended nights, and Ena tracks three Bramblewake settlements. Their
+  proximity prompts use the existing contextual action and toast surfaces.
+  After completion they discuss the player's Greenward decision or Warden
+  outcome instead of repeating a finished checklist forever.
 - **Three starter quests**, each rewarding materials that feed straight
   back into crafting:
   - `quest_survive_three_nights` — survive 3 town nights → 5 Heartwood
@@ -41,9 +47,9 @@ This is deliberately a silent-milestone system, not a quest board:
   were exposed ahead of any dedicated panel — a future quest-browsing UI
   has data to render without further server work.
 
-Quest-giver NPCs, a quest-browsing UI, branching/choice objectives, and
-quests whose objective isn't already derivable from tracked state all
-remain open — see the Scope honesty row below.
+A quest-browsing UI, branching/choice objectives, and quests whose objective
+isn't already derivable from tracked state all remain open — see the Scope
+honesty row below.
 
 ## Flow and authority
 
@@ -89,12 +95,17 @@ decisions already made in this codebase.
    Sap added to the material bank.
 4. Survive three town nights. Require a "QUEST COMPLETE: THREE NIGHTS
    SURVIVED" toast on the third dawn and 5 Heartwood added.
-5. Complete three Bramblewake expeditions with settled rewards. Require a
+5. Talk to Tomas, Pip, and Ena before completion. Require each resident to
+   report the linked objective and exact live progress without accepting or
+   resetting anything.
+6. Complete three Bramblewake expeditions with settled rewards. Require a
    "QUEST COMPLETE: BRAMBLEWAKE VETERAN" toast on the third settlement and
    3 Brightcap added.
-6. Repeat any of the triggering actions after a quest is already claimed.
+7. Talk to each resident after completion. Require story dialogue to replace
+   checklist dialogue and reflect the player's chapter consequence.
+8. Repeat any of the triggering actions after a quest is already claimed.
    Require no duplicate reward and no duplicate toast.
-7. Disconnect and rejoin. Require claimed quests and their granted
+9. Disconnect and rejoin. Require claimed quests and their granted
    materials to still match what was true before disconnecting.
 
 ## Exit and abuse gate
@@ -107,7 +118,8 @@ decisions already made in this codebase.
 | No dead quests | every quest's reward material has an authored source elsewhere in the content (no quest can require an ungettable reward path) |
 | Toast integrity | a quest claim never silently replaces the toast of the action that triggered it (folded into one string instead) |
 | Persistence | claimed quests and their granted materials survive a disconnect/reconnect and a server restart |
-| Scope honesty | quest-giver NPCs, a quest-browsing UI, and branching/choice objectives remain open |
+| Resident context | each resident reports only the linked server snapshot and completed dialogue reflects chapter consequence |
+| Scope honesty | a quest-browsing UI and branching/choice objectives remain open |
 
 Automated checks establish the claim transaction's idempotence, reward
 granting, and multi-quest-in-one-pass behavior as pure Luau tests. Only

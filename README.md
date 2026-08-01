@@ -19,7 +19,7 @@ eight active events, durable extraction settlement, player rescue, combat
 mobility, six-enemy first-night roster, four basic profession kits, Old Growth,
 the Warden Stag, the Bramblewake Blackout, permanent chapter-one resolution, a
 repeating town normal-night cycle with four tactical themes, four starter
-recipes, consumable and authoritative passive gear effects, silent quest
+recipes, consumable and authoritative passive gear effects, resident-guided quest
 milestones, physical town-tier building growth, and
 the four-person Bramblewake resident cast with day/night routines implemented;
 Studio and device exit gates remain pending.**
@@ -64,10 +64,10 @@ The repository currently contains:
   shield and an instant stamina restore — that consume exactly one owned
   item, check their own preconditions before spending it, and are usable
   through dedicated keyboard, gamepad, and touch bindings;
-- a first set of three silent quest milestones that auto-claim a material
+- a first set of three resident-guided quest milestones that auto-claim a material
   reward the moment their already-tracked objective (nights survived,
-  items crafted, expeditions settled) is met, with no quest giver or
-  accept step;
+  items crafted, expeditions settled) is met, with Tomas, Pip, and Ena
+  surfacing live progress and consequence-aware story dialogue;
 - persistent free-town selection for Scout, Warden, Engineer, and Medic, with
   server-owned reveal/slow, guard, lantern-repair, and area-heal abilities;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
@@ -78,7 +78,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 212 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 217 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused

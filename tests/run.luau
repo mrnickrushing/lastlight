@@ -27,6 +27,7 @@ TestRunner.run({
     require("./specs/Quests.spec"),
     require("./specs/RateLimiter.spec"),
     require("./specs/ReviveFlow.spec"),
+    require("./specs/ResidentDialogue.spec"),
     require("./specs/SaveSchema.spec"),
     require("./specs/ServiceRegistry.spec"),
     require("./specs/SurvivalState.spec"),
