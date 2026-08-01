@@ -84,6 +84,7 @@ local expeditionService = ExpeditionService.new(
     featureFlags,
     ExpeditionEventFlow,
     ExpeditionRewardLedger,
+    ExtractionPayoff,
     profileService,
     analyticsService,
     Config.BramblewakePreviewSeed

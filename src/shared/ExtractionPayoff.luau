@@ -54,4 +54,13 @@ function ExtractionPayoff.firstAvailableSlot(occupied: any, slotCount: number): 
     return nil
 end
 
+function ExtractionPayoff.claim(pending: any, owner: any): any
+    if type(pending) ~= "table" or owner == nil then
+        return nil
+    end
+    local payoff = pending[owner]
+    pending[owner] = nil
+    return payoff
+end
+
 return table.freeze(ExtractionPayoff)

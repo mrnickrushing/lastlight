@@ -21,6 +21,7 @@ export type ExpeditionService = typeof(setmetatable(
         _featureFlags: any,
         _eventFlow: any,
         _rewardLedger: any,
+        _extractionPayoff: any,
         _profileService: any,
         _analyticsService: any,
         _seed: number,
@@ -43,6 +44,7 @@ function ExpeditionService.new(
     featureFlags: any,
     eventFlow: any,
     rewardLedger: any,
+    extractionPayoff: any,
     profileService: any,
     analyticsService: any,
     seed: number
@@ -56,6 +58,7 @@ function ExpeditionService.new(
         _featureFlags = featureFlags,
         _eventFlow = eventFlow,
         _rewardLedger = rewardLedger,
+        _extractionPayoff = extractionPayoff,
         _profileService = profileService,
         _analyticsService = analyticsService,
         _seed = seed,
@@ -110,6 +113,25 @@ function ExpeditionService.Start(self: ExpeditionService)
         seed = manifest.seed,
         source = manifest.source,
     })
+    local function bindPlayer(player: Player)
+        player.CharacterAdded:Connect(function(character: Model)
+            task.defer(function()
+                local root = character:WaitForChild("HumanoidRootPart", 5)
+                if
+                    root ~= nil
+                    and player.Parent ~= nil
+                    and player.Character == character
+                    and player:GetAttribute("LastLightInExpedition") ~= true
+                then
+                    self:_deliverPendingPayoff(player)
+                end
+            end)
+        end)
+    end
+    Players.PlayerAdded:Connect(bindPlayer)
+    for _, player in Players:GetPlayers() do
+        bindPlayer(player)
+    end
     Players.PlayerRemoving:Connect(function(player: Player)
         self._pendingExtractionPayoffs[player] = nil
     end)
@@ -343,14 +365,18 @@ function ExpeditionService._combinedPending(self: ExpeditionService, player: Pla
     }
 end
 
+function ExpeditionService._deliverPendingPayoff(self: ExpeditionService, player: Player): boolean
+    local payoff = self._extractionPayoff.claim(self._pendingExtractionPayoffs, player)
+    if payoff == nil then
+        return false
+    end
+    self._worldService:showExtractionPayoff(player, payoff.materials)
+    return true
+end
+
 function ExpeditionService._exitWithPayoff(self: ExpeditionService, player: Player): boolean
     return self._worldService:exitBramblewake(player, function()
-        local payoff = self._pendingExtractionPayoffs[player]
-        if payoff == nil then
-            return
-        end
-        self._pendingExtractionPayoffs[player] = nil
-        self._worldService:showExtractionPayoff(player, payoff.materials)
+        self:_deliverPendingPayoff(player)
     end)
 end
 
