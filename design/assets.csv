@@ -7,3 +7,6 @@ cabin_entry_paths,door-to-square circulation,procedural 3D environment,two worn 
 workshop_districts,crafting and trade activity,procedural 3D environment,separated west and east supported workshop bays,27x14 studs each,VISUAL_QUALITY_STANDARD.md#style-formula,generate
 greenward_garden,eastern cultivation district,procedural 3D environment,bordered productive garden outside the cabin lot,34x30 studs,VISUAL_QUALITY_STANDARD.md#style-formula,generate
 mastery_clearings,profession progression destinations,procedural 3D environment,four edge clearings with distinct physical altars,13x8 studs each,VISUAL_QUALITY_STANDARD.md#style-formula,generate
+emberhollow_lantern_trail,arrival guidance and tutorial spine,procedural 3D environment,high-contrast rutted road with physical chevrons and repeated lantern posts,19 studs wide,VISUAL_QUALITY_STANDARD.md#style-formula,generate
+tutorial_activity_yards,progression staging beside the route,procedural 3D environment,separate Heartwood tool and barricade lots connected by short dirt spurs,three side lots,VISUAL_QUALITY_STANDARD.md#style-formula,generate
+heartwood_stump,first gathering landmark,procedural 3D prop,asymmetrical bark stump with roots split crown and exposed amber heart cavity,about 9 studs tall,VISUAL_QUALITY_STANDARD.md#style-formula,generate

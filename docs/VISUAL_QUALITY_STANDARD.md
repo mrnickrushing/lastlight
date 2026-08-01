@@ -110,6 +110,16 @@ inn, and mastery clearings remain outside that central circulation envelope.
 - The critical route is visually continuous through worn ground, edge language,
   repeated landmarks, and direction signs. Players should not need a HUD arrow
   to infer the intended direction.
+- Tutorial interactions branch off the critical route onto short, readable
+  activity spurs. Never place a gathering node, tool display, worksite, sign,
+  or decorative landmark directly across the path the player is following.
+- Establish a visual hierarchy at gameplay distance: route surface first,
+  current objective landmark second, side activities third, decorative skyline
+  last. A decorative mesh that outshouts the objective must move, shrink, or
+  lose contrast.
+- Use at least three mutually reinforcing route cues for the arrival sequence:
+  contrasting ground, repeated physical landmarks, and directional edge or
+  inlay geometry. Floating labels are close-range confirmation, not navigation.
 - Terrain needs foreground, playable midground, and horizon depth. Avoid flat
   rectangles, abrupt terrain seams, inverted water volumes, and repeated tree
   walls.

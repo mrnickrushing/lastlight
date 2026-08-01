@@ -41,7 +41,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.38.0", "unexpected build version")
+assert(Config.BuildVersion == "0.39.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -337,7 +337,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v19",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v20",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -364,20 +364,56 @@ for _, descendant in world:GetDescendants() do
 end
 assert(heroDetailCounts.HeartwoodRoot == 6, "Heartwood needs a rooted physical silhouette")
 assert(heroDetailCounts.HeartwoodShard == 3, "Heartwood needs faceted gathered material")
+local heartwoodBarkRibs = 0
+local heartwoodCrownPieces = 0
+for _, descendant in world:GetDescendants() do
+    if descendant.Name == "HeartwoodBarkRib" then
+        heartwoodBarkRibs += 1
+    elseif descendant.Name == "HeartwoodSplitCrown" then
+        heartwoodCrownPieces += 1
+    end
+end
+assert(heartwoodBarkRibs == 10, "Heartwood needs an irregular bark silhouette")
+assert(heartwoodCrownPieces == 6, "Heartwood needs a recognizable split crown")
+assert(world:FindFirstChild("HeartwoodCavity", true) ~= nil, "Heartwood needs an exposed cavity")
 assert(heroDetailCounts.BarricadeWorkPost == 5, "construction plot needs visible work in progress")
 assert(heroDetailCounts.FirstLanternCagePost == 4, "First Lantern needs a physical metal cage")
 assert(heroDetailCounts.ArchiveNotice == 5, "archive needs readable physical field notices")
 local roadSegments = 0
 local roadEdgeStones = 0
+local roadRuts = 0
+local roadChevrons = 0
+local tutorialSpurs = 0
 for _, descendant in world:GetDescendants() do
     if descendant.Name == "EmberhollowRoad" then
         roadSegments += 1
+        assert(
+            descendant:IsA("BasePart") and descendant.Size.X >= 19,
+            "arrival road needs a dominant gameplay-scale width"
+        )
     elseif descendant.Name == "RoadEdgeStone" then
         roadEdgeStones += 1
+    elseif descendant.Name == "RoadRut" then
+        roadRuts += 1
+    elseif descendant.Name == "RoadChevron" then
+        roadChevrons += 1
+        assert(
+            descendant:IsA("BasePart") and not descendant.CanCollide,
+            "road direction markers cannot obstruct movement"
+        )
+    elseif descendant.Name == "TutorialSpurPath" then
+        tutorialSpurs += 1
+        assert(
+            descendant:IsA("BasePart") and not descendant.CanCollide,
+            "tutorial activity spurs are visual route layers"
+        )
     end
 end
 assert(roadSegments == 6, "arrival road must connect every authored route segment")
 assert(roadEdgeStones >= 40, "arrival road needs a repeated visible stone edge")
+assert(roadRuts == 12, "every road segment needs two readable travel ruts")
+assert(roadChevrons == 12, "every road segment needs a physical direction chevron")
+assert(tutorialSpurs == 3, "each early tutorial activity needs a path from the main road")
 local cabinRafters = 0
 local cabinHearths = 0
 local cabinFirewood = 0
@@ -506,6 +542,11 @@ for _, descendant in world:GetDescendants() do
                 and descendant:FindFirstChild("ToolDisplayOpenLid") ~= nil,
             "starter tools need physical open supply displays"
         )
+        local crate = descendant:FindFirstChild("ToolDisplayCrate")
+        assert(
+            crate ~= nil and crate:IsA("BasePart") and crate.Position.X <= -39,
+            "starter tools belong in the side yard, not across the road"
+        )
     elseif descendant:IsA("Model") and string.sub(descendant.Name, 1, 16) == "CraftingDisplay_" then
         craftingDisplays += 1
         assert(
@@ -516,6 +557,21 @@ for _, descendant in world:GetDescendants() do
 end
 assert(toolDisplays == 3, "all three starter tools need physical displays")
 assert(craftingDisplays == 4, "all four starter recipes need physical displays")
+local toolYard = world:FindFirstChild("StarterToolYard", true)
+assert(toolYard ~= nil and toolYard:IsA("Model"), "starter tools need one readable work yard")
+assert(toolYard:FindFirstChild("ToolYardRoof") ~= nil, "tool yard needs a shelter silhouette")
+local heartwoodStump = world:FindFirstChild("HeartwoodStump", true)
+local constructionPlot = world:FindFirstChild("ConstructionPlot", true)
+assert(
+    heartwoodStump ~= nil and heartwoodStump:IsA("BasePart") and heartwoodStump.Position.X >= 34,
+    "Heartwood must sit beside the road rather than on it"
+)
+assert(
+    constructionPlot ~= nil
+        and constructionPlot:IsA("BasePart")
+        and constructionPlot.Position.X <= -38,
+    "barricade worksite must sit beside the road rather than on it"
+)
 local builderMaterialSets = 0
 local completedBuildingFrames = 0
 for _, descendant in world:GetDescendants() do
