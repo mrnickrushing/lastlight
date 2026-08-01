@@ -241,6 +241,68 @@ local function buildEmberhollowSanctuary(parent: Instance)
         signText.TextColor3 = accent
         signText.TextScaled = true
         signText.Parent = surface
+
+        if name == "MARA'S SHELTER" then
+            local cot = part(
+                cabinFolder,
+                "MaraCot",
+                Vector3.new(5.2, 0.55, 2.7),
+                CFrame.new(center + Vector3.new(-3.2, 0.85, 3.6)),
+                Color3.fromRGB(96, 112, 83),
+                Enum.Material.Fabric,
+                false
+            )
+            cot.CanQuery = false
+            local tableTop = part(
+                cabinFolder,
+                "MaraWorkTable",
+                Vector3.new(4.2, 0.45, 2.5),
+                CFrame.new(center + Vector3.new(3.5, 2.1, 3.5)),
+                Color3.fromRGB(89, 64, 43),
+                Enum.Material.WoodPlanks,
+                false
+            )
+            tableTop.CanQuery = false
+            for jarIndex = -1, 1 do
+                local jar = part(
+                    cabinFolder,
+                    "MemoryJar",
+                    Vector3.new(0.7, 1.05, 0.7),
+                    CFrame.new(center + Vector3.new(3.5 + jarIndex * 1.1, 2.85, 3.5)),
+                    if jarIndex == 0 then FOXFIRE else AMBER,
+                    Enum.Material.Glass,
+                    false
+                )
+                jar.Shape = Enum.PartType.Cylinder
+                jar.Transparency = 0.22
+                jar.CanQuery = false
+            end
+        else
+            for bedIndex = -1, 1, 2 do
+                local bedroll = part(
+                    cabinFolder,
+                    "WayfarerBedroll",
+                    Vector3.new(4.8, 0.45, 2.3),
+                    CFrame.new(center + Vector3.new(bedIndex * 3.3, 0.72, 2.7)),
+                    if bedIndex < 0
+                        then Color3.fromRGB(127, 91, 58)
+                        else Color3.fromRGB(72, 104, 82),
+                    Enum.Material.Fabric,
+                    false
+                )
+                bedroll.CanQuery = false
+            end
+            local trunk = part(
+                cabinFolder,
+                "WayfarerTrunk",
+                Vector3.new(4.4, 2.3, 2.5),
+                CFrame.new(center + Vector3.new(0, 1.15, 4.25)),
+                Color3.fromRGB(88, 61, 39),
+                Enum.Material.WoodPlanks,
+                false
+            )
+            trunk.CanQuery = false
+        end
     end
 
     cabin(Vector3.new(-22, 0, -112), "WAYFARER CABIN", AMBER)
@@ -1228,9 +1290,111 @@ function WorldService._buildMara(self: WorldService, world: Model)
         Enum.Material.Fabric,
         false
     )
+    part(
+        model,
+        "CoatSkirt",
+        Vector3.new(2.9, 2.5, 1.55),
+        CFrame.new(-3, 1.9, -30),
+        Color3.fromRGB(48, 68, 55),
+        Enum.Material.Fabric,
+        false
+    )
+    for side = -1, 1, 2 do
+        part(
+            model,
+            "Arm",
+            Vector3.new(0.72, 3.1, 0.72),
+            CFrame.new(-3 + side * 1.55, 3.45, -30) * CFrame.Angles(0, 0, math.rad(side * 9)),
+            Color3.fromRGB(54, 75, 59),
+            Enum.Material.Fabric,
+            false
+        )
+        local hand = part(
+            model,
+            "Hand",
+            Vector3.new(0.76, 0.76, 0.76),
+            CFrame.new(-3 + side * 1.78, 1.95, -30),
+            Color3.fromRGB(205, 153, 111),
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        hand.Shape = Enum.PartType.Ball
+        part(
+            model,
+            "Leg",
+            Vector3.new(0.82, 2.1, 0.9),
+            CFrame.new(-3 + side * 0.68, 0.65, -30),
+            Color3.fromRGB(45, 51, 48),
+            Enum.Material.Fabric,
+            false
+        )
+        part(
+            model,
+            "Boot",
+            Vector3.new(1, 0.72, 1.5),
+            CFrame.new(-3 + side * 0.68, 0.36, -30.25),
+            Color3.fromRGB(54, 39, 31),
+            Enum.Material.Leather,
+            false
+        )
+        local eye = part(
+            model,
+            "Eye",
+            Vector3.new(0.28, 0.28, 0.16),
+            CFrame.new(-3 + side * 0.48, 6.18, -30.94),
+            Color3.fromRGB(55, 39, 34),
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        eye.Shape = Enum.PartType.Ball
+    end
+    part(
+        model,
+        "HairBack",
+        Vector3.new(2.2, 2.6, 0.65),
+        CFrame.new(-3, 5.7, -29.8),
+        Color3.fromRGB(79, 43, 31),
+        Enum.Material.SmoothPlastic,
+        false
+    )
+    part(
+        model,
+        "FieldSatchel",
+        Vector3.new(1.55, 1.7, 0.8),
+        CFrame.new(-4.45, 2.85, -29.55) * CFrame.Angles(0, 0, math.rad(-8)),
+        Color3.fromRGB(113, 79, 49),
+        Enum.Material.Leather,
+        false
+    )
+    part(
+        model,
+        "SatchelStrap",
+        Vector3.new(0.24, 4.4, 0.24),
+        CFrame.new(-3.5, 3.85, -29.55) * CFrame.Angles(0, 0, math.rad(24)),
+        Color3.fromRGB(83, 57, 40),
+        Enum.Material.Leather,
+        false
+    )
+    local handLantern = part(
+        model,
+        "MaraLantern",
+        Vector3.new(0.95, 1.25, 0.95),
+        CFrame.new(-1.2, 1.45, -30),
+        AMBER,
+        Enum.Material.Glass,
+        false
+    )
+    handLantern.Shape = Enum.PartType.Ball
+    handLantern.Transparency = 0.14
+    local handLight = Instance.new("PointLight")
+    handLight.Color = AMBER
+    handLight.Brightness = 0.65
+    handLight.Range = 10
+    handLight.Shadows = false
+    handLight.Parent = handLantern
     model.PrimaryPart = root
     model.Parent = world
-    addBillboard(head, "MARA", AMBER)
+    addBillboard(head, "MARA · GREENWARD", AMBER)
 
     for index = -1, 1 do
         part(
