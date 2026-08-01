@@ -334,10 +334,10 @@ salvage result, and migration version.
 
 Each surface region ships eight event templates:
 
-Build `0.11.0` implements four representative runtime templates: Moving Hedge,
-Lost Wagon, Root Bridge, and Foxlight Trail. Pollen Storm and the remaining
-Bramblewake templates, plus all later-region events, are catalog targets rather
-than implemented runtime content.
+The Bramblewake vertical slice implements all eight runtime templates. Every
+event remains optional, has a profession-independent solution, and fails without
+blocking the extraction route. All later-region events remain catalog targets
+rather than implemented runtime content.
 
 ### Bramblewake
 

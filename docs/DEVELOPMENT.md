@@ -110,7 +110,7 @@ registry, save-schema-v4 constant, eight tutorial interactions, 13 active event
 interactions, two dormant elite interactions, six locked boss interactions,
 seven dormant Blackout interactions, one extraction interaction, runtime remotes,
 Input Action System rollout, world readiness, arrival collision, deterministic
-Bramblewake replay, 12 streamed modules, four POIs, four event state contracts,
+Bramblewake replay, 12 streamed modules, four POIs, eight event state contracts,
 mobile part budget, shared survival/revive, six-enemy combat/telegraph,
 profession contracts, Old Growth shield/fire/rooted/model contracts, Warden Stag
 phase/root/choice/model contracts, Blackout relay/vote/story contracts, and
