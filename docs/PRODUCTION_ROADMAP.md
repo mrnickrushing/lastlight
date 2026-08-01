@@ -128,8 +128,8 @@ physical Emberhollow altars. The twelve choices add distinct bounded ability or
 rescue effects without making any path required for traversal.
 Additional equipment families, a
 recipe-browsing UI and quest-board UI, branching quests, the full
-recipe/inventory/quest catalog, additional incident families beyond the first
-four three-site emergencies,
+recipe/inventory/quest catalog, additional incident mechanics beyond the first
+eight three-site emergency families,
 additional region-specific consequences, later town tiers, final
 art/audio, and all Studio/device/group evidence remain open.
 See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md) and

@@ -38,7 +38,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.26.0", "unexpected build version")
+assert(Config.BuildVersion == "0.27.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -107,6 +107,10 @@ assert(
 assert(
     TownNightIncident.forTheme("EMBERFALL").id == "incident_emberfall_cinders",
     "town incident catalog is missing"
+)
+assert(
+    TownNightIncident.forTheme("EMBERFALL", 5).id == "incident_emberfall_flues",
+    "alternate town incident catalog is missing"
 )
 local medicRescue = ProfessionRescue.resolve("profession_medic", 1, 2.5, 35, 3)
 assert(medicRescue.duration < 2.5 and medicRescue.health == 45, "Medic rescue tuning is missing")
