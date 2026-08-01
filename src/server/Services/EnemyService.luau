@@ -2,6 +2,7 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
 
 local EnemyService = {}
 EnemyService.__index = EnemyService
@@ -152,6 +153,39 @@ function EnemyService._notify(self: EnemyService, toast: string?)
     end
 end
 
+function EnemyService._showSpawnPulse(_self: EnemyService, position: Vector3, color: Color3)
+    local pulse = Instance.new("Part")
+    pulse.Name = "BramblewakeSpawnPulse"
+    pulse.Anchored = true
+    pulse.CanCollide = false
+    pulse.CanQuery = false
+    pulse.CanTouch = false
+    pulse.CastShadow = false
+    pulse.Shape = Enum.PartType.Cylinder
+    pulse.Material = Enum.Material.Neon
+    pulse.Color = color
+    pulse.Transparency = 0.18
+    pulse.Size = Vector3.new(0.16, 4, 4)
+    pulse.CFrame = CFrame.new(position + Vector3.new(0, 0.12, 0))
+        * CFrame.Angles(0, 0, math.rad(90))
+    pulse.Parent = workspace
+
+    local tween = TweenService:Create(
+        pulse,
+        TweenInfo.new(0.85, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        {
+            Size = Vector3.new(0.16, 18, 18),
+            Transparency = 1,
+        }
+    )
+    tween:Play()
+    task.delay(0.95, function()
+        if pulse.Parent ~= nil then
+            pulse:Destroy()
+        end
+    end)
+end
+
 function EnemyService._clearAttack(_self: EnemyService, enemy: Enemy)
     local attack = enemy.attack
     if attack == nil then
@@ -219,6 +253,12 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
     end
 
     local origin = self:_spawnPosition(definition)
+    self:_showSpawnPulse(
+        origin,
+        if definition.statusEffect == "spark_theft"
+            then Color3.fromRGB(103, 191, 175)
+            else Color3.fromRGB(255, 119, 79)
+    )
     local model = self._enemyBuilder.build(
         definition,
         origin,
