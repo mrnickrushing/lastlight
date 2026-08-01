@@ -41,3 +41,9 @@ Do not push implementation commits directly to `main`.
 Start with [README.md](README.md), then follow the linked design documents. If
 code and plans disagree, record a decision in [docs/DECISIONS.md](docs/DECISIONS.md)
 before changing scope.
+
+For practical Roblox implementation details, also read
+[docs/ROBLOX_GAME_PLAYBOOK.md](docs/ROBLOX_GAME_PLAYBOOK.md). It covers Rojo and
+generated-place provenance, mesh/PBR sizing, streaming, moving-platform
+physics, mobile layout, remotes, persistence, commerce, and Open Cloud
+publishing.
