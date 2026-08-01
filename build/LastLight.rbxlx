@@ -1219,14 +1219,14 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.25.0",
+    BuildVersion = "0.26.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 10,
+    SaveSchemaVersion = 11,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -5144,9 +5144,23 @@ local ProfessionMastery = {}
 export type Entry = {
     xp: number,
     level: number,
+    specializationId: string?,
 }
 
 export type State = { [string]: Entry }
+
+export type Specialization = {
+    id: string,
+    name: string,
+    description: string,
+    effectAmountBonus: number?,
+    effectRadiusBonus: number?,
+    activeSecondsBonus: number?,
+    cooldownReduction: number?,
+    rescueDurationMultiplier: number?,
+    rescueHealthBonus: number?,
+    rescueWardBonus: number?,
+}
 
 local MAX_LEVEL = 10
 local XP_PER_LEVEL = 100
@@ -5161,28 +5175,111 @@ local RANKS = table.freeze({
     table.freeze({ level = 10, name = "MASTER" }),
 })
 
-local SPECIALIZATIONS = table.freeze({
+local function specialization(definition: any): Specialization
+    return table.freeze({
+        id = assert(definition.id, "specialization ID is required"),
+        name = assert(definition.name, "specialization name is required"),
+        description = assert(definition.description, "specialization description is required"),
+        effectAmountBonus = tonumber(definition.effectAmountBonus) or 0,
+        effectRadiusBonus = tonumber(definition.effectRadiusBonus) or 0,
+        activeSecondsBonus = tonumber(definition.activeSecondsBonus) or 0,
+        cooldownReduction = tonumber(definition.cooldownReduction) or 0,
+        rescueDurationMultiplier = tonumber(definition.rescueDurationMultiplier) or 1,
+        rescueHealthBonus = tonumber(definition.rescueHealthBonus) or 0,
+        rescueWardBonus = tonumber(definition.rescueWardBonus) or 0,
+    })
+end
+
+local SPECIALIZATIONS: { [string]: { Specialization } } = table.freeze({
     profession_scout = table.freeze({
-        table.freeze({ id = "specialization_pathfinder", name = "PATHFINDER" }),
-        table.freeze({ id = "specialization_foxfire_trapper", name = "FOXFIRE TRAPPER" }),
-        table.freeze({ id = "specialization_trailseer", name = "TRAILSEER" }),
+        specialization({
+            id = "specialization_pathfinder",
+            name = "PATHFINDER",
+            description = "Foxfire Mark reaches 8 studs farther.",
+            effectRadiusBonus = 8,
+        }),
+        specialization({
+            id = "specialization_foxfire_trapper",
+            name = "FOXFIRE TRAPPER",
+            description = "Foxfire Mark lasts 3 seconds longer.",
+            activeSecondsBonus = 3,
+        }),
+        specialization({
+            id = "specialization_trailseer",
+            name = "TRAILSEER",
+            description = "Foxfire Mark recharges 4 seconds faster.",
+            cooldownReduction = 4,
+        }),
     }),
     profession_warden = table.freeze({
-        table.freeze({ id = "specialization_bulwark", name = "BULWARK" }),
-        table.freeze({ id = "specialization_greenkeeper", name = "GREENKEEPER" }),
-        table.freeze({ id = "specialization_oathbound", name = "OATHBOUND" }),
+        specialization({
+            id = "specialization_bulwark",
+            name = "BULWARK",
+            description = "Lantern Guard reduces 10% more incoming damage.",
+            effectAmountBonus = 10,
+        }),
+        specialization({
+            id = "specialization_greenkeeper",
+            name = "GREENKEEPER",
+            description = "Lantern Guard lasts 3 seconds longer.",
+            activeSecondsBonus = 3,
+        }),
+        specialization({
+            id = "specialization_oathbound",
+            name = "OATHBOUND",
+            description = "Warden rescues grant 1.5 more ward seconds.",
+            rescueWardBonus = 1.5,
+        }),
     }),
     profession_engineer = table.freeze({
-        table.freeze({ id = "specialization_lamplighter", name = "LAMPLIGHTER" }),
-        table.freeze({ id = "specialization_rootwright", name = "ROOTWRIGHT" }),
-        table.freeze({ id = "specialization_salvager", name = "SALVAGER" }),
+        specialization({
+            id = "specialization_lamplighter",
+            name = "LAMPLIGHTER",
+            description = "Emergency Patch restores 10 more lantern health.",
+            effectAmountBonus = 10,
+        }),
+        specialization({
+            id = "specialization_rootwright",
+            name = "ROOTWRIGHT",
+            description = "Emergency Patch reaches 10 studs farther.",
+            effectRadiusBonus = 10,
+        }),
+        specialization({
+            id = "specialization_salvager",
+            name = "SALVAGER",
+            description = "Emergency Patch recharges 5 seconds faster.",
+            cooldownReduction = 5,
+        }),
     }),
     profession_medic = table.freeze({
-        table.freeze({ id = "specialization_dawnmender", name = "DAWNMENDER" }),
-        table.freeze({ id = "specialization_wayhome_tender", name = "WAYHOME TENDER" }),
-        table.freeze({ id = "specialization_brightcap_herbalist", name = "BRIGHTCAP HERBALIST" }),
+        specialization({
+            id = "specialization_dawnmender",
+            name = "DAWNMENDER",
+            description = "Guiding Pulse restores 10 more health.",
+            effectAmountBonus = 10,
+        }),
+        specialization({
+            id = "specialization_wayhome_tender",
+            name = "WAYHOME TENDER",
+            description = "Medic rescues are faster and restore 8 more health.",
+            rescueDurationMultiplier = 0.82,
+            rescueHealthBonus = 8,
+        }),
+        specialization({
+            id = "specialization_brightcap_herbalist",
+            name = "BRIGHTCAP HERBALIST",
+            description = "Guiding Pulse reaches 10 studs farther.",
+            effectRadiusBonus = 10,
+        }),
     }),
 })
+
+local SPECIALIZATION_PROFESSIONS: { [string]: string } = {}
+for professionId, definitions in SPECIALIZATIONS do
+    for _, definition in definitions do
+        SPECIALIZATION_PROFESSIONS[definition.id] = professionId
+    end
+end
 
 local function levelForXp(xp: number): number
     return math.clamp(math.floor(xp / XP_PER_LEVEL) + 1, 1, MAX_LEVEL)
@@ -5213,7 +5310,17 @@ function ProfessionMastery.normalize(value: any): State
             local xp = if type(raw.xp) == "number"
                 then math.clamp(math.floor(raw.xp), 0, MAX_XP)
                 else 0
-            result[definition.id] = { xp = xp, level = levelForXp(xp) }
+            local level = levelForXp(xp)
+            local specializationId = if level >= MAX_LEVEL
+                    and type(raw.specializationId) == "string"
+                    and SPECIALIZATION_PROFESSIONS[raw.specializationId] == definition.id
+                then raw.specializationId
+                else nil
+            result[definition.id] = {
+                xp = xp,
+                level = level,
+                specializationId = specializationId,
+            }
         end
     end
     return result
@@ -5224,13 +5331,19 @@ function ProfessionMastery.award(state: State, professionId: any, amount: number
         return state, { applied = false, reason = "invalid_mastery_award" }
     end
     local nextState = ProfessionMastery.normalize(state)
-    local current = nextState[professionId] or {
-        xp = 0,
-        level = 1,
-    }
+    local current = nextState[professionId]
+        or {
+            xp = 0,
+            level = 1,
+            specializationId = nil,
+        }
     local nextXp = math.min(MAX_XP, current.xp + math.floor(amount))
     local nextLevel = levelForXp(nextXp)
-    nextState[professionId] = { xp = nextXp, level = nextLevel }
+    nextState[professionId] = {
+        xp = nextXp,
+        level = nextLevel,
+        specializationId = current.specializationId,
+    }
     return nextState,
         {
             applied = true,
@@ -5243,19 +5356,102 @@ function ProfessionMastery.award(state: State, professionId: any, amount: number
         }
 end
 
+function ProfessionMastery.selectSpecialization(
+    state: State,
+    professionId: any,
+    specializationId: any
+): (State, any)
+    if not ProfessionCatalog.isValid(professionId) then
+        return state, { applied = false, reason = "unknown_profession" }
+    end
+    if
+        type(specializationId) ~= "string"
+        or SPECIALIZATION_PROFESSIONS[specializationId] ~= professionId
+    then
+        return state, { applied = false, reason = "invalid_specialization" }
+    end
+    local normalized = ProfessionMastery.normalize(state)
+    local current = normalized[professionId] or { xp = 0, level = 1, specializationId = nil }
+    if current.level < MAX_LEVEL then
+        return state, { applied = false, reason = "specialization_locked" }
+    end
+    if current.specializationId == specializationId then
+        return state,
+            {
+                applied = false,
+                duplicate = true,
+                professionId = professionId,
+                reason = "already_selected",
+                specializationId = specializationId,
+            }
+    end
+    local nextState = table.clone(normalized)
+    nextState[professionId] = {
+        xp = current.xp,
+        level = current.level,
+        specializationId = specializationId,
+    }
+    return nextState,
+        {
+            applied = true,
+            professionId = professionId,
+            specializationId = specializationId,
+        }
+end
+
+function ProfessionMastery.specializationProfession(specializationId: any): string?
+    return if type(specializationId) == "string"
+        then SPECIALIZATION_PROFESSIONS[specializationId]
+        else nil
+end
+
+function ProfessionMastery.specializationDefinition(specializationId: any): any
+    local professionId = ProfessionMastery.specializationProfession(specializationId)
+    if professionId == nil then
+        return nil
+    end
+    for _, definition in SPECIALIZATIONS[professionId] do
+        if definition.id == specializationId then
+            return definition
+        end
+    end
+    return nil
+end
+
 function ProfessionMastery.tuning(state: State, professionId: any): any
     local normalized = ProfessionMastery.normalize(state)
     local entry = if ProfessionCatalog.isValid(professionId)
-        then normalized[professionId] or { xp = 0, level = 1 }
-        else { xp = 0, level = 1 }
+        then normalized[professionId] or { xp = 0, level = 1, specializationId = nil }
+        else { xp = 0, level = 1, specializationId = nil }
     local rewardSteps = math.floor(entry.level / 2)
+    local selectedSpecialization =
+        ProfessionMastery.specializationDefinition(entry.specializationId)
     return {
         level = entry.level,
         rankName = rankName(entry.level),
-        effectAmountBonus = rewardSteps * 2,
-        effectRadiusBonus = rewardSteps * 1.5,
-        activeSecondsBonus = rewardSteps * 0.35,
-        cooldownReduction = rewardSteps * 0.4,
+        effectAmountBonus = rewardSteps * 2 + (if selectedSpecialization == nil
+            then 0
+            else selectedSpecialization.effectAmountBonus or 0),
+        effectRadiusBonus = rewardSteps * 1.5 + (if selectedSpecialization == nil
+            then 0
+            else selectedSpecialization.effectRadiusBonus or 0),
+        activeSecondsBonus = rewardSteps * 0.35 + (if selectedSpecialization == nil
+            then 0
+            else selectedSpecialization.activeSecondsBonus or 0),
+        cooldownReduction = rewardSteps * 0.4 + (if selectedSpecialization == nil
+            then 0
+            else selectedSpecialization.cooldownReduction or 0),
+        rescueDurationMultiplier = if selectedSpecialization == nil
+            then 1
+            else selectedSpecialization.rescueDurationMultiplier or 1,
+        rescueHealthBonus = if selectedSpecialization == nil
+            then 0
+            else selectedSpecialization.rescueHealthBonus or 0,
+        rescueWardBonus = if selectedSpecialization == nil
+            then 0
+            else selectedSpecialization.rescueWardBonus or 0,
+        specialization = selectedSpecialization,
+        specializationId = entry.specializationId,
         specializationUnlocked = entry.level >= MAX_LEVEL,
         specializationUnlockLevel = MAX_LEVEL,
         specializations = if ProfessionCatalog.isValid(professionId)
@@ -5268,7 +5464,7 @@ function ProfessionMastery.snapshot(state: State): { [string]: any }
     local normalized = ProfessionMastery.normalize(state)
     local result = {}
     for _, definition in ProfessionCatalog.list() do
-        local entry = normalized[definition.id] or { xp = 0, level = 1 }
+        local entry = normalized[definition.id] or { xp = 0, level = 1, specializationId = nil }
         local tuning = ProfessionMastery.tuning(normalized, definition.id)
         result[definition.id] = {
             xp = entry.xp,
@@ -5280,6 +5476,8 @@ function ProfessionMastery.snapshot(state: State): { [string]: any }
             effectRadiusBonus = tuning.effectRadiusBonus,
             activeSecondsBonus = tuning.activeSecondsBonus,
             cooldownReduction = tuning.cooldownReduction,
+            specialization = tuning.specialization,
+            specializationId = tuning.specializationId,
             specializationUnlocked = tuning.specializationUnlocked,
             specializationUnlockLevel = tuning.specializationUnlockLevel,
             specializations = tuning.specializations,
@@ -5320,7 +5518,8 @@ function ProfessionRescue.resolve(
     level: any,
     baseDuration: number,
     baseHealth: number,
-    baseWardSeconds: number
+    baseWardSeconds: number,
+    specializationTuning: any?
 ): any
     assert(finite(baseDuration) and baseDuration > 0, "base revive duration is invalid")
     assert(finite(baseHealth) and baseHealth > 0, "base revive health is invalid")
@@ -5344,6 +5543,21 @@ function ProfessionRescue.resolve(
         wardSeconds = baseWardSeconds + 0.5 + masterySteps * 0.1
         rescueTitle = "WARDEN ESCORT"
         specialized = true
+    end
+
+    if type(specializationTuning) == "table" then
+        local durationMultiplier = if finite(specializationTuning.rescueDurationMultiplier)
+            then math.clamp(specializationTuning.rescueDurationMultiplier, 0.7, 1)
+            else 1
+        local healthBonus = if finite(specializationTuning.rescueHealthBonus)
+            then math.clamp(math.floor(specializationTuning.rescueHealthBonus), 0, 12)
+            else 0
+        local wardBonus = if finite(specializationTuning.rescueWardBonus)
+            then math.clamp(specializationTuning.rescueWardBonus, 0, 2)
+            else 0
+        duration *= durationMultiplier
+        health += healthBonus
+        wardSeconds += wardBonus
     end
 
     return table.freeze({
@@ -6065,6 +6279,7 @@ local RuntimeIds = {
         RepairTown = "repair_town",
         ResolveTownIncident = "resolve_town_incident",
         RecoverExpeditionCache = "recover_expedition_cache",
+        SelectProfessionSpecialization = "select_profession_specialization",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -6106,6 +6321,20 @@ local RuntimeIds = {
         "town_repair_archive",
         "town_repair_workshop",
         "town_repair_inn",
+    }),
+    ProfessionSpecializationInteractionIds = table.freeze({
+        "mastery_specialization_pathfinder",
+        "mastery_specialization_foxfire_trapper",
+        "mastery_specialization_trailseer",
+        "mastery_specialization_bulwark",
+        "mastery_specialization_greenkeeper",
+        "mastery_specialization_oathbound",
+        "mastery_specialization_lamplighter",
+        "mastery_specialization_rootwright",
+        "mastery_specialization_salvager",
+        "mastery_specialization_dawnmender",
+        "mastery_specialization_wayhome_tender",
+        "mastery_specialization_brightcap_herbalist",
     }),
 }
 
@@ -6183,7 +6412,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 10,
+        schemaVersion = 11,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -6310,7 +6539,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 10
+    profile.schemaVersion = 11
     return profile
 end
 
@@ -6355,6 +6584,28 @@ function SaveSchema.withMasteryAward(
 ): (Profile, any)
     local nextMastery, result =
         ProfessionMastery.award(profile.profession.mastery, professionId, amount)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.profession = table.clone(profile.profession)
+    nextProfile.profession.mastery = nextMastery
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.withProfessionSpecialization(
+    profile: Profile,
+    professionId: string,
+    specializationId: string,
+    now: number
+): (Profile, any)
+    local nextMastery, result = ProfessionMastery.selectSpecialization(
+        profile.profession.mastery,
+        professionId,
+        specializationId
+    )
     if not result.applied then
         return profile, result
     end
@@ -9075,6 +9326,23 @@ function AnalyticsService.professionMasteryRank(
             })
         end)
     end
+end
+
+function AnalyticsService.professionSpecializationSelected(
+    self: AnalyticsService,
+    player: Player,
+    professionId: string,
+    specializationId: string,
+    accepted: boolean,
+    reason: string?
+)
+    self._logger:info("profession_specialization_selected", {
+        accepted = accepted,
+        player = player.UserId,
+        profession = professionId,
+        reason = reason,
+        specialization = specializationId,
+    })
 end
 
 function AnalyticsService.townNightConsequence(
@@ -15051,6 +15319,87 @@ function ProfessionService.select(
     }
 end
 
+function ProfessionService.selectSpecialization(
+    self: ProfessionService,
+    player: Player,
+    specializationId: string
+): any
+    local state = self._states[player]
+    if state == nil then
+        return {
+            accepted = false,
+            message = "YOUR PROFESSION MASTERY IS STILL LOADING",
+            reason = "player_loading",
+        }
+    end
+    local snapshot = self._professionState.snapshot(state, workspace:GetServerTimeNow())
+    local professionId = self._professionMastery.specializationProfession(specializationId)
+    if professionId == nil then
+        return {
+            accepted = false,
+            message = "THAT MASTERY PATH DOES NOT EXIST",
+            reason = "invalid_specialization",
+        }
+    end
+    if snapshot.selectedId ~= professionId then
+        return {
+            accepted = false,
+            message = "EQUIP THE MATCHING PROFESSION BEFORE CHOOSING THIS PATH",
+            reason = "profession_mismatch",
+        }
+    end
+    local canSwitch, unavailableMessage = self:_switchAvailability(player)
+    if not canSwitch then
+        return {
+            accepted = false,
+            message = unavailableMessage or "MASTERY PATHS CAN ONLY CHANGE IN SAFE DAYLIGHT",
+            reason = "switch_unavailable",
+        }
+    end
+    local result =
+        self._profileService:selectProfessionSpecialization(player, professionId, specializationId)
+    local definition = self._professionMastery.specializationDefinition(specializationId)
+    if not result.applied then
+        local message = if result.duplicate
+            then string.format("%s IS ALREADY YOUR MASTERY PATH", definition.name)
+            elseif result.reason == "specialization_locked" then "REACH MASTERY RANK 10 FIRST"
+            else "THAT MASTERY PATH CANNOT BE CHOSEN"
+        self._analyticsService:professionSpecializationSelected(
+            player,
+            professionId,
+            specializationId,
+            false,
+            result.reason
+        )
+        return {
+            accepted = result.duplicate == true,
+            changed = false,
+            message = message,
+            reason = result.reason,
+        }
+    end
+    self._analyticsService:professionSpecializationSelected(
+        player,
+        professionId,
+        specializationId,
+        true,
+        nil
+    )
+    self._logger:info("profession_specialization_selected", {
+        player = player.UserId,
+        profession = professionId,
+        specialization = specializationId,
+    })
+    local message = string.format("%s PATH CHOSEN — %s", definition.name, definition.description)
+    self:_notify(player, message)
+    return {
+        accepted = true,
+        changed = true,
+        message = message,
+        reason = "selected",
+    }
+end
+
 function ProfessionService._abilityPreflight(
     self: ProfessionService,
     player: Player,
@@ -15243,7 +15592,8 @@ function ProfessionService.rescueTuning(
         mastery.level,
         baseDuration,
         baseHealth,
-        baseWardSeconds
+        baseWardSeconds,
+        mastery
     )
 end
 
@@ -15534,6 +15884,31 @@ function ProfileService.masterySnapshot(self: ProfileService, player: Player): a
         return {}
     end
     return self._saveSchema.masterySnapshot(profile)
+end
+
+function ProfileService.selectProfessionSpecialization(
+    self: ProfileService,
+    player: Player,
+    professionId: string,
+    specializationId: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { applied = false, reason = "profile_unavailable" }
+    end
+    local nextProfile, result = self._saveSchema.withProfessionSpecialization(
+        profile,
+        professionId,
+        specializationId,
+        os.time()
+    )
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent then
+            self._dirty[player] = true
+        end
+    end
+    return result
 end
 
 function ProfileService.setNightNumber(
@@ -17151,6 +17526,16 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
     end
     if actionId == self._runtimeIds.Actions.OpenFieldBook then
         self:_setToast(player, "FIELD BOOK UPDATED — CHECK RECIPES, QUESTS, AND MASTERY")
+        self:_publish(player)
+        return
+    end
+    if actionId == self._runtimeIds.Actions.SelectProfessionSpecialization then
+        local specializationId = prompt:GetAttribute("Payload")
+        if type(specializationId) ~= "string" then
+            return
+        end
+        local result = self._professionService:selectSpecialization(player, specializationId)
+        self:_setToast(player, result.message)
         self:_publish(player)
         return
     end
@@ -20568,6 +20953,117 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         "Field Book",
         nil
     )
+
+    local masteryGrove = Instance.new("Folder")
+    masteryGrove.Name = "GreenwardMasteryGrove"
+    masteryGrove.Parent = interactables
+    local professionAltars = {
+        {
+            center = Vector3.new(-47, 0, -105),
+            color = FOXFIRE,
+            name = "SCOUT",
+            paths = {
+                { id = "specialization_pathfinder", name = "PATHFINDER" },
+                { id = "specialization_foxfire_trapper", name = "FOXFIRE TRAPPER" },
+                { id = "specialization_trailseer", name = "TRAILSEER" },
+            },
+        },
+        {
+            center = Vector3.new(47, 0, -105),
+            color = Color3.fromRGB(112, 151, 119),
+            name = "WARDEN",
+            paths = {
+                { id = "specialization_bulwark", name = "BULWARK" },
+                { id = "specialization_greenkeeper", name = "GREENKEEPER" },
+                { id = "specialization_oathbound", name = "OATHBOUND" },
+            },
+        },
+        {
+            center = Vector3.new(-47, 0, -145),
+            color = Color3.fromRGB(191, 137, 73),
+            name = "ENGINEER",
+            paths = {
+                { id = "specialization_lamplighter", name = "LAMPLIGHTER" },
+                { id = "specialization_rootwright", name = "ROOTWRIGHT" },
+                { id = "specialization_salvager", name = "SALVAGER" },
+            },
+        },
+        {
+            center = Vector3.new(47, 0, -145),
+            color = Color3.fromRGB(176, 108, 112),
+            name = "MEDIC",
+            paths = {
+                { id = "specialization_dawnmender", name = "DAWNMENDER" },
+                { id = "specialization_wayhome_tender", name = "WAYHOME TENDER" },
+                { id = "specialization_brightcap_herbalist", name = "BRIGHTCAP HERBALIST" },
+            },
+        },
+    }
+    for _, altar in professionAltars do
+        local dais = part(
+            masteryGrove,
+            altar.name .. "MasteryDais",
+            Vector3.new(13, 0.8, 8),
+            CFrame.new(altar.center + Vector3.new(0, 0.4, 0)),
+            Color3.fromRGB(62, 64, 57),
+            Enum.Material.Slate
+        )
+        for ring = 1, 2 do
+            local rootRing = part(
+                masteryGrove,
+                altar.name .. "RootRing",
+                Vector3.new(13.6 + ring, 0.28, 8.6 + ring),
+                CFrame.new(altar.center + Vector3.new(0, 0.7 + ring * 0.12, 0)),
+                if ring == 1 then BARK else MOSS,
+                if ring == 1 then Enum.Material.Wood else Enum.Material.Ground,
+                false
+            )
+            rootRing.CanQuery = false
+        end
+        labelSign(
+            masteryGrove,
+            CFrame.new(altar.center + Vector3.new(0, 4.8, 3.7)) * CFrame.Angles(0, math.pi, 0),
+            altar.name .. " MASTERY"
+        )
+        for pathIndex, path in altar.paths do
+            local xOffset = (pathIndex - 2) * 3.7
+            local stone = part(
+                masteryGrove,
+                altar.name .. "PathStone",
+                Vector3.new(2.6, 3.8, 2.6),
+                CFrame.new(altar.center + Vector3.new(xOffset, 2.55, -0.5))
+                    * CFrame.Angles(
+                        math.rad(pathIndex == 2 and 2 or -3),
+                        0,
+                        math.rad(xOffset * 0.6)
+                    ),
+                if pathIndex == 2 then altar.color else Color3.fromRGB(76, 82, 75),
+                Enum.Material.Slate
+            )
+            local crest = part(
+                masteryGrove,
+                altar.name .. "PathCrest",
+                Vector3.new(1.15, 1.15, 0.22),
+                stone.CFrame * CFrame.new(0, 0.45, -1.38),
+                altar.color,
+                Enum.Material.Glass,
+                false
+            )
+            crest.Shape = Enum.PartType.Ball
+            crest.Transparency = 0.1
+            addBillboard(stone, path.name, altar.color)
+            self:_registerInteraction(
+                stone,
+                "mastery_" .. path.id,
+                self._runtimeIds.Actions.SelectProfessionSpecialization,
+                "CHOOSE PATH",
+                path.name,
+                path.id,
+                1.1
+            )
+        end
+        dais:SetAttribute("ProfessionId", "profession_" .. string.lower(altar.name))
+    end
 end
 
 function WorldService.Init(self: WorldService, context: any)

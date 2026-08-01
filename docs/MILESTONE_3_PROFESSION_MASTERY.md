@@ -20,8 +20,8 @@ Every second level adds a bounded server-derived improvement: +2 effect amount,
 +1.5 studs radius, +0.35 seconds active duration, and -0.4 seconds cooldown.
 Only the parts of that package relevant to a kit affect play. At level 10, each
 profession exposes three named specialization paths in the mastery snapshot.
-Selection and path-specific effects remain a later increment; no path is sold
-or silently selected for the player.
+Build `0.26.0` adds explicit physical selection and bounded path effects; no
+path is sold or silently selected for the player.
 
 ## Authority and player feedback
 
@@ -45,9 +45,9 @@ or silently selected for the player.
 | Engineer | Lamplighter, Rootwright, Salvager |
 | Medic | Dawnmender, Wayhome Tender, Brightcap Herbalist |
 
-These stable IDs can be persisted in a future schema without renaming player
-choices. This increment deliberately stops before selection because each path
-still needs its own gameplay contract, balance pass, and selector evidence.
+These stable IDs persist in save schema 11. Selection and effect contracts are
+defined in
+[MILESTONE_3_PROFESSION_SPECIALIZATIONS.md](MILESTONE_3_PROFESSION_SPECIALIZATIONS.md).
 
 ## Required Studio evidence
 
@@ -59,8 +59,8 @@ still needs its own gameplay contract, balance pass, and selector evidence.
    bounded values in the server snapshot.
 5. Rejoin after progress, switch professions, and confirm each profession keeps
    its own XP and rank.
-6. Reach level 10 and confirm the three correct specialization IDs become
-   unlocked but none is selected automatically.
+6. Reach level 10 and confirm the three correct specialization IDs unlock with
+   none selected automatically, then complete the specialization runbook.
 7. Verify solo and group balance on phone, keyboard/mouse, and controller. The
    mastery layer must not make any profession mandatory for a route or recovery.
 

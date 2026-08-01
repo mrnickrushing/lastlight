@@ -54,5 +54,29 @@ return {
                 TestRunner.equal(tuning.level, 1)
             end,
         },
+        {
+            name = "applies bounded Oathbound and Wayhome specialization rescue bonuses",
+            run = function()
+                local oathbound = ProfessionRescue.resolve(
+                    "profession_warden",
+                    10,
+                    2.5,
+                    35,
+                    3,
+                    { rescueWardBonus = 1.5 }
+                )
+                local wayhome = ProfessionRescue.resolve(
+                    "profession_medic",
+                    10,
+                    2.5,
+                    35,
+                    3,
+                    { rescueDurationMultiplier = 0.82, rescueHealthBonus = 8 }
+                )
+                TestRunner.truthy(oathbound.wardSeconds > 5)
+                TestRunner.truthy(wayhome.duration < 1.7)
+                TestRunner.equal(wayhome.health, 63)
+            end,
+        },
     },
 }

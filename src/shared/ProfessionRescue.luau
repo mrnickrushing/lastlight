@@ -17,7 +17,8 @@ function ProfessionRescue.resolve(
     level: any,
     baseDuration: number,
     baseHealth: number,
-    baseWardSeconds: number
+    baseWardSeconds: number,
+    specializationTuning: any?
 ): any
     assert(finite(baseDuration) and baseDuration > 0, "base revive duration is invalid")
     assert(finite(baseHealth) and baseHealth > 0, "base revive health is invalid")
@@ -41,6 +42,21 @@ function ProfessionRescue.resolve(
         wardSeconds = baseWardSeconds + 0.5 + masterySteps * 0.1
         rescueTitle = "WARDEN ESCORT"
         specialized = true
+    end
+
+    if type(specializationTuning) == "table" then
+        local durationMultiplier = if finite(specializationTuning.rescueDurationMultiplier)
+            then math.clamp(specializationTuning.rescueDurationMultiplier, 0.7, 1)
+            else 1
+        local healthBonus = if finite(specializationTuning.rescueHealthBonus)
+            then math.clamp(math.floor(specializationTuning.rescueHealthBonus), 0, 12)
+            else 0
+        local wardBonus = if finite(specializationTuning.rescueWardBonus)
+            then math.clamp(specializationTuning.rescueWardBonus, 0, 2)
+            else 0
+        duration *= durationMultiplier
+        health += healthBonus
+        wardSeconds += wardBonus
     end
 
     return table.freeze({

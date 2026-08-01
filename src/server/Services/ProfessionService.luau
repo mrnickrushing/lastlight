@@ -199,6 +199,87 @@ function ProfessionService.select(
     }
 end
 
+function ProfessionService.selectSpecialization(
+    self: ProfessionService,
+    player: Player,
+    specializationId: string
+): any
+    local state = self._states[player]
+    if state == nil then
+        return {
+            accepted = false,
+            message = "YOUR PROFESSION MASTERY IS STILL LOADING",
+            reason = "player_loading",
+        }
+    end
+    local snapshot = self._professionState.snapshot(state, workspace:GetServerTimeNow())
+    local professionId = self._professionMastery.specializationProfession(specializationId)
+    if professionId == nil then
+        return {
+            accepted = false,
+            message = "THAT MASTERY PATH DOES NOT EXIST",
+            reason = "invalid_specialization",
+        }
+    end
+    if snapshot.selectedId ~= professionId then
+        return {
+            accepted = false,
+            message = "EQUIP THE MATCHING PROFESSION BEFORE CHOOSING THIS PATH",
+            reason = "profession_mismatch",
+        }
+    end
+    local canSwitch, unavailableMessage = self:_switchAvailability(player)
+    if not canSwitch then
+        return {
+            accepted = false,
+            message = unavailableMessage or "MASTERY PATHS CAN ONLY CHANGE IN SAFE DAYLIGHT",
+            reason = "switch_unavailable",
+        }
+    end
+    local result =
+        self._profileService:selectProfessionSpecialization(player, professionId, specializationId)
+    local definition = self._professionMastery.specializationDefinition(specializationId)
+    if not result.applied then
+        local message = if result.duplicate
+            then string.format("%s IS ALREADY YOUR MASTERY PATH", definition.name)
+            elseif result.reason == "specialization_locked" then "REACH MASTERY RANK 10 FIRST"
+            else "THAT MASTERY PATH CANNOT BE CHOSEN"
+        self._analyticsService:professionSpecializationSelected(
+            player,
+            professionId,
+            specializationId,
+            false,
+            result.reason
+        )
+        return {
+            accepted = result.duplicate == true,
+            changed = false,
+            message = message,
+            reason = result.reason,
+        }
+    end
+    self._analyticsService:professionSpecializationSelected(
+        player,
+        professionId,
+        specializationId,
+        true,
+        nil
+    )
+    self._logger:info("profession_specialization_selected", {
+        player = player.UserId,
+        profession = professionId,
+        specialization = specializationId,
+    })
+    local message = string.format("%s PATH CHOSEN — %s", definition.name, definition.description)
+    self:_notify(player, message)
+    return {
+        accepted = true,
+        changed = true,
+        message = message,
+        reason = "selected",
+    }
+end
+
 function ProfessionService._abilityPreflight(
     self: ProfessionService,
     player: Player,
@@ -391,7 +472,8 @@ function ProfessionService.rescueTuning(
         mastery.level,
         baseDuration,
         baseHealth,
-        baseWardSeconds
+        baseWardSeconds,
+        mastery
     )
 end
 

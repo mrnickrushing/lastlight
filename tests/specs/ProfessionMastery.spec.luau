@@ -84,5 +84,106 @@ return {
                 TestRunner.equal(#snapshot.profession_medic.specializations, 3)
             end,
         },
+        {
+            name = "persists only an unlocked specialization owned by that profession",
+            run = function()
+                local state = ProfessionMastery.normalize({
+                    profession_scout = {
+                        xp = 900,
+                        specializationId = "specialization_pathfinder",
+                    },
+                    profession_medic = {
+                        xp = 800,
+                        specializationId = "specialization_dawnmender",
+                    },
+                    profession_warden = {
+                        xp = 900,
+                        specializationId = "specialization_pathfinder",
+                    },
+                })
+                TestRunner.equal(
+                    state.profession_scout.specializationId,
+                    "specialization_pathfinder"
+                )
+                TestRunner.equal(state.profession_medic.specializationId, nil)
+                TestRunner.equal(state.profession_warden.specializationId, nil)
+            end,
+        },
+        {
+            name = "selects and preserves one level-ten specialization",
+            run = function()
+                local state = ProfessionMastery.normalize({
+                    profession_engineer = { xp = 900 },
+                })
+                local selected, result = ProfessionMastery.selectSpecialization(
+                    state,
+                    "profession_engineer",
+                    "specialization_lamplighter"
+                )
+                local awarded = ProfessionMastery.award(selected, "profession_engineer", 10)
+                local replay, replayResult = ProfessionMastery.selectSpecialization(
+                    awarded,
+                    "profession_engineer",
+                    "specialization_lamplighter"
+                )
+                TestRunner.equal(result.applied, true)
+                TestRunner.equal(
+                    awarded.profession_engineer.specializationId,
+                    "specialization_lamplighter"
+                )
+                TestRunner.equal(replay, awarded)
+                TestRunner.equal(replayResult.duplicate, true)
+            end,
+        },
+        {
+            name = "rejects locked and cross-profession specialization choices",
+            run = function()
+                local state = ProfessionMastery.normalize({
+                    profession_scout = { xp = 800 },
+                })
+                local _, locked = ProfessionMastery.selectSpecialization(
+                    state,
+                    "profession_scout",
+                    "specialization_pathfinder"
+                )
+                local _, mismatched = ProfessionMastery.selectSpecialization(
+                    state,
+                    "profession_scout",
+                    "specialization_bulwark"
+                )
+                TestRunner.equal(locked.reason, "specialization_locked")
+                TestRunner.equal(mismatched.reason, "invalid_specialization")
+            end,
+        },
+        {
+            name = "applies distinct bounded path bonuses",
+            run = function()
+                local scout = ProfessionMastery.tuning({
+                    profession_scout = {
+                        xp = 900,
+                        level = 10,
+                        specializationId = "specialization_trailseer",
+                    },
+                }, "profession_scout")
+                local warden = ProfessionMastery.tuning({
+                    profession_warden = {
+                        xp = 900,
+                        level = 10,
+                        specializationId = "specialization_oathbound",
+                    },
+                }, "profession_warden")
+                local medic = ProfessionMastery.tuning({
+                    profession_medic = {
+                        xp = 900,
+                        level = 10,
+                        specializationId = "specialization_wayhome_tender",
+                    },
+                }, "profession_medic")
+                TestRunner.truthy(scout.cooldownReduction > 5)
+                TestRunner.equal(warden.rescueWardBonus, 1.5)
+                TestRunner.equal(medic.rescueHealthBonus, 8)
+                TestRunner.truthy(medic.rescueDurationMultiplier < 1)
+            end,
+        },
     },
 }

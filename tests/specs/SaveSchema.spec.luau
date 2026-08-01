@@ -10,7 +10,7 @@ return {
             name = "creates a safe first-session profile",
             run = function()
                 local profile = SaveSchema.default(100)
-                TestRunner.equal(profile.schemaVersion, 10)
+                TestRunner.equal(profile.schemaVersion, 11)
                 TestRunner.equal(profile.tutorial.stage, "arrive")
                 TestRunner.equal(profile.tutorial.complete, false)
                 TestRunner.equal(profile.revision, 0)
@@ -52,7 +52,7 @@ return {
                 TestRunner.equal(profile.tutorial.stage, "build")
                 TestRunner.equal(profile.tutorial.selectedTool, "hammer")
                 TestRunner.equal(profile.revision, 4)
-                TestRunner.equal(profile.schemaVersion, 10)
+                TestRunner.equal(profile.schemaVersion, 11)
             end,
         },
         {
@@ -68,7 +68,7 @@ return {
                         complete = true,
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 10)
+                TestRunner.equal(profile.schemaVersion, 11)
                 TestRunner.equal(profile.revision, 7)
                 TestRunner.equal(profile.tutorial.complete, true)
                 TestRunner.equal(SaveSchema.expeditionPending(profile).count, 0)
@@ -154,7 +154,7 @@ return {
                         selectedId = "profession_hacker",
                     },
                 }, 300)
-                TestRunner.equal(migrated.schemaVersion, 10)
+                TestRunner.equal(migrated.schemaVersion, 11)
                 TestRunner.equal(migrated.profession.selectedId, nil)
 
                 local selected = SaveSchema.withProfession(migrated, "profession_medic", 320)
@@ -176,7 +176,7 @@ return {
                         },
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 10)
+                TestRunner.equal(profile.schemaVersion, 11)
                 TestRunner.equal(profile.story.chapterOne.status, "unresolved")
                 TestRunner.equal(profile.story.chapterOne.decision, nil)
             end,
@@ -224,7 +224,7 @@ return {
                     revision = 3,
                     tutorial = { stage = "reveal", complete = false },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 10)
+                TestRunner.equal(profile.schemaVersion, 11)
                 TestRunner.equal(profile.town.nightNumber, 1)
             end,
         },
@@ -285,7 +285,7 @@ return {
                     town = { nightNumber = 7 },
                 }, 300)
                 local condition = SaveSchema.townCondition(profile)
-                TestRunner.equal(profile.schemaVersion, 10)
+                TestRunner.equal(profile.schemaVersion, 11)
                 TestRunner.equal(condition.integrity, 100)
                 TestRunner.equal(condition.damageLevel, 0)
                 TestRunner.equal(condition.lastNightNumber, 0)
@@ -316,7 +316,7 @@ return {
                     schemaVersion = 5,
                     town = { nightNumber = 3 },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 10)
+                TestRunner.equal(profile.schemaVersion, 11)
                 TestRunner.equal(next(profile.gear), nil)
             end,
         },
@@ -397,7 +397,7 @@ return {
                     schemaVersion = 6,
                     gear = { gear_meadow_satchel = 1 },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 10)
+                TestRunner.equal(profile.schemaVersion, 11)
                 TestRunner.equal(next(profile.quests.claimed), nil)
             end,
         },
@@ -456,7 +456,7 @@ return {
             name = "migrates schema nine profiles into empty recovery state",
             run = function()
                 local profile = SaveSchema.normalize({ schemaVersion = 9 }, 100)
-                TestRunner.equal(profile.schemaVersion, 10)
+                TestRunner.equal(profile.schemaVersion, 11)
                 TestRunner.equal(SaveSchema.expeditionRecovery(profile), nil)
                 TestRunner.equal(#profile.inventory.recoveryOrder, 0)
             end,
@@ -490,6 +490,33 @@ return {
                 TestRunner.equal(recoveryResult.applied, true)
                 TestRunner.equal(SaveSchema.expeditionRecovery(recovered), nil)
                 TestRunner.equal(SaveSchema.expeditionPending(recovered).count, 2)
+            end,
+        },
+        {
+            name = "migrates schema ten and persists a profession specialization",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    schemaVersion = 10,
+                    profession = {
+                        selectedId = "profession_scout",
+                        mastery = {
+                            profession_scout = { xp = 900 },
+                        },
+                    },
+                }, 100)
+                local specialized, result = SaveSchema.withProfessionSpecialization(
+                    profile,
+                    "profession_scout",
+                    "specialization_pathfinder",
+                    110
+                )
+                TestRunner.equal(profile.schemaVersion, 11)
+                TestRunner.equal(result.applied, true)
+                TestRunner.equal(
+                    SaveSchema.masterySnapshot(specialized).profession_scout.specializationId,
+                    "specialization_pathfinder"
+                )
+                TestRunner.equal(specialized.revision, profile.revision + 1)
             end,
         },
     },

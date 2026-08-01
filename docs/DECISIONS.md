@@ -94,6 +94,19 @@ arbitrary. Locking a bounded half behind a reachable, persistent world object
 creates tension without inventing rewards, enabling paid protection, or turning
 a short first run into total loss.
 
+## 2026-08-01 — Physical mastery paths with bounded role tradeoffs
+
+**Decision:** At profession level 10, players explicitly choose one of three
+persistent paths for that profession at a physical Emberhollow mastery altar.
+Each path changes one narrow server-derived ability or rescue dimension. Path
+selection is free, reversible in safe daylight, and never required for an
+objective, traversal route, revive, or reward.
+
+**Reason:** Mastery needs a meaningful long-term identity choice rather than a
+finished XP bar. Physical altars preserve world presence and avoid another
+permanent mobile overlay, while narrow bounded effects make paths readable and
+balanceable without selling power or letting clients submit effect values.
+
 ## 2026-07-26 — Shared stamina and readable attack resolution
 
 **Decision:** Introduce one server-owned stamina resource for sprint and dodge

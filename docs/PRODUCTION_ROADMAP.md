@@ -84,7 +84,7 @@ this milestone to complete from CI alone.
 
 ## Milestone 3 — Bramblewake vertical slice
 
-**Increment status (2026-07-26):** the expedition foundation, first active
+**Increment status (2026-08-01):** the expedition foundation, first active
 event layer, durable extraction settlement, player rescue loop, combat
 mobility/telegraph foundation, the complete standard Bramblewake enemy roster,
 four basic profession kits, the Old Growth elite, the Warden Stag boss, and the
@@ -108,7 +108,7 @@ present-participant Greenward vote with deterministic tie handling, an
 immutable per-player chapter transaction, and a repeating server-owned town
 day/dusk/night cycle with an escalating six-enemy wave schedule, a
 seventh-night telegraph that is deliberately decoupled from Blackout access,
-and a save-schema-v10 night count, town condition, mastery, equipment loadout,
+and a save-schema-v11 night count, town condition, mastery, equipment loadout,
 and expedition recovery state that persists per player and resumes from
 whoever's record is highest across a server restart, plus four starter
 crafting recipes that convert banked expedition materials into named gear
@@ -123,7 +123,10 @@ Medic revives now complete faster, restore more health, and grant a longer
 recovery ward; Warden revives extend that ward. Both bonuses scale within the
 existing ten-level mastery cap while every profession retains the baseline
 rescue path.
-Profession specialization selection/effects, additional equipment families, a
+Level-10 masters can choose one of three persistent paths per profession at four
+physical Emberhollow altars. The twelve choices add distinct bounded ability or
+rescue effects without making any path required for traversal.
+Additional equipment families, a
 recipe-browsing UI and quest-board UI, branching quests, the full
 recipe/inventory/quest catalog, additional incident families beyond the first
 four three-site emergencies,
@@ -136,6 +139,7 @@ See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md)
 [MILESTONE_3_COMBAT_MOBILITY.md](MILESTONE_3_COMBAT_MOBILITY.md), and
 [MILESTONE_3_PROFESSION_KITS.md](MILESTONE_3_PROFESSION_KITS.md), and
 [MILESTONE_3_PROFESSION_MASTERY.md](MILESTONE_3_PROFESSION_MASTERY.md), and
+[MILESTONE_3_PROFESSION_SPECIALIZATIONS.md](MILESTONE_3_PROFESSION_SPECIALIZATIONS.md), and
 [MILESTONE_3_BRAMBLEWAKE_ENEMIES.md](MILESTONE_3_BRAMBLEWAKE_ENEMIES.md), and
 [MILESTONE_3_OLD_GROWTH_ELITE.md](MILESTONE_3_OLD_GROWTH_ELITE.md), and
 [MILESTONE_3_WARDEN_STAG_BOSS.md](MILESTONE_3_WARDEN_STAG_BOSS.md), and

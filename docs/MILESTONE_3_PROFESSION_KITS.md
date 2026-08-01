@@ -110,7 +110,8 @@ private Studio/server session before calling this slice complete:
 The follow-on profession-mastery increment added ten persistent levels, six rank
 names, bounded gameplay rewards, and three stable level-10 specialization paths
 per playable kit. The rescue-utility increment then added mastery-scaled Medic
-and Warden revive modifiers. Specialization selection/effects, all three
-remaining professions, profession-specific art/audio, boss interactions, wider
+and Warden revive modifiers. The follow-on specialization increment added
+physical selection and twelve bounded path effects. All three remaining
+professions, profession-specific art/audio, boss interactions, wider
 enemy support, deployable engineering structures, balance telemetry thresholds,
 and recorded device/group evidence remain open.

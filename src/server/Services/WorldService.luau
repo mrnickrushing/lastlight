@@ -2019,6 +2019,117 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         "Field Book",
         nil
     )
+
+    local masteryGrove = Instance.new("Folder")
+    masteryGrove.Name = "GreenwardMasteryGrove"
+    masteryGrove.Parent = interactables
+    local professionAltars = {
+        {
+            center = Vector3.new(-47, 0, -105),
+            color = FOXFIRE,
+            name = "SCOUT",
+            paths = {
+                { id = "specialization_pathfinder", name = "PATHFINDER" },
+                { id = "specialization_foxfire_trapper", name = "FOXFIRE TRAPPER" },
+                { id = "specialization_trailseer", name = "TRAILSEER" },
+            },
+        },
+        {
+            center = Vector3.new(47, 0, -105),
+            color = Color3.fromRGB(112, 151, 119),
+            name = "WARDEN",
+            paths = {
+                { id = "specialization_bulwark", name = "BULWARK" },
+                { id = "specialization_greenkeeper", name = "GREENKEEPER" },
+                { id = "specialization_oathbound", name = "OATHBOUND" },
+            },
+        },
+        {
+            center = Vector3.new(-47, 0, -145),
+            color = Color3.fromRGB(191, 137, 73),
+            name = "ENGINEER",
+            paths = {
+                { id = "specialization_lamplighter", name = "LAMPLIGHTER" },
+                { id = "specialization_rootwright", name = "ROOTWRIGHT" },
+                { id = "specialization_salvager", name = "SALVAGER" },
+            },
+        },
+        {
+            center = Vector3.new(47, 0, -145),
+            color = Color3.fromRGB(176, 108, 112),
+            name = "MEDIC",
+            paths = {
+                { id = "specialization_dawnmender", name = "DAWNMENDER" },
+                { id = "specialization_wayhome_tender", name = "WAYHOME TENDER" },
+                { id = "specialization_brightcap_herbalist", name = "BRIGHTCAP HERBALIST" },
+            },
+        },
+    }
+    for _, altar in professionAltars do
+        local dais = part(
+            masteryGrove,
+            altar.name .. "MasteryDais",
+            Vector3.new(13, 0.8, 8),
+            CFrame.new(altar.center + Vector3.new(0, 0.4, 0)),
+            Color3.fromRGB(62, 64, 57),
+            Enum.Material.Slate
+        )
+        for ring = 1, 2 do
+            local rootRing = part(
+                masteryGrove,
+                altar.name .. "RootRing",
+                Vector3.new(13.6 + ring, 0.28, 8.6 + ring),
+                CFrame.new(altar.center + Vector3.new(0, 0.7 + ring * 0.12, 0)),
+                if ring == 1 then BARK else MOSS,
+                if ring == 1 then Enum.Material.Wood else Enum.Material.Ground,
+                false
+            )
+            rootRing.CanQuery = false
+        end
+        labelSign(
+            masteryGrove,
+            CFrame.new(altar.center + Vector3.new(0, 4.8, 3.7)) * CFrame.Angles(0, math.pi, 0),
+            altar.name .. " MASTERY"
+        )
+        for pathIndex, path in altar.paths do
+            local xOffset = (pathIndex - 2) * 3.7
+            local stone = part(
+                masteryGrove,
+                altar.name .. "PathStone",
+                Vector3.new(2.6, 3.8, 2.6),
+                CFrame.new(altar.center + Vector3.new(xOffset, 2.55, -0.5))
+                    * CFrame.Angles(
+                        math.rad(pathIndex == 2 and 2 or -3),
+                        0,
+                        math.rad(xOffset * 0.6)
+                    ),
+                if pathIndex == 2 then altar.color else Color3.fromRGB(76, 82, 75),
+                Enum.Material.Slate
+            )
+            local crest = part(
+                masteryGrove,
+                altar.name .. "PathCrest",
+                Vector3.new(1.15, 1.15, 0.22),
+                stone.CFrame * CFrame.new(0, 0.45, -1.38),
+                altar.color,
+                Enum.Material.Glass,
+                false
+            )
+            crest.Shape = Enum.PartType.Ball
+            crest.Transparency = 0.1
+            addBillboard(stone, path.name, altar.color)
+            self:_registerInteraction(
+                stone,
+                "mastery_" .. path.id,
+                self._runtimeIds.Actions.SelectProfessionSpecialization,
+                "CHOOSE PATH",
+                path.name,
+                path.id,
+                1.1
+            )
+        end
+        dais:SetAttribute("ProfessionId", "profession_" .. string.lower(altar.name))
+    end
 end
 
 function WorldService.Init(self: WorldService, context: any)
