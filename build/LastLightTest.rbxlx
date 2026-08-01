@@ -28965,6 +28965,16 @@ local function fillHillAnnulus(
                     continue
                 end
 
+                -- Stop the grid short of the Bramblewake expedition. Bounding
+                -- only the peak ring was not enough: ExpeditionGenerator's
+                -- ROUTES[2] walks to cellX = -2, putting a module centre at
+                -- x = 1456 whose 72-stud cell reaches x = 1420, while this
+                -- grid fills all the way to WORLD_EXTENT = 1450. That 30-stud
+                -- overlap would grow hills through the first modules.
+                if x >= BRAMBLEWAKE_KEEP_OUT_X then
+                    continue
+                end
+
                 -- Same function foliage placement reads, so a tree can never
                 -- disagree with the ground it stands on.
                 local height = surfaceHeightAt(x, z, seed) - GROUND_Y
