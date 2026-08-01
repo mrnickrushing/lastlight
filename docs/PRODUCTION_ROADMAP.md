@@ -124,7 +124,8 @@ existing ten-level mastery cap while every profession retains the baseline
 rescue path.
 Profession specialization selection/effects, additional equipment families, a
 recipe-browsing UI and quest-board UI, branching quests, the full
-recipe/inventory/quest catalog, deeper per-night events beyond the four tactical profiles,
+recipe/inventory/quest catalog, additional incident families beyond the first
+four three-site emergencies,
 additional region-specific consequences, later town tiers, final
 art/audio, and all Studio/device/group evidence remain open.
 See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md) and

@@ -15,6 +15,7 @@ export type TownNightService = typeof(setmetatable(
         _worldService: any,
         _enemyService: any,
         _townNightSchedule: any,
+        _townNightIncident: any,
         _townCondition: any,
         _condition: any,
         _daySeconds: number,
@@ -28,6 +29,7 @@ export type TownNightService = typeof(setmetatable(
         _phaseEndsAt: number,
         _onChanged: ((string?) -> ())?,
         _onNightCompleted: ((number, number, any) -> ())?,
+        _incident: any,
     },
     TownNightService
 ))
@@ -38,6 +40,7 @@ function TownNightService.new(
     worldService: any,
     enemyService: any,
     townNightSchedule: any,
+    townNightIncident: any,
     townCondition: any,
     featureFlags: any
 ): TownNightService
@@ -47,6 +50,7 @@ function TownNightService.new(
         _worldService = worldService,
         _enemyService = enemyService,
         _townNightSchedule = townNightSchedule,
+        _townNightIncident = townNightIncident,
         _townCondition = townCondition,
         _condition = townCondition.default(),
         _daySeconds = config.NormalDaySeconds,
@@ -60,6 +64,7 @@ function TownNightService.new(
         _phaseEndsAt = 0,
         _onChanged = nil,
         _onNightCompleted = nil,
+        _incident = nil,
     }, TownNightService)
 end
 
@@ -86,6 +91,127 @@ function TownNightService._notify(self: TownNightService, toast: string?)
     if callback ~= nil then
         callback(toast)
     end
+end
+
+function TownNightService._expireIncident(
+    self: TownNightService,
+    nightNumber: number,
+    incidentId: string
+)
+    local incident = self._incident
+    if
+        incident == nil
+        or incident.nightNumber ~= nightNumber
+        or incident.definition.id ~= incidentId
+        or incident.status ~= "active"
+    then
+        return
+    end
+    local nextIncident, result =
+        self._townNightIncident.expire(incident, workspace:GetServerTimeNow())
+    if not result.applied then
+        return
+    end
+    self._incident = nextIncident
+    self._worldService:clearTownIncident()
+    local pressure =
+        self._enemyService:applyLanternPressure(result.lanternPenalty, incident.definition.id)
+    self:_notify(
+        string.format(
+            "%s FAILED — %d SITE%s LOST · FIRST LANTERN -%d",
+            incident.definition.title,
+            result.unresolved,
+            if result.unresolved == 1 then "" else "S",
+            pressure.damage or 0
+        )
+    )
+    self._logger:info("town_incident_failed", {
+        damage = pressure.damage or 0,
+        incident = incident.definition.id,
+        night = nightNumber,
+        unresolved = result.unresolved,
+    })
+end
+
+function TownNightService._startIncident(self: TownNightService, nightNumber: number, theme: string)
+    self._worldService:clearTownIncident()
+    local now = workspace:GetServerTimeNow()
+    local incident = self._townNightIncident.create(theme, nightNumber, now)
+    self._incident = incident
+    self._worldService:startTownIncident(incident.definition, incident.endsAt)
+    self:_notify(incident.definition.title .. " — " .. incident.definition.instruction)
+    self._logger:info("town_incident_started", {
+        incident = incident.definition.id,
+        night = nightNumber,
+        required = #incident.definition.sites,
+    })
+    task.delay(incident.definition.duration + 0.05, function()
+        self:_expireIncident(nightNumber, incident.definition.id)
+    end)
+end
+
+function TownNightService.resolveIncident(
+    self: TownNightService,
+    player: Player,
+    prompt: ProximityPrompt
+): any
+    local incident = self._incident
+    if self._phase ~= "night" or incident == nil or incident.status ~= "active" then
+        return {
+            accepted = false,
+            message = "THAT NIGHT INCIDENT IS NO LONGER ACTIVE",
+            reason = "incident_inactive",
+        }
+    end
+    local siteId = prompt:GetAttribute("Payload")
+    local nextIncident, result =
+        self._townNightIncident.interact(incident, siteId, workspace:GetServerTimeNow())
+    if not result.accepted then
+        if result.reason == "incident_expired" then
+            self:_expireIncident(incident.nightNumber, incident.definition.id)
+        end
+        return {
+            accepted = false,
+            message = if result.reason == "site_resolved"
+                then "THAT SITE IS ALREADY SECURE"
+                else "THE INCIDENT WINDOW HAS CLOSED",
+            reason = result.reason,
+        }
+    end
+
+    self._incident = nextIncident
+    self._worldService:resolveTownIncidentSite(result.siteId, nextIncident.resolvedCount)
+    self._logger:info("town_incident_site_resolved", {
+        incident = incident.definition.id,
+        player = player.UserId,
+        remaining = result.remaining,
+        site = result.siteId,
+    })
+    if result.completed then
+        self:_notify(incident.definition.title .. " SECURED — THE WATCH HOLDS")
+        task.delay(1.5, function()
+            if self._incident == nextIncident then
+                self._worldService:clearTownIncident()
+            end
+        end)
+        return {
+            accepted = true,
+            completed = true,
+            message = incident.definition.title .. " SECURED",
+            reason = "incident_complete",
+        }
+    end
+    return {
+        accepted = true,
+        completed = false,
+        message = string.format(
+            "%s SECURED — %d SITE%s REMAIN",
+            string.upper(tostring(result.siteId)),
+            result.remaining,
+            if result.remaining == 1 then "" else "S"
+        ),
+        reason = "site_resolved",
+    }
 end
 
 local function waitUntilTime(target: number)
@@ -149,6 +275,7 @@ function TownNightService._runCycle(self: TownNightService)
         waitUntilTime(self._phaseEndsAt)
 
         self._phase = "night"
+        self._incident = nil
         local nightStartedAt = workspace:GetServerTimeNow()
         self._phaseEndsAt = nightStartedAt + self._nightSeconds
         -- Frozen for the rest of this night: a higher number from a veteran
@@ -190,6 +317,8 @@ function TownNightService._runCycle(self: TownNightService)
             elseif beat.kind == "breach" then
                 self._worldService:setTownBreach(true, theme)
                 self._enemyService:setBreach()
+            elseif beat.kind == "incident" then
+                self:_startIncident(activeNight, theme)
             elseif beat.kind == "warning" and beat.at > 0 then
                 -- The schedule's opening warning beat always lands at at=0,
                 -- immediately after the arrival toast above (which already
@@ -201,6 +330,11 @@ function TownNightService._runCycle(self: TownNightService)
         end
 
         waitUntilTime(self._phaseEndsAt)
+        local endingIncident = self._incident
+        if endingIncident ~= nil and endingIncident.status == "active" then
+            self:_expireIncident(activeNight, endingIncident.definition.id)
+        end
+        self._worldService:clearTownIncident()
         local endingLanternHealth = self._enemyService:lanternHealth()
         local nextCondition, damageResult =
             self._townCondition.afterNight(self._condition, endingLanternHealth, activeNight)
@@ -294,6 +428,7 @@ function TownNightService.snapshot(self: TownNightService): any
         theme = self._townNightSchedule.theme(self._nightNumber),
         phase = self._phase,
         phaseEndsAt = self._phaseEndsAt,
+        incident = self._townNightIncident.snapshot(self._incident),
     }
 end
 

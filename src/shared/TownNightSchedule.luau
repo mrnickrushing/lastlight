@@ -4,8 +4,9 @@ local TownNightSchedule = {}
 
 export type Beat = {
     at: number,
-    kind: "spawn" | "warning" | "breach",
+    kind: "spawn" | "warning" | "breach" | "incident",
     enemyId: string?,
+    incidentId: string?,
     theme: string?,
     wave: number?,
 }
@@ -117,6 +118,15 @@ function TownNightSchedule.beats(duration: number, nightNumber: number): { Beat 
             })
         end
     end
+
+    table.insert(result, {
+        at = math.min(duration * 0.58, lastValidAt),
+        kind = "incident",
+        enemyId = nil,
+        incidentId = "theme_incident",
+        theme = theme,
+        wave = nil,
+    })
 
     table.sort(result, function(a, b)
         return a.at < b.at

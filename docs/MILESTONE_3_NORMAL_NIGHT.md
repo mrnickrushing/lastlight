@@ -20,7 +20,7 @@ Blackout by walking into Bramblewake any time after First Light, without
 simulating six additional town nights first — that fast path is unchanged.
 This increment adds the repeating night alongside it, not in front of it.
 Production content differentiation between nights (unique enemies, town-tier
-growth, resident schedules, art/audio) remains later work; this increment
+growth, resident schedules, art/audio) remained later work in this increment; it
 repeats the existing six-enemy Bramblewake roster with escalating wave counts
 instead of adding new content.
 
@@ -46,8 +46,10 @@ The increment includes:
 - pure Luau tests for the wave schedule's escalation, bounds, roster coverage,
   determinism, and the night-number migration/persistence contract.
 
-Further content differentiation beyond the four tactical profiles, later town-tier growth, resident schedules,
-and all Studio/device evidence remain open — see the Scope honesty row below.
+The follow-on [night-incident increment](MILESTONE_3_NIGHT_INCIDENTS.md) adds one
+theme-specific, three-site physical emergency to each normal night. Additional
+incident families, later town-tier growth, and all Studio/device evidence remain
+open — see the Scope honesty row below.
 
 The follow-on [town-condition increment](MILESTONE_3_TOWN_CONDITION.md) now
 captures lantern health before the dawn reset, persists bounded building damage,
@@ -62,9 +64,9 @@ wave — exactly as the first night already does. `TownNightService` waits for
 runs day/dusk/night indefinitely using `Config.NormalDaySeconds`,
 `Config.DuskSeconds`, and `Config.NormalNightSeconds`. Each night it hands the
 existing `EnemyService` a beat schedule from `TownNightSchedule.beats(duration,
-nightNumber)` — the same `spawn`/`breach`/`warning` beat shape the first
-night's `NightSchedule` already uses, so no new client protocol, remote, or
-enemy-attack code was needed. The client never drives the phase, the wave
+nightNumber)`. The follow-on incident increment adds a deterministic `incident`
+beat to that schedule while preserving the same client action protocol. The
+client never drives the phase, the wave
 count, or the night number; it only renders the snapshot the server publishes.
 
 ## Wave schedule
@@ -164,7 +166,7 @@ retroactively changes a night already in progress.
 | Independence | night count and `blackoutDue` never gate, block, or auto-start Bramblewake/Blackout access |
 | Readability | phase, countdown, and lantern health reuse the existing HUD fields without requiring new client code |
 | Persistence | night count survives a server restart, resumes from the highest present player's record, and never regresses |
-| Scope honesty | per-night content differentiation, town-tier growth, resident schedules, recurring multi-chapter Blackouts, and all Studio/device evidence stay open |
+| Scope honesty | additional incident families, unique night enemies, later town tiers, recurring multi-chapter Blackouts, and all Studio/device evidence stay open |
 
 Automated checks establish the wave schedule's escalation, bounds, roster
 coverage, determinism, and the night-number migration/persistence contract as

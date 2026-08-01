@@ -37,6 +37,7 @@ local SaveSchema = require(root.SaveSchema)
 local StatusEffectState = require(root.StatusEffectState)
 local SurvivalState = require(root.SurvivalState)
 local TownNightSchedule = require(root.TownNightSchedule)
+local TownNightIncident = require(root.TownNightIncident)
 local TownCondition = require(root.TownCondition)
 local TownProgression = require(root.TownProgression)
 local TutorialFlow = require(root.TutorialFlow)
@@ -219,6 +220,7 @@ local townNightService = TownNightService.new(
     worldService,
     enemyService,
     TownNightSchedule,
+    TownNightIncident,
     TownCondition,
     featureFlags
 )

@@ -52,6 +52,7 @@ export type WorldService = typeof(setmetatable(
         _townConsequence: any,
         _townCondition: any,
         _townResidents: { [string]: any },
+        _townIncidentModel: Model?,
     },
     WorldService
 ))
@@ -941,6 +942,7 @@ function WorldService.new(logger: Logger, extractionPayoff: any, townProgression
         _townConsequence = nil,
         _townCondition = { integrity = 100, damageLevel = 0, repairsRemaining = 0 },
         _townResidents = {},
+        _townIncidentModel = nil,
     }, WorldService)
 end
 
@@ -4577,6 +4579,240 @@ function WorldService.setTownBreach(self: WorldService, enabled: boolean, theme:
             end
         end)
     end
+end
+
+function WorldService.clearTownIncident(self: WorldService)
+    for interactionId, prompt in self._interactions do
+        if prompt:GetAttribute("ActionId") == self._runtimeIds.Actions.ResolveTownIncident then
+            if prompt.Parent ~= nil then
+                prompt:Destroy()
+            end
+            self._interactions[interactionId] = nil
+        end
+    end
+    if self._townIncidentModel ~= nil and self._townIncidentModel.Parent ~= nil then
+        self._townIncidentModel:Destroy()
+    end
+    self._townIncidentModel = nil
+    local world = self._world
+    if world ~= nil then
+        world:SetAttribute("TownIncidentId", nil)
+        world:SetAttribute("TownIncidentEndsAt", nil)
+        world:SetAttribute("TownIncidentResolved", nil)
+        world:SetAttribute("TownIncidentRequired", nil)
+    end
+end
+
+local INCIDENT_SITES = table.freeze({
+    archive = Vector3.new(-31, 0.65, -108),
+    workshop = Vector3.new(31, 0.65, -108),
+    inn = Vector3.new(-28, 0.65, -137),
+})
+
+local function buildIncidentSite(parent: Model, incidentId: string, siteId: string): BasePart
+    local at = assert(INCIDENT_SITES[siteId], "town incident site is unknown")
+    local site = Instance.new("Model")
+    site.Name = "IncidentSite_" .. siteId
+    site:SetAttribute("SiteId", siteId)
+    site:SetAttribute("Resolved", false)
+    site.Parent = parent
+
+    local target: Part
+    if incidentId == "incident_emberfall_cinders" then
+        target = part(
+            site,
+            "IncidentCore",
+            Vector3.new(3.8, 0.75, 3.2),
+            CFrame.new(at),
+            Color3.fromRGB(55, 47, 42),
+            Enum.Material.Slate,
+            false
+        )
+        target.Shape = Enum.PartType.Ball
+        for index = -1, 1 do
+            part(
+                site,
+                "CharredTimber",
+                Vector3.new(0.42, 3.3, 0.42),
+                CFrame.new(at + Vector3.new(index * 0.8, 0.55, 0))
+                    * CFrame.Angles(math.rad(90), 0, math.rad(index * 24)),
+                Color3.fromRGB(40, 32, 29),
+                Enum.Material.Wood,
+                false
+            )
+        end
+        local ember = part(
+            site,
+            "BuriedEmber",
+            Vector3.new(1.2, 0.18, 1.2),
+            CFrame.new(at + Vector3.new(0, 0.46, 0)),
+            Color3.fromRGB(190, 78, 38),
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        ember.Shape = Enum.PartType.Ball
+    elseif incidentId == "incident_miretide_clogs" then
+        target = part(
+            site,
+            "IncidentCore",
+            Vector3.new(0.28, 4.2, 4.2),
+            CFrame.new(at) * CFrame.Angles(0, 0, math.rad(90)),
+            Color3.fromRGB(58, 67, 48),
+            Enum.Material.Ground,
+            false
+        )
+        target.Shape = Enum.PartType.Cylinder
+        for index = 1, 5 do
+            local angle = math.rad(index * 72)
+            part(
+                site,
+                "DrainStone",
+                Vector3.new(0.85, 0.7, 1.2),
+                CFrame.new(at + Vector3.new(math.cos(angle) * 2, 0.12, math.sin(angle) * 2))
+                    * CFrame.Angles(0, -angle, 0),
+                Color3.fromRGB(88, 91, 79),
+                Enum.Material.Rock,
+                false
+            )
+        end
+        for index = -1, 1 do
+            part(
+                site,
+                "RootClog",
+                Vector3.new(0.5, 3.5, 0.5),
+                CFrame.new(at + Vector3.new(index * 0.65, 0.55, 0))
+                    * CFrame.Angles(0, 0, math.rad(78 + index * 16)),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
+    elseif incidentId == "incident_rootmoon_anchors" then
+        target = part(
+            site,
+            "IncidentCore",
+            Vector3.new(2.7, 1.1, 2.7),
+            CFrame.new(at),
+            WET_EARTH,
+            Enum.Material.Ground,
+            false
+        )
+        target.Shape = Enum.PartType.Ball
+        for index = -1, 1 do
+            part(
+                site,
+                "RootAnchor",
+                Vector3.new(0.72, 5.2, 0.72),
+                CFrame.new(at + Vector3.new(index * 0.85, 2.2, index % 2 * 0.4))
+                    * CFrame.Angles(math.rad(index * 8), 0, math.rad(index * 13)),
+                BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
+    else
+        target = part(
+            site,
+            "IncidentCore",
+            Vector3.new(3.6, 0.5, 3.6),
+            CFrame.new(at),
+            Color3.fromRGB(45, 43, 42),
+            Enum.Material.Metal,
+            false
+        )
+        for index = -1, 1 do
+            part(
+                site,
+                "ColdFuel",
+                Vector3.new(0.42, 2.8, 0.42),
+                CFrame.new(at + Vector3.new(index * 0.62, 0.75, 0))
+                    * CFrame.Angles(math.rad(90), 0, math.rad(index * 34)),
+                Color3.fromRGB(55, 43, 34),
+                Enum.Material.Wood,
+                false
+            )
+        end
+        for index = -1, 1, 2 do
+            part(
+                site,
+                "BrazierLeg",
+                Vector3.new(0.28, 2.4, 0.28),
+                CFrame.new(at + Vector3.new(index * 1.15, -0.25, 0)),
+                Color3.fromRGB(58, 57, 55),
+                Enum.Material.Metal,
+                false
+            )
+        end
+    end
+    target:SetAttribute("IncidentId", incidentId)
+    target:SetAttribute("SiteId", siteId)
+    return target
+end
+
+function WorldService.startTownIncident(self: WorldService, definition: any, endsAt: number)
+    self:clearTownIncident()
+    local world = self._world
+    if world == nil or not self._night then
+        return
+    end
+    local model = Instance.new("Model")
+    model.Name = "TownNightIncident"
+    model:SetAttribute("IncidentId", definition.id)
+    model:SetAttribute("Title", definition.title)
+    model:SetAttribute("Required", #definition.sites)
+    model.Parent = world
+    self._townIncidentModel = model
+    for _, siteId in definition.sites do
+        local target = buildIncidentSite(model, definition.id, siteId)
+        local interactionId = string.format("town_incident:%s:%s", definition.id, siteId)
+        self:_registerInteraction(
+            target,
+            interactionId,
+            self._runtimeIds.Actions.ResolveTownIncident,
+            definition.actionText,
+            definition.objectText,
+            siteId,
+            0.85
+        )
+        addBillboard(target, string.format("%s · %s", definition.title, siteId), CREAM)
+    end
+    world:SetAttribute("TownIncidentId", definition.id)
+    world:SetAttribute("TownIncidentEndsAt", endsAt)
+    world:SetAttribute("TownIncidentResolved", 0)
+    world:SetAttribute("TownIncidentRequired", #definition.sites)
+end
+
+function WorldService.resolveTownIncidentSite(self: WorldService, siteId: string, resolved: number)
+    local model = self._townIncidentModel
+    local world = self._world
+    if model == nil or world == nil then
+        return
+    end
+    for _, child in model:GetChildren() do
+        if child:IsA("Model") and child:GetAttribute("SiteId") == siteId then
+            child:SetAttribute("Resolved", true)
+            local target = child:FindFirstChild("IncidentCore")
+            if target ~= nil and target:IsA("BasePart") then
+                local interactionId = nil
+                local prompt = target:FindFirstChildOfClass("ProximityPrompt")
+                if prompt ~= nil then
+                    interactionId = prompt:GetAttribute("InteractionId")
+                    prompt:Destroy()
+                end
+                if type(interactionId) == "string" then
+                    self._interactions[interactionId] = nil
+                end
+                local oldLabel = target:FindFirstChild("WorldLabel")
+                if oldLabel ~= nil then
+                    oldLabel:Destroy()
+                end
+                target.Color = Color3.fromRGB(72, 96, 66)
+                addBillboard(target, "SECURED", FOXFIRE)
+            end
+            break
+        end
+    end
+    world:SetAttribute("TownIncidentResolved", resolved)
 end
 
 function WorldService._applyDuskLighting(_self: WorldService)

@@ -28,6 +28,7 @@ local ReviveFlow = require(root.ReviveFlow)
 local RuntimeIds = require(root.RuntimeIds)
 local SurvivalState = require(root.SurvivalState)
 local StatusEffectState = require(root.StatusEffectState)
+local TownNightIncident = require(root.TownNightIncident)
 local SaveSchema = require(root.SaveSchema)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
@@ -37,7 +38,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 9, "unexpected save schema version")
-assert(Config.BuildVersion == "0.23.0", "unexpected build version")
+assert(Config.BuildVersion == "0.24.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -87,6 +88,14 @@ assert(
     "profession selection action ID changed"
 )
 assert(RuntimeIds.Actions.RepairTown == "repair_town", "town repair action ID changed")
+assert(
+    RuntimeIds.Actions.ResolveTownIncident == "resolve_town_incident",
+    "town incident action ID changed"
+)
+assert(
+    TownNightIncident.forTheme("EMBERFALL").id == "incident_emberfall_cinders",
+    "town incident catalog is missing"
+)
 local medicRescue = ProfessionRescue.resolve("profession_medic", 1, 2.5, 35, 3)
 assert(medicRescue.duration < 2.5 and medicRescue.health == 45, "Medic rescue tuning is missing")
 assert(RuntimeIds.Actions.OldGrowthFire == "old_growth_fire", "Old Growth action ID changed")

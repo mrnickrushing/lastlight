@@ -39,6 +39,7 @@ TestRunner.run({
     require("./specs/WeatherProfile.spec"),
     require("./specs/BramblewakeBlackout.spec"),
     require("./specs/TownNightSchedule.spec"),
+    require("./specs/TownNightIncident.spec"),
     require("./specs/TownProgression.spec"),
     require("./specs/TownCondition.spec"),
 })
