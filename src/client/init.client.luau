@@ -9,6 +9,7 @@ assert(root ~= nil, "Last Light shared root did not replicate before client boot
 local Config = require(root.Config)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local RuntimeIds = require(root.RuntimeIds)
+local AmbientController = require(script.Controllers.AmbientController)
 local HUDController = require(script.Controllers.HUDController)
 local InputController = require(script.Controllers.InputController)
 local InteractionController = require(script.Controllers.InteractionController)
@@ -31,6 +32,7 @@ local playerGui = player:WaitForChild("PlayerGui", Config.BootstrapTimeoutSecond
 assert(playerGui ~= nil and playerGui:IsA("PlayerGui"), "PlayerGui unavailable")
 
 local hud = HUDController.new(playerGui, ProfessionCatalog.list())
+local ambient = AmbientController.new(RuntimeIds.AmbientMoteTag)
 local interaction = InteractionController.new(RuntimeIds.InteractionTag, hud)
 
 local function send(kind: string, fields: { [string]: any }?)
@@ -75,6 +77,7 @@ end)
 
 stateChanged.OnClientEvent:Connect(function(snapshot: any)
     hud:update(snapshot)
+    ambient:setPhase(tostring(snapshot.phase or "day"))
 end)
 
 task.spawn(function()
@@ -83,6 +86,7 @@ task.spawn(function()
     end)
     if ok and snapshot ~= nil then
         hud:update(snapshot)
+        ambient:setPhase(tostring(snapshot.phase or "day"))
     end
 end)
 

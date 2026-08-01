@@ -4878,6 +4878,7 @@ local RuntimeIds = {
     FolderName = "LastLightRuntime",
     WorldName = "LastLightWorld",
     InteractionTag = "LastLightInteractable",
+    AmbientMoteTag = "LastLightAmbientMote",
     ExpeditionModuleTag = "LastLightExpeditionModule",
     ExpeditionPointOfInterestTag = "LastLightExpeditionPOI",
     ExpeditionEventTag = "LastLightExpeditionEvent",
@@ -15894,7 +15895,8 @@ local function emberDrift(
     position: Vector3,
     color: Color3,
     count: number,
-    spread: number
+    spread: number,
+    ambientTag: string?
 )
     local random = Random.new(math.floor(position.X * 17 + position.Z * 31))
     for _ = 1, count do
@@ -15917,6 +15919,9 @@ local function emberDrift(
         mote.Shape = Enum.PartType.Ball
         mote.Transparency = random:NextNumber(0.1, 0.35)
         mote.CanQuery = false
+        if ambientTag ~= nil then
+            CollectionService:AddTag(mote, ambientTag)
+        end
     end
 end
 
@@ -16485,6 +16490,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         glow.Shape = Enum.PartType.Ball
         glow.Transparency = random:NextNumber(0.02, 0.28)
         glow.CanQuery = false
+        CollectionService:AddTag(glow, _self._runtimeIds.AmbientMoteTag)
     end
 
     for index = 1, 24 do
@@ -16499,7 +16505,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
 
     addFillLight(geometry, Vector3.new(-46, 12, -96), Color3.fromRGB(54, 103, 95), 0.85, 78)
     addFillLight(geometry, Vector3.new(38, 10, -28), Color3.fromRGB(255, 177, 88), 0.45, 54)
-    emberDrift(geometry, Vector3.new(0, 0, -112), AMBER, 16, 28)
+    emberDrift(geometry, Vector3.new(0, 0, -112), AMBER, 16, 28, _self._runtimeIds.AmbientMoteTag)
 
     lantern(geometry, Vector3.new(0, 0, -8), 0.72)
     lantern(geometry, Vector3.new(-9, 0, -62), 0.62)
@@ -20757,6 +20763,7 @@ assert(root ~= nil, "Last Light shared root did not replicate before client boot
 local Config = require(root.Config)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local RuntimeIds = require(root.RuntimeIds)
+local AmbientController = require(script.Controllers.AmbientController)
 local HUDController = require(script.Controllers.HUDController)
 local InputController = require(script.Controllers.InputController)
 local InteractionController = require(script.Controllers.InteractionController)
@@ -20779,6 +20786,7 @@ local playerGui = player:WaitForChild("PlayerGui", Config.BootstrapTimeoutSecond
 assert(playerGui ~= nil and playerGui:IsA("PlayerGui"), "PlayerGui unavailable")
 
 local hud = HUDController.new(playerGui, ProfessionCatalog.list())
+local ambient = AmbientController.new(RuntimeIds.AmbientMoteTag)
 local interaction = InteractionController.new(RuntimeIds.InteractionTag, hud)
 
 local function send(kind: string, fields: { [string]: any }?)
@@ -20823,6 +20831,7 @@ end)
 
 stateChanged.OnClientEvent:Connect(function(snapshot: any)
     hud:update(snapshot)
+    ambient:setPhase(tostring(snapshot.phase or "day"))
 end)
 
 task.spawn(function()
@@ -20831,6 +20840,7 @@ task.spawn(function()
     end)
     if ok and snapshot ~= nil then
         hud:update(snapshot)
+        ambient:setPhase(tostring(snapshot.phase or "day"))
     end
 end)
 
@@ -20842,6 +20852,137 @@ print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
             <string name="Name">Controllers</string>
           </Properties>
           <Item class="ModuleScript" referent="74">
+            <Properties>
+              <string name="Name">AmbientController</string>
+              <string name="Source"><![CDATA[--!strict
+
+local CollectionService = game:GetService("CollectionService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local AmbientController = {}
+AmbientController.__index = AmbientController
+
+type MoteState = {
+    basePosition: Vector3,
+    baseTransparency: number,
+    phaseOffset: number,
+    visible: boolean,
+}
+
+export type AmbientController = typeof(setmetatable(
+    {} :: {
+        _tag: string,
+        _motes: { [BasePart]: MoteState },
+        _phase: string,
+        _elapsed: number,
+        _connection: RBXScriptConnection?,
+    },
+    AmbientController
+))
+
+local ACTIVE_DISTANCE = 125
+local UPDATE_INTERVAL = 1 / 24
+
+local function phaseOffsetFor(instance: Instance): number
+    local position = if instance:IsA("BasePart") then instance.Position else Vector3.zero
+    return math.abs(position.X * 0.071 + position.Y * 0.137 + position.Z * 0.043) % (math.pi * 2)
+end
+
+function AmbientController.new(tag: string): AmbientController
+    local self = setmetatable({
+        _tag = tag,
+        _motes = {},
+        _phase = "day",
+        _elapsed = 0,
+        _connection = nil,
+    }, AmbientController)
+
+    local function register(instance: Instance)
+        if not instance:IsA("BasePart") or self._motes[instance] ~= nil then
+            return
+        end
+        self._motes[instance] = {
+            basePosition = instance.Position,
+            baseTransparency = instance.Transparency,
+            phaseOffset = phaseOffsetFor(instance),
+            visible = false,
+        }
+    end
+    local function unregister(instance: Instance)
+        if instance:IsA("BasePart") then
+            self._motes[instance] = nil
+        end
+    end
+
+    for _, instance in CollectionService:GetTagged(tag) do
+        register(instance)
+    end
+    CollectionService:GetInstanceAddedSignal(tag):Connect(register)
+    CollectionService:GetInstanceRemovedSignal(tag):Connect(unregister)
+
+    local accumulator = 0
+    self._connection = RunService.RenderStepped:Connect(function(deltaTime: number)
+        accumulator += deltaTime
+        if accumulator < UPDATE_INTERVAL then
+            return
+        end
+        local elapsed = accumulator
+        accumulator = 0
+        self:_step(elapsed)
+    end)
+    return self
+end
+
+function AmbientController.setPhase(self: AmbientController, phase: string)
+    self._phase = string.lower(phase)
+end
+
+function AmbientController._step(self: AmbientController, deltaTime: number)
+    self._elapsed += deltaTime
+    local camera = Workspace.CurrentCamera
+    if camera == nil then
+        return
+    end
+    local cameraPosition = camera.CFrame.Position
+    local night = self._phase == "night"
+    local dusk = self._phase == "dusk"
+    local amplitude = if night then 0.92 elseif dusk then 0.68 else 0.42
+    local transparencyBias = if night then -0.08 elseif dusk then -0.03 else 0.14
+
+    for mote, state in self._motes do
+        if mote.Parent == nil then
+            self._motes[mote] = nil
+            continue
+        end
+        local active = (state.basePosition - cameraPosition).Magnitude <= ACTIVE_DISTANCE
+        if active then
+            local wave = self._elapsed + state.phaseOffset
+            mote.Position = state.basePosition
+                + Vector3.new(
+                    math.sin(wave * 0.83) * amplitude,
+                    math.sin(wave * 1.17) * amplitude * 0.45,
+                    math.cos(wave * 0.71) * amplitude
+                )
+            mote.Transparency = math.clamp(
+                state.baseTransparency + transparencyBias + math.sin(wave * 1.7) * 0.08,
+                0.04,
+                0.72
+            )
+            state.visible = true
+        elseif state.visible then
+            mote.Position = state.basePosition
+            mote.Transparency = math.clamp(state.baseTransparency + transparencyBias, 0.04, 0.72)
+            state.visible = false
+        end
+    end
+end
+
+return AmbientController
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="75">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -22914,7 +23055,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="75">
+          <Item class="ModuleScript" referent="76">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -23231,7 +23372,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="76">
+          <Item class="ModuleScript" referent="77">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -23343,7 +23484,7 @@ return InteractionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="77">
+  <Item class="Workspace" referent="78">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

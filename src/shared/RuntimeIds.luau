@@ -6,6 +6,7 @@ local RuntimeIds = {
     FolderName = "LastLightRuntime",
     WorldName = "LastLightWorld",
     InteractionTag = "LastLightInteractable",
+    AmbientMoteTag = "LastLightAmbientMote",
     ExpeditionModuleTag = "LastLightExpeditionModule",
     ExpeditionPointOfInterestTag = "LastLightExpeditionPOI",
     ExpeditionEventTag = "LastLightExpeditionEvent",
