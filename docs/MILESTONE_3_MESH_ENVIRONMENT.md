@@ -58,6 +58,16 @@ publishing runbook:
 fish -c 'source ~/.secrets/roblox.fish; python3 scripts/upload_mesh_assets.py --all'
 ```
 
+To replace the content of assets that are already uploaded — for example after
+a shading or geometry fix in `generate_mesh_kit.py` — add `--update-existing`.
+This overwrites the live Roblox asset in place with no undo; read the flag's
+`--help` text before running it.
+
+For the full pick-an-asset / render-check-it / place-it procedure, including
+how to fetch and view a real Roblox thumbnail for a mesh before spending a
+placement on it, see
+[VISUAL_QUALITY_STANDARD.md's mesh and asset workflow](VISUAL_QUALITY_STANDARD.md#mesh-and-asset-workflow).
+
 ## First-pass kit
 
 | Stable ID | Role | Target | Placement |
