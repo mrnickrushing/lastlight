@@ -105,6 +105,55 @@ type MeshPlacement = {
     fallbackInstance: Instance?,
 }
 
+local function authoredPlacementTransform(placement: MeshPlacement): (CFrame, Vector3)
+    local random = Random.new(placement.seed * 97 + 31)
+    local pitch = 0
+    local roll = 0
+    local profileScale = Vector3.one
+
+    -- Repeated organic assets keep the same measured mesh and collision-free
+    -- template, but no two placements present the same upright silhouette.
+    -- Buildings remain level so their doors, rotor, and fallback shells align.
+    if placement.fallbackKind == "conifer" or placement.fallbackKind == "broadleaf" then
+        pitch = random:NextNumber(math.rad(-6.5), math.rad(6.5))
+        roll = random:NextNumber(math.rad(-7.5), math.rad(7.5))
+        profileScale = Vector3.new(
+            random:NextNumber(0.84, 1.16),
+            random:NextNumber(0.92, 1.1),
+            random:NextNumber(0.84, 1.16)
+        )
+    elseif placement.fallbackKind == "boulders" then
+        pitch = random:NextNumber(math.rad(-4), math.rad(4))
+        roll = random:NextNumber(math.rad(-4), math.rad(4))
+        profileScale = Vector3.new(
+            random:NextNumber(0.82, 1.18),
+            random:NextNumber(0.88, 1.08),
+            random:NextNumber(0.82, 1.18)
+        )
+    elseif placement.fallbackKind == "deadfall" then
+        pitch = random:NextNumber(math.rad(-2.5), math.rad(2.5))
+        roll = random:NextNumber(math.rad(-3.5), math.rad(3.5))
+        profileScale = Vector3.new(
+            random:NextNumber(0.88, 1.12),
+            random:NextNumber(0.9, 1.08),
+            random:NextNumber(0.82, 1.18)
+        )
+    elseif placement.fallbackKind == "undergrowth" then
+        pitch = random:NextNumber(math.rad(-5), math.rad(5))
+        roll = random:NextNumber(math.rad(-5), math.rad(5))
+        profileScale = Vector3.new(
+            random:NextNumber(0.82, 1.18),
+            random:NextNumber(0.88, 1.12),
+            random:NextNumber(0.82, 1.18)
+        )
+    elseif placement.assetId == "mesh_lantern_post_a" then
+        pitch = random:NextNumber(math.rad(-2.5), math.rad(2.5))
+        roll = random:NextNumber(math.rad(-3), math.rad(3))
+    end
+
+    return CFrame.new(placement.position) * CFrame.Angles(pitch, placement.yaw, roll), profileScale
+end
+
 local WAYHOME_DELIVERY_LIFETIME = 180
 local WAYHOME_DELIVERY_ORIGINS = table.freeze({
     Vector3.new(-27, 0, -13),
@@ -2198,13 +2247,15 @@ function WorldService._placeAuthoredMeshes(
             if attributeTarget.Parent == nil or placementParent.Parent == nil then
                 return
             end
+            local placementFrame, profileScale = authoredPlacementTransform(placement)
             local placed, result = pcall(
                 self._meshTemplateLoader.place,
                 self._meshTemplateLoader,
                 placement.assetId,
                 placementParent,
-                CFrame.new(placement.position) * CFrame.Angles(0, placement.yaw, 0),
-                placement.scale
+                placementFrame,
+                placement.scale,
+                profileScale
             )
             local model = if placed then result else nil
             if not placed then
@@ -3646,7 +3697,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v20")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v21")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -3746,7 +3797,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v20",
+        worldVersion = "bramblewake-blackout-v21",
     })
 end
 

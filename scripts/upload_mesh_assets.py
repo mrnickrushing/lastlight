@@ -97,7 +97,8 @@ def _submit_and_await(
             if payload.get("error"):
                 raise RuntimeError(f"{asset_id}: Roblox processing failed: {json.dumps(payload['error'])}")
             response_payload = payload.get("response") or {}
-            resolved_id = str(response_payload.get("assetId", asset_id if method == "PATCH" else ""))
+            fallback_id = str(request_body.get("assetId", "")) if method == "PATCH" else ""
+            resolved_id = str(response_payload.get("assetId", fallback_id))
             if method == "POST" and not resolved_id.isdigit():
                 raise RuntimeError(f"{asset_id}: completed operation had no numeric asset ID")
             print(f"{asset_id}: {verb} complete ({resolved_id})", flush=True)
@@ -122,7 +123,9 @@ def upload(asset: dict[str, object], creator_user_id: str, api_key: str, timeout
     return _submit_and_await(asset_id, "POST", CREATE_URL, request_body, file_path, api_key, timeout, "upload")
 
 
-def update_content(asset: dict[str, object], api_key: str, timeout: int) -> int:
+def update_content(
+    asset: dict[str, object], creator_user_id: str, api_key: str, timeout: int
+) -> int:
     """Replace an already-uploaded asset's content with the current GLB on
     disk, keeping the same Roblox asset ID. This is the only way a
     regenerated GLB (a shading fix, a remeasured bound, anything that is not
@@ -140,9 +143,17 @@ def update_content(asset: dict[str, object], api_key: str, timeout: int) -> int:
 
     # No updateMask: per Roblox's Open Cloud reference, updateMask governs
     # metadata fields (description, displayName, icon, previews) and is
-    # documented separately from content replacement, which this call does
-    # not touch. Only the model's binary content is being changed here.
-    request_body = {"assetType": "Model"}
+    # documented separately from content replacement. Content replacement
+    # still requires the URL asset ID, creator, and expected price in the
+    # multipart request body; omitting assetId is interpreted as zero.
+    request_body = {
+        "assetType": "Model",
+        "assetId": str(roblox_asset_id),
+        "creationContext": {
+            "creator": {"userId": creator_user_id},
+            "expectedPrice": 0,
+        },
+    }
     url = UPDATE_URL.format(asset_id=roblox_asset_id)
     return _submit_and_await(asset_id, "PATCH", url, request_body, file_path, api_key, timeout, "content update")
 
@@ -175,7 +186,7 @@ def main() -> None:
             flush=True,
         )
         for asset in selected:
-            update_content(asset, api_key, args.timeout)
+            update_content(asset, args.creator_user_id, api_key, args.timeout)
         return
 
     selected = [asset for asset in in_scope if asset.get("robloxAssetId") is None]

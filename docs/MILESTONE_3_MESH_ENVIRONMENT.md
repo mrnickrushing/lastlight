@@ -80,7 +80,7 @@ placement on it, see
 | `mesh_root_arch_a` | Hero landmark and route gate | 25 studs | Curated core location only |
 | `mesh_fern_cluster_a` | Ground silhouette breakup | 5 studs | Core forest only |
 | `mesh_hollow_lantern_shrine_a` | Walk-through arrival sanctuary | 28 studs | Curated arrival landmark only |
-| `mesh_wayfarer_cabin_a` | Open-front gabled camp shelter | 20 studs | Two arrival shelters |
+| `mesh_wayfarer_cabin_a` | Retired visual failure retained for provenance | 20 studs | Never place |
 | `mesh_lantern_post_a` | Crooked caged safe-route light | 9 studs | Arrival road rhythm |
 | `mesh_crooked_farmhouse_a` | Rooted abandoned farmhouse | 24 studs | Hollow Farm landmark |
 | `mesh_foxfire_windmill_tower_a` | Root-swallowed mill tower | 36 studs | Windmill Copse landmark |
@@ -156,6 +156,25 @@ bark silhouette and exposed core cavity, and decorative hero arches move to the
 clearing perimeter so they frame rather than compete with current objectives.
 General world labels now appear only at close inspection distance.
 
+Build `0.40.0` makes the authored kit read as tactile stylized woodland rather
+than identical gray blocks. The Blender pipeline now writes smooth faces and
+angle-derived sharp edges directly onto each mesh, avoiding the optional
+Blender geometry-node asset that can be missing in headless installs. All 12
+live Roblox asset thumbnails were fetched after the in-place upload reached
+`Completed` and visually checked for smooth organic surfaces with intentional
+hard silhouette breaks.
+
+At runtime, imported material-group names map to restrained built-in Roblox
+materials: bark and cut timber use Wood/WoodPlanks, stone uses Slate, foliage
+uses LeafyGrass/Grass, iron uses Metal, and safe or memory cues use Neon. The
+custom PBR root arch keeps its matching authored `SurfaceAppearance`; no custom
+maps are added to meshes without matching UVs. Repeated organic placements gain
+seeded pitch, roll, width, height, and depth variation through
+`MeshTemplateLoader:place`, while buildings remain level and undistorted. The
+retired cabin is rejected at the loader boundary, so it cannot accidentally
+re-enter visible dressing. This profile variation changes no mesh triangle or
+material-slot budget.
+
 Hollow Farm and Foxfire Mill use the same replacement contract as Emberhollow:
 their authored meshes replace only visible structural shells. Invisible
 procedural collision remains authoritative, while farmhouse windows, field
@@ -186,7 +205,7 @@ failed asset request simply leaves the complete procedural landmark visible.
 - A failed asset request produces the established procedural equivalent.
 - Studio review covers phone, tablet, desktop, low graphics, and maximum
   graphics before the mesh kit replaces additional forest bands.
-- Studio Output reports client build `0.39.0`, world version
-  `bramblewake-blackout-v20`, `mesh_dressing_ready ... fallbacks=0`, and
+- Studio Output reports client build `0.40.0`, world version
+  `bramblewake-blackout-v21`, `mesh_dressing_ready ... fallbacks=0`, and
   `expedition_mesh_dressing_ready ... fallbacks=0` before the landmarks are
   accepted as live visual evidence.

@@ -1219,7 +1219,7 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.39.0",
+    BuildVersion = "0.40.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -19779,6 +19779,55 @@ type MeshPlacement = {
     fallbackInstance: Instance?,
 }
 
+local function authoredPlacementTransform(placement: MeshPlacement): (CFrame, Vector3)
+    local random = Random.new(placement.seed * 97 + 31)
+    local pitch = 0
+    local roll = 0
+    local profileScale = Vector3.one
+
+    -- Repeated organic assets keep the same measured mesh and collision-free
+    -- template, but no two placements present the same upright silhouette.
+    -- Buildings remain level so their doors, rotor, and fallback shells align.
+    if placement.fallbackKind == "conifer" or placement.fallbackKind == "broadleaf" then
+        pitch = random:NextNumber(math.rad(-6.5), math.rad(6.5))
+        roll = random:NextNumber(math.rad(-7.5), math.rad(7.5))
+        profileScale = Vector3.new(
+            random:NextNumber(0.84, 1.16),
+            random:NextNumber(0.92, 1.1),
+            random:NextNumber(0.84, 1.16)
+        )
+    elseif placement.fallbackKind == "boulders" then
+        pitch = random:NextNumber(math.rad(-4), math.rad(4))
+        roll = random:NextNumber(math.rad(-4), math.rad(4))
+        profileScale = Vector3.new(
+            random:NextNumber(0.82, 1.18),
+            random:NextNumber(0.88, 1.08),
+            random:NextNumber(0.82, 1.18)
+        )
+    elseif placement.fallbackKind == "deadfall" then
+        pitch = random:NextNumber(math.rad(-2.5), math.rad(2.5))
+        roll = random:NextNumber(math.rad(-3.5), math.rad(3.5))
+        profileScale = Vector3.new(
+            random:NextNumber(0.88, 1.12),
+            random:NextNumber(0.9, 1.08),
+            random:NextNumber(0.82, 1.18)
+        )
+    elseif placement.fallbackKind == "undergrowth" then
+        pitch = random:NextNumber(math.rad(-5), math.rad(5))
+        roll = random:NextNumber(math.rad(-5), math.rad(5))
+        profileScale = Vector3.new(
+            random:NextNumber(0.82, 1.18),
+            random:NextNumber(0.88, 1.12),
+            random:NextNumber(0.82, 1.18)
+        )
+    elseif placement.assetId == "mesh_lantern_post_a" then
+        pitch = random:NextNumber(math.rad(-2.5), math.rad(2.5))
+        roll = random:NextNumber(math.rad(-3), math.rad(3))
+    end
+
+    return CFrame.new(placement.position) * CFrame.Angles(pitch, placement.yaw, roll), profileScale
+end
+
 local WAYHOME_DELIVERY_LIFETIME = 180
 local WAYHOME_DELIVERY_ORIGINS = table.freeze({
     Vector3.new(-27, 0, -13),
@@ -21872,13 +21921,15 @@ function WorldService._placeAuthoredMeshes(
             if attributeTarget.Parent == nil or placementParent.Parent == nil then
                 return
             end
+            local placementFrame, profileScale = authoredPlacementTransform(placement)
             local placed, result = pcall(
                 self._meshTemplateLoader.place,
                 self._meshTemplateLoader,
                 placement.assetId,
                 placementParent,
-                CFrame.new(placement.position) * CFrame.Angles(0, placement.yaw, 0),
-                placement.scale
+                placementFrame,
+                placement.scale,
+                profileScale
             )
             local model = if placed then result else nil
             if not placed then
@@ -23320,7 +23371,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v20")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v21")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -23420,7 +23471,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v20",
+        worldVersion = "bramblewake-blackout-v21",
     })
 end
 
@@ -30967,12 +31018,94 @@ return table.freeze(MeshAssetRegistry)
         </Item>
         <Item class="ModuleScript" referent="81">
           <Properties>
+            <string name="Name">MeshMaterialPlan</string>
+            <string name="Source"><![CDATA[--!strict
+
+-- Roblox's GLB importer preserves the mesh groups used by the authored kit,
+-- but model thumbnails and runtime loads otherwise fall back to gray
+-- SmoothPlastic. Keep the material decision data-only so it can be validated
+-- outside Studio; MeshTemplateLoader owns the actual Enum.Material mapping.
+
+local MeshMaterialPlan = {}
+
+export type Style = {
+    material: string,
+    color: { number },
+}
+
+local STYLES: { [string]: Style } = {
+    bark_dark = { material = "Wood", color = { 36, 26, 24 } },
+    bark_mid = { material = "Wood", color = { 62, 39, 30 } },
+    bark_cut = { material = "WoodPlanks", color = { 121, 83, 52 } },
+    pine_dark = { material = "LeafyGrass", color = { 18, 42, 32 } },
+    pine_mid = { material = "LeafyGrass", color = { 42, 77, 51 } },
+    leaf_dark = { material = "LeafyGrass", color = { 31, 68, 41 } },
+    leaf_mid = { material = "LeafyGrass", color = { 58, 91, 54 } },
+    moss = { material = "Grass", color = { 72, 104, 55 } },
+    stone_dark = { material = "Slate", color = { 43, 52, 60 } },
+    stone = { material = "Slate", color = { 75, 83, 89 } },
+    fungus = { material = "Ground", color = { 135, 60, 29 } },
+    foxfire = { material = "Neon", color = { 94, 206, 176 } },
+    lantern_amber = { material = "Neon", color = { 255, 181, 76 } },
+    iron = { material = "Metal", color = { 42, 46, 52 } },
+    meadow = { material = "Grass", color = { 131, 93, 24 } },
+}
+
+-- Longest-first prevents `stone` and `bark` families from swallowing their
+-- more specific dark/cut variants.
+local ORDER = table.freeze({
+    "lantern_amber",
+    "stone_dark",
+    "bark_dark",
+    "bark_mid",
+    "bark_cut",
+    "pine_dark",
+    "pine_mid",
+    "leaf_dark",
+    "leaf_mid",
+    "foxfire",
+    "fungus",
+    "meadow",
+    "stone",
+    "moss",
+    "iron",
+})
+
+function MeshMaterialPlan.groupForPart(partName: string): string?
+    local normalized = string.lower(partName)
+    for _, group in ORDER do
+        if string.find(normalized, group, 1, true) ~= nil then
+            return group
+        end
+    end
+    return nil
+end
+
+function MeshMaterialPlan.styleForPart(partName: string): Style?
+    local group = MeshMaterialPlan.groupForPart(partName)
+    if group == nil then
+        return nil
+    end
+    return STYLES[group]
+end
+
+function MeshMaterialPlan.groups(): { string }
+    return table.clone(ORDER)
+end
+
+return table.freeze(MeshMaterialPlan)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="82">
+          <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
 
 local InsertService = game:GetService("InsertService")
 
 local MeshAssetRegistry = require(script.Parent.MeshAssetRegistry)
+local MeshMaterialPlan = require(script.Parent.MeshMaterialPlan)
 
 local MeshTemplateLoader = {}
 MeshTemplateLoader.__index = MeshTemplateLoader
@@ -31024,6 +31157,65 @@ local function longestDimension(size: Vector3): number
     return math.max(size.X, size.Y, size.Z)
 end
 
+local ROBLOX_MATERIALS = table.freeze({
+    Grass = Enum.Material.Grass,
+    Ground = Enum.Material.Ground,
+    LeafyGrass = Enum.Material.LeafyGrass,
+    Metal = Enum.Material.Metal,
+    Neon = Enum.Material.Neon,
+    Slate = Enum.Material.Slate,
+    Wood = Enum.Material.Wood,
+    WoodPlanks = Enum.Material.WoodPlanks,
+})
+
+local function applyBuiltInMaterials(model: Model, customPbr: boolean): (number, number)
+    if customPbr then
+        return 0, 0
+    end
+
+    local styled = 0
+    local unstyled = 0
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("MeshPart") then
+            local style = MeshMaterialPlan.styleForPart(descendant.Name)
+            if style == nil then
+                unstyled += 1
+            else
+                local material = ROBLOX_MATERIALS[style.material]
+                local color = style.color
+                assert(material ~= nil, "unknown built-in mesh material " .. style.material)
+                descendant.Material = material
+                descendant.MaterialVariant = ""
+                descendant.Color = Color3.fromRGB(color[1], color[2], color[3])
+                for _, child in descendant:GetChildren() do
+                    if child:IsA("SurfaceAppearance") then
+                        child:Destroy()
+                    end
+                end
+                styled += 1
+            end
+        end
+    end
+    return styled, unstyled
+end
+
+local function applyProfileScale(model: Model, profileScale: Vector3)
+    if profileScale == Vector3.one then
+        return
+    end
+
+    local pivot = model:GetPivot()
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("BasePart") then
+            local relative = pivot:ToObjectSpace(descendant.CFrame)
+            descendant.Size *= profileScale
+            descendant.CFrame = pivot
+                * CFrame.new(relative.Position * profileScale)
+                * relative.Rotation
+        end
+    end
+end
+
 function MeshTemplateLoader.new(logger: Logger): MeshTemplateLoader
     return setmetatable({
         _logger = logger,
@@ -31048,6 +31240,11 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
         self._logger:info("mesh_asset_unknown", { assetId = stableId })
         return nil
     end
+    if entry.placementBand == "retired_visual_failure" then
+        self._failed[stableId] = true
+        self._logger:info("mesh_asset_retired", { assetId = stableId })
+        return nil
+    end
 
     local ok, loaded = pcall(InsertService.LoadAsset, InsertService, entry.assetId)
     if not ok or not loaded:IsA("Model") then
@@ -31065,6 +31262,7 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
 
     loaded.Name = "Template_" .. stableId
     local meshPartCount = sanitize(loaded)
+    local styledParts, unstyledParts = applyBuiltInMaterials(loaded, entry.pbr)
     local _, nativeSize = loaded:GetBoundingBox()
     local nativeLongest = longestDimension(nativeSize)
     local normalizationScale = MeshAssetRegistry.scaleFor(stableId, nativeLongest)
@@ -31092,6 +31290,8 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
         assetId = stableId,
         robloxAssetId = entry.assetId,
         meshParts = meshPartCount,
+        styledParts = styledParts,
+        unstyledParts = unstyledParts,
         nativeLongestDimension = nativeLongest,
         targetLongestDimension = entry.targetLongestDimension,
     })
@@ -31103,7 +31303,8 @@ function MeshTemplateLoader.place(
     stableId: string,
     parent: Instance,
     at: CFrame,
-    placementScale: number
+    placementScale: number,
+    profileScale: Vector3?
 ): Model?
     local template = self:_load(stableId)
     local templateScale = self._templateScale[stableId]
@@ -31114,9 +31315,12 @@ function MeshTemplateLoader.place(
     local clone = template:Clone()
     clone.Name = "Authored_" .. stableId
     clone:ScaleTo(templateScale * placementScale)
+    local resolvedProfileScale = profileScale or Vector3.one
+    applyProfileScale(clone, resolvedProfileScale)
     clone:PivotTo(at)
     clone:SetAttribute("MeshAssetId", stableId)
     clone:SetAttribute("PlacementScale", placementScale)
+    clone:SetAttribute("ProfileScale", resolvedProfileScale)
     clone.Parent = parent
     return clone
 end
@@ -31125,7 +31329,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -31288,7 +31492,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -31808,7 +32012,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -32004,15 +32208,15 @@ return table.freeze(WardenStagBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="85">
+  <Item class="StarterPlayer" referent="86">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="86">
+    <Item class="StarterPlayerScripts" referent="87">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="87">
+      <Item class="LocalScript" referent="88">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -32125,11 +32329,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="88">
+        <Item class="Folder" referent="89">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="89">
+          <Item class="ModuleScript" referent="90">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -32260,7 +32464,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="90">
+          <Item class="ModuleScript" referent="91">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -34333,7 +34537,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="91">
+          <Item class="ModuleScript" referent="92">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -34650,7 +34854,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="92">
+          <Item class="ModuleScript" referent="93">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -34758,7 +34962,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="93">
+          <Item class="ModuleScript" referent="94">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -34890,7 +35094,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="94">
+          <Item class="ModuleScript" referent="95">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -35166,7 +35370,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="95">
+  <Item class="Workspace" referent="96">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>
