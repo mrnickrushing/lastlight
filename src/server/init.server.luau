@@ -33,6 +33,7 @@ local SaveSchema = require(root.SaveSchema)
 local StatusEffectState = require(root.StatusEffectState)
 local SurvivalState = require(root.SurvivalState)
 local TownNightSchedule = require(root.TownNightSchedule)
+local TownProgression = require(root.TownProgression)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
@@ -75,7 +76,7 @@ local content = Registry.new(Regions)
 local networkService = NetworkService.new(logger)
 local profileService = ProfileService.new(logger, environmentConfig.UsePersistentData)
 local analyticsService = AnalyticsService.new(logger)
-local worldService = WorldService.new(logger, ExtractionPayoff)
+local worldService = WorldService.new(logger, ExtractionPayoff, TownProgression)
 local expeditionService = ExpeditionService.new(
     logger,
     worldService,

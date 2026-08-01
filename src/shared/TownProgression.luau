@@ -93,4 +93,79 @@ function TownProgression.resolve(profile: any): Consequence
     }
 end
 
+-- Emberhollow is one shared server world even though progression is stored per
+-- player. Reconcile arrivals monotonically so a fresh or lower-tier player can
+-- never tear down buildings and residents that are already visible. The first
+-- resolved chapter consequence seen by the server owns the shared landscape;
+-- later conflicting personal choices remain in those players' profiles and
+-- snapshots without making the physical world flicker between joins.
+function TownProgression.merge(current: any, incoming: Consequence): Consequence
+    if type(current) ~= "table" then
+        return incoming
+    end
+
+    local currentTier = math.clamp(math.floor(tonumber(current.tier) or 0), 0, 3)
+    local incomingTier = math.clamp(math.floor(tonumber(incoming.tier) or 0), 0, 3)
+    local base = if incomingTier > currentTier then incoming else current
+    local result = table.clone(base)
+    result.tier = math.max(currentTier, incomingTier)
+    result.growthStage = math.max(
+        math.clamp(math.floor(tonumber(current.growthStage) or 0), 0, 3),
+        math.clamp(math.floor(tonumber(incoming.growthStage) or 0), 0, 3)
+    )
+
+    local mergedStages = {}
+    for _, buildingId in
+        {
+            "building_first_lantern",
+            "building_archive",
+            "building_town_board",
+            "building_workbench",
+            "building_inn",
+        }
+    do
+        local currentStages = if type(current.buildingStages) == "table"
+            then current.buildingStages
+            else {}
+        local incomingStages = if type(incoming.buildingStages) == "table"
+            then incoming.buildingStages
+            else {}
+        mergedStages[buildingId] = math.max(
+            math.clamp(math.floor(tonumber(currentStages[buildingId]) or 0), 0, 3),
+            math.clamp(math.floor(tonumber(incomingStages[buildingId]) or 0), 0, 3)
+        )
+    end
+    result.buildingStages = mergedStages
+
+    local residentSet = {}
+    for _, source in { current.residentIds, incoming.residentIds } do
+        if type(source) == "table" then
+            for _, residentId in source do
+                if type(residentId) == "string" then
+                    residentSet[residentId] = true
+                end
+            end
+        end
+    end
+    local mergedResidents = {}
+    for _, residentId in { "npc_tomas_reed", "npc_pip_wren", "npc_ena_moss" } do
+        if residentSet[residentId] == true then
+            table.insert(mergedResidents, residentId)
+        end
+    end
+    result.residentIds = mergedResidents
+
+    local consequenceSource = if type(current.decision) == "string"
+        then current
+        elseif type(incoming.decision) == "string" then incoming
+        else base
+    result.title = consequenceSource.title
+    result.detail = consequenceSource.detail
+    result.decision = consequenceSource.decision
+    result.wardenOutcome = consequenceSource.wardenOutcome
+    result.landscapeKind = consequenceSource.landscapeKind
+    result.memorialKind = consequenceSource.memorialKind
+    return result :: Consequence
+end
+
 return table.freeze(TownProgression)
