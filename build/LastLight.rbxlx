@@ -20270,6 +20270,7 @@ print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
+local TweenService = game:GetService("TweenService")
 
 local HUDController = {}
 HUDController.__index = HUDController
@@ -20457,6 +20458,7 @@ export type HUDController = typeof(setmetatable(
     {} :: {
         _gui: ScreenGui,
         _scale: UIScale,
+        _phaseFrame: Frame,
         _phase: TextLabel,
         _objectiveFrame: Frame,
         _objective: TextLabel,
@@ -20519,6 +20521,7 @@ export type HUDController = typeof(setmetatable(
         _professionMenuOpen: boolean,
         _professionSwitchable: boolean,
         _lastToastRevision: number,
+        _lastPhase: string?,
         _onCompact: ((boolean) -> ())?,
         _onProfessionSelected: ((string) -> ())?,
         _onEquip: ((string) -> ())?,
@@ -21327,6 +21330,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     local self = setmetatable({
         _gui = gui,
         _scale = scale,
+        _phaseFrame = phaseFrame,
         _phase = phase,
         _objectiveFrame = objectiveFrame,
         _objective = objective,
@@ -21389,6 +21393,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _professionMenuOpen = false,
         _professionSwitchable = false,
         _lastToastRevision = 0,
+        _lastPhase = nil,
         _onCompact = nil,
         _onProfessionSelected = nil,
         _onEquip = nil,
@@ -21961,6 +21966,41 @@ function HUDController._layout(self: HUDController)
     end
 end
 
+function HUDController._presentPhase(self: HUDController, phase: string)
+    local accent = if phase == "DUSK"
+        then Color3.fromRGB(255, 164, 91)
+        elseif phase == "NIGHT" then Color3.fromRGB(174, 211, 255)
+        elseif phase == "REVEAL" then Color3.fromRGB(172, 255, 205)
+        else COLORS.amber
+
+    self._phase.TextColor3 = accent
+    local phaseStroke = self._phaseFrame:FindFirstChildOfClass("UIStroke")
+    if phaseStroke ~= nil then
+        phaseStroke.Color = accent
+    end
+
+    local scale = self._phaseFrame:FindFirstChild("PhasePulse")
+    if scale == nil then
+        scale = Instance.new("UIScale")
+        scale.Name = "PhasePulse"
+        scale.Parent = self._phaseFrame
+    end
+    if scale:IsA("UIScale") then
+        scale.Scale = 1.06
+        TweenService:Create(
+            scale,
+            TweenInfo.new(0.42, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            { Scale = 1 }
+        ):Play()
+    end
+    self._phase.TextTransparency = 0.22
+    TweenService:Create(
+        self._phase,
+        TweenInfo.new(0.34, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { TextTransparency = 0 }
+    ):Play()
+end
+
 function HUDController._updateClock(self: HUDController)
     local state = self._currentState
     if state == nil then
@@ -21968,6 +22008,10 @@ function HUDController._updateClock(self: HUDController)
     end
 
     local phase = string.upper(tostring(state.phase or "day"))
+    if phase ~= self._lastPhase then
+        self._lastPhase = phase
+        self:_presentPhase(phase)
+    end
     local phaseEndsAt = tonumber(state.phaseEndsAt) or 0
     local blackout = state.blackout
     local blackoutVisible = type(blackout) == "table"
