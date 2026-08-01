@@ -105,7 +105,12 @@ local function groundPatch(
     return patch
 end
 
-local function fernCluster(parent: Instance, center: Vector3, scale: number)
+local function fernCluster(
+    parent: Instance,
+    center: Vector3,
+    scale: number,
+    ambientSwayTag: string?
+)
     for blade = 1, 6 do
         local angle = (blade / 6) * math.pi * 2
         local frond = part(
@@ -125,6 +130,9 @@ local function fernCluster(parent: Instance, center: Vector3, scale: number)
             false
         )
         frond.CanQuery = false
+        if ambientSwayTag ~= nil and (blade == 2 or blade == 5) then
+            CollectionService:AddTag(frond, ambientSwayTag)
+        end
     end
 end
 
@@ -532,7 +540,7 @@ local function moduleDressing(parent: Instance, center: Vector3, seed: number, r
         local radius = random:NextNumber(7, 28)
         local position = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
         if index % 2 == 0 then
-            fernCluster(parent, position, random:NextNumber(0.7, 1.25))
+            fernCluster(parent, position, random:NextNumber(0.7, 1.25), runtimeIds.AmbientSwayTag)
         else
             local tuft = orb(
                 parent,

@@ -9,6 +9,7 @@ local RuntimeIds = {
     AmbientMoteTag = "LastLightAmbientMote",
     AmbientMotionTag = "LastLightAmbientMotion",
     AmbientLightTag = "LastLightAmbientLight",
+    AmbientSwayTag = "LastLightAmbientSway",
     ExpeditionModuleTag = "LastLightExpeditionModule",
     ExpeditionPointOfInterestTag = "LastLightExpeditionPOI",
     ExpeditionEventTag = "LastLightExpeditionEvent",

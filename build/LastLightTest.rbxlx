@@ -4980,6 +4980,7 @@ local RuntimeIds = {
     AmbientMoteTag = "LastLightAmbientMote",
     AmbientMotionTag = "LastLightAmbientMotion",
     AmbientLightTag = "LastLightAmbientLight",
+    AmbientSwayTag = "LastLightAmbientSway",
     ExpeditionModuleTag = "LastLightExpeditionModule",
     ExpeditionPointOfInterestTag = "LastLightExpeditionPOI",
     ExpeditionEventTag = "LastLightExpeditionEvent",
@@ -6646,13 +6647,44 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
+      <Item class="ModuleScript" referent="44">
+        <Properties>
+          <string name="Name">WeatherProfile</string>
+          <string name="Source"><![CDATA[--!strict
+
+local WeatherProfile = {}
+
+local STREAK_COUNTS = table.freeze({
+    day = 10,
+    dusk = 14,
+    night = 18,
+    reveal = 8,
+})
+
+function WeatherProfile.streakCount(phase: string): number
+    return STREAK_COUNTS[string.lower(phase)] or STREAK_COUNTS.day
+end
+
+function WeatherProfile.wrapHeight(height: number, floor: number, ceiling: number): number
+    assert(ceiling > floor, "weather ceiling must be above floor")
+    if height >= floor then
+        return height
+    end
+    local span = ceiling - floor
+    return ceiling - ((floor - height) % span)
+end
+
+return table.freeze(WeatherProfile)
+]]></string>
+        </Properties>
+      </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="44">
+  <Item class="ServerScriptService" referent="45">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="45">
+    <Item class="Script" referent="46">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -6926,7 +6958,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -7024,11 +7056,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="47">
+      <Item class="Folder" referent="48">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="48">
+        <Item class="ModuleScript" referent="49">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -7715,7 +7747,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="49">
+        <Item class="ModuleScript" referent="50">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -8213,7 +8245,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="50">
+        <Item class="ModuleScript" referent="51">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9283,7 +9315,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9753,7 +9785,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9857,7 +9889,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -9951,7 +9983,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10164,7 +10196,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10988,7 +11020,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11167,7 +11199,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11680,7 +11712,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12487,7 +12519,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12841,7 +12873,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13623,7 +13655,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13845,7 +13877,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14827,7 +14859,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15661,7 +15693,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16053,7 +16085,7 @@ local function lantern(parent: Instance, at: Vector3, scale: number, ambientLigh
     return post
 end
 
-local function pine(parent: Instance, position: Vector3, scale: number)
+local function pine(parent: Instance, position: Vector3, scale: number, ambientSwayTag: string?)
     local trunk = part(
         parent,
         "PineTrunk",
@@ -16084,6 +16116,9 @@ local function pine(parent: Instance, position: Vector3, scale: number)
             )
             foliage.Shape = Enum.PartType.Wedge
             foliage.CanQuery = false
+            if ambientSwayTag ~= nil and half == 2 then
+                CollectionService:AddTag(foliage, ambientSwayTag)
+            end
         end
     end
     for side = -1, 1, 2 do
@@ -16151,7 +16186,12 @@ local function groundPatch(
     return patch
 end
 
-local function fernCluster(parent: Instance, position: Vector3, scale: number)
+local function fernCluster(
+    parent: Instance,
+    position: Vector3,
+    scale: number,
+    ambientSwayTag: string?
+)
     for blade = 1, 7 do
         local angle = (blade / 7) * math.pi * 2
         local leaf = part(
@@ -16171,6 +16211,9 @@ local function fernCluster(parent: Instance, position: Vector3, scale: number)
             false
         )
         leaf.CanQuery = false
+        if ambientSwayTag ~= nil and (blade == 2 or blade == 5) then
+            CollectionService:AddTag(leaf, ambientSwayTag)
+        end
     end
 end
 
@@ -16760,7 +16803,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         local radius = random:NextNumber(54, 154)
         local zBias = -70
         local position = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius + zBias)
-        pine(geometry, position, random:NextNumber(0.82, 1.65))
+        pine(geometry, position, random:NextNumber(0.82, 1.65), _self._runtimeIds.AmbientSwayTag)
         if index % 3 == 0 then
             rock(
                 geometry,
@@ -16780,7 +16823,8 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             fernCluster(
                 geometry,
                 position + Vector3.new(random:NextNumber(-7, 7), 0, random:NextNumber(-7, 7)),
-                random:NextNumber(0.75, 1.35)
+                random:NextNumber(0.75, 1.35),
+                _self._runtimeIds.AmbientSwayTag
             )
         end
         if index % 13 == 0 then
@@ -16835,7 +16879,12 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         local position = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius - 70)
         rock(geometry, position, 0.5 + (index % 5) * 0.13)
         if index % 2 == 0 then
-            fernCluster(geometry, position + Vector3.new(3, 0, -2), 0.8)
+            fernCluster(
+                geometry,
+                position + Vector3.new(3, 0, -2),
+                0.8,
+                _self._runtimeIds.AmbientSwayTag
+            )
         end
     end
 
@@ -18694,11 +18743,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="65">
+      <Item class="Folder" referent="66">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -18808,7 +18857,12 @@ local function groundPatch(
     return patch
 end
 
-local function fernCluster(parent: Instance, center: Vector3, scale: number)
+local function fernCluster(
+    parent: Instance,
+    center: Vector3,
+    scale: number,
+    ambientSwayTag: string?
+)
     for blade = 1, 6 do
         local angle = (blade / 6) * math.pi * 2
         local frond = part(
@@ -18828,6 +18882,9 @@ local function fernCluster(parent: Instance, center: Vector3, scale: number)
             false
         )
         frond.CanQuery = false
+        if ambientSwayTag ~= nil and (blade == 2 or blade == 5) then
+            CollectionService:AddTag(frond, ambientSwayTag)
+        end
     end
 end
 
@@ -19235,7 +19292,7 @@ local function moduleDressing(parent: Instance, center: Vector3, seed: number, r
         local radius = random:NextNumber(7, 28)
         local position = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
         if index % 2 == 0 then
-            fernCluster(parent, position, random:NextNumber(0.7, 1.25))
+            fernCluster(parent, position, random:NextNumber(0.7, 1.25), runtimeIds.AmbientSwayTag)
         else
             local tuft = orb(
                 parent,
@@ -20392,7 +20449,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -20781,7 +20838,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="68">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -20944,7 +21001,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -21139,11 +21196,11 @@ return table.freeze(WardenStagBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="70">
+    <Item class="Folder" referent="71">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="71">
+      <Item class="Script" referent="72">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -21516,6 +21573,13 @@ for _, target in ambientLightTargets do
     assert(target:IsA("BasePart"), "ambient light tags must target BaseParts")
     assert(not target.CanCollide, "ambient light motion cannot own collision")
 end
+local ambientSwayTargets = CollectionService:GetTagged(RuntimeIds.AmbientSwayTag)
+assert(#ambientSwayTargets >= 120, "expected authored foliage sway coverage")
+for _, target in ambientSwayTargets do
+    assert(target:IsA("BasePart"), "ambient sway tags must target BaseParts")
+    assert(not target.CanCollide, "ambient foliage motion cannot own collision")
+    assert(not target.CanQuery, "ambient foliage motion cannot affect targeting")
+end
 local blackoutLayer = expedition:FindFirstChild("BramblewakeBlackoutLayer")
 assert(blackoutLayer ~= nil and blackoutLayer:IsA("Model"), "Bramblewake Blackout layer is missing")
 assert(
@@ -21630,15 +21694,15 @@ print("[Last Light] PASS FoundationIntegration")
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="72">
+  <Item class="StarterPlayer" referent="73">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="73">
+    <Item class="StarterPlayerScripts" referent="74">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="74">
+      <Item class="LocalScript" referent="75">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -21653,11 +21717,13 @@ local Config = require(root.Config)
 local AmbientMotion = require(root.AmbientMotion)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local RuntimeIds = require(root.RuntimeIds)
+local WeatherProfile = require(root.WeatherProfile)
 local AmbientController = require(script.Controllers.AmbientController)
 local HUDController = require(script.Controllers.HUDController)
 local InputController = require(script.Controllers.InputController)
 local InteractionController = require(script.Controllers.InteractionController)
 local WorldMotionController = require(script.Controllers.WorldMotionController)
+local WeatherController = require(script.Controllers.WeatherController)
 
 local runtime =
     ReplicatedStorage:WaitForChild(RuntimeIds.FolderName, Config.BootstrapTimeoutSeconds)
@@ -21681,8 +21747,10 @@ local ambient = AmbientController.new(RuntimeIds.AmbientMoteTag)
 local worldMotion = WorldMotionController.new(
     RuntimeIds.AmbientMotionTag,
     RuntimeIds.AmbientLightTag,
+    RuntimeIds.AmbientSwayTag,
     AmbientMotion
 )
+local weather = WeatherController.new(WeatherProfile)
 local interaction = InteractionController.new(RuntimeIds.InteractionTag, hud)
 
 local function send(kind: string, fields: { [string]: any }?)
@@ -21729,6 +21797,7 @@ stateChanged.OnClientEvent:Connect(function(snapshot: any)
     hud:update(snapshot)
     ambient:setPhase(tostring(snapshot.phase or "day"))
     worldMotion:setPhase(tostring(snapshot.phase or "day"))
+    weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
 end)
 
 task.spawn(function()
@@ -21739,17 +21808,18 @@ task.spawn(function()
         hud:update(snapshot)
         ambient:setPhase(tostring(snapshot.phase or "day"))
         worldMotion:setPhase(tostring(snapshot.phase or "day"))
+        weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
     end
 end)
 
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="75">
+        <Item class="Folder" referent="76">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="76">
+          <Item class="ModuleScript" referent="77">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -21880,7 +21950,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="77">
+          <Item class="ModuleScript" referent="78">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -23953,7 +24023,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="78">
+          <Item class="ModuleScript" referent="79">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -24270,7 +24340,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="79">
+          <Item class="ModuleScript" referent="80">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -24378,7 +24448,139 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="80">
+          <Item class="ModuleScript" referent="81">
+            <Properties>
+              <string name="Name">WeatherController</string>
+              <string name="Source"><![CDATA[--!strict
+
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+
+local WeatherController = {}
+WeatherController.__index = WeatherController
+
+type Streak = {
+    drift: number,
+    offset: Vector3,
+    part: Part,
+    speed: number,
+}
+
+export type WeatherController = typeof(setmetatable(
+    {} :: {
+        _profile: any,
+        _folder: Folder,
+        _streaks: { Streak },
+        _active: boolean,
+        _phase: string,
+        _elapsed: number,
+        _connection: RBXScriptConnection?,
+    },
+    WeatherController
+))
+
+local MAX_STREAKS = 18
+local UPDATE_INTERVAL = 1 / 24
+local FLOOR = -12
+local CEILING = 28
+
+function WeatherController.new(profile: any): WeatherController
+    local folder = Instance.new("Folder")
+    folder.Name = "LastLightLocalWeather"
+    folder.Parent = Workspace
+
+    local random = Random.new(1847)
+    local streaks: { Streak } = {}
+    for _ = 1, MAX_STREAKS do
+        local streak = Instance.new("Part")
+        streak.Name = "BramblewakeRain"
+        streak.Anchored = true
+        streak.CanCollide = false
+        streak.CanQuery = false
+        streak.CanTouch = false
+        streak.CastShadow = false
+        streak.Color = Color3.fromRGB(163, 193, 201)
+        streak.Material = Enum.Material.Glass
+        streak.Size = Vector3.new(0.045, random:NextNumber(3.8, 6.2), 0.045)
+        streak.Transparency = 1
+        streak.Parent = folder
+        table.insert(streaks, {
+            drift = random:NextNumber(-1.8, -0.7),
+            offset = Vector3.new(
+                random:NextNumber(-28, 28),
+                random:NextNumber(FLOOR, CEILING),
+                random:NextNumber(-34, 18)
+            ),
+            part = streak,
+            speed = random:NextNumber(44, 62),
+        })
+    end
+
+    local self = setmetatable({
+        _profile = profile,
+        _folder = folder,
+        _streaks = streaks,
+        _active = false,
+        _phase = "day",
+        _elapsed = 0,
+        _connection = nil,
+    }, WeatherController)
+
+    local accumulator = 0
+    self._connection = RunService.RenderStepped:Connect(function(deltaTime: number)
+        accumulator += deltaTime
+        if accumulator < UPDATE_INTERVAL then
+            return
+        end
+        local elapsed = accumulator
+        accumulator = 0
+        self:_step(elapsed)
+    end)
+    return self
+end
+
+function WeatherController.setContext(
+    self: WeatherController,
+    expeditionActive: boolean,
+    phase: string
+)
+    self._active = expeditionActive
+    self._phase = string.lower(phase)
+    if not expeditionActive then
+        for _, streak in self._streaks do
+            streak.part.Transparency = 1
+        end
+    end
+end
+
+function WeatherController._step(self: WeatherController, deltaTime: number)
+    if not self._active then
+        return
+    end
+    self._elapsed += deltaTime
+    local camera = Workspace.CurrentCamera
+    if camera == nil then
+        return
+    end
+    local cameraPosition = camera.CFrame.Position
+    local visibleCount = self._profile.streakCount(self._phase)
+    for index, streak in self._streaks do
+        local nextY =
+            self._profile.wrapHeight(streak.offset.Y - streak.speed * deltaTime, FLOOR, CEILING)
+        streak.offset = Vector3.new(streak.offset.X, nextY, streak.offset.Z)
+        local wind = math.sin(self._elapsed * 0.43 + index) * 0.55
+        local fallDrift = (CEILING - nextY) * 0.22 * streak.drift
+        local position = cameraPosition + streak.offset + Vector3.new(fallDrift + wind, 0, 0)
+        streak.part.CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(-7))
+        streak.part.Transparency = if index <= visibleCount then 0.68 else 1
+    end
+end
+
+return WeatherController
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="82">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -24407,13 +24609,22 @@ type LightState = {
     active: boolean,
 }
 
+type SwayState = {
+    baseCFrame: CFrame,
+    phaseOffset: number,
+    position: Vector3,
+    active: boolean,
+}
+
 export type WorldMotionController = typeof(setmetatable(
     {} :: {
         _motionTag: string,
         _lightTag: string,
+        _swayTag: string,
         _ambientMotion: any,
         _motions: { [Model]: MotionState },
         _lights: { [BasePart]: LightState },
+        _sways: { [BasePart]: SwayState },
         _phase: string,
         _elapsed: number,
         _connection: RBXScriptConnection?,
@@ -24422,6 +24633,7 @@ export type WorldMotionController = typeof(setmetatable(
 ))
 
 local ACTIVE_DISTANCE = 190
+local SWAY_DISTANCE = 125
 local UPDATE_INTERVAL = 1 / 20
 
 local function phaseOffsetFor(instance: Instance): number
@@ -24435,14 +24647,17 @@ end
 function WorldMotionController.new(
     motionTag: string,
     lightTag: string,
+    swayTag: string,
     ambientMotion: any
 ): WorldMotionController
     local self = setmetatable({
         _motionTag = motionTag,
         _lightTag = lightTag,
+        _swayTag = swayTag,
         _ambientMotion = ambientMotion,
         _motions = {},
         _lights = {},
+        _sways = {},
         _phase = "day",
         _elapsed = 0,
         _connection = nil,
@@ -24485,6 +24700,22 @@ function WorldMotionController.new(
             self._lights[instance] = nil
         end
     end
+    local function registerSway(instance: Instance)
+        if not instance:IsA("BasePart") or self._sways[instance] ~= nil then
+            return
+        end
+        self._sways[instance] = {
+            baseCFrame = instance.CFrame,
+            phaseOffset = phaseOffsetFor(instance),
+            position = instance.Position,
+            active = false,
+        }
+    end
+    local function unregisterSway(instance: Instance)
+        if instance:IsA("BasePart") then
+            self._sways[instance] = nil
+        end
+    end
 
     for _, instance in CollectionService:GetTagged(motionTag) do
         registerMotion(instance)
@@ -24492,10 +24723,15 @@ function WorldMotionController.new(
     for _, instance in CollectionService:GetTagged(lightTag) do
         registerLight(instance)
     end
+    for _, instance in CollectionService:GetTagged(swayTag) do
+        registerSway(instance)
+    end
     CollectionService:GetInstanceAddedSignal(motionTag):Connect(registerMotion)
     CollectionService:GetInstanceRemovedSignal(motionTag):Connect(unregisterMotion)
     CollectionService:GetInstanceAddedSignal(lightTag):Connect(registerLight)
     CollectionService:GetInstanceRemovedSignal(lightTag):Connect(unregisterLight)
+    CollectionService:GetInstanceAddedSignal(swayTag):Connect(registerSway)
+    CollectionService:GetInstanceRemovedSignal(swayTag):Connect(unregisterSway)
 
     local accumulator = 0
     self._connection = RunService.RenderStepped:Connect(function(deltaTime: number)
@@ -24567,6 +24803,25 @@ function WorldMotionController._step(self: WorldMotionController, deltaTime: num
             state.active = false
         end
     end
+
+    for foliage, state in self._sways do
+        if foliage.Parent == nil then
+            self._sways[foliage] = nil
+            continue
+        end
+        local active = (state.position - cameraPosition).Magnitude <= SWAY_DISTANCE
+        if active then
+            local wind = math.sin(self._elapsed * 1.18 + state.phaseOffset)
+            local gust = math.sin(self._elapsed * 0.31 + state.phaseOffset * 0.47)
+            local angle = math.rad(1.8 + if self._phase == "night" then 1.1 else 0.4)
+            foliage.CFrame = state.baseCFrame
+                * CFrame.Angles(wind * angle * 0.22, 0, (wind + gust * 0.35) * angle)
+            state.active = true
+        elseif state.active then
+            foliage.CFrame = state.baseCFrame
+            state.active = false
+        end
+    end
 end
 
 return WorldMotionController
@@ -24577,7 +24832,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="81">
+  <Item class="Workspace" referent="83">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

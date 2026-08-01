@@ -387,7 +387,7 @@ local function lantern(parent: Instance, at: Vector3, scale: number, ambientLigh
     return post
 end
 
-local function pine(parent: Instance, position: Vector3, scale: number)
+local function pine(parent: Instance, position: Vector3, scale: number, ambientSwayTag: string?)
     local trunk = part(
         parent,
         "PineTrunk",
@@ -418,6 +418,9 @@ local function pine(parent: Instance, position: Vector3, scale: number)
             )
             foliage.Shape = Enum.PartType.Wedge
             foliage.CanQuery = false
+            if ambientSwayTag ~= nil and half == 2 then
+                CollectionService:AddTag(foliage, ambientSwayTag)
+            end
         end
     end
     for side = -1, 1, 2 do
@@ -485,7 +488,12 @@ local function groundPatch(
     return patch
 end
 
-local function fernCluster(parent: Instance, position: Vector3, scale: number)
+local function fernCluster(
+    parent: Instance,
+    position: Vector3,
+    scale: number,
+    ambientSwayTag: string?
+)
     for blade = 1, 7 do
         local angle = (blade / 7) * math.pi * 2
         local leaf = part(
@@ -505,6 +513,9 @@ local function fernCluster(parent: Instance, position: Vector3, scale: number)
             false
         )
         leaf.CanQuery = false
+        if ambientSwayTag ~= nil and (blade == 2 or blade == 5) then
+            CollectionService:AddTag(leaf, ambientSwayTag)
+        end
     end
 end
 
@@ -1094,7 +1105,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         local radius = random:NextNumber(54, 154)
         local zBias = -70
         local position = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius + zBias)
-        pine(geometry, position, random:NextNumber(0.82, 1.65))
+        pine(geometry, position, random:NextNumber(0.82, 1.65), _self._runtimeIds.AmbientSwayTag)
         if index % 3 == 0 then
             rock(
                 geometry,
@@ -1114,7 +1125,8 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             fernCluster(
                 geometry,
                 position + Vector3.new(random:NextNumber(-7, 7), 0, random:NextNumber(-7, 7)),
-                random:NextNumber(0.75, 1.35)
+                random:NextNumber(0.75, 1.35),
+                _self._runtimeIds.AmbientSwayTag
             )
         end
         if index % 13 == 0 then
@@ -1169,7 +1181,12 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         local position = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius - 70)
         rock(geometry, position, 0.5 + (index % 5) * 0.13)
         if index % 2 == 0 then
-            fernCluster(geometry, position + Vector3.new(3, 0, -2), 0.8)
+            fernCluster(
+                geometry,
+                position + Vector3.new(3, 0, -2),
+                0.8,
+                _self._runtimeIds.AmbientSwayTag
+            )
         end
     end
 
