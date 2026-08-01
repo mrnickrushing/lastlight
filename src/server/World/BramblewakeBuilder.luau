@@ -1,6 +1,7 @@
 --!strict
 
 local CollectionService = game:GetService("CollectionService")
+local WorldSignBuilder = require(script.Parent.WorldSignBuilder)
 
 local BramblewakeBuilder = {}
 
@@ -310,19 +311,168 @@ end
 -- this compatibility hook for older callers without adding floating UI cards.
 local function objectIcon(_target: BasePart, _kind: string, _color: Color3) end
 
-local function destinationRing(parent: Instance, center: Vector3, color: Color3, radius: number)
-    for index = 1, 8 do
-        local angle = (index / 8) * math.pi * 2
-        local marker = orb(
-            parent,
-            "DestinationMarker",
-            center + Vector3.new(math.cos(angle) * radius, 0.35, math.sin(angle) * radius),
-            0.28,
-            color,
-            Enum.Material.Neon
+local function destinationCairns(parent: Instance, center: Vector3, color: Color3, radius: number)
+    local placements = {
+        { angle = math.rad(28), radius = radius * 0.92, lean = math.rad(-5) },
+        { angle = math.rad(157), radius = radius * 1.08, lean = math.rad(4) },
+        { angle = math.rad(262), radius = radius * 0.84, lean = math.rad(-3) },
+    }
+    for index, placement in placements do
+        local offset = Vector3.new(
+            math.cos(placement.angle) * placement.radius,
+            0,
+            math.sin(placement.angle) * placement.radius
         )
-        marker.CanQuery = false
+        local base = center + offset
+        local stone = part(
+            parent,
+            "DestinationCairnStone",
+            Vector3.new(1.75, 1.35, 1.45),
+            CFrame.new(base + Vector3.new(0, 0.68, 0))
+                * CFrame.Angles(0, placement.angle + 0.37, placement.lean),
+            if index == 2 then Color3.fromRGB(70, 81, 77) else STONE,
+            Enum.Material.Slate,
+            false
+        )
+        stone.Shape = Enum.PartType.Ball
+        local inset = part(
+            parent,
+            "DestinationCairnInset",
+            Vector3.new(0.42, 0.42, 0.16),
+            CFrame.lookAt(base + Vector3.new(0, 1.62, 0), center),
+            color,
+            Enum.Material.Glass,
+            false
+        )
+        inset.Transparency = 0.12
+        inset:SetAttribute("CairnIndex", index)
     end
+end
+
+local function cagedLanternShell(parent: Instance, center: Vector3, scale: number, prefix: string)
+    part(
+        parent,
+        prefix .. "StoneFoot",
+        Vector3.new(4.4, 0.8, 4.4) * scale,
+        CFrame.new(center + Vector3.new(0, -2.2 * scale, 0)),
+        STONE,
+        Enum.Material.Slate,
+        false
+    )
+    for sideX = -1, 1, 2 do
+        for sideZ = -1, 1, 2 do
+            part(
+                parent,
+                prefix .. "CageBar",
+                Vector3.new(0.28, 5.1, 0.28) * scale,
+                CFrame.new(center + Vector3.new(sideX * 1.45 * scale, 0, sideZ * 1.45 * scale))
+                    * CFrame.Angles(0, 0, math.rad(sideX * sideZ * 2.5)),
+                Color3.fromRGB(48, 52, 56),
+                Enum.Material.Metal,
+                false
+            )
+        end
+    end
+    local hood = part(
+        parent,
+        prefix .. "RainHood",
+        Vector3.new(4.8, 1.1, 4.8) * scale,
+        CFrame.new(center + Vector3.new(0, 2.72 * scale, 0)),
+        DARK_BARK,
+        Enum.Material.Slate,
+        false
+    )
+    hood.Shape = Enum.PartType.Cylinder
+end
+
+local function livingRootShell(parent: Instance, center: Vector3, scale: number, prefix: string)
+    part(
+        parent,
+        prefix .. "RootMound",
+        Vector3.new(5.8, 1.2, 5.2) * scale,
+        CFrame.new(center + Vector3.new(0, -2.15 * scale, 0)),
+        Color3.fromRGB(56, 67, 50),
+        Enum.Material.Ground,
+        false
+    )
+    for rootIndex = 1, 3 do
+        local angle = (rootIndex / 3) * math.pi * 2
+        part(
+            parent,
+            prefix .. "LivingRoot",
+            Vector3.new(0.72, 5.6 + (rootIndex % 2) * 1.1, 0.72) * scale,
+            CFrame.new(
+                center
+                    + Vector3.new(
+                        math.cos(angle) * 1.75 * scale,
+                        -0.2 * scale,
+                        math.sin(angle) * 1.75 * scale
+                    )
+            )
+                * CFrame.Angles(
+                    math.rad(math.sin(angle) * 10),
+                    angle,
+                    math.rad(math.cos(angle) * 28)
+                ),
+            if rootIndex % 2 == 0 then BARK else DARK_BARK,
+            Enum.Material.Wood,
+            false
+        )
+    end
+end
+
+local function chapterChoiceShrine(
+    parent: Instance,
+    center: Vector3,
+    color: Color3,
+    decisionId: string
+): BasePart
+    local target = orb(
+        parent,
+        "GreenwardChoice_" .. decisionId,
+        center + Vector3.new(0, 1.3, 0),
+        1.15,
+        color,
+        Enum.Material.Glass
+    )
+    target.Transparency = 0.35
+    part(
+        parent,
+        "ChoicePlanter_" .. decisionId,
+        Vector3.new(6.8, 1.5, 5.2),
+        CFrame.new(center + Vector3.new(0, -0.25, 0)),
+        Color3.fromRGB(78, 58, 39),
+        Enum.Material.WoodPlanks,
+        false
+    )
+    local stemCount = 2
+    for stemIndex = 1, stemCount do
+        local x = ((stemIndex * 17) % 9 - 4) * 0.55
+        local z = ((stemIndex * 11) % 7 - 3) * 0.48
+        local height = 2.4 + (stemIndex % 3) * 0.65
+        part(
+            parent,
+            "ChoicePlantStem_" .. decisionId,
+            Vector3.new(0.28, height, 0.28),
+            CFrame.new(center + Vector3.new(x, 0.5 + height * 0.5, z))
+                * CFrame.Angles(0, 0, math.rad((stemIndex % 2 == 0 and 1 or -1) * 8)),
+            if decisionId == "restore_farmland" then MEADOW else MOSS,
+            Enum.Material.Grass,
+            false
+        )
+        local leaf = part(
+            parent,
+            "ChoicePlantLeaf_" .. decisionId,
+            Vector3.new(1.15, 0.22, 0.65),
+            CFrame.new(center + Vector3.new(x + 0.35, 1.4 + height * 0.62, z)),
+            color,
+            Enum.Material.LeafyGrass,
+            false
+        )
+        leaf.Shape = Enum.PartType.Wedge
+    end
+    target:SetAttribute("PhysicalChoiceShrine", true)
+    return target
 end
 
 local function tree(parent: Instance, position: Vector3, scale: number)
@@ -463,26 +613,16 @@ local function evacuationRoadMarker(
     local side = Vector3.new(-direction.Z, 0, direction.X)
     local base = center + direction * 13 + side * 9
     local lean = if sequenceIndex % 4 == 1 then math.rad(-4) else math.rad(4)
-    part(
+    local sign = WorldSignBuilder.createDirectionSign(
         parent,
         "EvacuationRoadMarker",
-        Vector3.new(0.72, 6.2, 0.72),
-        CFrame.new(base + Vector3.new(0, 3.1, 0)) * CFrame.Angles(0, 0, lean),
-        DARK_BARK,
-        Enum.Material.Wood,
-        false
+        CFrame.lookAt(base + Vector3.new(0, 5.4, 0), neighbor) * CFrame.Angles(0, 0, lean),
+        "EVACUATION ROAD",
+        CREAM
     )
-    local board = part(
-        parent,
-        "EvacuationRoadSign",
-        Vector3.new(6.4, 2.1, 0.48),
-        CFrame.lookAt(base + Vector3.new(0, 5.4, 0), neighbor),
-        Color3.fromRGB(88, 59, 38),
-        Enum.Material.WoodPlanks,
-        false
-    )
-    board.CanQuery = false
-    billboard(board, "EVACUATION ROAD", CREAM)
+    local board = sign.PrimaryPart
+    assert(board ~= nil, "evacuation road sign has no board")
+    board.Name = "EvacuationRoadSign"
 end
 
 local function window(parent: Instance, position: Vector3, rotation: number)
@@ -1457,7 +1597,7 @@ local function buildEventSocket(
     CollectionService:AddTag(anchor, runtimeIds.ExpeditionEventTag)
     billboard(anchor, string.upper(definition.displayName), AMBER)
     objectIcon(anchor, "event", AMBER)
-    destinationRing(parent, anchor.Position, AMBER, 5.5)
+    destinationCairns(parent, anchor.Position, AMBER, 5.5)
 
     local scene = Instance.new("Model")
     scene.Name = "EventScene_" .. definition.id
@@ -1954,7 +2094,7 @@ local function buildWardenSeal(
         center + Vector3.new(0, 1.5, 0),
         7,
         Color3.fromRGB(87, 119, 101),
-        Enum.Material.SmoothPlastic
+        Enum.Material.Glass
     )
     seal.Shape = Enum.PartType.Cylinder
     seal.CFrame *= CFrame.Angles(0, 0, math.rad(90))
@@ -1996,14 +2136,15 @@ local function buildWardenSeal(
             arena,
             "LivingRootNode" .. definition.suffix,
             center + definition.direction * 22 + Vector3.new(0, 3, 0),
-            5,
+            1.45,
             Color3.fromRGB(80, 116, 83),
-            Enum.Material.SmoothPlastic
+            Enum.Material.Glass
         )
         node.Shape = Enum.PartType.Cylinder
         node.CFrame *= CFrame.Angles(0, 0, math.rad(90))
-        node.Size = Vector3.new(2.6, 4.8, 2.6)
+        node.Size = Vector3.new(1.2, 2.7, 1.2)
         node.Transparency = 0.34
+        livingRootShell(arena, node.Position, 0.92, "Warden" .. definition.suffix)
         node:SetAttribute("BossId", "boss_warden_stag")
         node:SetAttribute("BossInteraction", "cleanse_root")
         node:SetAttribute("BossNodeId", definition.nodeId)
@@ -2042,10 +2183,27 @@ local function buildWardenSeal(
             CFrame.new(center + Vector3.new(definition.side * 12, 4.5, 8))
                 * CFrame.Angles(0, 0, math.rad(definition.side * 24)),
             Color3.fromRGB(194, 199, 173),
-            Enum.Material.SmoothPlastic,
+            Enum.Material.Wood,
             false
         )
         target.Transparency = 0.2
+        for tineIndex = 1, 3 do
+            part(
+                arena,
+                "MemoryAntlerTine",
+                Vector3.new(0.7, 3.1 - tineIndex * 0.35, 0.7),
+                target.CFrame
+                    * CFrame.new(
+                        definition.side * (0.75 + tineIndex * 0.18),
+                        1.1 + tineIndex * 1.65,
+                        0
+                    )
+                    * CFrame.Angles(0, 0, math.rad(-definition.side * (42 + tineIndex * 4))),
+                Color3.fromRGB(151, 148, 125),
+                Enum.Material.Wood,
+                false
+            )
+        end
         target:SetAttribute("BossId", "boss_warden_stag")
         target:SetAttribute("BossInteraction", "break_antler")
         target:SetAttribute("BossAntlerId", definition.antlerId)
@@ -2133,6 +2291,7 @@ local function buildBlackoutLayer(
         AMBER,
         Enum.Material.Neon
     )
+    cagedLanternShell(layer, sourceFlame.Position, 0.78, "BlackoutLantern")
     light(sourceFlame, AMBER, 1.8, 16)
     fireSource:SetAttribute("BlackoutInteraction", "take_fire")
     CollectionService:AddTag(fireSource, runtimeIds.ExpeditionBlackoutTag)
@@ -2248,14 +2407,9 @@ local function buildBlackoutLayer(
             },
         }
     do
-        local seedling = orb(
-            layer,
-            "GreenwardChoice_" .. definition.decisionId,
-            bossCenter + definition.offset,
-            5,
-            definition.color,
-            Enum.Material.SmoothPlastic
-        )
+        local shrineCenter = bossCenter + Vector3.new(definition.offset.X, 0, definition.offset.Z)
+        local seedling =
+            chapterChoiceShrine(layer, shrineCenter, definition.color, definition.decisionId)
         seedling.Transparency = 0.58
         seedling:SetAttribute("BlackoutInteraction", "chapter_decision")
         seedling:SetAttribute("BlackoutDecisionId", definition.decisionId)
@@ -2394,11 +2548,12 @@ function BramblewakeBuilder.build(
                 module,
                 "OldGrowthFireSource",
                 center + Vector3.new(-20, 3.4, -12),
-                4.2,
+                1.35,
                 AMBER,
-                Enum.Material.SmoothPlastic
+                Enum.Material.Glass
             )
             fireSource.Transparency = 0.48
+            cagedLanternShell(module, fireSource.Position, 0.86, "OldGrowthLantern")
             fireSource:SetAttribute("EliteId", definition.eliteId)
             fireSource:SetAttribute("EliteInteraction", "fire_source")
             billboard(fireSource, "LANTERN FIRE", CREAM)
@@ -2408,11 +2563,12 @@ function BramblewakeBuilder.build(
                 module,
                 "OldGrowthRootHeart",
                 center + Vector3.new(20, 4.2, 12),
-                5.2,
+                1.6,
                 FOXFIRE,
-                Enum.Material.SmoothPlastic
+                Enum.Material.Glass
             )
             rootHeart.Transparency = 0.56
+            livingRootShell(module, rootHeart.Position, 1.08, "OldGrowthHeart")
             rootHeart:SetAttribute("EliteId", definition.eliteId)
             rootHeart:SetAttribute("EliteInteraction", "root_heart")
             billboard(rootHeart, "ROOT HEART", CREAM)
@@ -2435,7 +2591,7 @@ function BramblewakeBuilder.build(
             target:SetAttribute("ExtractionId", "extraction_bw_wayhome")
             CollectionService:AddTag(target, runtimeIds.ExpeditionExtractionTag)
             extractionTarget = target
-            destinationRing(module, target.Position, AMBER, 7)
+            destinationCairns(module, target.Position, AMBER, 7)
         end
 
         if placement.poiId ~= nil then
@@ -2459,16 +2615,14 @@ function BramblewakeBuilder.build(
         end
 
         if placement.index == 1 then
-            local marker = orb(
+            local arrivalSign = WorldSignBuilder.createDirectionSign(
                 module,
                 "BramblewakeArrival",
-                center + Vector3.new(0, 5, 0),
-                4,
-                FOXFIRE,
-                Enum.Material.Neon
+                CFrame.new(center + Vector3.new(0, 5.4, -8)) * CFrame.Angles(0, math.pi, 0),
+                "BRAMBLEWAKE WOODS",
+                CREAM
             )
-            marker.Transparency = 0.25
-            billboard(marker, "BRAMBLEWAKE WOODS", CREAM)
+            arrivalSign:SetAttribute("ArrivalLandmark", true)
         end
     end
 

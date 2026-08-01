@@ -41,7 +41,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.40.1", "unexpected build version")
+assert(Config.BuildVersion == "0.41.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -337,7 +337,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v22",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v23",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -379,6 +379,33 @@ assert(world:FindFirstChild("HeartwoodCavity", true) ~= nil, "Heartwood needs an
 assert(heroDetailCounts.BarricadeWorkPost == 5, "construction plot needs visible work in progress")
 assert(heroDetailCounts.FirstLanternCagePost == 4, "First Lantern needs a physical metal cage")
 assert(heroDetailCounts.ArchiveNotice == 5, "archive needs readable physical field notices")
+local noticeArtwork = 0
+local townNotices = 0
+local physicalNoticeBoards = 0
+for _, descendant in world:GetDescendants() do
+    if descendant:IsA("ImageLabel") and string.sub(descendant.Name, 1, 12) == "NoticeImage_" then
+        noticeArtwork += 1
+        assert(
+            descendant.Image == "rbxassetid://83727643922166",
+            "first-world notice uses an unapproved cloud image"
+        )
+        assert(
+            descendant.ImageRectSize == Vector2.new(627, 418),
+            "notice image does not use one measured atlas cell"
+        )
+    elseif descendant:IsA("BasePart") and descendant.Name == "TownNotice" then
+        townNotices += 1
+        assert(descendant.Material == Enum.Material.Fabric, "town notices must read as paper")
+        assert(type(descendant:GetAttribute("NoticePanelId")) == "string", "town notice has no art")
+    elseif
+        descendant:IsA("BasePart") and descendant:GetAttribute("PhysicalNoticeBoard") == true
+    then
+        physicalNoticeBoards += 1
+    end
+end
+assert(townNotices == 3, "Town Board needs three distinct illustrated notices")
+assert(noticeArtwork == 8, "first-world boards need all eight placed notice illustrations")
+assert(physicalNoticeBoards == 2, "archive and Town Board must both be physical notice boards")
 local roadSegments = 0
 local roadEdgeStones = 0
 local roadRuts = 0
@@ -665,6 +692,13 @@ local trailWear = 0
 local trailEdges = 0
 local roadMarkers = 0
 local roadSigns = 0
+local destinationMarkers = 0
+local destinationCairnStones = 0
+local physicalExpeditionSigns = 0
+local chapterChoicePlanters = 0
+local oldGrowthCageBars = 0
+local oldGrowthHeartRoots = 0
+local wardenLivingRoots = 0
 for _, descendant in expedition:GetDescendants() do
     if descendant.Name == "CriticalPath" then
         criticalPaths += 1
@@ -676,12 +710,36 @@ for _, descendant in expedition:GetDescendants() do
         roadMarkers += 1
     elseif descendant.Name == "EvacuationRoadSign" then
         roadSigns += 1
+    elseif descendant.Name == "DestinationMarker" then
+        destinationMarkers += 1
+    elseif descendant.Name == "DestinationCairnStone" then
+        destinationCairnStones += 1
+    elseif descendant.Name == "PhysicalSignDetails" then
+        physicalExpeditionSigns += 1
+    elseif string.sub(descendant.Name, 1, 14) == "ChoicePlanter_" then
+        chapterChoicePlanters += 1
+    elseif descendant.Name == "OldGrowthLanternCageBar" then
+        oldGrowthCageBars += 1
+    elseif string.find(descendant.Name, "OldGrowthHeartLivingRoot", 1, true) ~= nil then
+        oldGrowthHeartRoots += 1
+    elseif
+        string.find(descendant.Name, "Warden", 1, true) ~= nil
+        and string.find(descendant.Name, "LivingRoot", 1, true) ~= nil
+    then
+        wardenLivingRoots += 1
     end
 end
 assert(criticalPaths == 22, "every Bramblewake connection needs two joined trail arms")
 assert(trailWear == criticalPaths, "every Bramblewake trail arm needs a worn center")
 assert(trailEdges == criticalPaths * 2, "every Bramblewake trail arm needs two visible edges")
 assert(roadMarkers == 6 and roadSigns == 6, "the critical route needs six direction markers")
+assert(destinationMarkers == 0, "event and extraction targets cannot use neon destination rings")
+assert(destinationCairnStones >= 12, "destinations need asymmetric physical cairn clusters")
+assert(physicalExpeditionSigns >= 7, "expedition route and arrival signs need physical framing")
+assert(chapterChoicePlanters == 3, "chapter decisions need three distinct physical planters")
+assert(oldGrowthCageBars == 4, "Old Growth fire needs a recognizable lantern cage")
+assert(oldGrowthHeartRoots == 3, "Old Growth heart needs a rooted physical shell")
+assert(wardenLivingRoots == 12, "Warden nodes need three living roots each")
 
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(

@@ -1219,7 +1219,7 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.40.1",
+    BuildVersion = "0.41.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -19685,6 +19685,7 @@ local BramblewakeBuilder = require(script.Parent.Parent.World.BramblewakeBuilder
 local FoliageBuilder = require(script.Parent.Parent.World.FoliageBuilder)
 local MeshTemplateLoader = require(script.Parent.Parent.World.MeshTemplateLoader)
 local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
+local WorldSignBuilder = require(script.Parent.Parent.World.WorldSignBuilder)
 
 local WorldService = {}
 WorldService.__index = WorldService
@@ -19869,23 +19870,7 @@ local function part(
 end
 
 local function labelSign(parent: Instance, at: CFrame, text: string)
-    local board =
-        part(parent, "TrailSign", Vector3.new(8, 3, 0.6), at, BARK, Enum.Material.WoodPlanks)
-    local surface = Instance.new("SurfaceGui")
-    surface.Face = Enum.NormalId.Front
-    surface.LightInfluence = 0.5
-    surface.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
-    surface.PixelsPerStud = 32
-    surface.Parent = board
-
-    local textLabel = Instance.new("TextLabel")
-    textLabel.BackgroundTransparency = 1
-    textLabel.Size = UDim2.fromScale(1, 1)
-    textLabel.Font = Enum.Font.GothamBold
-    textLabel.Text = text
-    textLabel.TextColor3 = CREAM
-    textLabel.TextScaled = true
-    textLabel.Parent = surface
+    WorldSignBuilder.createDirectionSign(parent, "TrailSign", at, text, CREAM)
 end
 
 local function buildEmberhollowSanctuary(parent: Instance): { Instance }
@@ -21822,7 +21807,12 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         Enum.Material.WoodPlanks,
         false
     )
-    addBillboard(warningBoard, "NIGHT WATCH · HOLD THE LANTERN ROAD", CREAM)
+    WorldSignBuilder.dressBoard(
+        warningBoard,
+        "NIGHT WATCH · HOLD THE LANTERN ROAD",
+        CREAM,
+        "warning"
+    )
 end
 
 -- Rebuilds the same placement from inexpensive geometry when an authored model
@@ -23067,7 +23057,11 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 1.8
             )
             else Vector3.new(1.8, 1.8, 1.8)
-        marker.Material = Enum.Material.SmoothPlastic
+        marker.Material = if definition.recipeId == "recipe_meadow_satchel"
+                or definition.recipeId == "recipe_ironroot_hood"
+            then Enum.Material.Fabric
+            elseif definition.recipeId == "recipe_bramble_boots" then Enum.Material.Leather
+            else Enum.Material.Glass
         marker.Transparency = 0.06
         if definition.recipeId == "recipe_meadow_satchel" then
             part(
@@ -23199,20 +23193,13 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         Enum.Material.Slate,
         false
     )
-    for noticeIndex = -2, 2 do
-        local notice = part(
-            interactables,
-            "ArchiveNotice",
-            Vector3.new(1.35 + (noticeIndex % 2) * 0.25, 1.7, 0.12),
-            CFrame.new(archiveX + noticeIndex * 1.55, 4 + (noticeIndex % 2) * 0.35, archiveZ - 0.58)
-                * CFrame.Angles(0, 0, math.rad(noticeIndex * 3)),
-            if noticeIndex == 0 then CREAM else Color3.fromRGB(186, 168, 130),
-            Enum.Material.SmoothPlastic,
-            false
-        )
-        notice.CastShadow = false
-    end
-    addBillboard(archive, "GREENWARD ARCHIVE · FIELD BOOK", CREAM)
+    WorldSignBuilder.dressNoticeBoard(archive, "GREENWARD ARCHIVE · FIELD BOOK", CREAM, {
+        "field_botany",
+        "evacuation_route",
+        "bramble_hazard",
+        "lantern_maintenance",
+        "supply_inventory",
+    })
     self:_registerInteraction(
         archive,
         self._runtimeIds.InteractionIds.QuestBoard,
@@ -23371,7 +23358,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v22")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v23")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -23471,7 +23458,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v22",
+        worldVersion = "bramblewake-blackout-v23",
     })
 end
 
@@ -24484,7 +24471,12 @@ local function buildTownConsequenceLandscape(parent: Instance, consequence: any)
         Enum.Material.WoodPlanks,
         false
     )
-    addBillboard(sign, string.format("TIER %d · %s", consequence.tier, consequence.title), CREAM)
+    WorldSignBuilder.dressBoard(
+        sign,
+        string.format("TIER %d · %s", consequence.tier, consequence.title),
+        CREAM,
+        "consequence"
+    )
     sign:SetAttribute("Consequence", consequence.detail)
     parent:SetAttribute("LandscapeKind", landscapeKind)
     parent:SetAttribute("MemorialKind", memorialKind)
@@ -24628,7 +24620,7 @@ local function buildTownProgressionBuildings(
             Enum.Material.WoodPlanks,
             false
         )
-        addBillboard(sign, displayName .. " · PLANNED", CREAM)
+        WorldSignBuilder.dressBoard(sign, displayName .. " · PLANNED", CREAM, "construction")
         return model
     end
 
@@ -24745,7 +24737,7 @@ local function buildTownProgressionBuildings(
             Enum.Material.WoodPlanks,
             false
         )
-        addBillboard(sign, displayName, accent)
+        WorldSignBuilder.dressBoard(sign, displayName, accent, "building")
         local lightAnchor = part(
             model,
             "WarmInterior",
@@ -24919,20 +24911,12 @@ local function buildTownProgressionBuildings(
         Enum.Material.WoodPlanks,
         false
     )
-    addBillboard(board, string.format("EMBERHOLLOW · TIER %d", consequence.tier or 0), CREAM)
-    for notice = -1, 1 do
-        local paper = part(
-            boardModel,
-            "TownNotice",
-            Vector3.new(2.5, 2.1, 0.08),
-            CFrame.new(12 + notice * 3.3, 4.6 + math.abs(notice) * 0.35, -86.38)
-                * CFrame.Angles(0, 0, math.rad(notice * 4)),
-            if notice == 0 then Color3.fromRGB(223, 205, 161) else Color3.fromRGB(184, 164, 126),
-            Enum.Material.SmoothPlastic,
-            false
-        )
-        paper.CastShadow = false
-    end
+    WorldSignBuilder.dressNoticeBoard(
+        board,
+        string.format("EMBERHOLLOW · TIER %d", consequence.tier or 0),
+        CREAM,
+        { "community_watch", "lantern_maintenance", "supply_inventory" }
+    )
 
     local innStage = stageFor("building_inn")
     local inn = buildingShell(
@@ -27248,6 +27232,7 @@ return table.freeze(WorldService)
             <string name="Source"><![CDATA[--!strict
 
 local CollectionService = game:GetService("CollectionService")
+local WorldSignBuilder = require(script.Parent.WorldSignBuilder)
 
 local BramblewakeBuilder = {}
 
@@ -27557,19 +27542,168 @@ end
 -- this compatibility hook for older callers without adding floating UI cards.
 local function objectIcon(_target: BasePart, _kind: string, _color: Color3) end
 
-local function destinationRing(parent: Instance, center: Vector3, color: Color3, radius: number)
-    for index = 1, 8 do
-        local angle = (index / 8) * math.pi * 2
-        local marker = orb(
-            parent,
-            "DestinationMarker",
-            center + Vector3.new(math.cos(angle) * radius, 0.35, math.sin(angle) * radius),
-            0.28,
-            color,
-            Enum.Material.Neon
+local function destinationCairns(parent: Instance, center: Vector3, color: Color3, radius: number)
+    local placements = {
+        { angle = math.rad(28), radius = radius * 0.92, lean = math.rad(-5) },
+        { angle = math.rad(157), radius = radius * 1.08, lean = math.rad(4) },
+        { angle = math.rad(262), radius = radius * 0.84, lean = math.rad(-3) },
+    }
+    for index, placement in placements do
+        local offset = Vector3.new(
+            math.cos(placement.angle) * placement.radius,
+            0,
+            math.sin(placement.angle) * placement.radius
         )
-        marker.CanQuery = false
+        local base = center + offset
+        local stone = part(
+            parent,
+            "DestinationCairnStone",
+            Vector3.new(1.75, 1.35, 1.45),
+            CFrame.new(base + Vector3.new(0, 0.68, 0))
+                * CFrame.Angles(0, placement.angle + 0.37, placement.lean),
+            if index == 2 then Color3.fromRGB(70, 81, 77) else STONE,
+            Enum.Material.Slate,
+            false
+        )
+        stone.Shape = Enum.PartType.Ball
+        local inset = part(
+            parent,
+            "DestinationCairnInset",
+            Vector3.new(0.42, 0.42, 0.16),
+            CFrame.lookAt(base + Vector3.new(0, 1.62, 0), center),
+            color,
+            Enum.Material.Glass,
+            false
+        )
+        inset.Transparency = 0.12
+        inset:SetAttribute("CairnIndex", index)
     end
+end
+
+local function cagedLanternShell(parent: Instance, center: Vector3, scale: number, prefix: string)
+    part(
+        parent,
+        prefix .. "StoneFoot",
+        Vector3.new(4.4, 0.8, 4.4) * scale,
+        CFrame.new(center + Vector3.new(0, -2.2 * scale, 0)),
+        STONE,
+        Enum.Material.Slate,
+        false
+    )
+    for sideX = -1, 1, 2 do
+        for sideZ = -1, 1, 2 do
+            part(
+                parent,
+                prefix .. "CageBar",
+                Vector3.new(0.28, 5.1, 0.28) * scale,
+                CFrame.new(center + Vector3.new(sideX * 1.45 * scale, 0, sideZ * 1.45 * scale))
+                    * CFrame.Angles(0, 0, math.rad(sideX * sideZ * 2.5)),
+                Color3.fromRGB(48, 52, 56),
+                Enum.Material.Metal,
+                false
+            )
+        end
+    end
+    local hood = part(
+        parent,
+        prefix .. "RainHood",
+        Vector3.new(4.8, 1.1, 4.8) * scale,
+        CFrame.new(center + Vector3.new(0, 2.72 * scale, 0)),
+        DARK_BARK,
+        Enum.Material.Slate,
+        false
+    )
+    hood.Shape = Enum.PartType.Cylinder
+end
+
+local function livingRootShell(parent: Instance, center: Vector3, scale: number, prefix: string)
+    part(
+        parent,
+        prefix .. "RootMound",
+        Vector3.new(5.8, 1.2, 5.2) * scale,
+        CFrame.new(center + Vector3.new(0, -2.15 * scale, 0)),
+        Color3.fromRGB(56, 67, 50),
+        Enum.Material.Ground,
+        false
+    )
+    for rootIndex = 1, 3 do
+        local angle = (rootIndex / 3) * math.pi * 2
+        part(
+            parent,
+            prefix .. "LivingRoot",
+            Vector3.new(0.72, 5.6 + (rootIndex % 2) * 1.1, 0.72) * scale,
+            CFrame.new(
+                center
+                    + Vector3.new(
+                        math.cos(angle) * 1.75 * scale,
+                        -0.2 * scale,
+                        math.sin(angle) * 1.75 * scale
+                    )
+            )
+                * CFrame.Angles(
+                    math.rad(math.sin(angle) * 10),
+                    angle,
+                    math.rad(math.cos(angle) * 28)
+                ),
+            if rootIndex % 2 == 0 then BARK else DARK_BARK,
+            Enum.Material.Wood,
+            false
+        )
+    end
+end
+
+local function chapterChoiceShrine(
+    parent: Instance,
+    center: Vector3,
+    color: Color3,
+    decisionId: string
+): BasePart
+    local target = orb(
+        parent,
+        "GreenwardChoice_" .. decisionId,
+        center + Vector3.new(0, 1.3, 0),
+        1.15,
+        color,
+        Enum.Material.Glass
+    )
+    target.Transparency = 0.35
+    part(
+        parent,
+        "ChoicePlanter_" .. decisionId,
+        Vector3.new(6.8, 1.5, 5.2),
+        CFrame.new(center + Vector3.new(0, -0.25, 0)),
+        Color3.fromRGB(78, 58, 39),
+        Enum.Material.WoodPlanks,
+        false
+    )
+    local stemCount = 2
+    for stemIndex = 1, stemCount do
+        local x = ((stemIndex * 17) % 9 - 4) * 0.55
+        local z = ((stemIndex * 11) % 7 - 3) * 0.48
+        local height = 2.4 + (stemIndex % 3) * 0.65
+        part(
+            parent,
+            "ChoicePlantStem_" .. decisionId,
+            Vector3.new(0.28, height, 0.28),
+            CFrame.new(center + Vector3.new(x, 0.5 + height * 0.5, z))
+                * CFrame.Angles(0, 0, math.rad((stemIndex % 2 == 0 and 1 or -1) * 8)),
+            if decisionId == "restore_farmland" then MEADOW else MOSS,
+            Enum.Material.Grass,
+            false
+        )
+        local leaf = part(
+            parent,
+            "ChoicePlantLeaf_" .. decisionId,
+            Vector3.new(1.15, 0.22, 0.65),
+            CFrame.new(center + Vector3.new(x + 0.35, 1.4 + height * 0.62, z)),
+            color,
+            Enum.Material.LeafyGrass,
+            false
+        )
+        leaf.Shape = Enum.PartType.Wedge
+    end
+    target:SetAttribute("PhysicalChoiceShrine", true)
+    return target
 end
 
 local function tree(parent: Instance, position: Vector3, scale: number)
@@ -27710,26 +27844,16 @@ local function evacuationRoadMarker(
     local side = Vector3.new(-direction.Z, 0, direction.X)
     local base = center + direction * 13 + side * 9
     local lean = if sequenceIndex % 4 == 1 then math.rad(-4) else math.rad(4)
-    part(
+    local sign = WorldSignBuilder.createDirectionSign(
         parent,
         "EvacuationRoadMarker",
-        Vector3.new(0.72, 6.2, 0.72),
-        CFrame.new(base + Vector3.new(0, 3.1, 0)) * CFrame.Angles(0, 0, lean),
-        DARK_BARK,
-        Enum.Material.Wood,
-        false
+        CFrame.lookAt(base + Vector3.new(0, 5.4, 0), neighbor) * CFrame.Angles(0, 0, lean),
+        "EVACUATION ROAD",
+        CREAM
     )
-    local board = part(
-        parent,
-        "EvacuationRoadSign",
-        Vector3.new(6.4, 2.1, 0.48),
-        CFrame.lookAt(base + Vector3.new(0, 5.4, 0), neighbor),
-        Color3.fromRGB(88, 59, 38),
-        Enum.Material.WoodPlanks,
-        false
-    )
-    board.CanQuery = false
-    billboard(board, "EVACUATION ROAD", CREAM)
+    local board = sign.PrimaryPart
+    assert(board ~= nil, "evacuation road sign has no board")
+    board.Name = "EvacuationRoadSign"
 end
 
 local function window(parent: Instance, position: Vector3, rotation: number)
@@ -28704,7 +28828,7 @@ local function buildEventSocket(
     CollectionService:AddTag(anchor, runtimeIds.ExpeditionEventTag)
     billboard(anchor, string.upper(definition.displayName), AMBER)
     objectIcon(anchor, "event", AMBER)
-    destinationRing(parent, anchor.Position, AMBER, 5.5)
+    destinationCairns(parent, anchor.Position, AMBER, 5.5)
 
     local scene = Instance.new("Model")
     scene.Name = "EventScene_" .. definition.id
@@ -29201,7 +29325,7 @@ local function buildWardenSeal(
         center + Vector3.new(0, 1.5, 0),
         7,
         Color3.fromRGB(87, 119, 101),
-        Enum.Material.SmoothPlastic
+        Enum.Material.Glass
     )
     seal.Shape = Enum.PartType.Cylinder
     seal.CFrame *= CFrame.Angles(0, 0, math.rad(90))
@@ -29243,14 +29367,15 @@ local function buildWardenSeal(
             arena,
             "LivingRootNode" .. definition.suffix,
             center + definition.direction * 22 + Vector3.new(0, 3, 0),
-            5,
+            1.45,
             Color3.fromRGB(80, 116, 83),
-            Enum.Material.SmoothPlastic
+            Enum.Material.Glass
         )
         node.Shape = Enum.PartType.Cylinder
         node.CFrame *= CFrame.Angles(0, 0, math.rad(90))
-        node.Size = Vector3.new(2.6, 4.8, 2.6)
+        node.Size = Vector3.new(1.2, 2.7, 1.2)
         node.Transparency = 0.34
+        livingRootShell(arena, node.Position, 0.92, "Warden" .. definition.suffix)
         node:SetAttribute("BossId", "boss_warden_stag")
         node:SetAttribute("BossInteraction", "cleanse_root")
         node:SetAttribute("BossNodeId", definition.nodeId)
@@ -29289,10 +29414,27 @@ local function buildWardenSeal(
             CFrame.new(center + Vector3.new(definition.side * 12, 4.5, 8))
                 * CFrame.Angles(0, 0, math.rad(definition.side * 24)),
             Color3.fromRGB(194, 199, 173),
-            Enum.Material.SmoothPlastic,
+            Enum.Material.Wood,
             false
         )
         target.Transparency = 0.2
+        for tineIndex = 1, 3 do
+            part(
+                arena,
+                "MemoryAntlerTine",
+                Vector3.new(0.7, 3.1 - tineIndex * 0.35, 0.7),
+                target.CFrame
+                    * CFrame.new(
+                        definition.side * (0.75 + tineIndex * 0.18),
+                        1.1 + tineIndex * 1.65,
+                        0
+                    )
+                    * CFrame.Angles(0, 0, math.rad(-definition.side * (42 + tineIndex * 4))),
+                Color3.fromRGB(151, 148, 125),
+                Enum.Material.Wood,
+                false
+            )
+        end
         target:SetAttribute("BossId", "boss_warden_stag")
         target:SetAttribute("BossInteraction", "break_antler")
         target:SetAttribute("BossAntlerId", definition.antlerId)
@@ -29380,6 +29522,7 @@ local function buildBlackoutLayer(
         AMBER,
         Enum.Material.Neon
     )
+    cagedLanternShell(layer, sourceFlame.Position, 0.78, "BlackoutLantern")
     light(sourceFlame, AMBER, 1.8, 16)
     fireSource:SetAttribute("BlackoutInteraction", "take_fire")
     CollectionService:AddTag(fireSource, runtimeIds.ExpeditionBlackoutTag)
@@ -29495,14 +29638,9 @@ local function buildBlackoutLayer(
             },
         }
     do
-        local seedling = orb(
-            layer,
-            "GreenwardChoice_" .. definition.decisionId,
-            bossCenter + definition.offset,
-            5,
-            definition.color,
-            Enum.Material.SmoothPlastic
-        )
+        local shrineCenter = bossCenter + Vector3.new(definition.offset.X, 0, definition.offset.Z)
+        local seedling =
+            chapterChoiceShrine(layer, shrineCenter, definition.color, definition.decisionId)
         seedling.Transparency = 0.58
         seedling:SetAttribute("BlackoutInteraction", "chapter_decision")
         seedling:SetAttribute("BlackoutDecisionId", definition.decisionId)
@@ -29641,11 +29779,12 @@ function BramblewakeBuilder.build(
                 module,
                 "OldGrowthFireSource",
                 center + Vector3.new(-20, 3.4, -12),
-                4.2,
+                1.35,
                 AMBER,
-                Enum.Material.SmoothPlastic
+                Enum.Material.Glass
             )
             fireSource.Transparency = 0.48
+            cagedLanternShell(module, fireSource.Position, 0.86, "OldGrowthLantern")
             fireSource:SetAttribute("EliteId", definition.eliteId)
             fireSource:SetAttribute("EliteInteraction", "fire_source")
             billboard(fireSource, "LANTERN FIRE", CREAM)
@@ -29655,11 +29794,12 @@ function BramblewakeBuilder.build(
                 module,
                 "OldGrowthRootHeart",
                 center + Vector3.new(20, 4.2, 12),
-                5.2,
+                1.6,
                 FOXFIRE,
-                Enum.Material.SmoothPlastic
+                Enum.Material.Glass
             )
             rootHeart.Transparency = 0.56
+            livingRootShell(module, rootHeart.Position, 1.08, "OldGrowthHeart")
             rootHeart:SetAttribute("EliteId", definition.eliteId)
             rootHeart:SetAttribute("EliteInteraction", "root_heart")
             billboard(rootHeart, "ROOT HEART", CREAM)
@@ -29682,7 +29822,7 @@ function BramblewakeBuilder.build(
             target:SetAttribute("ExtractionId", "extraction_bw_wayhome")
             CollectionService:AddTag(target, runtimeIds.ExpeditionExtractionTag)
             extractionTarget = target
-            destinationRing(module, target.Position, AMBER, 7)
+            destinationCairns(module, target.Position, AMBER, 7)
         end
 
         if placement.poiId ~= nil then
@@ -29706,16 +29846,14 @@ function BramblewakeBuilder.build(
         end
 
         if placement.index == 1 then
-            local marker = orb(
+            local arrivalSign = WorldSignBuilder.createDirectionSign(
                 module,
                 "BramblewakeArrival",
-                center + Vector3.new(0, 5, 0),
-                4,
-                FOXFIRE,
-                Enum.Material.Neon
+                CFrame.new(center + Vector3.new(0, 5.4, -8)) * CFrame.Angles(0, math.pi, 0),
+                "BRAMBLEWAKE WOODS",
+                CREAM
             )
-            marker.Transparency = 0.25
-            billboard(marker, "BRAMBLEWAKE WOODS", CREAM)
+            arrivalSign:SetAttribute("ArrivalLandmark", true)
         end
     end
 
@@ -32210,13 +32348,415 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
+        <Item class="ModuleScript" referent="86">
+          <Properties>
+            <string name="Name">WorldArtRegistry</string>
+            <string name="Source"><![CDATA[--!strict
+
+-- Data-only cloud art mapping. Keep this synchronized with
+-- assets/images/manifest.json so pure Luau tests can validate every atlas cell
+-- without Roblox engine types.
+
+local WorldArtRegistry = {}
+
+export type Panel = {
+    assetId: number,
+    offsetX: number,
+    offsetY: number,
+    width: number,
+    height: number,
+}
+
+local ASSET_ID = 83727643922166
+local CELL_WIDTH = 627
+local CELL_HEIGHT = 418
+
+local PANELS: { [string]: Panel } = table.freeze({
+    evacuation_route = {
+        assetId = ASSET_ID,
+        offsetX = 0,
+        offsetY = 0,
+        width = CELL_WIDTH,
+        height = CELL_HEIGHT,
+    },
+    lantern_maintenance = {
+        assetId = ASSET_ID,
+        offsetX = CELL_WIDTH,
+        offsetY = 0,
+        width = CELL_WIDTH,
+        height = CELL_HEIGHT,
+    },
+    supply_inventory = {
+        assetId = ASSET_ID,
+        offsetX = 0,
+        offsetY = CELL_HEIGHT,
+        width = CELL_WIDTH,
+        height = CELL_HEIGHT,
+    },
+    bramble_hazard = {
+        assetId = ASSET_ID,
+        offsetX = CELL_WIDTH,
+        offsetY = CELL_HEIGHT,
+        width = CELL_WIDTH,
+        height = CELL_HEIGHT,
+    },
+    field_botany = {
+        assetId = ASSET_ID,
+        offsetX = 0,
+        offsetY = CELL_HEIGHT * 2,
+        width = CELL_WIDTH,
+        height = CELL_HEIGHT,
+    },
+    community_watch = {
+        assetId = ASSET_ID,
+        offsetX = CELL_WIDTH,
+        offsetY = CELL_HEIGHT * 2,
+        width = CELL_WIDTH,
+        height = CELL_HEIGHT,
+    },
+})
+
+local ORDER = table.freeze({
+    "evacuation_route",
+    "lantern_maintenance",
+    "supply_inventory",
+    "bramble_hazard",
+    "field_botany",
+    "community_watch",
+})
+
+function WorldArtRegistry.noticePanel(panelId: string): Panel?
+    return PANELS[panelId]
+end
+
+function WorldArtRegistry.noticePanelIds(): { string }
+    return table.clone(ORDER)
+end
+
+return table.freeze(WorldArtRegistry)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="87">
+          <Properties>
+            <string name="Name">WorldSignBuilder</string>
+            <string name="Source"><![CDATA[--!strict
+
+local WorldArtRegistry = require(script.Parent.WorldArtRegistry)
+
+local WorldSignBuilder = {}
+
+local BARK = Color3.fromRGB(62, 39, 30)
+local WET_BARK = Color3.fromRGB(36, 26, 24)
+local PARCHMENT = Color3.fromRGB(210, 190, 146)
+local IRON = Color3.fromRGB(50, 54, 58)
+local WAX = Color3.fromRGB(142, 71, 49)
+
+local function part(
+    parent: Instance,
+    name: string,
+    size: Vector3,
+    cframe: CFrame,
+    color: Color3,
+    material: Enum.Material
+): Part
+    local instance = Instance.new("Part")
+    instance.Name = name
+    instance.Size = size
+    instance.CFrame = cframe
+    instance.Color = color
+    instance.Material = material
+    instance.Anchored = true
+    instance.CanCollide = false
+    instance.CanTouch = false
+    instance.CanQuery = false
+    instance.CastShadow = true
+    instance.TopSurface = Enum.SurfaceType.Smooth
+    instance.BottomSurface = Enum.SurfaceType.Smooth
+    instance.Parent = parent
+    return instance
+end
+
+local function addSurfaceText(board: BasePart, title: string, accent: Color3)
+    local surface = Instance.new("SurfaceGui")
+    surface.Name = "PhysicalSignText"
+    surface.Face = Enum.NormalId.Front
+    surface.LightInfluence = 0.3
+    surface.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+    surface.PixelsPerStud = 42
+    surface.Parent = board
+
+    local shadow = Instance.new("TextLabel")
+    shadow.Name = "SignLetterShadow"
+    shadow.BackgroundTransparency = 1
+    shadow.Position = UDim2.fromOffset(2, 2)
+    shadow.Size = UDim2.fromScale(1, 1)
+    shadow.Font = Enum.Font.GothamBold
+    shadow.Text = title
+    shadow.TextColor3 = Color3.fromRGB(19, 17, 15)
+    shadow.TextScaled = true
+    shadow.TextWrapped = true
+    shadow.Parent = surface
+
+    local label = Instance.new("TextLabel")
+    label.Name = "SignLetters"
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Font = Enum.Font.GothamBold
+    label.Text = title
+    label.TextColor3 = accent
+    label.TextScaled = true
+    label.TextWrapped = true
+    label.Parent = surface
+
+    local padding = Instance.new("UIPadding")
+    padding.PaddingTop = UDim.new(0.16, 0)
+    padding.PaddingBottom = UDim.new(0.16, 0)
+    padding.PaddingLeft = UDim.new(0.08, 0)
+    padding.PaddingRight = UDim.new(0.08, 0)
+    padding.Parent = label
+end
+
+local function addBoardFrame(board: BasePart, style: string): Folder
+    local existing = board:FindFirstChild("PhysicalSignDetails")
+    if existing ~= nil then
+        existing:Destroy()
+    end
+    local details = Instance.new("Folder")
+    details.Name = "PhysicalSignDetails"
+    details.Parent = board
+
+    local width = board.Size.X
+    local height = board.Size.Y
+    local front = -(board.Size.Z * 0.5 + 0.1)
+    local railDepth = math.max(0.22, board.Size.Z * 0.48)
+    for side = -1, 1, 2 do
+        if style ~= "direction" then
+            part(
+                details,
+                "SignFrameSide",
+                Vector3.new(0.42, height + 0.7, railDepth),
+                board.CFrame * CFrame.new(side * (width * 0.5 + 0.1), 0, front),
+                if side < 0 then WET_BARK else BARK,
+                Enum.Material.Wood
+            )
+        end
+        part(
+            details,
+            "SignFrameRail",
+            Vector3.new(width + 0.9, 0.38, railDepth),
+            board.CFrame
+                * CFrame.new(0, side * (height * 0.5 + 0.1), front)
+                * CFrame.Angles(0, 0, math.rad(side * 1.5)),
+            if side < 0 then BARK else WET_BARK,
+            Enum.Material.Wood
+        )
+    end
+    for pinX = -1, 1, 2 do
+        local pinRows = if style == "direction" then { 0 } else { -1, 1 }
+        for _, pinY in pinRows do
+            local pin = part(
+                details,
+                "SignIronPin",
+                Vector3.new(0.2, 0.2, 0.16),
+                board.CFrame * CFrame.new(pinX * width * 0.43, pinY * height * 0.38, front - 0.2),
+                IRON,
+                Enum.Material.Metal
+            )
+            pin.Shape = Enum.PartType.Ball
+        end
+    end
+    if style == "direction" then
+        local arrowColor = Color3.fromRGB(149, 112, 62)
+        part(
+            details,
+            "CarvedDirectionShaft",
+            Vector3.new(width * 0.22, 0.18, 0.12),
+            board.CFrame * CFrame.new(width * 0.31, -height * 0.28, front - 0.2),
+            arrowColor,
+            Enum.Material.WoodPlanks
+        )
+        local head = part(
+            details,
+            "CarvedDirectionHead",
+            Vector3.new(0.48, 0.6, 0.12),
+            board.CFrame
+                * CFrame.new(width * 0.44, -height * 0.28, front - 0.2)
+                * CFrame.Angles(0, math.rad(90), 0),
+            arrowColor,
+            Enum.Material.WoodPlanks
+        )
+        head.Shape = Enum.PartType.Wedge
+    end
+    board:SetAttribute("PhysicalSignStyle", style)
+    return details
+end
+
+function WorldSignBuilder.dressBoard(board: BasePart, title: string, accent: Color3, style: string?)
+    for _, child in board:GetChildren() do
+        if child:IsA("BillboardGui") or child:IsA("SurfaceGui") then
+            child:Destroy()
+        end
+    end
+    addBoardFrame(board, style or "plaque")
+    addSurfaceText(board, title, accent)
+end
+
+function WorldSignBuilder.createDirectionSign(
+    parent: Instance,
+    name: string,
+    at: CFrame,
+    title: string,
+    accent: Color3
+): Model
+    local model = Instance.new("Model")
+    model.Name = name
+    model:SetAttribute("PhysicalSign", true)
+    model.Parent = parent
+
+    local board = part(
+        model,
+        "DirectionBoard",
+        Vector3.new(8, 2.45, 0.52),
+        at,
+        Color3.fromRGB(83, 57, 38),
+        Enum.Material.WoodPlanks
+    )
+    part(
+        model,
+        "DirectionPost",
+        Vector3.new(0.68, 5.8, 0.68),
+        at * CFrame.new(-2.65, -3.7, 0.18) * CFrame.Angles(0, 0, math.rad(-4)),
+        WET_BARK,
+        Enum.Material.Wood
+    )
+    part(
+        model,
+        "DirectionPostBrace",
+        Vector3.new(0.4, 3.1, 0.4),
+        at * CFrame.new(-3.25, -4.25, 0.3) * CFrame.Angles(0, 0, math.rad(24)),
+        BARK,
+        Enum.Material.Wood
+    )
+    WorldSignBuilder.dressBoard(board, title, accent, "direction")
+    model.PrimaryPart = board
+    return model
+end
+
+local function addNoticeArtwork(paper: BasePart, panelId: string)
+    local panel = WorldArtRegistry.noticePanel(panelId)
+    assert(panel ~= nil, "unknown notice artwork " .. panelId)
+    local surface = Instance.new("SurfaceGui")
+    surface.Name = "NoticeArtwork"
+    surface.Face = Enum.NormalId.Front
+    surface.LightInfluence = 0.2
+    surface.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+    surface.PixelsPerStud = 96
+    surface.Parent = paper
+
+    local image = Instance.new("ImageLabel")
+    image.Name = "NoticeImage_" .. panelId
+    image.BackgroundTransparency = 1
+    image.Size = UDim2.fromScale(1, 1)
+    image.Image = "rbxassetid://" .. tostring(panel.assetId)
+    image.ImageRectOffset = Vector2.new(panel.offsetX, panel.offsetY)
+    image.ImageRectSize = Vector2.new(panel.width, panel.height)
+    image.ScaleType = Enum.ScaleType.Stretch
+    image.Parent = surface
+    paper:SetAttribute("NoticePanelId", panelId)
+    paper:SetAttribute("NoticeAssetId", panel.assetId)
+end
+
+function WorldSignBuilder.dressNoticeBoard(
+    board: BasePart,
+    title: string,
+    accent: Color3,
+    panelIds: { string }
+)
+    WorldSignBuilder.dressBoard(board, title, accent, "notice")
+    local details = board:FindFirstChild("PhysicalSignDetails")
+    assert(details ~= nil, "notice board frame missing")
+
+    local titlePlate = part(
+        details,
+        "NoticeBoardHeader",
+        Vector3.new(math.min(board.Size.X * 0.7, 8), 1.05, 0.3),
+        board.CFrame
+            * CFrame.new(0, board.Size.Y * 0.5 + 0.72, -(board.Size.Z * 0.5 + 0.3))
+            * CFrame.Angles(0, 0, math.rad(-1.5)),
+        WET_BARK,
+        Enum.Material.WoodPlanks
+    )
+    addSurfaceText(titlePlate, title, accent)
+
+    -- The header owns the wording; the board face holds actual pinned art.
+    local boardSurface = board:FindFirstChild("PhysicalSignText")
+    if boardSurface ~= nil then
+        boardSurface:Destroy()
+    end
+
+    local columns = math.min(3, #panelIds)
+    local rows = math.ceil(#panelIds / columns)
+    local paperWidth = math.min(2.55, (board.Size.X - 1.2) / columns - 0.3)
+    local paperHeight = paperWidth / 1.5
+    local usableHeight = board.Size.Y - 0.9
+    local rowSpacing = math.min(paperHeight + 0.35, usableHeight / rows)
+    for index, panelId in panelIds do
+        local row = math.floor((index - 1) / columns)
+        local column = (index - 1) % columns
+        local columnsInRow = math.min(columns, #panelIds - row * columns)
+        local x = (column - (columnsInRow - 1) * 0.5) * (paperWidth + 0.35)
+        local y = (rows - 1) * rowSpacing * 0.5 - row * rowSpacing - 0.12
+        local rotation = math.rad(((index * 7) % 9) - 4)
+        local paper = part(
+            details,
+            if board.Name == "TownBoard" then "TownNotice" else "ArchiveNotice",
+            Vector3.new(paperWidth, paperHeight, 0.1),
+            board.CFrame
+                * CFrame.new(x, y, -(board.Size.Z * 0.5 + 0.22))
+                * CFrame.Angles(0, 0, rotation),
+            PARCHMENT,
+            Enum.Material.Fabric
+        )
+        paper.CastShadow = false
+        addNoticeArtwork(paper, panelId)
+
+        local pin = part(
+            details,
+            "NoticeIronPin",
+            Vector3.new(0.16, 0.16, 0.13),
+            paper.CFrame * CFrame.new(0, paperHeight * 0.38, -0.12),
+            IRON,
+            Enum.Material.Metal
+        )
+        pin.Shape = Enum.PartType.Ball
+        if index % 2 == 0 then
+            local seal = part(
+                details,
+                "NoticeWaxSeal",
+                Vector3.new(0.32, 0.32, 0.1),
+                paper.CFrame * CFrame.new(paperWidth * 0.34, -paperHeight * 0.34, -0.12),
+                WAX,
+                Enum.Material.SmoothPlastic
+            )
+            seal.Shape = Enum.PartType.Ball
+        end
+    end
+    board:SetAttribute("NoticeCount", #panelIds)
+    board:SetAttribute("PhysicalNoticeBoard", true)
+end
+
+return table.freeze(WorldSignBuilder)
+]]></string>
+          </Properties>
+        </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="86">
+    <Item class="Folder" referent="88">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="87">
+      <Item class="Script" referent="89">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -32263,7 +32803,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.40.1", "unexpected build version")
+assert(Config.BuildVersion == "0.41.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -32559,7 +33099,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v22",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v23",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -32601,6 +33141,33 @@ assert(world:FindFirstChild("HeartwoodCavity", true) ~= nil, "Heartwood needs an
 assert(heroDetailCounts.BarricadeWorkPost == 5, "construction plot needs visible work in progress")
 assert(heroDetailCounts.FirstLanternCagePost == 4, "First Lantern needs a physical metal cage")
 assert(heroDetailCounts.ArchiveNotice == 5, "archive needs readable physical field notices")
+local noticeArtwork = 0
+local townNotices = 0
+local physicalNoticeBoards = 0
+for _, descendant in world:GetDescendants() do
+    if descendant:IsA("ImageLabel") and string.sub(descendant.Name, 1, 12) == "NoticeImage_" then
+        noticeArtwork += 1
+        assert(
+            descendant.Image == "rbxassetid://83727643922166",
+            "first-world notice uses an unapproved cloud image"
+        )
+        assert(
+            descendant.ImageRectSize == Vector2.new(627, 418),
+            "notice image does not use one measured atlas cell"
+        )
+    elseif descendant:IsA("BasePart") and descendant.Name == "TownNotice" then
+        townNotices += 1
+        assert(descendant.Material == Enum.Material.Fabric, "town notices must read as paper")
+        assert(type(descendant:GetAttribute("NoticePanelId")) == "string", "town notice has no art")
+    elseif
+        descendant:IsA("BasePart") and descendant:GetAttribute("PhysicalNoticeBoard") == true
+    then
+        physicalNoticeBoards += 1
+    end
+end
+assert(townNotices == 3, "Town Board needs three distinct illustrated notices")
+assert(noticeArtwork == 8, "first-world boards need all eight placed notice illustrations")
+assert(physicalNoticeBoards == 2, "archive and Town Board must both be physical notice boards")
 local roadSegments = 0
 local roadEdgeStones = 0
 local roadRuts = 0
@@ -32887,6 +33454,13 @@ local trailWear = 0
 local trailEdges = 0
 local roadMarkers = 0
 local roadSigns = 0
+local destinationMarkers = 0
+local destinationCairnStones = 0
+local physicalExpeditionSigns = 0
+local chapterChoicePlanters = 0
+local oldGrowthCageBars = 0
+local oldGrowthHeartRoots = 0
+local wardenLivingRoots = 0
 for _, descendant in expedition:GetDescendants() do
     if descendant.Name == "CriticalPath" then
         criticalPaths += 1
@@ -32898,12 +33472,36 @@ for _, descendant in expedition:GetDescendants() do
         roadMarkers += 1
     elseif descendant.Name == "EvacuationRoadSign" then
         roadSigns += 1
+    elseif descendant.Name == "DestinationMarker" then
+        destinationMarkers += 1
+    elseif descendant.Name == "DestinationCairnStone" then
+        destinationCairnStones += 1
+    elseif descendant.Name == "PhysicalSignDetails" then
+        physicalExpeditionSigns += 1
+    elseif string.sub(descendant.Name, 1, 14) == "ChoicePlanter_" then
+        chapterChoicePlanters += 1
+    elseif descendant.Name == "OldGrowthLanternCageBar" then
+        oldGrowthCageBars += 1
+    elseif string.find(descendant.Name, "OldGrowthHeartLivingRoot", 1, true) ~= nil then
+        oldGrowthHeartRoots += 1
+    elseif
+        string.find(descendant.Name, "Warden", 1, true) ~= nil
+        and string.find(descendant.Name, "LivingRoot", 1, true) ~= nil
+    then
+        wardenLivingRoots += 1
     end
 end
 assert(criticalPaths == 22, "every Bramblewake connection needs two joined trail arms")
 assert(trailWear == criticalPaths, "every Bramblewake trail arm needs a worn center")
 assert(trailEdges == criticalPaths * 2, "every Bramblewake trail arm needs two visible edges")
 assert(roadMarkers == 6 and roadSigns == 6, "the critical route needs six direction markers")
+assert(destinationMarkers == 0, "event and extraction targets cannot use neon destination rings")
+assert(destinationCairnStones >= 12, "destinations need asymmetric physical cairn clusters")
+assert(physicalExpeditionSigns >= 7, "expedition route and arrival signs need physical framing")
+assert(chapterChoicePlanters == 3, "chapter decisions need three distinct physical planters")
+assert(oldGrowthCageBars == 4, "Old Growth fire needs a recognizable lantern cage")
+assert(oldGrowthHeartRoots == 3, "Old Growth heart needs a rooted physical shell")
+assert(wardenLivingRoots == 12, "Warden nodes need three living roots each")
 
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
@@ -33138,15 +33736,15 @@ print("[Last Light] PASS FoundationIntegration")
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="88">
+  <Item class="StarterPlayer" referent="90">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="89">
+    <Item class="StarterPlayerScripts" referent="91">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="90">
+      <Item class="LocalScript" referent="92">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -33259,11 +33857,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="91">
+        <Item class="Folder" referent="93">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="92">
+          <Item class="ModuleScript" referent="94">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -33394,7 +33992,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="93">
+          <Item class="ModuleScript" referent="95">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -35467,7 +36065,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="94">
+          <Item class="ModuleScript" referent="96">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -35784,7 +36382,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="95">
+          <Item class="ModuleScript" referent="97">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -35892,7 +36490,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="96">
+          <Item class="ModuleScript" referent="98">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -36024,7 +36622,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="97">
+          <Item class="ModuleScript" referent="99">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -36300,7 +36898,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="98">
+  <Item class="Workspace" referent="100">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>
