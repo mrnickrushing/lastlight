@@ -17544,11 +17544,15 @@ function WorldService.buildBarricade(self: WorldService, animated: boolean?)
 
     local prompt = self._interactions[self._runtimeIds.InteractionIds.Barricade]
     if prompt ~= nil then
-        prompt.Enabled = false
+        -- Tutorial progress is per player but this model is shared. Keep the
+        -- prompt alive so a player still at `build` can submit their own
+        -- action after somebody else constructed the server-wide barricade;
+        -- HUDController hides it for every stage that no longer needs it.
+        prompt.Enabled = true
         local target = prompt.Parent
         if target ~= nil and target:IsA("BasePart") then
             target.CanCollide = false
-            target.CanQuery = false
+            target.CanQuery = true
             TweenService
                 :Create(
                     target,
