@@ -48,6 +48,19 @@ return {
             end,
         },
         {
+            name = "ignores cue words in the stable asset ID prefix",
+            run = function()
+                TestRunner.equal(
+                    MeshMaterialPlan.groupForPart("mesh_foxfire_windmill_tower_a__LL_iron"),
+                    "iron"
+                )
+                TestRunner.equal(
+                    MeshMaterialPlan.groupForPart("mesh_foxfire_windmill_tower_a__LL_moss"),
+                    "moss"
+                )
+            end,
+        },
+        {
             name = "does not guess a material for an unknown or custom PBR group",
             run = function()
                 TestRunner.equal(MeshMaterialPlan.styleForPart("tripo_embedded_pbr"), nil)

@@ -175,6 +175,10 @@ retired cabin is rejected at the loader boundary, so it cannot accidentally
 re-enter visible dressing. This profile variation changes no mesh triangle or
 material-slot budget.
 
+Build `0.40.1` scopes material matching to the imported group suffix after
+`__`. Asset IDs may contain visual cue words such as `foxfire`; those words can
+no longer override a windmill part whose actual material group is iron or moss.
+
 Hollow Farm and Foxfire Mill use the same replacement contract as Emberhollow:
 their authored meshes replace only visible structural shells. Invisible
 procedural collision remains authoritative, while farmhouse windows, field
@@ -205,7 +209,7 @@ failed asset request simply leaves the complete procedural landmark visible.
 - A failed asset request produces the established procedural equivalent.
 - Studio review covers phone, tablet, desktop, low graphics, and maximum
   graphics before the mesh kit replaces additional forest bands.
-- Studio Output reports client build `0.40.0`, world version
-  `bramblewake-blackout-v21`, `mesh_dressing_ready ... fallbacks=0`, and
+- Studio Output reports client build `0.40.1`, world version
+  `bramblewake-blackout-v22`, `mesh_dressing_ready ... fallbacks=0`, and
   `expedition_mesh_dressing_ready ... fallbacks=0` before the landmarks are
   accepted as live visual evidence.

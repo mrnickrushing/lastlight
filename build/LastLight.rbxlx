@@ -1219,7 +1219,7 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.40.0",
+    BuildVersion = "0.40.1",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -23371,7 +23371,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v21")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v22")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -23471,7 +23471,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v21",
+        worldVersion = "bramblewake-blackout-v22",
     })
 end
 
@@ -31073,8 +31073,13 @@ local ORDER = table.freeze({
 
 function MeshMaterialPlan.groupForPart(partName: string): string?
     local normalized = string.lower(partName)
+    -- The stable asset ID may itself contain a cue name (for example,
+    -- `mesh_foxfire_windmill_tower_a`). Imported part names put the authored
+    -- material group after `__`; match that segment so the asset prefix cannot
+    -- turn ordinary iron or moss into Neon.
+    local materialSegment = string.match(normalized, ".*__(.+)$") or normalized
     for _, group in ORDER do
-        if string.find(normalized, group, 1, true) ~= nil then
+        if string.find(materialSegment, group, 1, true) ~= nil then
             return group
         end
     end
