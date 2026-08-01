@@ -66,7 +66,8 @@ local NIGHT_AMBIENT = Color3.fromRGB(13, 18, 33)
 local AMBER = Color3.fromRGB(255, 181, 76)
 local FOXFIRE = Color3.fromRGB(94, 206, 176)
 local CREAM = Color3.fromRGB(244, 230, 197)
-local GREEN = Color3.fromRGB(42, 77, 51)
+-- GREEN lived here for the old pine() canopy. That generator is gone; the same
+-- value now reaches the forest as FOLIAGE_TONE.needle below.
 local DARK_GREEN = Color3.fromRGB(18, 42, 32)
 local BARK = Color3.fromRGB(62, 39, 30)
 local WET_BARK = Color3.fromRGB(36, 26, 24)

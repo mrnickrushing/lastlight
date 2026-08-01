@@ -336,7 +336,7 @@ function FoliageBuilder.snag(
     local lean = random:NextNumber(-0.34, 0.34)
     local top = trunk(parent, position, height, 1.25 * scale, lean, tone)
 
-    for branchIndex = 1, random:NextInteger(2, 4) do
+    for _ = 1, random:NextInteger(2, 4) do
         local angle = random:NextNumber(0, math.pi * 2)
         local length = random:NextNumber(3.5, 7) * scale
         local branch = newPart(
