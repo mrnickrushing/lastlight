@@ -16,6 +16,7 @@ export type ProfessionService = typeof(setmetatable(
         _logger: Logger,
         _catalog: any,
         _professionState: any,
+        _professionMastery: any,
         _featureFlags: any,
         _profileService: any,
         _survivalService: any,
@@ -32,6 +33,7 @@ function ProfessionService.new(
     logger: Logger,
     catalog: any,
     professionState: any,
+    professionMastery: any,
     featureFlags: any,
     profileService: any,
     survivalService: any,
@@ -42,6 +44,7 @@ function ProfessionService.new(
         _logger = logger,
         _catalog = catalog,
         _professionState = professionState,
+        _professionMastery = professionMastery,
         _featureFlags = featureFlags,
         _profileService = profileService,
         _survivalService = survivalService,
@@ -196,14 +199,16 @@ end
 function ProfessionService._abilityPreflight(
     self: ProfessionService,
     player: Player,
-    definition: any
+    definition: any,
+    tuning: any
 ): (boolean, string)
+    local effectRadius = definition.effectRadius + tuning.effectRadiusBonus
     local enemyService = self._enemyService
     if definition.id == self._catalog.Ids.Scout then
         if enemyService == nil then
             return false, "THREAT TRACKING IS STILL LOADING"
         end
-        return enemyService:canMarkNearest(player, definition.effectRadius)
+        return enemyService:canMarkNearest(player, effectRadius)
     elseif definition.id == self._catalog.Ids.Warden then
         if enemyService == nil or not enemyService:combatActive() then
             return false, "LANTERN GUARD NEEDS AN ACTIVE THREAT"
@@ -213,9 +218,9 @@ function ProfessionService._abilityPreflight(
         if enemyService == nil then
             return false, "LANTERN REPAIRS ARE STILL LOADING"
         end
-        return enemyService:canRepairLantern(player, definition.effectRadius)
+        return enemyService:canRepairLantern(player, effectRadius)
     elseif definition.id == self._catalog.Ids.Medic then
-        return self._survivalService:canHealInRadius(player, definition.effectRadius)
+        return self._survivalService:canHealInRadius(player, effectRadius)
     end
     return true, "LANTERN GUARD READY"
 end
@@ -223,28 +228,26 @@ end
 function ProfessionService._applyAbility(
     self: ProfessionService,
     player: Player,
-    definition: any
+    definition: any,
+    tuning: any
 ): (string, number)
+    local effectAmount = definition.effectAmount + tuning.effectAmountBonus
+    local effectRadius = definition.effectRadius + tuning.effectRadiusBonus
+    local activeSeconds = if definition.id == self._catalog.Ids.Scout
+            or definition.id == self._catalog.Ids.Warden
+        then definition.activeSeconds + tuning.activeSecondsBonus
+        else definition.activeSeconds
     if definition.id == self._catalog.Ids.Scout then
-        local _, message = self._enemyService:markNearest(
-            player,
-            definition.effectRadius,
-            definition.activeSeconds
-        )
+        local _, message = self._enemyService:markNearest(player, effectRadius, activeSeconds)
         return message, 1
     elseif definition.id == self._catalog.Ids.Warden then
         return "LANTERN GUARD ACTIVE — ENEMY DAMAGE REDUCED", 1
     elseif definition.id == self._catalog.Ids.Engineer then
-        local _, message = self._enemyService:repairLantern(
-            player,
-            definition.effectRadius,
-            definition.effectAmount
-        )
+        local _, message = self._enemyService:repairLantern(player, effectRadius, effectAmount)
         return message, 1
     end
 
-    local healResult =
-        self._survivalService:healInRadius(player, definition.effectAmount, definition.effectRadius)
+    local healResult = self._survivalService:healInRadius(player, effectAmount, effectRadius)
     return string.format(
         "GUIDING PULSE — %d TRAVELER%s RESTORED",
         healResult.affected,
@@ -295,7 +298,9 @@ function ProfessionService.useAbility(self: ProfessionService, player: Player): 
     end
 
     local definition = decision.definition
-    local validTarget, preflightMessage = self:_abilityPreflight(player, definition)
+    local masteryState = self._profileService:masterySnapshot(player)
+    local tuning = self._professionMastery.tuning(masteryState, definition.id)
+    local validTarget, preflightMessage = self:_abilityPreflight(player, definition, tuning)
     if not validTarget then
         self._analyticsService:professionAbility(player, definition.id, false, "invalid_target", 0)
         return {
@@ -305,10 +310,35 @@ function ProfessionService.useAbility(self: ProfessionService, player: Player): 
         }
     end
 
-    local nextState = self._professionState.commitAbility(state, now)
+    local cooldownSeconds = math.max(1, definition.cooldownSeconds - tuning.cooldownReduction)
+    local activeSeconds = if definition.id == self._catalog.Ids.Scout
+            or definition.id == self._catalog.Ids.Warden
+        then definition.activeSeconds + tuning.activeSecondsBonus
+        else definition.activeSeconds
+    local nextState =
+        self._professionState.commitAbility(state, now, cooldownSeconds, activeSeconds)
     self._states[player] = nextState
     self:_syncPlayer(player)
-    local message, affected = self:_applyAbility(player, definition)
+    local message, affected = self:_applyAbility(player, definition, tuning)
+    local masteryResult = self._profileService:awardMastery(player, definition.id, 10)
+    if masteryResult.leveledUp then
+        message = string.format(
+            "%s · %s RANK %d — %s",
+            message,
+            definition.displayName,
+            masteryResult.level,
+            masteryResult.rankName
+        )
+        if masteryResult.specializationUnlocked then
+            message ..= " · SPECIALIZATIONS UNLOCKED"
+        end
+        self._analyticsService:professionMasteryRank(
+            player,
+            definition.id,
+            masteryResult.level,
+            masteryResult.rankName
+        )
+    end
     self._analyticsService:professionAbility(player, definition.id, true, nil, affected)
     self:_notify(player, message)
     return {
@@ -329,7 +359,12 @@ function ProfessionService.mitigateIncomingDamage(
     if state == nil or not self._professionState.mitigatesDamage(state, now) then
         return amount, false
     end
-    return math.max(1, math.ceil(amount * 0.4)), true
+    local masteryState = self._profileService:masterySnapshot(player)
+    local tuning = self._professionMastery.tuning(masteryState, self._catalog.Ids.Warden)
+    local definition = self._catalog.get(self._catalog.Ids.Warden)
+    local damageReduction =
+        math.clamp((definition.effectAmount + tuning.effectAmountBonus) / 100, 0, 0.8)
+    return math.max(1, math.ceil(amount * (1 - damageReduction))), true
 end
 
 function ProfessionService.snapshot(self: ProfessionService, player: Player): any
@@ -342,6 +377,10 @@ function ProfessionService.snapshot(self: ProfessionService, player: Player): an
     snapshot.enabled = self._featureFlags:isEnabled("profession_kits_enabled")
     snapshot.switchable = switchable
     snapshot.switchUnavailableMessage = unavailableMessage
+    snapshot.mastery = self._professionMastery.tuning(
+        self._profileService:masterySnapshot(player),
+        snapshot.selectedId
+    )
     return snapshot
 end
 

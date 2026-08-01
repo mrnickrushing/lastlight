@@ -107,8 +107,10 @@ private Studio/server session before calling this slice complete:
 
 ## Open work
 
-This increment is the rank-zero profession foundation. Mastery XP, ranks,
-specializations, all three remaining professions, profession-specific art/audio,
+The follow-on profession-mastery increment adds ten persistent levels, six rank
+names, bounded gameplay rewards, and three stable level-10 specialization paths
+per playable kit. Specialization selection/effects, all three remaining
+professions, profession-specific art/audio,
 boss interactions, wider enemy support, revive modifiers, deployable engineering
 structures, balance telemetry thresholds, and recorded device/group evidence
 remain open.

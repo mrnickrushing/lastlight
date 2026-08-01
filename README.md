@@ -20,8 +20,9 @@ mobility, six-enemy first-night roster, four basic profession kits, Old Growth,
 the Warden Stag, the Bramblewake Blackout, permanent chapter-one resolution, a
 repeating town normal-night cycle with four tactical themes, four starter
 recipes, consumable and authoritative passive gear effects, resident-guided quest
-milestones, physical town-tier building growth, and
-the four-person Bramblewake resident cast with day/night routines implemented;
+milestones, physical town-tier building growth, the four-person Bramblewake
+resident cast with day/night routines, and ten-level profession mastery with
+earned ability bonuses implemented;
 Studio and device exit gates remain pending.**
 
 The repository currently contains:
@@ -70,6 +71,9 @@ The repository currently contains:
   surfacing live progress and consequence-aware story dialogue;
 - persistent free-town selection for Scout, Warden, Engineer, and Medic, with
   server-owned reveal/slow, guard, lantern-repair, and area-heal abilities;
+- ten persistent mastery levels per playable profession, six earned rank names,
+  bounded effect/range/duration/cooldown bonuses, and three stable level-10
+  specialization paths per kit ready for a future selection increment;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
   analytics, save normalization, and published-place tutorial persistence;
 - mobile, keyboard/mouse, and controller actions through Roblox's Input Action
@@ -78,7 +82,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 217 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 223 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -101,6 +105,8 @@ The stamina, dodge, telegraph, input, latency, and device gates are in
 [the combat mobility runbook](docs/MILESTONE_3_COMBAT_MOBILITY.md).
 The profession selection, authority, balance, persistence, and device gates are in
 [the profession-kit runbook](docs/MILESTONE_3_PROFESSION_KITS.md).
+The mastery ranks, earned bonuses, specialization foundation, and balance gates
+are in [the profession-mastery runbook](docs/MILESTONE_3_PROFESSION_MASTERY.md).
 The six-enemy sequence, mechanic, readability, solo-balance, and device gates are in
 [the Bramblewake enemy-roster runbook](docs/MILESTONE_3_BRAMBLEWAKE_ENEMIES.md).
 The three-phase elite, carried-fire, reward, accessibility, and abuse gates are in

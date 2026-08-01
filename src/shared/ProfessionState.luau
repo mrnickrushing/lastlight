@@ -103,14 +103,29 @@ function ProfessionState.canUse(state: State, now: number, canAct: boolean): any
     }
 end
 
-function ProfessionState.commitAbility(state: State, now: number): (State, any)
+function ProfessionState.commitAbility(
+    state: State,
+    now: number,
+    cooldownSeconds: number?,
+    activeSeconds: number?
+): (State, any)
     local professionId = state.selectedId
     local definition = if professionId == nil then nil else ProfessionCatalog.get(professionId)
     assert(definition ~= nil, "cannot commit a profession ability without a valid profession")
 
     local nextState: State = table.clone(state)
-    nextState.cooldownReadyAt = now + definition.cooldownSeconds
-    nextState.activeUntil = now + definition.activeSeconds
+    local resolvedCooldown = if cooldownSeconds ~= nil
+            and validNumber(cooldownSeconds)
+            and cooldownSeconds >= 1
+        then cooldownSeconds
+        else definition.cooldownSeconds
+    local resolvedActive = if activeSeconds ~= nil
+            and validNumber(activeSeconds)
+            and activeSeconds >= 0
+        then activeSeconds
+        else definition.activeSeconds
+    nextState.cooldownReadyAt = now + resolvedCooldown
+    nextState.activeUntil = now + resolvedActive
     nextState.revision += 1
     return nextState,
         {

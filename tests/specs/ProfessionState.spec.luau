@@ -68,6 +68,16 @@ return {
             end,
         },
         {
+            name = "commits server-derived mastery timing without changing base definitions",
+            run = function()
+                local state = ProfessionState.create(ProfessionCatalog.Ids.Warden, 10)
+                local used = ProfessionState.commitAbility(state, 10, 18.8, 7.05)
+                TestRunner.equal(used.cooldownReadyAt, 28.8)
+                TestRunner.equal(used.activeUntil, 17.05)
+                TestRunner.equal(state.cooldownReadyAt, 10)
+            end,
+        },
+        {
             name = "rejects ability use before a profession is selected",
             run = function()
                 local state = ProfessionState.create(nil, 10)

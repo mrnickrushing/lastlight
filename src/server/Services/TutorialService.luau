@@ -727,12 +727,7 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         self._combatService:dodge(player)
     elseif kind == self._runtimeIds.Actions.ProfessionAbility then
         local result = self._professionService:useAbility(player)
-        if result.accepted then
-            local profile = self._profileService:get(player)
-            if profile ~= nil and profile.profession.selectedId ~= nil then
-                self._profileService:awardMastery(player, profile.profession.selectedId, 10)
-            end
-        else
+        if not result.accepted then
             self:_setToast(player, result.message)
             self:_publish(player)
         end
