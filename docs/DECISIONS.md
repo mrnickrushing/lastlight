@@ -405,3 +405,16 @@ needed, would be scope invented for its own sake. Reading progress live
 rather than storing it also means a quest can never be permanently lost to
 a later regression (e.g. crafting an item and then using it up) — once
 satisfied at any check, it's claimed for good.
+
+## 2026-07-31 — Residents surface quests without owning quest state
+
+**Decision:** Tomas, Pip, and Ena now act as physical quest contacts for the
+three automatic milestones. Talking to them reads the same authoritative quest
+snapshot already published to the client. It never accepts, resets, advances,
+or claims a quest. Once the linked quest is claimed, each resident switches to
+story dialogue shaped by the player's Greenward decision or Warden outcome.
+
+**Reason:** The automatic claim model remains safer and prevents missed rewards,
+while named residents give objectives a human source and make the town react to
+the story. Reusing proximity prompts and the existing toast surface adds that
+context without introducing a second quest-state machine or another HUD panel.

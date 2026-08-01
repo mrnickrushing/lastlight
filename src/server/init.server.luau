@@ -27,6 +27,7 @@ local BramblewakeBlackout = require(root.BramblewakeBlackout)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local ProfessionState = require(root.ProfessionState)
 local RateLimiter = require(root.RateLimiter)
+local ResidentDialogue = require(root.ResidentDialogue)
 local ReviveFlow = require(root.ReviveFlow)
 local RuntimeIds = require(root.RuntimeIds)
 local SaveSchema = require(root.SaveSchema)
@@ -238,7 +239,8 @@ local tutorialService = TutorialService.new(
     blackoutService,
     analyticsService,
     CraftingCatalog,
-    Equipment
+    Equipment,
+    ResidentDialogue
 )
 
 local services = ServiceRegistry.new({

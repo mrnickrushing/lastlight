@@ -378,6 +378,30 @@ function AnalyticsService.questClaimed(self: AnalyticsService, player: Player, q
     end
 end
 
+function AnalyticsService.residentTalked(
+    self: AnalyticsService,
+    player: Player,
+    residentId: string,
+    questId: string,
+    state: string
+)
+    self._logger:info("resident_talked", {
+        player = player.UserId,
+        quest = string.sub(questId, 1, 48),
+        resident = string.sub(residentId, 1, 48),
+        state = string.sub(state, 1, 24),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "ResidentTalked", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = residentId,
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = questId,
+                [Enum.AnalyticsCustomFieldKeys.CustomField03.Name] = state,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.eliteStarted(
     self: AnalyticsService,
     player: Player,

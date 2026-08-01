@@ -70,8 +70,8 @@ end
 -- Silently claims every not-yet-claimed quest whose objective is currently
 -- met, granting each one's material reward. Called opportunistically after
 -- any action that could move a signal (a night completing, a craft
--- succeeding, an expedition settling) rather than through a quest board —
--- no quest-giver or accept step exists yet, so a quest that's already
+-- succeeding, an expedition settling) rather than through an accept step.
+-- Resident quest-givers surface this progress and its story context, so a quest that's already
 -- satisfiable claims itself the moment it's checked.
 function Quests.checkAndClaim(
     claimed: { [string]: boolean },

@@ -55,6 +55,7 @@ export type TutorialService = typeof(setmetatable(
         _analyticsService: any,
         _craftingCatalog: any,
         _equipmentCatalog: any,
+        _residentDialogue: any,
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
         _expeditionEventRevision: { [Player]: number },
@@ -85,7 +86,8 @@ function TutorialService.new(
     blackoutService: any,
     analyticsService: any,
     craftingCatalog: any,
-    equipmentCatalog: any
+    equipmentCatalog: any,
+    residentDialogue: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -110,6 +112,7 @@ function TutorialService.new(
         _analyticsService = analyticsService,
         _craftingCatalog = craftingCatalog,
         _equipmentCatalog = equipmentCatalog,
+        _residentDialogue = residentDialogue,
         _sessions = {},
         _expeditionModuleIndex = {},
         _expeditionEventRevision = {},
@@ -471,6 +474,27 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
     end
     if actionId == self._runtimeIds.Actions.OpenFieldBook then
         self:_setToast(player, "FIELD BOOK UPDATED — CHECK RECIPES, QUESTS, AND MASTERY")
+        self:_publish(player)
+        return
+    end
+    if actionId == self._runtimeIds.Actions.TalkResident then
+        local residentId = prompt:GetAttribute("Payload")
+        local response = self._residentDialogue.respond(
+            residentId,
+            self._profileService:questSnapshot(player),
+            self._profileService:townConsequence(player)
+        )
+        if response == nil then
+            self:_setToast(player, "THE RESIDENT IS BUSY WITH THE NIGHT WATCH")
+        else
+            self:_setToast(player, response.message)
+            self._analyticsService:residentTalked(
+                player,
+                tostring(residentId),
+                response.questId,
+                response.state
+            )
+        end
         self:_publish(player)
         return
     end
