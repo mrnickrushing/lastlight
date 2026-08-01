@@ -41,6 +41,7 @@ export type PlayerSurvivalService = typeof(setmetatable(
         _analyticsService: any,
         _equipmentStatsProvider: ((Player) -> any)?,
         _reviveTuningProvider: ((Player) -> any)?,
+        _expeditionFailureHandler: ((Player) -> any)?,
         _states: { [Player]: any },
         _spawned: { [Player]: boolean },
         _channels: { [Player]: ReviveChannel },
@@ -90,6 +91,7 @@ function PlayerSurvivalService.new(
         _analyticsService = analyticsService,
         _equipmentStatsProvider = nil,
         _reviveTuningProvider = nil,
+        _expeditionFailureHandler = nil,
         _states = {},
         _spawned = {},
         _channels = {},
@@ -113,6 +115,27 @@ function PlayerSurvivalService.setReviveTuningProvider(
     provider: (Player) -> any
 )
     self._reviveTuningProvider = provider
+end
+
+function PlayerSurvivalService.setExpeditionFailureHandler(
+    self: PlayerSurvivalService,
+    handler: (Player) -> any
+)
+    self._expeditionFailureHandler = handler
+end
+
+function PlayerSurvivalService._recordExpeditionFailure(
+    self: PlayerSurvivalService,
+    player: Player
+): string?
+    local handler = self._expeditionFailureHandler
+    if handler == nil or player:GetAttribute("LastLightInExpedition") ~= true then
+        return nil
+    end
+    local result = handler(player)
+    return if type(result) == "table" and type(result.message) == "string"
+        then result.message
+        else nil
 end
 
 function PlayerSurvivalService._reviveTuning(self: PlayerSurvivalService, player: Player): any
@@ -362,7 +385,9 @@ function PlayerSurvivalService._bindPlayer(self: PlayerSurvivalService, player: 
                 activeHumanoid.BreakJointsOnDeath = false
                 self:_syncPlayer(player)
                 if returningCharacter or resetFromDowned then
+                    local retreatMessage = nil
                     if player:GetAttribute("LastLightInExpedition") == true then
+                        retreatMessage = self:_recordExpeditionFailure(player)
                         self._worldService:exitBramblewake(player)
                     end
                     self._analyticsService:playerRecovered(
@@ -371,7 +396,7 @@ function PlayerSurvivalService._bindPlayer(self: PlayerSurvivalService, player: 
                             then "character_reset_safe_retreat"
                             else "character_respawn_safe_retreat"
                     )
-                    self:_notify(player, "SAFE RETREAT — CHARACTER RESET")
+                    self:_notify(player, retreatMessage or "SAFE RETREAT — CHARACTER RESET")
                 end
                 self:_notify(nil, nil)
             end
@@ -731,7 +756,9 @@ function PlayerSurvivalService._recover(self: PlayerSurvivalService, player: Pla
     self._states[player] = nextState
     self:_clearVisual(player)
     self:_syncPlayer(player)
+    local retreatMessage = nil
     if player:GetAttribute("LastLightInExpedition") == true then
+        retreatMessage = self:_recordExpeditionFailure(player)
         self._worldService:exitBramblewake(player)
     else
         local character = player.Character
@@ -740,7 +767,7 @@ function PlayerSurvivalService._recover(self: PlayerSurvivalService, player: Pla
         end
     end
     self._analyticsService:playerRecovered(player, "bleedout_safe_retreat")
-    self:_notify(player, "SAFE RETREAT — UNBANKED POUCH RETAINED")
+    self:_notify(player, retreatMessage or "SAFE RETREAT — UNBANKED POUCH RETAINED")
 end
 
 function PlayerSurvivalService._step(self: PlayerSurvivalService, now: number)

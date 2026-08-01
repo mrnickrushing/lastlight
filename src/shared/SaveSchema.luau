@@ -65,7 +65,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 9,
+        schemaVersion = 10,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -192,7 +192,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 9
+    profile.schemaVersion = 10
     return profile
 end
 
@@ -270,6 +270,56 @@ end
 
 function SaveSchema.expeditionPending(profile: Profile): any
     return ExpeditionInventory.pending(profile.inventory)
+end
+
+function SaveSchema.expeditionRecoveryCacheId(
+    runId: string,
+    userId: number,
+    fingerprint: string
+): string
+    return ExpeditionInventory.recoveryCacheId(runId, userId, fingerprint)
+end
+
+function SaveSchema.withExpeditionFailureCache(
+    profile: Profile,
+    cacheId: string,
+    manifestHash: string,
+    now: number
+): (Profile, any)
+    local nextInventory, result =
+        ExpeditionInventory.cacheAfterFailure(profile.inventory, cacheId, manifestHash, now)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.inventory = nextInventory
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.expeditionRecovery(profile: Profile): any
+    return ExpeditionInventory.activeRecovery(profile.inventory)
+end
+
+function SaveSchema.expeditionCachedTransactionIds(profile: Profile): { string }
+    return ExpeditionInventory.cachedTransactionIds(profile.inventory)
+end
+
+function SaveSchema.withRecoveredExpeditionCache(
+    profile: Profile,
+    cacheId: string,
+    now: number
+): (Profile, any)
+    local nextInventory, result = ExpeditionInventory.recover(profile.inventory, cacheId, now)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.inventory = nextInventory
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
 end
 
 function SaveSchema.expeditionSettlementId(

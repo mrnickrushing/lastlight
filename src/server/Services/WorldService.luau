@@ -3793,6 +3793,7 @@ function WorldService.buildBramblewake(
             or actionId == self._runtimeIds.Actions.OldGrowthFire
             or actionId == self._runtimeIds.Actions.WardenStagChoice
             or actionId == self._runtimeIds.Actions.BramblewakeBlackout
+            or actionId == self._runtimeIds.Actions.RecoverExpeditionCache
         then
             self._interactions[interactionId] = nil
         end
@@ -3894,6 +3895,100 @@ function WorldService.buildBramblewake(
     world:SetAttribute("ExpeditionManifestHash", manifest.hash)
     world:SetAttribute("ExpeditionEventInteractions", #result.eventInteractions)
     return result
+end
+
+function WorldService.clearRecoveryCache(self: WorldService, player: Player)
+    local interactionId = string.format("recovery_cache:%d", player.UserId)
+    local prompt = self._interactions[interactionId]
+    if prompt ~= nil then
+        prompt:Destroy()
+        self._interactions[interactionId] = nil
+    end
+    local world = self._world
+    if world ~= nil then
+        local caches = world:FindFirstChild("ExpeditionRecoveryCaches")
+        local model = if caches == nil
+            then nil
+            else caches:FindFirstChild("RecoveryCache_" .. tostring(player.UserId))
+        if model ~= nil then
+            model:Destroy()
+        end
+    end
+end
+
+function WorldService.showRecoveryCache(self: WorldService, player: Player, cache: any)
+    self:clearRecoveryCache(player)
+    local world = self._world
+    local entry = self._expeditionEntry
+    if world == nil or entry == nil or cache == nil then
+        return
+    end
+    local caches = world:FindFirstChild("ExpeditionRecoveryCaches")
+    if caches == nil then
+        caches = Instance.new("Folder")
+        caches.Name = "ExpeditionRecoveryCaches"
+        caches.Parent = world
+    end
+    local model = Instance.new("Model")
+    model.Name = "RecoveryCache_" .. tostring(player.UserId)
+    model:SetAttribute("CacheId", cache.cacheId)
+    model:SetAttribute("OwnerUserId", player.UserId)
+    model.Parent = caches
+    local side = if player.UserId % 2 == 0 then -1 else 1
+    local offset = Vector3.new(side * (5 + player.UserId % 3), 0.7, 7 + player.UserId % 4)
+    local at = entry.Position + offset
+    local body = part(
+        model,
+        "RecoverySatchel",
+        Vector3.new(3.8, 2.6, 2.4),
+        CFrame.new(at),
+        Color3.fromRGB(77, 57, 40),
+        Enum.Material.Fabric,
+        false
+    )
+    for index = -1, 1, 2 do
+        part(
+            model,
+            "SatchelBrace",
+            Vector3.new(0.28, 2.8, 2.55),
+            CFrame.new(at + Vector3.new(index * 1.25, 0, 0)),
+            Color3.fromRGB(111, 81, 48),
+            Enum.Material.Wood,
+            false
+        )
+    end
+    part(
+        model,
+        "SatchelFlap",
+        Vector3.new(3.65, 0.35, 2.2),
+        CFrame.new(at + Vector3.new(0, 1.35, -0.15)) * CFrame.Angles(math.rad(-7), 0, 0),
+        Color3.fromRGB(53, 72, 51),
+        Enum.Material.Fabric,
+        false
+    )
+    local clasp = part(
+        model,
+        "WayhomeClasp",
+        Vector3.new(0.8, 0.8, 0.32),
+        CFrame.new(at + Vector3.new(0, 0.25, -1.3)),
+        Color3.fromRGB(185, 145, 72),
+        Enum.Material.Metal,
+        false
+    )
+    clasp.Shape = Enum.PartType.Ball
+    addBillboard(body, "LOST SATCHEL · " .. string.upper(player.DisplayName), CREAM)
+    local interactionId = string.format("recovery_cache:%d", player.UserId)
+    self:_registerInteraction(
+        body,
+        interactionId,
+        self._runtimeIds.Actions.RecoverExpeditionCache,
+        "RECOVER",
+        "Lost Expedition Satchel",
+        cache.cacheId,
+        1.2
+    )
+    local prompt = self._interactions[interactionId]
+    prompt:SetAttribute("OwnerUserId", player.UserId)
 end
 
 function WorldService.blackoutArena(self: WorldService): any

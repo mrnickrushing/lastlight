@@ -52,6 +52,7 @@ local RuntimeIds = {
         TalkResident = "talk_resident",
         RepairTown = "repair_town",
         ResolveTownIncident = "resolve_town_incident",
+        RecoverExpeditionCache = "recover_expedition_cache",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",

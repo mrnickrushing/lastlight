@@ -34,7 +34,8 @@ Implemented in source:
 
 Not implemented by this increment:
 
-- partial loss of unbanked materials or a recovery cache/contract;
+- the follow-on [expedition recovery increment](MILESTONE_3_EXPEDITION_RECOVERY.md)
+  now applies a persistent partial-pouch recovery contract on expedition retreat;
 - a full-party defeat state, spectating, guard recovery, or boss-specific defeat;
 - Medic profession modifiers, consumable healing, armor, status effects, or
   reviving more than one target;

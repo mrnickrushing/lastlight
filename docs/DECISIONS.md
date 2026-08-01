@@ -78,6 +78,22 @@ first. A non-modal rescue rail and automatic help signal keep touch controls and
 the world readable, while server channel validation prevents self, range,
 disconnect, and repeat-request exploits.
 
+## 2026-07-31 — Persistent partial-pouch recovery before rarity loss
+
+**Decision:** On an expedition safe retreat with at least two unbanked reward
+transactions, keep the first deterministic half in the pouch and move the other
+half into a schema-v10 owner-only recovery cache. The next Bramblewake entry
+places a physical lost satchel near the safe arrival route. Recovering it returns
+the original transactions to the unbanked pouch exactly once. A one-transaction
+pouch is retained in full, and this vertical slice does not permanently delete
+common materials before reward rarity is authored.
+
+**Reason:** Failure needs a consequence and a return hook, but deleting value
+before rarity, contract risk, and production persistence evidence exist would be
+arbitrary. Locking a bounded half behind a reachable, persistent world object
+creates tension without inventing rewards, enabling paid protection, or turning
+a short first run into total loss.
+
 ## 2026-07-26 — Shared stamina and readable attack resolution
 
 **Decision:** Introduce one server-owned stamina resource for sprint and dodge

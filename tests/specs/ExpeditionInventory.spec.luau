@@ -158,5 +158,104 @@ return {
                 TestRunner.equal(ExpeditionInventory.pending(rotated).count, 1)
             end,
         },
+        {
+            name = "moves deterministic half of a failed pouch into recovery",
+            run = function()
+                local inventory = ExpeditionInventory.default()
+                for index = 1, 4 do
+                    inventory = ExpeditionInventory.addUnbanked(
+                        inventory,
+                        "reward_" .. tostring(index),
+                        "hash",
+                        { materialId = "material_heartwood", amount = index },
+                        index
+                    )
+                end
+                local pending = ExpeditionInventory.pending(inventory)
+                local cacheId = ExpeditionInventory.recoveryCacheId("run", 7, pending.fingerprint)
+                local cached, result =
+                    ExpeditionInventory.cacheAfterFailure(inventory, cacheId, "hash", 20)
+                TestRunner.equal(result.applied, true)
+                TestRunner.equal(result.retained, 2)
+                TestRunner.equal(#result.transactionIds, 2)
+                TestRunner.equal(ExpeditionInventory.pending(cached).count, 2)
+                TestRunner.equal(ExpeditionInventory.activeRecovery(cached).cacheId, cacheId)
+            end,
+        },
+        {
+            name = "retains a one-reward pouch instead of creating total loss",
+            run = function()
+                local inventory = ExpeditionInventory.default()
+                inventory =
+                    ExpeditionInventory.addUnbanked(inventory, "only_reward", "hash", HEARTWOOD, 1)
+                local unchanged, result = ExpeditionInventory.cacheAfterFailure(
+                    inventory,
+                    "expedition_cache:run:7:one",
+                    "hash",
+                    2
+                )
+                TestRunner.equal(result.applied, false)
+                TestRunner.equal(result.reason, "insufficient_pouch")
+                TestRunner.equal(unchanged, inventory)
+                TestRunner.equal(ExpeditionInventory.pending(unchanged).count, 1)
+            end,
+        },
+        {
+            name = "recovers cached transactions exactly once into the pouch",
+            run = function()
+                local inventory = ExpeditionInventory.default()
+                inventory =
+                    ExpeditionInventory.addUnbanked(inventory, "reward_a", "hash", HEARTWOOD, 1)
+                inventory =
+                    ExpeditionInventory.addUnbanked(inventory, "reward_b", "hash", HEARTWOOD, 2)
+                local cacheId = "expedition_cache:run:7:pair"
+                inventory = ExpeditionInventory.cacheAfterFailure(inventory, cacheId, "hash", 3)
+                local recovered, result = ExpeditionInventory.recover(inventory, cacheId, 4)
+                local replay, replayResult = ExpeditionInventory.recover(recovered, cacheId, 5)
+                TestRunner.equal(result.applied, true)
+                TestRunner.equal(ExpeditionInventory.pending(recovered).count, 2)
+                TestRunner.equal(ExpeditionInventory.activeRecovery(recovered), nil)
+                TestRunner.equal(replay, recovered)
+                TestRunner.equal(replayResult.duplicate, true)
+                TestRunner.equal(replayResult.materials.material_heartwood, 4)
+                TestRunner.equal(#replayResult.transactionIds, 1)
+            end,
+        },
+        {
+            name = "normalizes only caches backed by matching cached rewards",
+            run = function()
+                local restored = ExpeditionInventory.normalize({
+                    materials = {},
+                    expeditionRewards = {
+                        reward_a = {
+                            amount = 2,
+                            cacheId = "cache_a",
+                            grantedAt = 1,
+                            manifestHash = "hash",
+                            materialId = "material_brightcap",
+                            status = "cached",
+                        },
+                    },
+                    rewardOrder = { "reward_a" },
+                    recoveryCaches = {
+                        cache_a = {
+                            createdAt = 2,
+                            manifestHash = "hash",
+                            rewardTransactionIds = { "reward_a" },
+                            status = "active",
+                        },
+                        forged = {
+                            rewardTransactionIds = { "missing" },
+                            status = "active",
+                        },
+                    },
+                    recoveryOrder = { "cache_a", "forged" },
+                    settlements = {},
+                    settlementOrder = {},
+                })
+                TestRunner.equal(ExpeditionInventory.activeRecovery(restored).cacheId, "cache_a")
+                TestRunner.equal(restored.recoveryCaches.forged, nil)
+            end,
+        },
     },
 }

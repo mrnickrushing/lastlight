@@ -29,8 +29,9 @@ Implemented:
 
 Not implemented by this increment:
 
-- partial-loss recovery caches; the follow-on
-  [event increment](MILESTONE_3_BRAMBLEWAKE_EVENTS.md) now completes all eight
+- the follow-on [recovery increment](MILESTONE_3_EXPEDITION_RECOVERY.md) now adds
+  persistent owner-only lost satchels; the follow-on
+  [event increment](MILESTONE_3_BRAMBLEWAKE_EVENTS.md) completes all eight
   Bramblewake events;
 - profession kits, full inventory UI/capacity, crafting, or quests;
 - the boss, normal night, or Blackout; the complete standard roster and

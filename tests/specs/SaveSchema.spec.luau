@@ -10,7 +10,7 @@ return {
             name = "creates a safe first-session profile",
             run = function()
                 local profile = SaveSchema.default(100)
-                TestRunner.equal(profile.schemaVersion, 9)
+                TestRunner.equal(profile.schemaVersion, 10)
                 TestRunner.equal(profile.tutorial.stage, "arrive")
                 TestRunner.equal(profile.tutorial.complete, false)
                 TestRunner.equal(profile.revision, 0)
@@ -52,7 +52,7 @@ return {
                 TestRunner.equal(profile.tutorial.stage, "build")
                 TestRunner.equal(profile.tutorial.selectedTool, "hammer")
                 TestRunner.equal(profile.revision, 4)
-                TestRunner.equal(profile.schemaVersion, 9)
+                TestRunner.equal(profile.schemaVersion, 10)
             end,
         },
         {
@@ -68,7 +68,7 @@ return {
                         complete = true,
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 9)
+                TestRunner.equal(profile.schemaVersion, 10)
                 TestRunner.equal(profile.revision, 7)
                 TestRunner.equal(profile.tutorial.complete, true)
                 TestRunner.equal(SaveSchema.expeditionPending(profile).count, 0)
@@ -154,7 +154,7 @@ return {
                         selectedId = "profession_hacker",
                     },
                 }, 300)
-                TestRunner.equal(migrated.schemaVersion, 9)
+                TestRunner.equal(migrated.schemaVersion, 10)
                 TestRunner.equal(migrated.profession.selectedId, nil)
 
                 local selected = SaveSchema.withProfession(migrated, "profession_medic", 320)
@@ -176,7 +176,7 @@ return {
                         },
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 9)
+                TestRunner.equal(profile.schemaVersion, 10)
                 TestRunner.equal(profile.story.chapterOne.status, "unresolved")
                 TestRunner.equal(profile.story.chapterOne.decision, nil)
             end,
@@ -224,7 +224,7 @@ return {
                     revision = 3,
                     tutorial = { stage = "reveal", complete = false },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 9)
+                TestRunner.equal(profile.schemaVersion, 10)
                 TestRunner.equal(profile.town.nightNumber, 1)
             end,
         },
@@ -285,7 +285,7 @@ return {
                     town = { nightNumber = 7 },
                 }, 300)
                 local condition = SaveSchema.townCondition(profile)
-                TestRunner.equal(profile.schemaVersion, 9)
+                TestRunner.equal(profile.schemaVersion, 10)
                 TestRunner.equal(condition.integrity, 100)
                 TestRunner.equal(condition.damageLevel, 0)
                 TestRunner.equal(condition.lastNightNumber, 0)
@@ -316,7 +316,7 @@ return {
                     schemaVersion = 5,
                     town = { nightNumber = 3 },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 9)
+                TestRunner.equal(profile.schemaVersion, 10)
                 TestRunner.equal(next(profile.gear), nil)
             end,
         },
@@ -397,7 +397,7 @@ return {
                     schemaVersion = 6,
                     gear = { gear_meadow_satchel = 1 },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 9)
+                TestRunner.equal(profile.schemaVersion, 10)
                 TestRunner.equal(next(profile.quests.claimed), nil)
             end,
         },
@@ -450,6 +450,46 @@ return {
                 TestRunner.equal(byId.quest_survive_three_nights.threshold, 3)
                 TestRunner.equal(byId.quest_survive_three_nights.complete, true)
                 TestRunner.equal(byId.quest_survive_three_nights.claimed, false)
+            end,
+        },
+        {
+            name = "migrates schema nine profiles into empty recovery state",
+            run = function()
+                local profile = SaveSchema.normalize({ schemaVersion = 9 }, 100)
+                TestRunner.equal(profile.schemaVersion, 10)
+                TestRunner.equal(SaveSchema.expeditionRecovery(profile), nil)
+                TestRunner.equal(#profile.inventory.recoveryOrder, 0)
+            end,
+        },
+        {
+            name = "persists failure cache and recovery through schema wrappers",
+            run = function()
+                local profile = SaveSchema.default(1)
+                profile = SaveSchema.withUnbankedExpeditionReward(
+                    profile,
+                    "reward_a",
+                    "hash",
+                    { materialId = "material_heartwood", amount = 2 },
+                    2
+                )
+                profile = SaveSchema.withUnbankedExpeditionReward(
+                    profile,
+                    "reward_b",
+                    "hash",
+                    { materialId = "material_brightcap", amount = 3 },
+                    3
+                )
+                local pending = SaveSchema.expeditionPending(profile)
+                local cacheId = SaveSchema.expeditionRecoveryCacheId("run", 12, pending.fingerprint)
+                local cached, cacheResult =
+                    SaveSchema.withExpeditionFailureCache(profile, cacheId, "hash", 4)
+                TestRunner.equal(cacheResult.applied, true)
+                TestRunner.equal(SaveSchema.expeditionRecovery(cached).cacheId, cacheId)
+                local recovered, recoveryResult =
+                    SaveSchema.withRecoveredExpeditionCache(cached, cacheId, 5)
+                TestRunner.equal(recoveryResult.applied, true)
+                TestRunner.equal(SaveSchema.expeditionRecovery(recovered), nil)
+                TestRunner.equal(SaveSchema.expeditionPending(recovered).count, 2)
             end,
         },
     },
