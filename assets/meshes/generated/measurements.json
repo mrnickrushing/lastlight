@@ -161,6 +161,36 @@
       ],
       "bytes": 19772
     },
+    "mesh_hollow_lantern_shrine_a": {
+      "boundsMin": [
+        -14.0,
+        -9.9814,
+        0.0
+      ],
+      "boundsMax": [
+        14.0,
+        9.9814,
+        25.4634
+      ],
+      "dimensions": [
+        28.0,
+        19.9628,
+        25.4634
+      ],
+      "longestDimension": 28.0,
+      "triangles": 952,
+      "meshObjects": 7,
+      "materials": [
+        "LL_bark_cut",
+        "LL_bark_dark",
+        "LL_bark_mid",
+        "LL_lantern_amber",
+        "LL_moss",
+        "LL_stone",
+        "LL_stone_dark"
+      ],
+      "bytes": 75624
+    },
     "mesh_root_arch_a": {
       "boundsMin": [
         -5.5953,

@@ -1219,7 +1219,7 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.30.1",
+    BuildVersion = "0.31.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -20654,6 +20654,7 @@ local FOLIAGE_KEEP_OUT = table.freeze({
     table.freeze({ x = 52, z = -112, radius = 22 }), -- greenward plot
     table.freeze({ x = 0, z = -143, radius = 26 }), -- night watch posts
     table.freeze({ x = 52, z = -45, radius = 22 }), -- authored root arch landmark
+    table.freeze({ x = -52, z = -38, radius = 24 }), -- hollow lantern shrine landmark
 })
 
 --[[
@@ -20927,6 +20928,15 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             seed = 9147,
             swayTag = nil,
         },
+        {
+            assetId = "mesh_hollow_lantern_shrine_a",
+            fallbackKind = "hollow_shrine",
+            position = Vector3.new(-52, TerrainBuilder.surfaceHeight(-52, -38), -38),
+            scale = 1,
+            yaw = math.rad(22),
+            seed = 9148,
+            swayTag = nil,
+        },
     }
 
     -- Only the near band is planted here. Bands 2 and 3 are scenery beyond the
@@ -21175,6 +21185,14 @@ local function buildMeshFallback(parent: Instance, placement: MeshPlacement)
             parent,
             placement.position,
             placement.scale,
+            FOLIAGE_TONE,
+            placement.yaw
+        )
+    elseif placement.fallbackKind == "hollow_shrine" then
+        FoliageBuilder.rootArch(
+            parent,
+            placement.position,
+            placement.scale * 1.1,
             FOLIAGE_TONE,
             placement.yaw
         )
@@ -22095,7 +22113,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v10")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v11")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -22195,7 +22213,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v10",
+        worldVersion = "bramblewake-blackout-v11",
     })
 end
 
@@ -28941,6 +28959,15 @@ local ENTRIES: { Entry } = {
         placementBand = "core",
         pbr = false,
     },
+    {
+        id = "mesh_hollow_lantern_shrine_a",
+        assetId = 82771177912612,
+        targetLongestDimension = 28,
+        maxTriangles = 8000,
+        maxMaterialSlots = 7,
+        placementBand = "curated_core",
+        pbr = false,
+    },
 }
 
 local BY_ID: { [string]: Entry } = {}
@@ -30060,7 +30087,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.30.1", "unexpected build version")
+assert(Config.BuildVersion == "0.31.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -30356,7 +30383,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v10",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v11",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")

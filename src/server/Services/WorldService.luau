@@ -980,6 +980,7 @@ local FOLIAGE_KEEP_OUT = table.freeze({
     table.freeze({ x = 52, z = -112, radius = 22 }), -- greenward plot
     table.freeze({ x = 0, z = -143, radius = 26 }), -- night watch posts
     table.freeze({ x = 52, z = -45, radius = 22 }), -- authored root arch landmark
+    table.freeze({ x = -52, z = -38, radius = 24 }), -- hollow lantern shrine landmark
 })
 
 --[[
@@ -1253,6 +1254,15 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             seed = 9147,
             swayTag = nil,
         },
+        {
+            assetId = "mesh_hollow_lantern_shrine_a",
+            fallbackKind = "hollow_shrine",
+            position = Vector3.new(-52, TerrainBuilder.surfaceHeight(-52, -38), -38),
+            scale = 1,
+            yaw = math.rad(22),
+            seed = 9148,
+            swayTag = nil,
+        },
     }
 
     -- Only the near band is planted here. Bands 2 and 3 are scenery beyond the
@@ -1501,6 +1511,14 @@ local function buildMeshFallback(parent: Instance, placement: MeshPlacement)
             parent,
             placement.position,
             placement.scale,
+            FOLIAGE_TONE,
+            placement.yaw
+        )
+    elseif placement.fallbackKind == "hollow_shrine" then
+        FoliageBuilder.rootArch(
+            parent,
+            placement.position,
+            placement.scale * 1.1,
             FOLIAGE_TONE,
             placement.yaw
         )
@@ -2421,7 +2439,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v10")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v11")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -2521,7 +2539,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v10",
+        worldVersion = "bramblewake-blackout-v11",
     })
 end
 

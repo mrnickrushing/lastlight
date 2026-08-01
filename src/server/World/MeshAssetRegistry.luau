@@ -80,6 +80,15 @@ local ENTRIES: { Entry } = {
         placementBand = "core",
         pbr = false,
     },
+    {
+        id = "mesh_hollow_lantern_shrine_a",
+        assetId = 82771177912612,
+        targetLongestDimension = 28,
+        maxTriangles = 8000,
+        maxMaterialSlots = 7,
+        placementBand = "curated_core",
+        pbr = false,
+    },
 }
 
 local BY_ID: { [string]: Entry } = {}

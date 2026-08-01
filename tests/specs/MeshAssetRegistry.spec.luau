@@ -10,7 +10,7 @@ return {
             name = "keeps stable and unique uploaded asset mappings",
             run = function()
                 local entries = MeshAssetRegistry.all()
-                TestRunner.equal(#entries, 7)
+                TestRunner.equal(#entries, 8)
                 local stableIds = {}
                 local robloxIds = {}
                 for _, entry in entries do
@@ -41,6 +41,16 @@ return {
                 local conifer = MeshAssetRegistry.get("mesh_conifer_hero_a")
                 TestRunner.truthy(conifer ~= nil)
                 TestRunner.equal((conifer :: MeshAssetRegistry.Entry).pbr, false)
+            end,
+        },
+        {
+            name = "keeps the arrival shrine curated and measured",
+            run = function()
+                local shrine = MeshAssetRegistry.get("mesh_hollow_lantern_shrine_a")
+                TestRunner.truthy(shrine ~= nil)
+                TestRunner.equal((shrine :: MeshAssetRegistry.Entry).targetLongestDimension, 28)
+                TestRunner.equal((shrine :: MeshAssetRegistry.Entry).placementBand, "curated_core")
+                TestRunner.equal((shrine :: MeshAssetRegistry.Entry).pbr, false)
             end,
         },
     },
