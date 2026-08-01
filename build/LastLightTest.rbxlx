@@ -1219,14 +1219,14 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.20.0",
+    BuildVersion = "0.21.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 8,
+    SaveSchemaVersion = 9,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -5547,6 +5547,7 @@ local RuntimeIds = {
         EquipGear = "equip_gear",
         OpenFieldBook = "open_field_book",
         TalkResident = "talk_resident",
+        RepairTown = "repair_town",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -5584,6 +5585,11 @@ local RuntimeIds = {
         npc_pip_wren = "resident_pip_wren",
         npc_ena_moss = "resident_ena_moss",
     }),
+    TownRepairInteractionIds = table.freeze({
+        "town_repair_archive",
+        "town_repair_workshop",
+        "town_repair_inn",
+    }),
 }
 
 return table.freeze(RuntimeIds)
@@ -5603,6 +5609,7 @@ local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
 local TownProgression = require("./TownProgression")
+local TownCondition = require("./TownCondition")
 
 local SaveSchema = {}
 
@@ -5635,6 +5642,7 @@ export type Profile = {
     },
     town: {
         nightNumber: number,
+        condition: TownCondition.State,
     },
     gear: { [string]: number },
     equipped: Equipment.Equipped,
@@ -5658,7 +5666,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 8,
+        schemaVersion = 9,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -5684,6 +5692,7 @@ function SaveSchema.default(now: number): Profile
         },
         town = {
             nightNumber = 1,
+            condition = TownCondition.default(),
         },
         gear = Crafting.default(),
         equipped = Equipment.default(),
@@ -5776,13 +5785,15 @@ function SaveSchema.normalize(value: any, now: number): Profile
     then
         profile.town.nightNumber = town.nightNumber
     end
+    profile.town.condition =
+        TownCondition.normalize(if type(town) == "table" then town.condition else nil)
     profile.gear = Crafting.normalizeGear(value.gear)
     profile.equipped = Equipment.normalize(value.equipped)
     local quests = value.quests
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 8
+    profile.schemaVersion = 9
     return profile
 end
 
@@ -5976,6 +5987,29 @@ end
 
 function SaveSchema.nightNumber(profile: Profile): number
     return profile.town.nightNumber
+end
+
+function SaveSchema.withTownCondition(profile: Profile, condition: any, now: number): Profile
+    local normalized = TownCondition.normalize(condition)
+    local current = TownCondition.normalize(profile.town.condition)
+    if
+        normalized.integrity == current.integrity
+        and normalized.lastNightNumber == current.lastNightNumber
+        and normalized.lastDamage == current.lastDamage
+        and normalized.repairsCompleted == current.repairsCompleted
+    then
+        return profile
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.town = table.clone(profile.town)
+    nextProfile.town.condition = normalized
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile
+end
+
+function SaveSchema.townCondition(profile: Profile): any
+    return TownCondition.snapshot(profile.town.condition)
 end
 
 function SaveSchema.withCraftedItem(profile: Profile, recipeId: string, now: number): (Profile, any)
@@ -6468,6 +6502,167 @@ return table.freeze(SurvivalState)
       </Item>
       <Item class="ModuleScript" referent="41">
         <Properties>
+          <string name="Name">TownCondition</string>
+          <string name="Source"><![CDATA[--!strict
+
+local TownCondition = {}
+
+export type State = {
+    integrity: number,
+    lastNightNumber: number,
+    lastDamage: number,
+    repairsCompleted: number,
+}
+
+local MIN_INTEGRITY = 25
+local REPAIR_AMOUNT = 20
+
+local function validNumber(value: any): boolean
+    return type(value) == "number" and value == value and value > -math.huge and value < math.huge
+end
+
+local function damageLevel(integrity: number): number
+    if integrity >= 90 then
+        return 0
+    elseif integrity >= 70 then
+        return 1
+    elseif integrity >= 50 then
+        return 2
+    end
+    return 3
+end
+
+function TownCondition.default(): State
+    return {
+        integrity = 100,
+        lastNightNumber = 0,
+        lastDamage = 0,
+        repairsCompleted = 0,
+    }
+end
+
+function TownCondition.normalize(value: any): State
+    local result = TownCondition.default()
+    if type(value) ~= "table" then
+        return result
+    end
+    if validNumber(value.integrity) then
+        result.integrity = math.clamp(math.floor(value.integrity), MIN_INTEGRITY, 100)
+    end
+    if validNumber(value.lastNightNumber) and value.lastNightNumber >= 0 then
+        result.lastNightNumber = math.clamp(math.floor(value.lastNightNumber), 0, 1_000_000)
+    end
+    if validNumber(value.lastDamage) then
+        result.lastDamage = math.clamp(math.floor(value.lastDamage), 0, 55)
+    end
+    if validNumber(value.repairsCompleted) and value.repairsCompleted >= 0 then
+        result.repairsCompleted = math.floor(value.repairsCompleted)
+    end
+    return result
+end
+
+function TownCondition.afterNight(
+    state: State,
+    endingLanternHealth: number,
+    nightNumber: number
+): (State, any)
+    local current = TownCondition.normalize(state)
+    if
+        type(endingLanternHealth) ~= "number"
+        or not validNumber(endingLanternHealth)
+        or type(nightNumber) ~= "number"
+        or not validNumber(nightNumber)
+        or nightNumber < 1
+        or nightNumber ~= math.floor(nightNumber)
+    then
+        return current, { applied = false, reason = "invalid_night_result" }
+    end
+    if nightNumber <= current.lastNightNumber then
+        return current, { applied = false, reason = "night_already_recorded" }
+    end
+
+    local lanternHealth = math.clamp(endingLanternHealth, 0, 100)
+    local damage = if lanternHealth >= 90
+        then 0
+        elseif lanternHealth >= 70 then 15
+        elseif lanternHealth >= 45 then 35
+        else 55
+    local nextState = table.clone(current)
+    nextState.integrity = math.max(MIN_INTEGRITY, current.integrity - damage)
+    nextState.lastNightNumber = nightNumber
+    nextState.lastDamage = current.integrity - nextState.integrity
+    return nextState,
+        {
+            applied = true,
+            damage = nextState.lastDamage,
+            damageLevel = damageLevel(nextState.integrity),
+            integrity = nextState.integrity,
+            reason = if damage > 0 then "night_damage" else "clean_defense",
+        }
+end
+
+function TownCondition.repair(state: State): (State, any)
+    local current = TownCondition.normalize(state)
+    if current.integrity >= 100 then
+        return current, { applied = false, reason = "town_already_repaired" }
+    end
+    local nextState = table.clone(current)
+    nextState.integrity = math.min(100, current.integrity + REPAIR_AMOUNT)
+    nextState.repairsCompleted += 1
+    if nextState.integrity >= 100 then
+        nextState.lastDamage = 0
+    end
+    return nextState,
+        {
+            applied = true,
+            restored = nextState.integrity - current.integrity,
+            integrity = nextState.integrity,
+            damageLevel = damageLevel(nextState.integrity),
+            reason = "town_repaired",
+        }
+end
+
+-- Prefer the newest defended night. Within that same day, higher integrity is
+-- evidence of later repair work, so a stale player profile cannot re-damage a
+-- shared server town after another player has already repaired it.
+function TownCondition.merge(current: any, incoming: any): State
+    local left = TownCondition.normalize(current)
+    local right = TownCondition.normalize(incoming)
+    if right.lastNightNumber > left.lastNightNumber then
+        return right
+    elseif left.lastNightNumber > right.lastNightNumber then
+        return left
+    elseif right.integrity > left.integrity then
+        return right
+    elseif left.integrity > right.integrity then
+        return left
+    elseif right.repairsCompleted > left.repairsCompleted then
+        return right
+    end
+    return left
+end
+
+function TownCondition.snapshot(state: State): any
+    local current = TownCondition.normalize(state)
+    return {
+        integrity = current.integrity,
+        damageLevel = damageLevel(current.integrity),
+        lastNightNumber = current.lastNightNumber,
+        lastDamage = current.lastDamage,
+        repairsCompleted = current.repairsCompleted,
+        repairsRemaining = math.ceil((100 - current.integrity) / REPAIR_AMOUNT),
+    }
+end
+
+TownCondition.MinimumIntegrity = MIN_INTEGRITY
+TownCondition.RepairAmount = REPAIR_AMOUNT
+
+return table.freeze(TownCondition)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="42">
+        <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -6609,7 +6804,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -6786,7 +6981,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -6930,7 +7125,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -6966,7 +7161,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -7348,7 +7543,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -7381,11 +7576,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="47">
+  <Item class="ServerScriptService" referent="48">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="48">
+    <Item class="Script" referent="49">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -7426,6 +7621,7 @@ local SaveSchema = require(root.SaveSchema)
 local StatusEffectState = require(root.StatusEffectState)
 local SurvivalState = require(root.SurvivalState)
 local TownNightSchedule = require(root.TownNightSchedule)
+local TownCondition = require(root.TownCondition)
 local TownProgression = require(root.TownProgression)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
@@ -7596,6 +7792,7 @@ local townNightService = TownNightService.new(
     worldService,
     enemyService,
     TownNightSchedule,
+    TownCondition,
     featureFlags
 )
 professionService:setSwitchProvider(function(player: Player): (boolean, string?)
@@ -7671,7 +7868,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -7769,11 +7966,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="50">
+      <Item class="Folder" referent="51">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="51">
+        <Item class="ModuleScript" referent="52">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -8116,6 +8313,42 @@ function AnalyticsService.professionMasteryRank(
             RobloxAnalytics:LogCustomEvent(player, "ProfessionMasteryRank", level, {
                 [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = professionId,
                 [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = rankName,
+            })
+        end)
+    end
+end
+
+function AnalyticsService.townNightConsequence(
+    self: AnalyticsService,
+    nightNumber: number,
+    endingLanternHealth: number,
+    integrity: number,
+    damageLevel: number
+)
+    self._logger:info("town_night_consequence", {
+        damageLevel = damageLevel,
+        endingLanternHealth = endingLanternHealth,
+        integrity = integrity,
+        night = nightNumber,
+    })
+end
+
+function AnalyticsService.townRepaired(
+    self: AnalyticsService,
+    player: Player,
+    integrity: number,
+    repairsRemaining: number
+)
+    self._logger:info("town_repaired", {
+        integrity = integrity,
+        player = player.UserId,
+        repairsRemaining = repairsRemaining,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "TownRepaired", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = tostring(integrity),
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = tostring(repairsRemaining),
             })
         end)
     end
@@ -8507,7 +8740,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="52">
+        <Item class="ModuleScript" referent="53">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9005,7 +9238,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="53">
+        <Item class="ModuleScript" referent="54">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10128,7 +10361,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10649,7 +10882,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10753,7 +10986,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -10847,7 +11080,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11060,7 +11293,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11884,7 +12117,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12063,7 +12296,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12629,7 +12862,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13473,7 +13706,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13866,7 +14099,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14140,6 +14373,34 @@ function ProfileService.setNightNumber(
         self._dirty[player] = true
     end
     return true
+end
+
+function ProfileService.setTownCondition(
+    self: ProfileService,
+    player: Player,
+    condition: any
+): boolean
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return false
+    end
+    local nextProfile = self._saveSchema.withTownCondition(profile, condition, os.time())
+    if nextProfile == profile then
+        return true
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    return true
+end
+
+function ProfileService.townCondition(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { integrity = 100, damageLevel = 0, repairsRemaining = 0 }
+    end
+    return self._saveSchema.townCondition(profile)
 end
 
 function ProfileService.nightNumber(self: ProfileService, player: Player): number
@@ -14648,7 +14909,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14668,6 +14929,8 @@ export type TownNightService = typeof(setmetatable(
         _worldService: any,
         _enemyService: any,
         _townNightSchedule: any,
+        _townCondition: any,
+        _condition: any,
         _daySeconds: number,
         _duskSeconds: number,
         _nightSeconds: number,
@@ -14678,7 +14941,7 @@ export type TownNightService = typeof(setmetatable(
         _phase: string,
         _phaseEndsAt: number,
         _onChanged: ((string?) -> ())?,
-        _onNightCompleted: ((number) -> ())?,
+        _onNightCompleted: ((number, number, any) -> ())?,
     },
     TownNightService
 ))
@@ -14689,6 +14952,7 @@ function TownNightService.new(
     worldService: any,
     enemyService: any,
     townNightSchedule: any,
+    townCondition: any,
     featureFlags: any
 ): TownNightService
     return setmetatable({
@@ -14697,6 +14961,8 @@ function TownNightService.new(
         _worldService = worldService,
         _enemyService = enemyService,
         _townNightSchedule = townNightSchedule,
+        _townCondition = townCondition,
+        _condition = townCondition.default(),
         _daySeconds = config.NormalDaySeconds,
         _duskSeconds = config.DuskSeconds,
         _nightSeconds = config.NormalNightSeconds,
@@ -14722,7 +14988,10 @@ end
 -- Fires once per completed night with the night number that just finished
 -- (i.e. the value every connected player's profile should now record), so
 -- persistence stays owned by whoever is holding the profile, not this loop.
-function TownNightService.setNightCompletedHandler(self: TownNightService, callback: (number) -> ())
+function TownNightService.setNightCompletedHandler(
+    self: TownNightService,
+    callback: (number, number, any) -> ()
+)
     self._onNightCompleted = callback
 end
 
@@ -14751,8 +15020,16 @@ end
 -- Disabling the kill switch leaves the tutorial's authored First Night,
 -- Bramblewake expeditions, and manual Blackout entry untouched — only this
 -- repeating town day/dusk/night loop stops advancing.
-function TownNightService.ensureStarted(self: TownNightService, nightNumber: number)
+function TownNightService.ensureStarted(
+    self: TownNightService,
+    nightNumber: number,
+    condition: any?
+)
     self._nightNumber = math.max(self._nightNumber, math.floor(nightNumber))
+    if condition ~= nil then
+        self._condition = self._townCondition.merge(self._condition, condition)
+        self._worldService:setTownCondition(self:conditionSnapshot())
+    end
     if not self._enabled or self._started then
         return
     end
@@ -14767,6 +15044,7 @@ function TownNightService._runCycle(self: TownNightService)
         self._phase = "day"
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._daySeconds
         self._worldService:setDusk(false)
+        self._worldService:setTownRepairEnabled(true)
         self:_notify(nil)
         self._logger:info("town_day_started", { night = self._nightNumber })
         waitUntilTime(self._phaseEndsAt)
@@ -14774,6 +15052,7 @@ function TownNightService._runCycle(self: TownNightService)
         self._phase = "dusk"
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._duskSeconds
         self._worldService:setDusk(true)
+        self._worldService:setTownRepairEnabled(false)
         self:_notify(
             string.format(
                 "DUSK FALLS — %s NIGHT %d APPROACHES",
@@ -14836,21 +15115,72 @@ function TownNightService._runCycle(self: TownNightService)
         end
 
         waitUntilTime(self._phaseEndsAt)
+        local endingLanternHealth = self._enemyService:lanternHealth()
+        local nextCondition, damageResult =
+            self._townCondition.afterNight(self._condition, endingLanternHealth, activeNight)
+        self._condition = nextCondition
         self._enemyService:stopNight()
         self._worldService:setTownBreach(false, theme)
         self._worldService:setNight(false)
-        self:_notify(string.format("DAWN BREAKS — NIGHT %d SURVIVED", activeNight))
-        self._logger:info("town_night_completed", { night = activeNight })
+        local conditionSnapshot = self:conditionSnapshot()
+        self._worldService:setTownCondition(conditionSnapshot)
+        local damage = tonumber(damageResult.damage) or 0
+        local dawnToast = if damage > 0
+            then string.format(
+                "DAWN BREAKS — TOWN INTEGRITY %d%% · %d REPAIR%s NEEDED",
+                conditionSnapshot.integrity,
+                conditionSnapshot.repairsRemaining,
+                if conditionSnapshot.repairsRemaining == 1 then "" else "S"
+            )
+            else string.format("DAWN BREAKS — NIGHT %d HELD CLEAN", activeNight)
+        self:_notify(dawnToast)
+        self._logger:info("town_night_completed", {
+            damage = damage,
+            endingLanternHealth = endingLanternHealth,
+            integrity = conditionSnapshot.integrity,
+            night = activeNight,
+        })
         -- Adopt whichever is higher: the honest next night after the one
         -- that just actually ran, or a veteran's still-pending higher seed
         -- from ensureStarted. Either way this can only advance.
         self._nightNumber = math.max(self._nightNumber, activeNight + 1)
         local onNightCompleted = self._onNightCompleted
         if onNightCompleted ~= nil then
-            onNightCompleted(activeNight + 1)
+            onNightCompleted(activeNight + 1, endingLanternHealth, self:conditionSnapshot())
         end
         task.wait(0)
     end
+end
+
+function TownNightService.conditionSnapshot(self: TownNightService): any
+    return self._townCondition.snapshot(self._condition)
+end
+
+function TownNightService.repairTown(self: TownNightService): any
+    if self._phase ~= "day" then
+        return { accepted = false, message = "TOWN REPAIRS WAIT FOR DAYLIGHT", reason = "not_day" }
+    end
+    local nextCondition, result = self._townCondition.repair(self._condition)
+    if not result.applied then
+        return {
+            accepted = false,
+            message = "EMBERHOLLOW IS ALREADY FULLY REPAIRED",
+            reason = result.reason,
+        }
+    end
+    self._condition = nextCondition
+    self._worldService:setTownCondition(self:conditionSnapshot())
+    local snapshot = self:conditionSnapshot()
+    return {
+        accepted = true,
+        condition = snapshot,
+        message = string.format(
+            "TOWN REPAIR +%d · INTEGRITY %d%%",
+            result.restored,
+            snapshot.integrity
+        ),
+        reason = result.reason,
+    }
 end
 
 function TownNightService._isBlackoutDue(self: TownNightService, nightNumber: number?): boolean
@@ -14867,6 +15197,7 @@ function TownNightService.snapshot(self: TownNightService): any
         blackoutInterval = self._blackoutInterval,
         enemyCount = self._enemyService:activeCount(),
         lanternHealth = self._enemyService:lanternHealth(),
+        townCondition = self:conditionSnapshot(),
         nightActive = self:isNightActive(),
         nightNumber = self._nightNumber,
         theme = self._townNightSchedule.theme(self._nightNumber),
@@ -14879,7 +15210,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15041,16 +15372,25 @@ function TutorialService.Init(self: TutorialService, _context: any)
         end
         self:_publishAll()
     end)
-    self._townNightService:setNightCompletedHandler(function(nightNumber: number)
-        for player in self._sessions do
-            self._profileService:setNightNumber(player, nightNumber)
-            local questSuffix = self:_questToastSuffix(player)
-            if questSuffix ~= nil then
-                self:_setToast(player, questSuffix)
+    self._townNightService:setNightCompletedHandler(
+        function(nightNumber: number, endingLanternHealth: number, condition: any)
+            for player in self._sessions do
+                self._profileService:setNightNumber(player, nightNumber)
+                self._profileService:setTownCondition(player, condition)
+                local questSuffix = self:_questToastSuffix(player)
+                if questSuffix ~= nil then
+                    self:_setToast(player, questSuffix)
+                end
             end
+            self._analyticsService:townNightConsequence(
+                nightNumber - 1,
+                endingLanternHealth,
+                condition.integrity,
+                condition.damageLevel
+            )
+            self:_publishAll()
         end
-        self:_publishAll()
-    end)
+    )
     self._enemyService:setChangedHandler(function(toast: string?)
         if toast ~= nil then
             for _, session in self._sessions do
@@ -15200,7 +15540,10 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
         end
     elseif stage == "reveal" or stage == "complete" then
         self._worldService:setBeaconVisible(true)
-        self._townNightService:ensureStarted(profile.town.nightNumber)
+        self._townNightService:ensureStarted(
+            profile.town.nightNumber,
+            self._profileService:townCondition(player)
+        )
     end
 
     local currentStage = session.stage
@@ -15380,6 +15723,27 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
             )
         end
         self:_publish(player)
+        return
+    end
+    if actionId == self._runtimeIds.Actions.RepairTown then
+        if player:GetAttribute("LastLightInExpedition") == true then
+            self:_setToast(player, "RETURN THROUGH WAYHOME BEFORE REPAIRING TOWN")
+            self:_publish(player)
+            return
+        end
+        local result = self._townNightService:repairTown()
+        if result.accepted then
+            for sessionPlayer in self._sessions do
+                self._profileService:setTownCondition(sessionPlayer, result.condition)
+            end
+            self._analyticsService:townRepaired(
+                player,
+                result.condition.integrity,
+                result.condition.repairsRemaining
+            )
+        end
+        self:_setToast(player, result.message)
+        self:_publishAll()
         return
     end
 
@@ -15853,6 +16217,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         equipmentStats = self._profileService:equipmentStats(player),
         mastery = self._profileService:masterySnapshot(player),
         townConsequence = self._profileService:townConsequence(player),
+        townCondition = self._townNightService:conditionSnapshot(),
         recipes = self._craftingCatalog:list(),
         equipmentCatalog = self._equipmentCatalog.list(),
         quests = self._profileService:questSnapshot(player),
@@ -15880,7 +16245,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16714,7 +17079,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16769,6 +17134,7 @@ export type WorldService = typeof(setmetatable(
         _blackoutArena: any,
         _characterRoots: { [Player]: BasePart? },
         _townConsequence: any,
+        _townCondition: any,
         _townResidents: { [string]: any },
     },
     WorldService
@@ -17657,6 +18023,7 @@ function WorldService.new(logger: Logger, extractionPayoff: any, townProgression
         _blackoutArena = nil,
         _characterRoots = {},
         _townConsequence = nil,
+        _townCondition = { integrity = 100, damageLevel = 0, repairsRemaining = 0 },
         _townResidents = {},
     }, WorldService)
 end
@@ -18768,6 +19135,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     self:_buildMara(world)
     self:_buildInteractables(world)
+    self:setTownCondition(self._townCondition)
 
     world:SetAttribute("Ready", true)
 end
@@ -20177,6 +20545,118 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
     world:SetAttribute("WardenOutcome", tostring(resolved.wardenOutcome or "unresolved"))
 end
 
+function WorldService.setTownCondition(self: WorldService, condition: any)
+    local world = self._world
+    if world == nil or type(condition) ~= "table" then
+        return
+    end
+    local integrity = math.clamp(math.floor(tonumber(condition.integrity) or 100), 25, 100)
+    local damageLevel = math.clamp(math.floor(tonumber(condition.damageLevel) or 0), 0, 3)
+    self._townCondition = {
+        integrity = integrity,
+        damageLevel = damageLevel,
+        lastNightNumber = math.max(0, math.floor(tonumber(condition.lastNightNumber) or 0)),
+        lastDamage = math.max(0, math.floor(tonumber(condition.lastDamage) or 0)),
+        repairsCompleted = math.max(0, math.floor(tonumber(condition.repairsCompleted) or 0)),
+        repairsRemaining = math.max(0, math.floor(tonumber(condition.repairsRemaining) or 0)),
+    }
+
+    for _, interactionId in self._runtimeIds.TownRepairInteractionIds do
+        local prompt = self._interactions[interactionId]
+        if prompt ~= nil then
+            prompt:Destroy()
+            self._interactions[interactionId] = nil
+        end
+    end
+    local existing = world:FindFirstChild("TownDamageConsequences")
+    if existing ~= nil then
+        existing:Destroy()
+    end
+    world:SetAttribute("TownIntegrity", integrity)
+    world:SetAttribute("TownDamageLevel", damageLevel)
+    if damageLevel == 0 then
+        return
+    end
+
+    local damage = Instance.new("Model")
+    damage.Name = "TownDamageConsequences"
+    damage:SetAttribute("Integrity", integrity)
+    damage:SetAttribute("DamageLevel", damageLevel)
+    damage.Parent = world
+    local sites = {
+        {
+            id = self._runtimeIds.TownRepairInteractionIds[1],
+            name = "Archive Roof Brace",
+            position = Vector3.new(-40, 2.4, -96),
+        },
+        {
+            id = self._runtimeIds.TownRepairInteractionIds[2],
+            name = "Workbench Shutters",
+            position = Vector3.new(39, 2.4, -95),
+        },
+        {
+            id = self._runtimeIds.TownRepairInteractionIds[3],
+            name = "Inn Storm Frame",
+            position = Vector3.new(-40, 2.4, -140),
+        },
+    }
+    for siteIndex = 1, damageLevel do
+        local site = sites[siteIndex]
+        local target = part(
+            damage,
+            "RepairPile_" .. tostring(siteIndex),
+            Vector3.new(5.5, 1.2, 2.8),
+            CFrame.new(site.position) * CFrame.Angles(0, math.rad(siteIndex * 8 - 16), 0),
+            Color3.fromRGB(93, 65, 43),
+            Enum.Material.WoodPlanks,
+            false
+        )
+        for braceIndex = -1, 1 do
+            part(
+                damage,
+                "StormBrokenBrace",
+                Vector3.new(0.55, 5.5, 0.55),
+                target.CFrame
+                    * CFrame.new(braceIndex * 1.8, 2, 0)
+                    * CFrame.Angles(0, 0, math.rad(braceIndex * 18)),
+                if braceIndex == 0 then Color3.fromRGB(48, 41, 37) else BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
+        local canvas = part(
+            damage,
+            "StormTarp",
+            Vector3.new(5.8, 0.2, 4.4),
+            CFrame.new(site.position + Vector3.new(0, 4.2, 0))
+                * CFrame.Angles(0, 0, math.rad(siteIndex % 2 == 0 and -7 or 7)),
+            Color3.fromRGB(75, 87, 77),
+            Enum.Material.Fabric,
+            false
+        )
+        canvas.Transparency = 0.06
+        self:_registerInteraction(
+            target,
+            site.id,
+            self._runtimeIds.Actions.RepairTown,
+            "REPAIR",
+            site.name,
+            nil,
+            1.1
+        )
+    end
+    self:setTownRepairEnabled(not self._night and not self._dusk)
+end
+
+function WorldService.setTownRepairEnabled(self: WorldService, enabled: boolean)
+    for _, interactionId in self._runtimeIds.TownRepairInteractionIds do
+        local prompt = self._interactions[interactionId]
+        if prompt ~= nil then
+            prompt.Enabled = enabled and self._townCondition.damageLevel > 0
+        end
+    end
+end
+
 function WorldService.showExtractionPayoff(self: WorldService, player: Player, materials: any)
     local entries, total = self._extractionPayoff.summarize(materials)
     local world = self._world
@@ -21338,11 +21818,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="68">
+      <Item class="Folder" referent="69">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -23413,7 +23893,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -23802,7 +24282,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -23965,7 +24445,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="72">
+        <Item class="ModuleScript" referent="73">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -24160,11 +24640,11 @@ return table.freeze(WardenStagBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="73">
+    <Item class="Folder" referent="74">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="74">
+      <Item class="Script" referent="75">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -24205,8 +24685,8 @@ local OldGrowthBuilder = require(serverRoot.World.OldGrowthBuilder)
 local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
-assert(Config.SaveSchemaVersion == 8, "unexpected save schema version")
-assert(Config.BuildVersion == "0.20.0", "unexpected build version")
+assert(Config.SaveSchemaVersion == 9, "unexpected save schema version")
+assert(Config.BuildVersion == "0.21.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -24255,6 +24735,7 @@ assert(
     RuntimeIds.Actions.SelectProfession == "select_profession",
     "profession selection action ID changed"
 )
+assert(RuntimeIds.Actions.RepairTown == "repair_town", "town repair action ID changed")
 assert(RuntimeIds.Actions.OldGrowthFire == "old_growth_fire", "Old Growth action ID changed")
 assert(RuntimeIds.Actions.WardenStagChoice == "warden_stag_choice", "Warden Stag action ID changed")
 assert(
@@ -24455,6 +24936,12 @@ assert(world:FindFirstChild("Mara", true) ~= nil, "Mara is missing")
 assert(world:FindFirstChild("HeartwoodStump", true) ~= nil, "gather node is missing")
 assert(world:FindFirstChild("ConstructionPlot", true) ~= nil, "construction plot is missing")
 assert(world:FindFirstChild("FirstLantern", true) ~= nil, "First Lantern is missing")
+assert(world:GetAttribute("TownIntegrity") == 100, "new towns must begin fully repaired")
+assert(world:GetAttribute("TownDamageLevel") == 0, "new towns cannot begin visibly damaged")
+assert(
+    world:FindFirstChild("TownDamageConsequences") == nil,
+    "pristine towns cannot build repair debris"
+)
 
 local expedition = world:FindFirstChild("BramblewakeExpedition")
 assert(expedition ~= nil and expedition:IsA("Model"), "Bramblewake expedition is missing")
@@ -24681,15 +25168,15 @@ print("[Last Light] PASS FoundationIntegration")
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="75">
+  <Item class="StarterPlayer" referent="76">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="76">
+    <Item class="StarterPlayerScripts" referent="77">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="77">
+      <Item class="LocalScript" referent="78">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -24802,11 +25289,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="78">
+        <Item class="Folder" referent="79">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="79">
+          <Item class="ModuleScript" referent="80">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -24937,7 +25424,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="80">
+          <Item class="ModuleScript" referent="81">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -27010,7 +27497,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="81">
+          <Item class="ModuleScript" referent="82">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -27327,7 +27814,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="82">
+          <Item class="ModuleScript" referent="83">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -27435,7 +27922,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="83">
+          <Item class="ModuleScript" referent="84">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -27567,7 +28054,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="84">
+          <Item class="ModuleScript" referent="85">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -27843,7 +28330,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="85">
+  <Item class="Workspace" referent="86">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

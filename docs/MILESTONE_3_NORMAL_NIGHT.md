@@ -49,6 +49,11 @@ The increment includes:
 Further content differentiation beyond the four tactical profiles, later town-tier growth, resident schedules,
 and all Studio/device evidence remain open — see the Scope honesty row below.
 
+The follow-on [town-condition increment](MILESTONE_3_TOWN_CONDITION.md) now
+captures lantern health before the dawn reset, persists bounded building damage,
+and adds physical daylight repair work. This runbook retains the original cycle
+contract; the follow-on owns consequence and repair evidence.
+
 ## Flow and authority
 
 The server owns the phase, the phase clock, the night count, and every enemy

@@ -418,3 +418,17 @@ story dialogue shaped by the player's Greenward decision or Warden outcome.
 while named residents give objectives a human source and make the town react to
 the story. Reusing proximity prompts and the existing toast surface adds that
 context without introducing a second quest-state machine or another HUD panel.
+
+## 2026-07-31 — Newest night wins town damage; same-day repairs win ties
+
+**Decision:** Persistent town condition remains in each player's profile, like
+the existing night count and chapter consequence. One shared server town merges
+those records by preferring the highest recorded night. When records describe
+the same night, the higher integrity wins because it represents later repair
+work. Accepted repairs are copied to every connected writable profile.
+
+**Reason:** Last Light does not yet own a separate global town DataStore. A
+monotonic night-first merge prevents an old pristine save from erasing recent
+damage, while the same-night integrity tie-break prevents a stale damaged save
+from undoing work the current group already completed. It preserves one coherent
+physical town without pretending per-player saves are global state.

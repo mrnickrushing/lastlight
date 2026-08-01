@@ -157,16 +157,25 @@ function TutorialService.Init(self: TutorialService, _context: any)
         end
         self:_publishAll()
     end)
-    self._townNightService:setNightCompletedHandler(function(nightNumber: number)
-        for player in self._sessions do
-            self._profileService:setNightNumber(player, nightNumber)
-            local questSuffix = self:_questToastSuffix(player)
-            if questSuffix ~= nil then
-                self:_setToast(player, questSuffix)
+    self._townNightService:setNightCompletedHandler(
+        function(nightNumber: number, endingLanternHealth: number, condition: any)
+            for player in self._sessions do
+                self._profileService:setNightNumber(player, nightNumber)
+                self._profileService:setTownCondition(player, condition)
+                local questSuffix = self:_questToastSuffix(player)
+                if questSuffix ~= nil then
+                    self:_setToast(player, questSuffix)
+                end
             end
+            self._analyticsService:townNightConsequence(
+                nightNumber - 1,
+                endingLanternHealth,
+                condition.integrity,
+                condition.damageLevel
+            )
+            self:_publishAll()
         end
-        self:_publishAll()
-    end)
+    )
     self._enemyService:setChangedHandler(function(toast: string?)
         if toast ~= nil then
             for _, session in self._sessions do
@@ -316,7 +325,10 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
         end
     elseif stage == "reveal" or stage == "complete" then
         self._worldService:setBeaconVisible(true)
-        self._townNightService:ensureStarted(profile.town.nightNumber)
+        self._townNightService:ensureStarted(
+            profile.town.nightNumber,
+            self._profileService:townCondition(player)
+        )
     end
 
     local currentStage = session.stage
@@ -496,6 +508,27 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
             )
         end
         self:_publish(player)
+        return
+    end
+    if actionId == self._runtimeIds.Actions.RepairTown then
+        if player:GetAttribute("LastLightInExpedition") == true then
+            self:_setToast(player, "RETURN THROUGH WAYHOME BEFORE REPAIRING TOWN")
+            self:_publish(player)
+            return
+        end
+        local result = self._townNightService:repairTown()
+        if result.accepted then
+            for sessionPlayer in self._sessions do
+                self._profileService:setTownCondition(sessionPlayer, result.condition)
+            end
+            self._analyticsService:townRepaired(
+                player,
+                result.condition.integrity,
+                result.condition.repairsRemaining
+            )
+        end
+        self:_setToast(player, result.message)
+        self:_publishAll()
         return
     end
 
@@ -969,6 +1002,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         equipmentStats = self._profileService:equipmentStats(player),
         mastery = self._profileService:masterySnapshot(player),
         townConsequence = self._profileService:townConsequence(player),
+        townCondition = self._townNightService:conditionSnapshot(),
         recipes = self._craftingCatalog:list(),
         equipmentCatalog = self._equipmentCatalog.list(),
         quests = self._profileService:questSnapshot(player),

@@ -50,6 +50,7 @@ export type WorldService = typeof(setmetatable(
         _blackoutArena: any,
         _characterRoots: { [Player]: BasePart? },
         _townConsequence: any,
+        _townCondition: any,
         _townResidents: { [string]: any },
     },
     WorldService
@@ -938,6 +939,7 @@ function WorldService.new(logger: Logger, extractionPayoff: any, townProgression
         _blackoutArena = nil,
         _characterRoots = {},
         _townConsequence = nil,
+        _townCondition = { integrity = 100, damageLevel = 0, repairsRemaining = 0 },
         _townResidents = {},
     }, WorldService)
 end
@@ -2049,6 +2051,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     self:_buildMara(world)
     self:_buildInteractables(world)
+    self:setTownCondition(self._townCondition)
 
     world:SetAttribute("Ready", true)
 end
@@ -3456,6 +3459,118 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
     world:SetAttribute("TownTier", resolved.tier)
     world:SetAttribute("TownDecision", tostring(resolved.decision or "unresolved"))
     world:SetAttribute("WardenOutcome", tostring(resolved.wardenOutcome or "unresolved"))
+end
+
+function WorldService.setTownCondition(self: WorldService, condition: any)
+    local world = self._world
+    if world == nil or type(condition) ~= "table" then
+        return
+    end
+    local integrity = math.clamp(math.floor(tonumber(condition.integrity) or 100), 25, 100)
+    local damageLevel = math.clamp(math.floor(tonumber(condition.damageLevel) or 0), 0, 3)
+    self._townCondition = {
+        integrity = integrity,
+        damageLevel = damageLevel,
+        lastNightNumber = math.max(0, math.floor(tonumber(condition.lastNightNumber) or 0)),
+        lastDamage = math.max(0, math.floor(tonumber(condition.lastDamage) or 0)),
+        repairsCompleted = math.max(0, math.floor(tonumber(condition.repairsCompleted) or 0)),
+        repairsRemaining = math.max(0, math.floor(tonumber(condition.repairsRemaining) or 0)),
+    }
+
+    for _, interactionId in self._runtimeIds.TownRepairInteractionIds do
+        local prompt = self._interactions[interactionId]
+        if prompt ~= nil then
+            prompt:Destroy()
+            self._interactions[interactionId] = nil
+        end
+    end
+    local existing = world:FindFirstChild("TownDamageConsequences")
+    if existing ~= nil then
+        existing:Destroy()
+    end
+    world:SetAttribute("TownIntegrity", integrity)
+    world:SetAttribute("TownDamageLevel", damageLevel)
+    if damageLevel == 0 then
+        return
+    end
+
+    local damage = Instance.new("Model")
+    damage.Name = "TownDamageConsequences"
+    damage:SetAttribute("Integrity", integrity)
+    damage:SetAttribute("DamageLevel", damageLevel)
+    damage.Parent = world
+    local sites = {
+        {
+            id = self._runtimeIds.TownRepairInteractionIds[1],
+            name = "Archive Roof Brace",
+            position = Vector3.new(-40, 2.4, -96),
+        },
+        {
+            id = self._runtimeIds.TownRepairInteractionIds[2],
+            name = "Workbench Shutters",
+            position = Vector3.new(39, 2.4, -95),
+        },
+        {
+            id = self._runtimeIds.TownRepairInteractionIds[3],
+            name = "Inn Storm Frame",
+            position = Vector3.new(-40, 2.4, -140),
+        },
+    }
+    for siteIndex = 1, damageLevel do
+        local site = sites[siteIndex]
+        local target = part(
+            damage,
+            "RepairPile_" .. tostring(siteIndex),
+            Vector3.new(5.5, 1.2, 2.8),
+            CFrame.new(site.position) * CFrame.Angles(0, math.rad(siteIndex * 8 - 16), 0),
+            Color3.fromRGB(93, 65, 43),
+            Enum.Material.WoodPlanks,
+            false
+        )
+        for braceIndex = -1, 1 do
+            part(
+                damage,
+                "StormBrokenBrace",
+                Vector3.new(0.55, 5.5, 0.55),
+                target.CFrame
+                    * CFrame.new(braceIndex * 1.8, 2, 0)
+                    * CFrame.Angles(0, 0, math.rad(braceIndex * 18)),
+                if braceIndex == 0 then Color3.fromRGB(48, 41, 37) else BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
+        local canvas = part(
+            damage,
+            "StormTarp",
+            Vector3.new(5.8, 0.2, 4.4),
+            CFrame.new(site.position + Vector3.new(0, 4.2, 0))
+                * CFrame.Angles(0, 0, math.rad(siteIndex % 2 == 0 and -7 or 7)),
+            Color3.fromRGB(75, 87, 77),
+            Enum.Material.Fabric,
+            false
+        )
+        canvas.Transparency = 0.06
+        self:_registerInteraction(
+            target,
+            site.id,
+            self._runtimeIds.Actions.RepairTown,
+            "REPAIR",
+            site.name,
+            nil,
+            1.1
+        )
+    end
+    self:setTownRepairEnabled(not self._night and not self._dusk)
+end
+
+function WorldService.setTownRepairEnabled(self: WorldService, enabled: boolean)
+    for _, interactionId in self._runtimeIds.TownRepairInteractionIds do
+        local prompt = self._interactions[interactionId]
+        if prompt ~= nil then
+            prompt.Enabled = enabled and self._townCondition.damageLevel > 0
+        end
+    end
 end
 
 function WorldService.showExtractionPayoff(self: WorldService, player: Player, materials: any)

@@ -88,7 +88,7 @@ decisions already made in this codebase.
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open `build/LastLightTest.rbxlx`, press Play, and require
-   `[Last Light] PASS FoundationIntegration`, build `0.19.0`, schema `8`,
+   `[Last Light] PASS FoundationIntegration`, build `0.19.0`, schema `9`,
    and no red errors.
 3. Open `build/LastLight.rbxlx`, finish First Light, craft one item.
    Require a "CRAFTED ... · QUEST COMPLETE: FIRST CRAFT" toast and 3 Amber

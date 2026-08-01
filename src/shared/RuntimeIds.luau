@@ -50,6 +50,7 @@ local RuntimeIds = {
         EquipGear = "equip_gear",
         OpenFieldBook = "open_field_book",
         TalkResident = "talk_resident",
+        RepairTown = "repair_town",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -86,6 +87,11 @@ local RuntimeIds = {
         npc_tomas_reed = "resident_tomas_reed",
         npc_pip_wren = "resident_pip_wren",
         npc_ena_moss = "resident_ena_moss",
+    }),
+    TownRepairInteractionIds = table.freeze({
+        "town_repair_archive",
+        "town_repair_workshop",
+        "town_repair_inn",
     }),
 }
 

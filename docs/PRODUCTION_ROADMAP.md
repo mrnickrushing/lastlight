@@ -108,20 +108,20 @@ present-participant Greenward vote with deterministic tie handling, an
 immutable per-player chapter transaction, and a repeating server-owned town
 day/dusk/night cycle with an escalating six-enemy wave schedule, a
 seventh-night telegraph that is deliberately decoupled from Blackout access,
-and a save-schema-v8 night count, mastery, and equipment loadout that persists per player and resumes from
+and a save-schema-v9 night count, town condition, mastery, and equipment loadout that persists per player and resumes from
 whoever's record is highest across a server restart, plus four starter
 crafting recipes that convert banked expedition materials into named gear
 recorded on a player's own profile through a server-owned, all-or-nothing
 transaction, a first pair of consumable gear effects (a stacking
 damage-reduction shield and an instant stamina restore) usable through
-dedicated keyboard/gamepad/touch bindings, and a first set of three silent
+dedicated keyboard/gamepad/touch bindings, and a first set of three resident-guided
 quest milestones that auto-claim a material reward the moment their
 already-tracked objective is met. Head/feet equipment slots now provide
 server-authoritative damage-reduction and stamina-regeneration passives.
 Profession specialization selection/effects, additional equipment families and 3D gear
 visuals, a recipe-browsing UI and quest-board UI, branching quests, the full
 recipe/inventory/quest catalog, deeper per-night events beyond the four tactical profiles,
-consequences visibly changing future town/region content, town tier, final
+additional region-specific consequences, later town tiers, final
 art/audio, and all Studio/device/group evidence remain open.
 See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md) and
 [MILESTONE_3_BRAMBLEWAKE_EVENTS.md](MILESTONE_3_BRAMBLEWAKE_EVENTS.md), and
@@ -135,6 +135,7 @@ See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md)
 [MILESTONE_3_WARDEN_STAG_BOSS.md](MILESTONE_3_WARDEN_STAG_BOSS.md), and
 [MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md](MILESTONE_3_BRAMBLEWAKE_BLACKOUT.md), and
 [MILESTONE_3_NORMAL_NIGHT.md](MILESTONE_3_NORMAL_NIGHT.md), and
+[MILESTONE_3_TOWN_CONDITION.md](MILESTONE_3_TOWN_CONDITION.md), and
 [MILESTONE_3_CRAFTING.md](MILESTONE_3_CRAFTING.md), and
 [MILESTONE_3_GEAR_EFFECTS.md](MILESTONE_3_GEAR_EFFECTS.md), and
 [MILESTONE_3_QUESTS.md](MILESTONE_3_QUESTS.md).

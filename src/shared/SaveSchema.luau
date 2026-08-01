@@ -8,6 +8,7 @@ local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
 local TownProgression = require("./TownProgression")
+local TownCondition = require("./TownCondition")
 
 local SaveSchema = {}
 
@@ -40,6 +41,7 @@ export type Profile = {
     },
     town: {
         nightNumber: number,
+        condition: TownCondition.State,
     },
     gear: { [string]: number },
     equipped: Equipment.Equipped,
@@ -63,7 +65,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 8,
+        schemaVersion = 9,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -89,6 +91,7 @@ function SaveSchema.default(now: number): Profile
         },
         town = {
             nightNumber = 1,
+            condition = TownCondition.default(),
         },
         gear = Crafting.default(),
         equipped = Equipment.default(),
@@ -181,13 +184,15 @@ function SaveSchema.normalize(value: any, now: number): Profile
     then
         profile.town.nightNumber = town.nightNumber
     end
+    profile.town.condition =
+        TownCondition.normalize(if type(town) == "table" then town.condition else nil)
     profile.gear = Crafting.normalizeGear(value.gear)
     profile.equipped = Equipment.normalize(value.equipped)
     local quests = value.quests
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 8
+    profile.schemaVersion = 9
     return profile
 end
 
@@ -381,6 +386,29 @@ end
 
 function SaveSchema.nightNumber(profile: Profile): number
     return profile.town.nightNumber
+end
+
+function SaveSchema.withTownCondition(profile: Profile, condition: any, now: number): Profile
+    local normalized = TownCondition.normalize(condition)
+    local current = TownCondition.normalize(profile.town.condition)
+    if
+        normalized.integrity == current.integrity
+        and normalized.lastNightNumber == current.lastNightNumber
+        and normalized.lastDamage == current.lastDamage
+        and normalized.repairsCompleted == current.repairsCompleted
+    then
+        return profile
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.town = table.clone(profile.town)
+    nextProfile.town.condition = normalized
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile
+end
+
+function SaveSchema.townCondition(profile: Profile): any
+    return TownCondition.snapshot(profile.town.condition)
 end
 
 function SaveSchema.withCraftedItem(profile: Profile, recipeId: string, now: number): (Profile, any)

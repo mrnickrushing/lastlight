@@ -21,8 +21,9 @@ the Warden Stag, the Bramblewake Blackout, permanent chapter-one resolution, a
 repeating town normal-night cycle with four tactical themes, four starter
 recipes, consumable and authoritative passive gear effects, resident-guided quest
 milestones, physical town-tier building growth, the four-person Bramblewake
-resident cast with day/night routines, and ten-level profession mastery with
-earned ability bonuses implemented;
+resident cast with day/night routines, ten-level profession mastery with earned
+ability bonuses, and persistent physical town damage with daylight repair work
+implemented;
 Studio and device exit gates remain pending.**
 
 The repository currently contains:
@@ -38,7 +39,7 @@ The repository currently contains:
   a known-good fallback, beacon entry, route progress, and expedition fall recovery;
 - eight active optional Bramblewake events with 25 shared interaction steps,
   timeout-safe routes, durable unbanked rewards, kill switch, and telemetry;
-- save-schema-v8 inventory/profession/mastery/story/town-night/gear/equipment/quest migration,
+- save-schema-v9 inventory/profession/mastery/story/town-night/condition/gear/equipment/quest migration,
   run-specific reward tombstones, Wayhome extraction, atomic banking,
   retry-safe settlement, and town return streaming;
 - server-owned health, six distinct readable enemy attacks, 30-second downed crawl,
@@ -58,6 +59,9 @@ The repository currently contains:
   escalating six-enemy wave schedule, a seventh-night telegraph deliberately
   decoupled from Blackout access, a feature kill switch, and a per-player
   night count that survives a server restart;
+- dawn consequences derived from the First Lantern's ending health, three
+  physical building-damage states, and server-owned daylight repairs that
+  persist and reconcile across connected players;
 - a first pair of town crafting recipes that atomically convert banked
   expedition materials into named gear recorded on a player's own profile,
   gated to server-owned benches once First Light is complete;
@@ -82,7 +86,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 223 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 232 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -120,6 +124,9 @@ abuse gates are in
 The wave-escalation, determinism, kill-switch, and Blackout-independence gates
 for the repeating town cycle are in
 [the Normal Night runbook](docs/MILESTONE_3_NORMAL_NIGHT.md).
+The integrity calculation, physical damage states, repair authority, migration,
+and reconciliation gates are in
+[the town-condition runbook](docs/MILESTONE_3_TOWN_CONDITION.md).
 The recipe authority, atomicity, gating, and persistence gates for the first
 crafting recipes are in
 [the crafting runbook](docs/MILESTONE_3_CRAFTING.md).
