@@ -726,9 +726,14 @@ local function buildStoryLandmark(
     parent: Instance,
     center: Vector3,
     kind: string,
-    title: string
+    title: string,
+    offset: any
 ): number
-    local origin = center + Vector3.new(20, 0, 19)
+    assert(
+        type(offset) == "table" and type(offset.x) == "number" and type(offset.z) == "number",
+        "Bramblewake story landmark is missing its authored offset"
+    )
+    local origin = center + Vector3.new(offset.x, 0, offset.z)
     local count = 0
     local function storyPart(
         name: string,
@@ -870,7 +875,7 @@ local function buildStoryLandmark(
                 if toolIndex == 0 then Enum.Material.Metal else Enum.Material.Wood
             )
         end
-    else
+    elseif kind == "lost_crossing" then
         anchor = storyPart(
             "LostCrossingSatchel",
             Vector3.new(3.1, 2.2, 1.3),
@@ -911,6 +916,8 @@ local function buildStoryLandmark(
         )
         lostLantern.Shape = Enum.PartType.Ball
         lostLantern.Transparency = 0.28
+    else
+        error("Unknown Bramblewake story landmark kind: " .. kind)
     end
     billboard(anchor, title, CREAM)
     parent:SetAttribute("StoryLandmark", kind)
@@ -1702,6 +1709,7 @@ function BramblewakeBuilder.build(
     local eventInteractions = {}
     local eventSockets: { [string]: BasePart } = {}
     local storyLandmarkCount = 0
+    local storyLandmarkPartCount = 0
     local eliteArena = nil
     local oldGrowthCenter: Vector3? = nil
     local extractionTarget: BasePart? = nil
@@ -1763,8 +1771,19 @@ function BramblewakeBuilder.build(
             type(definition.storyLandmark) == "string"
             and type(definition.storyTitle) == "string"
         then
-            buildStoryLandmark(module, center, definition.storyLandmark, definition.storyTitle)
+            local landmarkParts = buildStoryLandmark(
+                module,
+                center,
+                definition.storyLandmark,
+                definition.storyTitle,
+                definition.storyOffset
+            )
+            assert(
+                landmarkParts == definition.storyPartCount,
+                "Bramblewake story landmark exceeded its authored part count"
+            )
             storyLandmarkCount += 1
+            storyLandmarkPartCount += landmarkParts
         end
         if definition.eliteId == "elite_old_growth" then
             oldGrowthCenter = center
@@ -1872,6 +1891,7 @@ function BramblewakeBuilder.build(
     expedition:SetAttribute("EventCount", catalog.EventCount)
     expedition:SetAttribute("EventInteractionCount", #eventInteractions)
     expedition:SetAttribute("StoryLandmarkCount", storyLandmarkCount)
+    expedition:SetAttribute("StoryLandmarkPartCount", storyLandmarkPartCount)
     expedition:SetAttribute("ExtractionReady", extractionTarget ~= nil)
     expedition:SetAttribute("BossArenaReady", bossArena ~= nil)
     expedition:SetAttribute("BlackoutLayerReady", blackout ~= nil)

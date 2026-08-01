@@ -305,9 +305,21 @@ assert(
     expedition:GetAttribute("EventInteractionCount") == BramblewakeExpedition.EventInteractionCount,
     "Bramblewake event interaction count is incorrect"
 )
+local expectedStoryLandmarks = 0
+local expectedStoryLandmarkParts = 0
+for _, definition in BramblewakeExpedition.Modules do
+    if definition.storyLandmark ~= nil then
+        expectedStoryLandmarks += 1
+        expectedStoryLandmarkParts += definition.storyPartCount
+    end
+end
 assert(
-    expedition:GetAttribute("StoryLandmarkCount") == 4,
-    "Bramblewake must build all four environmental story landmarks"
+    expedition:GetAttribute("StoryLandmarkCount") == expectedStoryLandmarks,
+    "Bramblewake must build every authored environmental story landmark"
+)
+assert(
+    expedition:GetAttribute("StoryLandmarkPartCount") == expectedStoryLandmarkParts,
+    "Bramblewake story landmark part count must match its authored budget"
 )
 assert(expedition:GetAttribute("BossArenaReady") == true, "Warden Stag arena is not ready")
 assert(expedition:GetAttribute("BlackoutLayerReady") == true, "Blackout layer is not ready")

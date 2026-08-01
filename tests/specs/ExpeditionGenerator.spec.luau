@@ -74,6 +74,9 @@ return {
                     local definition = ExpeditionGenerator.moduleDefinition(moduleId)
                     TestRunner.equal(definition.storyLandmark, landmark)
                     TestRunner.truthy(type(definition.storyTitle) == "string")
+                    TestRunner.truthy(type(definition.storyOffset.x) == "number")
+                    TestRunner.truthy(type(definition.storyOffset.z) == "number")
+                    TestRunner.truthy(definition.storyPartCount > 0)
                 end
             end,
         },
