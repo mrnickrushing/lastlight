@@ -1976,6 +1976,65 @@ function WorldService._buildMara(self: WorldService, world: Model)
         Enum.Material.Fabric,
         false
     )
+    for side = -1, 1, 2 do
+        local shoulder = part(
+            model,
+            "CoatShoulder",
+            Vector3.new(1.05, 1.05, 1.18),
+            CFrame.new(-3 + side * 1.3, 4.35, -30),
+            Color3.fromRGB(50, 72, 56),
+            Enum.Material.Fabric,
+            false
+        )
+        shoulder.Shape = Enum.PartType.Ball
+        part(
+            model,
+            "HairLock",
+            Vector3.new(0.42, 1.85, 0.5),
+            CFrame.new(-3 + side * 0.88, 5.78, -30.18) * CFrame.Angles(0, 0, math.rad(side * 8)),
+            Color3.fromRGB(79, 43, 31),
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        part(
+            model,
+            "CoatTail",
+            Vector3.new(1.12, 2.25, 0.28),
+            CFrame.new(-3 + side * 0.68, 1.72, -29.13)
+                * CFrame.Angles(math.rad(-8), 0, math.rad(side * 5)),
+            Color3.fromRGB(42, 61, 49),
+            Enum.Material.Fabric,
+            false
+        )
+    end
+    part(
+        model,
+        "ScarfKnot",
+        Vector3.new(0.68, 0.68, 0.48),
+        CFrame.new(-3, 5.02, -30.83),
+        Color3.fromRGB(196, 134, 64),
+        Enum.Material.Fabric,
+        false
+    ).Shape =
+        Enum.PartType.Ball
+    part(
+        model,
+        "CoatBelt",
+        Vector3.new(2.75, 0.34, 1.5),
+        CFrame.new(-3, 2.52, -30),
+        Color3.fromRGB(84, 58, 40),
+        Enum.Material.Leather,
+        false
+    )
+    part(
+        model,
+        "CoatBuckle",
+        Vector3.new(0.52, 0.5, 0.2),
+        CFrame.new(-3, 2.5, -30.82),
+        AMBER,
+        Enum.Material.Metal,
+        false
+    )
     part(
         model,
         "CoatSkirt",
@@ -2034,6 +2093,25 @@ function WorldService._buildMara(self: WorldService, world: Model)
         )
         eye.Shape = Enum.PartType.Ball
     end
+    part(
+        model,
+        "Nose",
+        Vector3.new(0.3, 0.42, 0.34),
+        CFrame.new(-3, 5.98, -31.02),
+        Color3.fromRGB(190, 137, 99),
+        Enum.Material.SmoothPlastic,
+        false
+    ).Shape =
+        Enum.PartType.Ball
+    part(
+        model,
+        "Mouth",
+        Vector3.new(0.52, 0.12, 0.1),
+        CFrame.new(-3, 5.58, -31.02),
+        Color3.fromRGB(104, 59, 51),
+        Enum.Material.SmoothPlastic,
+        false
+    )
     part(
         model,
         "HairBack",
@@ -2124,6 +2202,31 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     )
     stump.Shape = Enum.PartType.Cylinder
     stump.CFrame *= CFrame.Angles(0, 0, math.pi / 2)
+    for rootIndex = 1, 6 do
+        local angle = (rootIndex / 6) * math.pi * 2
+        part(
+            interactables,
+            "HeartwoodRoot",
+            Vector3.new(1.05, 1.15, 5.8),
+            CFrame.new(20 + math.cos(angle) * 3.4, 0.62, -48 + math.sin(angle) * 3.4)
+                * CFrame.Angles(0, -angle, math.rad(5 + rootIndex % 2 * 4)),
+            if rootIndex % 2 == 0 then BARK else WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+    end
+    for ringIndex = 1, 3 do
+        local growthRing = part(
+            interactables,
+            "HeartwoodGrowthRing",
+            Vector3.new(0.16, 5.7 - ringIndex * 0.7, 5.7 - ringIndex * 0.7),
+            stump.CFrame * CFrame.new(3.05, 0, 0),
+            Color3.fromRGB(128 + ringIndex * 12, 91 + ringIndex * 8, 55),
+            Enum.Material.Wood,
+            false
+        )
+        growthRing.Shape = Enum.PartType.Cylinder
+    end
     local heart = part(
         interactables,
         "HeartwoodCore",
@@ -2134,6 +2237,21 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         false
     )
     heart.Shape = Enum.PartType.Ball
+    heart.Transparency = 0.2
+    for shardIndex = -1, 1 do
+        local shard = part(
+            interactables,
+            "HeartwoodShard",
+            Vector3.new(0.9, 2.9 + math.abs(shardIndex) * 0.55, 1.05),
+            CFrame.new(20 + shardIndex * 1.05, 4.25 + math.abs(shardIndex) * 0.25, -48)
+                * CFrame.Angles(0, math.rad(shardIndex * 18), math.rad(shardIndex * -8)),
+            AMBER,
+            Enum.Material.Glass,
+            false
+        )
+        shard.Shape = Enum.PartType.Wedge
+        shard.Transparency = 0.12
+    end
     local heartLight = Instance.new("PointLight")
     heartLight.Color = AMBER
     heartLight.Brightness = 1.1
@@ -2170,16 +2288,79 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         },
     }
     for _, definition in tools do
+        local display = Instance.new("Model")
+        display.Name = "ToolDisplay_" .. definition.tool
+        display:SetAttribute("DisplayKind", "open_supply_crate")
+        display.Parent = interactables
         local pedestal = part(
-            interactables,
+            display,
             "Tool_" .. definition.tool,
             Vector3.new(6, 2, 6),
             CFrame.new(definition.x, 1, -68),
             Color3.fromRGB(66, 70, 65),
             Enum.Material.Slate
         )
+        pedestal.Transparency = 1
+        pedestal.CanCollide = false
+        pedestal.CastShadow = false
+        part(
+            display,
+            "ToolDisplayCrate",
+            Vector3.new(5.8, 1.7, 4.9),
+            CFrame.new(definition.x, 0.85, -68),
+            Color3.fromRGB(89, 62, 42),
+            Enum.Material.WoodPlanks
+        )
+        part(
+            display,
+            "ToolDisplayCushion",
+            Vector3.new(4.8, 0.34, 3.7),
+            CFrame.new(definition.x, 1.87, -68),
+            Color3.fromRGB(64, 77, 65):Lerp(definition.color, 0.24),
+            Enum.Material.Fabric,
+            false
+        )
+        for side = -1, 1, 2 do
+            part(
+                display,
+                "ToolDisplayBand",
+                Vector3.new(0.36, 1.95, 5.12),
+                CFrame.new(definition.x + side * 2.1, 0.98, -68),
+                Color3.fromRGB(87, 91, 86),
+                Enum.Material.Metal,
+                false
+            )
+            part(
+                display,
+                "ToolDisplayLidBrace",
+                Vector3.new(0.38, 3.8, 0.38),
+                CFrame.new(definition.x + side * 2.25, 3.15, -70.05)
+                    * CFrame.Angles(math.rad(-12), 0, 0),
+                Color3.fromRGB(72, 49, 35),
+                Enum.Material.Wood,
+                false
+            )
+        end
+        part(
+            display,
+            "ToolDisplayOpenLid",
+            Vector3.new(5.8, 0.46, 4.7),
+            CFrame.new(definition.x, 3.72, -70.38) * CFrame.Angles(math.rad(-68), 0, 0),
+            Color3.fromRGB(77, 53, 37),
+            Enum.Material.WoodPlanks,
+            false
+        )
+        part(
+            display,
+            "ToolDisplayPlaque",
+            Vector3.new(3.7, 1.05, 0.28),
+            CFrame.new(definition.x, 1.1, -65.48) * CFrame.Angles(math.rad(-8), 0, 0),
+            definition.color,
+            Enum.Material.SmoothPlastic,
+            false
+        )
         local marker = part(
-            interactables,
+            display,
             "ToolHandle",
             Vector3.new(0.45, 4.2, 0.45),
             CFrame.new(definition.x, 4.1, -68)
@@ -2190,7 +2371,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         )
         if definition.tool == "axe" then
             local head = part(
-                interactables,
+                display,
                 "AxeHead",
                 Vector3.new(2.25, 0.65, 0.38),
                 CFrame.new(definition.x - 0.28, 5.82, -68) * CFrame.Angles(0, 0, math.rad(28)),
@@ -2201,7 +2382,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             head.Shape = Enum.PartType.Wedge
         elseif definition.tool == "hammer" then
             local head = part(
-                interactables,
+                display,
                 "HammerHead",
                 Vector3.new(2.15, 0.78, 0.9),
                 CFrame.new(definition.x, 5.85, -68) * CFrame.Angles(0, 0, math.rad(90)),
@@ -2212,7 +2393,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             head.Shape = Enum.PartType.Cylinder
         else
             local cup = part(
-                interactables,
+                display,
                 "TorchCup",
                 Vector3.new(1.2, 0.72, 1.2),
                 CFrame.new(definition.x, 6.05, -68),
@@ -2222,7 +2403,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             )
             cup.Shape = Enum.PartType.Cylinder
             local flame = part(
-                interactables,
+                display,
                 "TorchFlame",
                 Vector3.new(1.15, 1.55, 1.15),
                 CFrame.new(definition.x, 6.95, -68),
@@ -2258,6 +2439,42 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         Enum.Material.Ground
     )
     plot.Transparency = 0.08
+    for postIndex = -2, 2 do
+        local height = 2.8 + (postIndex + 2) * 0.55
+        part(
+            interactables,
+            "BarricadeWorkPost",
+            Vector3.new(0.78, height, 0.78),
+            CFrame.new(-20 + postIndex * 3.6, height / 2, -88)
+                * CFrame.Angles(0, 0, math.rad(postIndex * 3)),
+            WET_BARK,
+            Enum.Material.Wood
+        )
+    end
+    for braceIndex = -1, 1 do
+        part(
+            interactables,
+            "BarricadeWorkBrace",
+            Vector3.new(14.8, 0.55, 0.62),
+            CFrame.new(-20, 1.7 + (braceIndex + 1) * 1.4, -88)
+                * CFrame.Angles(0, 0, math.rad(braceIndex * 6)),
+            Color3.fromRGB(103, 72, 46),
+            Enum.Material.WoodPlanks,
+            false
+        )
+    end
+    for supplyIndex = 1, 4 do
+        part(
+            interactables,
+            "BarricadeLumber",
+            Vector3.new(4.8 + supplyIndex * 0.45, 0.42, 0.58),
+            CFrame.new(-27.3, 0.45 + supplyIndex * 0.36, -85.4)
+                * CFrame.Angles(0, math.rad(-8 + supplyIndex * 3), math.rad(2)),
+            Color3.fromRGB(112, 78, 48),
+            Enum.Material.WoodPlanks,
+            false
+        )
+    end
     addBillboard(plot, "BARRICADE PLOT", CREAM)
     self:_registerInteraction(
         plot,
@@ -2275,6 +2492,50 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         CFrame.new(0, 1.5, -112),
         Color3.fromRGB(67, 68, 61),
         Enum.Material.Slate
+    )
+    for stepIndex = 1, 3 do
+        part(
+            interactables,
+            "FirstLanternPlinth",
+            Vector3.new(10.5 - stepIndex * 1.45, 0.52, 10.5 - stepIndex * 1.45),
+            CFrame.new(0, 0.25 + stepIndex * 0.42, -112),
+            if stepIndex % 2 == 0 then Color3.fromRGB(76, 79, 73) else Color3.fromRGB(61, 66, 62),
+            Enum.Material.Slate
+        )
+    end
+    for sideX = -1, 1, 2 do
+        for sideZ = -1, 1, 2 do
+            part(
+                interactables,
+                "FirstLanternCagePost",
+                Vector3.new(0.48, 6.2, 0.48),
+                CFrame.new(sideX * 2.35, 5.7, -112 + sideZ * 2.35)
+                    * CFrame.Angles(0, 0, math.rad(sideX * sideZ * 4)),
+                Color3.fromRGB(75, 72, 62),
+                Enum.Material.Metal,
+                false
+            )
+        end
+    end
+    for ringY = 3.1, 8.2, 5.1 do
+        part(
+            interactables,
+            "FirstLanternCageBand",
+            Vector3.new(5.45, 0.34, 5.45),
+            CFrame.new(0, ringY, -112),
+            Color3.fromRGB(86, 76, 59),
+            Enum.Material.Metal,
+            false
+        )
+    end
+    part(
+        interactables,
+        "FirstLanternCrown",
+        Vector3.new(4.9, 0.6, 4.9),
+        CFrame.new(0, 8.65, -112) * CFrame.Angles(0, math.rad(45), 0),
+        Color3.fromRGB(73, 67, 57),
+        Enum.Material.Metal,
+        false
     )
     local flame = part(
         interactables,
@@ -2523,16 +2784,54 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         },
     }
     for _, definition in craftingBenches do
+        local display = Instance.new("Model")
+        display.Name = "CraftingDisplay_" .. definition.recipeId
+        display:SetAttribute("RecipeId", definition.recipeId)
+        display:SetAttribute("DisplayKind", "physical_recipe_sample")
+        display.Parent = interactables
         local bench = part(
-            interactables,
+            display,
             "CraftingBench_" .. definition.recipeId,
             Vector3.new(6, 2.6, 6),
             CFrame.new(definition.x, 1.3, -130),
             Color3.fromRGB(66, 70, 65),
             Enum.Material.Slate
         )
+        bench.Transparency = 1
+        bench.CanCollide = false
+        bench.CastShadow = false
+        part(
+            display,
+            "CraftingTableTop",
+            Vector3.new(6.4, 0.55, 4.8),
+            CFrame.new(definition.x, 3.15, -130),
+            Color3.fromRGB(91, 64, 44),
+            Enum.Material.WoodPlanks
+        )
+        for side = -1, 1, 2 do
+            for depth = -1, 1, 2 do
+                part(
+                    display,
+                    "CraftingTableLeg",
+                    Vector3.new(0.55, 3.15, 0.55),
+                    CFrame.new(definition.x + side * 2.65, 1.57, -130 + depth * 1.85)
+                        * CFrame.Angles(0, 0, math.rad(side * 3)),
+                    WET_BARK,
+                    Enum.Material.Wood
+                )
+            end
+        end
+        part(
+            display,
+            "CraftingWorkbenchApron",
+            Vector3.new(5.4, 0.75, 0.42),
+            CFrame.new(definition.x, 2.55, -127.82),
+            Color3.fromRGB(68, 48, 36),
+            Enum.Material.Wood,
+            false
+        )
         local marker = part(
-            interactables,
+            display,
             "CraftingBenchGlow",
             Vector3.new(2, 3.4, 2),
             CFrame.new(definition.x, 4.3, -130),
@@ -2554,6 +2853,81 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             else Vector3.new(1.8, 1.8, 1.8)
         marker.Material = Enum.Material.SmoothPlastic
         marker.Transparency = 0.06
+        if definition.recipeId == "recipe_meadow_satchel" then
+            part(
+                display,
+                "SatchelFlap",
+                Vector3.new(2.35, 0.32, 1.1),
+                CFrame.new(definition.x, 4.72, -129.64) * CFrame.Angles(math.rad(18), 0, 0),
+                Color3.fromRGB(103, 128, 84),
+                Enum.Material.Fabric,
+                false
+            )
+            for strapSide = -1, 1, 2 do
+                part(
+                    display,
+                    "SatchelStrap",
+                    Vector3.new(0.22, 2.4, 0.22),
+                    CFrame.new(definition.x + strapSide * 1.05, 4.65, -130.2)
+                        * CFrame.Angles(0, 0, math.rad(strapSide * 24)),
+                    Color3.fromRGB(78, 58, 41),
+                    Enum.Material.Fabric,
+                    false
+                )
+            end
+        elseif definition.recipeId == "recipe_amber_charm" then
+            local charmRing = part(
+                display,
+                "AmberCharmRing",
+                Vector3.new(0.32, 2.4, 2.4),
+                CFrame.new(definition.x, 4.55, -130) * CFrame.Angles(0, math.rad(90), 0),
+                Color3.fromRGB(126, 97, 54),
+                Enum.Material.Metal,
+                false
+            )
+            charmRing.Shape = Enum.PartType.Cylinder
+            part(
+                display,
+                "AmberCharmCord",
+                Vector3.new(0.2, 1.7, 0.2),
+                CFrame.new(definition.x, 5.8, -130),
+                Color3.fromRGB(73, 54, 38),
+                Enum.Material.Fabric,
+                false
+            )
+        elseif definition.recipeId == "recipe_ironroot_hood" then
+            part(
+                display,
+                "HoodShoulders",
+                Vector3.new(3.6, 0.55, 1.45),
+                CFrame.new(definition.x, 3.82, -130),
+                Color3.fromRGB(75, 91, 81),
+                Enum.Material.Fabric,
+                false
+            )
+            part(
+                display,
+                "HoodStand",
+                Vector3.new(0.34, 2.5, 0.34),
+                CFrame.new(definition.x, 4.45, -130),
+                Color3.fromRGB(76, 55, 39),
+                Enum.Material.Wood,
+                false
+            )
+        else
+            for bootSide = -1, 1, 2 do
+                part(
+                    display,
+                    "BrambleBoot",
+                    Vector3.new(0.92, 1.45, 1.9),
+                    CFrame.new(definition.x + bootSide * 0.72, 4.05, -129.72)
+                        * CFrame.Angles(0, math.rad(bootSide * 8), 0),
+                    Color3.fromRGB(103, 76, 54),
+                    Enum.Material.Leather,
+                    false
+                )
+            end
+        end
         local markerLight = Instance.new("PointLight")
         markerLight.Color = definition.color
         markerLight.Brightness = 0.75
@@ -2578,6 +2952,47 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         BARK,
         Enum.Material.WoodPlanks
     )
+    for side = -1, 1, 2 do
+        part(
+            interactables,
+            "ArchivePost",
+            Vector3.new(0.75, 8.2, 0.75),
+            CFrame.new(side * 5.1, 4.1, -154.1) * CFrame.Angles(0, 0, math.rad(side * 3)),
+            WET_BARK,
+            Enum.Material.Wood
+        )
+        part(
+            interactables,
+            "ArchiveShelf",
+            Vector3.new(3.8, 0.42, 1.9),
+            CFrame.new(side * 2.2, 1.65, -153.25),
+            Color3.fromRGB(91, 65, 44),
+            Enum.Material.WoodPlanks,
+            false
+        )
+    end
+    part(
+        interactables,
+        "ArchiveCanopy",
+        Vector3.new(12.2, 0.62, 4.1),
+        CFrame.new(0, 7.5, -153.4) * CFrame.Angles(math.rad(-6), 0, 0),
+        Color3.fromRGB(47, 53, 48),
+        Enum.Material.Slate,
+        false
+    )
+    for noticeIndex = -2, 2 do
+        local notice = part(
+            interactables,
+            "ArchiveNotice",
+            Vector3.new(1.35 + (noticeIndex % 2) * 0.25, 1.7, 0.12),
+            CFrame.new(noticeIndex * 1.55, 4 + (noticeIndex % 2) * 0.35, -154.58)
+                * CFrame.Angles(0, 0, math.rad(noticeIndex * 3)),
+            if noticeIndex == 0 then CREAM else Color3.fromRGB(186, 168, 130),
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        notice.CastShadow = false
+    end
     addBillboard(archive, "GREENWARD ARCHIVE · FIELD BOOK", CREAM)
     self:_registerInteraction(
         archive,
@@ -2737,7 +3152,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v16")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v17")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -2837,7 +3252,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v16",
+        worldVersion = "bramblewake-blackout-v17",
     })
 end
 
@@ -4427,6 +4842,66 @@ local function buildTownProgressionBuildings(
         )
         apron.Transparency = 0.04
         for side = -1, 1, 2 do
+            local shoulder = part(
+                model,
+                "CoatShoulder",
+                Vector3.new(1.02, 1.02, 1.18),
+                CFrame.new(side * 1.3, 1.15, 0),
+                definition.coat:Lerp(definition.accent, 0.1),
+                Enum.Material.Fabric,
+                false
+            )
+            shoulder.Shape = Enum.PartType.Ball
+            part(
+                model,
+                "CoatCuff",
+                Vector3.new(0.84, 0.42, 0.84),
+                CFrame.new(side * 1.67, -0.83, 0),
+                definition.accent,
+                Enum.Material.Fabric,
+                false
+            )
+            part(
+                model,
+                "HairSide",
+                Vector3.new(0.42, 1.45, 0.5),
+                CFrame.new(side * 0.88, 2.85, 0.08) * CFrame.Angles(0, 0, math.rad(side * 7)),
+                definition.hair,
+                Enum.Material.SmoothPlastic,
+                false
+            )
+        end
+        part(
+            model,
+            "WorkBelt",
+            Vector3.new(2.65, 0.32, 1.45),
+            CFrame.new(0, -0.55, 0),
+            Color3.fromRGB(77, 55, 40),
+            Enum.Material.Leather,
+            false
+        )
+        part(
+            model,
+            "WorkBeltBuckle",
+            Vector3.new(0.5, 0.46, 0.18),
+            CFrame.new(0, -0.55, -0.8),
+            definition.accent,
+            Enum.Material.Metal,
+            false
+        )
+        for lapelSide = -1, 1, 2 do
+            part(
+                model,
+                "CoatLapel",
+                Vector3.new(0.58, 1.7, 0.16),
+                CFrame.new(lapelSide * 0.48, 0.72, -0.78)
+                    * CFrame.Angles(0, 0, math.rad(lapelSide * 18)),
+                definition.accent:Lerp(definition.coat, 0.35),
+                Enum.Material.Fabric,
+                false
+            )
+        end
+        for side = -1, 1, 2 do
             part(
                 model,
                 "Arm",
@@ -4475,8 +4950,36 @@ local function buildTownProgressionBuildings(
             )
             eye.Shape = Enum.PartType.Ball
         end
+        part(
+            model,
+            "Nose",
+            Vector3.new(0.28, 0.4, 0.32),
+            CFrame.new(0, 3, -1.02),
+            definition.skin:Lerp(Color3.fromRGB(119, 72, 57), 0.12),
+            Enum.Material.SmoothPlastic,
+            false
+        ).Shape =
+            Enum.PartType.Ball
+        part(
+            model,
+            "Mouth",
+            Vector3.new(0.48, 0.11, 0.1),
+            CFrame.new(0, 2.62, -1.02),
+            Color3.fromRGB(91, 52, 47),
+            Enum.Material.SmoothPlastic,
+            false
+        )
 
         if definition.prop == "cookpot" then
+            part(
+                model,
+                "QuartermasterCap",
+                Vector3.new(2.45, 0.48, 2.35),
+                CFrame.new(0, 4.18, 0.02) * CFrame.Angles(0, 0, math.rad(-4)),
+                Color3.fromRGB(83, 55, 40),
+                Enum.Material.Fabric,
+                false
+            )
             local pot = part(
                 model,
                 "QuartermasterCookpot",
@@ -4499,6 +5002,24 @@ local function buildTownProgressionBuildings(
         elseif definition.prop == "route_map" then
             part(
                 model,
+                "CourierScarf",
+                Vector3.new(2.55, 0.46, 1.46),
+                CFrame.new(0, 1.9, 0),
+                definition.accent,
+                Enum.Material.Fabric,
+                false
+            )
+            part(
+                model,
+                "CourierScarfTail",
+                Vector3.new(0.62, 2.05, 0.28),
+                CFrame.new(0.82, 1.08, 0.75) * CFrame.Angles(math.rad(-12), 0, math.rad(-8)),
+                definition.accent,
+                Enum.Material.Fabric,
+                false
+            )
+            part(
+                model,
                 "CourierSatchel",
                 Vector3.new(1.65, 1.8, 0.75),
                 CFrame.new(-1.45, -0.25, 0.35),
@@ -4517,6 +5038,15 @@ local function buildTownProgressionBuildings(
             )
             map.CastShadow = false
         else
+            part(
+                model,
+                "SeedkeeperShawl",
+                Vector3.new(3, 0.48, 1.65),
+                CFrame.new(0, 1.72, 0),
+                Color3.fromRGB(106, 126, 72),
+                Enum.Material.Fabric,
+                false
+            )
             local basket = part(
                 model,
                 "SeedBasket",
@@ -4544,6 +5074,15 @@ local function buildTownProgressionBuildings(
                 Vector3.new(3.3, 0.3, 3.3),
                 CFrame.new(0, 4.15, 0),
                 Color3.fromRGB(135, 112, 66),
+                Enum.Material.Fabric,
+                false
+            )
+            part(
+                model,
+                "SeedkeeperHatCrown",
+                Vector3.new(1.75, 1.25, 1.75),
+                CFrame.new(0, 4.72, 0.08),
+                Color3.fromRGB(122, 101, 61),
                 Enum.Material.Fabric,
                 false
             )
@@ -4856,6 +5395,26 @@ function WorldService.showExtractionPayoff(self: WorldService, player: Player, m
         Enum.Material.WoodPlanks,
         false
     )
+    for railSide = -1, 1, 2 do
+        part(
+            delivery,
+            "WayhomePalletRail",
+            Vector3.new(0.42, 1.85, 5.65),
+            CFrame.new(origin + Vector3.new(railSide * 3.18, 1.2, 0)),
+            Color3.fromRGB(72, 50, 36),
+            Enum.Material.Wood,
+            false
+        )
+        part(
+            delivery,
+            "WayhomePalletBinding",
+            Vector3.new(6.55, 0.22, 0.26),
+            CFrame.new(origin + Vector3.new(0, 1.65, railSide * 2.25)),
+            Color3.fromRGB(103, 91, 68),
+            Enum.Material.Fabric,
+            false
+        )
+    end
     addBillboard(
         pallet,
         string.format(
