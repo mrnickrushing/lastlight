@@ -931,6 +931,144 @@ function WorldService._configureLighting(_self: WorldService)
     clouds.Parent = Workspace.Terrain
 end
 
+--[[
+    Depth bands for the generated forest: near framing, regional mid-ground,
+    distant silhouette. Density falls with distance because far trees only
+    contribute silhouette, and spending parts on them is what pushes a mobile
+    device over budget.
+]]
+local FOREST_BANDS = table.freeze({
+    table.freeze({ inner = 64, outer = 168, count = 74, minScale = 0.85, maxScale = 1.5 }),
+    table.freeze({ inner = 168, outer = 340, count = 86, minScale = 1.1, maxScale = 1.9 }),
+    table.freeze({ inner = 340, outer = 620, count = 64, minScale = 1.5, maxScale = 2.6 }),
+})
+
+-- Trees are never planted inside this corridor around the walkable route.
+local ROUTE_HALF_WIDTH = 26
+
+--[[
+    Authored structures the forest must not grow into, as {x, z, radius}.
+
+    A corridor test alone is not enough: it only protects the walkable route,
+    so band 1 (radius 64-168) could still drop a collidable trunk through the
+    workshop roof, onto a mastery dais, or across a crafting bench, all of
+    which sit outside the corridor. Radii are sized for a canopy rather than a
+    trunk, because the visible problem is a tree overhanging a building, not
+    just its base intersecting one.
+]]
+local FOLIAGE_KEEP_OUT = table.freeze({
+    table.freeze({ x = -22, z = -112, radius = 30 }), -- Wayfarer cabin
+    table.freeze({ x = 22, z = -112, radius = 30 }), -- Mara's shelter
+    table.freeze({ x = 0, z = -112, radius = 34 }), -- lantern courtyard
+    table.freeze({ x = -22, z = -130, radius = 32 }), -- western workshop bay
+    table.freeze({ x = 22, z = -130, radius = 32 }), -- eastern workshop bay
+    table.freeze({ x = -47, z = -145, radius = 22 }), -- mastery dais
+    table.freeze({ x = 47, z = -145, radius = 22 }), -- mastery dais
+    table.freeze({ x = 78, z = -105, radius = 22 }), -- mastery dais
+    table.freeze({ x = -40, z = -132, radius = 24 }), -- Wayfarer inn
+    table.freeze({ x = 52, z = -112, radius = 22 }), -- greenward plot
+    table.freeze({ x = 0, z = -143, radius = 26 }), -- night watch posts
+})
+
+--[[
+    True when a position is clear of the route corridor and every authored
+    structure, so foliage may be planted there.
+]]
+local function isFoliagePlantable(x: number, z: number): boolean
+    if math.abs(x) <= ROUTE_HALF_WIDTH and z <= 20 and z >= -200 then
+        return false
+    end
+
+    for _, keepOut in FOLIAGE_KEEP_OUT do
+        local dx = x - keepOut.x
+        local dz = z - keepOut.z
+        if dx * dx + dz * dz < keepOut.radius * keepOut.radius then
+            return false
+        end
+    end
+
+    return true
+end
+
+--[[
+    Plants one depth band of the forest.
+
+    Each band owns a Random seeded from its own index rather than sharing one
+    sequential generator. That is what lets band 1 be planted before the world
+    is ready and bands 2-3 afterwards without changing what either produces: a
+    shared generator would make every tree depend on how much of the rest of
+    the build had already consumed from it, so deferring a band would silently
+    reshape the whole forest -- and the firefly loop draws from the same
+    generator, so it would have reshaped it differently depending on timing.
+]]
+local function plantForestBand(forest: Instance, bandIndex: number, swayTag: string?)
+    local band = FOREST_BANDS[bandIndex]
+    local random = Random.new(1847 + bandIndex * 7919)
+    local treeSeed = 4100 + bandIndex * 1000
+
+    for _ = 1, band.count do
+        local angle = random:NextNumber(0, math.pi * 2)
+        local radius = random:NextNumber(band.inner, band.outer)
+        local x = math.cos(angle) * radius
+        local z = math.sin(angle) * radius - 70
+
+        if isFoliagePlantable(x, z) then
+            -- Sit the trunk on the real surface. Bands 2 and 3 reach 340 and
+            -- 620 studs, well past the flat bowl, where the ground rises by up
+            -- to ~90 studs; planting at a hardcoded y = 0 buried exactly the
+            -- depth layers this scatter exists to create.
+            local position = Vector3.new(x, TerrainBuilder.surfaceHeight(x, z), z)
+            treeSeed += 1
+            local scale = random:NextNumber(band.minScale, band.maxScale)
+            local roll = random:NextNumber()
+
+            if roll < 0.62 then
+                FoliageBuilder.conifer(forest, position, scale, FOLIAGE_TONE, treeSeed, swayTag)
+            elseif roll < 0.9 then
+                FoliageBuilder.broadleaf(forest, position, scale, FOLIAGE_TONE, treeSeed, swayTag)
+            else
+                FoliageBuilder.snag(forest, position, scale, FOLIAGE_TONE, treeSeed)
+            end
+
+            -- Ground detail only in the near band, where the camera can
+            -- actually resolve it.
+            if bandIndex == 1 then
+                if treeSeed % 3 == 0 then
+                    FoliageBuilder.boulders(
+                        forest,
+                        position
+                            + Vector3.new(random:NextNumber(-12, 12), 0, random:NextNumber(-12, 12)),
+                        random:NextNumber(0.7, 1.5),
+                        FOLIAGE_TONE,
+                        treeSeed
+                    )
+                end
+                if treeSeed % 4 == 0 then
+                    FoliageBuilder.undergrowth(
+                        forest,
+                        position
+                            + Vector3.new(random:NextNumber(-9, 9), 0, random:NextNumber(-9, 9)),
+                        random:NextNumber(0.8, 1.5),
+                        FOLIAGE_TONE,
+                        treeSeed,
+                        swayTag
+                    )
+                end
+                if treeSeed % 11 == 0 then
+                    FoliageBuilder.deadfall(
+                        forest,
+                        position
+                            + Vector3.new(random:NextNumber(-10, 10), 0, random:NextNumber(-10, 10)),
+                        random:NextNumber(0.7, 1.3),
+                        FOLIAGE_TONE,
+                        treeSeed
+                    )
+                end
+            end
+        end
+    end
+end
+
 function WorldService._buildEnvironment(_self: WorldService, world: Model)
     local geometry = Instance.new("Folder")
     geometry.Name = "Environment"
@@ -939,7 +1077,12 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     -- Real sculpted Terrain instead of a 320 x 6 x 340 Part. The valley floor
     -- every authored coordinate below sits on stays flat at y = 0; all relief
     -- happens outside it. See TerrainBuilder for why that split matters.
-    TerrainBuilder.build()
+    --
+    -- Core only: this runs before ArrivalSpawn exists and before the world is
+    -- marked ready, so it covers the ground a player can stand on and stops
+    -- there. The horizon is filled in by _buildDistantScenery once joining is
+    -- unblocked.
+    TerrainBuilder.buildCore()
 
     groundPatch(
         geometry,
@@ -1007,93 +1150,11 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
 
     local random = Random.new(1847)
     local swayTag = _self._runtimeIds.AmbientSwayTag
-    local ROUTE_HALF_WIDTH = 26
 
-    -- Bands: {inner radius, outer radius, tree count, scale range}. Density
-    -- falls with distance because far trees only contribute silhouette, and
-    -- spending parts on them is what pushes a mobile device over budget.
-    local bands = {
-        { inner = 64, outer = 168, count = 74, minScale = 0.85, maxScale = 1.5 },
-        { inner = 168, outer = 340, count = 86, minScale = 1.1, maxScale = 1.9 },
-        { inner = 340, outer = 620, count = 64, minScale = 1.5, maxScale = 2.6 },
-    }
-
-    local treeSeed = 4100
-    for bandIndex, band in bands do
-        for _ = 1, band.count do
-            local angle = random:NextNumber(0, math.pi * 2)
-            local radius = random:NextNumber(band.inner, band.outer)
-            local position = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius - 70)
-
-            -- Never plant on the walkable route corridor. Trees on the path
-            -- were not a problem when the ring sat outside it; at this density
-            -- they would be.
-            if math.abs(position.X) > ROUTE_HALF_WIDTH or position.Z > 20 or position.Z < -200 then
-                treeSeed += 1
-                local scale = random:NextNumber(band.minScale, band.maxScale)
-                local roll = random:NextNumber()
-
-                if roll < 0.62 then
-                    FoliageBuilder.conifer(forest, position, scale, FOLIAGE_TONE, treeSeed, swayTag)
-                elseif roll < 0.9 then
-                    FoliageBuilder.broadleaf(
-                        forest,
-                        position,
-                        scale,
-                        FOLIAGE_TONE,
-                        treeSeed,
-                        swayTag
-                    )
-                else
-                    FoliageBuilder.snag(forest, position, scale, FOLIAGE_TONE, treeSeed)
-                end
-
-                -- Ground detail only in the near band, where the camera can
-                -- actually resolve it.
-                if bandIndex == 1 then
-                    if treeSeed % 3 == 0 then
-                        FoliageBuilder.boulders(
-                            forest,
-                            position
-                                + Vector3.new(
-                                    random:NextNumber(-12, 12),
-                                    0,
-                                    random:NextNumber(-12, 12)
-                                ),
-                            random:NextNumber(0.7, 1.5),
-                            FOLIAGE_TONE,
-                            treeSeed
-                        )
-                    end
-                    if treeSeed % 4 == 0 then
-                        FoliageBuilder.undergrowth(
-                            forest,
-                            position
-                                + Vector3.new(random:NextNumber(-9, 9), 0, random:NextNumber(-9, 9)),
-                            random:NextNumber(0.8, 1.5),
-                            FOLIAGE_TONE,
-                            treeSeed,
-                            swayTag
-                        )
-                    end
-                    if treeSeed % 11 == 0 then
-                        FoliageBuilder.deadfall(
-                            forest,
-                            position
-                                + Vector3.new(
-                                    random:NextNumber(-10, 10),
-                                    0,
-                                    random:NextNumber(-10, 10)
-                                ),
-                            random:NextNumber(0.7, 1.3),
-                            FOLIAGE_TONE,
-                            treeSeed
-                        )
-                    end
-                end
-            end
-        end
-    end
+    -- Only the near band is planted here. Bands 2 and 3 are scenery beyond the
+    -- immediate clearing and are planted after the world is marked ready; see
+    -- _buildDistantScenery.
+    plantForestBand(forest, 1, swayTag)
 
     for _ = 1, 34 do
         local glow = part(
@@ -1120,23 +1181,30 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     for index = 1, 24 do
         local angle = (index / 24) * math.pi * 2
         local radius = 48 + (index % 4) * 8
-        local position = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius - 70)
-        FoliageBuilder.boulders(
-            forest,
-            position,
-            0.6 + (index % 5) * 0.16,
-            FOLIAGE_TONE,
-            8300 + index
-        )
-        if index % 2 == 0 then
-            FoliageBuilder.undergrowth(
+        local x = math.cos(angle) * radius
+        local z = math.sin(angle) * radius - 70
+
+        -- Same keep-out test the tree bands use. This ring sits at radius
+        -- 48-72, so without it indices land directly on the lantern trail.
+        if isFoliagePlantable(x, z) then
+            local position = Vector3.new(x, TerrainBuilder.surfaceHeight(x, z), z)
+            FoliageBuilder.boulders(
                 forest,
-                position + Vector3.new(3, 0, -2),
-                0.9,
+                position,
+                0.6 + (index % 5) * 0.16,
                 FOLIAGE_TONE,
-                8400 + index,
-                _self._runtimeIds.AmbientSwayTag
+                8300 + index
             )
+            if index % 2 == 0 then
+                FoliageBuilder.undergrowth(
+                    forest,
+                    position + Vector3.new(3, 0, -2),
+                    0.9,
+                    FOLIAGE_TONE,
+                    8400 + index,
+                    _self._runtimeIds.AmbientSwayTag
+                )
+            end
         end
     end
 
@@ -1276,6 +1344,56 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         false
     )
     addBillboard(warningBoard, "NIGHT WATCH · HOLD THE LANTERN ROAD", CREAM)
+end
+
+--[[
+    Fills in the horizon after joining is unblocked.
+
+    Everything here is optional scenery: terrain past CORE_RADIUS, and the two
+    outer forest bands. None of it is ground a player can stand on and none of
+    it gates the tutorial, so it must not sit between a joining player and a
+    playable world. AGENTS.md is explicit that joining never blocks on the
+    whole world loading, and Config.BootstrapTimeoutSeconds is only 8 -- the
+    first version of this change generated the entire 121 x 121 hill grid, the
+    peak ring, and all 4,000-plus forest parts before ArrivalSpawn even
+    existed.
+
+    Yields between grid rows and between bands so the work lands across many
+    frames instead of one long hitch. Failures are contained: scenery breaking
+    out here must not take down a world that is already ready and playable.
+]]
+function WorldService._buildDistantScenery(self: WorldService)
+    local world = self._world
+    if world == nil then
+        return
+    end
+
+    local geometry = world:FindFirstChild("Environment")
+    local forest = if geometry ~= nil then geometry:FindFirstChild("Forest") else nil
+    local swayTag = self._runtimeIds.AmbientSwayTag
+
+    task.spawn(function()
+        local ok, err = pcall(function()
+            TerrainBuilder.buildDistant(nil, nil, function()
+                task.wait()
+            end)
+
+            for bandIndex = 2, 3 do
+                -- The world can be torn down and rebuilt while this runs.
+                if forest == nil or forest.Parent == nil then
+                    return
+                end
+                plantForestBand(forest, bandIndex, swayTag)
+                task.wait()
+            end
+        end)
+
+        if not ok then
+            self._logger:info("distant_scenery_failed", { error = tostring(err) })
+            return
+        end
+        self._logger:info("distant_scenery_ready", {})
+    end)
 end
 
 function WorldService._buildMara(self: WorldService, world: Model)
@@ -2116,6 +2234,9 @@ function WorldService.Init(self: WorldService, context: any)
     self:setTownCondition(self._townCondition)
 
     world:SetAttribute("Ready", true)
+
+    -- Only after the world is playable. See _buildDistantScenery.
+    self:_buildDistantScenery()
 end
 
 function WorldService.Start(self: WorldService)

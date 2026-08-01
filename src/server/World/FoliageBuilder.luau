@@ -88,6 +88,90 @@ local function newPart(
 end
 
 --[[
+    Creates a cylinder of `length` and `diameter` whose long axis runs along
+    `orientation`'s *up* direction.
+
+    This exists because a Roblox cylinder's circular faces point along its
+    LOCAL X axis, so `Size.X` is the length and `Size.Y`/`Size.Z` are the
+    diameters -- the opposite of the intuitive (diameter, height, diameter)
+    ordering every other upright part uses. Getting this wrong does not error
+    or look obviously broken in code; it silently produces a disc that is one
+    diameter long and several studs wide in the wrong direction, which is
+    exactly what shipped in the first version of this file and in the
+    generator it replaced.
+
+    Callers pass a CFrame oriented the way they want the cylinder to *point*
+    (its up axis becomes the cylinder's length), and this applies the axis
+    swap. One place to be wrong instead of five.
+]]
+local function cylinderPart(
+    parent: Instance,
+    name: string,
+    length: number,
+    diameter: number,
+    orientation: CFrame,
+    color: Color3,
+    material: Enum.Material,
+    canCollide: boolean
+): Part
+    local instance = newPart(
+        parent,
+        name,
+        Vector3.new(length, diameter, diameter),
+        orientation * CFrame.Angles(0, 0, math.rad(90)),
+        color,
+        material,
+        canCollide
+    )
+    instance.Shape = Enum.PartType.Cylinder
+    return instance
+end
+
+--[[
+    Creates a cylinder spanning two points.
+
+    Defining a cylinder by its endpoints removes the axis reasoning entirely,
+    which matters most for the near-horizontal pieces: deriving "which roll and
+    yaw make the length point that way" by hand is what produced the disc-shaped
+    trunks in the first place, and it also silently decouples a piece from the
+    positions computed around it. With endpoints, the geometry and the things
+    placed against it read from the same two vectors.
+
+    CFrame.lookAt's LookVector is the span direction, and rotating 90 degrees
+    about Y brings the cylinder's local X onto it.
+]]
+local function cylinderBetween(
+    parent: Instance,
+    name: string,
+    fromPoint: Vector3,
+    toPoint: Vector3,
+    diameter: number,
+    color: Color3,
+    material: Enum.Material,
+    canCollide: boolean
+): Part?
+    local span = toPoint - fromPoint
+    local length = span.Magnitude
+    if length < 0.05 then
+        -- CFrame.lookAt is undefined for coincident points, and a zero-length
+        -- cylinder is not worth an instance.
+        return nil
+    end
+
+    local instance = newPart(
+        parent,
+        name,
+        Vector3.new(length, diameter, diameter),
+        CFrame.lookAt(fromPoint + span * 0.5, toPoint) * CFrame.Angles(0, math.rad(90), 0),
+        color,
+        material,
+        canCollide
+    )
+    instance.Shape = Enum.PartType.Cylinder
+    return instance
+end
+
+--[[
     A leaning, tapering trunk built from stacked segments.
 
     Each segment is narrower and slightly more offset than the one below, which
@@ -115,25 +199,20 @@ local function trunk(
         local offset = drift * (height * 0.05 * nextFraction * nextFraction)
         local center = base + Vector3.new(0, height * fraction + segmentHeight / 2, 0) + offset
 
-        local piece = newPart(
+        -- Upright, with a small tilt that grows toward the crown so the trunk
+        -- curves rather than hinging.
+        cylinderPart(
             parent,
             "TreeTrunk",
-            Vector3.new(segmentRadius * 2, segmentHeight * 1.04, segmentRadius * 2),
+            segmentHeight * 1.04,
+            segmentRadius * 2,
             CFrame.new(center)
-                * CFrame.Angles(
-                    math.sin(lean) * 0.05 * nextFraction,
-                    lean,
-                    math.cos(lean) * 0.05 * nextFraction
-                ),
+                * CFrame.Angles(0, lean, 0)
+                * CFrame.Angles(0, 0, math.sin(lean) * 0.06 * nextFraction),
             if index == 1 then tone.barkWet else tone.bark,
             Enum.Material.Wood,
             index <= 2
         )
-        piece.Shape = Enum.PartType.Cylinder
-        -- Cylinder parts extend along X, so stand them upright.
-        piece.CFrame = CFrame.new(center)
-            * CFrame.Angles(0, lean, math.rad(90))
-            * CFrame.Angles(0, 0, math.sin(lean) * 0.06 * nextFraction)
 
         top = center + Vector3.new(0, segmentHeight / 2, 0) + offset
     end
@@ -260,32 +339,25 @@ function FoliageBuilder.broadleaf(
     -- Limbs, so the canopy has something to sit on.
     for limbIndex = 1, 3 do
         local angle = (limbIndex / 3) * math.pi * 2 + random:NextNumber(-0.4, 0.4)
-        local limb = newPart(
+        -- Angled outward and up from the trunk top. The 52-degree roll leans
+        -- the limb away from vertical; cylinderPart handles the axis swap.
+        cylinderPart(
             parent,
             "BroadleafLimb",
-            Vector3.new(1.05 * scale, 8 * scale, 1.05 * scale),
+            8 * scale,
+            1.05 * scale,
             CFrame.new(
                 top
                     + Vector3.new(
-                        math.cos(angle) * 2.2 * scale,
-                        1.4 * scale,
-                        math.sin(angle) * 2.2 * scale
+                        math.cos(angle) * 2.6 * scale,
+                        2.2 * scale,
+                        math.sin(angle) * 2.6 * scale
                     )
-            )
-                * CFrame.Angles(math.cos(angle) * 0.6, angle, math.sin(angle) * 0.6),
+            ) * CFrame.Angles(0, angle, math.rad(52)),
             tone.bark,
             Enum.Material.Wood,
             false
         )
-        limb.Shape = Enum.PartType.Cylinder
-        limb.CFrame = CFrame.new(
-            top
-                + Vector3.new(
-                    math.cos(angle) * 2.6 * scale,
-                    2.2 * scale,
-                    math.sin(angle) * 2.6 * scale
-                )
-        ) * CFrame.Angles(0, angle, math.rad(52))
     end
 
     for cluster = 1, 6 do
@@ -339,24 +411,23 @@ function FoliageBuilder.snag(
     for _ = 1, random:NextInteger(2, 4) do
         local angle = random:NextNumber(0, math.pi * 2)
         local length = random:NextNumber(3.5, 7) * scale
-        local branch = newPart(
+        cylinderPart(
             parent,
             "SnagBranch",
-            Vector3.new(0.55 * scale, length, 0.55 * scale),
-            CFrame.new(top),
+            length,
+            0.55 * scale,
+            CFrame.new(
+                top
+                    + Vector3.new(
+                        math.cos(angle) * length * 0.32,
+                        -random:NextNumber(0.5, 4) * scale,
+                        math.sin(angle) * length * 0.32
+                    )
+            ) * CFrame.Angles(0, angle, math.rad(random:NextNumber(38, 74))),
             tone.barkWet,
             Enum.Material.Wood,
             false
         )
-        branch.Shape = Enum.PartType.Cylinder
-        branch.CFrame = CFrame.new(
-            top
-                + Vector3.new(
-                    math.cos(angle) * length * 0.32,
-                    -random:NextNumber(0.5, 4) * scale,
-                    math.sin(angle) * length * 0.32
-                )
-        ) * CFrame.Angles(0, angle, math.rad(random:NextNumber(38, 74)))
     end
 end
 
@@ -443,57 +514,54 @@ function FoliageBuilder.deadfall(
     local length = random:NextNumber(12, 20) * scale
     local radius = random:NextNumber(1.1, 1.8) * scale
 
-    local log = newPart(
+    -- Both ends are computed once and reused, so the log, its splinters, and
+    -- its fungi cannot drift apart.
+    local heading = Vector3.new(math.cos(angle), 0, math.sin(angle))
+    local center = position + Vector3.new(0, radius * 0.78, 0)
+    local tailEnd = center - heading * (length * 0.5)
+    local headEnd = center + heading * (length * 0.5)
+
+    cylinderBetween(
         parent,
         "FallenLog",
-        Vector3.new(radius * 2, length, radius * 2),
-        CFrame.new(position + Vector3.new(0, radius * 0.78, 0)),
+        tailEnd,
+        headEnd,
+        radius * 2,
         tone.barkWet,
         Enum.Material.Wood,
         true
     )
-    log.Shape = Enum.PartType.Cylinder
-    log.CFrame = CFrame.new(position + Vector3.new(0, radius * 0.78, 0))
-        * CFrame.Angles(0, angle, math.rad(90))
-        * CFrame.Angles(0, math.rad(random:NextNumber(-6, 6)), 0)
 
-    -- Splintered end, so the log looks broken rather than sawn.
+    -- Splintered end, so the log looks broken rather than sawn. Each shard
+    -- fans out from the real end point.
     for splinter = 1, 3 do
-        local shard = newPart(
+        local fan = (splinter - 2) * 0.5
+        local outward = Vector3.new(math.cos(angle + fan), 0, math.sin(angle + fan))
+        local shardLength = radius * random:NextNumber(1.4, 2.6)
+        cylinderBetween(
             parent,
             "LogSplinter",
-            Vector3.new(radius * 0.42, radius * random:NextNumber(1.4, 2.6), radius * 0.42),
-            CFrame.new(
-                position
-                    + Vector3.new(
-                        math.cos(angle) * length * 0.5,
-                        radius * random:NextNumber(0.6, 1.5),
-                        math.sin(angle) * length * 0.5
-                    )
-            )
-                * CFrame.Angles(math.rad(random:NextNumber(50, 84)), angle + splinter, 0),
+            headEnd,
+            headEnd
+                + outward * shardLength
+                + Vector3.new(0, random:NextNumber(-0.4, 0.9) * radius, 0),
+            radius * 0.42,
             tone.bark,
             Enum.Material.Wood,
             false
         )
-        shard.Shape = Enum.PartType.Cylinder
     end
 
     for shelf = 1, random:NextInteger(1, 3) do
-        local along = random:NextNumber(-0.34, 0.34)
+        -- Positioned along the same axis the log was built from, so a shelf
+        -- always lands on the log rather than beside it.
+        local along = random:NextNumber(0.18, 0.82)
+        local seat = tailEnd:Lerp(headEnd, along) + Vector3.new(0, radius * 0.72, 0)
         local fungus = newPart(
             parent,
             "ShelfFungus",
             Vector3.new(radius * 1.9, radius * 0.3, radius * 1.35),
-            CFrame.new(
-                position
-                    + Vector3.new(
-                        math.cos(angle) * length * along,
-                        radius * 1.5,
-                        math.sin(angle) * length * along
-                    )
-            )
-                * CFrame.Angles(0, angle + shelf, math.rad(random:NextNumber(-14, 14))),
+            CFrame.new(seat) * CFrame.Angles(0, angle + shelf, math.rad(random:NextNumber(-14, 14))),
             tone.leafPale,
             Enum.Material.Fabric,
             false

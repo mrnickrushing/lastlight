@@ -69,6 +69,15 @@ local WORLD_EXTENT = 1450
 
 local VOXEL = 4
 
+local DEFAULT_SEED = 20260801
+
+-- The Bramblewake expedition is built around x = 1600 (BramblewakeBuilder's
+-- ORIGIN) as its own streamed area. No generated terrain may reach past this
+-- line, or hills and peaks grow through the expedition modules. The hill grid
+-- already stops at WORLD_EXTENT = 1450; this bounds the peak ring too, whose
+-- radius would otherwise carry it further out than its centre suggests.
+local BRAMBLEWAKE_KEEP_OUT_X = 1400
+
 export type Palette = {
     valley: Enum.Material,
     meadow: Enum.Material,
@@ -142,40 +151,113 @@ end
     Columns are sampled on a coarse grid and filled as blocks. A finer grid
     would cost proportionally more fills for detail that terrain smoothing and
     the tree line hide anyway.
+
+    `minRadius`/`maxRadius` select an annulus by distance from the bowl centre,
+    which is what lets the near ground be generated before a player can join
+    and the horizon be generated after. Splitting by radius rather than by grid
+    index guarantees the two passes tile exactly: no cell is filled twice, and
+    no cell between them is missed.
+
+    `onProgress` is called once per grid row so a deferred caller can yield.
+    Yielding inside the row loop instead of per cell keeps the number of
+    scheduler round-trips proportional to the grid edge, not its area.
 ]]
-local function fillSurroundingHills(terrain: Terrain, seed: number, palette: Palette)
+--[[
+    The height of the ground surface at a world position.
+
+    This is the single source of truth for the terrain's shape. Both the fill
+    loop and anything placed *on* the terrain must read it, or they disagree:
+    foliage was originally planted at a hardcoded y = 0 while the ground
+    outside the bowl rose by up to ~90 studs, which buried the mid and far
+    tree bands -- the exact depth layers this module exists to create.
+
+    Inside the bowl this is always GROUND_Y, which is the flat-floor guarantee
+    every authored gameplay coordinate depends on.
+]]
+local function surfaceHeightAt(x: number, z: number, seed: number): number
+    if isInsideBowl(x, z, 0) then
+        return GROUND_Y
+    end
+
+    local bowlCenterX = (BOWL_MIN_X + BOWL_MAX_X) / 2
+    local bowlCenterZ = (BOWL_MIN_Z + BOWL_MAX_Z) / 2
+    local dx = x - bowlCenterX
+    local dz = z - bowlCenterZ
+    local distance = math.sqrt(dx * dx + dz * dz)
+
+    -- Ramp relief in with distance from the valley so the ground leaves the
+    -- flat bowl gradually instead of at a wall.
+    local ramp = math.clamp((distance - 230) / 620, 0, 1)
+    local rise = terrainNoise(seed, x, z, 320) * 58 + 34
+    return GROUND_Y + math.max(0, rise * ramp * ramp)
+end
+
+--[[
+    Surface height for callers outside this module, using the same seed the
+    world was built with. Foliage placement uses this so trunks sit on the
+    ground rather than inside it.
+]]
+function TerrainBuilder.surfaceHeight(x: number, z: number, seed: number?): number
+    return surfaceHeightAt(x, z, seed or DEFAULT_SEED)
+end
+
+local function fillHillAnnulus(
+    terrain: Terrain,
+    seed: number,
+    palette: Palette,
+    minRadius: number,
+    maxRadius: number,
+    onProgress: (() -> ())?
+)
     local step = 24
     local bowlCenterX = (BOWL_MIN_X + BOWL_MAX_X) / 2
     local bowlCenterZ = (BOWL_MIN_Z + BOWL_MAX_Z) / 2
 
     for x = -WORLD_EXTENT, WORLD_EXTENT, step do
+        if onProgress ~= nil then
+            onProgress()
+        end
         for z = -WORLD_EXTENT, WORLD_EXTENT, step do
             if not isInsideBowl(x, z, 0) then
                 local dx = x - bowlCenterX
                 local dz = z - bowlCenterZ
                 local distance = math.sqrt(dx * dx + dz * dz)
 
-                -- Ramp relief in with distance from the valley so the ground
-                -- leaves the flat bowl gradually instead of at a wall.
-                local ramp = math.clamp((distance - 230) / 620, 0, 1)
-                local rise = terrainNoise(seed, x, z, 320) * 58 + 34
-                local height = rise * ramp * ramp
-
-                if height > 2 then
-                    local material = palette.slope
-                    if height > 96 then
-                        material = palette.peak
-                    elseif height > 46 then
-                        material = palette.ridge
-                    end
-
-                    local columnHeight = toVoxelSpan(height + BEDROCK_DEPTH)
-                    terrain:FillBlock(
-                        CFrame.new(x, GROUND_Y + height - columnHeight / 2, z),
-                        Vector3.new(toVoxelSpan(step), columnHeight, toVoxelSpan(step)),
-                        material
-                    )
+                if distance < minRadius or distance >= maxRadius then
+                    continue
                 end
+
+                -- Same function foliage placement reads, so a tree can never
+                -- disagree with the ground it stands on.
+                local height = surfaceHeightAt(x, z, seed) - GROUND_Y
+
+                -- Every cell outside the bowl is filled, including the ones
+                -- with no relief at all. Skipping flat cells left a void ring
+                -- between the bowl's rectangular edge and where the distance
+                -- ramp starts producing height -- a cell just past x = 190 is
+                -- outside the bowl but still under the 230-stud ramp, so it
+                -- got no terrain and no floor. Players walking off the bowl
+                -- edge fell through it into fall recovery, and removing the
+                -- old DistantCliff ring took away the fence that had been
+                -- accidentally hiding the gap.
+                local material = palette.slope
+                if height > 96 then
+                    material = palette.peak
+                elseif height > 46 then
+                    material = palette.ridge
+                elseif height < 1 then
+                    -- Flat skirt immediately outside the bowl reads as the
+                    -- same meadow, not as a different biome starting at a
+                    -- straight line.
+                    material = palette.valley
+                end
+
+                local columnHeight = toVoxelSpan(height + BEDROCK_DEPTH)
+                terrain:FillBlock(
+                    CFrame.new(x, GROUND_Y + height - columnHeight / 2, z),
+                    Vector3.new(toVoxelSpan(step), columnHeight, toVoxelSpan(step)),
+                    material
+                )
             end
         end
     end
@@ -200,6 +282,15 @@ local function fillHorizonPeaks(terrain: Terrain, seed: number, palette: Palette
         local z = math.sin(angle) * distance - 70
         local radius = random:NextNumber(110, 210)
         local height = random:NextNumber(150, 320)
+
+        -- The Bramblewake expedition is authored as a separate streamed area
+        -- around x = 1600. A peak at distance 1330 with radius 210 reaches
+        -- x = 1540, close enough to push a mountain through the first
+        -- expedition modules. Skipping peaks that reach into it keeps the two
+        -- areas from fighting over the same space.
+        if x + radius > BRAMBLEWAKE_KEEP_OUT_X then
+            continue
+        end
 
         -- Two stacked balls give a shoulder and a cap, which reads as a
         -- mountain rather than a dome.
@@ -255,13 +346,30 @@ local function fillStream(terrain: Terrain, palette: Palette)
     terrain:FillBall(Vector3.new(316, GROUND_Y - 2, -268), 22, palette.shore)
 end
 
+-- How deep a surface material patch reaches. Only needs to cover the topmost
+-- voxel layer that is actually visible; deeper is wasted writes.
+local SURFACE_PATCH_DEPTH = 8
+
 --[[
     Meadow and worn-earth colour variation across the valley floor.
 
-    Painted as shallow surface fills on top of the finished floor. This is what
-    stops the walkable area from being one uniform green: the design direction
-    asks for material variation from modular detail rather than unique
-    textures, and swapping the top voxel layer is the cheapest version of that.
+    Every patch is a block whose TOP FACE sits exactly at GROUND_Y and whose
+    body runs downward, and it is only ever yaw-rotated. Both properties are
+    load-bearing:
+
+      * The bowl is already solid from GROUND_Y down to bedrock, so a fill
+        entirely at or below GROUND_Y replaces the material of existing voxels
+        without changing occupancy. The walkable surface stays exactly flat.
+      * Yaw keeps the top face horizontal at a fixed height. Pitch or roll
+        would tip a corner up through the surface.
+
+    The first version used FillBall centred at GROUND_Y - 0.55 * radius, which
+    put the top of every ball 0.45 * radius ABOVE the ground -- up to a 19.8
+    stud solid mound, in the middle of the area this module promises is flat,
+    potentially burying the spawn and authored props. FillBall adds terrain; it
+    does not merely repaint it. A ball cannot repaint a flat surface at all:
+    any ball whose top is at or below the surface only touches it at a single
+    tangent point, so a block is the right primitive here, not a rounder one.
 ]]
 local function paintValleyVariation(terrain: Terrain, seed: number, palette: Palette)
     local random = Random.new(seed + 991)
@@ -269,37 +377,80 @@ local function paintValleyVariation(terrain: Terrain, seed: number, palette: Pal
     for _ = 1, 46 do
         local x = random:NextNumber(BOWL_MIN_X + 20, BOWL_MAX_X - 20)
         local z = random:NextNumber(BOWL_MIN_Z + 20, BOWL_MAX_Z - 20)
-        local radius = random:NextNumber(16, 44)
+        local width = toVoxelSpan(random:NextNumber(26, 78))
+        local depth = toVoxelSpan(random:NextNumber(26, 78))
         local material = if random:NextNumber() < 0.62 then palette.meadow else palette.slope
 
-        terrain:FillBall(Vector3.new(x, GROUND_Y - radius * 0.55, z), radius, material)
+        terrain:FillBlock(
+            CFrame.new(x, GROUND_Y - SURFACE_PATCH_DEPTH / 2, z)
+                * CFrame.Angles(0, random:NextNumber(0, math.pi), 0),
+            Vector3.new(width, SURFACE_PATCH_DEPTH, depth),
+            material
+        )
     end
 end
 
 --[[
-    Sculpts the whole arrival valley.
+    Where the join-blocking core pass stops and the deferred pass begins.
 
-    Safe to call more than once: ClearAllChildren-style resets are not needed
-    because every fill is deterministic and idempotent for a given seed --
-    re-running writes identical voxels.
+    Everything a player can reach, fall off, or see close up in their first
+    moments is inside this radius; past it the ground is scenery. Comfortably
+    beyond the 620-stud tree line so the transition is never the first thing
+    in view.
 ]]
-function TerrainBuilder.build(seed: number?, palette: Palette?)
-    local terrain = Workspace.Terrain
-    local resolvedSeed = seed or 20260801
-    local resolvedPalette = palette or DEFAULT_PALETTE
+local CORE_RADIUS = 760
 
-    fillValleyFloor(terrain, resolvedPalette)
-    fillSurroundingHills(terrain, resolvedSeed, resolvedPalette)
-    fillHorizonPeaks(terrain, resolvedSeed, resolvedPalette)
-    fillStream(terrain, resolvedPalette)
-    paintValleyVariation(terrain, resolvedSeed, resolvedPalette)
-
+local function applyWaterStyle(terrain: Terrain)
     terrain.Decoration = true
     terrain.WaterColor = Color3.fromRGB(44, 92, 104)
     terrain.WaterReflectance = 0.28
     terrain.WaterTransparency = 0.62
     terrain.WaterWaveSize = 0.08
     terrain.WaterWaveSpeed = 8
+end
+
+--[[
+    Sculpts everything a joining player needs: the flat valley floor, the
+    ground immediately around it, the stream, and surface variation.
+
+    This runs before the spawn exists and before the world is marked ready, so
+    it is deliberately the smaller half of the work. Config.BootstrapTimeoutSeconds
+    is 8, and AGENTS.md is explicit that joining must never block on the whole
+    world loading -- the first version generated the entire 121 x 121 hill grid
+    and the horizon here, which is optional scenery no one can reach.
+
+    Safe to call more than once: every fill is deterministic for a given seed,
+    so re-running writes identical voxels.
+]]
+function TerrainBuilder.buildCore(seed: number?, palette: Palette?)
+    local terrain = Workspace.Terrain
+    local resolvedSeed = seed or DEFAULT_SEED
+    local resolvedPalette = palette or DEFAULT_PALETTE
+
+    fillValleyFloor(terrain, resolvedPalette)
+    fillHillAnnulus(terrain, resolvedSeed, resolvedPalette, 0, CORE_RADIUS, nil)
+    fillStream(terrain, resolvedPalette)
+    paintValleyVariation(terrain, resolvedSeed, resolvedPalette)
+    applyWaterStyle(terrain)
+end
+
+--[[
+    Sculpts the horizon: the far hills and the peak ring.
+
+    Meant to be called after the world is marked ready. `onProgress` fires once
+    per grid row so the caller can yield between rows and keep the server
+    responsive while this fills in behind the tree line.
+
+    Everything here is past CORE_RADIUS, so it can only ever add scenery a
+    player is looking at from a distance -- never ground they are standing on.
+]]
+function TerrainBuilder.buildDistant(seed: number?, palette: Palette?, onProgress: (() -> ())?)
+    local terrain = Workspace.Terrain
+    local resolvedSeed = seed or DEFAULT_SEED
+    local resolvedPalette = palette or DEFAULT_PALETTE
+
+    fillHillAnnulus(terrain, resolvedSeed, resolvedPalette, CORE_RADIUS, math.huge, onProgress)
+    fillHorizonPeaks(terrain, resolvedSeed, resolvedPalette)
 end
 
 -- Exposed so world code and tests can reason about the flat region without
