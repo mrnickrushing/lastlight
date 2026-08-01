@@ -44,4 +44,5 @@ TestRunner.run({
     require("./specs/TownNightIncident.spec"),
     require("./specs/TownProgression.spec"),
     require("./specs/TownCondition.spec"),
+    require("./specs/TownGuardLastStand.spec"),
 })

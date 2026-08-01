@@ -407,6 +407,23 @@ function AnalyticsService.townNightConsequence(
     })
 end
 
+function AnalyticsService.townGuardLastStand(
+    self: AnalyticsService,
+    accepted: boolean,
+    reason: string,
+    partySize: number,
+    nightNumber: number,
+    lanternHealth: number
+)
+    self._logger:info("town_guard_last_stand_attempt", {
+        accepted = accepted,
+        lanternHealth = lanternHealth,
+        night = nightNumber,
+        partySize = partySize,
+        reason = reason,
+    })
+end
+
 function AnalyticsService.townRepaired(
     self: AnalyticsService,
     player: Player,

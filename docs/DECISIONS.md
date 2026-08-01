@@ -491,3 +491,18 @@ HUD rail or mobile button. Reusing Emergency Patch preserves input parity and
 all existing server checks, while a visible, bounded structure finally expresses
 the Engineer's build/control identity without creating client-selected placement,
 path obstruction, indefinite stacking, or paid combat power.
+
+## 2026-08-01 — Whole-party night recovery spends shared light once
+
+**Decision:** During a normal town night, if every connected, tutorial-ready
+town player is downed, the Night Watch may rally that party once for the active
+night. The server spends 12 First Lantern strength, revives eligible players at
+50 health, and grants a five-second ward. The recovery is unavailable below 30
+lantern strength and never includes expedition players.
+
+**Reason:** Cooperative night defense needs one dramatic recovery beat before a
+group collapse turns into simultaneous bleedout timers, but it must preserve
+stakes. A single server-owned use, a visible shared-resource cost, and no paid
+relief make the comeback legible and bounded. Tying it to the frozen active-night
+number prevents a veteran joining mid-wave from resetting or consuming the wrong
+night's allowance.

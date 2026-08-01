@@ -31,6 +31,7 @@ local RuntimeIds = require(root.RuntimeIds)
 local SurvivalState = require(root.SurvivalState)
 local StatusEffectState = require(root.StatusEffectState)
 local TownNightIncident = require(root.TownNightIncident)
+local TownGuardLastStand = require(root.TownGuardLastStand)
 local SaveSchema = require(root.SaveSchema)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
@@ -40,7 +41,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.28.0", "unexpected build version")
+assert(Config.BuildVersion == "0.29.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -49,6 +50,19 @@ local studioBraceAfterHit, studioBraceHit = EngineerBrace.absorb(studioBrace, 9,
 assert(
     studioBraceHit.absorbed == 9 and studioBraceAfterHit.capacity == 5,
     "Engineer Rootline Brace contract is missing"
+)
+local _, studioLastStand = TownGuardLastStand.attempt(TownGuardLastStand.default(), {
+    phase = "night",
+    nightNumber = 2,
+    lanternHealth = 60,
+    eligiblePlayers = 3,
+    downedPlayers = 3,
+})
+assert(
+    studioLastStand.accepted
+        and studioLastStand.lanternCost == 12
+        and studioLastStand.recoveryHealth == 50,
+    "Town Guard Last Stand contract is missing"
 )
 
 local calls = 0
@@ -317,9 +331,13 @@ assert(
     world:FindFirstChild("EngineerRootlineBrace") == nil,
     "Engineer Rootline Brace must not exist before Emergency Patch"
 )
+assert(
+    world:FindFirstChild("TownGuardLastStand") == nil,
+    "Town Guard Last Stand must not exist before a whole-party recovery"
+)
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v7",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v8",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")

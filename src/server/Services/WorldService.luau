@@ -2178,7 +2178,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v7")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v8")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -2273,7 +2273,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v7",
+        worldVersion = "bramblewake-blackout-v8",
     })
 end
 
@@ -2880,6 +2880,119 @@ function WorldService.setLanternHealth(self: WorldService, health: number)
     task.delay(0.5, function()
         if pulse.Parent ~= nil then
             pulse:Destroy()
+        end
+    end)
+end
+
+function WorldService.showTownGuardRecovery(self: WorldService, players: { Player }, result: any)
+    local world = self._world
+    local flame = self._lantern
+    if world == nil or flame == nil or #players < 1 then
+        return
+    end
+
+    local previous = world:FindFirstChild("TownGuardLastStand")
+    if previous ~= nil then
+        previous:Destroy()
+    end
+
+    world:SetAttribute("LastStandNight", result.nightNumber)
+    world:SetAttribute("LastStandPartySize", #players)
+    world:SetAttribute("LastStandLanternSpent", result.lanternSpent or result.lanternCost or 0)
+
+    local rally = Instance.new("Model")
+    rally.Name = "TownGuardLastStand"
+    rally:SetAttribute("NightNumber", result.nightNumber)
+    rally:SetAttribute("PartySize", #players)
+    rally.Parent = world
+
+    local ground = flame.Position - Vector3.new(0, 5.5, 0)
+    for index = 1, 4 do
+        local angle = math.rad(45 + (index - 1) * 90)
+        local offset = Vector3.new(math.cos(angle) * 7.4, 0, math.sin(angle) * 7.4)
+        local postAt = ground + offset
+        local post = part(
+            rally,
+            "WatchRallyPost",
+            Vector3.new(0.45, 4.8, 0.45),
+            CFrame.new(postAt + Vector3.new(0, 2.4, 0))
+                * CFrame.Angles(0, -angle, math.rad(if index % 2 == 0 then 5 else -5)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+        post.Transparency = 0.08
+        local pennant = part(
+            rally,
+            "WatchRallyPennant",
+            Vector3.new(2.4, 1.15, 0.16),
+            CFrame.new(postAt + Vector3.new(0.95 * math.cos(angle), 3.7, 0.95 * math.sin(angle)))
+                * CFrame.Angles(0, -angle, math.rad(-8)),
+            AMBER,
+            Enum.Material.Fabric,
+            false
+        )
+        pennant.Transparency = 0.08
+        pennant.CastShadow = false
+        TweenService:Create(
+            pennant,
+            TweenInfo.new(1.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            { Transparency = 1, Position = pennant.Position + Vector3.new(0, 1.2, 0) }
+        ):Play()
+    end
+
+    for _, signal in self._nightDefenseSignals do
+        if signal.Parent ~= nil then
+            TweenService
+                :Create(
+                    signal,
+                    TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    {
+                        Color = AMBER,
+                        Transparency = if signal:GetAttribute("SignalRole") == "fire"
+                            then 0
+                            else 0.12,
+                    }
+                )
+                :Play()
+            local signalLight = signal:FindFirstChild("WatchSignalLight")
+            if signalLight ~= nil and signalLight:IsA("PointLight") then
+                signalLight.Color = AMBER
+                signalLight.Brightness = 3.4
+            end
+        end
+    end
+
+    for _, player in players do
+        local character = player.Character
+        if character ~= nil and character.Parent ~= nil then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "LastLightTownGuardRecovery"
+            highlight.Adornee = character
+            highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+            highlight.FillColor = AMBER
+            highlight.FillTransparency = 0.72
+            highlight.OutlineColor = CREAM
+            highlight.OutlineTransparency = 0.08
+            highlight.Parent = character
+            task.delay(math.clamp(tonumber(result.recoveryWardSeconds) or 5, 0.5, 8), function()
+                if highlight.Parent ~= nil then
+                    highlight:Destroy()
+                end
+            end)
+        end
+    end
+
+    task.delay(0.7, function()
+        if world.Parent ~= nil then
+            self:_setNightDefenseState(
+                if self._breachActive then "breach" elseif self._night then "night" else "day"
+            )
+        end
+    end)
+    task.delay(1.6, function()
+        if rally.Parent ~= nil then
+            rally:Destroy()
         end
     end)
 end

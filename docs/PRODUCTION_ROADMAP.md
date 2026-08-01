@@ -130,6 +130,10 @@ All four current abilities now produce distinct short-lived physical world
 motifs. Engineer Emergency Patch also deploys one non-stacking 12-second
 Rootline Brace that absorbs up to 14 First Lantern pressure across normal enemy,
 spark-theft, and incident damage paths.
+When every eligible town player is downed during a normal night, the Night Watch
+can now rally that party once for the active night. The recovery spends 12 First
+Lantern strength, restores 50 health with a five-second ward, excludes expedition
+players, and adds only transient physical feedback.
 Additional equipment families, a
 recipe-browsing UI and quest-board UI, branching quests, the full
 recipe/inventory/quest catalog, additional incident mechanics beyond the first
@@ -145,6 +149,7 @@ See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md)
 [MILESTONE_3_PROFESSION_MASTERY.md](MILESTONE_3_PROFESSION_MASTERY.md), and
 [MILESTONE_3_PROFESSION_SPECIALIZATIONS.md](MILESTONE_3_PROFESSION_SPECIALIZATIONS.md), and
 [MILESTONE_3_PROFESSION_IDENTITY.md](MILESTONE_3_PROFESSION_IDENTITY.md), and
+[MILESTONE_3_TOWN_GUARD_LAST_STAND.md](MILESTONE_3_TOWN_GUARD_LAST_STAND.md), and
 [MILESTONE_3_BRAMBLEWAKE_ENEMIES.md](MILESTONE_3_BRAMBLEWAKE_ENEMIES.md), and
 [MILESTONE_3_OLD_GROWTH_ELITE.md](MILESTONE_3_OLD_GROWTH_ELITE.md), and
 [MILESTONE_3_WARDEN_STAG_BOSS.md](MILESTONE_3_WARDEN_STAG_BOSS.md), and

@@ -41,6 +41,7 @@ local SurvivalState = require(root.SurvivalState)
 local TownNightSchedule = require(root.TownNightSchedule)
 local TownNightIncident = require(root.TownNightIncident)
 local TownCondition = require(root.TownCondition)
+local TownGuardLastStand = require(root.TownGuardLastStand)
 local TownProgression = require(root.TownProgression)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
@@ -230,7 +231,14 @@ local townNightService = TownNightService.new(
     TownNightSchedule,
     TownNightIncident,
     TownCondition,
+    TownGuardLastStand,
+    analyticsService,
     featureFlags
+)
+survivalService:setPartyRecoveryProvider(
+    function(eligiblePlayers: number, downedPlayers: number): any
+        return townNightService:attemptLastStand(eligiblePlayers, downedPlayers)
+    end
 )
 professionService:setSwitchProvider(function(player: Player): (boolean, string?)
     local profile = profileService:get(player)

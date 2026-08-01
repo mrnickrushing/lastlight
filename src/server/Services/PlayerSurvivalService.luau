@@ -42,6 +42,8 @@ export type PlayerSurvivalService = typeof(setmetatable(
         _equipmentStatsProvider: ((Player) -> any)?,
         _reviveTuningProvider: ((Player) -> any)?,
         _expeditionFailureHandler: ((Player) -> any)?,
+        _partyRecoveryProvider: ((number, number) -> any)?,
+        _partyRecoveryPending: boolean,
         _states: { [Player]: any },
         _spawned: { [Player]: boolean },
         _channels: { [Player]: ReviveChannel },
@@ -92,6 +94,8 @@ function PlayerSurvivalService.new(
         _equipmentStatsProvider = nil,
         _reviveTuningProvider = nil,
         _expeditionFailureHandler = nil,
+        _partyRecoveryProvider = nil,
+        _partyRecoveryPending = false,
         _states = {},
         _spawned = {},
         _channels = {},
@@ -122,6 +126,13 @@ function PlayerSurvivalService.setExpeditionFailureHandler(
     handler: (Player) -> any
 )
     self._expeditionFailureHandler = handler
+end
+
+function PlayerSurvivalService.setPartyRecoveryProvider(
+    self: PlayerSurvivalService,
+    provider: (number, number) -> any
+)
+    self._partyRecoveryProvider = provider
 end
 
 function PlayerSurvivalService._recordExpeditionFailure(
@@ -424,6 +435,9 @@ function PlayerSurvivalService.Start(self: PlayerSurvivalService)
                 self:_cancelChannel(target, "reviver_left")
             end
         end
+        task.defer(function()
+            self:_attemptPartyRecovery()
+        end)
     end)
     for _, player in Players:GetPlayers() do
         self:_bindPlayer(player)
@@ -479,10 +493,81 @@ function PlayerSurvivalService.damage(
         self:_createVisual(player)
         self._analyticsService:playerDowned(player, string.sub(source, 1, 48))
         self:_notify(player, "DOWNED — CRAWL TOWARD LIGHT")
+        self:_attemptPartyRecovery()
     else
         self:_notify(nil, nil)
     end
     return result
+end
+
+function PlayerSurvivalService._attemptPartyRecovery(self: PlayerSurvivalService)
+    local provider = self._partyRecoveryProvider
+    if provider == nil or self._partyRecoveryPending then
+        return
+    end
+
+    local eligible: { Player } = {}
+    local downed = 0
+    for player, state in self._states do
+        if
+            player.Parent ~= nil
+            and player:GetAttribute("LastLightTutorialSurvivalReady") == true
+            and player:GetAttribute("LastLightInExpedition") ~= true
+        then
+            table.insert(eligible, player)
+            if state.status == "downed" then
+                downed += 1
+            end
+        end
+    end
+    if #eligible < 1 or downed ~= #eligible then
+        return
+    end
+
+    self._partyRecoveryPending = true
+    local result = provider(#eligible, downed)
+    if type(result) ~= "table" or result.accepted ~= true then
+        self._partyRecoveryPending = false
+        return
+    end
+
+    local channelTargets: { Player } = {}
+    for target in self._channels do
+        table.insert(channelTargets, target)
+    end
+    for _, target in channelTargets do
+        self:_cancelChannel(target, "town_guard_last_stand")
+    end
+    local now = workspace:GetServerTimeNow()
+    local recovered = {}
+    for _, player in eligible do
+        local state = self._states[player]
+        if state ~= nil and state.status == "downed" then
+            local nextState, recovery = self._survivalState.revive(state, now, {
+                health = result.recoveryHealth,
+                wardSeconds = result.recoveryWardSeconds,
+            })
+            if recovery.applied then
+                self._states[player] = nextState
+                self:_clearVisual(player)
+                self:_syncPlayer(player)
+                player:SetAttribute("LastLightGuardRecoveryNight", result.nightNumber)
+                table.insert(recovered, player)
+                self._analyticsService:playerRecovered(player, "town_guard_last_stand")
+            end
+        end
+    end
+    self._worldService:showTownGuardRecovery(recovered, result)
+    self:_notify(
+        nil,
+        string.format(
+            "THE NIGHT WATCH ANSWERS — %d TRAVELER%s RALLIED · LANTERN -%d",
+            #recovered,
+            if #recovered == 1 then "" else "S",
+            result.lanternSpent or result.lanternCost or 0
+        )
+    )
+    self._partyRecoveryPending = false
 end
 
 function PlayerSurvivalService.canHealInRadius(

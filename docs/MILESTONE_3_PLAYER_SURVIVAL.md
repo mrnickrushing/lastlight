@@ -23,6 +23,8 @@ Implemented in source:
 - safe retreat after bleedout at 50 health with a five-second light ward;
 - reset/respawn handling as a 50-health safe retreat rather than a defeat bypass
   or full heal;
+- one Town Guard Last Stand per normal night when every eligible town player is
+  downed, paid from First Lantern strength and never from Robux;
 - expedition retreat through the existing streamed town-return path;
 - a non-modal self-downed rescue rail, compact ally-down alert, and contextual
   health pill that preserve the mobile playfield;
@@ -36,7 +38,9 @@ Not implemented by this increment:
 
 - the follow-on [expedition recovery increment](MILESTONE_3_EXPEDITION_RECOVERY.md)
   now applies a persistent partial-pouch recovery contract on expedition retreat;
-- a full-party defeat state, spectating, guard recovery, or boss-specific defeat;
+- a terminal full-party defeat state, spectating, or boss-specific defeat; the
+  bounded normal-night guard recovery is implemented in
+  [its own runbook](MILESTONE_3_TOWN_GUARD_LAST_STAND.md);
 - Medic profession modifiers, consumable healing, armor, status effects, or
   reviving more than one target;
 - enemy navigation, boss, or Blackout; the complete standard roster and
