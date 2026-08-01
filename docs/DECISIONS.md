@@ -506,3 +506,19 @@ stakes. A single server-owned use, a visible shared-resource cost, and no paid
 relief make the comeback legible and bounded. Tying it to the frozen active-night
 number prevents a veteran joining mid-wave from resetting or consuming the wrong
 night's allowance.
+
+## 2026-08-01 — Bramblewake is the production-quality world standard
+
+**Decision:** Finish Bramblewake as the polished vertical slice before producing
+the remaining regions. Its authored mesh quality, gameplay scale, palette,
+lighting hierarchy, landmark readability, interaction language, streaming
+behavior, and phone performance budgets become the source of truth for later
+world production. Later regions reuse the standards and asset library, not
+Bramblewake's literal layout or region-specific silhouette.
+
+**Reason:** One complete world exposes the real interaction between art quality,
+navigation, loading, memory, combat readability, and mobile controls. Spreading
+placeholder-quality production across seven regions would multiply rework and
+leave no proven bar. A finished vertical slice turns the remaining regions into
+a controlled content pipeline while preserving each region's own hazards,
+landmarks, and palette accents.

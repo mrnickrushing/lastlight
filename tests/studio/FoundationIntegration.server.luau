@@ -337,7 +337,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v8",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v9",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")

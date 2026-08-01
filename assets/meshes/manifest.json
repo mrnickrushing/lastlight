@@ -1,0 +1,105 @@
+{
+  "schemaVersion": 1,
+  "measurementFile": "generated/measurements.json",
+  "styleFormula": "Polished stylized low-poly dark-fantasy woodland with hand-shaped faceted forms, softened bevels, asymmetrical silhouettes, and visible craft details. Environment uses rain-dark umber timber, deep moss greens, slate blue-gray stone, muted meadow gold, and charcoal indigo shadow; safe objectives use restrained lantern amber and memory cues use foxfire cyan. Materials stay matte, rough, and tactile under warm practical light and cool atmospheric moonlight. Maintain strong gameplay-scale silhouettes, sparse surface noise, readable negative space, and consistent three-quarter 3D proportions.",
+  "units": "studs",
+  "assets": [
+    {
+      "id": "mesh_conifer_hero_a",
+      "displayName": "Bramblewake Conifer A",
+      "role": "hero_conifer",
+      "placementBand": "core_near",
+      "source": "original_blender_procedural",
+      "provenance": "Original Last Light asset authored by the repository Blender pipeline.",
+      "file": "generated/mesh_conifer_hero_a.glb",
+      "targetLongestDimension": 27,
+      "maxTriangles": 7500,
+      "maxMaterialSlots": 4,
+      "robloxAssetId": 97306204840235
+    },
+    {
+      "id": "mesh_conifer_hero_b",
+      "displayName": "Bramblewake Conifer B",
+      "role": "hero_conifer",
+      "placementBand": "core_near",
+      "source": "original_blender_procedural",
+      "provenance": "Original Last Light asset authored by the repository Blender pipeline.",
+      "file": "generated/mesh_conifer_hero_b.glb",
+      "targetLongestDimension": 24,
+      "maxTriangles": 7500,
+      "maxMaterialSlots": 4,
+      "robloxAssetId": 88242699154685
+    },
+    {
+      "id": "mesh_broadleaf_hero_a",
+      "displayName": "Bramblewake Broadleaf A",
+      "role": "hero_broadleaf",
+      "placementBand": "core_near_town_edge",
+      "source": "original_blender_procedural",
+      "provenance": "Original Last Light asset authored by the repository Blender pipeline.",
+      "file": "generated/mesh_broadleaf_hero_a.glb",
+      "targetLongestDimension": 23,
+      "maxTriangles": 9000,
+      "maxMaterialSlots": 5,
+      "robloxAssetId": 101220678345453
+    },
+    {
+      "id": "mesh_boulder_cluster_a",
+      "displayName": "Bramblewake Boulder Cluster",
+      "role": "boulder_cluster",
+      "placementBand": "core_near",
+      "source": "original_blender_procedural",
+      "provenance": "Original Last Light asset authored by the repository Blender pipeline.",
+      "file": "generated/mesh_boulder_cluster_a.glb",
+      "targetLongestDimension": 10,
+      "maxTriangles": 3500,
+      "maxMaterialSlots": 3,
+      "robloxAssetId": 89472159459936
+    },
+    {
+      "id": "mesh_deadfall_a",
+      "displayName": "Bramblewake Deadfall",
+      "role": "deadfall",
+      "placementBand": "core_near",
+      "source": "original_blender_procedural",
+      "provenance": "Original Last Light asset authored by the repository Blender pipeline.",
+      "file": "generated/mesh_deadfall_a.glb",
+      "targetLongestDimension": 17,
+      "maxTriangles": 6500,
+      "maxMaterialSlots": 5,
+      "robloxAssetId": 81668325055416
+    },
+    {
+      "id": "mesh_root_arch_a",
+      "displayName": "Bramblewake Root Arch",
+      "role": "hero_landmark",
+      "placementBand": "curated_core",
+      "source": "original_higgsfield_tripo_then_blender_normalized",
+      "provenance": "Original Last Light prompt generation from Higgsfield job 66341740-7b8e-4309-b56b-f7ac830f8dd0, normalized and validated by the repository Blender pipeline.",
+      "file": "generated/mesh_root_arch_a.glb",
+      "sourceFile": "candidates/mesh_root_arch_tripo.glb",
+      "targetLongestDimension": 25,
+      "maxTriangles": 10000,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Color",
+        "NormalGL",
+        "ORM"
+      ],
+      "robloxAssetId": 133332812215237
+    },
+    {
+      "id": "mesh_fern_cluster_a",
+      "displayName": "Bramblewake Fern Cluster",
+      "role": "undergrowth",
+      "placementBand": "core",
+      "source": "original_blender_procedural",
+      "provenance": "Original Last Light asset authored by the repository Blender pipeline.",
+      "file": "generated/mesh_fern_cluster_a.glb",
+      "targetLongestDimension": 5,
+      "maxTriangles": 1800,
+      "maxMaterialSlots": 2,
+      "robloxAssetId": 133339285156460
+    }
+  ]
+}

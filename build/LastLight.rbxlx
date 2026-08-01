@@ -19683,6 +19683,7 @@ local Workspace = game:GetService("Workspace")
 
 local BramblewakeBuilder = require(script.Parent.Parent.World.BramblewakeBuilder)
 local FoliageBuilder = require(script.Parent.Parent.World.FoliageBuilder)
+local MeshTemplateLoader = require(script.Parent.Parent.World.MeshTemplateLoader)
 local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
 
 local WorldService = {}
@@ -19731,6 +19732,8 @@ export type WorldService = typeof(setmetatable(
         _townResidents: { [string]: any },
         _townIncidentModel: Model?,
         _engineerBraceModel: Model?,
+        _meshTemplateLoader: MeshTemplateLoader.MeshTemplateLoader,
+        _meshPlacements: { MeshPlacement },
     },
     WorldService
 ))
@@ -19759,6 +19762,16 @@ local FOLIAGE_TONE: FoliageBuilder.Tone = {
     moss = Color3.fromRGB(58, 91, 54),
     stone = Color3.fromRGB(75, 83, 79),
     stoneWarm = Color3.fromRGB(88, 84, 74),
+}
+
+type MeshPlacement = {
+    assetId: string,
+    fallbackKind: string,
+    position: Vector3,
+    scale: number,
+    yaw: number,
+    seed: number,
+    swayTag: string?,
 }
 
 local WAYHOME_DELIVERY_LIFETIME = 180
@@ -20489,6 +20502,8 @@ function WorldService.new(
         _townResidents = {},
         _townIncidentModel = nil,
         _engineerBraceModel = nil,
+        _meshTemplateLoader = MeshTemplateLoader.new(logger),
+        _meshPlacements = {},
     }, WorldService)
 end
 
@@ -20642,6 +20657,7 @@ local FOLIAGE_KEEP_OUT = table.freeze({
     table.freeze({ x = -40, z = -132, radius = 24 }), -- Wayfarer inn
     table.freeze({ x = 52, z = -112, radius = 22 }), -- greenward plot
     table.freeze({ x = 0, z = -143, radius = 26 }), -- night watch posts
+    table.freeze({ x = 52, z = -45, radius = 22 }), -- authored root arch landmark
 })
 
 --[[
@@ -20675,7 +20691,12 @@ end
     reshape the whole forest -- and the firefly loop draws from the same
     generator, so it would have reshaped it differently depending on timing.
 ]]
-local function plantForestBand(forest: Instance, bandIndex: number, swayTag: string?)
+local function plantForestBand(
+    forest: Instance,
+    bandIndex: number,
+    swayTag: string?,
+    meshPlacements: { MeshPlacement }?
+)
     local band = FOREST_BANDS[bandIndex]
     local random = Random.new(1847 + bandIndex * 7919)
     local treeSeed = 4100 + bandIndex * 1000
@@ -20697,9 +20718,42 @@ local function plantForestBand(forest: Instance, bandIndex: number, swayTag: str
             local roll = random:NextNumber()
 
             if roll < 0.62 then
-                FoliageBuilder.conifer(forest, position, scale, FOLIAGE_TONE, treeSeed, swayTag)
+                if bandIndex == 1 and meshPlacements ~= nil and treeSeed % 3 == 0 then
+                    table.insert(meshPlacements, {
+                        assetId = if treeSeed % 2 == 0
+                            then "mesh_conifer_hero_a"
+                            else "mesh_conifer_hero_b",
+                        fallbackKind = "conifer",
+                        position = position,
+                        scale = scale,
+                        yaw = random:NextNumber(0, math.pi * 2),
+                        seed = treeSeed,
+                        swayTag = swayTag,
+                    })
+                else
+                    FoliageBuilder.conifer(forest, position, scale, FOLIAGE_TONE, treeSeed, swayTag)
+                end
             elseif roll < 0.9 then
-                FoliageBuilder.broadleaf(forest, position, scale, FOLIAGE_TONE, treeSeed, swayTag)
+                if bandIndex == 1 and meshPlacements ~= nil and treeSeed % 3 == 0 then
+                    table.insert(meshPlacements, {
+                        assetId = "mesh_broadleaf_hero_a",
+                        fallbackKind = "broadleaf",
+                        position = position,
+                        scale = scale,
+                        yaw = random:NextNumber(0, math.pi * 2),
+                        seed = treeSeed,
+                        swayTag = swayTag,
+                    })
+                else
+                    FoliageBuilder.broadleaf(
+                        forest,
+                        position,
+                        scale,
+                        FOLIAGE_TONE,
+                        treeSeed,
+                        swayTag
+                    )
+                end
             else
                 FoliageBuilder.snag(forest, position, scale, FOLIAGE_TONE, treeSeed)
             end
@@ -20708,35 +20762,77 @@ local function plantForestBand(forest: Instance, bandIndex: number, swayTag: str
             -- actually resolve it.
             if bandIndex == 1 then
                 if treeSeed % 3 == 0 then
-                    FoliageBuilder.boulders(
-                        forest,
-                        position
-                            + Vector3.new(random:NextNumber(-12, 12), 0, random:NextNumber(-12, 12)),
-                        random:NextNumber(0.7, 1.5),
-                        FOLIAGE_TONE,
-                        treeSeed
-                    )
+                    local boulderPosition = position
+                        + Vector3.new(random:NextNumber(-12, 12), 0, random:NextNumber(-12, 12))
+                    local boulderScale = random:NextNumber(0.7, 1.5)
+                    if meshPlacements ~= nil and treeSeed % 2 == 0 then
+                        table.insert(meshPlacements, {
+                            assetId = "mesh_boulder_cluster_a",
+                            fallbackKind = "boulders",
+                            position = boulderPosition,
+                            scale = boulderScale,
+                            yaw = random:NextNumber(0, math.pi * 2),
+                            seed = treeSeed,
+                            swayTag = nil,
+                        })
+                    else
+                        FoliageBuilder.boulders(
+                            forest,
+                            boulderPosition,
+                            boulderScale,
+                            FOLIAGE_TONE,
+                            treeSeed
+                        )
+                    end
                 end
                 if treeSeed % 4 == 0 then
-                    FoliageBuilder.undergrowth(
-                        forest,
-                        position
-                            + Vector3.new(random:NextNumber(-9, 9), 0, random:NextNumber(-9, 9)),
-                        random:NextNumber(0.8, 1.5),
-                        FOLIAGE_TONE,
-                        treeSeed,
-                        swayTag
-                    )
+                    local fernPosition = position
+                        + Vector3.new(random:NextNumber(-9, 9), 0, random:NextNumber(-9, 9))
+                    local fernScale = random:NextNumber(0.8, 1.5)
+                    if meshPlacements ~= nil and treeSeed % 8 == 0 then
+                        table.insert(meshPlacements, {
+                            assetId = "mesh_fern_cluster_a",
+                            fallbackKind = "undergrowth",
+                            position = fernPosition,
+                            scale = fernScale,
+                            yaw = random:NextNumber(0, math.pi * 2),
+                            seed = treeSeed,
+                            swayTag = swayTag,
+                        })
+                    else
+                        FoliageBuilder.undergrowth(
+                            forest,
+                            fernPosition,
+                            fernScale,
+                            FOLIAGE_TONE,
+                            treeSeed,
+                            swayTag
+                        )
+                    end
                 end
                 if treeSeed % 11 == 0 then
-                    FoliageBuilder.deadfall(
-                        forest,
-                        position
-                            + Vector3.new(random:NextNumber(-10, 10), 0, random:NextNumber(-10, 10)),
-                        random:NextNumber(0.7, 1.3),
-                        FOLIAGE_TONE,
-                        treeSeed
-                    )
+                    local deadfallPosition = position
+                        + Vector3.new(random:NextNumber(-10, 10), 0, random:NextNumber(-10, 10))
+                    local deadfallScale = random:NextNumber(0.7, 1.3)
+                    if meshPlacements ~= nil then
+                        table.insert(meshPlacements, {
+                            assetId = "mesh_deadfall_a",
+                            fallbackKind = "deadfall",
+                            position = deadfallPosition,
+                            scale = deadfallScale,
+                            yaw = random:NextNumber(0, math.pi * 2),
+                            seed = treeSeed,
+                            swayTag = nil,
+                        })
+                    else
+                        FoliageBuilder.deadfall(
+                            forest,
+                            deadfallPosition,
+                            deadfallScale,
+                            FOLIAGE_TONE,
+                            treeSeed
+                        )
+                    end
                 end
             end
         end
@@ -20825,10 +20921,22 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     local random = Random.new(1847)
     local swayTag = _self._runtimeIds.AmbientSwayTag
 
+    _self._meshPlacements = {
+        {
+            assetId = "mesh_root_arch_a",
+            fallbackKind = "root_arch",
+            position = Vector3.new(52, TerrainBuilder.surfaceHeight(52, -45), -45),
+            scale = 1,
+            yaw = math.rad(-28),
+            seed = 9147,
+            swayTag = nil,
+        },
+    }
+
     -- Only the near band is planted here. Bands 2 and 3 are scenery beyond the
     -- immediate clearing and are planted after the world is marked ready; see
     -- _buildDistantScenery.
-    plantForestBand(forest, 1, swayTag)
+    plantForestBand(forest, 1, swayTag, _self._meshPlacements)
 
     for _ = 1, 34 do
         local glow = part(
@@ -21018,6 +21126,113 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         false
     )
     addBillboard(warningBoard, "NIGHT WATCH · HOLD THE LANTERN ROAD", CREAM)
+end
+
+-- Rebuilds the same placement from inexpensive geometry when an authored model
+-- cannot load. The choice is stable and never leaves a hole in the route art.
+local function buildMeshFallback(parent: Instance, placement: MeshPlacement)
+    if placement.fallbackKind == "conifer" then
+        FoliageBuilder.conifer(
+            parent,
+            placement.position,
+            placement.scale,
+            FOLIAGE_TONE,
+            placement.seed,
+            placement.swayTag
+        )
+    elseif placement.fallbackKind == "broadleaf" then
+        FoliageBuilder.broadleaf(
+            parent,
+            placement.position,
+            placement.scale,
+            FOLIAGE_TONE,
+            placement.seed,
+            placement.swayTag
+        )
+    elseif placement.fallbackKind == "boulders" then
+        FoliageBuilder.boulders(
+            parent,
+            placement.position,
+            placement.scale,
+            FOLIAGE_TONE,
+            placement.seed
+        )
+    elseif placement.fallbackKind == "undergrowth" then
+        FoliageBuilder.undergrowth(
+            parent,
+            placement.position,
+            placement.scale,
+            FOLIAGE_TONE,
+            placement.seed,
+            placement.swayTag
+        )
+    elseif placement.fallbackKind == "deadfall" then
+        FoliageBuilder.deadfall(
+            parent,
+            placement.position,
+            placement.scale,
+            FOLIAGE_TONE,
+            placement.seed
+        )
+    elseif placement.fallbackKind == "root_arch" then
+        FoliageBuilder.rootArch(
+            parent,
+            placement.position,
+            placement.scale,
+            FOLIAGE_TONE,
+            placement.yaw
+        )
+    end
+end
+
+-- Authored art is optional streaming dressing. Loading begins only after the
+-- spawn and interactions are ready, and a failed private asset immediately
+-- takes the procedural path above.
+function WorldService._buildMeshDressing(self: WorldService)
+    local world = self._world
+    if world == nil then
+        return
+    end
+
+    local geometry = world:FindFirstChild("Environment")
+    local forest = if geometry ~= nil then geometry:FindFirstChild("Forest") else nil
+    if forest == nil then
+        return
+    end
+
+    local placements = table.clone(self._meshPlacements)
+    task.spawn(function()
+        local authored = 0
+        local fallbacks = 0
+        for index, placement in placements do
+            if forest.Parent == nil then
+                return
+            end
+            local model = self._meshTemplateLoader:place(
+                placement.assetId,
+                forest,
+                CFrame.new(placement.position) * CFrame.Angles(0, placement.yaw, 0),
+                placement.scale
+            )
+            if model == nil then
+                buildMeshFallback(forest, placement)
+                fallbacks += 1
+            else
+                authored += 1
+            end
+            if index % 5 == 0 then
+                task.wait()
+            end
+        end
+
+        world:SetAttribute("AuthoredMeshCount", authored)
+        world:SetAttribute("AuthoredMeshFallbackCount", fallbacks)
+        self._logger:info("mesh_dressing_ready", {
+            authored = authored,
+            fallbacks = fallbacks,
+            placements = #placements,
+        })
+    end)
 end
 
 --[[
@@ -21884,7 +22099,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v8")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v9")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -21909,7 +22124,9 @@ function WorldService.Init(self: WorldService, context: any)
 
     world:SetAttribute("Ready", true)
 
-    -- Only after the world is playable. See _buildDistantScenery.
+    -- Only after the world is playable. Optional private assets and distant
+    -- terrain can yield without delaying ArrivalSpawn.
+    self:_buildMeshDressing()
     self:_buildDistantScenery()
 end
 
@@ -21982,7 +22199,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v8",
+        worldVersion = "bramblewake-blackout-v9",
     })
 end
 
@@ -27977,15 +28194,12 @@ return table.freeze(BramblewakeEnemyBuilder)
     Everything is seeded. Two servers, and a Studio build against a live one,
     generate an identical forest.
 
-    NOT MESHES -- AND WHY THAT IS THE RIGHT ORDER
+    PROCEDURAL FALLBACKS
 
-    Real MeshPart foliage would beat all of this. It also needs measured native
-    mesh sizes (guessed scales are reliably wrong by ~10x), an asset manifest,
-    and art-direction sign-off on specific Creator Store assets. Ground shape
-    and composition have to land first regardless: mesh trees standing on a
-    flat rectangle still read as props on a yard. This module is the graybox
-    the art direction asks for before final art, and its call sites are the
-    seams a mesh pass would later swap behind.
+    Measured authored MeshParts now replace selected core/near placements. The
+    functions in this module remain important: distant bands use them for a
+    cheap silhouette budget, and every authored placement falls back here if a
+    private asset is unavailable. Joining never waits on optional art.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -28566,11 +28780,362 @@ function FoliageBuilder.undergrowth(
     end
 end
 
+-- A recognizable route landmark used only if the authored PBR root arch is
+-- unavailable. Its opening remains clear and every piece is non-colliding.
+function FoliageBuilder.rootArch(
+    parent: Instance,
+    position: Vector3,
+    scale: number,
+    tone: Tone,
+    yaw: number
+)
+    local right = Vector3.new(math.cos(yaw), 0, math.sin(yaw))
+    local forward = Vector3.new(-math.sin(yaw), 0, math.cos(yaw))
+    local halfWidth = 9.4 * scale
+    local height = 13.2 * scale
+
+    for side = -1, 1, 2 do
+        local base = position + right * (halfWidth * side)
+        local points = {
+            base,
+            base
+                + right * (-side * 1.2 * scale)
+                + forward * (side * 0.2 * scale)
+                + Vector3.new(0, height * 0.3, 0),
+            base
+                + right * (-side * 3.6 * scale)
+                + forward * (-side * 0.1 * scale)
+                + Vector3.new(0, height * 0.67, 0),
+            position + right * (side * 2.2 * scale) + Vector3.new(0, height * 0.94, 0),
+            position + Vector3.new(0, height, 0),
+        }
+        for index = 1, #points - 1 do
+            cylinderBetween(
+                parent,
+                "RootArch",
+                points[index],
+                points[index + 1],
+                (2.2 - index * 0.26) * scale,
+                if index == 1 then tone.barkWet else tone.bark,
+                Enum.Material.Wood,
+                false
+            )
+        end
+
+        for rootIndex = 1, 3 do
+            local spread = (rootIndex - 2) * 0.55
+            cylinderBetween(
+                parent,
+                "RootArchFlare",
+                base + Vector3.new(0, 0.45 * scale, 0),
+                base
+                    + right * (side * (2.1 + rootIndex * 0.45) * scale)
+                    + forward * (spread * 3.1 * scale)
+                    + Vector3.new(0, 0.08 * scale, 0),
+                0.56 * scale,
+                tone.barkWet,
+                Enum.Material.Wood,
+                false
+            )
+        end
+    end
+
+    for mossIndex = 1, 5 do
+        local offset = (mossIndex - 3) * 1.15 * scale
+        local moss = newPart(
+            parent,
+            "RootArchMoss",
+            Vector3.new(2.8, 0.7, 1.8) * scale,
+            CFrame.new(position + right * offset + Vector3.new(0, height + 0.2 * scale, 0))
+                * CFrame.Angles(0, yaw + mossIndex * 0.41, 0),
+            tone.moss,
+            Enum.Material.Grass,
+            false
+        )
+        moss.Shape = Enum.PartType.Ball
+    end
+end
+
 return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
         <Item class="ModuleScript" referent="80">
+          <Properties>
+            <string name="Name">MeshAssetRegistry</string>
+            <string name="Source"><![CDATA[--!strict
+
+-- Roblox model assets created from the measured GLBs in assets/meshes.
+-- Stable IDs are source-facing; numeric IDs may only change through the
+-- manifest/upload pipeline and a matching review of this registry.
+
+local MeshAssetRegistry = {}
+
+export type Entry = {
+    id: string,
+    assetId: number,
+    targetLongestDimension: number,
+    maxTriangles: number,
+    maxMaterialSlots: number,
+    placementBand: string,
+    pbr: boolean,
+}
+
+local ENTRIES: { Entry } = {
+    {
+        id = "mesh_conifer_hero_a",
+        assetId = 97306204840235,
+        targetLongestDimension = 27,
+        maxTriangles = 7500,
+        maxMaterialSlots = 4,
+        placementBand = "core_near",
+        pbr = false,
+    },
+    {
+        id = "mesh_conifer_hero_b",
+        assetId = 88242699154685,
+        targetLongestDimension = 24,
+        maxTriangles = 7500,
+        maxMaterialSlots = 4,
+        placementBand = "core_near",
+        pbr = false,
+    },
+    {
+        id = "mesh_broadleaf_hero_a",
+        assetId = 101220678345453,
+        targetLongestDimension = 23,
+        maxTriangles = 9000,
+        maxMaterialSlots = 5,
+        placementBand = "core_near_town_edge",
+        pbr = false,
+    },
+    {
+        id = "mesh_boulder_cluster_a",
+        assetId = 89472159459936,
+        targetLongestDimension = 10,
+        maxTriangles = 3500,
+        maxMaterialSlots = 3,
+        placementBand = "core_near",
+        pbr = false,
+    },
+    {
+        id = "mesh_deadfall_a",
+        assetId = 81668325055416,
+        targetLongestDimension = 17,
+        maxTriangles = 6500,
+        maxMaterialSlots = 5,
+        placementBand = "core_near",
+        pbr = false,
+    },
+    {
+        id = "mesh_root_arch_a",
+        assetId = 133332812215237,
+        targetLongestDimension = 25,
+        maxTriangles = 10000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+    },
+    {
+        id = "mesh_fern_cluster_a",
+        assetId = 133339285156460,
+        targetLongestDimension = 5,
+        maxTriangles = 1800,
+        maxMaterialSlots = 2,
+        placementBand = "core",
+        pbr = false,
+    },
+}
+
+local BY_ID: { [string]: Entry } = {}
+for _, entry in ENTRIES do
+    assert(BY_ID[entry.id] == nil, "duplicate mesh asset stable ID: " .. entry.id)
+    BY_ID[entry.id] = table.freeze(entry)
+end
+
+function MeshAssetRegistry.get(stableId: string): Entry?
+    return BY_ID[stableId]
+end
+
+function MeshAssetRegistry.all(): { Entry }
+    return table.clone(ENTRIES)
+end
+
+function MeshAssetRegistry.scaleFor(stableId: string, importedLongestDimension: number): number?
+    local entry = BY_ID[stableId]
+    if entry == nil or importedLongestDimension <= 0 then
+        return nil
+    end
+    return entry.targetLongestDimension / importedLongestDimension
+end
+
+return table.freeze(MeshAssetRegistry)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="81">
+          <Properties>
+            <string name="Name">MeshTemplateLoader</string>
+            <string name="Source"><![CDATA[--!strict
+
+local InsertService = game:GetService("InsertService")
+
+local MeshAssetRegistry = require(script.Parent.MeshAssetRegistry)
+
+local MeshTemplateLoader = {}
+MeshTemplateLoader.__index = MeshTemplateLoader
+
+export type Logger = {
+    info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+}
+
+export type MeshTemplateLoader = typeof(setmetatable(
+    {} :: {
+        _logger: Logger,
+        _templates: { [string]: Model },
+        _templateScale: { [string]: number },
+        _failed: { [string]: boolean },
+    },
+    MeshTemplateLoader
+))
+
+local function sanitize(model: Model): number
+    local meshParts = 0
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("BasePart") then
+            descendant.Anchored = true
+            descendant.CanCollide = false
+            descendant.CanTouch = false
+            descendant.CanQuery = false
+            descendant.CastShadow = true
+            descendant.Massless = true
+            if descendant:IsA("MeshPart") then
+                descendant.CollisionFidelity = Enum.CollisionFidelity.Box
+                descendant.RenderFidelity = Enum.RenderFidelity.Automatic
+                meshParts += 1
+            end
+        elseif
+            descendant:IsA("LuaSourceContainer")
+            or descendant:IsA("ProximityPrompt")
+            or descendant:IsA("ClickDetector")
+            or descendant:IsA("DragDetector")
+            or descendant:IsA("Constraint")
+            or descendant:IsA("JointInstance")
+            or descendant:IsA("Humanoid")
+            or descendant:IsA("AnimationController")
+        then
+            descendant:Destroy()
+        end
+    end
+    return meshParts
+end
+
+local function longestDimension(size: Vector3): number
+    return math.max(size.X, size.Y, size.Z)
+end
+
+function MeshTemplateLoader.new(logger: Logger): MeshTemplateLoader
+    return setmetatable({
+        _logger = logger,
+        _templates = {},
+        _templateScale = {},
+        _failed = {},
+    }, MeshTemplateLoader)
+end
+
+function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): Model?
+    local cached = self._templates[stableId]
+    if cached ~= nil then
+        return cached
+    end
+    if self._failed[stableId] then
+        return nil
+    end
+
+    local entry = MeshAssetRegistry.get(stableId)
+    if entry == nil then
+        self._failed[stableId] = true
+        self._logger:info("mesh_asset_unknown", { assetId = stableId })
+        return nil
+    end
+
+    local ok, loaded = pcall(InsertService.LoadAsset, InsertService, entry.assetId)
+    if not ok or not loaded:IsA("Model") then
+        if ok then
+            loaded:Destroy()
+        end
+        self._failed[stableId] = true
+        self._logger:info("mesh_asset_load_failed", {
+            assetId = stableId,
+            robloxAssetId = entry.assetId,
+            error = if ok then "LoadAsset returned a non-Model" else tostring(loaded),
+        })
+        return nil
+    end
+
+    loaded.Name = "Template_" .. stableId
+    local meshPartCount = sanitize(loaded)
+    local _, nativeSize = loaded:GetBoundingBox()
+    local nativeLongest = longestDimension(nativeSize)
+    local normalizationScale = MeshAssetRegistry.scaleFor(stableId, nativeLongest)
+    if meshPartCount == 0 or normalizationScale == nil then
+        loaded:Destroy()
+        self._failed[stableId] = true
+        self._logger:info("mesh_asset_invalid", {
+            assetId = stableId,
+            meshParts = meshPartCount,
+            nativeLongestDimension = nativeLongest,
+        })
+        return nil
+    end
+
+    local desiredScale = loaded:GetScale() * normalizationScale
+    loaded:ScaleTo(desiredScale)
+    local boundsCFrame, boundsSize = loaded:GetBoundingBox()
+    loaded.WorldPivot = CFrame.new(boundsCFrame.Position - Vector3.new(0, boundsSize.Y * 0.5, 0))
+    loaded:PivotTo(CFrame.new())
+    loaded.Parent = nil
+
+    self._templates[stableId] = loaded
+    self._templateScale[stableId] = desiredScale
+    self._logger:info("mesh_asset_ready", {
+        assetId = stableId,
+        robloxAssetId = entry.assetId,
+        meshParts = meshPartCount,
+        nativeLongestDimension = nativeLongest,
+        targetLongestDimension = entry.targetLongestDimension,
+    })
+    return loaded
+end
+
+function MeshTemplateLoader.place(
+    self: MeshTemplateLoader,
+    stableId: string,
+    parent: Instance,
+    at: CFrame,
+    placementScale: number
+): Model?
+    local template = self:_load(stableId)
+    local templateScale = self._templateScale[stableId]
+    if template == nil or templateScale == nil or placementScale <= 0 then
+        return nil
+    end
+
+    local clone = template:Clone()
+    clone.Name = "Authored_" .. stableId
+    clone:ScaleTo(templateScale * placementScale)
+    clone:PivotTo(at)
+    clone:SetAttribute("MeshAssetId", stableId)
+    clone:SetAttribute("PlacementScale", placementScale)
+    clone.Parent = parent
+    return clone
+end
+
+return table.freeze(MeshTemplateLoader)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="82">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -28733,7 +29298,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="81">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -29219,7 +29784,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -29415,15 +29980,15 @@ return table.freeze(WardenStagBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="83">
+  <Item class="StarterPlayer" referent="85">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="84">
+    <Item class="StarterPlayerScripts" referent="86">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="85">
+      <Item class="LocalScript" referent="87">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -29536,11 +30101,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="86">
+        <Item class="Folder" referent="88">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="87">
+          <Item class="ModuleScript" referent="89">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -29671,7 +30236,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="88">
+          <Item class="ModuleScript" referent="90">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -31744,7 +32309,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="89">
+          <Item class="ModuleScript" referent="91">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -32061,7 +32626,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="90">
+          <Item class="ModuleScript" referent="92">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -32169,7 +32734,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="91">
+          <Item class="ModuleScript" referent="93">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -32301,7 +32866,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="92">
+          <Item class="ModuleScript" referent="94">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -32577,7 +33142,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="93">
+  <Item class="Workspace" referent="95">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

@@ -1,0 +1,471 @@
+"""Generate Last Light's original environment mesh kit with Blender.
+
+Run from the repository root:
+  blender --background --python scripts/generate_mesh_kit.py
+
+The output is deterministic. Every GLB is exported at its intended gameplay
+size, and measurements.json records the authored bounds and triangle count.
+"""
+
+from __future__ import annotations
+
+import json
+import math
+import random
+from pathlib import Path
+
+import bpy
+from mathutils import Vector
+
+
+ROOT = Path(__file__).resolve().parents[1]
+OUTPUT = ROOT / "assets" / "meshes" / "generated"
+PREVIEW = ROOT / "assets" / "meshes" / "previews" / "mesh-environment-kit.png"
+OUTPUT.mkdir(parents=True, exist_ok=True)
+PREVIEW.parent.mkdir(parents=True, exist_ok=True)
+
+ASSETS: dict[str, list[bpy.types.Object]] = {}
+MATERIALS: dict[str, bpy.types.Material] = {}
+TARGET_LONGEST_DIMENSIONS = {
+    "mesh_conifer_hero_a": 27.0,
+    "mesh_conifer_hero_b": 24.0,
+    "mesh_broadleaf_hero_a": 23.0,
+    "mesh_boulder_cluster_a": 10.0,
+    "mesh_deadfall_a": 17.0,
+    "mesh_root_arch_a": 25.0,
+    "mesh_fern_cluster_a": 5.0,
+}
+
+
+PALETTE = {
+    "bark_dark": ((0.105, 0.050, 0.025, 1), 0.93),
+    "bark_mid": ((0.205, 0.095, 0.042, 1), 0.88),
+    "bark_cut": ((0.390, 0.205, 0.090, 1), 0.80),
+    "pine_dark": ((0.025, 0.120, 0.072, 1), 0.92),
+    "pine_mid": ((0.055, 0.215, 0.112, 1), 0.90),
+    "leaf_dark": ((0.055, 0.145, 0.052, 1), 0.93),
+    "leaf_mid": ((0.125, 0.285, 0.090, 1), 0.90),
+    "moss": ((0.225, 0.330, 0.090, 1), 0.96),
+    "stone": ((0.205, 0.235, 0.255, 1), 0.97),
+    "stone_dark": ((0.105, 0.125, 0.145, 1), 0.98),
+    "fungus": ((0.530, 0.235, 0.085, 1), 0.84),
+    "foxfire": ((0.075, 0.750, 0.760, 1), 0.58),
+}
+
+
+def material(name: str) -> bpy.types.Material:
+    cached = MATERIALS.get(name)
+    if cached:
+        return cached
+    color, roughness = PALETTE[name]
+    mat = bpy.data.materials.new(f"LL_{name}")
+    mat.diffuse_color = color
+    mat.use_nodes = True
+    shader = mat.node_tree.nodes.get("Principled BSDF")
+    shader.inputs["Base Color"].default_value = color
+    shader.inputs["Roughness"].default_value = roughness
+    shader.inputs["Metallic"].default_value = 0.0
+    if name == "foxfire":
+        shader.inputs["Emission Color"].default_value = color
+        shader.inputs["Emission Strength"].default_value = 1.4
+    MATERIALS[name] = mat
+    return mat
+
+
+def register(asset_id: str, obj: bpy.types.Object, mat_name: str) -> bpy.types.Object:
+    obj.name = f"{asset_id}__{obj.name}"
+    if obj.type == "MESH":
+        obj.data.materials.append(material(mat_name))
+        for polygon in obj.data.polygons:
+            polygon.use_smooth = False
+    obj["lastLightAssetId"] = asset_id
+    ASSETS.setdefault(asset_id, []).append(obj)
+    return obj
+
+
+def cone(
+    asset_id: str,
+    name: str,
+    start: tuple[float, float, float],
+    end: tuple[float, float, float],
+    radius_start: float,
+    radius_end: float,
+    mat_name: str,
+    vertices: int = 8,
+) -> bpy.types.Object:
+    a, b = Vector(start), Vector(end)
+    delta = b - a
+    bpy.ops.mesh.primitive_cone_add(
+        vertices=vertices,
+        radius1=radius_start,
+        radius2=radius_end,
+        depth=delta.length,
+        location=(a + b) * 0.5,
+    )
+    obj = bpy.context.object
+    obj.name = name
+    obj.rotation_mode = "QUATERNION"
+    obj.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(delta.normalized())
+    return register(asset_id, obj, mat_name)
+
+
+def irregular_ico(
+    asset_id: str,
+    name: str,
+    location: tuple[float, float, float],
+    scale: tuple[float, float, float],
+    mat_name: str,
+    seed: int,
+    subdivisions: int = 1,
+) -> bpy.types.Object:
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=subdivisions, radius=1, location=location)
+    obj = bpy.context.object
+    obj.name = name
+    rng = random.Random(seed)
+    for vertex in obj.data.vertices:
+        factor = 0.82 + rng.random() * 0.30
+        vertex.co *= factor
+    obj.scale = scale
+    obj.rotation_euler = (
+        rng.uniform(-0.16, 0.16),
+        rng.uniform(-0.16, 0.16),
+        rng.uniform(-math.pi, math.pi),
+    )
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    return register(asset_id, obj, mat_name)
+
+
+def leaf_plane(
+    asset_id: str,
+    name: str,
+    base: tuple[float, float, float],
+    tip: tuple[float, float, float],
+    width: float,
+    mat_name: str,
+) -> bpy.types.Object:
+    a, b = Vector(base), Vector(tip)
+    forward = b - a
+    side = forward.cross(Vector((0, 0, 1)))
+    if side.length < 0.01:
+        side = Vector((1, 0, 0))
+    side.normalize()
+    middle = a.lerp(b, 0.52)
+    verts = [a, middle + side * width, b, middle - side * width]
+    mesh = bpy.data.meshes.new(name)
+    mesh.from_pydata(verts, [], [(0, 1, 2, 3)])
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    bpy.context.collection.objects.link(obj)
+    return register(asset_id, obj, mat_name)
+
+
+def add_branching_trunk(asset_id: str, crooked: float, height: float, seed: int) -> None:
+    rng = random.Random(seed)
+    points = [(0.0, 0.0, 0.0)]
+    for index in range(1, 6):
+        z = height * index / 5
+        points.append((crooked * math.sin(index * 1.5), crooked * 0.55 * math.cos(index), z))
+    for index in range(5):
+        taper = 1 - index / 6
+        cone(asset_id, f"trunk_{index}", points[index], points[index + 1], 0.82 * taper, 0.62 * taper, "bark_mid", 9)
+    for index in range(2, 5):
+        origin = Vector(points[index])
+        angle = rng.uniform(0, math.tau)
+        reach = height * rng.uniform(0.16, 0.24)
+        tip = origin + Vector((math.cos(angle) * reach, math.sin(angle) * reach, height * rng.uniform(0.10, 0.18)))
+        cone(asset_id, f"branch_{index}", origin, tip, 0.34, 0.08, "bark_mid", 7)
+
+
+def make_conifer(asset_id: str, height: float, crooked: float, seed: int) -> None:
+    add_branching_trunk(asset_id, crooked, height, seed)
+    rng = random.Random(seed)
+    for tier in range(5):
+        z = height * (0.32 + tier * 0.13)
+        radius = height * (0.24 - tier * 0.034)
+        for cluster in range(3):
+            angle = cluster * math.tau / 3 + tier * 0.61
+            location = (
+                math.cos(angle) * radius * 0.28 + crooked * math.sin(tier * 1.5),
+                math.sin(angle) * radius * 0.28,
+                z + rng.uniform(-0.25, 0.25),
+            )
+            irregular_ico(
+                asset_id,
+                f"needle_{tier}_{cluster}",
+                location,
+                (radius, radius * 0.62, height * 0.105),
+                "pine_mid" if (tier + cluster) % 3 else "pine_dark",
+                seed * 100 + tier * 10 + cluster,
+                1,
+            )
+    irregular_ico(asset_id, "needle_crown", (crooked * 0.3, 0, height * 0.94), (height * 0.085, height * 0.08, height * 0.14), "pine_dark", seed + 999, 1)
+    for root_index in range(5):
+        angle = root_index * math.tau / 5 + 0.2
+        cone(asset_id, f"root_{root_index}", (0, 0, 0.35), (math.cos(angle) * 2.0, math.sin(angle) * 2.0, 0.03), 0.33, 0.08, "bark_dark", 7)
+
+
+def make_broadleaf(asset_id: str) -> None:
+    height = 19.5
+    add_branching_trunk(asset_id, 0.55, height, 311)
+    branches = [
+        ((0.2, 0.0, 9.0), (5.2, 1.4, 15.5)),
+        ((0.0, 0.1, 10.2), (-4.6, 2.8, 16.3)),
+        ((0.2, 0.0, 11.0), (2.0, -4.6, 17.4)),
+    ]
+    for index, (start, end) in enumerate(branches):
+        cone(asset_id, f"crown_branch_{index}", start, end, 0.52, 0.13, "bark_mid", 8)
+    canopies = [
+        ((0.0, 0.0, 18.1), (5.4, 4.4, 3.7)),
+        ((4.1, 1.1, 16.6), (4.0, 3.2, 2.9)),
+        ((-4.0, 2.0, 16.8), (4.2, 3.4, 3.0)),
+        ((1.3, -3.7, 17.2), (4.0, 3.2, 3.2)),
+        ((-1.8, -2.1, 19.6), (3.8, 3.1, 2.6)),
+    ]
+    for index, (loc, scale) in enumerate(canopies):
+        irregular_ico(asset_id, f"canopy_{index}", loc, scale, "leaf_mid" if index % 2 else "leaf_dark", 900 + index, 2)
+    for root_index in range(7):
+        angle = root_index * math.tau / 7
+        cone(asset_id, f"root_{root_index}", (0, 0, 0.5), (math.cos(angle) * 2.4, math.sin(angle) * 2.4, 0.05), 0.42, 0.07, "bark_dark", 7)
+
+
+def make_boulders(asset_id: str) -> None:
+    specs = [
+        ((-1.7, 0.0, 2.1), (3.3, 2.7, 2.3), 400),
+        ((2.3, 0.7, 1.55), (2.4, 2.0, 1.7), 401),
+        ((0.7, -1.7, 1.0), (1.8, 1.5, 1.2), 402),
+        ((-3.0, -1.5, 0.65), (1.3, 1.1, 0.8), 403),
+    ]
+    for index, (loc, scale, seed) in enumerate(specs):
+        irregular_ico(asset_id, f"stone_{index}", loc, scale, "stone" if index < 2 else "stone_dark", seed, 2)
+    for index in range(5):
+        irregular_ico(asset_id, f"moss_{index}", (-2.8 + index * 1.25, -0.5 + (index % 2) * 0.7, 3.5 - abs(index - 2) * 0.35), (0.9, 0.55, 0.22), "moss", 500 + index, 1)
+
+
+def make_deadfall(asset_id: str) -> None:
+    cone(asset_id, "fallen_trunk", (-7.5, 0, 1.2), (7.5, 0.8, 1.65), 1.2, 0.82, "bark_mid", 11)
+    cone(asset_id, "broken_tip", (7.5, 0.8, 1.65), (8.1, 1.0, 1.9), 0.82, 0.06, "bark_cut", 7)
+    for index, angle in enumerate((-1.15, -0.55, 0.55, 1.12)):
+        start = (-7.1, 0.0, 1.15)
+        tip = (-8.2, math.sin(angle) * 2.5, max(0.08, 1.0 + math.cos(angle) * 0.5))
+        cone(asset_id, f"root_fan_{index}", start, tip, 0.34, 0.05, "bark_dark", 7)
+    for index in range(7):
+        x = -3.8 + index * 1.15
+        cone(asset_id, f"mushroom_stem_{index}", (x, -0.75, 1.25), (x, -0.82, 1.7 + (index % 2) * 0.22), 0.09, 0.07, "bark_cut", 6)
+        irregular_ico(asset_id, f"mushroom_cap_{index}", (x, -0.82, 1.77 + (index % 2) * 0.22), (0.36, 0.3, 0.12), "fungus", 610 + index, 1)
+    for index in range(5):
+        irregular_ico(asset_id, f"moss_{index}", (-5.0 + index * 2.4, 0.0, 2.05), (1.15, 0.78, 0.23), "moss", 620 + index, 1)
+
+
+def make_root_arch(asset_id: str) -> None:
+    left = [(-10.5, 0, 0), (-9.0, 0.2, 4.0), (-6.5, -0.1, 8.6), (-2.7, 0.2, 12.0), (0, 0, 13.3)]
+    right = [(10.5, 0, 0), (8.8, -0.2, 4.3), (6.2, 0.2, 8.8), (2.6, -0.15, 12.1), (0, 0, 13.3)]
+    for side_name, points in (("left", left), ("right", right)):
+        for index in range(len(points) - 1):
+            radius = 1.25 - index * 0.18
+            cone(asset_id, f"{side_name}_arch_{index}", points[index], points[index + 1], radius, radius * 0.78, "bark_mid", 9)
+    for side, sign in (("left", -1), ("right", 1)):
+        for root_index in range(4):
+            angle = -1.2 + root_index * 0.8
+            cone(asset_id, f"{side}_ground_root_{root_index}", (sign * 9.8, 0, 1.0), (sign * (11.2 + root_index * 0.6), math.sin(angle) * 3.0, 0.08), 0.48, 0.07, "bark_dark", 7)
+    for index in range(8):
+        angle = index * math.tau / 8
+        location = (math.cos(angle) * 1.45, math.sin(angle) * 0.7, 13.35 + math.sin(angle) * 0.25)
+        irregular_ico(asset_id, f"crown_moss_{index}", location, (1.5, 0.8, 0.42), "moss", 700 + index, 1)
+    for index in range(3):
+        irregular_ico(asset_id, f"foxfire_{index}", (-1.4 + index * 1.35, -0.8, 11.8 + (index % 2) * 0.7), (0.23, 0.16, 0.38), "foxfire", 730 + index, 1)
+
+
+def make_fern(asset_id: str) -> None:
+    rng = random.Random(808)
+    for frond in range(9):
+        angle = frond * math.tau / 9 + rng.uniform(-0.18, 0.18)
+        reach = rng.uniform(1.8, 2.5)
+        tip = (math.cos(angle) * reach, math.sin(angle) * reach, rng.uniform(1.0, 2.0))
+        cone(asset_id, f"stem_{frond}", (0, 0, 0.08), tip, 0.055, 0.025, "leaf_dark", 5)
+        base = Vector((0, 0, 0.1))
+        end = Vector(tip)
+        direction = end - base
+        for leaflet in range(1, 5):
+            center = base + direction * (leaflet / 5)
+            tangent = Vector((-math.sin(angle), math.cos(angle), 0))
+            length = 0.46 * (1 - leaflet * 0.08)
+            for side in (-1, 1):
+                leaf_tip = center + tangent * side * length + Vector((0, 0, 0.12))
+                leaf_plane(asset_id, f"leaf_{frond}_{leaflet}_{side}", center, leaf_tip, 0.14, "leaf_mid")
+
+
+def asset_bounds(objects: list[bpy.types.Object]) -> tuple[Vector, Vector]:
+    points = [obj.matrix_world @ Vector(corner) for obj in objects for corner in obj.bound_box]
+    minimum = Vector((min(p.x for p in points), min(p.y for p in points), min(p.z for p in points)))
+    maximum = Vector((max(p.x for p in points), max(p.y for p in points), max(p.z for p in points)))
+    return minimum, maximum
+
+
+def asset_triangles(objects: list[bpy.types.Object]) -> int:
+    total = 0
+    for obj in objects:
+        if obj.type == "MESH":
+            obj.data.calc_loop_triangles()
+            total += len(obj.data.loop_triangles)
+    return total
+
+
+def consolidate_assets_by_material() -> None:
+    """Collapse construction pieces to a small MeshPart budget per asset."""
+    for asset_id, objects in list(ASSETS.items()):
+        groups: dict[str, list[bpy.types.Object]] = {}
+        for obj in objects:
+            if obj.type != "MESH" or not obj.material_slots or not obj.material_slots[0].material:
+                continue
+            groups.setdefault(obj.material_slots[0].material.name, []).append(obj)
+        consolidated: list[bpy.types.Object] = []
+        for material_name, group in sorted(groups.items()):
+            bpy.ops.object.select_all(action="DESELECT")
+            for obj in group:
+                obj.select_set(True)
+            bpy.context.view_layer.objects.active = group[0]
+            bpy.ops.object.join()
+            joined = bpy.context.object
+            joined.name = f"{asset_id}__{material_name.removeprefix('LL_')}"
+            joined["lastLightAssetId"] = asset_id
+            consolidated.append(joined)
+        ASSETS[asset_id] = consolidated
+
+
+def normalize_assets() -> None:
+    """Center each asset on X/Y, ground it on Z, and size it exactly."""
+    for asset_id, objects in ASSETS.items():
+        minimum, maximum = asset_bounds(objects)
+        dimensions = maximum - minimum
+        target = TARGET_LONGEST_DIMENSIONS[asset_id]
+        scale = target / max(dimensions)
+        anchor = Vector(((minimum.x + maximum.x) * 0.5, (minimum.y + maximum.y) * 0.5, minimum.z))
+        for obj in objects:
+            obj.location = (obj.location - anchor) * scale
+            obj.scale *= scale
+
+
+def export_assets() -> dict[str, dict[str, object]]:
+    measurements: dict[str, dict[str, object]] = {}
+    for asset_id, objects in sorted(ASSETS.items()):
+        bpy.ops.object.select_all(action="DESELECT")
+        for obj in objects:
+            obj.select_set(True)
+        bpy.context.view_layer.objects.active = objects[0]
+        path = OUTPUT / f"{asset_id}.glb"
+        bpy.ops.export_scene.gltf(
+            filepath=str(path),
+            export_format="GLB",
+            use_selection=True,
+            export_apply=True,
+            export_yup=True,
+            export_materials="EXPORT",
+        )
+        minimum, maximum = asset_bounds(objects)
+        dimensions = maximum - minimum
+        measurements[asset_id] = {
+            "boundsMin": [round(value, 4) for value in minimum],
+            "boundsMax": [round(value, 4) for value in maximum],
+            "dimensions": [round(value, 4) for value in dimensions],
+            "longestDimension": round(max(dimensions), 4),
+            "triangles": asset_triangles(objects),
+            "meshObjects": sum(1 for obj in objects if obj.type == "MESH"),
+            "materials": sorted({slot.material.name for obj in objects if obj.type == "MESH" for slot in obj.material_slots if slot.material}),
+            "bytes": path.stat().st_size,
+        }
+    (OUTPUT / "measurements.json").write_text(json.dumps({"schemaVersion": 1, "assets": measurements}, indent=2) + "\n")
+    return measurements
+
+
+def make_preview() -> None:
+    placements = {
+        "mesh_conifer_hero_a": (-25, 5, 0),
+        "mesh_conifer_hero_b": (-13, 6, 0),
+        "mesh_broadleaf_hero_a": (1, 8, 0),
+        "mesh_root_arch_a": (21, 8, 0),
+        "mesh_boulder_cluster_a": (-14, -10, 0),
+        "mesh_deadfall_a": (1, -10, 0),
+        "mesh_fern_cluster_a": (17, -10, 0),
+    }
+    for asset_id, objects in ASSETS.items():
+        offset = Vector(placements[asset_id])
+        minimum, _ = asset_bounds(objects)
+        offset.z -= minimum.z
+        for obj in objects:
+            obj.location += offset
+
+    bpy.ops.mesh.primitive_plane_add(size=90, location=(0, 0, -0.03))
+    ground = bpy.context.object
+    ground.data.materials.append(material("stone_dark"))
+
+    world = bpy.context.scene.world
+    world.use_nodes = True
+    background = world.node_tree.nodes.get("Background")
+    background.inputs["Color"].default_value = (0.008, 0.014, 0.021, 1)
+    background.inputs["Strength"].default_value = 0.52
+
+    bpy.ops.object.light_add(type="AREA", location=(-15, -20, 30))
+    key = bpy.context.object
+    key.data.energy = 2400
+    key.data.shape = "DISK"
+    key.data.size = 18
+    key.data.color = (1.0, 0.52, 0.25)
+    key.rotation_euler = (Vector((0, 2, 8)) - key.location).to_track_quat("-Z", "Y").to_euler()
+
+    bpy.ops.object.light_add(type="AREA", location=(18, 8, 26))
+    fill = bpy.context.object
+    fill.data.energy = 2100
+    fill.data.size = 24
+    fill.data.color = (0.22, 0.52, 1.0)
+    fill.rotation_euler = (Vector((4, 4, 9)) - fill.location).to_track_quat("-Z", "Y").to_euler()
+
+    bpy.ops.object.light_add(type="SUN", location=(0, 0, 30))
+    moon = bpy.context.object
+    moon.data.energy = 1.25
+    moon.data.angle = math.radians(28)
+    moon.data.color = (0.38, 0.55, 0.82)
+    moon.rotation_euler = (math.radians(32), math.radians(-18), math.radians(-28))
+
+    bpy.ops.object.camera_add(location=(62, -86, 45))
+    camera = bpy.context.object
+    direction = Vector((0, 2, 8.5)) - camera.location
+    camera.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
+    camera.data.lens = 52
+    bpy.context.scene.camera = camera
+
+    scene = bpy.context.scene
+    scene.render.engine = "BLENDER_EEVEE_NEXT"
+    scene.render.resolution_x = 1600
+    scene.render.resolution_y = 900
+    scene.render.resolution_percentage = 100
+    scene.render.image_settings.file_format = "PNG"
+    scene.render.filepath = str(PREVIEW)
+    scene.render.film_transparent = False
+    scene.render.image_settings.color_mode = "RGBA"
+    scene.view_settings.look = "AgX - Medium High Contrast"
+    bpy.ops.render.render(write_still=True)
+
+
+def main() -> None:
+    bpy.ops.object.select_all(action="SELECT")
+    bpy.ops.object.delete(use_global=False)
+    for block in (bpy.data.meshes, bpy.data.curves, bpy.data.materials, bpy.data.cameras, bpy.data.lights):
+        for item in list(block):
+            block.remove(item)
+
+    make_conifer("mesh_conifer_hero_a", 27.0, 0.38, 101)
+    make_conifer("mesh_conifer_hero_b", 24.0, 0.82, 202)
+    make_broadleaf("mesh_broadleaf_hero_a")
+    make_boulders("mesh_boulder_cluster_a")
+    make_deadfall("mesh_deadfall_a")
+    make_root_arch("mesh_root_arch_a")
+    make_fern("mesh_fern_cluster_a")
+    consolidate_assets_by_material()
+    normalize_assets()
+    measurements = export_assets()
+    make_preview()
+    print(json.dumps({"generated": sorted(measurements), "preview": str(PREVIEW)}))
+
+
+if __name__ == "__main__":
+    main()
