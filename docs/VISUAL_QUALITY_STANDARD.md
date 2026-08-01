@@ -183,6 +183,77 @@ clarity. Cosmetic geometry must not alter authoritative combat bounds.
 7. API keys live only in the operator environment. Never commit, print, log, or
    embed credentials in source or generated places.
 
+### Picking an asset
+
+Start from [`assets/meshes/manifest.json`](../assets/meshes/manifest.json), the
+machine-readable source of truth, not memory or a screenshot. Each entry's `id`
+is the stable ID used everywhere else (registry, loader, logs, clone
+attributes); its `robloxAssetId` is the numeric Roblox asset, present only after
+Open Cloud finishes processing an upload. `placementBand` (`core`, `core_near`,
+`core_near_town_edge`, `curated_core`, `curated_expedition`) is an advisory hint
+for where in the world the asset was authored to live — nothing at runtime
+enforces it, so respecting it is the placing agent's responsibility, not a
+guardrail that will catch a mistake.
+
+`retired_visual_failure` is not a location, it is a rejection. An entry carrying
+that band (currently `mesh_wayfarer_cabin_a`) failed Studio review and must
+never be placed as visible world dressing; its manifest and registry entries
+exist only for provenance and measurement history. Check this field before
+reusing any asset ID you have not personally placed before.
+
+### Checking how an asset actually renders, before placing it
+
+Reading the manifest or the generator script is not seeing the asset. Flat
+shading, blown-out materials, and missing geometry are invisible in JSON and
+Luau source; they only show up in a render. Before placing — or re-placing after
+any generator change — an asset that already has a `robloxAssetId`, fetch its
+real Roblox thumbnail and look at it. No API key is required:
+
+```bash
+curl -s "https://thumbnails.roblox.com/v1/assets?assetIds=<robloxAssetId>&size=420x420&format=Png"
+```
+
+The response looks like
+`{"data":[{"targetId":...,"state":"Completed","imageUrl":"..."}]}`. Rendering is
+asynchronous: `state: "Pending"` means the render is not ready and any
+`imageUrl` returned with it is a placeholder, not the asset. Poll again after a
+few seconds until `state` is `Completed`, then download `imageUrl` and actually
+view the image — an agent with image-reading tool support can view it directly;
+one without must hand the file to the operator. Do not report a visual fix as
+verified from a 200 status code or a non-empty `imageUrl` alone: `state` has to
+say `Completed`, and someone has to look at the pixels.
+
+This renders one asset at a time, standalone, against a neutral backdrop. It
+does not substitute for the Studio evidence required below for terrain,
+lighting, multi-asset composition, or anything a player would see in place — it
+only proves whether the mesh itself is shaped and shaded correctly before a
+placement is spent on it.
+
+There is no equivalent endpoint for scenes, terrain, or lighting.
+`assets-thumbnail-3d` exists but returned `state: "Error"` for every Model-type
+asset in this kit tested against it and cannot be relied on. There is no
+headless Roblox Studio and no full-place cloud renderer reachable from an agent
+session. Do not design a workflow around either existing.
+
+### Placing an asset
+
+Placement always goes through
+`MeshTemplateLoader:place(stableId, parent, at, placementScale)`
+(`src/server/World/MeshTemplateLoader.luau`), never a direct
+`InsertService:LoadAsset` call at the placement site. `place` loads and
+sanitizes the Roblox model once per server (stripping scripts, prompts,
+constraints, and joints), normalizes it to the manifest's measured
+`targetLongestDimension`, then clones, scales, pivots to `at`, and tags the
+clone with `MeshAssetId` and `PlacementScale` attributes for later inspection. A
+failed load returns `nil` and the call site must fall back to the existing
+procedural builder for that spot — a load failure must never block joining or
+leave a gap.
+
+Before writing a new placement call: confirm the asset's `placementBand` fits
+the location, confirm the band is not `retired_visual_failure`, and confirm
+someone has actually looked at a `Completed` thumbnail for it since the last
+generator or upload change that could have affected its shading or geometry.
+
 ## Performance and mobile gates
 
 - Preserve streaming cells and a playable arrival area inside the bootstrap
