@@ -319,6 +319,7 @@ function EnemyService.startNight(self: EnemyService)
     table.clear(self._queue)
     self._nightActive = true
     self._lanternHealth = 100
+    self._worldService:setLanternHealth(self._lanternHealth)
     self._breachMultiplier = 1
     self._nextSpawnAt = 0
     self:_notify(nil)
@@ -329,6 +330,7 @@ function EnemyService.stopNight(self: EnemyService)
     self:_destroyActive()
     table.clear(self._queue)
     self._lanternHealth = 100
+    self._worldService:setLanternHealth(self._lanternHealth)
     self._breachMultiplier = 1
     self._nextSpawnAt = 0
     self:_notify(nil)
@@ -642,6 +644,7 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
     elseif result.applied and enemy.definition.statusEffect == "spark_theft" then
         self._lanternHealth =
             math.max(18, self._lanternHealth - (enemy.definition.statusLanternDamage or 0))
+        self._worldService:setLanternHealth(self._lanternHealth)
     end
     self._analyticsService:enemyAttackResult(
         target,
@@ -715,6 +718,7 @@ function EnemyService._lanternImpact(self: EnemyService, enemy: Enemy, now: numb
     else
         self:_notify(nil)
     end
+    self._worldService:setLanternHealth(self._lanternHealth)
 end
 
 function EnemyService._step(self: EnemyService, deltaTime: number)
@@ -896,6 +900,7 @@ function EnemyService.repairLantern(
     end
     local previous = self._lanternHealth
     self._lanternHealth = math.min(100, self._lanternHealth + amount)
+    self._worldService:setLanternHealth(self._lanternHealth)
     local restored = self._lanternHealth - previous
     local message = string.format("EMERGENCY PATCH — FIRST LANTERN +%d", restored)
     self:_notify(message)
