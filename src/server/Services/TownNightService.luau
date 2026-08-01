@@ -142,8 +142,9 @@ function TownNightService._runCycle(self: TownNightService)
         local activeNight = self._nightNumber
         local blackoutDue = self:_isBlackoutDue(activeNight)
         local theme = self._townNightSchedule.theme(activeNight)
+        local themeProfile = self._townNightSchedule.profile(activeNight)
         self._worldService:setNight(true, theme)
-        self._enemyService:startNight()
+        self._enemyService:startNight(themeProfile)
         self:_notify(
             if blackoutDue
                 then string.format(
@@ -151,7 +152,12 @@ function TownNightService._runCycle(self: TownNightService)
                     theme,
                     activeNight
                 )
-                else string.format("%s NIGHT %d HAS ARRIVED", theme, activeNight)
+                else string.format(
+                    "%s NIGHT %d — %s",
+                    theme,
+                    activeNight,
+                    themeProfile.instruction
+                )
         )
         self._logger:info("town_night_started", {
             blackoutDue = blackoutDue,

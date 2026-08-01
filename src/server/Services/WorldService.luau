@@ -34,6 +34,7 @@ export type WorldService = typeof(setmetatable(
         _dusk: boolean,
         _duskSignals: { BasePart },
         _nightDefenseSignals: { BasePart },
+        _nightThemeDressing: Model?,
         _breachActive: boolean,
         _night: boolean,
         _blackoutLightingActive: boolean,
@@ -920,6 +921,7 @@ function WorldService.new(logger: Logger, extractionPayoff: any): WorldService
         _dusk = false,
         _duskSignals = {},
         _nightDefenseSignals = {},
+        _nightThemeDressing = nil,
         _breachActive = false,
         _night = false,
         _blackoutLightingActive = false,
@@ -4194,6 +4196,133 @@ local function nightThemeColor(theme: string?): Color3
         else AMBER
 end
 
+local function buildNightThemeDressing(parent: Instance, theme: string): Model
+    local model = Instance.new("Model")
+    model.Name = "NightThemeDressing"
+    model:SetAttribute("Theme", theme)
+    model.Parent = parent
+    local accent = nightThemeColor(theme)
+
+    if theme == "EMBERFALL" then
+        for row = 0, 2 do
+            for side = -1, 1, 2 do
+                local center = Vector3.new(side * 7.5, 0.45, -144 + row * 12)
+                local basin = part(
+                    model,
+                    "EmberCatchBasin",
+                    Vector3.new(3.4, 0.7, 3.4),
+                    CFrame.new(center),
+                    Color3.fromRGB(72, 58, 49),
+                    Enum.Material.Slate,
+                    false
+                )
+                basin.Shape = Enum.PartType.Cylinder
+                local coal = part(
+                    model,
+                    "CaughtEmbers",
+                    Vector3.new(2.2, 0.35, 2.2),
+                    CFrame.new(center + Vector3.new(0, 0.48, 0)),
+                    accent,
+                    Enum.Material.Neon,
+                    false
+                )
+                coal.Shape = Enum.PartType.Cylinder
+                coal.Transparency = 0.18
+            end
+        end
+    elseif theme == "MIRETIDE" then
+        for poolIndex = 0, 4 do
+            local side = if poolIndex % 2 == 0 then -1 else 1
+            local pool = part(
+                model,
+                "MiretidePool",
+                Vector3.new(8 + poolIndex % 3, 0.16, 6.5),
+                CFrame.new(side * 6.5, 0.24, -145 + poolIndex * 7.2)
+                    * CFrame.Angles(0, math.rad(side * (8 + poolIndex * 3)), 0),
+                accent,
+                Enum.Material.Glass,
+                false
+            )
+            pool.Transparency = 0.48
+            local reed = part(
+                model,
+                "MiretideReeds",
+                Vector3.new(0.35, 3.2, 0.35),
+                pool.CFrame + Vector3.new(side * 2.4, 1.5, 0.8),
+                Color3.fromRGB(64, 103, 77),
+                Enum.Material.Grass,
+                false
+            )
+            reed.CFrame *= CFrame.Angles(0, 0, math.rad(side * 8))
+        end
+    elseif theme == "ROOTMOON" then
+        for archIndex = 0, 2 do
+            local z = -145 + archIndex * 13
+            for side = -1, 1, 2 do
+                part(
+                    model,
+                    "RootmoonPillar",
+                    Vector3.new(1.05, 8, 1.05),
+                    CFrame.new(side * 6.2, 4, z) * CFrame.Angles(0, 0, math.rad(-side * 12)),
+                    Color3.fromRGB(72, 54, 45),
+                    Enum.Material.Wood,
+                    false
+                )
+            end
+            local crown = part(
+                model,
+                "RootmoonCrown",
+                Vector3.new(13, 1, 1),
+                CFrame.new(0, 7.7, z),
+                accent,
+                Enum.Material.Wood,
+                false
+            )
+            crown.Transparency = 0.12
+        end
+    else
+        for driftIndex = 1, 8 do
+            local side = if driftIndex % 2 == 0 then -1 else 1
+            local drift = part(
+                model,
+                "AshenDrift",
+                Vector3.new(4 + driftIndex % 3, 1.1, 2.5 + driftIndex % 2),
+                CFrame.new(side * (7 + driftIndex % 3), 0.55, -149 + driftIndex * 4.2)
+                    * CFrame.Angles(0, math.rad(side * driftIndex * 9), 0),
+                Color3.fromRGB(89, 82, 78),
+                Enum.Material.Sand,
+                false
+            )
+            drift.Shape = Enum.PartType.Ball
+            drift.Transparency = 0.18
+            if driftIndex % 2 == 0 then
+                part(
+                    model,
+                    "CharredWaypost",
+                    Vector3.new(0.65, 5.5, 0.65),
+                    CFrame.new(side * 9, 2.7, -149 + driftIndex * 4.2)
+                        * CFrame.Angles(0, 0, math.rad(side * 10)),
+                    Color3.fromRGB(38, 35, 34),
+                    Enum.Material.Wood,
+                    false
+                )
+            end
+        end
+    end
+
+    local marker = part(
+        model,
+        "NightThemeMarker",
+        Vector3.new(12, 2.5, 0.45),
+        CFrame.new(0, 5.2, -151),
+        Color3.fromRGB(48, 39, 35),
+        Enum.Material.WoodPlanks,
+        false
+    )
+    addBillboard(marker, theme, accent)
+    return model
+end
+
 function WorldService._setNightDefenseState(self: WorldService, state: string, theme: string?)
     local accent = if state == "breach" then Color3.fromRGB(255, 91, 58) else nightThemeColor(theme)
     for _, signal in self._nightDefenseSignals do
@@ -4421,6 +4550,13 @@ end
 function WorldService.setNight(self: WorldService, enabled: boolean, theme: string?)
     self._night = enabled
     self._breachActive = false
+    if self._nightThemeDressing ~= nil then
+        self._nightThemeDressing:Destroy()
+        self._nightThemeDressing = nil
+    end
+    if enabled and self._world ~= nil then
+        self._nightThemeDressing = buildNightThemeDressing(self._world, theme or "EMBERFALL")
+    end
     self:_setNightDefenseState(if enabled then "night" else "day", theme)
     self:_setTownResidentRoutine(if enabled then "night" elseif self._dusk then "dusk" else "day")
     if enabled then

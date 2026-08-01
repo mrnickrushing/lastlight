@@ -120,7 +120,7 @@ already-tracked objective is met. Head/feet equipment slots now provide
 server-authoritative damage-reduction and stamina-regeneration passives.
 Profession mastery/specializations, additional equipment families and 3D gear
 visuals, a recipe-browsing UI and quest-board UI, quest-giver NPCs, the full
-recipe/inventory/quest catalog, per-night content differentiation,
+recipe/inventory/quest catalog, deeper per-night events beyond the four tactical profiles,
 consequences visibly changing future town/region content, town tier, final
 art/audio, and all Studio/device/group evidence remain open.
 See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md) and

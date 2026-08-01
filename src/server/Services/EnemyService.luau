@@ -60,6 +60,7 @@ export type EnemyService = typeof(setmetatable(
         _nightActive: boolean,
         _lanternHealth: number,
         _breachMultiplier: number,
+        _nightModifiers: any,
         _onChanged: ((string?) -> ())?,
         _heartbeat: RBXScriptConnection?,
     },
@@ -107,6 +108,12 @@ function EnemyService.new(
         _nightActive = false,
         _lanternHealth = 100,
         _breachMultiplier = 1,
+        _nightModifiers = {
+            healthMultiplier = 1,
+            speedMultiplier = 1,
+            playerDamageMultiplier = 1,
+            lanternDamageMultiplier = 1,
+        },
         _onChanged = nil,
         _heartbeat = nil,
     }, EnemyService)
@@ -347,13 +354,24 @@ function EnemyService._destroyActive(self: EnemyService)
     self._active = nil
 end
 
-function EnemyService.startNight(self: EnemyService)
+function EnemyService.startNight(self: EnemyService, modifiers: any?)
     self:_destroyActive()
     table.clear(self._queue)
     self._nightActive = true
     self._lanternHealth = 100
     self._worldService:setLanternHealth(self._lanternHealth)
     self._breachMultiplier = 1
+    local profile = if type(modifiers) == "table" then modifiers else {}
+    self._nightModifiers = {
+        healthMultiplier = math.clamp(tonumber(profile.healthMultiplier) or 1, 0.8, 1.3),
+        speedMultiplier = math.clamp(tonumber(profile.speedMultiplier) or 1, 0.8, 1.3),
+        playerDamageMultiplier = math.clamp(tonumber(profile.playerDamageMultiplier) or 1, 1, 1.2),
+        lanternDamageMultiplier = math.clamp(
+            tonumber(profile.lanternDamageMultiplier) or 1,
+            1,
+            1.25
+        ),
+    }
     self._nextSpawnAt = 0
     self:_notify(nil)
 end
@@ -365,6 +383,12 @@ function EnemyService.stopNight(self: EnemyService)
     self._lanternHealth = 100
     self._worldService:setLanternHealth(self._lanternHealth)
     self._breachMultiplier = 1
+    self._nightModifiers = {
+        healthMultiplier = 1,
+        speedMultiplier = 1,
+        playerDamageMultiplier = 1,
+        lanternDamageMultiplier = 1,
+    }
     self._nextSpawnAt = 0
     self:_notify(nil)
 end
@@ -409,6 +433,12 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
     model.Parent = workspace
     local spawnedAt = workspace:GetServerTimeNow()
     local basePosition = model:GetPivot().Position
+    local themedHealth =
+        math.max(1, math.ceil(definition.health * self._nightModifiers.healthMultiplier))
+    model:SetAttribute("EnemyHealth", themedHealth)
+    model:SetAttribute("EnemyMaxHealth", themedHealth)
+    model:SetAttribute("NightHealthMultiplier", self._nightModifiers.healthMultiplier)
+    model:SetAttribute("NightSpeedMultiplier", self._nightModifiers.speedMultiplier)
     self._active = {
         attack = nil,
         basePosition = basePosition,
@@ -416,7 +446,7 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
         facingPosition = if definition.targetMode == "player"
             then basePosition + Vector3.new(0, 0, -10)
             else self._worldService:lanternPosition(),
-        health = definition.health,
+        health = themedHealth,
         lastAttackAt = spawnedAt,
         markedUntil = 0,
         model = model,
@@ -682,7 +712,10 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
         return
     end
 
-    local damage = enemy.definition.playerDamage
+    local damage = math.max(
+        1,
+        math.ceil(enemy.definition.playerDamage * self._nightModifiers.playerDamageMultiplier)
+    )
     local guarded = false
     if self._professionService ~= nil then
         damage, guarded = self._professionService:mitigateIncomingDamage(target, damage, now)
@@ -696,8 +729,14 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
             enemy.definition.statusMultiplier or 1
         )
     elseif result.applied and enemy.definition.statusEffect == "spark_theft" then
-        self._lanternHealth =
-            math.max(18, self._lanternHealth - (enemy.definition.statusLanternDamage or 0))
+        self._lanternHealth = math.max(
+            18,
+            self._lanternHealth
+                - math.ceil(
+                    (enemy.definition.statusLanternDamage or 0)
+                        * self._nightModifiers.lanternDamageMultiplier
+                )
+        )
         self._worldService:setLanternHealth(self._lanternHealth)
     end
     self._analyticsService:enemyAttackResult(
@@ -760,8 +799,16 @@ function EnemyService._lanternImpact(self: EnemyService, enemy: Enemy, now: numb
         return
     end
     enemy.lastAttackAt = now
-    self._lanternHealth =
-        math.max(0, self._lanternHealth - math.max(0, enemy.definition.lanternDamage))
+    self._lanternHealth = math.max(
+        0,
+        self._lanternHealth
+            - math.max(
+                0,
+                math.ceil(
+                    enemy.definition.lanternDamage * self._nightModifiers.lanternDamageMultiplier
+                )
+            )
+    )
     if self._lanternHealth <= 0 then
         self._lanternHealth = 18
         local collapsedId = enemy.definition.id
@@ -830,7 +877,9 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
         then enemy.definition.attackRange * 0.72
         else 10
     if delta.Magnitude > stoppingDistance then
-        local speed = enemy.definition.speed * self._breachMultiplier
+        local speed = enemy.definition.speed
+            * self._nightModifiers.speedMultiplier
+            * self._breachMultiplier
         if now < enemy.markedUntil then
             speed *= 0.65
         end
