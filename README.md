@@ -23,7 +23,7 @@ recipes, consumable and authoritative passive gear effects, resident-guided ques
 milestones, physical town-tier building growth, the four-person Bramblewake
 resident cast with day/night routines, ten-level profession mastery with earned
 ability bonuses, and persistent physical town damage with daylight repair work
-implemented;
+implemented, plus replicated physical visuals for equipped permanent gear;
 Studio and device exit gates remain pending.**
 
 The repository currently contains:
@@ -86,7 +86,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 232 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 236 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -133,6 +133,9 @@ crafting recipes are in
 The consumable-effect authority, atomicity, composability, and input-parity
 gates for the first gear effects are in
 [the gear effects runbook](docs/MILESTONE_3_GEAR_EFFECTS.md).
+The replicated character silhouettes, avatar compatibility, and inspection gates
+for equipped permanent gear are in
+[the equipment visuals runbook](docs/MILESTONE_3_EQUIPMENT_VISUALS.md).
 The claim-authority, idempotence, and no-progress-loss gates for the first
 quest milestones are in
 [the quests runbook](docs/MILESTONE_3_QUESTS.md).

@@ -41,9 +41,9 @@ The original slice implemented:
   the same multi-input parity every other core action already has. A
   button is only visible once its owned count is above zero.
 
-Additional equipment slots, new 3D gear visuals, and crafting gear into better
-gear remain open. Head/feet slots and authoritative passive stats are now
-implemented.
+Additional equipment slots and crafting gear into better gear remain open.
+Head/feet slots, authoritative passive stats, and their first replicated 3D
+character silhouettes are now implemented.
 
 ## Flow and authority
 
@@ -100,7 +100,7 @@ the two damage reductions compose instead of overriding each other.
 | Composability | the Amber Charm's shield stacks with Warden's own mitigation instead of overriding it |
 | Input parity | both items are usable via keyboard, gamepad, and touch through the same Input Action System every other core action uses |
 | Persistence | remaining owned counts survive a disconnect/reconnect and a server restart |
-| Scope honesty | additional slots, new gear visuals, and gear-crafts-gear progression remain open; head/feet passives are implemented later |
+| Scope honesty | additional slots and gear-crafts-gear progression remain open; head/feet passives and their first replicated visuals are implemented later |
 
 Automated checks establish the shield/stamina-restore transitions and the
 consume-one-unit transaction as pure Luau tests. Only recorded Studio and

@@ -118,8 +118,8 @@ dedicated keyboard/gamepad/touch bindings, and a first set of three resident-gui
 quest milestones that auto-claim a material reward the moment their
 already-tracked objective is met. Head/feet equipment slots now provide
 server-authoritative damage-reduction and stamina-regeneration passives.
-Profession specialization selection/effects, additional equipment families and 3D gear
-visuals, a recipe-browsing UI and quest-board UI, branching quests, the full
+Profession specialization selection/effects, additional equipment families, a
+recipe-browsing UI and quest-board UI, branching quests, the full
 recipe/inventory/quest catalog, deeper per-night events beyond the four tactical profiles,
 additional region-specific consequences, later town tiers, final
 art/audio, and all Studio/device/group evidence remain open.
