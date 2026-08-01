@@ -19,8 +19,9 @@ four active events, durable extraction settlement, player rescue, combat
 mobility, six-enemy first-night roster, four basic profession kits, Old Growth,
 the Warden Stag, the Bramblewake Blackout, permanent chapter-one resolution, a
 repeating town normal-night cycle, four starter recipes, consumable and passive
-gear effects, silent quest milestones, and physical town-tier building growth
-implemented; Studio and device exit gates remain pending.**
+gear effects, silent quest milestones, physical town-tier building growth, and
+the four-person Bramblewake resident cast with day/night routines implemented;
+Studio and device exit gates remain pending.**
 
 The repository currently contains:
 

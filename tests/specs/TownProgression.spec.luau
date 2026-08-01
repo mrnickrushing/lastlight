@@ -26,6 +26,8 @@ return {
                 TestRunner.equal(consequence.growthStage, 2)
                 TestRunner.equal(consequence.buildingStages.building_archive, 2)
                 TestRunner.equal(consequence.buildingStages.building_inn, 1)
+                TestRunner.equal(#consequence.residentIds, 3)
+                TestRunner.equal(consequence.residentIds[1], "npc_tomas_reed")
             end,
         },
         {
@@ -39,6 +41,7 @@ return {
                 TestRunner.equal(consequence.buildingStages.building_archive, 0)
                 TestRunner.equal(consequence.buildingStages.building_town_board, 1)
                 TestRunner.equal(consequence.buildingStages.building_inn, 0)
+                TestRunner.equal(#consequence.residentIds, 0)
             end,
         },
         {

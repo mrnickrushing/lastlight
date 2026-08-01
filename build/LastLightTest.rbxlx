@@ -6163,6 +6163,7 @@ export type Consequence = {
     memorialKind: string,
     growthStage: number,
     buildingStages: { [string]: number },
+    residentIds: { string },
 }
 
 local function buildingStages(tier: number): { [string]: number }
@@ -6176,6 +6177,20 @@ local function buildingStages(tier: number): { [string]: number }
         building_town_board = math.max(1, tier),
         building_workbench = math.max(1, tier),
         building_inn = math.max(0, tier - 1),
+    }
+end
+
+local function residentIds(tier: number): { string }
+    if tier < 1 then
+        return {}
+    end
+    -- Mara is present from the tutorial and is built separately. Chapter one
+    -- brings the remaining Bramblewake residents home together, completing
+    -- the vertical slice's four-person town cast.
+    return {
+        "npc_tomas_reed",
+        "npc_pip_wren",
+        "npc_ena_moss",
     }
 end
 
@@ -6225,6 +6240,7 @@ function TownProgression.resolve(profile: any): Consequence
         memorialKind = memorialKind,
         growthStage = tier,
         buildingStages = buildingStages(tier),
+        residentIds = residentIds(tier),
     }
 end
 
@@ -15953,6 +15969,7 @@ export type WorldService = typeof(setmetatable(
         _blackoutArena: any,
         _characterRoots: { [Player]: BasePart? },
         _townConsequence: any,
+        _townResidents: { [string]: any },
     },
     WorldService
 ))
@@ -16838,6 +16855,7 @@ function WorldService.new(logger: Logger, extractionPayoff: any): WorldService
         _blackoutArena = nil,
         _characterRoots = {},
         _townConsequence = nil,
+        _townResidents = {},
     }, WorldService)
 end
 
@@ -18630,10 +18648,15 @@ local function buildTownConsequenceLandscape(parent: Instance, consequence: any)
     parent:SetAttribute("GrowthStage", growthStage)
 end
 
-local function buildTownProgressionBuildings(parent: Instance, consequence: any)
+local function buildTownProgressionBuildings(
+    parent: Instance,
+    consequence: any,
+    runtimeIds: any
+): { [string]: any }
     local stages = if type(consequence.buildingStages) == "table"
         then consequence.buildingStages
         else {}
+    local residents: { [string]: any } = {}
 
     local function stageFor(id: string): number
         return math.clamp(math.floor(tonumber(stages[id]) or 0), 0, 3)
@@ -18987,10 +19010,309 @@ local function buildTownProgressionBuildings(parent: Instance, consequence: any)
         end
     end
 
+    local residentDefinitions = {
+        npc_tomas_reed = {
+            displayName = "TOMAS REED",
+            role = "QUARTERMASTER",
+            coat = Color3.fromRGB(116, 72, 49),
+            accent = Color3.fromRGB(221, 154, 78),
+            skin = Color3.fromRGB(177, 124, 87),
+            hair = Color3.fromRGB(55, 40, 34),
+            prop = "cookpot",
+            day = CFrame.new(-40, 3, -128) * CFrame.Angles(0, math.rad(180), 0),
+            dusk = CFrame.new(-10, 3, -128) * CFrame.Angles(0, math.rad(-10), 0),
+            night = CFrame.new(-9, 3, -138) * CFrame.Angles(0, math.rad(-15), 0),
+            dayDuty = "PREPARING SUPPLIES",
+        },
+        npc_pip_wren = {
+            displayName = "PIP WREN",
+            role = "COURIER",
+            coat = Color3.fromRGB(61, 88, 92),
+            accent = Color3.fromRGB(112, 192, 176),
+            skin = Color3.fromRGB(210, 157, 112),
+            hair = Color3.fromRGB(111, 66, 43),
+            prop = "route_map",
+            day = CFrame.new(12, 3, -81) * CFrame.Angles(0, math.rad(180), 0),
+            dusk = CFrame.new(0, 3, -128),
+            night = CFrame.new(0, 3, -139),
+            dayDuty = "MAPPING SAFE ROUTES",
+        },
+        npc_ena_moss = {
+            displayName = "ENA MOSS",
+            role = "SEEDKEEPER",
+            coat = Color3.fromRGB(72, 103, 62),
+            accent = Color3.fromRGB(191, 178, 82),
+            skin = Color3.fromRGB(126, 87, 65),
+            hair = Color3.fromRGB(41, 35, 29),
+            prop = "seed_basket",
+            day = CFrame.new(52, 3, -101) * CFrame.Angles(0, math.rad(180), 0),
+            dusk = CFrame.new(10, 3, -128) * CFrame.Angles(0, math.rad(10), 0),
+            night = CFrame.new(9, 3, -138) * CFrame.Angles(0, math.rad(15), 0),
+            dayDuty = "TENDING THE GREENWARD",
+        },
+    }
+
+    local function buildResident(residentId: string, definition: any)
+        local model = Instance.new("Model")
+        model.Name = definition.displayName
+        model:SetAttribute("ResidentId", residentId)
+        model:SetAttribute("ResidentRole", definition.role)
+        model:SetAttribute("RoutineDay", definition.day)
+        model:SetAttribute("RoutineDusk", definition.dusk)
+        model:SetAttribute("RoutineNight", definition.night)
+        model:SetAttribute("DayDuty", definition.dayDuty)
+        model:SetAttribute("MotionKind", "resident")
+        model:SetAttribute("MotionSpeed", 0.58 + (#residentId % 5) * 0.06)
+        model.Parent = parent
+
+        local root = part(
+            model,
+            "HumanoidRootPart",
+            Vector3.new(2, 2, 1),
+            CFrame.new(0, 0, 0),
+            definition.coat,
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        root.Transparency = 1
+        part(
+            model,
+            "WorkCoat",
+            Vector3.new(2.5, 3.2, 1.35),
+            CFrame.new(0, 0.4, 0),
+            definition.coat,
+            Enum.Material.Fabric,
+            false
+        )
+        local head = part(
+            model,
+            "Head",
+            Vector3.new(2, 2, 2),
+            CFrame.new(0, 3, 0),
+            definition.skin,
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        head.Shape = Enum.PartType.Ball
+        local hair = part(
+            model,
+            "Hair",
+            Vector3.new(2.15, 1.15, 2.15),
+            CFrame.new(0, 3.65, 0.1),
+            definition.hair,
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        hair.Shape = Enum.PartType.Ball
+        local apron = part(
+            model,
+            "ProfessionLayer",
+            Vector3.new(1.85, 2.2, 0.18),
+            CFrame.new(0, 0.2, -0.78),
+            definition.accent,
+            Enum.Material.Fabric,
+            false
+        )
+        apron.Transparency = 0.04
+        for side = -1, 1, 2 do
+            part(
+                model,
+                "Arm",
+                Vector3.new(0.7, 3, 0.7),
+                CFrame.new(side * 1.55, 0.35, 0) * CFrame.Angles(0, 0, math.rad(side * 7)),
+                definition.coat,
+                Enum.Material.Fabric,
+                false
+            )
+            local hand = part(
+                model,
+                "Hand",
+                Vector3.new(0.72, 0.72, 0.72),
+                CFrame.new(side * 1.72, -1.2, 0),
+                definition.skin,
+                Enum.Material.SmoothPlastic,
+                false
+            )
+            hand.Shape = Enum.PartType.Ball
+            part(
+                model,
+                "Leg",
+                Vector3.new(0.82, 2.2, 0.9),
+                CFrame.new(side * 0.62, -2.25, 0),
+                Color3.fromRGB(45, 49, 47),
+                Enum.Material.Fabric,
+                false
+            )
+            part(
+                model,
+                "Boot",
+                Vector3.new(1, 0.7, 1.45),
+                CFrame.new(side * 0.62, -3.15, -0.22),
+                Color3.fromRGB(52, 39, 31),
+                Enum.Material.Leather,
+                false
+            )
+            local eye = part(
+                model,
+                "Eye",
+                Vector3.new(0.25, 0.25, 0.14),
+                CFrame.new(side * 0.47, 3.2, -0.93),
+                Color3.fromRGB(43, 34, 30),
+                Enum.Material.SmoothPlastic,
+                false
+            )
+            eye.Shape = Enum.PartType.Ball
+        end
+
+        if definition.prop == "cookpot" then
+            local pot = part(
+                model,
+                "QuartermasterCookpot",
+                Vector3.new(2.4, 1.5, 2.4),
+                CFrame.new(2.5, -0.8, -0.2),
+                Color3.fromRGB(87, 91, 88),
+                Enum.Material.Metal,
+                false
+            )
+            pot.Shape = Enum.PartType.Cylinder
+            part(
+                model,
+                "QuartermasterLadle",
+                Vector3.new(0.22, 3.2, 0.22),
+                CFrame.new(2.2, 0.55, -0.3) * CFrame.Angles(0, 0, math.rad(-20)),
+                Color3.fromRGB(131, 137, 136),
+                Enum.Material.Metal,
+                false
+            )
+        elseif definition.prop == "route_map" then
+            part(
+                model,
+                "CourierSatchel",
+                Vector3.new(1.65, 1.8, 0.75),
+                CFrame.new(-1.45, -0.25, 0.35),
+                Color3.fromRGB(105, 74, 46),
+                Enum.Material.Leather,
+                false
+            )
+            local map = part(
+                model,
+                "CourierRouteMap",
+                Vector3.new(2.6, 1.7, 0.12),
+                CFrame.new(2, -0.05, -0.8) * CFrame.Angles(0, math.rad(-18), math.rad(5)),
+                Color3.fromRGB(220, 204, 164),
+                Enum.Material.SmoothPlastic,
+                false
+            )
+            map.CastShadow = false
+        else
+            local basket = part(
+                model,
+                "SeedBasket",
+                Vector3.new(2.4, 1.45, 2),
+                CFrame.new(2.25, -0.85, 0),
+                Color3.fromRGB(118, 83, 48),
+                Enum.Material.WoodPlanks,
+                false
+            )
+            for seedIndex = -1, 1 do
+                local seed = part(
+                    model,
+                    "SeedBundle",
+                    Vector3.new(0.55, 0.7, 0.55),
+                    basket.CFrame + Vector3.new(seedIndex * 0.65, 0.8, 0),
+                    if seedIndex == 0 then AMBER else FOXFIRE,
+                    Enum.Material.Grass,
+                    false
+                )
+                seed.Shape = Enum.PartType.Ball
+            end
+            part(
+                model,
+                "SeedkeeperHat",
+                Vector3.new(3.3, 0.3, 3.3),
+                CFrame.new(0, 4.15, 0),
+                Color3.fromRGB(135, 112, 66),
+                Enum.Material.Fabric,
+                false
+            )
+        end
+
+        local nightLantern = part(
+            model,
+            "NightWatchLantern",
+            Vector3.new(0.85, 1.15, 0.85),
+            CFrame.new(-2.15, -1.35, -0.1),
+            AMBER,
+            Enum.Material.Glass,
+            false
+        )
+        nightLantern.Shape = Enum.PartType.Ball
+        nightLantern.Transparency = 1
+        nightLantern:SetAttribute("NightOnly", true)
+        local lanternLight = Instance.new("PointLight")
+        lanternLight.Color = AMBER
+        lanternLight.Brightness = 0.75
+        lanternLight.Range = 12
+        lanternLight.Shadows = false
+        lanternLight.Enabled = false
+        lanternLight.Parent = nightLantern
+
+        model.PrimaryPart = root
+        model:PivotTo(definition.day)
+        addBillboard(head, definition.displayName .. " · " .. definition.role, definition.accent)
+        CollectionService:AddTag(model, runtimeIds.AmbientMotionTag)
+        residents[residentId] = {
+            model = model,
+            dayDuty = definition.dayDuty,
+        }
+    end
+
+    local activeResidentIds = if type(consequence.residentIds) == "table"
+        then consequence.residentIds
+        else {}
+    for _, residentId in activeResidentIds do
+        local definition = residentDefinitions[residentId]
+        if definition ~= nil then
+            buildResident(residentId, definition)
+        end
+    end
+
     parent:SetAttribute("BuildingCount", 4)
+    parent:SetAttribute("ResidentCount", #activeResidentIds)
     parent:SetAttribute("ArchiveStage", archiveStage)
     parent:SetAttribute("WorkbenchStage", workbenchStage)
     parent:SetAttribute("InnStage", innStage)
+    return residents
+end
+
+function WorldService._setTownResidentRoutine(self: WorldService, phase: string)
+    local normalized = if phase == "night" then "Night" elseif phase == "dusk" then "Dusk" else "Day"
+    for _, resident in self._townResidents do
+        local model = resident.model
+        if model ~= nil and model.Parent ~= nil then
+            local destination = model:GetAttribute("Routine" .. normalized)
+            if typeof(destination) == "CFrame" then
+                model:PivotTo(destination)
+            end
+            model:SetAttribute("Routine", string.lower(normalized))
+            model:SetAttribute(
+                "CurrentDuty",
+                if normalized == "Day"
+                    then resident.dayDuty
+                    elseif normalized == "Dusk" then "REPORTING TO THE NIGHT WATCH"
+                    else "DEFENDING THE LANTERN ROAD"
+            )
+            local lanternPart = model:FindFirstChild("NightWatchLantern")
+            if lanternPart ~= nil and lanternPart:IsA("BasePart") then
+                local active = normalized ~= "Day"
+                lanternPart.Transparency = if active then 0.16 else 1
+                local light = lanternPart:FindFirstChildOfClass("PointLight")
+                if light ~= nil then
+                    light.Enabled = active
+                end
+            end
+        end
+    end
 end
 
 function WorldService.setTownConsequence(self: WorldService, consequence: any)
@@ -19014,7 +19336,10 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
     local buildings = Instance.new("Model")
     buildings.Name = "TownProgressionBuildings"
     buildings.Parent = world
-    buildTownProgressionBuildings(buildings, consequence)
+    self._townResidents = buildTownProgressionBuildings(buildings, consequence, self._runtimeIds)
+    self:_setTownResidentRoutine(
+        if self._night then "night" elseif self._dusk then "dusk" else "day"
+    )
     local visualPartCount = 0
     for _, descendant in landscape:GetDescendants() do
         if descendant:IsA("BasePart") then
@@ -19938,6 +20263,7 @@ function WorldService.setDusk(self: WorldService, enabled: boolean)
     self._dusk = enabled
     self:_setDuskSignals(enabled)
     self:_setNightDefenseState(if enabled then "dusk" else "day", nil)
+    self:_setTownResidentRoutine(if enabled then "dusk" else "day")
     if self._blackoutLightingActive or self._night then
         return
     end
@@ -20017,6 +20343,7 @@ function WorldService.setNight(self: WorldService, enabled: boolean, theme: stri
     self._night = enabled
     self._breachActive = false
     self:_setNightDefenseState(if enabled then "night" else "day", theme)
+    self:_setTownResidentRoutine(if enabled then "night" elseif self._dusk then "dusk" else "day")
     if enabled then
         self._dusk = false
         self:_setDuskSignals(false)

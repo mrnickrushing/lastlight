@@ -12,6 +12,7 @@ export type Consequence = {
     memorialKind: string,
     growthStage: number,
     buildingStages: { [string]: number },
+    residentIds: { string },
 }
 
 local function buildingStages(tier: number): { [string]: number }
@@ -25,6 +26,20 @@ local function buildingStages(tier: number): { [string]: number }
         building_town_board = math.max(1, tier),
         building_workbench = math.max(1, tier),
         building_inn = math.max(0, tier - 1),
+    }
+end
+
+local function residentIds(tier: number): { string }
+    if tier < 1 then
+        return {}
+    end
+    -- Mara is present from the tutorial and is built separately. Chapter one
+    -- brings the remaining Bramblewake residents home together, completing
+    -- the vertical slice's four-person town cast.
+    return {
+        "npc_tomas_reed",
+        "npc_pip_wren",
+        "npc_ena_moss",
     }
 end
 
@@ -74,6 +89,7 @@ function TownProgression.resolve(profile: any): Consequence
         memorialKind = memorialKind,
         growthStage = tier,
         buildingStages = buildingStages(tier),
+        residentIds = residentIds(tier),
     }
 end
 
