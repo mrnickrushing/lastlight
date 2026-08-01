@@ -494,7 +494,8 @@ local function emberDrift(
     position: Vector3,
     color: Color3,
     count: number,
-    spread: number
+    spread: number,
+    ambientTag: string?
 )
     local random = Random.new(math.floor(position.X * 17 + position.Z * 31))
     for _ = 1, count do
@@ -517,6 +518,9 @@ local function emberDrift(
         mote.Shape = Enum.PartType.Ball
         mote.Transparency = random:NextNumber(0.1, 0.35)
         mote.CanQuery = false
+        if ambientTag ~= nil then
+            CollectionService:AddTag(mote, ambientTag)
+        end
     end
 end
 
@@ -1085,6 +1089,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         glow.Shape = Enum.PartType.Ball
         glow.Transparency = random:NextNumber(0.02, 0.28)
         glow.CanQuery = false
+        CollectionService:AddTag(glow, _self._runtimeIds.AmbientMoteTag)
     end
 
     for index = 1, 24 do
@@ -1099,7 +1104,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
 
     addFillLight(geometry, Vector3.new(-46, 12, -96), Color3.fromRGB(54, 103, 95), 0.85, 78)
     addFillLight(geometry, Vector3.new(38, 10, -28), Color3.fromRGB(255, 177, 88), 0.45, 54)
-    emberDrift(geometry, Vector3.new(0, 0, -112), AMBER, 16, 28)
+    emberDrift(geometry, Vector3.new(0, 0, -112), AMBER, 16, 28, _self._runtimeIds.AmbientMoteTag)
 
     lantern(geometry, Vector3.new(0, 0, -8), 0.72)
     lantern(geometry, Vector3.new(-9, 0, -62), 0.62)
