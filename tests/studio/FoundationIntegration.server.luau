@@ -41,7 +41,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.33.0", "unexpected build version")
+assert(Config.BuildVersion == "0.34.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -337,7 +337,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v14",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v15",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -433,6 +433,28 @@ assert(
             <= BramblewakeExpedition.PartBudget + BramblewakeExpedition.BossArenaPartBudget + BramblewakeExpedition.BlackoutPartBudget,
     "Bramblewake preview is outside its detailed mobile part budget"
 )
+local criticalPaths = 0
+local trailWear = 0
+local trailEdges = 0
+local roadMarkers = 0
+local roadSigns = 0
+for _, descendant in expedition:GetDescendants() do
+    if descendant.Name == "CriticalPath" then
+        criticalPaths += 1
+    elseif descendant.Name == "EvacuationTrailWear" then
+        trailWear += 1
+    elseif descendant.Name == "EvacuationTrailEdge" then
+        trailEdges += 1
+    elseif descendant.Name == "EvacuationRoadMarker" then
+        roadMarkers += 1
+    elseif descendant.Name == "EvacuationRoadSign" then
+        roadSigns += 1
+    end
+end
+assert(criticalPaths == 22, "every Bramblewake connection needs two joined trail arms")
+assert(trailWear == criticalPaths, "every Bramblewake trail arm needs a worn center")
+assert(trailEdges == criticalPaths * 2, "every Bramblewake trail arm needs two visible edges")
+assert(roadMarkers == 6 and roadSigns == 6, "the critical route needs six direction markers")
 
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(

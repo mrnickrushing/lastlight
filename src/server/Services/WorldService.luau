@@ -2547,7 +2547,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v14")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v15")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -2647,7 +2647,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v14",
+        worldVersion = "bramblewake-blackout-v15",
     })
 end
 

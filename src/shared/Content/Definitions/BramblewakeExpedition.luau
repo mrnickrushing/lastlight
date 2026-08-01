@@ -627,7 +627,7 @@ return table.freeze({
     PointOfInterestCount = 4,
     EventCount = 8,
     EventInteractionCount = eventInteractionCount,
-    PartBudget = 480,
+    PartBudget = 565,
     BossArenaPartBudget = 40,
     BlackoutPartBudget = 20,
     LightBudget = 32,
