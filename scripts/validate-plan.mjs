@@ -186,6 +186,18 @@ if (existsSync(terrainBuilderPath)) {
   }
 }
 
+const meshLoaderPath = join(root, "src/server/World/MeshTemplateLoader.luau");
+if (existsSync(meshLoaderPath)) {
+  const meshLoader = readFileSync(meshLoaderPath, "utf8");
+  for (const restrictedProperty of ["CollisionFidelity", "RenderFidelity"]) {
+    if (meshLoader.includes(`.${restrictedProperty} =`)) {
+      failures.push(
+        `MeshTemplateLoader must not write capability-restricted MeshPart.${restrictedProperty}`
+      );
+    }
+  }
+}
+
 /**
  * Checks both the number and uniqueness of catalog IDs captured by a regex.
  */

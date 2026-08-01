@@ -107,6 +107,6 @@ shadow budget where the player cannot inspect the asset.
 - A failed asset request produces the established procedural equivalent.
 - Studio review covers phone, tablet, desktop, low graphics, and maximum
   graphics before the mesh kit replaces additional forest bands.
-- Studio Output reports client build `0.31.0`, world version
-  `bramblewake-blackout-v11`, and an `AuthoredMeshFallbackCount` of zero before
+- Studio Output reports client build `0.31.1`, world version
+  `bramblewake-blackout-v12`, and an `AuthoredMeshFallbackCount` of zero before
   the shrine is accepted as live visual evidence.
