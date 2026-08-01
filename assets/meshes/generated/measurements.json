@@ -191,6 +191,33 @@
       ],
       "bytes": 75624
     },
+    "mesh_lantern_post_a": {
+      "boundsMin": [
+        -2.1141,
+        -1.0163,
+        0.0
+      ],
+      "boundsMax": [
+        2.1141,
+        1.0163,
+        9.0
+      ],
+      "dimensions": [
+        4.2282,
+        2.0325,
+        9.0
+      ],
+      "longestDimension": 9.0,
+      "triangles": 332,
+      "meshObjects": 4,
+      "materials": [
+        "LL_bark_dark",
+        "LL_bark_mid",
+        "LL_iron",
+        "LL_lantern_amber"
+      ],
+      "bytes": 28324
+    },
     "mesh_root_arch_a": {
       "boundsMin": [
         -5.5953,
@@ -234,6 +261,35 @@
         }
       ],
       "bytes": 854820
+    },
+    "mesh_wayfarer_cabin_a": {
+      "boundsMin": [
+        -9.2106,
+        -10.0,
+        0.0
+      ],
+      "boundsMax": [
+        9.2106,
+        10.0,
+        17.6788
+      ],
+      "dimensions": [
+        18.4213,
+        20.0,
+        17.6788
+      ],
+      "longestDimension": 20.0,
+      "triangles": 1272,
+      "meshObjects": 6,
+      "materials": [
+        "LL_bark_cut",
+        "LL_bark_dark",
+        "LL_bark_mid",
+        "LL_moss",
+        "LL_stone",
+        "LL_stone_dark"
+      ],
+      "bytes": 103952
     }
   }
 }

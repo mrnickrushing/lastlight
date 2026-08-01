@@ -35,6 +35,8 @@ TARGET_LONGEST_DIMENSIONS = {
     "mesh_root_arch_a": 25.0,
     "mesh_fern_cluster_a": 5.0,
     "mesh_hollow_lantern_shrine_a": 28.0,
+    "mesh_wayfarer_cabin_a": 20.0,
+    "mesh_lantern_post_a": 9.0,
 }
 
 
@@ -52,6 +54,7 @@ PALETTE = {
     "fungus": ((0.530, 0.235, 0.085, 1), 0.84),
     "foxfire": ((0.075, 0.750, 0.760, 1), 0.58),
     "lantern_amber": ((1.000, 0.390, 0.055, 1), 0.42),
+    "iron": ((0.105, 0.115, 0.125, 1), 0.72),
 }
 
 
@@ -108,6 +111,29 @@ def cone(
     obj.name = name
     obj.rotation_mode = "QUATERNION"
     obj.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(delta.normalized())
+    return register(asset_id, obj, mat_name)
+
+
+def box(
+    asset_id: str,
+    name: str,
+    location: tuple[float, float, float],
+    dimensions: tuple[float, float, float],
+    rotation: tuple[float, float, float],
+    mat_name: str,
+    bevel: float = 0.0,
+) -> bpy.types.Object:
+    bpy.ops.mesh.primitive_cube_add(size=1, location=location, rotation=rotation)
+    obj = bpy.context.object
+    obj.name = name
+    obj.dimensions = dimensions
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    if bevel > 0:
+        modifier = obj.modifiers.new(name="softened_edges", type="BEVEL")
+        modifier.width = bevel
+        modifier.segments = 1
+        bpy.context.view_layer.objects.active = obj
+        bpy.ops.object.modifier_apply(modifier=modifier.name)
     return register(asset_id, obj, mat_name)
 
 
@@ -402,6 +428,135 @@ def make_hollow_lantern_shrine(asset_id: str) -> None:
         )
 
 
+def make_wayfarer_cabin(asset_id: str) -> None:
+    """Build an open-front camp cabin with a readable handmade silhouette."""
+    box(asset_id, "floor", (0, 0, 0.35), (14.8, 12.4, 0.7), (0, 0, 0), "bark_cut", 0.12)
+
+    # Separate uneven planks replace the single rectangular wall masses used
+    # by the runtime placeholder while keeping the doorway fully open.
+    for index in range(8):
+        x = -6.2 + index * 1.78
+        height = 7.5 + (index % 3) * 0.35
+        box(
+            asset_id,
+            f"back_plank_{index}",
+            (x, 5.65, height * 0.5 + 0.45),
+            (1.65, 0.62, height),
+            (0, math.radians((index % 3 - 1) * 1.4), math.radians((index % 2 - 0.5) * 1.2)),
+            "bark_mid" if index % 3 else "bark_dark",
+            0.10,
+        )
+    for side in (-1, 1):
+        for index in range(6):
+            y = -4.5 + index * 1.85
+            height = 7.4 + (index % 2) * 0.45
+            box(
+                asset_id,
+                f"side_plank_{side}_{index}",
+                (side * 7.0, y, height * 0.5 + 0.45),
+                (0.68, 1.72, height),
+                (math.radians((index % 3 - 1) * 1.0), 0, math.radians(side * (index % 2) * 1.2)),
+                "bark_mid" if index % 3 else "bark_dark",
+                0.10,
+            )
+
+    for side in (-1, 1):
+        cone(
+            asset_id,
+            f"door_post_{side}",
+            (side * 5.3, -5.7, 0.5),
+            (side * 5.0, -5.6, 8.5),
+            0.52,
+            0.42,
+            "bark_dark",
+            7,
+        )
+    cone(asset_id, "front_beam", (-5.2, -5.65, 8.2), (5.2, -5.65, 8.45), 0.52, 0.48, "bark_dark", 7)
+
+    # Proper gabled roof panels create a shelter silhouette instead of a flat
+    # slab. Their overhang protects the open porch and windows.
+    box(
+        asset_id,
+        "roof_front",
+        (0, -3.15, 9.75),
+        (16.4, 7.4, 0.7),
+        (math.radians(-29), 0, 0),
+        "stone_dark",
+        0.12,
+    )
+    box(
+        asset_id,
+        "roof_back",
+        (0, 3.15, 9.75),
+        (16.4, 7.4, 0.7),
+        (math.radians(29), 0, 0),
+        "stone_dark",
+        0.12,
+    )
+    box(asset_id, "porch", (0, -7.0, 0.45), (10.5, 3.2, 0.42), (0, 0, 0), "bark_cut", 0.10)
+
+    for side in (-1, 1):
+        cone(
+            asset_id,
+            f"front_brace_{side}",
+            (side * 5.1, -5.9, 2.0),
+            (side * 2.8, -5.9, 7.8),
+            0.26,
+            0.20,
+            "bark_cut",
+            6,
+        )
+
+    box(asset_id, "chimney", (4.7, 2.7, 11.0), (2.0, 2.0, 5.0), (0, 0, 0), "stone", 0.18)
+    for index, location in enumerate(((-5.8, 5.3, 7.9), (5.7, 5.25, 8.2), (-6.8, -0.5, 7.0))):
+        irregular_ico(
+            asset_id,
+            f"roof_moss_{index}",
+            location,
+            (1.35, 0.65, 0.28),
+            "moss",
+            1600 + index,
+            1,
+        )
+
+
+def make_lantern_post(asset_id: str) -> None:
+    cone(asset_id, "post_lower", (0, 0, 0), (0.28, 0.05, 5.6), 0.48, 0.37, "bark_mid", 8)
+    cone(asset_id, "post_upper", (0.28, 0.05, 5.4), (0.75, 0.0, 7.5), 0.38, 0.26, "bark_dark", 8)
+    cone(asset_id, "crooked_arm", (0.65, 0, 7.15), (2.05, 0, 7.4), 0.30, 0.20, "bark_dark", 7)
+    cone(asset_id, "arm_hook", (2.0, 0, 7.35), (2.0, 0, 6.75), 0.12, 0.09, "iron", 6)
+
+    # Four cage rails and a faceted amber core stay legible without becoming a
+    # giant neon sphere like the old placeholder.
+    for rail_x in (-0.42, 0.42):
+        for rail_y in (-0.34, 0.34):
+            cone(
+                asset_id,
+                f"cage_rail_{rail_x}_{rail_y}",
+                (2.0 + rail_x, rail_y, 5.2),
+                (2.0 + rail_x * 0.72, rail_y * 0.72, 6.65),
+                0.065,
+                0.05,
+                "iron",
+                5,
+            )
+    box(asset_id, "cage_base", (2.0, 0, 5.15), (1.15, 0.95, 0.18), (0, 0, 0), "iron", 0.06)
+    box(asset_id, "cage_cap", (2.0, 0, 6.65), (0.9, 0.76, 0.18), (0, 0, 0), "iron", 0.06)
+    irregular_ico(asset_id, "amber_core", (2.0, 0, 5.9), (0.46, 0.36, 0.72), "lantern_amber", 1701, 1)
+    for root_index in range(3):
+        angle = root_index * math.tau / 3 + 0.3
+        cone(
+            asset_id,
+            f"post_root_{root_index}",
+            (0, 0, 0.25),
+            (math.cos(angle) * 1.0, math.sin(angle) * 1.0, 0.04),
+            0.20,
+            0.04,
+            "bark_dark",
+            6,
+        )
+
+
 def asset_bounds(objects: list[bpy.types.Object]) -> tuple[Vector, Vector]:
     points = [obj.matrix_world @ Vector(corner) for obj in objects for corner in obj.bound_box]
     minimum = Vector((min(p.x for p in points), min(p.y for p in points), min(p.z for p in points)))
@@ -492,6 +647,8 @@ def make_preview() -> None:
         "mesh_broadleaf_hero_a": (-2, 8, 0),
         "mesh_root_arch_a": (17, 8, 0),
         "mesh_hollow_lantern_shrine_a": (34, 8, 0),
+        "mesh_wayfarer_cabin_a": (-4, 28, 0),
+        "mesh_lantern_post_a": (24, -10, 0),
         "mesh_boulder_cluster_a": (-18, -10, 0),
         "mesh_deadfall_a": (0, -10, 0),
         "mesh_fern_cluster_a": (15, -10, 0),
@@ -511,11 +668,12 @@ def make_preview() -> None:
     world.use_nodes = True
     background = world.node_tree.nodes.get("Background")
     background.inputs["Color"].default_value = (0.008, 0.014, 0.021, 1)
-    background.inputs["Strength"].default_value = 0.52
+    background.inputs["Strength"].default_value = 0.82
 
     bpy.ops.object.light_add(type="AREA", location=(-15, -20, 30))
     key = bpy.context.object
-    key.data.energy = 2400
+    key.data.energy = 3600
+    key.data.use_shadow = False
     key.data.shape = "DISK"
     key.data.size = 18
     key.data.color = (1.0, 0.52, 0.25)
@@ -523,14 +681,15 @@ def make_preview() -> None:
 
     bpy.ops.object.light_add(type="AREA", location=(18, 8, 26))
     fill = bpy.context.object
-    fill.data.energy = 2100
+    fill.data.energy = 3200
+    fill.data.use_shadow = False
     fill.data.size = 24
     fill.data.color = (0.22, 0.52, 1.0)
     fill.rotation_euler = (Vector((4, 4, 9)) - fill.location).to_track_quat("-Z", "Y").to_euler()
 
     bpy.ops.object.light_add(type="SUN", location=(0, 0, 30))
     moon = bpy.context.object
-    moon.data.energy = 1.25
+    moon.data.energy = 1.8
     moon.data.angle = math.radians(28)
     moon.data.color = (0.38, 0.55, 0.82)
     moon.rotation_euler = (math.radians(32), math.radians(-18), math.radians(-28))
@@ -570,6 +729,8 @@ def main() -> None:
     make_root_arch("mesh_root_arch_a")
     make_fern("mesh_fern_cluster_a")
     make_hollow_lantern_shrine("mesh_hollow_lantern_shrine_a")
+    make_wayfarer_cabin("mesh_wayfarer_cabin_a")
+    make_lantern_post("mesh_lantern_post_a")
     consolidate_assets_by_material()
     normalize_assets()
     measurements = export_assets()

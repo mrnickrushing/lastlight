@@ -98,6 +98,8 @@ type MeshPlacement = {
     yaw: number,
     seed: number,
     swayTag: string?,
+    parent: Instance?,
+    fallbackInstance: Instance?,
 }
 
 local WAYHOME_DELIVERY_LIFETIME = 180
@@ -160,7 +162,7 @@ local function labelSign(parent: Instance, at: CFrame, text: string)
     textLabel.Parent = surface
 end
 
-local function buildEmberhollowSanctuary(parent: Instance)
+local function buildEmberhollowSanctuary(parent: Instance): { Instance }
     local courtyard = Vector3.new(0, 0, -112)
     local courtyardPatch = part(
         parent,
@@ -176,13 +178,17 @@ local function buildEmberhollowSanctuary(parent: Instance)
     -- A readable camp silhouette gives the arrival area a destination before
     -- the player understands the systems. The cabins are fully roofed, with a
     -- deliberate doorway instead of four floating walls.
-    local function cabin(center: Vector3, name: string, accent: Color3)
+    local function cabin(center: Vector3, name: string, accent: Color3): Instance
         local cabinFolder = Instance.new("Folder")
         cabinFolder.Name = name
         cabinFolder.Parent = parent
 
+        local shell = Instance.new("Folder")
+        shell.Name = "ProceduralCabinShell"
+        shell.Parent = cabinFolder
+
         part(
-            cabinFolder,
+            shell,
             "CabinFloor",
             Vector3.new(14, 0.5, 12),
             CFrame.new(center + Vector3.new(0, 0.25, 0)),
@@ -190,7 +196,7 @@ local function buildEmberhollowSanctuary(parent: Instance)
             Enum.Material.WoodPlanks
         )
         part(
-            cabinFolder,
+            shell,
             "CabinBackWall",
             Vector3.new(14, 8, 0.7),
             CFrame.new(center + Vector3.new(0, 4.25, 5.65)),
@@ -199,7 +205,7 @@ local function buildEmberhollowSanctuary(parent: Instance)
         )
         for side = -1, 1, 2 do
             part(
-                cabinFolder,
+                shell,
                 "CabinSideWall",
                 Vector3.new(0.7, 8, 12),
                 CFrame.new(center + Vector3.new(side * 6.65, 4.25, 0)),
@@ -207,7 +213,7 @@ local function buildEmberhollowSanctuary(parent: Instance)
                 Enum.Material.WoodPlanks
             )
             part(
-                cabinFolder,
+                shell,
                 "CabinDoorPost",
                 Vector3.new(0.8, 8, 0.8),
                 CFrame.new(center + Vector3.new(side * 5.2, 4.25, -5.65)),
@@ -216,7 +222,7 @@ local function buildEmberhollowSanctuary(parent: Instance)
             )
         end
         part(
-            cabinFolder,
+            shell,
             "CabinFrontBeam",
             Vector3.new(14, 1, 0.8),
             CFrame.new(center + Vector3.new(0, 7.8, -5.65)),
@@ -236,7 +242,7 @@ local function buildEmberhollowSanctuary(parent: Instance)
             window.Transparency = 0.22
         end
         local roof = part(
-            cabinFolder,
+            shell,
             "CabinRoof",
             Vector3.new(16, 0.8, 14),
             CFrame.new(center + Vector3.new(0, 8.7, 0)) * CFrame.Angles(0, 0, math.rad(2)),
@@ -245,7 +251,7 @@ local function buildEmberhollowSanctuary(parent: Instance)
         )
         roof.CastShadow = true
         local porch = part(
-            cabinFolder,
+            shell,
             "CabinPorch",
             Vector3.new(10, 0.35, 3),
             CFrame.new(center + Vector3.new(0, 0.55, -7.1)),
@@ -354,10 +360,13 @@ local function buildEmberhollowSanctuary(parent: Instance)
             )
             trunk.CanQuery = false
         end
+        return shell
     end
 
-    cabin(Vector3.new(-22, 0, -112), "WAYFARER CABIN", AMBER)
-    cabin(Vector3.new(22, 0, -112), "MARA'S SHELTER", FOXFIRE)
+    local shells = {
+        cabin(Vector3.new(-22, 0, -112), "WAYFARER CABIN", AMBER),
+        cabin(Vector3.new(22, 0, -112), "MARA'S SHELTER", FOXFIRE),
+    }
 
     for index = 1, 8 do
         local angle = (index / 8) * math.pi * 2
@@ -401,11 +410,20 @@ local function buildEmberhollowSanctuary(parent: Instance)
         CFrame.new(0, 3.2, -95) * CFrame.Angles(0, math.pi, 0),
         "EMBERHOLLOW · SAFE CAMP"
     )
+    return shells
 end
 
-local function lantern(parent: Instance, at: Vector3, scale: number, ambientLightTag: string?): Part
+local function lantern(
+    parent: Instance,
+    at: Vector3,
+    scale: number,
+    ambientLightTag: string?
+): Model
+    local model = Instance.new("Model")
+    model.Name = "ProceduralLanternPost"
+    model.Parent = parent
     local post = part(
-        parent,
+        model,
         "LanternPost",
         Vector3.new(0.8 * scale, 7 * scale, 0.8 * scale),
         CFrame.new(at + Vector3.new(0, 3.5 * scale, 0)),
@@ -413,7 +431,7 @@ local function lantern(parent: Instance, at: Vector3, scale: number, ambientLigh
         Enum.Material.Wood
     )
     local glow = part(
-        parent,
+        model,
         "LanternGlow",
         Vector3.new(2.1 * scale, 2.7 * scale, 2.1 * scale),
         CFrame.new(at + Vector3.new(0, 6.2 * scale, 0)),
@@ -435,7 +453,8 @@ local function lantern(parent: Instance, at: Vector3, scale: number, ambientLigh
     if ambientLightTag ~= nil then
         CollectionService:AddTag(glow, ambientLightTag)
     end
-    return post
+    model.PrimaryPart = post
+    return model
 end
 
 local function groundPatch(
@@ -1209,23 +1228,46 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         local delta = finish - start
         local distance = delta.Magnitude
         local midpoint = (start + finish) / 2
+        local roadFrame = CFrame.lookAt(midpoint, finish)
         local trail = part(
             geometry,
-            "LanternTrail",
-            Vector3.new(12, 0.35, distance + 3),
-            CFrame.lookAt(midpoint, finish),
-            WET_EARTH,
-            Enum.Material.Mud
+            "EmberhollowRoad",
+            Vector3.new(17, 0.5, distance + 4),
+            roadFrame,
+            Color3.fromRGB(58, 43, 31),
+            Enum.Material.Ground
         )
-        trail.Reflectance = 0.04
-        for side = -1, 1, 2 do
-            groundPatch(
-                geometry,
-                midpoint + Vector3.new(side * 7.2, 0.04, 0),
-                Vector3.new(2.4, 0.18, distance * 0.82),
-                Color3.fromRGB(31, 54, 37),
-                Enum.Material.LeafyGrass
-            )
+        trail.Reflectance = 0.02
+        local wornCenter = part(
+            geometry,
+            "EmberhollowRoadWear",
+            Vector3.new(6.5, 0.12, distance + 2),
+            roadFrame * CFrame.new(0, 0.31, 0),
+            Color3.fromRGB(101, 77, 48),
+            Enum.Material.Mud,
+            false
+        )
+        wornCenter.CanQuery = false
+
+        local markerCount = math.max(2, math.floor(distance / 8))
+        for marker = 0, markerCount do
+            local along = -distance * 0.5 + distance * marker / markerCount
+            for side = -1, 1, 2 do
+                local edgeStone = part(
+                    geometry,
+                    "RoadEdgeStone",
+                    Vector3.new(1.4, 0.45, 2.6),
+                    roadFrame
+                        * CFrame.new(side * 8.6, 0.34, along)
+                        * CFrame.Angles(0, math.rad(side * (marker % 2) * 7), 0),
+                    if marker % 3 == 0
+                        then Color3.fromRGB(107, 101, 86)
+                        else Color3.fromRGB(75, 83, 79),
+                    Enum.Material.Slate,
+                    false
+                )
+                edgeStone.CanQuery = false
+            end
         end
     end
 
@@ -1326,11 +1368,42 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     addFillLight(geometry, Vector3.new(38, 10, -28), Color3.fromRGB(255, 177, 88), 0.45, 54)
     emberDrift(geometry, Vector3.new(0, 0, -112), AMBER, 16, 28, _self._runtimeIds.AmbientMoteTag)
 
-    lantern(geometry, Vector3.new(0, 0, -8), 0.72, _self._runtimeIds.AmbientLightTag)
-    lantern(geometry, Vector3.new(-9, 0, -62), 0.62, _self._runtimeIds.AmbientLightTag)
-    lantern(geometry, Vector3.new(9, 0, -102), 0.62, _self._runtimeIds.AmbientLightTag)
+    local lanternSpecs = {
+        { position = Vector3.new(0, 0, -8), scale = 0.72, yaw = math.rad(-18) },
+        { position = Vector3.new(-9, 0, -62), scale = 0.62, yaw = math.rad(14) },
+        { position = Vector3.new(9, 0, -102), scale = 0.62, yaw = math.rad(-12) },
+    }
+    for index, spec in lanternSpecs do
+        local placeholder =
+            lantern(geometry, spec.position, spec.scale, _self._runtimeIds.AmbientLightTag)
+        table.insert(_self._meshPlacements, {
+            assetId = "mesh_lantern_post_a",
+            fallbackKind = "placeholder",
+            position = spec.position,
+            scale = spec.scale,
+            yaw = spec.yaw,
+            seed = 9200 + index,
+            swayTag = nil,
+            parent = geometry,
+            fallbackInstance = placeholder,
+        })
+    end
     labelSign(geometry, CFrame.new(7, 3, -14) * CFrame.Angles(0, math.pi, 0), "EMBERHOLLOW")
-    buildEmberhollowSanctuary(geometry)
+    local cabinShells = buildEmberhollowSanctuary(geometry)
+    for index, shell in cabinShells do
+        local position = if index == 1 then Vector3.new(-22, 0, -112) else Vector3.new(22, 0, -112)
+        table.insert(_self._meshPlacements, {
+            assetId = "mesh_wayfarer_cabin_a",
+            fallbackKind = "placeholder",
+            position = position,
+            scale = 1,
+            yaw = 0,
+            seed = 9300 + index,
+            swayTag = nil,
+            parent = geometry,
+            fallbackInstance = shell,
+        })
+    end
 
     local warningFolder = Instance.new("Folder")
     warningFolder.Name = "DuskTreelineWarnings"
@@ -1525,6 +1598,18 @@ local function buildMeshFallback(parent: Instance, placement: MeshPlacement)
     end
 end
 
+local function hideProceduralPlaceholder(placeholder: Instance)
+    local instances = placeholder:GetDescendants()
+    table.insert(instances, placeholder)
+    for _, instance in instances do
+        if instance:IsA("BasePart") then
+            instance.Transparency = 1
+            instance.CastShadow = false
+        end
+    end
+    placeholder:SetAttribute("ReplacedByAuthoredMesh", true)
+end
+
 -- Authored art is optional streaming dressing. Loading begins only after the
 -- spawn and interactions are ready, and a failed private asset immediately
 -- takes the procedural path above.
@@ -1545,14 +1630,15 @@ function WorldService._buildMeshDressing(self: WorldService)
         local authored = 0
         local fallbacks = 0
         for index, placement in placements do
-            if forest.Parent == nil then
+            local placementParent = placement.parent or forest
+            if forest.Parent == nil or placementParent.Parent == nil then
                 return
             end
             local placed, result = pcall(
                 self._meshTemplateLoader.place,
                 self._meshTemplateLoader,
                 placement.assetId,
-                forest,
+                placementParent,
                 CFrame.new(placement.position) * CFrame.Angles(0, placement.yaw, 0),
                 placement.scale
             )
@@ -1564,9 +1650,14 @@ function WorldService._buildMeshDressing(self: WorldService)
                 })
             end
             if model == nil then
-                buildMeshFallback(forest, placement)
+                if placement.fallbackInstance == nil then
+                    buildMeshFallback(placementParent, placement)
+                end
                 fallbacks += 1
             else
+                if placement.fallbackInstance ~= nil then
+                    hideProceduralPlaceholder(placement.fallbackInstance)
+                end
                 authored += 1
             end
             if index % 5 == 0 then
@@ -2448,7 +2539,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v12")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v13")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -2548,7 +2639,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v12",
+        worldVersion = "bramblewake-blackout-v13",
     })
 end
 

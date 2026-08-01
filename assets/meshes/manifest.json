@@ -114,6 +114,32 @@
       "maxTriangles": 8000,
       "maxMaterialSlots": 7,
       "robloxAssetId": 82771177912612
+    },
+    {
+      "id": "mesh_wayfarer_cabin_a",
+      "displayName": "Emberhollow Wayfarer Cabin",
+      "role": "arrival_shelter_shell",
+      "placementBand": "curated_core",
+      "source": "original_blender_procedural",
+      "provenance": "Original Last Light shelter authored by the repository Blender pipeline from the established mesh style formula.",
+      "file": "generated/mesh_wayfarer_cabin_a.glb",
+      "targetLongestDimension": 20,
+      "maxTriangles": 5000,
+      "maxMaterialSlots": 6,
+      "robloxAssetId": 108978160303399
+    },
+    {
+      "id": "mesh_lantern_post_a",
+      "displayName": "Emberhollow Crooked Lantern Post",
+      "role": "safe_route_landmark",
+      "placementBand": "curated_core",
+      "source": "original_blender_procedural",
+      "provenance": "Original Last Light safe-route prop authored by the repository Blender pipeline from the established mesh style formula.",
+      "file": "generated/mesh_lantern_post_a.glb",
+      "targetLongestDimension": 9,
+      "maxTriangles": 2200,
+      "maxMaterialSlots": 4,
+      "robloxAssetId": 129285000481750
     }
   ]
 }

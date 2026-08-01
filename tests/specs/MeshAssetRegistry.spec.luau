@@ -10,7 +10,7 @@ return {
             name = "keeps stable and unique uploaded asset mappings",
             run = function()
                 local entries = MeshAssetRegistry.all()
-                TestRunner.equal(#entries, 8)
+                TestRunner.equal(#entries, 10)
                 local stableIds = {}
                 local robloxIds = {}
                 for _, entry in entries do
@@ -51,6 +51,18 @@ return {
                 TestRunner.equal((shrine :: MeshAssetRegistry.Entry).targetLongestDimension, 28)
                 TestRunner.equal((shrine :: MeshAssetRegistry.Entry).placementBand, "curated_core")
                 TestRunner.equal((shrine :: MeshAssetRegistry.Entry).pbr, false)
+            end,
+        },
+        {
+            name = "keeps camp replacements measured and curated",
+            run = function()
+                local cabin = MeshAssetRegistry.get("mesh_wayfarer_cabin_a")
+                local lantern = MeshAssetRegistry.get("mesh_lantern_post_a")
+                TestRunner.truthy(cabin ~= nil and lantern ~= nil)
+                TestRunner.equal((cabin :: MeshAssetRegistry.Entry).targetLongestDimension, 20)
+                TestRunner.equal((lantern :: MeshAssetRegistry.Entry).targetLongestDimension, 9)
+                TestRunner.equal((cabin :: MeshAssetRegistry.Entry).placementBand, "curated_core")
+                TestRunner.equal((lantern :: MeshAssetRegistry.Entry).placementBand, "curated_core")
             end,
         },
     },
