@@ -1219,7 +1219,7 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.23.0",
+    BuildVersion = "0.24.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -5848,6 +5848,7 @@ local RuntimeIds = {
         OpenFieldBook = "open_field_book",
         TalkResident = "talk_resident",
         RepairTown = "repair_town",
+        ResolveTownIncident = "resolve_town_incident",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -6969,6 +6970,163 @@ return table.freeze(TownCondition)
       </Item>
       <Item class="ModuleScript" referent="44">
         <Properties>
+          <string name="Name">TownNightIncident</string>
+          <string name="Source"><![CDATA[--!strict
+
+local TownNightIncident = {}
+
+local SITE_IDS = table.freeze({ "archive", "workshop", "inn" })
+
+local DEFINITIONS = table.freeze({
+    EMBERFALL = table.freeze({
+        id = "incident_emberfall_cinders",
+        title = "ROOFTOP CINDERS",
+        instruction = "SMOTHER THREE CINDER NESTS BEFORE THEY CATCH",
+        actionText = "SMOTHER",
+        objectText = "Cinder Nest",
+        duration = 42,
+        lanternPenalty = 12,
+        sites = SITE_IDS,
+    }),
+    MIRETIDE = table.freeze({
+        id = "incident_miretide_clogs",
+        title = "CHOKED DRAINS",
+        instruction = "PULL THREE ROOT CLOGS BEFORE THE SQUARE FLOODS",
+        actionText = "CLEAR",
+        objectText = "Root Clog",
+        duration = 42,
+        lanternPenalty = 12,
+        sites = SITE_IDS,
+    }),
+    ROOTMOON = table.freeze({
+        id = "incident_rootmoon_anchors",
+        title = "ROOT ANCHORS",
+        instruction = "SEVER THREE ANCHORS FEEDING THE NIGHT ASSAULT",
+        actionText = "SEVER",
+        objectText = "Root Anchor",
+        duration = 42,
+        lanternPenalty = 12,
+        sites = SITE_IDS,
+    }),
+    ["ASHEN VEIL"] = table.freeze({
+        id = "incident_ashen_watchfires",
+        title = "DARK WATCHFIRES",
+        instruction = "RELIGHT THREE WATCHFIRES BEFORE THE VEIL CLOSES",
+        actionText = "RELIGHT",
+        objectText = "Watchfire",
+        duration = 42,
+        lanternPenalty = 12,
+        sites = SITE_IDS,
+    }),
+})
+
+local function finite(value: any): boolean
+    return type(value) == "number" and value == value and value > -math.huge and value < math.huge
+end
+
+function TownNightIncident.forTheme(theme: any): any
+    return if type(theme) == "string" then DEFINITIONS[theme] else nil
+end
+
+function TownNightIncident.create(theme: string, nightNumber: number, now: number): any
+    local definition = TownNightIncident.forTheme(theme)
+    assert(definition ~= nil, "town-night incident theme is unknown")
+    assert(nightNumber >= 1 and nightNumber == math.floor(nightNumber), "night number is invalid")
+    assert(finite(now), "incident start time is invalid")
+    return {
+        definition = definition,
+        endsAt = now + definition.duration,
+        nightNumber = nightNumber,
+        resolved = {},
+        resolvedCount = 0,
+        startedAt = now,
+        status = "active",
+    }
+end
+
+local function knownSite(definition: any, siteId: any): boolean
+    if type(siteId) ~= "string" then
+        return false
+    end
+    for _, known in definition.sites do
+        if known == siteId then
+            return true
+        end
+    end
+    return false
+end
+
+function TownNightIncident.interact(state: any, siteId: any, now: number): (any, any)
+    assert(finite(now), "incident interaction time is invalid")
+    if state.status ~= "active" then
+        return state, { accepted = false, reason = "incident_inactive" }
+    end
+    if now >= state.endsAt then
+        local expired: any = table.clone(state)
+        expired.status = "failed"
+        return expired, { accepted = false, reason = "incident_expired" }
+    end
+    if not knownSite(state.definition, siteId) then
+        return state, { accepted = false, reason = "unknown_site" }
+    end
+    if state.resolved[siteId] == true then
+        return state, { accepted = false, reason = "site_resolved" }
+    end
+
+    local nextState: any = table.clone(state)
+    nextState.resolved = table.clone(state.resolved)
+    nextState.resolved[siteId] = true
+    nextState.resolvedCount += 1
+    local completed = nextState.resolvedCount >= #state.definition.sites
+    nextState.status = if completed then "complete" else "active"
+    return nextState,
+        {
+            accepted = true,
+            completed = completed,
+            remaining = math.max(0, #state.definition.sites - nextState.resolvedCount),
+            siteId = siteId,
+        }
+end
+
+function TownNightIncident.expire(state: any, now: number): (any, any)
+    assert(finite(now), "incident expiry time is invalid")
+    if state.status ~= "active" then
+        return state, { applied = false, reason = "incident_inactive" }
+    end
+    if now < state.endsAt then
+        return state, { applied = false, reason = "incident_active" }
+    end
+    local nextState: any = table.clone(state)
+    nextState.status = "failed"
+    return nextState,
+        {
+            applied = true,
+            lanternPenalty = state.definition.lanternPenalty,
+            unresolved = #state.definition.sites - state.resolvedCount,
+        }
+end
+
+function TownNightIncident.snapshot(state: any?): any
+    if state == nil then
+        return nil
+    end
+    return {
+        endsAt = state.endsAt,
+        id = state.definition.id,
+        instruction = state.definition.instruction,
+        resolved = state.resolvedCount,
+        required = #state.definition.sites,
+        status = state.status,
+        title = state.definition.title,
+    }
+end
+
+return table.freeze(TownNightIncident)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="45">
+        <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -6976,8 +7134,9 @@ local TownNightSchedule = {}
 
 export type Beat = {
     at: number,
-    kind: "spawn" | "warning" | "breach",
+    kind: "spawn" | "warning" | "breach" | "incident",
     enemyId: string?,
+    incidentId: string?,
     theme: string?,
     wave: number?,
 }
@@ -7090,6 +7249,15 @@ function TownNightSchedule.beats(duration: number, nightNumber: number): { Beat 
         end
     end
 
+    table.insert(result, {
+        at = math.min(duration * 0.58, lastValidAt),
+        kind = "incident",
+        enemyId = nil,
+        incidentId = "theme_incident",
+        theme = theme,
+        wave = nil,
+    })
+
     table.sort(result, function(a, b)
         return a.at < b.at
     end)
@@ -7110,7 +7278,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -7287,7 +7455,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -7431,7 +7599,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -7467,7 +7635,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -7849,7 +8017,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -7882,11 +8050,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="50">
+  <Item class="ServerScriptService" referent="51">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="51">
+    <Item class="Script" referent="52">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -7929,6 +8097,7 @@ local SaveSchema = require(root.SaveSchema)
 local StatusEffectState = require(root.StatusEffectState)
 local SurvivalState = require(root.SurvivalState)
 local TownNightSchedule = require(root.TownNightSchedule)
+local TownNightIncident = require(root.TownNightIncident)
 local TownCondition = require(root.TownCondition)
 local TownProgression = require(root.TownProgression)
 local TutorialFlow = require(root.TutorialFlow)
@@ -8111,6 +8280,7 @@ local townNightService = TownNightService.new(
     worldService,
     enemyService,
     TownNightSchedule,
+    TownNightIncident,
     TownCondition,
     featureFlags
 )
@@ -8188,7 +8358,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -8286,11 +8456,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="53">
+      <Item class="Folder" referent="54">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="54">
+        <Item class="ModuleScript" referent="55">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9060,7 +9230,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="55">
+        <Item class="ModuleScript" referent="56">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9558,7 +9728,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="56">
+        <Item class="ModuleScript" referent="57">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10577,6 +10747,31 @@ function EnemyService.repairLantern(
     return true, message
 end
 
+function EnemyService.applyLanternPressure(self: EnemyService, amount: number, source: string): any
+    if not self._nightActive then
+        return { applied = false, reason = "night_inactive" }
+    end
+    if amount ~= amount or amount <= 0 or amount ~= math.floor(amount) then
+        return { applied = false, reason = "invalid_amount" }
+    end
+    local bounded = math.clamp(amount, 1, 25)
+    local previous = self._lanternHealth
+    self._lanternHealth = math.max(18, self._lanternHealth - bounded)
+    local damage = previous - self._lanternHealth
+    self._worldService:setLanternHealth(self._lanternHealth)
+    self._logger:info("lantern_pressure_applied", {
+        damage = damage,
+        health = self._lanternHealth,
+        source = string.sub(source, 1, 48),
+    })
+    return {
+        applied = damage > 0,
+        damage = damage,
+        health = self._lanternHealth,
+        reason = if damage > 0 then "applied" else "minimum_health",
+    }
+end
+
 function EnemyService.damageNearest(self: EnemyService, player: Player): (boolean, string)
     local encounterService = self:_activeEncounterService()
     if encounterService ~= nil then
@@ -10681,7 +10876,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11202,7 +11397,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11306,7 +11501,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11495,7 +11690,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -11589,7 +11784,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11802,7 +11997,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12626,7 +12821,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12805,7 +13000,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13371,7 +13566,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14265,7 +14460,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14686,7 +14881,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15507,7 +15702,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="68">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15527,6 +15722,7 @@ export type TownNightService = typeof(setmetatable(
         _worldService: any,
         _enemyService: any,
         _townNightSchedule: any,
+        _townNightIncident: any,
         _townCondition: any,
         _condition: any,
         _daySeconds: number,
@@ -15540,6 +15736,7 @@ export type TownNightService = typeof(setmetatable(
         _phaseEndsAt: number,
         _onChanged: ((string?) -> ())?,
         _onNightCompleted: ((number, number, any) -> ())?,
+        _incident: any,
     },
     TownNightService
 ))
@@ -15550,6 +15747,7 @@ function TownNightService.new(
     worldService: any,
     enemyService: any,
     townNightSchedule: any,
+    townNightIncident: any,
     townCondition: any,
     featureFlags: any
 ): TownNightService
@@ -15559,6 +15757,7 @@ function TownNightService.new(
         _worldService = worldService,
         _enemyService = enemyService,
         _townNightSchedule = townNightSchedule,
+        _townNightIncident = townNightIncident,
         _townCondition = townCondition,
         _condition = townCondition.default(),
         _daySeconds = config.NormalDaySeconds,
@@ -15572,6 +15771,7 @@ function TownNightService.new(
         _phaseEndsAt = 0,
         _onChanged = nil,
         _onNightCompleted = nil,
+        _incident = nil,
     }, TownNightService)
 end
 
@@ -15598,6 +15798,127 @@ function TownNightService._notify(self: TownNightService, toast: string?)
     if callback ~= nil then
         callback(toast)
     end
+end
+
+function TownNightService._expireIncident(
+    self: TownNightService,
+    nightNumber: number,
+    incidentId: string
+)
+    local incident = self._incident
+    if
+        incident == nil
+        or incident.nightNumber ~= nightNumber
+        or incident.definition.id ~= incidentId
+        or incident.status ~= "active"
+    then
+        return
+    end
+    local nextIncident, result =
+        self._townNightIncident.expire(incident, workspace:GetServerTimeNow())
+    if not result.applied then
+        return
+    end
+    self._incident = nextIncident
+    self._worldService:clearTownIncident()
+    local pressure =
+        self._enemyService:applyLanternPressure(result.lanternPenalty, incident.definition.id)
+    self:_notify(
+        string.format(
+            "%s FAILED — %d SITE%s LOST · FIRST LANTERN -%d",
+            incident.definition.title,
+            result.unresolved,
+            if result.unresolved == 1 then "" else "S",
+            pressure.damage or 0
+        )
+    )
+    self._logger:info("town_incident_failed", {
+        damage = pressure.damage or 0,
+        incident = incident.definition.id,
+        night = nightNumber,
+        unresolved = result.unresolved,
+    })
+end
+
+function TownNightService._startIncident(self: TownNightService, nightNumber: number, theme: string)
+    self._worldService:clearTownIncident()
+    local now = workspace:GetServerTimeNow()
+    local incident = self._townNightIncident.create(theme, nightNumber, now)
+    self._incident = incident
+    self._worldService:startTownIncident(incident.definition, incident.endsAt)
+    self:_notify(incident.definition.title .. " — " .. incident.definition.instruction)
+    self._logger:info("town_incident_started", {
+        incident = incident.definition.id,
+        night = nightNumber,
+        required = #incident.definition.sites,
+    })
+    task.delay(incident.definition.duration + 0.05, function()
+        self:_expireIncident(nightNumber, incident.definition.id)
+    end)
+end
+
+function TownNightService.resolveIncident(
+    self: TownNightService,
+    player: Player,
+    prompt: ProximityPrompt
+): any
+    local incident = self._incident
+    if self._phase ~= "night" or incident == nil or incident.status ~= "active" then
+        return {
+            accepted = false,
+            message = "THAT NIGHT INCIDENT IS NO LONGER ACTIVE",
+            reason = "incident_inactive",
+        }
+    end
+    local siteId = prompt:GetAttribute("Payload")
+    local nextIncident, result =
+        self._townNightIncident.interact(incident, siteId, workspace:GetServerTimeNow())
+    if not result.accepted then
+        if result.reason == "incident_expired" then
+            self:_expireIncident(incident.nightNumber, incident.definition.id)
+        end
+        return {
+            accepted = false,
+            message = if result.reason == "site_resolved"
+                then "THAT SITE IS ALREADY SECURE"
+                else "THE INCIDENT WINDOW HAS CLOSED",
+            reason = result.reason,
+        }
+    end
+
+    self._incident = nextIncident
+    self._worldService:resolveTownIncidentSite(result.siteId, nextIncident.resolvedCount)
+    self._logger:info("town_incident_site_resolved", {
+        incident = incident.definition.id,
+        player = player.UserId,
+        remaining = result.remaining,
+        site = result.siteId,
+    })
+    if result.completed then
+        self:_notify(incident.definition.title .. " SECURED — THE WATCH HOLDS")
+        task.delay(1.5, function()
+            if self._incident == nextIncident then
+                self._worldService:clearTownIncident()
+            end
+        end)
+        return {
+            accepted = true,
+            completed = true,
+            message = incident.definition.title .. " SECURED",
+            reason = "incident_complete",
+        }
+    end
+    return {
+        accepted = true,
+        completed = false,
+        message = string.format(
+            "%s SECURED — %d SITE%s REMAIN",
+            string.upper(tostring(result.siteId)),
+            result.remaining,
+            if result.remaining == 1 then "" else "S"
+        ),
+        reason = "site_resolved",
+    }
 end
 
 local function waitUntilTime(target: number)
@@ -15661,6 +15982,7 @@ function TownNightService._runCycle(self: TownNightService)
         waitUntilTime(self._phaseEndsAt)
 
         self._phase = "night"
+        self._incident = nil
         local nightStartedAt = workspace:GetServerTimeNow()
         self._phaseEndsAt = nightStartedAt + self._nightSeconds
         -- Frozen for the rest of this night: a higher number from a veteran
@@ -15702,6 +16024,8 @@ function TownNightService._runCycle(self: TownNightService)
             elseif beat.kind == "breach" then
                 self._worldService:setTownBreach(true, theme)
                 self._enemyService:setBreach()
+            elseif beat.kind == "incident" then
+                self:_startIncident(activeNight, theme)
             elseif beat.kind == "warning" and beat.at > 0 then
                 -- The schedule's opening warning beat always lands at at=0,
                 -- immediately after the arrival toast above (which already
@@ -15713,6 +16037,11 @@ function TownNightService._runCycle(self: TownNightService)
         end
 
         waitUntilTime(self._phaseEndsAt)
+        local endingIncident = self._incident
+        if endingIncident ~= nil and endingIncident.status == "active" then
+            self:_expireIncident(activeNight, endingIncident.definition.id)
+        end
+        self._worldService:clearTownIncident()
         local endingLanternHealth = self._enemyService:lanternHealth()
         local nextCondition, damageResult =
             self._townCondition.afterNight(self._condition, endingLanternHealth, activeNight)
@@ -15806,6 +16135,7 @@ function TownNightService.snapshot(self: TownNightService): any
         theme = self._townNightSchedule.theme(self._nightNumber),
         phase = self._phase,
         phaseEndsAt = self._phaseEndsAt,
+        incident = self._townNightIncident.snapshot(self._incident),
     }
 end
 
@@ -15813,7 +16143,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16349,6 +16679,12 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self:_publishAll()
         return
     end
+    if actionId == self._runtimeIds.Actions.ResolveTownIncident then
+        local result = self._townNightService:resolveIncident(player, prompt)
+        self:_setToast(player, result.message)
+        self:_publishAll()
+        return
+    end
 
     if actionId == self._runtimeIds.Actions.Build and session.resources < 3 then
         self:_setToast(player, "YOU NEED 3 HEARTWOOD")
@@ -16851,7 +17187,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17685,7 +18021,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17742,6 +18078,7 @@ export type WorldService = typeof(setmetatable(
         _townConsequence: any,
         _townCondition: any,
         _townResidents: { [string]: any },
+        _townIncidentModel: Model?,
     },
     WorldService
 ))
@@ -18631,6 +18968,7 @@ function WorldService.new(logger: Logger, extractionPayoff: any, townProgression
         _townConsequence = nil,
         _townCondition = { integrity = 100, damageLevel = 0, repairsRemaining = 0 },
         _townResidents = {},
+        _townIncidentModel = nil,
     }, WorldService)
 end
 
@@ -22269,6 +22607,240 @@ function WorldService.setTownBreach(self: WorldService, enabled: boolean, theme:
     end
 end
 
+function WorldService.clearTownIncident(self: WorldService)
+    for interactionId, prompt in self._interactions do
+        if prompt:GetAttribute("ActionId") == self._runtimeIds.Actions.ResolveTownIncident then
+            if prompt.Parent ~= nil then
+                prompt:Destroy()
+            end
+            self._interactions[interactionId] = nil
+        end
+    end
+    if self._townIncidentModel ~= nil and self._townIncidentModel.Parent ~= nil then
+        self._townIncidentModel:Destroy()
+    end
+    self._townIncidentModel = nil
+    local world = self._world
+    if world ~= nil then
+        world:SetAttribute("TownIncidentId", nil)
+        world:SetAttribute("TownIncidentEndsAt", nil)
+        world:SetAttribute("TownIncidentResolved", nil)
+        world:SetAttribute("TownIncidentRequired", nil)
+    end
+end
+
+local INCIDENT_SITES = table.freeze({
+    archive = Vector3.new(-31, 0.65, -108),
+    workshop = Vector3.new(31, 0.65, -108),
+    inn = Vector3.new(-28, 0.65, -137),
+})
+
+local function buildIncidentSite(parent: Model, incidentId: string, siteId: string): BasePart
+    local at = assert(INCIDENT_SITES[siteId], "town incident site is unknown")
+    local site = Instance.new("Model")
+    site.Name = "IncidentSite_" .. siteId
+    site:SetAttribute("SiteId", siteId)
+    site:SetAttribute("Resolved", false)
+    site.Parent = parent
+
+    local target: Part
+    if incidentId == "incident_emberfall_cinders" then
+        target = part(
+            site,
+            "IncidentCore",
+            Vector3.new(3.8, 0.75, 3.2),
+            CFrame.new(at),
+            Color3.fromRGB(55, 47, 42),
+            Enum.Material.Slate,
+            false
+        )
+        target.Shape = Enum.PartType.Ball
+        for index = -1, 1 do
+            part(
+                site,
+                "CharredTimber",
+                Vector3.new(0.42, 3.3, 0.42),
+                CFrame.new(at + Vector3.new(index * 0.8, 0.55, 0))
+                    * CFrame.Angles(math.rad(90), 0, math.rad(index * 24)),
+                Color3.fromRGB(40, 32, 29),
+                Enum.Material.Wood,
+                false
+            )
+        end
+        local ember = part(
+            site,
+            "BuriedEmber",
+            Vector3.new(1.2, 0.18, 1.2),
+            CFrame.new(at + Vector3.new(0, 0.46, 0)),
+            Color3.fromRGB(190, 78, 38),
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        ember.Shape = Enum.PartType.Ball
+    elseif incidentId == "incident_miretide_clogs" then
+        target = part(
+            site,
+            "IncidentCore",
+            Vector3.new(0.28, 4.2, 4.2),
+            CFrame.new(at) * CFrame.Angles(0, 0, math.rad(90)),
+            Color3.fromRGB(58, 67, 48),
+            Enum.Material.Ground,
+            false
+        )
+        target.Shape = Enum.PartType.Cylinder
+        for index = 1, 5 do
+            local angle = math.rad(index * 72)
+            part(
+                site,
+                "DrainStone",
+                Vector3.new(0.85, 0.7, 1.2),
+                CFrame.new(at + Vector3.new(math.cos(angle) * 2, 0.12, math.sin(angle) * 2))
+                    * CFrame.Angles(0, -angle, 0),
+                Color3.fromRGB(88, 91, 79),
+                Enum.Material.Rock,
+                false
+            )
+        end
+        for index = -1, 1 do
+            part(
+                site,
+                "RootClog",
+                Vector3.new(0.5, 3.5, 0.5),
+                CFrame.new(at + Vector3.new(index * 0.65, 0.55, 0))
+                    * CFrame.Angles(0, 0, math.rad(78 + index * 16)),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
+    elseif incidentId == "incident_rootmoon_anchors" then
+        target = part(
+            site,
+            "IncidentCore",
+            Vector3.new(2.7, 1.1, 2.7),
+            CFrame.new(at),
+            WET_EARTH,
+            Enum.Material.Ground,
+            false
+        )
+        target.Shape = Enum.PartType.Ball
+        for index = -1, 1 do
+            part(
+                site,
+                "RootAnchor",
+                Vector3.new(0.72, 5.2, 0.72),
+                CFrame.new(at + Vector3.new(index * 0.85, 2.2, index % 2 * 0.4))
+                    * CFrame.Angles(math.rad(index * 8), 0, math.rad(index * 13)),
+                BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
+    else
+        target = part(
+            site,
+            "IncidentCore",
+            Vector3.new(3.6, 0.5, 3.6),
+            CFrame.new(at),
+            Color3.fromRGB(45, 43, 42),
+            Enum.Material.Metal,
+            false
+        )
+        for index = -1, 1 do
+            part(
+                site,
+                "ColdFuel",
+                Vector3.new(0.42, 2.8, 0.42),
+                CFrame.new(at + Vector3.new(index * 0.62, 0.75, 0))
+                    * CFrame.Angles(math.rad(90), 0, math.rad(index * 34)),
+                Color3.fromRGB(55, 43, 34),
+                Enum.Material.Wood,
+                false
+            )
+        end
+        for index = -1, 1, 2 do
+            part(
+                site,
+                "BrazierLeg",
+                Vector3.new(0.28, 2.4, 0.28),
+                CFrame.new(at + Vector3.new(index * 1.15, -0.25, 0)),
+                Color3.fromRGB(58, 57, 55),
+                Enum.Material.Metal,
+                false
+            )
+        end
+    end
+    target:SetAttribute("IncidentId", incidentId)
+    target:SetAttribute("SiteId", siteId)
+    return target
+end
+
+function WorldService.startTownIncident(self: WorldService, definition: any, endsAt: number)
+    self:clearTownIncident()
+    local world = self._world
+    if world == nil or not self._night then
+        return
+    end
+    local model = Instance.new("Model")
+    model.Name = "TownNightIncident"
+    model:SetAttribute("IncidentId", definition.id)
+    model:SetAttribute("Title", definition.title)
+    model:SetAttribute("Required", #definition.sites)
+    model.Parent = world
+    self._townIncidentModel = model
+    for _, siteId in definition.sites do
+        local target = buildIncidentSite(model, definition.id, siteId)
+        local interactionId = string.format("town_incident:%s:%s", definition.id, siteId)
+        self:_registerInteraction(
+            target,
+            interactionId,
+            self._runtimeIds.Actions.ResolveTownIncident,
+            definition.actionText,
+            definition.objectText,
+            siteId,
+            0.85
+        )
+        addBillboard(target, string.format("%s · %s", definition.title, siteId), CREAM)
+    end
+    world:SetAttribute("TownIncidentId", definition.id)
+    world:SetAttribute("TownIncidentEndsAt", endsAt)
+    world:SetAttribute("TownIncidentResolved", 0)
+    world:SetAttribute("TownIncidentRequired", #definition.sites)
+end
+
+function WorldService.resolveTownIncidentSite(self: WorldService, siteId: string, resolved: number)
+    local model = self._townIncidentModel
+    local world = self._world
+    if model == nil or world == nil then
+        return
+    end
+    for _, child in model:GetChildren() do
+        if child:IsA("Model") and child:GetAttribute("SiteId") == siteId then
+            child:SetAttribute("Resolved", true)
+            local target = child:FindFirstChild("IncidentCore")
+            if target ~= nil and target:IsA("BasePart") then
+                local interactionId = nil
+                local prompt = target:FindFirstChildOfClass("ProximityPrompt")
+                if prompt ~= nil then
+                    interactionId = prompt:GetAttribute("InteractionId")
+                    prompt:Destroy()
+                end
+                if type(interactionId) == "string" then
+                    self._interactions[interactionId] = nil
+                end
+                local oldLabel = target:FindFirstChild("WorldLabel")
+                if oldLabel ~= nil then
+                    oldLabel:Destroy()
+                end
+                target.Color = Color3.fromRGB(72, 96, 66)
+                addBillboard(target, "SECURED", FOXFIRE)
+            end
+            break
+        end
+    end
+    world:SetAttribute("TownIncidentResolved", resolved)
+end
+
 function WorldService._applyDuskLighting(_self: WorldService)
     Lighting.ClockTime = 18.15
     Lighting.Brightness = 1.42
@@ -22424,11 +22996,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="72">
+      <Item class="Folder" referent="73">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -24499,7 +25071,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="74">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -24888,7 +25460,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="75">
+        <Item class="ModuleScript" referent="76">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -25051,7 +25623,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="76">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -25247,15 +25819,15 @@ return table.freeze(WardenStagBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="77">
+  <Item class="StarterPlayer" referent="78">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="78">
+    <Item class="StarterPlayerScripts" referent="79">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="79">
+      <Item class="LocalScript" referent="80">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -25368,11 +25940,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="80">
+        <Item class="Folder" referent="81">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="81">
+          <Item class="ModuleScript" referent="82">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -25503,7 +26075,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="82">
+          <Item class="ModuleScript" referent="83">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -27576,7 +28148,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="83">
+          <Item class="ModuleScript" referent="84">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -27893,7 +28465,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="84">
+          <Item class="ModuleScript" referent="85">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -28001,7 +28573,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="85">
+          <Item class="ModuleScript" referent="86">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -28133,7 +28705,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="86">
+          <Item class="ModuleScript" referent="87">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -28409,7 +28981,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="87">
+  <Item class="Workspace" referent="88">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

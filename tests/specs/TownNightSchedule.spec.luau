@@ -56,6 +56,20 @@ return {
             end,
         },
         {
+            name = "schedules one theme incident with time left to resolve it",
+            run = function()
+                local incidents = 0
+                for _, beat in TownNightSchedule.beats(360, 4) do
+                    if beat.kind == "incident" then
+                        incidents += 1
+                        TestRunner.equal(beat.theme, "ASHEN VEIL")
+                        TestRunner.truthy(beat.at <= 360 - 42)
+                    end
+                end
+                TestRunner.equal(incidents, 1)
+            end,
+        },
+        {
             name = "cycles through the full six-enemy roster on a long escalated night",
             run = function()
                 local seen = {}

@@ -531,6 +531,12 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self:_publishAll()
         return
     end
+    if actionId == self._runtimeIds.Actions.ResolveTownIncident then
+        local result = self._townNightService:resolveIncident(player, prompt)
+        self:_setToast(player, result.message)
+        self:_publishAll()
+        return
+    end
 
     if actionId == self._runtimeIds.Actions.Build and session.resources < 3 then
         self:_setToast(player, "YOU NEED 3 HEARTWOOD")

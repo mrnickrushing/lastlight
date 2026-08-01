@@ -1014,6 +1014,31 @@ function EnemyService.repairLantern(
     return true, message
 end
 
+function EnemyService.applyLanternPressure(self: EnemyService, amount: number, source: string): any
+    if not self._nightActive then
+        return { applied = false, reason = "night_inactive" }
+    end
+    if amount ~= amount or amount <= 0 or amount ~= math.floor(amount) then
+        return { applied = false, reason = "invalid_amount" }
+    end
+    local bounded = math.clamp(amount, 1, 25)
+    local previous = self._lanternHealth
+    self._lanternHealth = math.max(18, self._lanternHealth - bounded)
+    local damage = previous - self._lanternHealth
+    self._worldService:setLanternHealth(self._lanternHealth)
+    self._logger:info("lantern_pressure_applied", {
+        damage = damage,
+        health = self._lanternHealth,
+        source = string.sub(source, 1, 48),
+    })
+    return {
+        applied = damage > 0,
+        damage = damage,
+        health = self._lanternHealth,
+        reason = if damage > 0 then "applied" else "minimum_health",
+    }
+end
+
 function EnemyService.damageNearest(self: EnemyService, player: Player): (boolean, string)
     local encounterService = self:_activeEncounterService()
     if encounterService ~= nil then
