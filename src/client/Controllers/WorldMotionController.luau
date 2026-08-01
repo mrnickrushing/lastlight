@@ -9,6 +9,8 @@ WorldMotionController.__index = WorldMotionController
 
 type MotionState = {
     basePivot: CFrame,
+    kind: string,
+    lastPivot: CFrame,
     position: Vector3,
     phaseOffset: number,
     speed: number,
@@ -85,6 +87,8 @@ function WorldMotionController.new(
         local pivot = instance:GetPivot()
         self._motions[instance] = {
             basePivot = pivot,
+            kind = tostring(instance:GetAttribute("MotionKind") or "rotor"),
+            lastPivot = pivot,
             position = pivot.Position,
             phaseOffset = phaseOffsetFor(instance),
             speed = math.max(0, tonumber(instance:GetAttribute("MotionSpeed")) or 0.34),
@@ -178,14 +182,34 @@ function WorldMotionController._step(self: WorldMotionController, deltaTime: num
             self._motions[model] = nil
             continue
         end
+        if state.kind == "resident" then
+            local current = model:GetPivot()
+            if (current.Position - state.lastPivot.Position).Magnitude > 0.08 then
+                state.basePivot = current
+                state.lastPivot = current
+                state.position = current.Position
+            end
+        end
         local active = (state.position - cameraPosition).Magnitude <= ACTIVE_DISTANCE
         if active then
-            local angle =
-                self._ambientMotion.rotorAngle(self._elapsed, state.speed, state.phaseOffset)
-            model:PivotTo(state.basePivot * CFrame.Angles(0, 0, angle))
+            local targetPivot: CFrame
+            if state.kind == "resident" then
+                local pose =
+                    self._ambientMotion.residentPose(self._elapsed, state.speed, state.phaseOffset)
+                targetPivot = state.basePivot
+                    * CFrame.new(0, pose.height, 0)
+                    * CFrame.Angles(0, pose.yaw, 0)
+            else
+                local angle =
+                    self._ambientMotion.rotorAngle(self._elapsed, state.speed, state.phaseOffset)
+                targetPivot = state.basePivot * CFrame.Angles(0, 0, angle)
+            end
+            model:PivotTo(targetPivot)
+            state.lastPivot = targetPivot
             state.active = true
         elseif state.active then
             model:PivotTo(state.basePivot)
+            state.lastPivot = state.basePivot
             state.active = false
         end
     end

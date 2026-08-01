@@ -352,15 +352,22 @@ for _, module in expeditionModules do
 end
 local ambientMotionTargets = CollectionService:GetTagged(RuntimeIds.AmbientMotionTag)
 assert(#ambientMotionTargets >= 1, "expected at least one living-world motion target")
+local foundResidentMotion = false
+local foundRotorMotion = false
 for _, target in ambientMotionTargets do
     assert(target:IsA("Model"), "ambient motion tags must target models")
     assert(target.PrimaryPart ~= nil, "ambient motion model is missing its pivot")
-    assert(target:GetAttribute("MotionKind") == "rotor", "ambient motion kind changed")
+    local motionKind = target:GetAttribute("MotionKind")
+    assert(motionKind == "rotor" or motionKind == "resident", "ambient motion kind is unsupported")
+    foundResidentMotion = foundResidentMotion or motionKind == "resident"
+    foundRotorMotion = foundRotorMotion or motionKind == "rotor"
     assert(
         (tonumber(target:GetAttribute("MotionSpeed")) or 0) > 0,
         "ambient motion target must declare a positive speed"
     )
 end
+assert(foundResidentMotion, "Mara is missing resident motion")
+assert(foundRotorMotion, "Windmill Copse is missing rotor motion")
 local ambientLightTargets = CollectionService:GetTagged(RuntimeIds.AmbientLightTag)
 assert(#ambientLightTargets >= 6, "expected practical town and expedition lights to animate")
 for _, target in ambientLightTargets do
