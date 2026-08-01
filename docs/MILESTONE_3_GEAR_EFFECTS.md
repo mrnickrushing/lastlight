@@ -15,7 +15,11 @@ own at least one crafted item
   → precondition unmet: nothing is spent, toast explains why
 ```
 
-This is deliberately a consumable-item slice, not an equipment system:
+This document records the original `0.19.0` consumable-item slice. Permanent
+equipment slots were added afterward, and their effects became authoritative in
+[MILESTONE_3_AUTHORITATIVE_EQUIPMENT.md](MILESTONE_3_AUTHORITATIVE_EQUIPMENT.md).
+
+The original slice implemented:
 
 - **Amber Charm** grants a **40% damage-reduction shield for 5 seconds**
   (`StatusEffectState.applyShield`, mirroring the existing drowsy/rooted
@@ -26,17 +30,20 @@ This is deliberately a consumable-item slice, not an equipment system:
   (`CombatState.restoreStamina`), routed through the same `advance()` step
   every other stamina transition uses so pending drain/regen is settled
   first.
-- Both are one-time consumables: using one always removes exactly one unit
+- Both consumable items are one-time uses: using one always removes exactly one unit
   from the player's `gear` map (`Crafting.useItem`, the mirror image of
   `Crafting.craft`'s atomic deduct-and-grant transaction). There is no
-  equip/unequip state — an item is either owned or it's been spent.
+  equip/unequip state for those two consumables — an item is either owned or
+  it has been spent. Ironroot Hood and Bramble Boots are separate permanent
+  equipment outputs.
 - A dedicated HUD button per item (not a picker), each wired through
   Roblox's Input Action System with keyboard, gamepad, and touch bindings,
   the same multi-input parity every other core action already has. A
   button is only visible once its owned count is above zero.
 
-Equipment slots, permanent passive stats, new 3D gear visuals, and crafting
-gear into better gear all remain open — see the Scope honesty row below.
+Additional equipment slots, new 3D gear visuals, and crafting gear into better
+gear remain open. Head/feet slots and authoritative passive stats are now
+implemented.
 
 ## Flow and authority
 
@@ -93,7 +100,7 @@ the two damage reductions compose instead of overriding each other.
 | Composability | the Amber Charm's shield stacks with Warden's own mitigation instead of overriding it |
 | Input parity | both items are usable via keyboard, gamepad, and touch through the same Input Action System every other core action uses |
 | Persistence | remaining owned counts survive a disconnect/reconnect and a server restart |
-| Scope honesty | equipment slots, permanent passive stats, new gear visuals, and gear-crafts-gear progression remain open |
+| Scope honesty | additional slots, new gear visuals, and gear-crafts-gear progression remain open; head/feet passives are implemented later |
 
 Automated checks establish the shield/stamina-restore transitions and the
 consume-one-unit transaction as pure Luau tests. Only recorded Studio and

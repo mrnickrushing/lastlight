@@ -27,5 +27,17 @@ return {
                 TestRunner.equal(equipped.feet, nil)
             end,
         },
+        {
+            name = "combines equipped passives by their authoritative slots",
+            run = function()
+                local stats = Equipment.stats({
+                    head = "gear_ironroot_hood",
+                    feet = "gear_bramble_boots",
+                    body = "gear_ironroot_hood",
+                })
+                TestRunner.equal(stats.damageReduction, 0.05)
+                TestRunner.equal(stats.staminaRegenMultiplier, 1.1)
+            end,
+        },
     },
 }

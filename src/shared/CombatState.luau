@@ -62,7 +62,12 @@ function CombatState.create(now: number): State
     }
 end
 
-function CombatState.advance(state: State, now: number, canAct: boolean): State
+function CombatState.advance(
+    state: State,
+    now: number,
+    canAct: boolean,
+    staminaRegenMultiplier: number?
+): State
     assert(finiteNumber(now), "combat state time is invalid")
     local nextState = copyAt(state, now)
     local delta = math.max(0, now - state.lastUpdatedAt)
@@ -84,7 +89,15 @@ function CombatState.advance(state: State, now: number, canAct: boolean): State
             nextState.sprinting = false
         end
     elseif canAct and now >= state.regenBlockedUntil and state.stamina < MAX_STAMINA then
-        local stamina = math.min(MAX_STAMINA, state.stamina + STAMINA_REGEN_PER_SECOND * delta)
+        local regenMultiplier = math.clamp(
+            if finiteNumber(staminaRegenMultiplier) then staminaRegenMultiplier :: number else 1,
+            0.75,
+            1.5
+        )
+        local stamina = math.min(
+            MAX_STAMINA,
+            state.stamina + STAMINA_REGEN_PER_SECOND * regenMultiplier * delta
+        )
         if stamina ~= state.stamina then
             nextState.stamina = stamina
             changed = true
@@ -101,9 +114,10 @@ function CombatState.setSprint(
     state: State,
     enabled: boolean,
     now: number,
-    canAct: boolean
+    canAct: boolean,
+    staminaRegenMultiplier: number?
 ): (State, TransitionResult)
-    local nextState = CombatState.advance(state, now, canAct)
+    local nextState = CombatState.advance(state, now, canAct, staminaRegenMultiplier)
     if enabled then
         if not canAct then
             return nextState,
@@ -155,8 +169,13 @@ function CombatState.setSprint(
     }
 end
 
-function CombatState.dodge(state: State, now: number, canAct: boolean): (State, TransitionResult)
-    local nextState = CombatState.advance(state, now, canAct)
+function CombatState.dodge(
+    state: State,
+    now: number,
+    canAct: boolean,
+    staminaRegenMultiplier: number?
+): (State, TransitionResult)
+    local nextState = CombatState.advance(state, now, canAct, staminaRegenMultiplier)
     if not canAct then
         return nextState,
             {
@@ -202,9 +221,10 @@ function CombatState.restoreStamina(
     state: State,
     now: number,
     amount: number,
-    canAct: boolean
+    canAct: boolean,
+    staminaRegenMultiplier: number?
 ): (State, TransitionResult)
-    local nextState = CombatState.advance(state, now, canAct)
+    local nextState = CombatState.advance(state, now, canAct, staminaRegenMultiplier)
     if not canAct then
         return nextState,
             {
