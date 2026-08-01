@@ -305,6 +305,10 @@ assert(
     expedition:GetAttribute("EventInteractionCount") == BramblewakeExpedition.EventInteractionCount,
     "Bramblewake event interaction count is incorrect"
 )
+assert(
+    expedition:GetAttribute("StoryLandmarkCount") == 4,
+    "Bramblewake must build all four environmental story landmarks"
+)
 assert(expedition:GetAttribute("BossArenaReady") == true, "Warden Stag arena is not ready")
 assert(expedition:GetAttribute("BlackoutLayerReady") == true, "Blackout layer is not ready")
 local expectedManifest = ExpeditionGenerator.generate(Config.BramblewakePreviewSeed)
