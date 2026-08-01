@@ -46,7 +46,7 @@ The increment includes:
 - pure Luau tests for the wave schedule's escalation, bounds, roster coverage,
   determinism, and the night-number migration/persistence contract.
 
-Content differentiation between nights, town-tier growth, resident schedules,
+Further content differentiation beyond the four tactical profiles, later town-tier growth, resident schedules,
 and all Studio/device evidence remain open — see the Scope honesty row below.
 
 ## Flow and authority

@@ -26,10 +26,49 @@ local ROSTER: { string } = {
 local MIN_WAVES = 3
 local MAX_WAVES = 8
 local THEMES = table.freeze({ "EMBERFALL", "MIRETIDE", "ROOTMOON", "ASHEN VEIL" })
+local THEME_PROFILES = table.freeze({
+    EMBERFALL = table.freeze({
+        id = "EMBERFALL",
+        instruction = "KEEP ATTACKERS OFF THE FIRST LANTERN",
+        healthMultiplier = 1,
+        speedMultiplier = 1,
+        playerDamageMultiplier = 1,
+        lanternDamageMultiplier = 1.25,
+    }),
+    MIRETIDE = table.freeze({
+        id = "MIRETIDE",
+        instruction = "SLOW ADVANCE · HEAVIER BLOWS",
+        healthMultiplier = 1,
+        speedMultiplier = 0.82,
+        playerDamageMultiplier = 1.2,
+        lanternDamageMultiplier = 1,
+    }),
+    ROOTMOON = table.freeze({
+        id = "ROOTMOON",
+        instruction = "ARMORED GROWTH · FOCUS EACH TARGET",
+        healthMultiplier = 1.25,
+        speedMultiplier = 0.94,
+        playerDamageMultiplier = 1,
+        lanternDamageMultiplier = 1,
+    }),
+    ["ASHEN VEIL"] = table.freeze({
+        id = "ASHEN VEIL",
+        instruction = "FRAGILE HUNTERS · FAST APPROACH",
+        healthMultiplier = 0.85,
+        speedMultiplier = 1.25,
+        playerDamageMultiplier = 1,
+        lanternDamageMultiplier = 1,
+    }),
+})
 
 function TownNightSchedule.theme(nightNumber: number): string
     assert(nightNumber >= 1 and nightNumber == math.floor(nightNumber), "night number is invalid")
     return THEMES[(nightNumber - 1) % #THEMES + 1]
+end
+
+function TownNightSchedule.profile(nightNumber: number): any
+    local theme = TownNightSchedule.theme(nightNumber)
+    return THEME_PROFILES[theme]
 end
 
 function TownNightSchedule.waveCount(nightNumber: number): number

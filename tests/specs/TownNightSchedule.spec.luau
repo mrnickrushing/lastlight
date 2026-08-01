@@ -107,6 +107,33 @@ return {
             end,
         },
         {
+            name = "gives every theme a distinct bounded gameplay profile",
+            run = function()
+                local signatures = {}
+                for nightNumber = 1, 4 do
+                    local profile = TownNightSchedule.profile(nightNumber)
+                    TestRunner.truthy(type(profile.instruction) == "string")
+                    TestRunner.truthy(profile.healthMultiplier >= 0.8)
+                    TestRunner.truthy(profile.healthMultiplier <= 1.3)
+                    TestRunner.truthy(profile.speedMultiplier >= 0.8)
+                    TestRunner.truthy(profile.speedMultiplier <= 1.3)
+                    TestRunner.truthy(profile.playerDamageMultiplier >= 1)
+                    TestRunner.truthy(profile.playerDamageMultiplier <= 1.2)
+                    TestRunner.truthy(profile.lanternDamageMultiplier >= 1)
+                    TestRunner.truthy(profile.lanternDamageMultiplier <= 1.25)
+                    local signature = string.format(
+                        "%.2f:%.2f:%.2f:%.2f",
+                        profile.healthMultiplier,
+                        profile.speedMultiplier,
+                        profile.playerDamageMultiplier,
+                        profile.lanternDamageMultiplier
+                    )
+                    TestRunner.equal(signatures[signature], nil)
+                    signatures[signature] = true
+                end
+            end,
+        },
+        {
             name = "pending excludes beats already passed",
             run = function()
                 local all = TownNightSchedule.beats(360, 3)
