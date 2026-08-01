@@ -155,6 +155,11 @@ local PHASE_LIGHT_LEVEL = table.freeze({
     reveal = 0.82,
 })
 
+export type ResidentPose = {
+    height: number,
+    yaw: number,
+}
+
 function AmbientMotion.rotorAngle(elapsed: number, speed: number, phaseOffset: number): number
     return (elapsed * math.max(0, speed) + phaseOffset) % TAU
 end
@@ -164,6 +169,18 @@ function AmbientMotion.lightLevel(elapsed: number, phaseOffset: number, phase: s
     local quickFlicker = math.sin(elapsed * 4.7 + phaseOffset) * 0.055
     local slowBreath = math.sin(elapsed * 1.3 + phaseOffset * 0.61) * 0.035
     return math.clamp(phaseLevel + quickFlicker + slowBreath, 0.58, 1.08)
+end
+
+function AmbientMotion.residentPose(
+    elapsed: number,
+    speed: number,
+    phaseOffset: number
+): ResidentPose
+    local wave = elapsed * math.max(0.1, speed) + phaseOffset
+    return {
+        height = math.sin(wave * 1.9) * 0.035,
+        yaw = math.sin(wave * 0.43) * math.rad(2.4),
+    }
 end
 
 return table.freeze(AmbientMotion)
@@ -17171,6 +17188,9 @@ function WorldService._buildMara(self: WorldService, world: Model)
     CollectionService:AddTag(handLantern, self._runtimeIds.AmbientLightTag)
     model.PrimaryPart = root
     model.Parent = world
+    model:SetAttribute("MotionKind", "resident")
+    model:SetAttribute("MotionSpeed", 0.72)
+    CollectionService:AddTag(model, self._runtimeIds.AmbientMotionTag)
     addBillboard(head, "MARA · GREENWARD", AMBER)
 
     for index = -1, 1 do
@@ -24339,6 +24359,8 @@ WorldMotionController.__index = WorldMotionController
 
 type MotionState = {
     basePivot: CFrame,
+    kind: string,
+    lastPivot: CFrame,
     position: Vector3,
     phaseOffset: number,
     speed: number,
@@ -24415,6 +24437,8 @@ function WorldMotionController.new(
         local pivot = instance:GetPivot()
         self._motions[instance] = {
             basePivot = pivot,
+            kind = tostring(instance:GetAttribute("MotionKind") or "rotor"),
+            lastPivot = pivot,
             position = pivot.Position,
             phaseOffset = phaseOffsetFor(instance),
             speed = math.max(0, tonumber(instance:GetAttribute("MotionSpeed")) or 0.34),
@@ -24508,14 +24532,34 @@ function WorldMotionController._step(self: WorldMotionController, deltaTime: num
             self._motions[model] = nil
             continue
         end
+        if state.kind == "resident" then
+            local current = model:GetPivot()
+            if (current.Position - state.lastPivot.Position).Magnitude > 0.08 then
+                state.basePivot = current
+                state.lastPivot = current
+                state.position = current.Position
+            end
+        end
         local active = (state.position - cameraPosition).Magnitude <= ACTIVE_DISTANCE
         if active then
-            local angle =
-                self._ambientMotion.rotorAngle(self._elapsed, state.speed, state.phaseOffset)
-            model:PivotTo(state.basePivot * CFrame.Angles(0, 0, angle))
+            local targetPivot: CFrame
+            if state.kind == "resident" then
+                local pose =
+                    self._ambientMotion.residentPose(self._elapsed, state.speed, state.phaseOffset)
+                targetPivot = state.basePivot
+                    * CFrame.new(0, pose.height, 0)
+                    * CFrame.Angles(0, pose.yaw, 0)
+            else
+                local angle =
+                    self._ambientMotion.rotorAngle(self._elapsed, state.speed, state.phaseOffset)
+                targetPivot = state.basePivot * CFrame.Angles(0, 0, angle)
+            end
+            model:PivotTo(targetPivot)
+            state.lastPivot = targetPivot
             state.active = true
         elseif state.active then
             model:PivotTo(state.basePivot)
+            state.lastPivot = state.basePivot
             state.active = false
         end
     end

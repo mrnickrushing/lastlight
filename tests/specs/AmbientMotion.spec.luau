@@ -39,5 +39,23 @@ return {
                 )
             end,
         },
+        {
+            name = "keeps resident breathing inside a subtle envelope",
+            run = function()
+                for index = 0, 100 do
+                    local pose = AmbientMotion.residentPose(index / 10, 0.72, 1.3)
+                    TestRunner.truthy(math.abs(pose.height) <= 0.035)
+                    TestRunner.truthy(math.abs(pose.yaw) <= math.rad(2.4))
+                end
+            end,
+        },
+        {
+            name = "changes resident lookout direction over time",
+            run = function()
+                local first = AmbientMotion.residentPose(0, 0.72, 0)
+                local later = AmbientMotion.residentPose(4, 0.72, 0)
+                TestRunner.truthy(first.yaw ~= later.yaw)
+            end,
+        },
     },
 }

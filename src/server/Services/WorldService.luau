@@ -1417,6 +1417,9 @@ function WorldService._buildMara(self: WorldService, world: Model)
     CollectionService:AddTag(handLantern, self._runtimeIds.AmbientLightTag)
     model.PrimaryPart = root
     model.Parent = world
+    model:SetAttribute("MotionKind", "resident")
+    model:SetAttribute("MotionSpeed", 0.72)
+    CollectionService:AddTag(model, self._runtimeIds.AmbientMotionTag)
     addBillboard(head, "MARA · GREENWARD", AMBER)
 
     for index = -1, 1 do
