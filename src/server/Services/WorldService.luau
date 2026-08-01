@@ -22,6 +22,7 @@ export type WorldService = typeof(setmetatable(
         Name: string,
         _logger: Logger,
         _extractionPayoff: any,
+        _townProgression: any,
         _runtimeIds: any,
         _world: Model?,
         _interactions: { [string]: ProximityPrompt },
@@ -904,11 +905,12 @@ local function _addObjectIcon(partInstance: BasePart, kind: string, accent: Colo
     end
 end
 
-function WorldService.new(logger: Logger, extractionPayoff: any): WorldService
+function WorldService.new(logger: Logger, extractionPayoff: any, townProgression: any): WorldService
     return setmetatable({
         Name = WorldService.Name,
         _logger = logger,
         _extractionPayoff = extractionPayoff,
+        _townProgression = townProgression,
         _runtimeIds = nil,
         _world = nil,
         _interactions = {},
@@ -3397,11 +3399,12 @@ function WorldService._setTownResidentRoutine(self: WorldService, phase: string)
 end
 
 function WorldService.setTownConsequence(self: WorldService, consequence: any)
-    self._townConsequence = consequence
     local world = self._world
     if world == nil or type(consequence) ~= "table" then
         return
     end
+    local resolved = self._townProgression.merge(self._townConsequence, consequence)
+    self._townConsequence = resolved
     local existing = world:FindFirstChild("GreenwardConsequence")
     if existing ~= nil then
         existing:Destroy()
@@ -3413,11 +3416,11 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
     local landscape = Instance.new("Model")
     landscape.Name = "GreenwardConsequence"
     landscape.Parent = world
-    buildTownConsequenceLandscape(landscape, consequence)
+    buildTownConsequenceLandscape(landscape, resolved)
     local buildings = Instance.new("Model")
     buildings.Name = "TownProgressionBuildings"
     buildings.Parent = world
-    self._townResidents = buildTownProgressionBuildings(buildings, consequence, self._runtimeIds)
+    self._townResidents = buildTownProgressionBuildings(buildings, resolved, self._runtimeIds)
     self:_setTownResidentRoutine(
         if self._night then "night" elseif self._dusk then "dusk" else "day"
     )
@@ -3428,9 +3431,9 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
         end
     end
     landscape:SetAttribute("VisualPartCount", visualPartCount)
-    world:SetAttribute("TownTier", consequence.tier)
-    world:SetAttribute("TownDecision", tostring(consequence.decision or "unresolved"))
-    world:SetAttribute("WardenOutcome", tostring(consequence.wardenOutcome or "unresolved"))
+    world:SetAttribute("TownTier", resolved.tier)
+    world:SetAttribute("TownDecision", tostring(resolved.decision or "unresolved"))
+    world:SetAttribute("WardenOutcome", tostring(resolved.wardenOutcome or "unresolved"))
 end
 
 function WorldService.showExtractionPayoff(self: WorldService, player: Player, materials: any)

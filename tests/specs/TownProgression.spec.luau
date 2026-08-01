@@ -87,5 +87,64 @@ return {
                 TestRunner.equal(consequence.buildingStages.building_inn, 2)
             end,
         },
+        {
+            name = "never regresses a shared town when a fresh player joins",
+            run = function()
+                local established = TownProgression.resolve({
+                    town = { nightNumber = 7 },
+                    story = {
+                        chapterOne = {
+                            status = "complete",
+                            decision = "shared_agroforest",
+                            wardenOutcome = "preserved",
+                        },
+                    },
+                })
+                local merged = TownProgression.merge(established, TownProgression.resolve({}))
+                TestRunner.equal(merged.tier, 2)
+                TestRunner.equal(merged.decision, "shared_agroforest")
+                TestRunner.equal(merged.buildingStages.building_archive, 2)
+                TestRunner.equal(#merged.residentIds, 3)
+            end,
+        },
+        {
+            name = "adopts higher construction without erasing the first shared consequence",
+            run = function()
+                local farmland = TownProgression.resolve({
+                    story = {
+                        chapterOne = {
+                            status = "complete",
+                            decision = "restore_farmland",
+                            wardenOutcome = "scarred",
+                        },
+                    },
+                })
+                local veteran = TownProgression.resolve({ town = { nightNumber = 10 } })
+                local merged = TownProgression.merge(farmland, veteran)
+                TestRunner.equal(merged.tier, 3)
+                TestRunner.equal(merged.landscapeKind, "cultivated_fields")
+                TestRunner.equal(merged.memorialKind, "scarred_antlers")
+                TestRunner.equal(merged.buildingStages.building_archive, 3)
+                TestRunner.equal(merged.buildingStages.building_inn, 2)
+            end,
+        },
+        {
+            name = "adopts the first resolved chapter arriving after an unresolved player",
+            run = function()
+                local unresolved = TownProgression.resolve({})
+                local wild = TownProgression.resolve({
+                    story = {
+                        chapterOne = {
+                            status = "complete",
+                            decision = "wild_regrowth",
+                            wardenOutcome = "harmed",
+                        },
+                    },
+                })
+                local merged = TownProgression.merge(unresolved, wild)
+                TestRunner.equal(merged.decision, "wild_regrowth")
+                TestRunner.equal(merged.memorialKind, "broken_antlers")
+            end,
+        },
     },
 }

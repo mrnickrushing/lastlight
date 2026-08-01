@@ -6303,6 +6303,81 @@ function TownProgression.resolve(profile: any): Consequence
     }
 end
 
+-- Emberhollow is one shared server world even though progression is stored per
+-- player. Reconcile arrivals monotonically so a fresh or lower-tier player can
+-- never tear down buildings and residents that are already visible. The first
+-- resolved chapter consequence seen by the server owns the shared landscape;
+-- later conflicting personal choices remain in those players' profiles and
+-- snapshots without making the physical world flicker between joins.
+function TownProgression.merge(current: any, incoming: Consequence): Consequence
+    if type(current) ~= "table" then
+        return incoming
+    end
+
+    local currentTier = math.clamp(math.floor(tonumber(current.tier) or 0), 0, 3)
+    local incomingTier = math.clamp(math.floor(tonumber(incoming.tier) or 0), 0, 3)
+    local base = if incomingTier > currentTier then incoming else current
+    local result = table.clone(base)
+    result.tier = math.max(currentTier, incomingTier)
+    result.growthStage = math.max(
+        math.clamp(math.floor(tonumber(current.growthStage) or 0), 0, 3),
+        math.clamp(math.floor(tonumber(incoming.growthStage) or 0), 0, 3)
+    )
+
+    local mergedStages = {}
+    for _, buildingId in
+        {
+            "building_first_lantern",
+            "building_archive",
+            "building_town_board",
+            "building_workbench",
+            "building_inn",
+        }
+    do
+        local currentStages = if type(current.buildingStages) == "table"
+            then current.buildingStages
+            else {}
+        local incomingStages = if type(incoming.buildingStages) == "table"
+            then incoming.buildingStages
+            else {}
+        mergedStages[buildingId] = math.max(
+            math.clamp(math.floor(tonumber(currentStages[buildingId]) or 0), 0, 3),
+            math.clamp(math.floor(tonumber(incomingStages[buildingId]) or 0), 0, 3)
+        )
+    end
+    result.buildingStages = mergedStages
+
+    local residentSet = {}
+    for _, source in { current.residentIds, incoming.residentIds } do
+        if type(source) == "table" then
+            for _, residentId in source do
+                if type(residentId) == "string" then
+                    residentSet[residentId] = true
+                end
+            end
+        end
+    end
+    local mergedResidents = {}
+    for _, residentId in { "npc_tomas_reed", "npc_pip_wren", "npc_ena_moss" } do
+        if residentSet[residentId] == true then
+            table.insert(mergedResidents, residentId)
+        end
+    end
+    result.residentIds = mergedResidents
+
+    local consequenceSource = if type(current.decision) == "string"
+        then current
+        elseif type(incoming.decision) == "string" then incoming
+        else base
+    result.title = consequenceSource.title
+    result.detail = consequenceSource.detail
+    result.decision = consequenceSource.decision
+    result.wardenOutcome = consequenceSource.wardenOutcome
+    result.landscapeKind = consequenceSource.landscapeKind
+    result.memorialKind = consequenceSource.memorialKind
+    return result :: Consequence
+end
+
 return table.freeze(TownProgression)
 ]]></string>
         </Properties>
@@ -6945,6 +7020,7 @@ local SaveSchema = require(root.SaveSchema)
 local StatusEffectState = require(root.StatusEffectState)
 local SurvivalState = require(root.SurvivalState)
 local TownNightSchedule = require(root.TownNightSchedule)
+local TownProgression = require(root.TownProgression)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
@@ -6987,7 +7063,7 @@ local content = Registry.new(Regions)
 local networkService = NetworkService.new(logger)
 local profileService = ProfileService.new(logger, environmentConfig.UsePersistentData)
 local analyticsService = AnalyticsService.new(logger)
-local worldService = WorldService.new(logger, ExtractionPayoff)
+local worldService = WorldService.new(logger, ExtractionPayoff, TownProgression)
 local expeditionService = ExpeditionService.new(
     logger,
     worldService,
@@ -16152,6 +16228,7 @@ export type WorldService = typeof(setmetatable(
         Name: string,
         _logger: Logger,
         _extractionPayoff: any,
+        _townProgression: any,
         _runtimeIds: any,
         _world: Model?,
         _interactions: { [string]: ProximityPrompt },
@@ -17034,11 +17111,12 @@ local function _addObjectIcon(partInstance: BasePart, kind: string, accent: Colo
     end
 end
 
-function WorldService.new(logger: Logger, extractionPayoff: any): WorldService
+function WorldService.new(logger: Logger, extractionPayoff: any, townProgression: any): WorldService
     return setmetatable({
         Name = WorldService.Name,
         _logger = logger,
         _extractionPayoff = extractionPayoff,
+        _townProgression = townProgression,
         _runtimeIds = nil,
         _world = nil,
         _interactions = {},
@@ -19527,11 +19605,12 @@ function WorldService._setTownResidentRoutine(self: WorldService, phase: string)
 end
 
 function WorldService.setTownConsequence(self: WorldService, consequence: any)
-    self._townConsequence = consequence
     local world = self._world
     if world == nil or type(consequence) ~= "table" then
         return
     end
+    local resolved = self._townProgression.merge(self._townConsequence, consequence)
+    self._townConsequence = resolved
     local existing = world:FindFirstChild("GreenwardConsequence")
     if existing ~= nil then
         existing:Destroy()
@@ -19543,11 +19622,11 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
     local landscape = Instance.new("Model")
     landscape.Name = "GreenwardConsequence"
     landscape.Parent = world
-    buildTownConsequenceLandscape(landscape, consequence)
+    buildTownConsequenceLandscape(landscape, resolved)
     local buildings = Instance.new("Model")
     buildings.Name = "TownProgressionBuildings"
     buildings.Parent = world
-    self._townResidents = buildTownProgressionBuildings(buildings, consequence, self._runtimeIds)
+    self._townResidents = buildTownProgressionBuildings(buildings, resolved, self._runtimeIds)
     self:_setTownResidentRoutine(
         if self._night then "night" elseif self._dusk then "dusk" else "day"
     )
@@ -19558,9 +19637,9 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
         end
     end
     landscape:SetAttribute("VisualPartCount", visualPartCount)
-    world:SetAttribute("TownTier", consequence.tier)
-    world:SetAttribute("TownDecision", tostring(consequence.decision or "unresolved"))
-    world:SetAttribute("WardenOutcome", tostring(consequence.wardenOutcome or "unresolved"))
+    world:SetAttribute("TownTier", resolved.tier)
+    world:SetAttribute("TownDecision", tostring(resolved.decision or "unresolved"))
+    world:SetAttribute("WardenOutcome", tostring(resolved.wardenOutcome or "unresolved"))
 end
 
 function WorldService.showExtractionPayoff(self: WorldService, player: Player, materials: any)
