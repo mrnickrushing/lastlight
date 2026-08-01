@@ -71,9 +71,9 @@ function TownNightService.setChangedHandler(self: TownNightService, callback: (s
     self._onChanged = callback
 end
 
--- Fires once per completed night with the night number that just finished
--- (i.e. the value every connected player's profile should now record), so
--- persistence stays owned by whoever is holding the profile, not this loop.
+-- Fires once per completed night with the next night number every connected
+-- profile should record, the ending lantern health, and the reconciled town
+-- condition. Persistence stays owned by whoever is holding each profile.
 function TownNightService.setNightCompletedHandler(
     self: TownNightService,
     callback: (number, number, any) -> ()
@@ -217,6 +217,11 @@ function TownNightService._runCycle(self: TownNightService)
                 conditionSnapshot.integrity,
                 conditionSnapshot.repairsRemaining,
                 if conditionSnapshot.repairsRemaining == 1 then "" else "S"
+            )
+            elseif conditionSnapshot.repairsRemaining > 0 then string.format(
+                "DAWN BREAKS — NIGHT %d HELD CLEAN · TOWN INTEGRITY %d%%",
+                activeNight,
+                conditionSnapshot.integrity
             )
             else string.format("DAWN BREAKS — NIGHT %d HELD CLEAN", activeNight)
         self:_notify(dawnToast)
