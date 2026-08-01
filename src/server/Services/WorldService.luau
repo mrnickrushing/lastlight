@@ -75,6 +75,9 @@ local function part(
     instance.Anchored = true
     instance.CanCollide = canCollide ~= false
     instance.CanTouch = instance.CanCollide
+    if not instance.CanCollide then
+        instance.CanQuery = false
+    end
     instance.CastShadow = true
     instance.TopSurface = Enum.SurfaceType.Smooth
     instance.BottomSurface = Enum.SurfaceType.Smooth
@@ -102,6 +105,187 @@ local function labelSign(parent: Instance, at: CFrame, text: string)
     textLabel.Parent = surface
 end
 
+local function buildEmberhollowSanctuary(parent: Instance)
+    local courtyard = Vector3.new(0, 0, -112)
+    local courtyardPatch = part(
+        parent,
+        "EmberhollowCourtyard",
+        Vector3.new(54, 0.3, 36),
+        CFrame.new(courtyard + Vector3.new(0, 0.18, 1)),
+        Color3.fromRGB(53, 59, 45),
+        Enum.Material.Ground,
+        false
+    )
+    courtyardPatch.Transparency = 0.08
+
+    -- A readable camp silhouette gives the arrival area a destination before
+    -- the player understands the systems. The cabins are fully roofed, with a
+    -- deliberate doorway instead of four floating walls.
+    local function cabin(center: Vector3, name: string, accent: Color3)
+        local cabinFolder = Instance.new("Folder")
+        cabinFolder.Name = name
+        cabinFolder.Parent = parent
+
+        part(
+            cabinFolder,
+            "CabinFloor",
+            Vector3.new(14, 0.5, 12),
+            CFrame.new(center + Vector3.new(0, 0.25, 0)),
+            Color3.fromRGB(75, 57, 42),
+            Enum.Material.WoodPlanks
+        )
+        part(
+            cabinFolder,
+            "CabinBackWall",
+            Vector3.new(14, 8, 0.7),
+            CFrame.new(center + Vector3.new(0, 4.25, 5.65)),
+            BARK,
+            Enum.Material.WoodPlanks
+        )
+        for side = -1, 1, 2 do
+            part(
+                cabinFolder,
+                "CabinSideWall",
+                Vector3.new(0.7, 8, 12),
+                CFrame.new(center + Vector3.new(side * 6.65, 4.25, 0)),
+                BARK,
+                Enum.Material.WoodPlanks
+            )
+            part(
+                cabinFolder,
+                "CabinDoorPost",
+                Vector3.new(0.8, 8, 0.8),
+                CFrame.new(center + Vector3.new(side * 5.2, 4.25, -5.65)),
+                WET_BARK,
+                Enum.Material.Wood
+            )
+        end
+        part(
+            cabinFolder,
+            "CabinFrontBeam",
+            Vector3.new(14, 1, 0.8),
+            CFrame.new(center + Vector3.new(0, 7.8, -5.65)),
+            WET_BARK,
+            Enum.Material.Wood
+        )
+        for side = -1, 1, 2 do
+            local window = part(
+                cabinFolder,
+                "CabinWindow",
+                Vector3.new(2.7, 2.2, 0.18),
+                CFrame.new(center + Vector3.new(side * 6.3, 4.8, 1.8)),
+                accent,
+                Enum.Material.Glass,
+                false
+            )
+            window.Transparency = 0.22
+        end
+        local roof = part(
+            cabinFolder,
+            "CabinRoof",
+            Vector3.new(16, 0.8, 14),
+            CFrame.new(center + Vector3.new(0, 8.7, 0)) * CFrame.Angles(0, 0, math.rad(2)),
+            Color3.fromRGB(42, 47, 41),
+            Enum.Material.Slate
+        )
+        roof.CastShadow = true
+        local porch = part(
+            cabinFolder,
+            "CabinPorch",
+            Vector3.new(10, 0.35, 3),
+            CFrame.new(center + Vector3.new(0, 0.55, -7.1)),
+            Color3.fromRGB(85, 63, 43),
+            Enum.Material.WoodPlanks
+        )
+        porch.CanQuery = false
+        local windowLight = Instance.new("PointLight")
+        windowLight.Color = accent
+        windowLight.Brightness = 0.9
+        windowLight.Range = 14
+        windowLight.Shadows = false
+        windowLight.Parent = cabinFolder
+        local lightAnchor = part(
+            cabinFolder,
+            "CabinLight",
+            Vector3.new(0.2, 0.2, 0.2),
+            CFrame.new(center + Vector3.new(0, 4.4, 2.8)),
+            accent,
+            Enum.Material.Neon,
+            false
+        )
+        windowLight.Parent = lightAnchor
+        local sign = part(
+            cabinFolder,
+            "CabinSign",
+            Vector3.new(5.5, 1.4, 0.35),
+            CFrame.new(center + Vector3.new(0, 6.8, -6.1)),
+            WET_BARK,
+            Enum.Material.WoodPlanks,
+            false
+        )
+        sign.CanQuery = false
+        local surface = Instance.new("SurfaceGui")
+        surface.Face = Enum.NormalId.Front
+        surface.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+        surface.PixelsPerStud = 28
+        surface.Parent = sign
+        local signText = Instance.new("TextLabel")
+        signText.BackgroundTransparency = 1
+        signText.Size = UDim2.fromScale(1, 1)
+        signText.Font = Enum.Font.GothamBold
+        signText.Text = string.upper(name)
+        signText.TextColor3 = accent
+        signText.TextScaled = true
+        signText.Parent = surface
+    end
+
+    cabin(Vector3.new(-22, 0, -112), "WAYFARER CABIN", AMBER)
+    cabin(Vector3.new(22, 0, -112), "MARA'S SHELTER", FOXFIRE)
+
+    for index = 1, 8 do
+        local angle = (index / 8) * math.pi * 2
+        local stone = part(
+            parent,
+            "LanternRingStone",
+            Vector3.new(2.2, 1.3, 1.7),
+            CFrame.new(courtyard + Vector3.new(math.cos(angle) * 7.3, 0.65, math.sin(angle) * 7.3))
+                * CFrame.Angles(0.08, angle, 0.12),
+            Color3.fromRGB(78, 82, 74),
+            Enum.Material.Slate
+        )
+        stone.Shape = Enum.PartType.Ball
+    end
+    for side = -1, 1, 2 do
+        local bench = part(
+            parent,
+            "LanternBench",
+            Vector3.new(7, 0.7, 1.6),
+            CFrame.new(courtyard + Vector3.new(side * 11, 1.2, 0))
+                * CFrame.Angles(0, math.rad(90), 0),
+            Color3.fromRGB(91, 65, 45),
+            Enum.Material.WoodPlanks
+        )
+        bench.CanQuery = false
+        for leg = -1, 1, 2 do
+            local support = part(
+                parent,
+                "LanternBenchLeg",
+                Vector3.new(0.45, 1.2, 1.1),
+                CFrame.new(courtyard + Vector3.new(side * 11, 0.6, leg * 2.1)),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+            support.CanQuery = false
+        end
+    end
+    labelSign(
+        parent,
+        CFrame.new(0, 3.2, -95) * CFrame.Angles(0, math.pi, 0),
+        "EMBERHOLLOW · SAFE CAMP"
+    )
+end
+
 local function lantern(parent: Instance, at: Vector3, scale: number): Part
     local post = part(
         parent,
@@ -126,7 +310,10 @@ local function lantern(parent: Instance, at: Vector3, scale: number): Part
     light.Color = AMBER
     light.Brightness = 2.4
     light.Range = 24 * scale
-    light.Shadows = true
+    -- Keep the sanctuary's key lantern as the only strong shadow source. The
+    -- route lights are guidance, not a second sun, which keeps mobile scenes
+    -- readable and avoids a wall of competing shadows.
+    light.Shadows = false
     light.Parent = glow
     return post
 end
@@ -685,9 +872,6 @@ function WorldService._configureLighting(_self: WorldService)
     Lighting.GlobalShadows = true
     Lighting.ExposureCompensation = -0.18
     pcall(function()
-        Lighting.Technology = Enum.Technology.Future
-    end)
-    pcall(function()
         Lighting.ShadowSoftness = 0.42
         Lighting.GeographicLatitude = 51
     end)
@@ -920,6 +1104,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     lantern(geometry, Vector3.new(-9, 0, -62), 0.62)
     lantern(geometry, Vector3.new(9, 0, -102), 0.62)
     labelSign(geometry, CFrame.new(7, 3, -14) * CFrame.Angles(0, math.pi, 0), "EMBERHOLLOW")
+    buildEmberhollowSanctuary(geometry)
 end
 
 function WorldService._buildMara(self: WorldService, world: Model)
