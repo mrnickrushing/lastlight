@@ -17,7 +17,10 @@ export type TownNightService = typeof(setmetatable(
         _townNightSchedule: any,
         _townNightIncident: any,
         _townCondition: any,
+        _townGuardLastStand: any,
+        _analyticsService: any,
         _condition: any,
+        _lastStandState: any,
         _daySeconds: number,
         _duskSeconds: number,
         _nightSeconds: number,
@@ -25,6 +28,7 @@ export type TownNightService = typeof(setmetatable(
         _enabled: boolean,
         _started: boolean,
         _nightNumber: number,
+        _activeNightNumber: number,
         _phase: string,
         _phaseEndsAt: number,
         _onChanged: ((string?) -> ())?,
@@ -42,6 +46,8 @@ function TownNightService.new(
     townNightSchedule: any,
     townNightIncident: any,
     townCondition: any,
+    townGuardLastStand: any,
+    analyticsService: any,
     featureFlags: any
 ): TownNightService
     return setmetatable({
@@ -52,7 +58,10 @@ function TownNightService.new(
         _townNightSchedule = townNightSchedule,
         _townNightIncident = townNightIncident,
         _townCondition = townCondition,
+        _townGuardLastStand = townGuardLastStand,
+        _analyticsService = analyticsService,
         _condition = townCondition.default(),
+        _lastStandState = townGuardLastStand.default(),
         _daySeconds = config.NormalDaySeconds,
         _duskSeconds = config.DuskSeconds,
         _nightSeconds = config.NormalNightSeconds,
@@ -60,6 +69,7 @@ function TownNightService.new(
         _enabled = featureFlags:isEnabled("town_night_cycle_enabled"),
         _started = false,
         _nightNumber = 1,
+        _activeNightNumber = 0,
         _phase = "dormant",
         _phaseEndsAt = 0,
         _onChanged = nil,
@@ -254,6 +264,7 @@ end
 function TownNightService._runCycle(self: TownNightService)
     while true do
         self._phase = "day"
+        self._activeNightNumber = 0
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._daySeconds
         self._worldService:setDusk(false)
         self._worldService:setTownRepairEnabled(true)
@@ -285,6 +296,7 @@ function TownNightService._runCycle(self: TownNightService)
         -- specific night — only self._nightNumber (read again below, after
         -- this night ends) picks it up, for the *next* night onward.
         local activeNight = self._nightNumber
+        self._activeNightNumber = activeNight
         local blackoutDue = self:_isBlackoutDue(activeNight)
         local theme = self._townNightSchedule.theme(activeNight)
         local themeProfile = self._townNightSchedule.profile(activeNight)
@@ -340,6 +352,7 @@ function TownNightService._runCycle(self: TownNightService)
             self._townCondition.afterNight(self._condition, endingLanternHealth, activeNight)
         self._condition = nextCondition
         self._enemyService:stopNight()
+        self._activeNightNumber = 0
         self._worldService:setTownBreach(false, theme)
         self._worldService:setNight(false)
         local conditionSnapshot = self:conditionSnapshot()
@@ -379,6 +392,52 @@ end
 
 function TownNightService.conditionSnapshot(self: TownNightService): any
     return self._townCondition.snapshot(self._condition)
+end
+
+function TownNightService.attemptLastStand(
+    self: TownNightService,
+    eligiblePlayers: number,
+    downedPlayers: number
+): any
+    local activeNight = if self._activeNightNumber > 0
+        then self._activeNightNumber
+        else self._nightNumber
+    local nextState, result = self._townGuardLastStand.attempt(self._lastStandState, {
+        phase = self._phase,
+        nightNumber = activeNight,
+        lanternHealth = self._enemyService:lanternHealth(),
+        eligiblePlayers = eligiblePlayers,
+        downedPlayers = downedPlayers,
+    })
+    self._lastStandState = nextState
+    if not result.accepted then
+        self._analyticsService:townGuardLastStand(
+            false,
+            result.reason,
+            eligiblePlayers,
+            activeNight,
+            self._enemyService:lanternHealth()
+        )
+        return result
+    end
+
+    local lantern =
+        self._enemyService:spendLanternStrength(result.lanternCost, "town_guard_last_stand")
+    result.lanternHealth = lantern.health
+    result.lanternSpent = lantern.spent
+    self._analyticsService:townGuardLastStand(
+        true,
+        result.reason,
+        eligiblePlayers,
+        activeNight,
+        lantern.health
+    )
+    self._logger:info("town_guard_last_stand", {
+        lanternHealth = lantern.health,
+        night = activeNight,
+        partySize = eligiblePlayers,
+    })
+    return result
 end
 
 function TownNightService.repairTown(self: TownNightService): any

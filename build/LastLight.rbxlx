@@ -1219,7 +1219,7 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.28.0",
+    BuildVersion = "0.29.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -7738,6 +7738,98 @@ return table.freeze(TownCondition)
       </Item>
       <Item class="ModuleScript" referent="46">
         <Properties>
+          <string name="Name">TownGuardLastStand</string>
+          <string name="Source"><![CDATA[--!strict
+
+local TownGuardLastStand = {}
+
+export type State = {
+    usedNight: number,
+}
+
+local LANTERN_COST = 12
+local MINIMUM_LANTERN_HEALTH = 30
+local RECOVERY_HEALTH = 50
+local RECOVERY_WARD_SECONDS = 5
+
+local function finite(value: any): boolean
+    return type(value) == "number" and value == value and value > -math.huge and value < math.huge
+end
+
+function TownGuardLastStand.default(): State
+    return { usedNight = 0 }
+end
+
+function TownGuardLastStand.normalize(value: any): State
+    if type(value) ~= "table" or not finite(value.usedNight) or value.usedNight < 0 then
+        return TownGuardLastStand.default()
+    end
+    return { usedNight = math.floor(value.usedNight) }
+end
+
+function TownGuardLastStand.attempt(state: State, context: any): (State, any)
+    local current = TownGuardLastStand.normalize(state)
+    if type(context) ~= "table" then
+        return current, { accepted = false, reason = "invalid_context" }
+    end
+    local nightNumber = context.nightNumber
+    local lanternHealth = context.lanternHealth
+    local eligiblePlayers = context.eligiblePlayers
+    local downedPlayers = context.downedPlayers
+    if
+        not finite(nightNumber)
+        or nightNumber < 1
+        or nightNumber ~= math.floor(nightNumber)
+        or not finite(lanternHealth)
+        or not finite(eligiblePlayers)
+        or not finite(downedPlayers)
+        or eligiblePlayers < 0
+        or downedPlayers < 0
+        or eligiblePlayers ~= math.floor(eligiblePlayers)
+        or downedPlayers ~= math.floor(downedPlayers)
+    then
+        return current, { accepted = false, reason = "invalid_context" }
+    end
+    if context.phase ~= "night" then
+        return current, { accepted = false, reason = "night_inactive" }
+    end
+    if eligiblePlayers < 1 then
+        return current, { accepted = false, reason = "party_empty" }
+    end
+    if downedPlayers ~= eligiblePlayers then
+        return current, { accepted = false, reason = "party_still_active" }
+    end
+    if current.usedNight == nightNumber then
+        return current, { accepted = false, reason = "last_stand_spent" }
+    end
+    if lanternHealth < MINIMUM_LANTERN_HEALTH then
+        return current, { accepted = false, reason = "lantern_too_weak" }
+    end
+
+    local nextState = { usedNight = nightNumber }
+    return nextState,
+        {
+            accepted = true,
+            lanternCost = LANTERN_COST,
+            nightNumber = nightNumber,
+            partySize = eligiblePlayers,
+            reason = "guard_recovery",
+            recoveryHealth = RECOVERY_HEALTH,
+            recoveryWardSeconds = RECOVERY_WARD_SECONDS,
+        }
+end
+
+TownGuardLastStand.LanternCost = LANTERN_COST
+TownGuardLastStand.MinimumLanternHealth = MINIMUM_LANTERN_HEALTH
+TownGuardLastStand.RecoveryHealth = RECOVERY_HEALTH
+TownGuardLastStand.RecoveryWardSeconds = RECOVERY_WARD_SECONDS
+
+return table.freeze(TownGuardLastStand)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="47">
+        <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -7948,7 +8040,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -8101,7 +8193,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -8278,7 +8370,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -8422,7 +8514,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -8458,7 +8550,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -8840,7 +8932,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -8873,11 +8965,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="53">
+  <Item class="ServerScriptService" referent="54">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="54">
+    <Item class="Script" referent="55">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -8924,6 +9016,7 @@ local SurvivalState = require(root.SurvivalState)
 local TownNightSchedule = require(root.TownNightSchedule)
 local TownNightIncident = require(root.TownNightIncident)
 local TownCondition = require(root.TownCondition)
+local TownGuardLastStand = require(root.TownGuardLastStand)
 local TownProgression = require(root.TownProgression)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
@@ -9113,7 +9206,14 @@ local townNightService = TownNightService.new(
     TownNightSchedule,
     TownNightIncident,
     TownCondition,
+    TownGuardLastStand,
+    analyticsService,
     featureFlags
+)
+survivalService:setPartyRecoveryProvider(
+    function(eligiblePlayers: number, downedPlayers: number): any
+        return townNightService:attemptLastStand(eligiblePlayers, downedPlayers)
+    end
 )
 professionService:setSwitchProvider(function(player: Player): (boolean, string?)
     local profile = profileService:get(player)
@@ -9189,7 +9289,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -9287,11 +9387,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="56">
+      <Item class="Folder" referent="57">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="57">
+        <Item class="ModuleScript" referent="58">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -9703,6 +9803,23 @@ function AnalyticsService.townNightConsequence(
     })
 end
 
+function AnalyticsService.townGuardLastStand(
+    self: AnalyticsService,
+    accepted: boolean,
+    reason: string,
+    partySize: number,
+    nightNumber: number,
+    lanternHealth: number
+)
+    self._logger:info("town_guard_last_stand_attempt", {
+        accepted = accepted,
+        lanternHealth = lanternHealth,
+        night = nightNumber,
+        partySize = partySize,
+        reason = reason,
+    })
+end
+
 function AnalyticsService.townRepaired(
     self: AnalyticsService,
     player: Player,
@@ -10110,7 +10227,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="58">
+        <Item class="ModuleScript" referent="59">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10608,7 +10725,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="59">
+        <Item class="ModuleScript" referent="60">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11732,6 +11849,40 @@ function EnemyService.applyLanternPressure(self: EnemyService, amount: number, s
     }
 end
 
+function EnemyService.spendLanternStrength(self: EnemyService, amount: number, source: string): any
+    if not self._nightActive then
+        return {
+            applied = false,
+            health = self._lanternHealth,
+            reason = "night_inactive",
+            spent = 0,
+        }
+    end
+    if amount ~= amount or amount <= 0 or amount ~= math.floor(amount) then
+        return {
+            applied = false,
+            health = self._lanternHealth,
+            reason = "invalid_amount",
+            spent = 0,
+        }
+    end
+    local previous = self._lanternHealth
+    self._lanternHealth = math.max(18, self._lanternHealth - math.clamp(amount, 1, 25))
+    local spent = previous - self._lanternHealth
+    self._worldService:setLanternHealth(self._lanternHealth)
+    self._logger:info("lantern_strength_spent", {
+        health = self._lanternHealth,
+        source = string.sub(source, 1, 48),
+        spent = spent,
+    })
+    return {
+        applied = spent > 0,
+        health = self._lanternHealth,
+        reason = if spent > 0 then "spent" else "minimum_health",
+        spent = spent,
+    }
+end
+
 function EnemyService.damageNearest(self: EnemyService, player: Player): (boolean, string)
     local encounterService = self:_activeEncounterService()
     if encounterService ~= nil then
@@ -11836,7 +11987,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12448,7 +12599,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12552,7 +12703,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12741,7 +12892,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -12835,7 +12986,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13048,7 +13199,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13872,7 +14023,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14051,7 +14202,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14617,7 +14768,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="68">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14664,6 +14815,8 @@ export type PlayerSurvivalService = typeof(setmetatable(
         _equipmentStatsProvider: ((Player) -> any)?,
         _reviveTuningProvider: ((Player) -> any)?,
         _expeditionFailureHandler: ((Player) -> any)?,
+        _partyRecoveryProvider: ((number, number) -> any)?,
+        _partyRecoveryPending: boolean,
         _states: { [Player]: any },
         _spawned: { [Player]: boolean },
         _channels: { [Player]: ReviveChannel },
@@ -14714,6 +14867,8 @@ function PlayerSurvivalService.new(
         _equipmentStatsProvider = nil,
         _reviveTuningProvider = nil,
         _expeditionFailureHandler = nil,
+        _partyRecoveryProvider = nil,
+        _partyRecoveryPending = false,
         _states = {},
         _spawned = {},
         _channels = {},
@@ -14744,6 +14899,13 @@ function PlayerSurvivalService.setExpeditionFailureHandler(
     handler: (Player) -> any
 )
     self._expeditionFailureHandler = handler
+end
+
+function PlayerSurvivalService.setPartyRecoveryProvider(
+    self: PlayerSurvivalService,
+    provider: (number, number) -> any
+)
+    self._partyRecoveryProvider = provider
 end
 
 function PlayerSurvivalService._recordExpeditionFailure(
@@ -15046,6 +15208,9 @@ function PlayerSurvivalService.Start(self: PlayerSurvivalService)
                 self:_cancelChannel(target, "reviver_left")
             end
         end
+        task.defer(function()
+            self:_attemptPartyRecovery()
+        end)
     end)
     for _, player in Players:GetPlayers() do
         self:_bindPlayer(player)
@@ -15101,10 +15266,81 @@ function PlayerSurvivalService.damage(
         self:_createVisual(player)
         self._analyticsService:playerDowned(player, string.sub(source, 1, 48))
         self:_notify(player, "DOWNED — CRAWL TOWARD LIGHT")
+        self:_attemptPartyRecovery()
     else
         self:_notify(nil, nil)
     end
     return result
+end
+
+function PlayerSurvivalService._attemptPartyRecovery(self: PlayerSurvivalService)
+    local provider = self._partyRecoveryProvider
+    if provider == nil or self._partyRecoveryPending then
+        return
+    end
+
+    local eligible: { Player } = {}
+    local downed = 0
+    for player, state in self._states do
+        if
+            player.Parent ~= nil
+            and player:GetAttribute("LastLightTutorialSurvivalReady") == true
+            and player:GetAttribute("LastLightInExpedition") ~= true
+        then
+            table.insert(eligible, player)
+            if state.status == "downed" then
+                downed += 1
+            end
+        end
+    end
+    if #eligible < 1 or downed ~= #eligible then
+        return
+    end
+
+    self._partyRecoveryPending = true
+    local result = provider(#eligible, downed)
+    if type(result) ~= "table" or result.accepted ~= true then
+        self._partyRecoveryPending = false
+        return
+    end
+
+    local channelTargets: { Player } = {}
+    for target in self._channels do
+        table.insert(channelTargets, target)
+    end
+    for _, target in channelTargets do
+        self:_cancelChannel(target, "town_guard_last_stand")
+    end
+    local now = workspace:GetServerTimeNow()
+    local recovered = {}
+    for _, player in eligible do
+        local state = self._states[player]
+        if state ~= nil and state.status == "downed" then
+            local nextState, recovery = self._survivalState.revive(state, now, {
+                health = result.recoveryHealth,
+                wardSeconds = result.recoveryWardSeconds,
+            })
+            if recovery.applied then
+                self._states[player] = nextState
+                self:_clearVisual(player)
+                self:_syncPlayer(player)
+                player:SetAttribute("LastLightGuardRecoveryNight", result.nightNumber)
+                table.insert(recovered, player)
+                self._analyticsService:playerRecovered(player, "town_guard_last_stand")
+            end
+        end
+    end
+    self._worldService:showTownGuardRecovery(recovered, result)
+    self:_notify(
+        nil,
+        string.format(
+            "THE NIGHT WATCH ANSWERS — %d TRAVELER%s RALLIED · LANTERN -%d",
+            #recovered,
+            if #recovered == 1 then "" else "S",
+            result.lanternSpent or result.lanternCost or 0
+        )
+    )
+    self._partyRecoveryPending = false
 end
 
 function PlayerSurvivalService.canHealInRadius(
@@ -15538,7 +15774,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16063,7 +16299,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17039,7 +17275,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17061,7 +17297,10 @@ export type TownNightService = typeof(setmetatable(
         _townNightSchedule: any,
         _townNightIncident: any,
         _townCondition: any,
+        _townGuardLastStand: any,
+        _analyticsService: any,
         _condition: any,
+        _lastStandState: any,
         _daySeconds: number,
         _duskSeconds: number,
         _nightSeconds: number,
@@ -17069,6 +17308,7 @@ export type TownNightService = typeof(setmetatable(
         _enabled: boolean,
         _started: boolean,
         _nightNumber: number,
+        _activeNightNumber: number,
         _phase: string,
         _phaseEndsAt: number,
         _onChanged: ((string?) -> ())?,
@@ -17086,6 +17326,8 @@ function TownNightService.new(
     townNightSchedule: any,
     townNightIncident: any,
     townCondition: any,
+    townGuardLastStand: any,
+    analyticsService: any,
     featureFlags: any
 ): TownNightService
     return setmetatable({
@@ -17096,7 +17338,10 @@ function TownNightService.new(
         _townNightSchedule = townNightSchedule,
         _townNightIncident = townNightIncident,
         _townCondition = townCondition,
+        _townGuardLastStand = townGuardLastStand,
+        _analyticsService = analyticsService,
         _condition = townCondition.default(),
+        _lastStandState = townGuardLastStand.default(),
         _daySeconds = config.NormalDaySeconds,
         _duskSeconds = config.DuskSeconds,
         _nightSeconds = config.NormalNightSeconds,
@@ -17104,6 +17349,7 @@ function TownNightService.new(
         _enabled = featureFlags:isEnabled("town_night_cycle_enabled"),
         _started = false,
         _nightNumber = 1,
+        _activeNightNumber = 0,
         _phase = "dormant",
         _phaseEndsAt = 0,
         _onChanged = nil,
@@ -17298,6 +17544,7 @@ end
 function TownNightService._runCycle(self: TownNightService)
     while true do
         self._phase = "day"
+        self._activeNightNumber = 0
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._daySeconds
         self._worldService:setDusk(false)
         self._worldService:setTownRepairEnabled(true)
@@ -17329,6 +17576,7 @@ function TownNightService._runCycle(self: TownNightService)
         -- specific night — only self._nightNumber (read again below, after
         -- this night ends) picks it up, for the *next* night onward.
         local activeNight = self._nightNumber
+        self._activeNightNumber = activeNight
         local blackoutDue = self:_isBlackoutDue(activeNight)
         local theme = self._townNightSchedule.theme(activeNight)
         local themeProfile = self._townNightSchedule.profile(activeNight)
@@ -17384,6 +17632,7 @@ function TownNightService._runCycle(self: TownNightService)
             self._townCondition.afterNight(self._condition, endingLanternHealth, activeNight)
         self._condition = nextCondition
         self._enemyService:stopNight()
+        self._activeNightNumber = 0
         self._worldService:setTownBreach(false, theme)
         self._worldService:setNight(false)
         local conditionSnapshot = self:conditionSnapshot()
@@ -17423,6 +17672,52 @@ end
 
 function TownNightService.conditionSnapshot(self: TownNightService): any
     return self._townCondition.snapshot(self._condition)
+end
+
+function TownNightService.attemptLastStand(
+    self: TownNightService,
+    eligiblePlayers: number,
+    downedPlayers: number
+): any
+    local activeNight = if self._activeNightNumber > 0
+        then self._activeNightNumber
+        else self._nightNumber
+    local nextState, result = self._townGuardLastStand.attempt(self._lastStandState, {
+        phase = self._phase,
+        nightNumber = activeNight,
+        lanternHealth = self._enemyService:lanternHealth(),
+        eligiblePlayers = eligiblePlayers,
+        downedPlayers = downedPlayers,
+    })
+    self._lastStandState = nextState
+    if not result.accepted then
+        self._analyticsService:townGuardLastStand(
+            false,
+            result.reason,
+            eligiblePlayers,
+            activeNight,
+            self._enemyService:lanternHealth()
+        )
+        return result
+    end
+
+    local lantern =
+        self._enemyService:spendLanternStrength(result.lanternCost, "town_guard_last_stand")
+    result.lanternHealth = lantern.health
+    result.lanternSpent = lantern.spent
+    self._analyticsService:townGuardLastStand(
+        true,
+        result.reason,
+        eligiblePlayers,
+        activeNight,
+        lantern.health
+    )
+    self._logger:info("town_guard_last_stand", {
+        lanternHealth = lantern.health,
+        night = activeNight,
+        partySize = eligiblePlayers,
+    })
+    return result
 end
 
 function TownNightService.repairTown(self: TownNightService): any
@@ -17480,7 +17775,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="72">
+        <Item class="ModuleScript" referent="73">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18540,7 +18835,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19374,7 +19669,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="74">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21557,7 +21852,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v7")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v8")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -21652,7 +21947,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v7",
+        worldVersion = "bramblewake-blackout-v8",
     })
 end
 
@@ -22259,6 +22554,119 @@ function WorldService.setLanternHealth(self: WorldService, health: number)
     task.delay(0.5, function()
         if pulse.Parent ~= nil then
             pulse:Destroy()
+        end
+    end)
+end
+
+function WorldService.showTownGuardRecovery(self: WorldService, players: { Player }, result: any)
+    local world = self._world
+    local flame = self._lantern
+    if world == nil or flame == nil or #players < 1 then
+        return
+    end
+
+    local previous = world:FindFirstChild("TownGuardLastStand")
+    if previous ~= nil then
+        previous:Destroy()
+    end
+
+    world:SetAttribute("LastStandNight", result.nightNumber)
+    world:SetAttribute("LastStandPartySize", #players)
+    world:SetAttribute("LastStandLanternSpent", result.lanternSpent or result.lanternCost or 0)
+
+    local rally = Instance.new("Model")
+    rally.Name = "TownGuardLastStand"
+    rally:SetAttribute("NightNumber", result.nightNumber)
+    rally:SetAttribute("PartySize", #players)
+    rally.Parent = world
+
+    local ground = flame.Position - Vector3.new(0, 5.5, 0)
+    for index = 1, 4 do
+        local angle = math.rad(45 + (index - 1) * 90)
+        local offset = Vector3.new(math.cos(angle) * 7.4, 0, math.sin(angle) * 7.4)
+        local postAt = ground + offset
+        local post = part(
+            rally,
+            "WatchRallyPost",
+            Vector3.new(0.45, 4.8, 0.45),
+            CFrame.new(postAt + Vector3.new(0, 2.4, 0))
+                * CFrame.Angles(0, -angle, math.rad(if index % 2 == 0 then 5 else -5)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+        post.Transparency = 0.08
+        local pennant = part(
+            rally,
+            "WatchRallyPennant",
+            Vector3.new(2.4, 1.15, 0.16),
+            CFrame.new(postAt + Vector3.new(0.95 * math.cos(angle), 3.7, 0.95 * math.sin(angle)))
+                * CFrame.Angles(0, -angle, math.rad(-8)),
+            AMBER,
+            Enum.Material.Fabric,
+            false
+        )
+        pennant.Transparency = 0.08
+        pennant.CastShadow = false
+        TweenService:Create(
+            pennant,
+            TweenInfo.new(1.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            { Transparency = 1, Position = pennant.Position + Vector3.new(0, 1.2, 0) }
+        ):Play()
+    end
+
+    for _, signal in self._nightDefenseSignals do
+        if signal.Parent ~= nil then
+            TweenService
+                :Create(
+                    signal,
+                    TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    {
+                        Color = AMBER,
+                        Transparency = if signal:GetAttribute("SignalRole") == "fire"
+                            then 0
+                            else 0.12,
+                    }
+                )
+                :Play()
+            local signalLight = signal:FindFirstChild("WatchSignalLight")
+            if signalLight ~= nil and signalLight:IsA("PointLight") then
+                signalLight.Color = AMBER
+                signalLight.Brightness = 3.4
+            end
+        end
+    end
+
+    for _, player in players do
+        local character = player.Character
+        if character ~= nil and character.Parent ~= nil then
+            local highlight = Instance.new("Highlight")
+            highlight.Name = "LastLightTownGuardRecovery"
+            highlight.Adornee = character
+            highlight.DepthMode = Enum.HighlightDepthMode.Occluded
+            highlight.FillColor = AMBER
+            highlight.FillTransparency = 0.72
+            highlight.OutlineColor = CREAM
+            highlight.OutlineTransparency = 0.08
+            highlight.Parent = character
+            task.delay(math.clamp(tonumber(result.recoveryWardSeconds) or 5, 0.5, 8), function()
+                if highlight.Parent ~= nil then
+                    highlight:Destroy()
+                end
+            end)
+        end
+    end
+
+    task.delay(0.7, function()
+        if world.Parent ~= nil then
+            self:_setNightDefenseState(
+                if self._breachActive then "breach" elseif self._night then "night" else "day"
+            )
+        end
+    end)
+    task.delay(1.6, function()
+        if rally.Parent ~= nil then
+            rally:Destroy()
         end
     end)
 end
@@ -25041,11 +25449,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="75">
+      <Item class="Folder" referent="76">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="76">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -27116,7 +27524,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="77">
+        <Item class="ModuleScript" referent="78">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -27505,7 +27913,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="78">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -27668,7 +28076,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="80">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -27864,15 +28272,15 @@ return table.freeze(WardenStagBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="80">
+  <Item class="StarterPlayer" referent="81">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="81">
+    <Item class="StarterPlayerScripts" referent="82">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="82">
+      <Item class="LocalScript" referent="83">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -27985,11 +28393,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="83">
+        <Item class="Folder" referent="84">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="84">
+          <Item class="ModuleScript" referent="85">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -28120,7 +28528,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="85">
+          <Item class="ModuleScript" referent="86">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -30193,7 +30601,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="86">
+          <Item class="ModuleScript" referent="87">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -30510,7 +30918,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="87">
+          <Item class="ModuleScript" referent="88">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -30618,7 +31026,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="88">
+          <Item class="ModuleScript" referent="89">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -30750,7 +31158,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="89">
+          <Item class="ModuleScript" referent="90">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -31026,7 +31434,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="90">
+  <Item class="Workspace" referent="91">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

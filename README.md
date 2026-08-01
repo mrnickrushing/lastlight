@@ -32,6 +32,8 @@ level-10 masters can choose one of three persistent paths per profession at
 physical mastery altars, with twelve distinct server-owned effects; all four
 abilities now produce distinct physical world feedback, and Emergency Patch
 deploys a temporary server-owned Rootline Brace that absorbs lantern pressure;
+the Night Watch now answers one fully downed town party per normal night by
+spending First Lantern strength for a bounded, server-owned Last Stand recovery;
 Studio and device exit gates remain pending.**
 
 The repository currently contains:
@@ -89,6 +91,9 @@ The repository currently contains:
 - four distinct color-independent profession ability motifs, plus an Engineer
   Rootline Brace that visibly tracks and absorbs up to 14 lantern pressure for
   12 seconds without adding another mobile control;
+- one free Town Guard Last Stand per normal night when every eligible town
+  player is downed, exchanging 12 First Lantern strength for a 50-health rally
+  and five-second ward without adding a purchase, control, or permanent HUD;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
   analytics, save normalization, and published-place tutorial persistence;
 - mobile, keyboard/mouse, and controller actions through Roblox's Input Action
@@ -97,7 +102,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 271 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 277 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -131,6 +136,8 @@ The Medic rescue-speed/recovery bonuses and Warden recovery-ward support are in
 [the profession rescue runbook](docs/MILESTONE_3_PROFESSION_RESCUE.md).
 The four physical ability motifs and temporary Engineer lantern brace are in
 [the profession identity runbook](docs/MILESTONE_3_PROFESSION_IDENTITY.md).
+The bounded whole-party town recovery and physical Night Watch response are in
+[the Town Guard Last Stand runbook](docs/MILESTONE_3_TOWN_GUARD_LAST_STAND.md).
 The six-enemy sequence, mechanic, readability, solo-balance, and device gates are in
 [the Bramblewake enemy-roster runbook](docs/MILESTONE_3_BRAMBLEWAKE_ENEMIES.md).
 The three-phase elite, carried-fire, reward, accessibility, and abuse gates are in
