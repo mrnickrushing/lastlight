@@ -15,7 +15,7 @@ playable game exists.
 ## Current status
 
 **Milestone 2 source implemented; Milestone 3 Bramblewake expedition foundation,
-four active events, durable extraction settlement, player rescue, combat
+eight active events, durable extraction settlement, player rescue, combat
 mobility, six-enemy first-night roster, four basic profession kits, Old Growth,
 the Warden Stag, the Bramblewake Blackout, permanent chapter-one resolution, a
 repeating town normal-night cycle with four tactical themes, four starter
@@ -33,9 +33,9 @@ The repository currently contains:
 - a bounded mobile loader and safe streamed arrival clearing with fall recovery;
 - Mara, Heartwood gathering, three starter tools, a construction plot, barricade,
   First Lantern, six-enemy authored night, and Bramblewake reveal;
-- 12 deterministic streamed Bramblewake modules, four POIs, four event sockets,
+- 12 deterministic streamed Bramblewake modules, four POIs, eight event sockets,
   a known-good fallback, beacon entry, route progress, and expedition fall recovery;
-- four active optional Bramblewake events with 13 shared interaction steps,
+- eight active optional Bramblewake events with 25 shared interaction steps,
   timeout-safe routes, durable unbanked rewards, kill switch, and telemetry;
 - save-schema-v8 inventory/profession/mastery/story/town-night/gear/equipment/quest migration,
   run-specific reward tombstones, Wayhome extraction, atomic banking,
@@ -78,7 +78,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 204 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 212 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused

@@ -102,9 +102,12 @@ local function placeContent(manifest: any, random: (number) -> number)
     local eventIndex = 1
     for _, placement in eventPlacements do
         local moduleDefinition = MODULES_BY_ID[placement.moduleId]
-        if moduleDefinition.eventSocket and not occupied[placement.index] then
+        -- POI and event sockets occupy opposite authored corners of a module,
+        -- so representative modules can host both without overlapping the
+        -- critical path or each other. This is required to place all eight
+        -- regional events while retaining all four POIs in twelve modules.
+        if moduleDefinition.eventSocket then
             placement.eventId = eventDefinitions[eventIndex].id
-            occupied[placement.index] = true
             eventIndex += 1
             if eventIndex > #eventDefinitions then
                 break
@@ -265,9 +268,6 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
                 if eventDefinition.minimumRouteSpace > Catalog.CellSize - 24 then
                     issue("event route-space requirement exceeds its module clearing")
                 end
-            end
-            if placement.poiId ~= nil then
-                issue("event and point of interest overlap the same module")
             end
             seenEvents[placement.eventId] = true
         end

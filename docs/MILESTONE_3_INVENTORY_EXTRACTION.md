@@ -2,7 +2,7 @@
 
 ## Scope
 
-This increment makes the four active Bramblewake event rewards durable and adds
+This increment makes the active Bramblewake event rewards durable and adds
 an authoritative Wayhome extraction flow. It is a bounded Milestone 3 slice, not
 the complete inventory, crafting, equipment, expedition-failure, or persistent
 town platform.

@@ -1157,6 +1157,84 @@ local function buildEventSocket(
         )
     elseif definition.visual == "root_bridge" then
         rootArch(parent, anchor.Position, 0.52)
+    elseif definition.visual == "pollen_storm" then
+        for moteIndex = 1, 7 do
+            local angle = (moteIndex / 7) * math.pi * 2
+            local mote = orb(
+                parent,
+                "PollenStormMote",
+                anchor.Position
+                    + Vector3.new(math.cos(angle) * 7, 3 + moteIndex % 3, math.sin(angle) * 5),
+                0.7,
+                Color3.fromRGB(224, 190, 93),
+                Enum.Material.SmoothPlastic
+            )
+            mote.Transparency = 0.28
+            mote.CanQuery = false
+        end
+    elseif definition.visual == "hungry_homestead" then
+        part(
+            parent,
+            "HomesteadPorch",
+            Vector3.new(16, 0.7, 9),
+            CFrame.new(anchor.Position + Vector3.new(0, 0.35, 1)),
+            Color3.fromRGB(104, 72, 45),
+            Enum.Material.WoodPlanks
+        )
+        for side = -1, 1, 2 do
+            part(
+                parent,
+                "HomesteadPost",
+                Vector3.new(0.7, 7, 0.7),
+                CFrame.new(anchor.Position + Vector3.new(side * 7, 3.5, -3)),
+                DARK_BARK,
+                Enum.Material.Wood
+            )
+        end
+        part(
+            parent,
+            "HomesteadRoof",
+            Vector3.new(18, 0.7, 11),
+            CFrame.new(anchor.Position + Vector3.new(0, 7.2, 1)) * CFrame.Angles(0, 0, math.rad(3)),
+            Color3.fromRGB(55, 61, 50),
+            Enum.Material.Slate
+        )
+    elseif definition.visual == "stag_tracks" then
+        for side = -1, 1, 2 do
+            part(
+                parent,
+                "WardenTrackAntler",
+                Vector3.new(0.6, 6.5, 0.6),
+                CFrame.new(anchor.Position + Vector3.new(side * 2.2, 4.2, 4))
+                    * CFrame.Angles(0, 0, math.rad(-side * 24)),
+                Color3.fromRGB(112, 109, 87),
+                Enum.Material.Wood,
+                false
+            )
+        end
+    elseif definition.visual == "wildfire_choice" then
+        for side = -1, 1, 2 do
+            local flame = orb(
+                parent,
+                "WildfireFront",
+                anchor.Position + Vector3.new(side * 8, 2.2, 4),
+                2.6,
+                Color3.fromRGB(232, 105, 57),
+                Enum.Material.Neon
+            )
+            flame.Transparency = 0.12
+            flame.CanQuery = false
+            part(
+                parent,
+                "CharredSapling",
+                Vector3.new(0.7, 6, 0.7),
+                CFrame.new(anchor.Position + Vector3.new(side * 8, 2.8, 6))
+                    * CFrame.Angles(0, 0, math.rad(side * 12)),
+                Color3.fromRGB(43, 37, 34),
+                Enum.Material.Wood,
+                false
+            )
+        end
     end
 
     local interactions = {}
@@ -1204,6 +1282,71 @@ local function buildEventSocket(
                 Enum.Material.WoodPlanks,
                 false
             )
+        elseif definition.visual == "pollen_storm" then
+            target = part(
+                parent,
+                "PollenScreen_" .. step.id,
+                Vector3.new(4.2, 5.2, 0.45),
+                CFrame.new(position) * CFrame.Angles(0, index * 0.18 - 0.36, 0),
+                Color3.fromRGB(171, 148, 86),
+                Enum.Material.Fabric,
+                false
+            )
+            for postSide = -1, 1, 2 do
+                part(
+                    parent,
+                    "PollenScreenPost_" .. step.id,
+                    Vector3.new(0.35, 5.8, 0.35),
+                    target.CFrame * CFrame.new(postSide * 2.2, 0, 0),
+                    DARK_BARK,
+                    Enum.Material.Wood,
+                    false
+                )
+            end
+        elseif definition.visual == "hungry_homestead" then
+            target = part(
+                parent,
+                "HomesteadStore_" .. step.id,
+                if step.id == "fill_water"
+                    then Vector3.new(2.7, 3.4, 2.7)
+                    else Vector3.new(3.6, 2.5, 3.2),
+                CFrame.new(position) * CFrame.Angles(0, index * 0.42, 0),
+                if step.id == "fill_water"
+                    then Color3.fromRGB(76, 104, 105)
+                    else Color3.fromRGB(116, 81, 48),
+                if step.id == "fill_water" then Enum.Material.Metal else Enum.Material.WoodPlanks,
+                false
+            )
+            if step.id == "fill_water" then
+                target.Shape = Enum.PartType.Cylinder
+            end
+        elseif definition.visual == "stag_tracks" then
+            target = part(
+                parent,
+                "WardenSign_" .. step.id,
+                if step.id == "study_scrape"
+                    then Vector3.new(1.1, 4.2, 1.1)
+                    else Vector3.new(3.8, 0.45, 2.8),
+                CFrame.new(position)
+                    * CFrame.Angles(0, index * 0.3, if step.id == "study_scrape" then 0 else 0.08),
+                Color3.fromRGB(102, 91, 69),
+                if step.id == "study_scrape" then Enum.Material.Wood else Enum.Material.Ground,
+                false
+            )
+            if step.id ~= "study_scrape" then
+                target.Shape = Enum.PartType.Ball
+            end
+        elseif definition.visual == "wildfire_choice" then
+            target = part(
+                parent,
+                "WetFirebreak_" .. step.id,
+                Vector3.new(4.8, 1.2, 3.4),
+                CFrame.new(position) * CFrame.Angles(0, index * 0.28, 0),
+                Color3.fromRGB(96, 79, 59),
+                Enum.Material.Mud,
+                false
+            )
+            target.Shape = Enum.PartType.Ball
         else
             target = part(
                 parent,

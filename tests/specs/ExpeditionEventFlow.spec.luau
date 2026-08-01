@@ -4,6 +4,17 @@ local Catalog = require("../../src/shared/Content/Definitions/BramblewakeExpedit
 local ExpeditionEventFlow = require("../../src/shared/ExpeditionEventFlow")
 local TestRunner = require("../TestRunner")
 
+local EXPECTED_EVENT_IDS = {
+    event_bw_foxlight_trail = true,
+    event_bw_hungry_homestead = true,
+    event_bw_lost_wagon = true,
+    event_bw_moving_hedge = true,
+    event_bw_pollen_storm = true,
+    event_bw_root_bridge = true,
+    event_bw_stag_tracks = true,
+    event_bw_wildfire_choice = true,
+}
+
 local function definition(eventId: string): any
     for _, event in Catalog.Events do
         if event.id == eventId then
@@ -20,12 +31,22 @@ return {
             name = "validates every active Bramblewake event contract",
             run = function()
                 local interactionCount = 0
+                local seen = {}
                 for _, event in Catalog.Events do
                     local valid, issues = ExpeditionEventFlow.validateDefinition(event)
                     TestRunner.truthy(valid, table.concat(issues, "; "))
+                    TestRunner.truthy(EXPECTED_EVENT_IDS[event.id] == true)
+                    TestRunner.truthy(not seen[event.id])
+                    seen[event.id] = true
                     interactionCount += #event.steps
                 end
+                TestRunner.equal(#Catalog.Events, 8)
+                TestRunner.equal(Catalog.EventCount, 8)
+                TestRunner.equal(interactionCount, 25)
                 TestRunner.equal(interactionCount, Catalog.EventInteractionCount)
+                for eventId in EXPECTED_EVENT_IDS do
+                    TestRunner.truthy(seen[eventId] == true)
+                end
             end,
         },
         {
@@ -52,6 +73,25 @@ return {
                 )
                 local snapshot = ExpeditionEventFlow.snapshot(state, event, 30)
                 TestRunner.equal(#snapshot.participants, #event.steps)
+            end,
+        },
+        {
+            name = "keeps every new event optional and profession independent",
+            run = function()
+                for _, eventId in
+                    {
+                        "event_bw_pollen_storm",
+                        "event_bw_hungry_homestead",
+                        "event_bw_stag_tracks",
+                        "event_bw_wildfire_choice",
+                    }
+                do
+                    local event = definition(eventId)
+                    TestRunner.equal(event.defaultSolution, true)
+                    TestRunner.equal(event.criticalPathBlocking, false)
+                    TestRunner.truthy(event.safeFailure ~= "")
+                    TestRunner.equal(#event.steps, 3)
+                end
             end,
         },
         {

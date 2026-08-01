@@ -2,17 +2,17 @@
 
 ## Scope
 
-This increment activates the four representative event sockets in the current
-Bramblewake route. It does not mark the vertical slice complete. The complete
-eight-event regional catalog, full inventory/crafting, professions,
+This increment activates the complete eight-event regional catalog in the
+current Bramblewake route. It does not mark the vertical slice complete. Full
+inventory/crafting, professions,
 combat roster, boss, nights, town tier, and final production art remain later
 Milestone 3 work.
 
 Implemented in source:
 
-- four server-owned, optional event lifecycles with dormant, active, completed,
+- eight server-owned, optional event lifecycles with dormant, active, completed,
   failed, and disabled states;
-- 13 stable interaction steps distributed across the four events;
+- 25 stable interaction steps distributed across the eight events;
 - shared solo/group contributions with duplicate-delivery idempotency;
 - deterministic reward transaction IDs derived from run, manifest, and event IDs;
 - a durable unbanked profile pouch plus server-session fallback ledger;
@@ -36,6 +36,10 @@ Recovery caches and the full inventory/crafting interface remain later work.
 | Lost Wagon | 3 wagon braces | 120 s | 3 Meadow Fiber | wagon reward is lost; no resident is removed |
 | Root Bridge | 3 living knots | 105 s | 2 Amber Sap | optional shortcut closes; amber path stays open |
 | Foxlight Trail | 4 foxlights | 100 s | 2 Brightcap | hidden memory sleeps; extraction stays reachable |
+| Pollen Storm | 3 pollen screens | 95 s | 3 Brightcap | storm remains cosmetic; route stays open |
+| Hungry Homestead | 3 supply stores | 115 s | 3 Spring Clay | residents shelter safely; route stays open |
+| Warden Stag Tracks | 3 trail signs | 100 s | 2 Amber Sap | trail goes cold; route stays open |
+| Wildfire Choice | 3 clay firebreaks | 90 s | 4 Heartwood | optional grove chars; route stays open |
 
 Every event has a default profession-independent solution. More players divide
 the same work instead of increasing health or required taps. Event geometry is
@@ -75,7 +79,7 @@ and the server-session fallback share the same stable transaction ID.
 8. In a new server, start an event and let it expire. Confirm its props disable
    and the amber critical path and Wayhome Gate remain reachable.
 9. In local/test Studio, override `bramblewake_events_enabled` to false before
-   service start. Confirm all four sockets remain visually present, prompts are
+   service start. Confirm all eight sockets remain visually present, prompts are
    disabled, and the full route remains traversable.
 10. Inspect server Output for event lifecycle and reward transaction logs without
     raw profile data.
@@ -89,7 +93,7 @@ Record evidence before this increment is called playtested:
 | Baseline phone | every event prop can be selected with one thumb; buttons do not overlap Roblox controls |
 | Largest text | objective, progress, and contextual action remain usable without hiding movement |
 | Keyboard/controller | live input switching updates the same contextual action without event reset |
-| Solo | all four events can complete inside their windows without a profession ability |
+| Solo | all eight events can complete inside their windows without a profession ability |
 | 2 and 4 players | different players contribute simultaneously and every contributor receives exactly one session reward |
 | 8 players | prompt selection remains readable and remote traffic stays bounded |
 | Timeout | every event fails clearly while the critical path and extraction remain open |

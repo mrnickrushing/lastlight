@@ -90,7 +90,7 @@ mobility/telegraph foundation, the complete standard Bramblewake enemy roster,
 four basic profession kits, the Old Growth elite, the Warden Stag boss, and the
 Bramblewake Blackout through permanent chapter-one resolution are implemented
 in source. The slice now has 12 representative modules, four POIs,
-four active events with 13 shared steps, deterministic assembly, a known-good
+eight active events with 25 shared steps, deterministic assembly, a known-good
 fallback, 1,000-seed invariants, streamed preview geometry, beacon entry,
 fall recovery, timeout-safe optional routes, schema-v4 unbanked/banked
 materials, profession choice, and chapter-one story state,
@@ -140,7 +140,7 @@ See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md)
 
 ### Deliverables
 
-- one complete region with 12 representative modules, 4 POIs, and 4 events;
+- one complete region with 12 representative modules, 4 POIs, and 8 events;
 - deterministic expedition assembly and known-good fallback;
 - Scout, Warden, Engineer, and Medic basic kits;
 - six Bramblewake enemies, Old Growth elite, Warden Stag boss;
