@@ -134,11 +134,96 @@ function ExpeditionService.Start(self: ExpeditionService)
     end
     Players.PlayerRemoving:Connect(function(player: Player)
         self._pendingExtractionPayoffs[player] = nil
+        self._worldService:clearRecoveryCache(player)
     end)
 end
 
 function ExpeditionService.enter(self: ExpeditionService, player: Player): boolean
-    return self._worldService:enterBramblewake(player)
+    local entered = self._worldService:enterBramblewake(player)
+    if entered then
+        local cache = self._profileService:recoveryCache(player)
+        if cache ~= nil then
+            self._worldService:showRecoveryCache(player, cache)
+        end
+    end
+    return entered
+end
+
+function ExpeditionService.failExpedition(self: ExpeditionService, player: Player): any
+    if player:GetAttribute("LastLightInExpedition") ~= true then
+        return { accepted = false, message = nil, reason = "player_not_in_expedition" }
+    end
+    local manifest = assert(self._manifest, "expedition manifest was not initialized")
+    local sessionPending = self._rewardLedger.pending(self._rewardLedgerState, player.UserId)
+    local result = self._profileService:cacheExpeditionFailure(
+        player,
+        self._runId,
+        manifest.hash,
+        sessionPending.rewards
+    )
+    self._worldService:clearRecoveryCache(player)
+    if result.cached and result.cacheId ~= nil then
+        self._logger:info("expedition_recovery_cache_created", {
+            cache = result.cacheId,
+            player = player.UserId,
+            retained = result.retained,
+        })
+        return {
+            accepted = result.accepted,
+            cacheId = result.cacheId,
+            message = "SAFE RETREAT — HALF THE POUCH WAITS IN A LOST SATCHEL",
+            reason = result.reason,
+        }
+    end
+    return {
+        accepted = result.accepted,
+        message = if result.accepted
+            then "SAFE RETREAT — SMALL POUCH RETAINED"
+            else "SAFE RETREAT — POUCH RETAINED WHILE PROFILE RECOVERS",
+        reason = result.reason,
+    }
+end
+
+function ExpeditionService.recoverCache(
+    self: ExpeditionService,
+    player: Player,
+    prompt: ProximityPrompt
+): any
+    if player:GetAttribute("LastLightInExpedition") ~= true then
+        return { accepted = false, message = "ENTER BRAMBLEWAKE TO RECOVER THE SATCHEL" }
+    end
+    if prompt:GetAttribute("OwnerUserId") ~= player.UserId then
+        return { accepted = false, message = "THAT LOST SATCHEL BELONGS TO ANOTHER TRAVELER" }
+    end
+    local cacheId = prompt:GetAttribute("Payload")
+    if type(cacheId) ~= "string" then
+        return { accepted = false, message = "THAT RECOVERY MARK IS INVALID" }
+    end
+    local result = self._profileService:recoverExpeditionCache(player, cacheId)
+    if not result.accepted then
+        return {
+            accepted = false,
+            message = if result.reason == "save_pending"
+                then "SATCHEL RECOVERY WILL RETRY WHEN YOUR PROFILE IS READY"
+                else "THAT SATCHEL HAS ALREADY BEEN RECOVERED",
+            reason = result.reason,
+        }
+    end
+    self._worldService:clearRecoveryCache(player)
+    local amount = 0
+    for _, count in result.materials do
+        amount += count
+    end
+    self._logger:info("expedition_recovery_cache_claimed", {
+        amount = amount,
+        cache = cacheId,
+        player = player.UserId,
+    })
+    return {
+        accepted = true,
+        message = string.format("LOST SATCHEL RECOVERED — %d MATERIALS BACK IN POUCH", amount),
+        reason = "recovered",
+    }
 end
 
 function ExpeditionService._participantCount(_self: ExpeditionService, state: any): number
@@ -343,6 +428,9 @@ function ExpeditionService._combinedPending(self: ExpeditionService, player: Pla
     local materials: { [string]: number } = {}
     local rewards = {}
     local seen: { [string]: boolean } = {}
+    for _, transactionId in profileInventory.cachedTransactionIds do
+        seen[transactionId] = true
+    end
     for _, reward in profileInventory.pendingRewards do
         seen[reward.transactionId] = true
         materials[reward.materialId] = (materials[reward.materialId] or 0) + reward.amount
@@ -361,6 +449,7 @@ function ExpeditionService._combinedPending(self: ExpeditionService, player: Pla
     return {
         banked = profileInventory.banked,
         materials = materials,
+        recovery = profileInventory.recovery,
         rewards = rewards,
     }
 end
@@ -375,6 +464,7 @@ function ExpeditionService._deliverPendingPayoff(self: ExpeditionService, player
 end
 
 function ExpeditionService._exitWithPayoff(self: ExpeditionService, player: Player): boolean
+    self._worldService:clearRecoveryCache(player)
     return self._worldService:exitBramblewake(player, function()
         self:_deliverPendingPayoff(player)
     end)
@@ -480,6 +570,7 @@ function ExpeditionService.snapshot(self: ExpeditionService, player: Player): an
     local inventory = self:_combinedPending(player)
     snapshot.unbankedRewards = inventory.materials
     snapshot.bankedMaterials = inventory.banked
+    snapshot.recoveryCache = inventory.recovery
     if not snapshot.active then
         return snapshot
     end

@@ -4,7 +4,7 @@
 
 This increment makes the active Bramblewake event rewards durable and adds
 an authoritative Wayhome extraction flow. It is a bounded Milestone 3 slice, not
-the complete inventory, crafting, equipment, expedition-failure, or persistent
+the complete inventory, crafting, equipment, or persistent
 town platform.
 
 Implemented in source:
@@ -22,6 +22,9 @@ Implemented in source:
 - server-session reward retention when profile load, write, or settlement fails;
 - bounded server-side streaming prefetch before returning to Emberhollow;
 - extraction success/failure telemetry and banked/unbanked snapshot fields;
+- a follow-on schema-v10 partial-pouch failure contract and persistent physical
+  recovery satchel, documented in
+  [MILESTONE_3_EXPEDITION_RECOVERY.md](MILESTONE_3_EXPEDITION_RECOVERY.md);
 - pure migration, normalization, retry, duplicate, and malformed-grant tests;
 - Studio DataModel assertions for the extraction target and server action.
 
@@ -29,7 +32,6 @@ Not implemented by this increment:
 
 - item slots, capacity, equipment, crafting, repair, loadouts, or an inventory screen;
 - resource gathering beyond the four current event rewards;
-- partial-loss expedition failure and recovery caches;
 - profile session locking, backups, admin repair, or the complete Milestone 4
   persistence platform;
 - production DataStore, device, multiplayer, forced-write-failure, or reconnect

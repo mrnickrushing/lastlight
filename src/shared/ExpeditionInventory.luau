@@ -6,6 +6,7 @@ local MAX_MATERIAL_STACK = 999999
 local MAX_REWARD_AMOUNT = 100
 local MAX_REWARD_TRANSACTIONS = 512
 local MAX_SETTLEMENTS = 128
+local MAX_RECOVERY_CACHES = 16
 local HASH_MODULUS = 2147483647
 local HASH_MULTIPLIER = 33
 
@@ -40,6 +41,8 @@ local function cloneInventory(inventory: any): any
         rewardOrder = table.clone(inventory.rewardOrder),
         settlements = table.clone(inventory.settlements),
         settlementOrder = table.clone(inventory.settlementOrder),
+        recoveryCaches = table.clone(inventory.recoveryCaches),
+        recoveryOrder = table.clone(inventory.recoveryOrder),
     }
 end
 
@@ -100,6 +103,8 @@ function ExpeditionInventory.default(): any
         rewardOrder = {},
         settlements = {},
         settlementOrder = {},
+        recoveryCaches = {},
+        recoveryOrder = {},
     }
 end
 
@@ -123,7 +128,7 @@ function ExpeditionInventory.normalize(value: any): any
                 and type(record.amount) == "number"
                 and record.amount >= 1
                 and record.amount <= MAX_REWARD_AMOUNT
-                and (record.status == "unbanked" or record.status == "settled")
+                and (record.status == "unbanked" or record.status == "cached" or record.status == "settled")
                 and inventory.expeditionRewards[transactionId] == nil
             then
                 inventory.expeditionRewards[transactionId] = {
@@ -135,6 +140,10 @@ function ExpeditionInventory.normalize(value: any): any
                         then string.sub(record.manifestHash, 1, 32)
                         else "unknown",
                     materialId = record.materialId,
+                    cacheId = if type(record.cacheId) == "string"
+                            and validTransactionId(record.cacheId)
+                        then record.cacheId
+                        else nil,
                     settledBy = if type(record.settledBy) == "string"
                         then string.sub(record.settledBy, 1, 180)
                         else nil,
@@ -167,6 +176,52 @@ function ExpeditionInventory.normalize(value: any): any
                         else 0,
                 }
                 table.insert(inventory.settlementOrder, settlementId)
+            end
+        end
+    end
+    if type(value.recoveryCaches) == "table" and type(value.recoveryOrder) == "table" then
+        for _, cacheId in value.recoveryOrder do
+            if #inventory.recoveryOrder >= MAX_RECOVERY_CACHES then
+                break
+            end
+            local record = value.recoveryCaches[cacheId]
+            if
+                validTransactionId(cacheId)
+                and type(record) == "table"
+                and (record.status == "active" or record.status == "recovered")
+                and inventory.recoveryCaches[cacheId] == nil
+            then
+                local transactionIds = normalizeTransactionIds(record.rewardTransactionIds)
+                local validIds = {}
+                for _, transactionId in transactionIds do
+                    local reward = inventory.expeditionRewards[transactionId]
+                    if
+                        record.status == "recovered"
+                        or (
+                            reward ~= nil
+                            and reward.status == "cached"
+                            and reward.cacheId == cacheId
+                        )
+                    then
+                        table.insert(validIds, transactionId)
+                    end
+                end
+                if record.status == "recovered" or #validIds > 0 then
+                    inventory.recoveryCaches[cacheId] = {
+                        createdAt = if type(record.createdAt) == "number"
+                            then math.floor(record.createdAt)
+                            else 0,
+                        manifestHash = if type(record.manifestHash) == "string"
+                            then string.sub(record.manifestHash, 1, 32)
+                            else "unknown",
+                        recoveredAt = if type(record.recoveredAt) == "number"
+                            then math.floor(record.recoveredAt)
+                            else nil,
+                        rewardTransactionIds = validIds,
+                        status = record.status,
+                    }
+                    table.insert(inventory.recoveryOrder, cacheId)
+                end
             end
         end
     end
@@ -224,6 +279,7 @@ function ExpeditionInventory.addUnbanked(
         grantedAt = math.floor(now),
         manifestHash = string.sub(manifestHash, 1, 32),
         materialId = reward.materialId,
+        cacheId = nil,
         settledBy = nil,
         status = "unbanked",
     }
@@ -233,6 +289,165 @@ function ExpeditionInventory.addUnbanked(
         applied = true,
         record = table.clone(record),
     }
+end
+
+local function recoveryMaterials(inventory: any, transactionIds: { string }): { [string]: number }
+    local materials: { [string]: number } = {}
+    for _, transactionId in transactionIds do
+        local reward = inventory.expeditionRewards[transactionId]
+        if reward ~= nil then
+            materials[reward.materialId] = (materials[reward.materialId] or 0) + reward.amount
+        end
+    end
+    return materials
+end
+
+function ExpeditionInventory.recoveryCacheId(
+    runId: string,
+    userId: number,
+    fingerprint: string
+): string
+    assert(type(runId) == "string" and runId ~= "", "expedition run ID is required")
+    assert(userId > 0, "recovery user ID is invalid")
+    return string.format(
+        "expedition_cache:%s:%d:%s",
+        string.sub(runId, 1, 64),
+        userId,
+        string.sub(fingerprint, 1, 16)
+    )
+end
+
+function ExpeditionInventory.cacheAfterFailure(
+    inventory: any,
+    cacheId: string,
+    manifestHash: string,
+    now: number
+): (any, any)
+    if not validTransactionId(cacheId) then
+        return inventory, { applied = false, reason = "invalid_cache" }
+    end
+    local existing = inventory.recoveryCaches[cacheId]
+    if existing ~= nil then
+        return inventory,
+            {
+                applied = false,
+                duplicate = true,
+                cacheId = cacheId,
+                record = table.clone(existing),
+            }
+    end
+    local pending = ExpeditionInventory.pending(inventory)
+    if pending.count < 2 then
+        return inventory, { applied = false, reason = "insufficient_pouch" }
+    end
+
+    local selected = {}
+    local cacheCount = math.floor(pending.count / 2)
+    for index = pending.count - cacheCount + 1, pending.count do
+        table.insert(selected, pending.transactionIds[index])
+    end
+    local nextInventory = cloneInventory(inventory)
+    while #nextInventory.recoveryOrder >= MAX_RECOVERY_CACHES do
+        local oldestId = nextInventory.recoveryOrder[1]
+        local oldest = nextInventory.recoveryCaches[oldestId]
+        if oldest == nil or oldest.status == "recovered" then
+            table.remove(nextInventory.recoveryOrder, 1)
+            nextInventory.recoveryCaches[oldestId] = nil
+        else
+            return inventory, { applied = false, reason = "recovery_cache_full" }
+        end
+    end
+    for _, transactionId in selected do
+        local reward = table.clone(nextInventory.expeditionRewards[transactionId])
+        reward.status = "cached"
+        reward.cacheId = cacheId
+        nextInventory.expeditionRewards[transactionId] = reward
+    end
+    local record = {
+        createdAt = math.floor(now),
+        manifestHash = string.sub(manifestHash, 1, 32),
+        recoveredAt = nil,
+        rewardTransactionIds = selected,
+        status = "active",
+    }
+    nextInventory.recoveryCaches[cacheId] = record
+    table.insert(nextInventory.recoveryOrder, cacheId)
+    return nextInventory,
+        {
+            applied = true,
+            cacheId = cacheId,
+            materials = recoveryMaterials(nextInventory, selected),
+            record = table.clone(record),
+            retained = pending.count - cacheCount,
+            transactionIds = table.clone(selected),
+        }
+end
+
+function ExpeditionInventory.activeRecovery(inventory: any): any
+    for _, cacheId in inventory.recoveryOrder do
+        local record = inventory.recoveryCaches[cacheId]
+        if record ~= nil and record.status == "active" then
+            return {
+                cacheId = cacheId,
+                createdAt = record.createdAt,
+                manifestHash = record.manifestHash,
+                materials = recoveryMaterials(inventory, record.rewardTransactionIds),
+                transactionIds = table.clone(record.rewardTransactionIds),
+            }
+        end
+    end
+    return nil
+end
+
+function ExpeditionInventory.cachedTransactionIds(inventory: any): { string }
+    local result = {}
+    for _, transactionId in inventory.rewardOrder do
+        local reward = inventory.expeditionRewards[transactionId]
+        if reward ~= nil and reward.status == "cached" then
+            table.insert(result, transactionId)
+        end
+    end
+    table.sort(result)
+    return result
+end
+
+function ExpeditionInventory.recover(inventory: any, cacheId: string, now: number): (any, any)
+    local record = inventory.recoveryCaches[cacheId]
+    if record == nil then
+        return inventory, { applied = false, reason = "unknown_cache" }
+    end
+    if record.status ~= "active" then
+        return inventory,
+            {
+                applied = false,
+                cacheId = cacheId,
+                duplicate = true,
+                materials = recoveryMaterials(inventory, record.rewardTransactionIds),
+                reason = "cache_recovered",
+                transactionIds = table.clone(record.rewardTransactionIds),
+            }
+    end
+    local nextInventory = cloneInventory(inventory)
+    local recoveredRecord = table.clone(record)
+    recoveredRecord.status = "recovered"
+    recoveredRecord.recoveredAt = math.floor(now)
+    nextInventory.recoveryCaches[cacheId] = recoveredRecord
+    for _, transactionId in record.rewardTransactionIds do
+        local reward = nextInventory.expeditionRewards[transactionId]
+        if reward ~= nil and reward.status == "cached" and reward.cacheId == cacheId then
+            local recoveredReward = table.clone(reward)
+            recoveredReward.status = "unbanked"
+            recoveredReward.cacheId = nil
+            nextInventory.expeditionRewards[transactionId] = recoveredReward
+        end
+    end
+    return nextInventory,
+        {
+            applied = true,
+            cacheId = cacheId,
+            materials = recoveryMaterials(nextInventory, record.rewardTransactionIds),
+            transactionIds = table.clone(record.rewardTransactionIds),
+        }
 end
 
 function ExpeditionInventory.pending(inventory: any): any

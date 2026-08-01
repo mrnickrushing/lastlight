@@ -26,7 +26,8 @@ ability bonuses, and persistent physical town damage with daylight repair work
 implemented, plus replicated physical visuals for equipped permanent gear and
 mastery-scaled Medic/Warden rescue utility; four rotating physical normal-night
 incidents now interrupt the defense with
-short cooperative town emergencies;
+short cooperative town emergencies; failed expeditions now create persistent,
+owner-only recovery satchels for a deterministic half of larger unbanked pouches;
 Studio and device exit gates remain pending.**
 
 The repository currently contains:
@@ -42,7 +43,7 @@ The repository currently contains:
   a known-good fallback, beacon entry, route progress, and expedition fall recovery;
 - eight active optional Bramblewake events with 25 shared interaction steps,
   timeout-safe routes, durable unbanked rewards, kill switch, and telemetry;
-- save-schema-v9 inventory/profession/mastery/story/town-night/condition/gear/equipment/quest migration,
+- save-schema-v10 inventory/profession/mastery/story/town-night/condition/gear/equipment/quest/recovery migration,
   run-specific reward tombstones, Wayhome extraction, atomic banking,
   retry-safe settlement, and town return streaming;
 - server-owned health, six distinct readable enemy attacks, 30-second downed crawl,
@@ -89,7 +90,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 248 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 254 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -106,6 +107,9 @@ The active-event contracts and abuse/device matrix are in
 [the Bramblewake event runbook](docs/MILESTONE_3_BRAMBLEWAKE_EVENTS.md).
 The save migration, banking, reconnect, and Wayhome gates are in
 [the inventory and extraction runbook](docs/MILESTONE_3_INVENTORY_EXTRACTION.md).
+The partial-pouch lock, owner-only physical satchel, migration, and exact-once
+recovery gates are in
+[the expedition recovery runbook](docs/MILESTONE_3_EXPEDITION_RECOVERY.md).
 The health, downed-state, revive, safe-retreat, and abuse gates are in
 [the player survival runbook](docs/MILESTONE_3_PLAYER_SURVIVAL.md).
 The stamina, dodge, telegraph, input, latency, and device gates are in

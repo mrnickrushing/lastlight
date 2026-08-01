@@ -108,6 +108,9 @@ local survivalService = PlayerSurvivalService.new(
     worldService,
     analyticsService
 )
+survivalService:setExpeditionFailureHandler(function(player: Player): any
+    return expeditionService:failExpedition(player)
+end)
 local combatService = PlayerCombatService.new(
     logger,
     Config,

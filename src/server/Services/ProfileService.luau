@@ -645,15 +645,145 @@ function ProfileService.inventorySnapshot(self: ProfileService, player: Player):
     if profile == nil then
         return {
             banked = {},
+            cachedTransactionIds = {},
             pending = {},
             pendingRewards = {},
+            recovery = nil,
         }
     end
     local pending = self._saveSchema.expeditionPending(profile)
     return {
         banked = table.clone(profile.inventory.materials),
+        cachedTransactionIds = self._saveSchema.expeditionCachedTransactionIds(profile),
         pending = pending.materials,
         pendingRewards = pending.rewards,
+        recovery = self._saveSchema.expeditionRecovery(profile),
+    }
+end
+
+function ProfileService.cacheExpeditionFailure(
+    self: ProfileService,
+    player: Player,
+    runId: string,
+    manifestHash: string,
+    sessionRewards: { any }
+): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { accepted = false, reason = "profile_unavailable" }
+    end
+    local workingProfile = profile
+    for _, sessionReward in sessionRewards do
+        local nextProfile, result = self._saveSchema.withUnbankedExpeditionReward(
+            workingProfile,
+            sessionReward.transactionId,
+            sessionReward.manifestHash,
+            { amount = sessionReward.amount, materialId = sessionReward.materialId },
+            os.time()
+        )
+        if not result.applied and not result.duplicate then
+            return { accepted = false, reason = result.reason }
+        end
+        workingProfile = nextProfile
+    end
+
+    local pending = self._saveSchema.expeditionPending(workingProfile)
+    if pending.count < 2 then
+        if workingProfile ~= profile then
+            self._profiles[player] = workingProfile
+            if self._persistent then
+                self._dirty[player] = true
+            end
+        end
+        local durable = if self._persistent and self._dirty[player] == true
+            then self:save(player)
+            else true
+        return {
+            accepted = durable,
+            cached = false,
+            durable = durable,
+            reason = if durable then "pouch_retained" else "save_pending",
+        }
+    end
+    local baseCacheId =
+        self._saveSchema.expeditionRecoveryCacheId(runId, player.UserId, pending.fingerprint)
+    local cacheId = baseCacheId
+    local suffix = 1
+    while
+        workingProfile.inventory.recoveryCaches[cacheId] ~= nil
+        and workingProfile.inventory.recoveryCaches[cacheId].status == "recovered"
+    do
+        suffix += 1
+        cacheId = string.format("%s:%d", baseCacheId, suffix)
+    end
+    local nextProfile, result = self._saveSchema.withExpeditionFailureCache(
+        workingProfile,
+        cacheId,
+        manifestHash,
+        os.time()
+    )
+    if not result.applied and not result.duplicate then
+        return { accepted = false, reason = result.reason }
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    local durable = if self._persistent then self:save(player) else true
+    return {
+        accepted = durable,
+        cacheId = cacheId,
+        cached = true,
+        durable = durable,
+        materials = result.materials or {},
+        reason = if durable then "cached" else "save_pending",
+        retained = result.retained or 0,
+        transactionIds = result.transactionIds or {},
+    }
+end
+
+function ProfileService.recoveryCache(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    return if profile == nil then nil else self._saveSchema.expeditionRecovery(profile)
+end
+
+function ProfileService.recoverExpeditionCache(
+    self: ProfileService,
+    player: Player,
+    cacheId: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { accepted = false, reason = "profile_unavailable" }
+    end
+    local nextProfile, result =
+        self._saveSchema.withRecoveredExpeditionCache(profile, cacheId, os.time())
+    if not result.applied then
+        if result.duplicate then
+            local durable = if self._persistent and self._dirty[player] == true
+                then self:save(player)
+                else true
+            return {
+                accepted = durable,
+                cacheId = cacheId,
+                durable = durable,
+                materials = result.materials or {},
+                reason = if durable then "recovered" else "save_pending",
+            }
+        end
+        return { accepted = false, reason = result.reason }
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    local durable = if self._persistent then self:save(player) else true
+    return {
+        accepted = durable,
+        cacheId = cacheId,
+        durable = durable,
+        materials = result.materials or {},
+        reason = if durable then "recovered" else "save_pending",
     }
 end
 

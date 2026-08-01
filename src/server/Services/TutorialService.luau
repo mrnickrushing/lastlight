@@ -537,6 +537,12 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self:_publishAll()
         return
     end
+    if actionId == self._runtimeIds.Actions.RecoverExpeditionCache then
+        local result = self._expeditionService:recoverCache(player, prompt)
+        self:_setToast(player, result.message)
+        self:_publish(player)
+        return
+    end
 
     if actionId == self._runtimeIds.Actions.Build and session.resources < 3 then
         self:_setToast(player, "YOU NEED 3 HEARTWOOD")

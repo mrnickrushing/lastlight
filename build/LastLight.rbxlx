@@ -1219,14 +1219,14 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.24.0",
+    BuildVersion = "0.25.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 9,
+    SaveSchemaVersion = 10,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -3647,6 +3647,7 @@ local MAX_MATERIAL_STACK = 999999
 local MAX_REWARD_AMOUNT = 100
 local MAX_REWARD_TRANSACTIONS = 512
 local MAX_SETTLEMENTS = 128
+local MAX_RECOVERY_CACHES = 16
 local HASH_MODULUS = 2147483647
 local HASH_MULTIPLIER = 33
 
@@ -3681,6 +3682,8 @@ local function cloneInventory(inventory: any): any
         rewardOrder = table.clone(inventory.rewardOrder),
         settlements = table.clone(inventory.settlements),
         settlementOrder = table.clone(inventory.settlementOrder),
+        recoveryCaches = table.clone(inventory.recoveryCaches),
+        recoveryOrder = table.clone(inventory.recoveryOrder),
     }
 end
 
@@ -3741,6 +3744,8 @@ function ExpeditionInventory.default(): any
         rewardOrder = {},
         settlements = {},
         settlementOrder = {},
+        recoveryCaches = {},
+        recoveryOrder = {},
     }
 end
 
@@ -3764,7 +3769,7 @@ function ExpeditionInventory.normalize(value: any): any
                 and type(record.amount) == "number"
                 and record.amount >= 1
                 and record.amount <= MAX_REWARD_AMOUNT
-                and (record.status == "unbanked" or record.status == "settled")
+                and (record.status == "unbanked" or record.status == "cached" or record.status == "settled")
                 and inventory.expeditionRewards[transactionId] == nil
             then
                 inventory.expeditionRewards[transactionId] = {
@@ -3776,6 +3781,10 @@ function ExpeditionInventory.normalize(value: any): any
                         then string.sub(record.manifestHash, 1, 32)
                         else "unknown",
                     materialId = record.materialId,
+                    cacheId = if type(record.cacheId) == "string"
+                            and validTransactionId(record.cacheId)
+                        then record.cacheId
+                        else nil,
                     settledBy = if type(record.settledBy) == "string"
                         then string.sub(record.settledBy, 1, 180)
                         else nil,
@@ -3808,6 +3817,52 @@ function ExpeditionInventory.normalize(value: any): any
                         else 0,
                 }
                 table.insert(inventory.settlementOrder, settlementId)
+            end
+        end
+    end
+    if type(value.recoveryCaches) == "table" and type(value.recoveryOrder) == "table" then
+        for _, cacheId in value.recoveryOrder do
+            if #inventory.recoveryOrder >= MAX_RECOVERY_CACHES then
+                break
+            end
+            local record = value.recoveryCaches[cacheId]
+            if
+                validTransactionId(cacheId)
+                and type(record) == "table"
+                and (record.status == "active" or record.status == "recovered")
+                and inventory.recoveryCaches[cacheId] == nil
+            then
+                local transactionIds = normalizeTransactionIds(record.rewardTransactionIds)
+                local validIds = {}
+                for _, transactionId in transactionIds do
+                    local reward = inventory.expeditionRewards[transactionId]
+                    if
+                        record.status == "recovered"
+                        or (
+                            reward ~= nil
+                            and reward.status == "cached"
+                            and reward.cacheId == cacheId
+                        )
+                    then
+                        table.insert(validIds, transactionId)
+                    end
+                end
+                if record.status == "recovered" or #validIds > 0 then
+                    inventory.recoveryCaches[cacheId] = {
+                        createdAt = if type(record.createdAt) == "number"
+                            then math.floor(record.createdAt)
+                            else 0,
+                        manifestHash = if type(record.manifestHash) == "string"
+                            then string.sub(record.manifestHash, 1, 32)
+                            else "unknown",
+                        recoveredAt = if type(record.recoveredAt) == "number"
+                            then math.floor(record.recoveredAt)
+                            else nil,
+                        rewardTransactionIds = validIds,
+                        status = record.status,
+                    }
+                    table.insert(inventory.recoveryOrder, cacheId)
+                end
             end
         end
     end
@@ -3865,6 +3920,7 @@ function ExpeditionInventory.addUnbanked(
         grantedAt = math.floor(now),
         manifestHash = string.sub(manifestHash, 1, 32),
         materialId = reward.materialId,
+        cacheId = nil,
         settledBy = nil,
         status = "unbanked",
     }
@@ -3874,6 +3930,165 @@ function ExpeditionInventory.addUnbanked(
         applied = true,
         record = table.clone(record),
     }
+end
+
+local function recoveryMaterials(inventory: any, transactionIds: { string }): { [string]: number }
+    local materials: { [string]: number } = {}
+    for _, transactionId in transactionIds do
+        local reward = inventory.expeditionRewards[transactionId]
+        if reward ~= nil then
+            materials[reward.materialId] = (materials[reward.materialId] or 0) + reward.amount
+        end
+    end
+    return materials
+end
+
+function ExpeditionInventory.recoveryCacheId(
+    runId: string,
+    userId: number,
+    fingerprint: string
+): string
+    assert(type(runId) == "string" and runId ~= "", "expedition run ID is required")
+    assert(userId > 0, "recovery user ID is invalid")
+    return string.format(
+        "expedition_cache:%s:%d:%s",
+        string.sub(runId, 1, 64),
+        userId,
+        string.sub(fingerprint, 1, 16)
+    )
+end
+
+function ExpeditionInventory.cacheAfterFailure(
+    inventory: any,
+    cacheId: string,
+    manifestHash: string,
+    now: number
+): (any, any)
+    if not validTransactionId(cacheId) then
+        return inventory, { applied = false, reason = "invalid_cache" }
+    end
+    local existing = inventory.recoveryCaches[cacheId]
+    if existing ~= nil then
+        return inventory,
+            {
+                applied = false,
+                duplicate = true,
+                cacheId = cacheId,
+                record = table.clone(existing),
+            }
+    end
+    local pending = ExpeditionInventory.pending(inventory)
+    if pending.count < 2 then
+        return inventory, { applied = false, reason = "insufficient_pouch" }
+    end
+
+    local selected = {}
+    local cacheCount = math.floor(pending.count / 2)
+    for index = pending.count - cacheCount + 1, pending.count do
+        table.insert(selected, pending.transactionIds[index])
+    end
+    local nextInventory = cloneInventory(inventory)
+    while #nextInventory.recoveryOrder >= MAX_RECOVERY_CACHES do
+        local oldestId = nextInventory.recoveryOrder[1]
+        local oldest = nextInventory.recoveryCaches[oldestId]
+        if oldest == nil or oldest.status == "recovered" then
+            table.remove(nextInventory.recoveryOrder, 1)
+            nextInventory.recoveryCaches[oldestId] = nil
+        else
+            return inventory, { applied = false, reason = "recovery_cache_full" }
+        end
+    end
+    for _, transactionId in selected do
+        local reward = table.clone(nextInventory.expeditionRewards[transactionId])
+        reward.status = "cached"
+        reward.cacheId = cacheId
+        nextInventory.expeditionRewards[transactionId] = reward
+    end
+    local record = {
+        createdAt = math.floor(now),
+        manifestHash = string.sub(manifestHash, 1, 32),
+        recoveredAt = nil,
+        rewardTransactionIds = selected,
+        status = "active",
+    }
+    nextInventory.recoveryCaches[cacheId] = record
+    table.insert(nextInventory.recoveryOrder, cacheId)
+    return nextInventory,
+        {
+            applied = true,
+            cacheId = cacheId,
+            materials = recoveryMaterials(nextInventory, selected),
+            record = table.clone(record),
+            retained = pending.count - cacheCount,
+            transactionIds = table.clone(selected),
+        }
+end
+
+function ExpeditionInventory.activeRecovery(inventory: any): any
+    for _, cacheId in inventory.recoveryOrder do
+        local record = inventory.recoveryCaches[cacheId]
+        if record ~= nil and record.status == "active" then
+            return {
+                cacheId = cacheId,
+                createdAt = record.createdAt,
+                manifestHash = record.manifestHash,
+                materials = recoveryMaterials(inventory, record.rewardTransactionIds),
+                transactionIds = table.clone(record.rewardTransactionIds),
+            }
+        end
+    end
+    return nil
+end
+
+function ExpeditionInventory.cachedTransactionIds(inventory: any): { string }
+    local result = {}
+    for _, transactionId in inventory.rewardOrder do
+        local reward = inventory.expeditionRewards[transactionId]
+        if reward ~= nil and reward.status == "cached" then
+            table.insert(result, transactionId)
+        end
+    end
+    table.sort(result)
+    return result
+end
+
+function ExpeditionInventory.recover(inventory: any, cacheId: string, now: number): (any, any)
+    local record = inventory.recoveryCaches[cacheId]
+    if record == nil then
+        return inventory, { applied = false, reason = "unknown_cache" }
+    end
+    if record.status ~= "active" then
+        return inventory,
+            {
+                applied = false,
+                cacheId = cacheId,
+                duplicate = true,
+                materials = recoveryMaterials(inventory, record.rewardTransactionIds),
+                reason = "cache_recovered",
+                transactionIds = table.clone(record.rewardTransactionIds),
+            }
+    end
+    local nextInventory = cloneInventory(inventory)
+    local recoveredRecord = table.clone(record)
+    recoveredRecord.status = "recovered"
+    recoveredRecord.recoveredAt = math.floor(now)
+    nextInventory.recoveryCaches[cacheId] = recoveredRecord
+    for _, transactionId in record.rewardTransactionIds do
+        local reward = nextInventory.expeditionRewards[transactionId]
+        if reward ~= nil and reward.status == "cached" and reward.cacheId == cacheId then
+            local recoveredReward = table.clone(reward)
+            recoveredReward.status = "unbanked"
+            recoveredReward.cacheId = nil
+            nextInventory.expeditionRewards[transactionId] = recoveredReward
+        end
+    end
+    return nextInventory,
+        {
+            applied = true,
+            cacheId = cacheId,
+            materials = recoveryMaterials(nextInventory, record.rewardTransactionIds),
+            transactionIds = table.clone(record.rewardTransactionIds),
+        }
 end
 
 function ExpeditionInventory.pending(inventory: any): any
@@ -5849,6 +6064,7 @@ local RuntimeIds = {
         TalkResident = "talk_resident",
         RepairTown = "repair_town",
         ResolveTownIncident = "resolve_town_incident",
+        RecoverExpeditionCache = "recover_expedition_cache",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -5967,7 +6183,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 9,
+        schemaVersion = 10,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -6094,7 +6310,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 9
+    profile.schemaVersion = 10
     return profile
 end
 
@@ -6172,6 +6388,56 @@ end
 
 function SaveSchema.expeditionPending(profile: Profile): any
     return ExpeditionInventory.pending(profile.inventory)
+end
+
+function SaveSchema.expeditionRecoveryCacheId(
+    runId: string,
+    userId: number,
+    fingerprint: string
+): string
+    return ExpeditionInventory.recoveryCacheId(runId, userId, fingerprint)
+end
+
+function SaveSchema.withExpeditionFailureCache(
+    profile: Profile,
+    cacheId: string,
+    manifestHash: string,
+    now: number
+): (Profile, any)
+    local nextInventory, result =
+        ExpeditionInventory.cacheAfterFailure(profile.inventory, cacheId, manifestHash, now)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.inventory = nextInventory
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.expeditionRecovery(profile: Profile): any
+    return ExpeditionInventory.activeRecovery(profile.inventory)
+end
+
+function SaveSchema.expeditionCachedTransactionIds(profile: Profile): { string }
+    return ExpeditionInventory.cachedTransactionIds(profile.inventory)
+end
+
+function SaveSchema.withRecoveredExpeditionCache(
+    profile: Profile,
+    cacheId: string,
+    now: number
+): (Profile, any)
+    local nextInventory, result = ExpeditionInventory.recover(profile.inventory, cacheId, now)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.inventory = nextInventory
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
 end
 
 function SaveSchema.expeditionSettlementId(
@@ -8168,6 +8434,9 @@ local survivalService = PlayerSurvivalService.new(
     worldService,
     analyticsService
 )
+survivalService:setExpeditionFailureHandler(function(player: Player): any
+    return expeditionService:failExpedition(player)
+end)
 local combatService = PlayerCombatService.new(
     logger,
     Config,
@@ -11015,11 +11284,96 @@ function ExpeditionService.Start(self: ExpeditionService)
     end
     Players.PlayerRemoving:Connect(function(player: Player)
         self._pendingExtractionPayoffs[player] = nil
+        self._worldService:clearRecoveryCache(player)
     end)
 end
 
 function ExpeditionService.enter(self: ExpeditionService, player: Player): boolean
-    return self._worldService:enterBramblewake(player)
+    local entered = self._worldService:enterBramblewake(player)
+    if entered then
+        local cache = self._profileService:recoveryCache(player)
+        if cache ~= nil then
+            self._worldService:showRecoveryCache(player, cache)
+        end
+    end
+    return entered
+end
+
+function ExpeditionService.failExpedition(self: ExpeditionService, player: Player): any
+    if player:GetAttribute("LastLightInExpedition") ~= true then
+        return { accepted = false, message = nil, reason = "player_not_in_expedition" }
+    end
+    local manifest = assert(self._manifest, "expedition manifest was not initialized")
+    local sessionPending = self._rewardLedger.pending(self._rewardLedgerState, player.UserId)
+    local result = self._profileService:cacheExpeditionFailure(
+        player,
+        self._runId,
+        manifest.hash,
+        sessionPending.rewards
+    )
+    self._worldService:clearRecoveryCache(player)
+    if result.cached and result.cacheId ~= nil then
+        self._logger:info("expedition_recovery_cache_created", {
+            cache = result.cacheId,
+            player = player.UserId,
+            retained = result.retained,
+        })
+        return {
+            accepted = result.accepted,
+            cacheId = result.cacheId,
+            message = "SAFE RETREAT — HALF THE POUCH WAITS IN A LOST SATCHEL",
+            reason = result.reason,
+        }
+    end
+    return {
+        accepted = result.accepted,
+        message = if result.accepted
+            then "SAFE RETREAT — SMALL POUCH RETAINED"
+            else "SAFE RETREAT — POUCH RETAINED WHILE PROFILE RECOVERS",
+        reason = result.reason,
+    }
+end
+
+function ExpeditionService.recoverCache(
+    self: ExpeditionService,
+    player: Player,
+    prompt: ProximityPrompt
+): any
+    if player:GetAttribute("LastLightInExpedition") ~= true then
+        return { accepted = false, message = "ENTER BRAMBLEWAKE TO RECOVER THE SATCHEL" }
+    end
+    if prompt:GetAttribute("OwnerUserId") ~= player.UserId then
+        return { accepted = false, message = "THAT LOST SATCHEL BELONGS TO ANOTHER TRAVELER" }
+    end
+    local cacheId = prompt:GetAttribute("Payload")
+    if type(cacheId) ~= "string" then
+        return { accepted = false, message = "THAT RECOVERY MARK IS INVALID" }
+    end
+    local result = self._profileService:recoverExpeditionCache(player, cacheId)
+    if not result.accepted then
+        return {
+            accepted = false,
+            message = if result.reason == "save_pending"
+                then "SATCHEL RECOVERY WILL RETRY WHEN YOUR PROFILE IS READY"
+                else "THAT SATCHEL HAS ALREADY BEEN RECOVERED",
+            reason = result.reason,
+        }
+    end
+    self._worldService:clearRecoveryCache(player)
+    local amount = 0
+    for _, count in result.materials do
+        amount += count
+    end
+    self._logger:info("expedition_recovery_cache_claimed", {
+        amount = amount,
+        cache = cacheId,
+        player = player.UserId,
+    })
+    return {
+        accepted = true,
+        message = string.format("LOST SATCHEL RECOVERED — %d MATERIALS BACK IN POUCH", amount),
+        reason = "recovered",
+    }
 end
 
 function ExpeditionService._participantCount(_self: ExpeditionService, state: any): number
@@ -11224,6 +11578,9 @@ function ExpeditionService._combinedPending(self: ExpeditionService, player: Pla
     local materials: { [string]: number } = {}
     local rewards = {}
     local seen: { [string]: boolean } = {}
+    for _, transactionId in profileInventory.cachedTransactionIds do
+        seen[transactionId] = true
+    end
     for _, reward in profileInventory.pendingRewards do
         seen[reward.transactionId] = true
         materials[reward.materialId] = (materials[reward.materialId] or 0) + reward.amount
@@ -11242,6 +11599,7 @@ function ExpeditionService._combinedPending(self: ExpeditionService, player: Pla
     return {
         banked = profileInventory.banked,
         materials = materials,
+        recovery = profileInventory.recovery,
         rewards = rewards,
     }
 end
@@ -11256,6 +11614,7 @@ function ExpeditionService._deliverPendingPayoff(self: ExpeditionService, player
 end
 
 function ExpeditionService._exitWithPayoff(self: ExpeditionService, player: Player): boolean
+    self._worldService:clearRecoveryCache(player)
     return self._worldService:exitBramblewake(player, function()
         self:_deliverPendingPayoff(player)
     end)
@@ -11361,6 +11720,7 @@ function ExpeditionService.snapshot(self: ExpeditionService, player: Player): an
     local inventory = self:_combinedPending(player)
     snapshot.unbankedRewards = inventory.materials
     snapshot.bankedMaterials = inventory.banked
+    snapshot.recoveryCache = inventory.recovery
     if not snapshot.active then
         return snapshot
     end
@@ -13612,6 +13972,7 @@ export type PlayerSurvivalService = typeof(setmetatable(
         _analyticsService: any,
         _equipmentStatsProvider: ((Player) -> any)?,
         _reviveTuningProvider: ((Player) -> any)?,
+        _expeditionFailureHandler: ((Player) -> any)?,
         _states: { [Player]: any },
         _spawned: { [Player]: boolean },
         _channels: { [Player]: ReviveChannel },
@@ -13661,6 +14022,7 @@ function PlayerSurvivalService.new(
         _analyticsService = analyticsService,
         _equipmentStatsProvider = nil,
         _reviveTuningProvider = nil,
+        _expeditionFailureHandler = nil,
         _states = {},
         _spawned = {},
         _channels = {},
@@ -13684,6 +14046,27 @@ function PlayerSurvivalService.setReviveTuningProvider(
     provider: (Player) -> any
 )
     self._reviveTuningProvider = provider
+end
+
+function PlayerSurvivalService.setExpeditionFailureHandler(
+    self: PlayerSurvivalService,
+    handler: (Player) -> any
+)
+    self._expeditionFailureHandler = handler
+end
+
+function PlayerSurvivalService._recordExpeditionFailure(
+    self: PlayerSurvivalService,
+    player: Player
+): string?
+    local handler = self._expeditionFailureHandler
+    if handler == nil or player:GetAttribute("LastLightInExpedition") ~= true then
+        return nil
+    end
+    local result = handler(player)
+    return if type(result) == "table" and type(result.message) == "string"
+        then result.message
+        else nil
 end
 
 function PlayerSurvivalService._reviveTuning(self: PlayerSurvivalService, player: Player): any
@@ -13933,7 +14316,9 @@ function PlayerSurvivalService._bindPlayer(self: PlayerSurvivalService, player: 
                 activeHumanoid.BreakJointsOnDeath = false
                 self:_syncPlayer(player)
                 if returningCharacter or resetFromDowned then
+                    local retreatMessage = nil
                     if player:GetAttribute("LastLightInExpedition") == true then
+                        retreatMessage = self:_recordExpeditionFailure(player)
                         self._worldService:exitBramblewake(player)
                     end
                     self._analyticsService:playerRecovered(
@@ -13942,7 +14327,7 @@ function PlayerSurvivalService._bindPlayer(self: PlayerSurvivalService, player: 
                             then "character_reset_safe_retreat"
                             else "character_respawn_safe_retreat"
                     )
-                    self:_notify(player, "SAFE RETREAT — CHARACTER RESET")
+                    self:_notify(player, retreatMessage or "SAFE RETREAT — CHARACTER RESET")
                 end
                 self:_notify(nil, nil)
             end
@@ -14302,7 +14687,9 @@ function PlayerSurvivalService._recover(self: PlayerSurvivalService, player: Pla
     self._states[player] = nextState
     self:_clearVisual(player)
     self:_syncPlayer(player)
+    local retreatMessage = nil
     if player:GetAttribute("LastLightInExpedition") == true then
+        retreatMessage = self:_recordExpeditionFailure(player)
         self._worldService:exitBramblewake(player)
     else
         local character = player.Character
@@ -14311,7 +14698,7 @@ function PlayerSurvivalService._recover(self: PlayerSurvivalService, player: Pla
         end
     end
     self._analyticsService:playerRecovered(player, "bleedout_safe_retreat")
-    self:_notify(player, "SAFE RETREAT — UNBANKED POUCH RETAINED")
+    self:_notify(player, retreatMessage or "SAFE RETREAT — UNBANKED POUCH RETAINED")
 end
 
 function PlayerSurvivalService._step(self: PlayerSurvivalService, now: number)
@@ -15531,15 +15918,145 @@ function ProfileService.inventorySnapshot(self: ProfileService, player: Player):
     if profile == nil then
         return {
             banked = {},
+            cachedTransactionIds = {},
             pending = {},
             pendingRewards = {},
+            recovery = nil,
         }
     end
     local pending = self._saveSchema.expeditionPending(profile)
     return {
         banked = table.clone(profile.inventory.materials),
+        cachedTransactionIds = self._saveSchema.expeditionCachedTransactionIds(profile),
         pending = pending.materials,
         pendingRewards = pending.rewards,
+        recovery = self._saveSchema.expeditionRecovery(profile),
+    }
+end
+
+function ProfileService.cacheExpeditionFailure(
+    self: ProfileService,
+    player: Player,
+    runId: string,
+    manifestHash: string,
+    sessionRewards: { any }
+): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { accepted = false, reason = "profile_unavailable" }
+    end
+    local workingProfile = profile
+    for _, sessionReward in sessionRewards do
+        local nextProfile, result = self._saveSchema.withUnbankedExpeditionReward(
+            workingProfile,
+            sessionReward.transactionId,
+            sessionReward.manifestHash,
+            { amount = sessionReward.amount, materialId = sessionReward.materialId },
+            os.time()
+        )
+        if not result.applied and not result.duplicate then
+            return { accepted = false, reason = result.reason }
+        end
+        workingProfile = nextProfile
+    end
+
+    local pending = self._saveSchema.expeditionPending(workingProfile)
+    if pending.count < 2 then
+        if workingProfile ~= profile then
+            self._profiles[player] = workingProfile
+            if self._persistent then
+                self._dirty[player] = true
+            end
+        end
+        local durable = if self._persistent and self._dirty[player] == true
+            then self:save(player)
+            else true
+        return {
+            accepted = durable,
+            cached = false,
+            durable = durable,
+            reason = if durable then "pouch_retained" else "save_pending",
+        }
+    end
+    local baseCacheId =
+        self._saveSchema.expeditionRecoveryCacheId(runId, player.UserId, pending.fingerprint)
+    local cacheId = baseCacheId
+    local suffix = 1
+    while
+        workingProfile.inventory.recoveryCaches[cacheId] ~= nil
+        and workingProfile.inventory.recoveryCaches[cacheId].status == "recovered"
+    do
+        suffix += 1
+        cacheId = string.format("%s:%d", baseCacheId, suffix)
+    end
+    local nextProfile, result = self._saveSchema.withExpeditionFailureCache(
+        workingProfile,
+        cacheId,
+        manifestHash,
+        os.time()
+    )
+    if not result.applied and not result.duplicate then
+        return { accepted = false, reason = result.reason }
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    local durable = if self._persistent then self:save(player) else true
+    return {
+        accepted = durable,
+        cacheId = cacheId,
+        cached = true,
+        durable = durable,
+        materials = result.materials or {},
+        reason = if durable then "cached" else "save_pending",
+        retained = result.retained or 0,
+        transactionIds = result.transactionIds or {},
+    }
+end
+
+function ProfileService.recoveryCache(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    return if profile == nil then nil else self._saveSchema.expeditionRecovery(profile)
+end
+
+function ProfileService.recoverExpeditionCache(
+    self: ProfileService,
+    player: Player,
+    cacheId: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { accepted = false, reason = "profile_unavailable" }
+    end
+    local nextProfile, result =
+        self._saveSchema.withRecoveredExpeditionCache(profile, cacheId, os.time())
+    if not result.applied then
+        if result.duplicate then
+            local durable = if self._persistent and self._dirty[player] == true
+                then self:save(player)
+                else true
+            return {
+                accepted = durable,
+                cacheId = cacheId,
+                durable = durable,
+                materials = result.materials or {},
+                reason = if durable then "recovered" else "save_pending",
+            }
+        end
+        return { accepted = false, reason = result.reason }
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    local durable = if self._persistent then self:save(player) else true
+    return {
+        accepted = durable,
+        cacheId = cacheId,
+        durable = durable,
+        materials = result.materials or {},
+        reason = if durable then "recovered" else "save_pending",
     }
 end
 
@@ -16683,6 +17200,12 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         local result = self._townNightService:resolveIncident(player, prompt)
         self:_setToast(player, result.message)
         self:_publishAll()
+        return
+    end
+    if actionId == self._runtimeIds.Actions.RecoverExpeditionCache then
+        local result = self._expeditionService:recoverCache(player, prompt)
+        self:_setToast(player, result.message)
+        self:_publish(player)
         return
     end
 
@@ -21819,6 +22342,7 @@ function WorldService.buildBramblewake(
             or actionId == self._runtimeIds.Actions.OldGrowthFire
             or actionId == self._runtimeIds.Actions.WardenStagChoice
             or actionId == self._runtimeIds.Actions.BramblewakeBlackout
+            or actionId == self._runtimeIds.Actions.RecoverExpeditionCache
         then
             self._interactions[interactionId] = nil
         end
@@ -21920,6 +22444,100 @@ function WorldService.buildBramblewake(
     world:SetAttribute("ExpeditionManifestHash", manifest.hash)
     world:SetAttribute("ExpeditionEventInteractions", #result.eventInteractions)
     return result
+end
+
+function WorldService.clearRecoveryCache(self: WorldService, player: Player)
+    local interactionId = string.format("recovery_cache:%d", player.UserId)
+    local prompt = self._interactions[interactionId]
+    if prompt ~= nil then
+        prompt:Destroy()
+        self._interactions[interactionId] = nil
+    end
+    local world = self._world
+    if world ~= nil then
+        local caches = world:FindFirstChild("ExpeditionRecoveryCaches")
+        local model = if caches == nil
+            then nil
+            else caches:FindFirstChild("RecoveryCache_" .. tostring(player.UserId))
+        if model ~= nil then
+            model:Destroy()
+        end
+    end
+end
+
+function WorldService.showRecoveryCache(self: WorldService, player: Player, cache: any)
+    self:clearRecoveryCache(player)
+    local world = self._world
+    local entry = self._expeditionEntry
+    if world == nil or entry == nil or cache == nil then
+        return
+    end
+    local caches = world:FindFirstChild("ExpeditionRecoveryCaches")
+    if caches == nil then
+        caches = Instance.new("Folder")
+        caches.Name = "ExpeditionRecoveryCaches"
+        caches.Parent = world
+    end
+    local model = Instance.new("Model")
+    model.Name = "RecoveryCache_" .. tostring(player.UserId)
+    model:SetAttribute("CacheId", cache.cacheId)
+    model:SetAttribute("OwnerUserId", player.UserId)
+    model.Parent = caches
+    local side = if player.UserId % 2 == 0 then -1 else 1
+    local offset = Vector3.new(side * (5 + player.UserId % 3), 0.7, 7 + player.UserId % 4)
+    local at = entry.Position + offset
+    local body = part(
+        model,
+        "RecoverySatchel",
+        Vector3.new(3.8, 2.6, 2.4),
+        CFrame.new(at),
+        Color3.fromRGB(77, 57, 40),
+        Enum.Material.Fabric,
+        false
+    )
+    for index = -1, 1, 2 do
+        part(
+            model,
+            "SatchelBrace",
+            Vector3.new(0.28, 2.8, 2.55),
+            CFrame.new(at + Vector3.new(index * 1.25, 0, 0)),
+            Color3.fromRGB(111, 81, 48),
+            Enum.Material.Wood,
+            false
+        )
+    end
+    part(
+        model,
+        "SatchelFlap",
+        Vector3.new(3.65, 0.35, 2.2),
+        CFrame.new(at + Vector3.new(0, 1.35, -0.15)) * CFrame.Angles(math.rad(-7), 0, 0),
+        Color3.fromRGB(53, 72, 51),
+        Enum.Material.Fabric,
+        false
+    )
+    local clasp = part(
+        model,
+        "WayhomeClasp",
+        Vector3.new(0.8, 0.8, 0.32),
+        CFrame.new(at + Vector3.new(0, 0.25, -1.3)),
+        Color3.fromRGB(185, 145, 72),
+        Enum.Material.Metal,
+        false
+    )
+    clasp.Shape = Enum.PartType.Ball
+    addBillboard(body, "LOST SATCHEL · " .. string.upper(player.DisplayName), CREAM)
+    local interactionId = string.format("recovery_cache:%d", player.UserId)
+    self:_registerInteraction(
+        body,
+        interactionId,
+        self._runtimeIds.Actions.RecoverExpeditionCache,
+        "RECOVER",
+        "Lost Expedition Satchel",
+        cache.cacheId,
+        1.2
+    )
+    local prompt = self._interactions[interactionId]
+    prompt:SetAttribute("OwnerUserId", player.UserId)
 end
 
 function WorldService.blackoutArena(self: WorldService): any
