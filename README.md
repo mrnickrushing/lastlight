@@ -29,7 +29,9 @@ incidents now interrupt the defense with
 short cooperative town emergencies; failed expeditions now create persistent,
 owner-only recovery satchels for a deterministic half of larger unbanked pouches;
 level-10 masters can choose one of three persistent paths per profession at
-physical mastery altars, with twelve distinct server-owned effects;
+physical mastery altars, with twelve distinct server-owned effects; all four
+abilities now produce distinct physical world feedback, and Emergency Patch
+deploys a temporary server-owned Rootline Brace that absorbs lantern pressure;
 Studio and device exit gates remain pending.**
 
 The repository currently contains:
@@ -84,6 +86,9 @@ The repository currently contains:
 - ten persistent mastery levels per playable profession, six earned rank names,
   bounded effect/range/duration/cooldown bonuses, and three persistent level-10
   specialization paths per kit selected through physical mastery stones;
+- four distinct color-independent profession ability motifs, plus an Engineer
+  Rootline Brace that visibly tracks and absorbs up to 14 lantern pressure for
+  12 seconds without adding another mobile control;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
   analytics, save normalization, and published-place tutorial persistence;
 - mobile, keyboard/mouse, and controller actions through Roblox's Input Action
@@ -92,7 +97,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 263 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 271 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -124,6 +129,8 @@ The physical path selection, persistence, twelve bounded effects, and abuse gate
 are in [the profession-specialization runbook](docs/MILESTONE_3_PROFESSION_SPECIALIZATIONS.md).
 The Medic rescue-speed/recovery bonuses and Warden recovery-ward support are in
 [the profession rescue runbook](docs/MILESTONE_3_PROFESSION_RESCUE.md).
+The four physical ability motifs and temporary Engineer lantern brace are in
+[the profession identity runbook](docs/MILESTONE_3_PROFESSION_IDENTITY.md).
 The six-enemy sequence, mechanic, readability, solo-balance, and device gates are in
 [the Bramblewake enemy-roster runbook](docs/MILESTONE_3_BRAMBLEWAKE_ENEMIES.md).
 The three-phase elite, carried-fire, reward, accessibility, and abuse gates are in

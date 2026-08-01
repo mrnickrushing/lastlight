@@ -477,3 +477,17 @@ monotonic night-first merge prevents an old pristine save from erasing recent
 damage, while the same-night integrity tie-break prevents a stale damaged save
 from undoing work the current group already completed. It preserves one coherent
 physical town without pretending per-player saves are global state.
+
+## 2026-08-01 — Profession identity stays physical; Engineer structure reuses Emergency Patch
+
+**Decision:** Give every current profession a short, color-independent physical
+ability motif in the world. Extend a successful Engineer Emergency Patch with
+one non-stacking Rootline Brace at the server-owned First Lantern. The brace
+lasts 12 seconds, absorbs at most 14 lantern pressure, and is consumed by every
+current lantern-damage path through one pure state contract.
+
+**Reason:** The game needs stronger role readability without another permanent
+HUD rail or mobile button. Reusing Emergency Patch preserves input parity and
+all existing server checks, while a visible, bounded structure finally expresses
+the Engineer's build/control identity without creating client-selected placement,
+path obstruction, indefinite stacking, or paid combat power.

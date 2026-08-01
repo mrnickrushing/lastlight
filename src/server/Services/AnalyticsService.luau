@@ -360,6 +360,38 @@ function AnalyticsService.professionSpecializationSelected(
     })
 end
 
+function AnalyticsService.engineerBraceDeployed(
+    self: AnalyticsService,
+    player: Player,
+    capacity: number,
+    duration: number,
+    revision: number
+)
+    self._logger:info("engineer_brace_deployed", {
+        capacity = capacity,
+        duration = duration,
+        player = player.UserId,
+        revision = revision,
+    })
+end
+
+function AnalyticsService.engineerBraceAbsorbed(
+    self: AnalyticsService,
+    ownerUserId: number,
+    source: string,
+    absorbed: number,
+    remaining: number,
+    capacity: number
+)
+    self._logger:info("engineer_brace_absorbed", {
+        absorbed = absorbed,
+        capacity = capacity,
+        owner = ownerUserId,
+        remaining = remaining,
+        source = string.sub(source, 1, 48),
+    })
+end
+
 function AnalyticsService.townNightConsequence(
     self: AnalyticsService,
     nightNumber: number,

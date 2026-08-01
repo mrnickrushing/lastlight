@@ -16,12 +16,14 @@ local BramblewakeEnemies = require(root.BramblewakeEnemies)
 local CombatState = require(root.CombatState)
 local EnemyAttackFlow = require(root.EnemyAttackFlow)
 local EnemyCombatRules = require(root.EnemyCombatRules)
+local EngineerBrace = require(root.EngineerBrace)
 local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local OldGrowthEncounter = require(root.OldGrowthEncounter)
 local WardenStagEncounter = require(root.WardenStagEncounter)
 local BramblewakeBlackout = require(root.BramblewakeBlackout)
 local ProfessionCatalog = require(root.ProfessionCatalog)
+local ProfessionAbilityVisuals = require(root.ProfessionAbilityVisuals)
 local ProfessionRescue = require(root.ProfessionRescue)
 local ProfessionState = require(root.ProfessionState)
 local ReviveFlow = require(root.ReviveFlow)
@@ -38,9 +40,16 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.27.1", "unexpected build version")
+assert(Config.BuildVersion == "0.28.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
+assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
+local studioBrace = EngineerBrace.deploy(EngineerBrace.default(), 10, 12, 14, 42)
+local studioBraceAfterHit, studioBraceHit = EngineerBrace.absorb(studioBrace, 9, 11)
+assert(
+    studioBraceHit.absorbed == 9 and studioBraceAfterHit.capacity == 5,
+    "Engineer Rootline Brace contract is missing"
+)
 
 local calls = 0
 local service = {
@@ -304,9 +313,13 @@ assert(getState ~= nil and getState:IsA("RemoteFunction"), "missing state functi
 
 local world = workspace:WaitForChild(RuntimeIds.WorldName, 8)
 assert(world ~= nil and world:IsA("Model"), "first-ten-minutes world did not build")
+assert(
+    world:FindFirstChild("EngineerRootlineBrace") == nil,
+    "Engineer Rootline Brace must not exist before Emergency Patch"
+)
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v6",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v7",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")

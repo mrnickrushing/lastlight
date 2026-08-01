@@ -49,6 +49,7 @@ export type EnemyService = typeof(setmetatable(
         _enemyCatalog: any,
         _enemyCombatRules: any,
         _enemyMotion: any,
+        _engineerBrace: any,
         _enemyBuilder: any,
         _analyticsService: any,
         _professionService: any,
@@ -61,6 +62,7 @@ export type EnemyService = typeof(setmetatable(
         _lanternHealth: number,
         _breachMultiplier: number,
         _nightModifiers: any,
+        _engineerBraceState: any,
         _onChanged: ((string?) -> ())?,
         _heartbeat: RBXScriptConnection?,
     },
@@ -83,6 +85,7 @@ function EnemyService.new(
     enemyCatalog: any,
     enemyCombatRules: any,
     enemyMotion: any,
+    engineerBrace: any,
     enemyBuilder: any,
     analyticsService: any
 ): EnemyService
@@ -97,6 +100,7 @@ function EnemyService.new(
         _enemyCatalog = enemyCatalog,
         _enemyCombatRules = enemyCombatRules,
         _enemyMotion = enemyMotion,
+        _engineerBrace = engineerBrace,
         _enemyBuilder = enemyBuilder,
         _analyticsService = analyticsService,
         _professionService = nil,
@@ -114,6 +118,7 @@ function EnemyService.new(
             playerDamageMultiplier = 1,
             lanternDamageMultiplier = 1,
         },
+        _engineerBraceState = engineerBrace.default(),
         _onChanged = nil,
         _heartbeat = nil,
     }, EnemyService)
@@ -354,12 +359,42 @@ function EnemyService._destroyActive(self: EnemyService)
     self._active = nil
 end
 
+function EnemyService._clearEngineerBrace(self: EnemyService)
+    self._engineerBraceState = self._engineerBrace.default()
+    self._worldService:setEngineerBrace(
+        self._engineerBrace.snapshot(self._engineerBraceState, workspace:GetServerTimeNow())
+    )
+end
+
+function EnemyService._absorbLanternPressure(
+    self: EnemyService,
+    amount: number,
+    source: string,
+    now: number
+): (number, number)
+    local nextState, result = self._engineerBrace.absorb(self._engineerBraceState, amount, now)
+    self._engineerBraceState = nextState
+    local snapshot = self._engineerBrace.snapshot(nextState, now)
+    self._worldService:setEngineerBrace(snapshot, result.absorbed or 0)
+    if result.applied then
+        self._analyticsService:engineerBraceAbsorbed(
+            result.ownerUserId or snapshot.ownerUserId,
+            source,
+            result.absorbed,
+            result.remaining,
+            snapshot.capacity
+        )
+    end
+    return result.remaining or math.max(0, math.ceil(amount)), result.absorbed or 0
+end
+
 function EnemyService.startNight(self: EnemyService, modifiers: any?)
     self:_destroyActive()
     table.clear(self._queue)
     self._nightActive = true
     self._lanternHealth = 100
     self._worldService:setLanternHealth(self._lanternHealth)
+    self:_clearEngineerBrace()
     self._breachMultiplier = 1
     local profile = if type(modifiers) == "table" then modifiers else {}
     self._nightModifiers = {
@@ -382,6 +417,7 @@ function EnemyService.stopNight(self: EnemyService)
     table.clear(self._queue)
     self._lanternHealth = 100
     self._worldService:setLanternHealth(self._lanternHealth)
+    self:_clearEngineerBrace()
     self._breachMultiplier = 1
     self._nightModifiers = {
         healthMultiplier = 1,
@@ -722,6 +758,8 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
     end
     damage = self._combatService:mitigateShieldedDamage(target, damage, now)
     local result = self._survivalService:damage(target, damage, enemyId)
+    local lanternPressure = 0
+    local lanternAbsorbed = 0
     if result.applied and enemy.definition.statusEffect == "drowsy" then
         self._combatService:applyDrowsy(
             target,
@@ -729,14 +767,15 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
             enemy.definition.statusMultiplier or 1
         )
     elseif result.applied and enemy.definition.statusEffect == "spark_theft" then
-        self._lanternHealth = math.max(
-            18,
-            self._lanternHealth
-                - math.ceil(
-                    (enemy.definition.statusLanternDamage or 0)
-                        * self._nightModifiers.lanternDamageMultiplier
-                )
+        lanternPressure, lanternAbsorbed = self:_absorbLanternPressure(
+            math.ceil(
+                (enemy.definition.statusLanternDamage or 0)
+                    * self._nightModifiers.lanternDamageMultiplier
+            ),
+            enemyId .. "_spark_theft",
+            now
         )
+        self._lanternHealth = math.max(18, self._lanternHealth - lanternPressure)
         self._worldService:setLanternHealth(self._lanternHealth)
     end
     self._analyticsService:enemyAttackResult(
@@ -749,7 +788,13 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
     elseif guarded and result.applied then
         self:_notify("LANTERN GUARD ABSORBS " .. enemy.definition.attackName)
     elseif result.applied and enemy.definition.statusEffect == "spark_theft" then
-        self:_notify("HOLLOW CROW STOLE AN EXPOSED LANTERN SPARK")
+        if lanternPressure <= 0 and lanternAbsorbed > 0 then
+            self:_notify("ROOTLINE BRACE CAUGHT THE STOLEN SPARK")
+        elseif lanternAbsorbed > 0 then
+            self:_notify("ROOTLINE BRACE SOFTENED THE HOLLOW CROW'S SPARK THEFT")
+        else
+            self:_notify("HOLLOW CROW STOLE AN EXPOSED LANTERN SPARK")
+        end
     else
         self:_notify(nil)
     end
@@ -799,16 +844,19 @@ function EnemyService._lanternImpact(self: EnemyService, enemy: Enemy, now: numb
         return
     end
     enemy.lastAttackAt = now
-    self._lanternHealth = math.max(
-        0,
-        self._lanternHealth
-            - math.max(
-                0,
-                math.ceil(
-                    enemy.definition.lanternDamage * self._nightModifiers.lanternDamageMultiplier
-                )
-            )
+    local pressure, absorbed = self:_absorbLanternPressure(
+        math.max(
+            0,
+            math.ceil(enemy.definition.lanternDamage * self._nightModifiers.lanternDamageMultiplier)
+        ),
+        enemy.definition.id .. "_lantern_impact",
+        now
     )
+    self._lanternHealth = math.max(0, self._lanternHealth - pressure)
+    if pressure <= 0 and absorbed > 0 then
+        self:_notify("ROOTLINE BRACE HOLDS THE FIRST LANTERN")
+        return
+    end
     if self._lanternHealth <= 0 then
         self._lanternHealth = 18
         local collapsedId = enemy.definition.id
@@ -816,6 +864,8 @@ function EnemyService._lanternImpact(self: EnemyService, enemy: Enemy, now: numb
         self._nextSpawnAt = now + 2
         self._logger:info("lantern_emergency_restore", { enemy = collapsedId })
         self:_notify("THE LIGHT FLICKERS — MARA RESTORES A SPARK")
+    elseif absorbed > 0 then
+        self:_notify("ROOTLINE BRACE ABSORBS PART OF THE IMPACT")
     else
         self:_notify(nil)
     end
@@ -1009,7 +1059,30 @@ function EnemyService.repairLantern(
     self._lanternHealth = math.min(100, self._lanternHealth + amount)
     self._worldService:setLanternHealth(self._lanternHealth)
     local restored = self._lanternHealth - previous
-    local message = string.format("EMERGENCY PATCH — FIRST LANTERN +%d", restored)
+    local now = workspace:GetServerTimeNow()
+    local nextBrace, deployment = self._engineerBrace.deploy(
+        self._engineerBraceState,
+        now,
+        self._config.EngineerBraceSeconds,
+        self._config.EngineerBraceCapacity,
+        player.UserId
+    )
+    self._engineerBraceState = nextBrace
+    local braceSnapshot = self._engineerBrace.snapshot(nextBrace, now)
+    self._worldService:setEngineerBrace(braceSnapshot)
+    if deployment.applied then
+        self._analyticsService:engineerBraceDeployed(
+            player,
+            deployment.capacity,
+            deployment.duration,
+            deployment.revision
+        )
+    end
+    local message = string.format(
+        "EMERGENCY PATCH — FIRST LANTERN +%d · ROOTLINE BRACE %d",
+        restored,
+        braceSnapshot.capacity
+    )
     self:_notify(message)
     return true, message
 end
@@ -1022,20 +1095,27 @@ function EnemyService.applyLanternPressure(self: EnemyService, amount: number, s
         return { applied = false, reason = "invalid_amount" }
     end
     local bounded = math.clamp(amount, 1, 25)
+    local now = workspace:GetServerTimeNow()
+    local remaining, absorbed = self:_absorbLanternPressure(bounded, source, now)
     local previous = self._lanternHealth
-    self._lanternHealth = math.max(18, self._lanternHealth - bounded)
+    self._lanternHealth = math.max(18, self._lanternHealth - remaining)
     local damage = previous - self._lanternHealth
     self._worldService:setLanternHealth(self._lanternHealth)
     self._logger:info("lantern_pressure_applied", {
         damage = damage,
         health = self._lanternHealth,
+        absorbed = absorbed,
         source = string.sub(source, 1, 48),
     })
     return {
-        applied = damage > 0,
+        absorbed = absorbed,
+        applied = damage > 0 or absorbed > 0,
         damage = damage,
         health = self._lanternHealth,
-        reason = if damage > 0 then "applied" else "minimum_health",
+        reason = if damage > 0
+            then "applied"
+            elseif absorbed > 0 then "brace_absorbed"
+            else "minimum_health",
     }
 end
 

@@ -20,6 +20,7 @@ export type ProfessionService = typeof(setmetatable(
         _professionRescue: any,
         _featureFlags: any,
         _profileService: any,
+        _worldService: any,
         _survivalService: any,
         _analyticsService: any,
         _states: { [Player]: any },
@@ -38,6 +39,7 @@ function ProfessionService.new(
     professionRescue: any,
     featureFlags: any,
     profileService: any,
+    worldService: any,
     survivalService: any,
     analyticsService: any
 ): ProfessionService
@@ -50,6 +52,7 @@ function ProfessionService.new(
         _professionRescue = professionRescue,
         _featureFlags = featureFlags,
         _profileService = profileService,
+        _worldService = worldService,
         _survivalService = survivalService,
         _analyticsService = analyticsService,
         _states = {},
@@ -417,6 +420,12 @@ function ProfessionService.useAbility(self: ProfessionService, player: Player): 
     self._states[player] = nextState
     self:_syncPlayer(player)
     local message, affected = self:_applyAbility(player, definition, tuning)
+    self._worldService:showProfessionAbility(
+        player,
+        definition.id,
+        definition.effectRadius + tuning.effectRadiusBonus,
+        activeSeconds
+    )
     local masteryResult = self._profileService:awardMastery(player, definition.id, 10)
     if masteryResult.leveledUp then
         message = string.format(
