@@ -12,6 +12,7 @@ TestRunner.run({
     require("./specs/Environment.spec"),
     require("./specs/EnemyAttackFlow.spec"),
     require("./specs/EnemyCombatRules.spec"),
+    require("./specs/EnemyMotion.spec"),
     require("./specs/ExpeditionEventFlow.spec"),
     require("./specs/ExpeditionGenerator.spec"),
     require("./specs/ExpeditionInventory.spec"),

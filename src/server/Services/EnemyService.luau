@@ -26,11 +26,14 @@ type Attack = {
 
 type Enemy = {
     attack: Attack?,
+    basePosition: Vector3,
     definition: any,
+    facingPosition: Vector3,
     health: number,
     lastAttackAt: number,
     markedUntil: number,
     model: Model,
+    spawnedAt: number,
 }
 
 export type EnemyService = typeof(setmetatable(
@@ -44,6 +47,7 @@ export type EnemyService = typeof(setmetatable(
         _enemyAttackFlow: any,
         _enemyCatalog: any,
         _enemyCombatRules: any,
+        _enemyMotion: any,
         _enemyBuilder: any,
         _analyticsService: any,
         _professionService: any,
@@ -76,6 +80,7 @@ function EnemyService.new(
     enemyAttackFlow: any,
     enemyCatalog: any,
     enemyCombatRules: any,
+    enemyMotion: any,
     enemyBuilder: any,
     analyticsService: any
 ): EnemyService
@@ -89,6 +94,7 @@ function EnemyService.new(
         _enemyAttackFlow = enemyAttackFlow,
         _enemyCatalog = enemyCatalog,
         _enemyCombatRules = enemyCombatRules,
+        _enemyMotion = enemyMotion,
         _enemyBuilder = enemyBuilder,
         _analyticsService = analyticsService,
         _professionService = nil,
@@ -151,6 +157,32 @@ function EnemyService._notify(self: EnemyService, toast: string?)
     if callback ~= nil then
         callback(toast)
     end
+end
+
+function EnemyService._poseEnemy(
+    self: EnemyService,
+    enemy: Enemy,
+    now: number,
+    motionState: string,
+    attackProgress: number?
+)
+    if enemy.model.Parent == nil then
+        return
+    end
+    local pose = self._enemyMotion.pose(
+        math.max(0, now - enemy.spawnedAt),
+        enemy.definition.modelKey,
+        motionState,
+        attackProgress
+    )
+    local position = enemy.basePosition + Vector3.new(0, pose.height, 0)
+    local flatFacing = Vector3.new(enemy.facingPosition.X, position.Y, enemy.facingPosition.Z)
+    if (flatFacing - position).Magnitude <= 0.01 then
+        flatFacing = position + Vector3.new(0, 0, -1)
+    end
+    enemy.model:PivotTo(
+        CFrame.lookAt(position, flatFacing) * CFrame.Angles(pose.pitch, 0, pose.roll)
+    )
 end
 
 function EnemyService._showSpawnPulse(_self: EnemyService, position: Vector3, color: Color3)
@@ -374,13 +406,20 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
             else self._worldService:lanternPosition()
     )
     model.Parent = workspace
+    local spawnedAt = workspace:GetServerTimeNow()
+    local basePosition = model:GetPivot().Position
     self._active = {
         attack = nil,
+        basePosition = basePosition,
         definition = definition,
+        facingPosition = if definition.targetMode == "player"
+            then basePosition + Vector3.new(0, 0, -10)
+            else self._worldService:lanternPosition(),
         health = definition.health,
-        lastAttackAt = workspace:GetServerTimeNow(),
+        lastAttackAt = spawnedAt,
         markedUntil = 0,
         model = model,
+        spawnedAt = spawnedAt,
     }
     self._logger:info("bramblewake_enemy_spawned", {
         enemy = definition.id,
@@ -538,6 +577,7 @@ function EnemyService._startAttack(self: EnemyService, enemy: Enemy, target: Pla
         return
     end
     local areaCFrame = self:_attackArea(enemy, root)
+    enemy.facingPosition = root.Position
     enemy.attack = {
         areaCFrame = areaCFrame,
         flow = self._enemyAttackFlow.create(target.UserId, now, enemy.definition.windup),
@@ -592,6 +632,16 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
         return
     end
     local root = rootPart(attack.target)
+    if root ~= nil then
+        enemy.facingPosition = root.Position
+    end
+    local attackDuration = math.max(0.01, attack.flow.endsAt - attack.flow.startedAt)
+    self:_poseEnemy(
+        enemy,
+        now,
+        "attacking",
+        math.clamp((now - attack.flow.startedAt) / attackDuration, 0, 1)
+    )
     local resolving = now >= attack.flow.endsAt
     local decision = self._enemyAttackFlow.evaluate(attack.flow, now, {
         clearPath = not resolving or self:_clearPath(enemy, attack.target),
@@ -759,10 +809,10 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
         return
     end
     if enemy.definition.stationary then
+        self:_poseEnemy(enemy, now, "idle", nil)
         return
     end
 
-    local current = enemy.model:GetPivot()
     local destination = self._worldService:lanternPosition()
     if enemy.definition.targetMode == "player" and closestPlayer ~= nil then
         local targetRoot = rootPart(closestPlayer)
@@ -770,8 +820,8 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
             destination = targetRoot.Position
         end
     end
-    local flatTarget = Vector3.new(destination.X, current.Position.Y, destination.Z)
-    local delta = flatTarget - current.Position
+    local flatTarget = Vector3.new(destination.X, enemy.basePosition.Y, destination.Z)
+    local delta = flatTarget - enemy.basePosition
     local stoppingDistance = if enemy.definition.targetMode == "player"
         then enemy.definition.attackRange * 0.72
         else 10
@@ -782,11 +832,15 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
         end
         local distance = math.min(delta.Magnitude - stoppingDistance, speed * deltaTime)
         if distance > 0 then
-            local nextPosition = current.Position + delta.Unit * distance
-            enemy.model:PivotTo(CFrame.lookAt(nextPosition, flatTarget))
+            enemy.basePosition += delta.Unit * distance
+            enemy.facingPosition = flatTarget
+            self:_poseEnemy(enemy, now, "moving", nil)
         end
         return
     end
+
+    enemy.facingPosition = flatTarget
+    self:_poseEnemy(enemy, now, "idle", nil)
 
     if enemy.definition.targetMode == "lantern" then
         self:_lanternImpact(enemy, now)

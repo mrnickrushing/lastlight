@@ -29,6 +29,7 @@ assert(
 )
 assert(sharedRoot:FindFirstChild("ProfessionState") ~= nil, "game build is missing ProfessionState")
 assert(sharedRoot:FindFirstChild("EnemyAttackFlow") ~= nil, "game build is missing EnemyAttackFlow")
+assert(sharedRoot:FindFirstChild("EnemyMotion") ~= nil, "game build is missing EnemyMotion")
 assert(
     sharedRoot:FindFirstChild("ExpeditionGenerator") ~= nil,
     "game build is missing ExpeditionGenerator"
