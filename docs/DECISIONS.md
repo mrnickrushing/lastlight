@@ -387,6 +387,10 @@ profession.
 
 ## 2026-07-26 — First quests are silent milestones, not a quest board
 
+**Follow-on:** The 2026-07-31 resident-guidance decision below supersedes the
+"no quest giver" presentation choice. Automatic tracking and claiming remain
+unchanged; Tomas, Pip, and Ena now explain the same server-owned milestones.
+
 **Decision:** Quests have no quest giver, no accept step, and no browsing
 UI. The server opportunistically checks every not-yet-claimed quest's
 objective after any action that could satisfy it (a night completing, a

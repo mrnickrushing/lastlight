@@ -428,7 +428,7 @@ assert(
 )
 assert(
     #CollectionService:GetTagged(RuntimeIds.ExpeditionEventTag) == BramblewakeExpedition.EventCount,
-    "expected four Bramblewake event sockets"
+    "expected eight Bramblewake event sockets"
 )
 local eventSteps = CollectionService:GetTagged(RuntimeIds.ExpeditionEventStepTag)
 assert(

@@ -630,7 +630,10 @@ end
 function TutorialService._nightComplete(self: TutorialService)
     for player, session in self._sessions do
         self:_advanceSurvivorToReveal(player, session)
-        self._townNightService:ensureStarted(self._profileService:nightNumber(player))
+        self._townNightService:ensureStarted(
+            self._profileService:nightNumber(player),
+            self._profileService:townCondition(player)
+        )
     end
     self:_publishAll()
 end

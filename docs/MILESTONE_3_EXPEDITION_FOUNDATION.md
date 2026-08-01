@@ -29,7 +29,9 @@ Implemented:
 
 Not implemented by this increment:
 
-- partial-loss recovery caches or the remaining four Bramblewake events;
+- partial-loss recovery caches; the follow-on
+  [event increment](MILESTONE_3_BRAMBLEWAKE_EVENTS.md) now completes all eight
+  Bramblewake events;
 - profession kits, full inventory UI/capacity, crafting, or quests;
 - the boss, normal night, or Blackout; the complete standard roster and
   [Old Growth elite](MILESTONE_3_OLD_GROWTH_ELITE.md) now expand this foundation;
