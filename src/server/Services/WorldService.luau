@@ -1417,14 +1417,33 @@ function WorldService._configureLighting(_self: WorldService)
         existingClouds:Destroy()
     end
 
+    -- Distant terrain peaks (TerrainBuilder reaches WORLD_EXTENT = 1450 studs)
+    -- were reported washing out to a pale white smear instead of reading as a
+    -- ridgeline. Atmosphere fades distant geometry toward Atmosphere.Color as
+    -- fog accumulates with distance, and there is no sightline in the supplied
+    -- Place6 reference (a small enclosed camp) anywhere near 1450 studs to have
+    -- exposed this: its own Atmosphere -- Density 0.225, Haze 1, Color
+    -- (199, 199, 199) -- is close to Roblox's stock defaults and was never
+    -- tested at range either.
+    --
+    -- Some fade-to-fog at that distance is correct and even desirable -- it is
+    -- what makes far terrain read as *distant*. The bug is the fade target:
+    -- (166, 185, 174) is a pale sage that reads as near-white once fully faded
+    -- to, everywhere something is far enough to reach it. A darker, more
+    -- saturated slate-blue target keeps the same falloff behavior but fades
+    -- distant peaks toward a moody ridgeline silhouette instead of a blown-out
+    -- white one -- consistent with the style formula's "slate blue-gray stone"
+    -- and "moon cyan: distance" anchors. Density and Haze are also both eased
+    -- back so full fade happens further out, giving mid-distance terrain more
+    -- room to read as rock before it starts blending away.
     local atmosphere = Instance.new("Atmosphere")
     atmosphere.Name = "LastLightAtmosphere"
-    atmosphere.Color = Color3.fromRGB(166, 185, 174)
-    atmosphere.Decay = Color3.fromRGB(43, 63, 61)
-    atmosphere.Density = 0.34
+    atmosphere.Color = Color3.fromRGB(74, 89, 98)
+    atmosphere.Decay = Color3.fromRGB(38, 52, 58)
+    atmosphere.Density = 0.24
     atmosphere.Offset = 0.08
-    atmosphere.Glare = 0.2
-    atmosphere.Haze = 1.9
+    atmosphere.Glare = 0.15
+    atmosphere.Haze = 1.0
     atmosphere.Parent = Lighting
 
     local bloom = Instance.new("BloomEffect")
