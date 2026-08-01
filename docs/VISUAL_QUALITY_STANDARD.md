@@ -52,8 +52,43 @@ physical geometry.
    mesh triangles.
 8. Do not block joining on optional visual assets. Procedural construction is a
    complete fallback, not an empty placeholder.
+9. Review placement before surface detail: footprint, orientation, entrance,
+   access path, clearance, sightline, then decoration. Reversing this order is
+   not an acceptable visual workflow.
 
 ## Environment standard
+
+### Site planning and circulation
+
+World layout is authored from player movement outward. Do not begin by placing
+finished props and trying to fit paths around them afterward.
+
+1. Establish the primary route, destination sightline, public square, side
+   paths, and building lots before adding structures or decoration.
+2. Every building entrance faces a road, square, porch, or deliberate access
+   path. The route must physically reach the doorway with enough clearance for
+   a character and a normal third-person camera.
+3. Preserve believable setbacks and negative space. Separate neighboring
+   footprints, keep doors and stairs unobstructed, and never place public props
+   in a building's entrance apron.
+4. Organize related activity into districts. Homes belong on readable lots;
+   workshops, gardens, communal areas, mastery spaces, and service boards each
+   need their own usable footprint instead of sharing one crowded center.
+5. Make the critical road a distinct raised or layered surface so clearing
+   patches, terrain, or square materials cannot visually erase it. Keep its
+   center and junctions open to movement.
+6. Reserve four kinds of clearance before detail: walking width, interaction
+   reach, camera orbit, and combat or event sightline. Decorative edging is
+   non-colliding and leaves explicit gates at every connected path.
+7. Validate the spatial plan in code where possible: entrance direction,
+   building separation, road elevation, clear route corridors, and district
+   bounds. A detailed model in an implausible or unplayable location still
+   fails this standard.
+
+For Emberhollow, the First Lantern is the civic center. The main dirt street
+passes through its square; the two arrival cabins occupy opposing lots and face
+inward; their paths meet the square; workshops, Greenward, the commons, archive,
+inn, and mastery clearings remain outside that central circulation envelope.
 
 ### Buildings and rooms
 

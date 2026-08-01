@@ -1,0 +1,9 @@
+id,role,type,description,size/ratio,style line ref,source
+emberhollow_main_street,primary navigation and settlement spine,procedural 3D environment,raised worn dirt street through the arrival settlement,16x116 studs,VISUAL_QUALITY_STANDARD.md#style-formula,generate
+first_lantern_square,civic focal point and route junction,procedural 3D environment,open four-gate town square around the restrained First Lantern,35x35 studs,VISUAL_QUALITY_STANDARD.md#style-formula,generate
+wayfarer_cabin,western inhabited arrival cabin,procedural 3D building,Place6-derived layered timber cabin facing the central street,about 20 studs long,VISUAL_QUALITY_STANDARD.md#style-formula,reference_media[0]
+mara_shelter,eastern story cabin,procedural 3D building,Place6-derived layered timber shelter facing the central street,about 20 studs long,VISUAL_QUALITY_STANDARD.md#style-formula,reference_media[0]
+cabin_entry_paths,door-to-square circulation,procedural 3D environment,two worn paths connecting cabin stairs to the civic square,6.5 studs wide,VISUAL_QUALITY_STANDARD.md#style-formula,generate
+workshop_districts,crafting and trade activity,procedural 3D environment,separated west and east supported workshop bays,27x14 studs each,VISUAL_QUALITY_STANDARD.md#style-formula,generate
+greenward_garden,eastern cultivation district,procedural 3D environment,bordered productive garden outside the cabin lot,34x30 studs,VISUAL_QUALITY_STANDARD.md#style-formula,generate
+mastery_clearings,profession progression destinations,procedural 3D environment,four edge clearings with distinct physical altars,13x8 studs each,VISUAL_QUALITY_STANDARD.md#style-formula,generate

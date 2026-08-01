@@ -1219,7 +1219,7 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.37.0",
+    BuildVersion = "0.38.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -19841,7 +19841,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
     local courtyardPatch = part(
         parent,
         "EmberhollowCourtyard",
-        Vector3.new(54, 0.3, 36),
+        Vector3.new(92, 0.3, 62),
         CFrame.new(courtyard + Vector3.new(0, 0.18, 1)),
         Color3.fromRGB(53, 59, 45),
         Enum.Material.Ground,
@@ -19854,9 +19854,10 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
     -- openings, four cross rafters, opposing roof wedges, framed windows, stairs,
     -- an open door, and a full-height stone chimney. Last Light owns the palette,
     -- props, dimensions, names, and lighting treatment.
-    local function cabin(center: Vector3, name: string, accent: Color3): Instance
+    local function cabin(center: Vector3, yaw: number, name: string, accent: Color3): Instance
         local scale = 0.72
         center += Vector3.new(0, 2.2, 0)
+        local cabinFrame = CFrame.new(center) * CFrame.Angles(0, yaw, 0)
         local cabinFolder = Instance.new("Folder")
         cabinFolder.Name = name
         cabinFolder.Parent = parent
@@ -19878,7 +19879,10 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
             return Vector3.new(x * scale, y * scale, z * scale)
         end
         local function referenceCFrame(x: number, y: number, z: number): CFrame
-            return CFrame.new(center + Vector3.new(x * scale, (y + 7.5) * scale + 0.25, z * scale))
+            return cabinFrame * CFrame.new(x * scale, (y + 7.5) * scale + 0.25, z * scale)
+        end
+        local function cabinCFrame(x: number, y: number, z: number): CFrame
+            return cabinFrame * CFrame.new(x, y, z)
         end
         local function referencePart(
             target: Instance,
@@ -20232,7 +20236,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
             cabinFolder,
             "CabinLight",
             Vector3.new(0.2, 0.2, 0.2),
-            CFrame.new(center + Vector3.new(0, 5.4, 2.8)),
+            cabinCFrame(0, 5.4, 2.8),
             accent,
             Enum.Material.Glass,
             false
@@ -20268,7 +20272,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                 cabinFolder,
                 "MaraCot",
                 Vector3.new(5.2, 0.55, 2.7),
-                CFrame.new(center + Vector3.new(4.2, 1.0, 3.5)),
+                cabinCFrame(4.2, 1.0, 3.5),
                 Color3.fromRGB(96, 112, 83),
                 Enum.Material.Fabric,
                 false
@@ -20278,7 +20282,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                 cabinFolder,
                 "MaraWorkTable",
                 Vector3.new(4.2, 0.45, 2.5),
-                CFrame.new(center + Vector3.new(4.5, 2.15, -3.2)),
+                cabinCFrame(4.5, 2.15, -3.2),
                 Color3.fromRGB(89, 64, 43),
                 Enum.Material.WoodPlanks,
                 false
@@ -20289,7 +20293,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                     cabinFolder,
                     "MemoryJar",
                     Vector3.new(0.7, 1.05, 0.7),
-                    CFrame.new(center + Vector3.new(4.5 + jarIndex * 1.1, 2.9, -3.2)),
+                    cabinCFrame(4.5 + jarIndex * 1.1, 2.9, -3.2),
                     if jarIndex == 0 then FOXFIRE else AMBER,
                     Enum.Material.Glass,
                     false
@@ -20304,7 +20308,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                     cabinFolder,
                     "WayfarerBedroll",
                     Vector3.new(4.8, 0.45, 2.3),
-                    CFrame.new(center + Vector3.new(3.5 + bedIndex * 3.6, 0.95, 3.8)),
+                    cabinCFrame(3.5 + bedIndex * 3.6, 0.95, 3.8),
                     if bedIndex < 0
                         then Color3.fromRGB(127, 91, 58)
                         else Color3.fromRGB(72, 104, 82),
@@ -20317,7 +20321,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                 cabinFolder,
                 "WayfarerTrunk",
                 Vector3.new(4.4, 2.3, 2.5),
-                CFrame.new(center + Vector3.new(5.2, 1.2, -3.6)),
+                cabinCFrame(5.2, 1.2, -3.6),
                 Color3.fromRGB(88, 61, 39),
                 Enum.Material.WoodPlanks,
                 false
@@ -20329,7 +20333,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
             cabinFolder,
             "CabinWovenRug",
             Vector3.new(6.4, 0.12, 3.4),
-            CFrame.new(center + Vector3.new(2.5, 0.68, -0.1)),
+            cabinCFrame(2.5, 0.68, -0.1),
             if name == "MARA'S SHELTER"
                 then Color3.fromRGB(70, 112, 102)
                 else Color3.fromRGB(132, 88, 54),
@@ -20342,7 +20346,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
             cabinFolder,
             "CabinSupplyShelf",
             Vector3.new(4.8, 0.35, 1.15),
-            CFrame.new(center + Vector3.new(4.5, 5.15, 7.5)),
+            cabinCFrame(4.5, 5.15, 7.5),
             Color3.fromRGB(92, 65, 43),
             Enum.Material.WoodPlanks,
             false
@@ -20365,7 +20369,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
             cabinFolder,
             "CabinStoolSeat",
             Vector3.new(2.1, 0.35, 2.1),
-            CFrame.new(center + Vector3.new(5.2, 1.9, 0.3)),
+            cabinCFrame(5.2, 1.9, 0.3),
             Color3.fromRGB(91, 64, 42),
             Enum.Material.WoodPlanks,
             false
@@ -20394,10 +20398,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                 woodpile,
                 "SplitFirewood",
                 Vector3.new(2.8, 0.65, 0.72),
-                CFrame.new(
-                    center
-                        + Vector3.new(-14.5, -1.45 + row * 0.62, 2.5 + ((logIndex - 1) % 3) * 0.78)
-                )
+                cabinCFrame(-14.5, -1.45 + row * 0.62, 2.5 + ((logIndex - 1) % 3) * 0.78)
                     * CFrame.Angles(0, math.rad(4 * logIndex), math.rad((logIndex % 2) * 5)),
                 if logIndex % 2 == 0 then BARK else WET_BARK,
                 Enum.Material.Wood,
@@ -20412,22 +20413,25 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
         end
         cabinFolder:SetAttribute("ConstructionPattern", "place6_reference_adapted")
         cabinFolder:SetAttribute("PhysicalPartCount", physicalParts)
+        cabinFolder:SetAttribute("FacesMainStreet", true)
+        cabinFolder:SetAttribute("TownYawDegrees", math.deg(yaw))
         return shell
     end
 
     local shells = {
-        cabin(Vector3.new(-22, 0, -112), "WAYFARER CABIN", AMBER),
-        cabin(Vector3.new(22, 0, -112), "MARA'S SHELTER", FOXFIRE),
+        cabin(Vector3.new(-36, 0, -112), math.rad(-90), "WAYFARER CABIN", AMBER),
+        cabin(Vector3.new(36, 0, -112), math.rad(90), "MARA'S SHELTER", FOXFIRE),
     }
 
     local commons = Instance.new("Model")
     commons.Name = "EmberhollowCampCommons"
     commons.Parent = parent
+    local commonsCenter = Vector3.new(70, 0, -132)
     local commonsTable = part(
         commons,
         "CampCommonsTable",
         Vector3.new(10.5, 0.55, 3.6),
-        CFrame.new(-1.5, 2.5, -124.5),
+        CFrame.new(commonsCenter + Vector3.new(0, 2.5, 0)),
         Color3.fromRGB(96, 67, 44),
         Enum.Material.WoodPlanks,
         false
@@ -20438,7 +20442,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
             commons,
             "CampCommonsBench",
             Vector3.new(10, 0.48, 1.25),
-            CFrame.new(-1.5, 1.4, -124.5 + side * 3.2),
+            CFrame.new(commonsCenter + Vector3.new(0, 1.4, side * 3.2)),
             Color3.fromRGB(84, 60, 42),
             Enum.Material.WoodPlanks,
             false
@@ -20474,26 +20478,85 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
         supply.CanQuery = false
     end
 
-    for index = 1, 8 do
-        local angle = (index / 8) * math.pi * 2
-        local stone = part(
+    local townStreet = part(
+        parent,
+        "TownMainStreet",
+        Vector3.new(16, 0.52, 116),
+        CFrame.new(0, 0.48, -116),
+        Color3.fromRGB(76, 55, 37),
+        Enum.Material.Ground,
+        false
+    )
+    townStreet.CanQuery = false
+    local streetWear = part(
+        parent,
+        "TownMainStreetWear",
+        Vector3.new(6.5, 0.14, 114),
+        CFrame.new(0, 0.82, -116),
+        Color3.fromRGB(112, 82, 49),
+        Enum.Material.Mud,
+        false
+    )
+    streetWear.CanQuery = false
+    local square = part(
+        parent,
+        "FirstLanternTownSquare",
+        Vector3.new(35, 0.56, 35),
+        CFrame.new(courtyard + Vector3.new(0, 0.52, 0)),
+        Color3.fromRGB(83, 64, 44),
+        Enum.Material.Ground,
+        false
+    )
+    square.CanQuery = false
+    for _, pathSpec in
+        {
+            { Vector3.new(-10, 0.84, -113), Vector3.new(-27.5, 0.84, -116.5) },
+            { Vector3.new(10, 0.84, -111), Vector3.new(27.5, 0.84, -107.5) },
+        }
+    do
+        local start = pathSpec[1]
+        local finish = pathSpec[2]
+        local delta = finish - start
+        local entryPath = part(
             parent,
-            "LanternRingStone",
-            Vector3.new(2.2, 1.3, 1.7),
-            CFrame.new(courtyard + Vector3.new(math.cos(angle) * 7.3, 0.65, math.sin(angle) * 7.3))
-                * CFrame.Angles(0.08, angle, 0.12),
-            Color3.fromRGB(78, 82, 74),
-            Enum.Material.Slate
+            "CabinEntryPath",
+            Vector3.new(6.5, 0.18, delta.Magnitude + 1),
+            CFrame.lookAt((start + finish) / 2, finish),
+            Color3.fromRGB(101, 76, 48),
+            Enum.Material.Mud,
+            false
         )
-        stone.Shape = Enum.PartType.Ball
+        entryPath.CanQuery = false
+    end
+
+    for index = 1, 16 do
+        local angle = (index / 16) * math.pi * 2
+        local xDirection = math.cos(angle)
+        local zDirection = math.sin(angle)
+        -- Leave four obvious gates: north/south for the main street and
+        -- east/west for the cabin paths. These stones are visual edging, not
+        -- player collision.
+        if math.abs(xDirection) > 0.28 and math.abs(zDirection) > 0.28 then
+            local stone = part(
+                parent,
+                "TownSquareEdgeStone",
+                Vector3.new(2.4, 0.75, 1.6),
+                CFrame.new(courtyard + Vector3.new(xDirection * 16.3, 0.86, zDirection * 16.3))
+                    * CFrame.Angles(0.08, angle, 0.12),
+                Color3.fromRGB(78, 82, 74),
+                Enum.Material.Slate,
+                false
+            )
+            stone.Shape = Enum.PartType.Ball
+        end
     end
     for side = -1, 1, 2 do
+        local benchZ = if side < 0 then -100 else -124
         local bench = part(
             parent,
             "LanternBench",
             Vector3.new(7, 0.7, 1.6),
-            CFrame.new(courtyard + Vector3.new(side * 11, 1.2, 0))
-                * CFrame.Angles(0, math.rad(90), 0),
+            CFrame.new(side * 19.5, 1.2, benchZ) * CFrame.Angles(0, math.rad(90), 0),
             Color3.fromRGB(91, 65, 45),
             Enum.Material.WoodPlanks
         )
@@ -20503,7 +20566,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                 parent,
                 "LanternBenchLeg",
                 Vector3.new(0.45, 1.2, 1.1),
-                CFrame.new(courtyard + Vector3.new(side * 11, 0.6, leg * 2.1)),
+                CFrame.new(side * 19.5, 0.6, benchZ + leg * 2.1),
                 WET_BARK,
                 Enum.Material.Wood,
                 false
@@ -21093,16 +21156,19 @@ local ROUTE_HALF_WIDTH = 26
     just its base intersecting one.
 ]]
 local FOLIAGE_KEEP_OUT = table.freeze({
-    table.freeze({ x = -22, z = -112, radius = 30 }), -- Wayfarer cabin
-    table.freeze({ x = 22, z = -112, radius = 30 }), -- Mara's shelter
-    table.freeze({ x = 0, z = -112, radius = 34 }), -- lantern courtyard
-    table.freeze({ x = -22, z = -130, radius = 32 }), -- western workshop bay
-    table.freeze({ x = 22, z = -130, radius = 32 }), -- eastern workshop bay
-    table.freeze({ x = -47, z = -145, radius = 22 }), -- mastery dais
-    table.freeze({ x = 47, z = -145, radius = 22 }), -- mastery dais
-    table.freeze({ x = 78, z = -105, radius = 22 }), -- mastery dais
-    table.freeze({ x = -40, z = -132, radius = 24 }), -- Wayfarer inn
-    table.freeze({ x = 52, z = -112, radius = 22 }), -- greenward plot
+    table.freeze({ x = -36, z = -112, radius = 30 }), -- Wayfarer cabin lot
+    table.freeze({ x = 36, z = -112, radius = 30 }), -- Mara's shelter lot
+    table.freeze({ x = 0, z = -112, radius = 36 }), -- lantern square
+    table.freeze({ x = -42, z = -142, radius = 32 }), -- western workshop district
+    table.freeze({ x = 42, z = -142, radius = 32 }), -- eastern workshop district
+    table.freeze({ x = -78, z = -76, radius = 22 }), -- Scout mastery clearing
+    table.freeze({ x = 78, z = -76, radius = 22 }), -- Warden mastery clearing
+    table.freeze({ x = -78, z = -168, radius = 22 }), -- Engineer mastery clearing
+    table.freeze({ x = 78, z = -168, radius = 22 }), -- Medic mastery clearing
+    table.freeze({ x = -70, z = -128, radius = 25 }), -- Wayfarer inn
+    table.freeze({ x = 72, z = -100, radius = 24 }), -- Greenward garden
+    table.freeze({ x = 70, z = -132, radius = 18 }), -- camp commons
+    table.freeze({ x = -20, z = -132, radius = 10 }), -- field-book archive
     table.freeze({ x = 0, z = -143, radius = 26 }), -- night watch posts
     table.freeze({ x = 52, z = -45, radius = 22 }), -- authored root arch landmark
     table.freeze({ x = -52, z = -38, radius = 24 }), -- hollow lantern shrine landmark
@@ -22442,7 +22508,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     local flame = part(
         interactables,
         "FirstLanternFlame",
-        Vector3.new(3.4, 5, 3.4),
+        Vector3.new(2.4, 3.6, 2.4),
         CFrame.new(0, 6, -112),
         AMBER,
         Enum.Material.Neon,
@@ -22451,8 +22517,8 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     flame.Shape = Enum.PartType.Ball
     local light = Instance.new("PointLight")
     light.Color = AMBER
-    light.Brightness = 3
-    light.Range = 42
+    light.Brightness = 1.5
+    light.Range = 30
     light.Shadows = true
     light.Parent = flame
     addBillboard(flame, "THE FIRST LANTERN", AMBER)
@@ -22547,12 +22613,13 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     local workshop = Instance.new("Folder")
     workshop.Name = "GreenwardWorkshop"
     workshop.Parent = interactables
+    local workshopZ = -142
     local function workshopBay(centerX: number, title: string, accent: Color3)
         part(
             workshop,
             "WorkshopFloor",
             Vector3.new(27, 0.45, 14),
-            CFrame.new(centerX, 0.22, -130),
+            CFrame.new(centerX, 0.22, workshopZ),
             Color3.fromRGB(73, 57, 42),
             Enum.Material.WoodPlanks
         )
@@ -22560,7 +22627,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             workshop,
             "WorkshopBackWall",
             Vector3.new(27, 7.4, 0.7),
-            CFrame.new(centerX, 3.7, -136.65),
+            CFrame.new(centerX, 3.7, workshopZ - 6.65),
             BARK,
             Enum.Material.WoodPlanks
         )
@@ -22569,7 +22636,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 workshop,
                 "WorkshopSideWall",
                 Vector3.new(0.7, 7.4, 14),
-                CFrame.new(centerX + side * 13.15, 3.7, -130),
+                CFrame.new(centerX + side * 13.15, 3.7, workshopZ),
                 BARK,
                 Enum.Material.WoodPlanks
             )
@@ -22577,7 +22644,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 workshop,
                 "WorkshopFrontPost",
                 Vector3.new(0.9, 8, 0.9),
-                CFrame.new(centerX + side * 12.7, 4, -123.35),
+                CFrame.new(centerX + side * 12.7, 4, workshopZ + 6.65),
                 WET_BARK,
                 Enum.Material.Wood
             )
@@ -22586,7 +22653,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             workshop,
             "WorkshopFrontBeam",
             Vector3.new(27, 0.9, 0.9),
-            CFrame.new(centerX, 7.45, -123.35),
+            CFrame.new(centerX, 7.45, workshopZ + 6.65),
             WET_BARK,
             Enum.Material.Wood
         )
@@ -22595,7 +22662,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 workshop,
                 "WorkshopRoof",
                 Vector3.new(29, 0.72, 8.4),
-                CFrame.new(centerX, 8.3, -130 + slope * 3.55)
+                CFrame.new(centerX, 8.3, workshopZ + slope * 3.55)
                     * CFrame.Angles(math.rad(slope * 8), 0, 0),
                 Color3.fromRGB(42, 47, 43),
                 Enum.Material.Slate
@@ -22605,7 +22672,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             workshop,
             "WorkshopShelf",
             Vector3.new(21, 0.4, 2.1),
-            CFrame.new(centerX, 3.2, -135.25),
+            CFrame.new(centerX, 3.2, workshopZ - 5.25),
             Color3.fromRGB(91, 65, 45),
             Enum.Material.WoodPlanks
         )
@@ -22614,7 +22681,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 workshop,
                 "WorkshopSupply",
                 Vector3.new(2.3, 1.4 + (supplyIndex % 2) * 0.5, 1.6),
-                CFrame.new(centerX - 8.2 + supplyIndex * 3.3, 4.1, -135.2),
+                CFrame.new(centerX - 8.2 + supplyIndex * 3.3, 4.1, workshopZ - 5.2),
                 if supplyIndex % 2 == 0 then accent else Color3.fromRGB(103, 78, 52),
                 if supplyIndex % 2 == 0 then Enum.Material.Fabric else Enum.Material.WoodPlanks,
                 false
@@ -22626,7 +22693,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 workshop,
                 "WorkshopCrate",
                 Vector3.new(3.1, 2.4, 3),
-                CFrame.new(centerX + crateIndex * 9.5, 1.2, -134.1),
+                CFrame.new(centerX + crateIndex * 9.5, 1.2, workshopZ - 4.1),
                 Color3.fromRGB(88, 64, 43),
                 Enum.Material.WoodPlanks,
                 false
@@ -22637,7 +22704,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             workshop,
             "WorkshopLamp",
             Vector3.new(1.25, 1.65, 1.25),
-            CFrame.new(centerX, 6.5, -126.1),
+            CFrame.new(centerX, 6.5, workshopZ + 3.9),
             accent,
             Enum.Material.Glass,
             false
@@ -22650,38 +22717,38 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         lampLight.Range = 15
         lampLight.Shadows = false
         lampLight.Parent = lamp
-        labelSign(workshop, CFrame.new(centerX, 5.4, -136.95), title)
+        labelSign(workshop, CFrame.new(centerX, 5.4, workshopZ - 6.95), title)
     end
-    workshopBay(-22, "ROOTWORKS", Color3.fromRGB(133, 176, 108))
-    workshopBay(22, "OUTFITTER", AMBER)
+    workshopBay(-42, "ROOTWORKS", Color3.fromRGB(133, 176, 108))
+    workshopBay(42, "OUTFITTER", AMBER)
 
     local craftingBenches = {
         {
             id = self._runtimeIds.InteractionIds.CraftMeadowSatchel,
             recipeId = "recipe_meadow_satchel",
             label = "MEADOW SATCHEL",
-            x = -16,
+            x = -48,
             color = Color3.fromRGB(133, 176, 108),
         },
         {
             id = self._runtimeIds.InteractionIds.CraftAmberCharm,
             recipeId = "recipe_amber_charm",
             label = "AMBER CHARM",
-            x = 16,
+            x = 36,
             color = AMBER,
         },
         {
             id = self._runtimeIds.InteractionIds.CraftIronrootHood,
             recipeId = "recipe_ironroot_hood",
             label = "IRONROOT HOOD",
-            x = -28,
+            x = -36,
             color = Color3.fromRGB(122, 148, 132),
         },
         {
             id = self._runtimeIds.InteractionIds.CraftBrambleBoots,
             recipeId = "recipe_bramble_boots",
             label = "BRAMBLE BOOTS",
-            x = 28,
+            x = 48,
             color = Color3.fromRGB(142, 112, 84),
         },
     }
@@ -22695,7 +22762,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             display,
             "CraftingBench_" .. definition.recipeId,
             Vector3.new(6, 2.6, 6),
-            CFrame.new(definition.x, 1.3, -130),
+            CFrame.new(definition.x, 1.3, workshopZ),
             Color3.fromRGB(66, 70, 65),
             Enum.Material.Slate
         )
@@ -22706,7 +22773,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             display,
             "CraftingTableTop",
             Vector3.new(6.4, 0.55, 4.8),
-            CFrame.new(definition.x, 3.15, -130),
+            CFrame.new(definition.x, 3.15, workshopZ),
             Color3.fromRGB(91, 64, 44),
             Enum.Material.WoodPlanks
         )
@@ -22716,7 +22783,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                     display,
                     "CraftingTableLeg",
                     Vector3.new(0.55, 3.15, 0.55),
-                    CFrame.new(definition.x + side * 2.65, 1.57, -130 + depth * 1.85)
+                    CFrame.new(definition.x + side * 2.65, 1.57, workshopZ + depth * 1.85)
                         * CFrame.Angles(0, 0, math.rad(side * 3)),
                     WET_BARK,
                     Enum.Material.Wood
@@ -22727,7 +22794,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             display,
             "CraftingWorkbenchApron",
             Vector3.new(5.4, 0.75, 0.42),
-            CFrame.new(definition.x, 2.55, -127.82),
+            CFrame.new(definition.x, 2.55, workshopZ + 2.18),
             Color3.fromRGB(68, 48, 36),
             Enum.Material.Wood,
             false
@@ -22736,7 +22803,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             display,
             "CraftingBenchGlow",
             Vector3.new(2, 3.4, 2),
-            CFrame.new(definition.x, 4.3, -130),
+            CFrame.new(definition.x, 4.3, workshopZ),
             definition.color,
             Enum.Material.Neon,
             false
@@ -22760,7 +22827,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "SatchelFlap",
                 Vector3.new(2.35, 0.32, 1.1),
-                CFrame.new(definition.x, 4.72, -129.64) * CFrame.Angles(math.rad(18), 0, 0),
+                CFrame.new(definition.x, 4.72, workshopZ + 0.36) * CFrame.Angles(math.rad(18), 0, 0),
                 Color3.fromRGB(103, 128, 84),
                 Enum.Material.Fabric,
                 false
@@ -22770,7 +22837,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                     display,
                     "SatchelStrap",
                     Vector3.new(0.22, 2.4, 0.22),
-                    CFrame.new(definition.x + strapSide * 1.05, 4.65, -130.2)
+                    CFrame.new(definition.x + strapSide * 1.05, 4.65, workshopZ - 0.2)
                         * CFrame.Angles(0, 0, math.rad(strapSide * 24)),
                     Color3.fromRGB(78, 58, 41),
                     Enum.Material.Fabric,
@@ -22782,7 +22849,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "AmberCharmRing",
                 Vector3.new(0.32, 2.4, 2.4),
-                CFrame.new(definition.x, 4.55, -130) * CFrame.Angles(0, math.rad(90), 0),
+                CFrame.new(definition.x, 4.55, workshopZ) * CFrame.Angles(0, math.rad(90), 0),
                 Color3.fromRGB(126, 97, 54),
                 Enum.Material.Metal,
                 false
@@ -22792,7 +22859,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "AmberCharmCord",
                 Vector3.new(0.2, 1.7, 0.2),
-                CFrame.new(definition.x, 5.8, -130),
+                CFrame.new(definition.x, 5.8, workshopZ),
                 Color3.fromRGB(73, 54, 38),
                 Enum.Material.Fabric,
                 false
@@ -22802,7 +22869,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "HoodShoulders",
                 Vector3.new(3.6, 0.55, 1.45),
-                CFrame.new(definition.x, 3.82, -130),
+                CFrame.new(definition.x, 3.82, workshopZ),
                 Color3.fromRGB(75, 91, 81),
                 Enum.Material.Fabric,
                 false
@@ -22811,7 +22878,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "HoodStand",
                 Vector3.new(0.34, 2.5, 0.34),
-                CFrame.new(definition.x, 4.45, -130),
+                CFrame.new(definition.x, 4.45, workshopZ),
                 Color3.fromRGB(76, 55, 39),
                 Enum.Material.Wood,
                 false
@@ -22822,7 +22889,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                     display,
                     "BrambleBoot",
                     Vector3.new(0.92, 1.45, 1.9),
-                    CFrame.new(definition.x + bootSide * 0.72, 4.05, -129.72)
+                    CFrame.new(definition.x + bootSide * 0.72, 4.05, workshopZ + 0.28)
                         * CFrame.Angles(0, math.rad(bootSide * 8), 0),
                     Color3.fromRGB(103, 76, 54),
                     Enum.Material.Leather,
@@ -22846,11 +22913,13 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         )
     end
 
+    local archiveX = -20
+    local archiveZ = -132
     local archive = part(
         interactables,
         "GreenwardArchive",
         Vector3.new(9, 6, 1),
-        CFrame.new(0, 3, -154),
+        CFrame.new(archiveX, 3, archiveZ),
         BARK,
         Enum.Material.WoodPlanks
     )
@@ -22859,7 +22928,8 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             interactables,
             "ArchivePost",
             Vector3.new(0.75, 8.2, 0.75),
-            CFrame.new(side * 5.1, 4.1, -154.1) * CFrame.Angles(0, 0, math.rad(side * 3)),
+            CFrame.new(archiveX + side * 5.1, 4.1, archiveZ - 0.1)
+                * CFrame.Angles(0, 0, math.rad(side * 3)),
             WET_BARK,
             Enum.Material.Wood
         )
@@ -22867,7 +22937,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             interactables,
             "ArchiveShelf",
             Vector3.new(3.8, 0.42, 1.9),
-            CFrame.new(side * 2.2, 1.65, -153.25),
+            CFrame.new(archiveX + side * 2.2, 1.65, archiveZ + 0.75),
             Color3.fromRGB(91, 65, 44),
             Enum.Material.WoodPlanks,
             false
@@ -22877,7 +22947,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         interactables,
         "ArchiveCanopy",
         Vector3.new(12.2, 0.62, 4.1),
-        CFrame.new(0, 7.5, -153.4) * CFrame.Angles(math.rad(-6), 0, 0),
+        CFrame.new(archiveX, 7.5, archiveZ + 0.6) * CFrame.Angles(math.rad(-6), 0, 0),
         Color3.fromRGB(47, 53, 48),
         Enum.Material.Slate,
         false
@@ -22887,7 +22957,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             interactables,
             "ArchiveNotice",
             Vector3.new(1.35 + (noticeIndex % 2) * 0.25, 1.7, 0.12),
-            CFrame.new(noticeIndex * 1.55, 4 + (noticeIndex % 2) * 0.35, -154.58)
+            CFrame.new(archiveX + noticeIndex * 1.55, 4 + (noticeIndex % 2) * 0.35, archiveZ - 0.58)
                 * CFrame.Angles(0, 0, math.rad(noticeIndex * 3)),
             if noticeIndex == 0 then CREAM else Color3.fromRGB(186, 168, 130),
             Enum.Material.SmoothPlastic,
@@ -22910,7 +22980,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     masteryGrove.Parent = interactables
     local professionAltars = {
         {
-            center = Vector3.new(-47, 0, -105),
+            center = Vector3.new(-78, 0, -76),
             color = FOXFIRE,
             name = "SCOUT",
             paths = {
@@ -22920,7 +22990,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             },
         },
         {
-            center = Vector3.new(78, 0, -105),
+            center = Vector3.new(78, 0, -76),
             color = Color3.fromRGB(112, 151, 119),
             name = "WARDEN",
             paths = {
@@ -22930,7 +23000,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             },
         },
         {
-            center = Vector3.new(-47, 0, -145),
+            center = Vector3.new(-78, 0, -168),
             color = Color3.fromRGB(191, 137, 73),
             name = "ENGINEER",
             paths = {
@@ -22940,7 +23010,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             },
         },
         {
-            center = Vector3.new(47, 0, -145),
+            center = Vector3.new(78, 0, -168),
             color = Color3.fromRGB(176, 108, 112),
             name = "MEDIC",
             paths = {
@@ -23054,7 +23124,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v18")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v19")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -23154,7 +23224,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v18",
+        worldVersion = "bramblewake-blackout-v19",
     })
 end
 
@@ -23716,7 +23786,7 @@ function WorldService.setLanternHealth(self: WorldService, health: number)
     local strength = clamped / 100
     local danger = Color3.fromRGB(255, 104, 76)
     local targetColor = danger:Lerp(AMBER, strength)
-    local targetSize = Vector3.new(1.8, 2.6, 1.8):Lerp(Vector3.new(3.4, 5, 3.4), strength)
+    local targetSize = Vector3.new(1.4, 2.2, 1.4):Lerp(Vector3.new(2.4, 3.6, 2.4), strength)
 
     TweenService:Create(
         flame,
@@ -23727,9 +23797,9 @@ function WorldService.setLanternHealth(self: WorldService, health: number)
     if light ~= nil then
         TweenService
             :Create(light, TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Brightness = 0.7 + strength * 2.3,
+                Brightness = 0.45 + strength * 1.05,
                 Color = targetColor,
-                Range = 18 + strength * 24,
+                Range = 16 + strength * 14,
             })
             :Play()
     end
@@ -23879,7 +23949,7 @@ function WorldService.showTownGuardRecovery(self: WorldService, players: { Playe
 end
 
 local function buildTownConsequenceLandscape(parent: Instance, consequence: any)
-    local center = Vector3.new(52, 0, -112)
+    local center = Vector3.new(72, 0, -100)
     local landscapeKind = tostring(consequence.landscapeKind or "seed_ground")
     local memorialKind = tostring(consequence.memorialKind or "unmarked_stone")
     local growthStage = math.clamp(math.floor(tonumber(consequence.growthStage) or 0), 0, 3)
@@ -24620,7 +24690,7 @@ local function buildTownProgressionBuildings(
     local inn = buildingShell(
         "building_inn",
         "WAYFARER INN",
-        Vector3.new(-40, 0, -132),
+        Vector3.new(-70, 0, -128),
         Vector3.new(18, 0, 14),
         innStage,
         Color3.fromRGB(219, 151, 77)
@@ -24631,7 +24701,7 @@ local function buildTownProgressionBuildings(
                 inn,
                 "InnTable",
                 Vector3.new(4.5, 0.55, 3),
-                CFrame.new(-40 + side * 5, 2.1, -128.5),
+                CFrame.new(-70 + side * 5, 2.1, -124.5),
                 Color3.fromRGB(100, 69, 45),
                 Enum.Material.WoodPlanks,
                 false
@@ -24648,7 +24718,7 @@ local function buildTownProgressionBuildings(
             skin = Color3.fromRGB(177, 124, 87),
             hair = Color3.fromRGB(55, 40, 34),
             prop = "cookpot",
-            day = CFrame.new(-40, 3, -128) * CFrame.Angles(0, math.rad(180), 0),
+            day = CFrame.new(-70, 3, -122) * CFrame.Angles(0, math.rad(180), 0),
             dusk = CFrame.new(-10, 3, -128) * CFrame.Angles(0, math.rad(-10), 0),
             night = CFrame.new(-9, 3, -138) * CFrame.Angles(0, math.rad(-15), 0),
             dayDuty = "PREPARING SUPPLIES",
@@ -24674,7 +24744,7 @@ local function buildTownProgressionBuildings(
             skin = Color3.fromRGB(126, 87, 65),
             hair = Color3.fromRGB(41, 35, 29),
             prop = "seed_basket",
-            day = CFrame.new(52, 3, -101) * CFrame.Angles(0, math.rad(180), 0),
+            day = CFrame.new(72, 3, -82) * CFrame.Angles(0, math.rad(180), 0),
             dusk = CFrame.new(10, 3, -128) * CFrame.Angles(0, math.rad(10), 0),
             night = CFrame.new(9, 3, -138) * CFrame.Angles(0, math.rad(15), 0),
             dayDuty = "TENDING THE GREENWARD",
