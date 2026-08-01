@@ -118,6 +118,10 @@ dedicated keyboard/gamepad/touch bindings, and a first set of three resident-gui
 quest milestones that auto-claim a material reward the moment their
 already-tracked objective is met. Head/feet equipment slots now provide
 server-authoritative damage-reduction and stamina-regeneration passives.
+Medic revives now complete faster, restore more health, and grant a longer
+recovery ward; Warden revives extend that ward. Both bonuses scale within the
+existing ten-level mastery cap while every profession retains the baseline
+rescue path.
 Profession specialization selection/effects, additional equipment families, a
 recipe-browsing UI and quest-board UI, branching quests, the full
 recipe/inventory/quest catalog, deeper per-night events beyond the four tactical profiles,

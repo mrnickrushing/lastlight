@@ -27,6 +27,7 @@ local WardenStagEncounter = require(root.WardenStagEncounter)
 local BramblewakeBlackout = require(root.BramblewakeBlackout)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local ProfessionMastery = require(root.ProfessionMastery)
+local ProfessionRescue = require(root.ProfessionRescue)
 local ProfessionState = require(root.ProfessionState)
 local RateLimiter = require(root.RateLimiter)
 local ResidentDialogue = require(root.ResidentDialogue)
@@ -125,11 +126,20 @@ local professionService = ProfessionService.new(
     ProfessionCatalog,
     ProfessionState,
     ProfessionMastery,
+    ProfessionRescue,
     featureFlags,
     profileService,
     survivalService,
     analyticsService
 )
+survivalService:setReviveTuningProvider(function(player: Player): any
+    return professionService:rescueTuning(
+        player,
+        Config.ReviveChannelSeconds,
+        Config.ReviveHealth,
+        Config.ReviveInvulnerabilitySeconds
+    )
+end)
 local enemyService = EnemyService.new(
     logger,
     Config,

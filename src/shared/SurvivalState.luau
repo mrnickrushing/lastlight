@@ -126,7 +126,7 @@ function SurvivalState.heal(state: State, amount: number): (State, TransitionRes
         }
 end
 
-function SurvivalState.revive(state: State, now: number): (State, TransitionResult)
+function SurvivalState.revive(state: State, now: number, tuning: any?): (State, TransitionResult)
     if state.status ~= "downed" then
         return state,
             {
@@ -142,12 +142,18 @@ function SurvivalState.revive(state: State, now: number): (State, TransitionResu
             }
     end
 
+    local reviveHealth = if type(tuning) == "table" and validNumber(tuning.health)
+        then math.clamp(math.floor(tuning.health), REVIVE_HEALTH, state.maxHealth)
+        else REVIVE_HEALTH
+    local wardSeconds = if type(tuning) == "table" and validNumber(tuning.wardSeconds)
+        then math.clamp(tuning.wardSeconds, REVIVE_INVULNERABILITY_SECONDS, 6)
+        else REVIVE_INVULNERABILITY_SECONDS
     local nextState: State = table.clone(state)
-    nextState.health = REVIVE_HEALTH
+    nextState.health = reviveHealth
     nextState.status = "active"
     nextState.downedAt = nil
     nextState.bleedoutAt = nil
-    nextState.invulnerableUntil = now + REVIVE_INVULNERABILITY_SECONDS
+    nextState.invulnerableUntil = now + wardSeconds
     nextState.revision += 1
     return nextState, {
         applied = true,
