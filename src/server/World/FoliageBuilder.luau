@@ -24,15 +24,12 @@
     Everything is seeded. Two servers, and a Studio build against a live one,
     generate an identical forest.
 
-    NOT MESHES -- AND WHY THAT IS THE RIGHT ORDER
+    PROCEDURAL FALLBACKS
 
-    Real MeshPart foliage would beat all of this. It also needs measured native
-    mesh sizes (guessed scales are reliably wrong by ~10x), an asset manifest,
-    and art-direction sign-off on specific Creator Store assets. Ground shape
-    and composition have to land first regardless: mesh trees standing on a
-    flat rectangle still read as props on a yard. This module is the graybox
-    the art direction asks for before final art, and its call sites are the
-    seams a mesh pass would later swap behind.
+    Measured authored MeshParts now replace selected core/near placements. The
+    functions in this module remain important: distant bands use them for a
+    cheap silhouette budget, and every authored placement falls back here if a
+    private asset is unavailable. Joining never waits on optional art.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -610,6 +607,82 @@ function FoliageBuilder.undergrowth(
         if swayTag ~= nil and index == 1 then
             CollectionService:AddTag(frond, swayTag)
         end
+    end
+end
+
+-- A recognizable route landmark used only if the authored PBR root arch is
+-- unavailable. Its opening remains clear and every piece is non-colliding.
+function FoliageBuilder.rootArch(
+    parent: Instance,
+    position: Vector3,
+    scale: number,
+    tone: Tone,
+    yaw: number
+)
+    local right = Vector3.new(math.cos(yaw), 0, math.sin(yaw))
+    local forward = Vector3.new(-math.sin(yaw), 0, math.cos(yaw))
+    local halfWidth = 9.4 * scale
+    local height = 13.2 * scale
+
+    for side = -1, 1, 2 do
+        local base = position + right * (halfWidth * side)
+        local points = {
+            base,
+            base
+                + right * (-side * 1.2 * scale)
+                + forward * (side * 0.2 * scale)
+                + Vector3.new(0, height * 0.3, 0),
+            base
+                + right * (-side * 3.6 * scale)
+                + forward * (-side * 0.1 * scale)
+                + Vector3.new(0, height * 0.67, 0),
+            position + right * (side * 2.2 * scale) + Vector3.new(0, height * 0.94, 0),
+            position + Vector3.new(0, height, 0),
+        }
+        for index = 1, #points - 1 do
+            cylinderBetween(
+                parent,
+                "RootArch",
+                points[index],
+                points[index + 1],
+                (2.2 - index * 0.26) * scale,
+                if index == 1 then tone.barkWet else tone.bark,
+                Enum.Material.Wood,
+                false
+            )
+        end
+
+        for rootIndex = 1, 3 do
+            local spread = (rootIndex - 2) * 0.55
+            cylinderBetween(
+                parent,
+                "RootArchFlare",
+                base + Vector3.new(0, 0.45 * scale, 0),
+                base
+                    + right * (side * (2.1 + rootIndex * 0.45) * scale)
+                    + forward * (spread * 3.1 * scale)
+                    + Vector3.new(0, 0.08 * scale, 0),
+                0.56 * scale,
+                tone.barkWet,
+                Enum.Material.Wood,
+                false
+            )
+        end
+    end
+
+    for mossIndex = 1, 5 do
+        local offset = (mossIndex - 3) * 1.15 * scale
+        local moss = newPart(
+            parent,
+            "RootArchMoss",
+            Vector3.new(2.8, 0.7, 1.8) * scale,
+            CFrame.new(position + right * offset + Vector3.new(0, height + 0.2 * scale, 0))
+                * CFrame.Angles(0, yaw + mossIndex * 0.41, 0),
+            tone.moss,
+            Enum.Material.Grass,
+            false
+        )
+        moss.Shape = Enum.PartType.Ball
     end
 end
 

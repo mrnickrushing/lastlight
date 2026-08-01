@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_root_arch_a",
+  "source": "assets/meshes/candidates/mesh_root_arch_tripo.glb",
+  "output": "assets/meshes/generated/mesh_root_arch_a.glb",
+  "targetLongestDimension": 25.0,
+  "boundsMin": [
+    -5.5953,
+    -12.5,
+    0.0
+  ],
+  "boundsMax": [
+    5.5953,
+    12.5,
+    21.0624
+  ],
+  "dimensions": [
+    11.1906,
+    25.0,
+    21.0624
+  ],
+  "longestDimension": 25.0,
+  "trianglesBefore": 7651,
+  "trianglesAfter": 7651,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Color_db7ca93b-fc86-445a-ac6c-3b5ebfa8d2b8",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "NormalGL_db7ca93b-fc86-445a-ac6c-3b5ebfa8d2b8",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "ORM_db7ca93b-fc86-445a-ac6c-3b5ebfa8d2b8",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    }
+  ],
+  "bytes": 854820
+}

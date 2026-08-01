@@ -9,6 +9,7 @@ local Workspace = game:GetService("Workspace")
 
 local BramblewakeBuilder = require(script.Parent.Parent.World.BramblewakeBuilder)
 local FoliageBuilder = require(script.Parent.Parent.World.FoliageBuilder)
+local MeshTemplateLoader = require(script.Parent.Parent.World.MeshTemplateLoader)
 local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
 
 local WorldService = {}
@@ -57,6 +58,8 @@ export type WorldService = typeof(setmetatable(
         _townResidents: { [string]: any },
         _townIncidentModel: Model?,
         _engineerBraceModel: Model?,
+        _meshTemplateLoader: MeshTemplateLoader.MeshTemplateLoader,
+        _meshPlacements: { MeshPlacement },
     },
     WorldService
 ))
@@ -85,6 +88,16 @@ local FOLIAGE_TONE: FoliageBuilder.Tone = {
     moss = Color3.fromRGB(58, 91, 54),
     stone = Color3.fromRGB(75, 83, 79),
     stoneWarm = Color3.fromRGB(88, 84, 74),
+}
+
+type MeshPlacement = {
+    assetId: string,
+    fallbackKind: string,
+    position: Vector3,
+    scale: number,
+    yaw: number,
+    seed: number,
+    swayTag: string?,
 }
 
 local WAYHOME_DELIVERY_LIFETIME = 180
@@ -815,6 +828,8 @@ function WorldService.new(
         _townResidents = {},
         _townIncidentModel = nil,
         _engineerBraceModel = nil,
+        _meshTemplateLoader = MeshTemplateLoader.new(logger),
+        _meshPlacements = {},
     }, WorldService)
 end
 
@@ -968,6 +983,7 @@ local FOLIAGE_KEEP_OUT = table.freeze({
     table.freeze({ x = -40, z = -132, radius = 24 }), -- Wayfarer inn
     table.freeze({ x = 52, z = -112, radius = 22 }), -- greenward plot
     table.freeze({ x = 0, z = -143, radius = 26 }), -- night watch posts
+    table.freeze({ x = 52, z = -45, radius = 22 }), -- authored root arch landmark
 })
 
 --[[
@@ -1001,7 +1017,12 @@ end
     reshape the whole forest -- and the firefly loop draws from the same
     generator, so it would have reshaped it differently depending on timing.
 ]]
-local function plantForestBand(forest: Instance, bandIndex: number, swayTag: string?)
+local function plantForestBand(
+    forest: Instance,
+    bandIndex: number,
+    swayTag: string?,
+    meshPlacements: { MeshPlacement }?
+)
     local band = FOREST_BANDS[bandIndex]
     local random = Random.new(1847 + bandIndex * 7919)
     local treeSeed = 4100 + bandIndex * 1000
@@ -1023,9 +1044,42 @@ local function plantForestBand(forest: Instance, bandIndex: number, swayTag: str
             local roll = random:NextNumber()
 
             if roll < 0.62 then
-                FoliageBuilder.conifer(forest, position, scale, FOLIAGE_TONE, treeSeed, swayTag)
+                if bandIndex == 1 and meshPlacements ~= nil and treeSeed % 3 == 0 then
+                    table.insert(meshPlacements, {
+                        assetId = if treeSeed % 2 == 0
+                            then "mesh_conifer_hero_a"
+                            else "mesh_conifer_hero_b",
+                        fallbackKind = "conifer",
+                        position = position,
+                        scale = scale,
+                        yaw = random:NextNumber(0, math.pi * 2),
+                        seed = treeSeed,
+                        swayTag = swayTag,
+                    })
+                else
+                    FoliageBuilder.conifer(forest, position, scale, FOLIAGE_TONE, treeSeed, swayTag)
+                end
             elseif roll < 0.9 then
-                FoliageBuilder.broadleaf(forest, position, scale, FOLIAGE_TONE, treeSeed, swayTag)
+                if bandIndex == 1 and meshPlacements ~= nil and treeSeed % 3 == 0 then
+                    table.insert(meshPlacements, {
+                        assetId = "mesh_broadleaf_hero_a",
+                        fallbackKind = "broadleaf",
+                        position = position,
+                        scale = scale,
+                        yaw = random:NextNumber(0, math.pi * 2),
+                        seed = treeSeed,
+                        swayTag = swayTag,
+                    })
+                else
+                    FoliageBuilder.broadleaf(
+                        forest,
+                        position,
+                        scale,
+                        FOLIAGE_TONE,
+                        treeSeed,
+                        swayTag
+                    )
+                end
             else
                 FoliageBuilder.snag(forest, position, scale, FOLIAGE_TONE, treeSeed)
             end
@@ -1034,35 +1088,77 @@ local function plantForestBand(forest: Instance, bandIndex: number, swayTag: str
             -- actually resolve it.
             if bandIndex == 1 then
                 if treeSeed % 3 == 0 then
-                    FoliageBuilder.boulders(
-                        forest,
-                        position
-                            + Vector3.new(random:NextNumber(-12, 12), 0, random:NextNumber(-12, 12)),
-                        random:NextNumber(0.7, 1.5),
-                        FOLIAGE_TONE,
-                        treeSeed
-                    )
+                    local boulderPosition = position
+                        + Vector3.new(random:NextNumber(-12, 12), 0, random:NextNumber(-12, 12))
+                    local boulderScale = random:NextNumber(0.7, 1.5)
+                    if meshPlacements ~= nil and treeSeed % 2 == 0 then
+                        table.insert(meshPlacements, {
+                            assetId = "mesh_boulder_cluster_a",
+                            fallbackKind = "boulders",
+                            position = boulderPosition,
+                            scale = boulderScale,
+                            yaw = random:NextNumber(0, math.pi * 2),
+                            seed = treeSeed,
+                            swayTag = nil,
+                        })
+                    else
+                        FoliageBuilder.boulders(
+                            forest,
+                            boulderPosition,
+                            boulderScale,
+                            FOLIAGE_TONE,
+                            treeSeed
+                        )
+                    end
                 end
                 if treeSeed % 4 == 0 then
-                    FoliageBuilder.undergrowth(
-                        forest,
-                        position
-                            + Vector3.new(random:NextNumber(-9, 9), 0, random:NextNumber(-9, 9)),
-                        random:NextNumber(0.8, 1.5),
-                        FOLIAGE_TONE,
-                        treeSeed,
-                        swayTag
-                    )
+                    local fernPosition = position
+                        + Vector3.new(random:NextNumber(-9, 9), 0, random:NextNumber(-9, 9))
+                    local fernScale = random:NextNumber(0.8, 1.5)
+                    if meshPlacements ~= nil and treeSeed % 8 == 0 then
+                        table.insert(meshPlacements, {
+                            assetId = "mesh_fern_cluster_a",
+                            fallbackKind = "undergrowth",
+                            position = fernPosition,
+                            scale = fernScale,
+                            yaw = random:NextNumber(0, math.pi * 2),
+                            seed = treeSeed,
+                            swayTag = swayTag,
+                        })
+                    else
+                        FoliageBuilder.undergrowth(
+                            forest,
+                            fernPosition,
+                            fernScale,
+                            FOLIAGE_TONE,
+                            treeSeed,
+                            swayTag
+                        )
+                    end
                 end
                 if treeSeed % 11 == 0 then
-                    FoliageBuilder.deadfall(
-                        forest,
-                        position
-                            + Vector3.new(random:NextNumber(-10, 10), 0, random:NextNumber(-10, 10)),
-                        random:NextNumber(0.7, 1.3),
-                        FOLIAGE_TONE,
-                        treeSeed
-                    )
+                    local deadfallPosition = position
+                        + Vector3.new(random:NextNumber(-10, 10), 0, random:NextNumber(-10, 10))
+                    local deadfallScale = random:NextNumber(0.7, 1.3)
+                    if meshPlacements ~= nil then
+                        table.insert(meshPlacements, {
+                            assetId = "mesh_deadfall_a",
+                            fallbackKind = "deadfall",
+                            position = deadfallPosition,
+                            scale = deadfallScale,
+                            yaw = random:NextNumber(0, math.pi * 2),
+                            seed = treeSeed,
+                            swayTag = nil,
+                        })
+                    else
+                        FoliageBuilder.deadfall(
+                            forest,
+                            deadfallPosition,
+                            deadfallScale,
+                            FOLIAGE_TONE,
+                            treeSeed
+                        )
+                    end
                 end
             end
         end
@@ -1151,10 +1247,22 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     local random = Random.new(1847)
     local swayTag = _self._runtimeIds.AmbientSwayTag
 
+    _self._meshPlacements = {
+        {
+            assetId = "mesh_root_arch_a",
+            fallbackKind = "root_arch",
+            position = Vector3.new(52, TerrainBuilder.surfaceHeight(52, -45), -45),
+            scale = 1,
+            yaw = math.rad(-28),
+            seed = 9147,
+            swayTag = nil,
+        },
+    }
+
     -- Only the near band is planted here. Bands 2 and 3 are scenery beyond the
     -- immediate clearing and are planted after the world is marked ready; see
     -- _buildDistantScenery.
-    plantForestBand(forest, 1, swayTag)
+    plantForestBand(forest, 1, swayTag, _self._meshPlacements)
 
     for _ = 1, 34 do
         local glow = part(
@@ -1344,6 +1452,113 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         false
     )
     addBillboard(warningBoard, "NIGHT WATCH · HOLD THE LANTERN ROAD", CREAM)
+end
+
+-- Rebuilds the same placement from inexpensive geometry when an authored model
+-- cannot load. The choice is stable and never leaves a hole in the route art.
+local function buildMeshFallback(parent: Instance, placement: MeshPlacement)
+    if placement.fallbackKind == "conifer" then
+        FoliageBuilder.conifer(
+            parent,
+            placement.position,
+            placement.scale,
+            FOLIAGE_TONE,
+            placement.seed,
+            placement.swayTag
+        )
+    elseif placement.fallbackKind == "broadleaf" then
+        FoliageBuilder.broadleaf(
+            parent,
+            placement.position,
+            placement.scale,
+            FOLIAGE_TONE,
+            placement.seed,
+            placement.swayTag
+        )
+    elseif placement.fallbackKind == "boulders" then
+        FoliageBuilder.boulders(
+            parent,
+            placement.position,
+            placement.scale,
+            FOLIAGE_TONE,
+            placement.seed
+        )
+    elseif placement.fallbackKind == "undergrowth" then
+        FoliageBuilder.undergrowth(
+            parent,
+            placement.position,
+            placement.scale,
+            FOLIAGE_TONE,
+            placement.seed,
+            placement.swayTag
+        )
+    elseif placement.fallbackKind == "deadfall" then
+        FoliageBuilder.deadfall(
+            parent,
+            placement.position,
+            placement.scale,
+            FOLIAGE_TONE,
+            placement.seed
+        )
+    elseif placement.fallbackKind == "root_arch" then
+        FoliageBuilder.rootArch(
+            parent,
+            placement.position,
+            placement.scale,
+            FOLIAGE_TONE,
+            placement.yaw
+        )
+    end
+end
+
+-- Authored art is optional streaming dressing. Loading begins only after the
+-- spawn and interactions are ready, and a failed private asset immediately
+-- takes the procedural path above.
+function WorldService._buildMeshDressing(self: WorldService)
+    local world = self._world
+    if world == nil then
+        return
+    end
+
+    local geometry = world:FindFirstChild("Environment")
+    local forest = if geometry ~= nil then geometry:FindFirstChild("Forest") else nil
+    if forest == nil then
+        return
+    end
+
+    local placements = table.clone(self._meshPlacements)
+    task.spawn(function()
+        local authored = 0
+        local fallbacks = 0
+        for index, placement in placements do
+            if forest.Parent == nil then
+                return
+            end
+            local model = self._meshTemplateLoader:place(
+                placement.assetId,
+                forest,
+                CFrame.new(placement.position) * CFrame.Angles(0, placement.yaw, 0),
+                placement.scale
+            )
+            if model == nil then
+                buildMeshFallback(forest, placement)
+                fallbacks += 1
+            else
+                authored += 1
+            end
+            if index % 5 == 0 then
+                task.wait()
+            end
+        end
+
+        world:SetAttribute("AuthoredMeshCount", authored)
+        world:SetAttribute("AuthoredMeshFallbackCount", fallbacks)
+        self._logger:info("mesh_dressing_ready", {
+            authored = authored,
+            fallbacks = fallbacks,
+            placements = #placements,
+        })
+    end)
 end
 
 --[[
@@ -2210,7 +2425,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v8")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v9")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -2235,7 +2450,9 @@ function WorldService.Init(self: WorldService, context: any)
 
     world:SetAttribute("Ready", true)
 
-    -- Only after the world is playable. See _buildDistantScenery.
+    -- Only after the world is playable. Optional private assets and distant
+    -- terrain can yield without delaying ArrivalSpawn.
+    self:_buildMeshDressing()
     self:_buildDistantScenery()
 end
 
@@ -2308,7 +2525,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v8",
+        worldVersion = "bramblewake-blackout-v9",
     })
 end
 

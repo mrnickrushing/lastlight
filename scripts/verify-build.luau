@@ -110,6 +110,14 @@ assert(
     worldBuilders:FindFirstChild("WardenStagBuilder") ~= nil,
     "game build is missing WardenStagBuilder"
 )
+assert(
+    worldBuilders:FindFirstChild("MeshAssetRegistry") ~= nil,
+    "game build is missing the measured mesh registry"
+)
+assert(
+    worldBuilders:FindFirstChild("MeshTemplateLoader") ~= nil,
+    "game build is missing the cached mesh loader"
+)
 assert(gamePlace:GetService("Workspace").StreamingEnabled, "streaming must remain enabled")
 local inputActionRollout =
     tostring(gamePlace:GetService("Workspace").PlayerScriptsUseInputActionSystem)
