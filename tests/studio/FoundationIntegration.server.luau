@@ -41,7 +41,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.37.0", "unexpected build version")
+assert(Config.BuildVersion == "0.38.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -337,7 +337,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v18",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v19",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -401,6 +401,7 @@ assert(cabinHearths == 2, "both cabins need a practical stone hearth")
 assert(cabinFirewood == 10, "both cabin exteriors need stocked firewood")
 assert(cabinRugs == 2, "both cabins need an inhabited interior floor layer")
 assert(campCommons == 1, "Emberhollow needs one physical communal gathering area")
+local cabinFoundations = {}
 for _, cabinName in { "WAYFARER CABIN", "MARA'S SHELTER" } do
     local cabin = world:FindFirstChild(cabinName, true)
     assert(cabin ~= nil, "missing reference-built cabin: " .. cabinName)
@@ -412,7 +413,89 @@ for _, cabinName in { "WAYFARER CABIN", "MARA'S SHELTER" } do
         (tonumber(cabin:GetAttribute("PhysicalPartCount")) or 0) >= 70,
         "cabin needs the full layered reference assembly: " .. cabinName
     )
+    assert(cabin:GetAttribute("FacesMainStreet") == true, "cabin entrance must face the street")
+    local expectedYaw = if cabinName == "WAYFARER CABIN" then -90 else 90
+    assert(
+        math.abs((tonumber(cabin:GetAttribute("TownYawDegrees")) or 0) - expectedYaw) < 0.1,
+        "cabin has the wrong town-facing orientation: " .. cabinName
+    )
+    local foundation = cabin:FindFirstChild("CabinFoundation", true)
+    local door = cabin:FindFirstChild("CabinOpenDoor", true)
+    assert(
+        foundation ~= nil and foundation:IsA("BasePart"),
+        "cabin needs a measurable foundation: " .. cabinName
+    )
+    assert(door ~= nil and door:IsA("BasePart"), "cabin needs a physical door: " .. cabinName)
+    assert(
+        math.abs(door.Position.X) < math.abs(foundation.Position.X),
+        "cabin door must be on the street-facing side: " .. cabinName
+    )
+    table.insert(cabinFoundations, foundation)
 end
+assert(
+    (cabinFoundations[1].Position - cabinFoundations[2].Position).Magnitude >= 65,
+    "cabin lots need believable separation across the town square"
+)
+local mainStreet = world:FindFirstChild("TownMainStreet", true)
+local streetWear = world:FindFirstChild("TownMainStreetWear", true)
+local townSquare = world:FindFirstChild("FirstLanternTownSquare", true)
+local courtyard = world:FindFirstChild("EmberhollowCourtyard", true)
+assert(mainStreet ~= nil and mainStreet:IsA("BasePart"), "town needs a visible main street")
+assert(streetWear ~= nil and streetWear:IsA("BasePart"), "town road needs a worn center line")
+assert(townSquare ~= nil and townSquare:IsA("BasePart"), "First Lantern needs a town square")
+assert(courtyard ~= nil and courtyard:IsA("BasePart"), "town needs its ground clearing")
+assert(
+    mainStreet.Position.Y + mainStreet.Size.Y * 0.5
+        > courtyard.Position.Y + courtyard.Size.Y * 0.5 + 0.2,
+    "main street must sit visibly above the general courtyard ground"
+)
+assert(
+    streetWear.Position.Y + streetWear.Size.Y * 0.5
+        > townSquare.Position.Y + townSquare.Size.Y * 0.5,
+    "worn road center must remain visible through the town square"
+)
+local entryPaths = 0
+local squareEdgeStones = 0
+local workshopFloors = 0
+local masteryDaises = 0
+for _, descendant in world:GetDescendants() do
+    if descendant.Name == "CabinEntryPath" then
+        entryPaths += 1
+        assert(descendant:IsA("BasePart") and not descendant.CanCollide, "entry paths are visual")
+    elseif descendant.Name == "TownSquareEdgeStone" then
+        squareEdgeStones += 1
+        assert(
+            descendant:IsA("BasePart") and not descendant.CanCollide,
+            "square edging cannot obstruct player circulation"
+        )
+    elseif descendant.Name == "WorkshopFloor" then
+        workshopFloors += 1
+        assert(
+            descendant:IsA("BasePart") and math.abs(descendant.Position.X) >= 28,
+            "workshop district cannot overlap the main street"
+        )
+    elseif string.find(descendant.Name, "MasteryDais", 1, true) ~= nil then
+        masteryDaises += 1
+        assert(
+            descendant:IsA("BasePart") and math.abs(descendant.Position.X) >= 65,
+            "mastery clearings belong at the settlement edge"
+        )
+    end
+end
+assert(entryPaths == 2, "each cabin needs one visible path to the square")
+assert(squareEdgeStones == 12, "town square edging must preserve four circulation gates")
+assert(workshopFloors == 2, "town needs two separated workshop bays")
+assert(masteryDaises == 4, "all four mastery clearings must remain available")
+local archiveBoard = world:FindFirstChild("GreenwardArchive", true)
+local greenwardGround = world:FindFirstChild("GreenwardGround", true)
+assert(
+    archiveBoard ~= nil and archiveBoard:IsA("BasePart") and math.abs(archiveBoard.Position.X) >= 15,
+    "field-book archive must sit off the main street"
+)
+assert(
+    greenwardGround ~= nil and greenwardGround:IsA("BasePart") and greenwardGround.Position.X >= 60,
+    "Greenward garden must occupy its own eastern lot"
+)
 local toolDisplays = 0
 local craftingDisplays = 0
 for _, descendant in world:GetDescendants() do
