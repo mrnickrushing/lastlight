@@ -41,7 +41,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.36.0", "unexpected build version")
+assert(Config.BuildVersion == "0.37.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -337,7 +337,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v17",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v18",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -396,11 +396,23 @@ for _, descendant in world:GetDescendants() do
         campCommons += 1
     end
 end
-assert(cabinRafters == 6, "both cabins need three visible interior rafters")
+assert(cabinRafters == 8, "both cabins need the four-rafter reference construction pattern")
 assert(cabinHearths == 2, "both cabins need a practical stone hearth")
 assert(cabinFirewood == 10, "both cabin exteriors need stocked firewood")
 assert(cabinRugs == 2, "both cabins need an inhabited interior floor layer")
 assert(campCommons == 1, "Emberhollow needs one physical communal gathering area")
+for _, cabinName in { "WAYFARER CABIN", "MARA'S SHELTER" } do
+    local cabin = world:FindFirstChild(cabinName, true)
+    assert(cabin ~= nil, "missing reference-built cabin: " .. cabinName)
+    assert(
+        cabin:GetAttribute("ConstructionPattern") == "place6_reference_adapted",
+        "cabin must use the supplied Place6 construction pattern: " .. cabinName
+    )
+    assert(
+        (tonumber(cabin:GetAttribute("PhysicalPartCount")) or 0) >= 70,
+        "cabin needs the full layered reference assembly: " .. cabinName
+    )
+end
 local toolDisplays = 0
 local craftingDisplays = 0
 for _, descendant in world:GetDescendants() do

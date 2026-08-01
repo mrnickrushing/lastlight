@@ -95,7 +95,7 @@ local ENTRIES: { Entry } = {
         targetLongestDimension = 20,
         maxTriangles = 5000,
         maxMaterialSlots = 6,
-        placementBand = "curated_core",
+        placementBand = "retired_visual_failure",
         pbr = false,
     },
     {

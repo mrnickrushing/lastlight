@@ -54,14 +54,17 @@ return {
             end,
         },
         {
-            name = "keeps camp replacements measured and curated",
+            name = "retires the failed cabin mesh while keeping the lantern curated",
             run = function()
                 local cabin = MeshAssetRegistry.get("mesh_wayfarer_cabin_a")
                 local lantern = MeshAssetRegistry.get("mesh_lantern_post_a")
                 TestRunner.truthy(cabin ~= nil and lantern ~= nil)
                 TestRunner.equal((cabin :: MeshAssetRegistry.Entry).targetLongestDimension, 20)
                 TestRunner.equal((lantern :: MeshAssetRegistry.Entry).targetLongestDimension, 9)
-                TestRunner.equal((cabin :: MeshAssetRegistry.Entry).placementBand, "curated_core")
+                TestRunner.equal(
+                    (cabin :: MeshAssetRegistry.Entry).placementBand,
+                    "retired_visual_failure"
+                )
                 TestRunner.equal((lantern :: MeshAssetRegistry.Entry).placementBand, "curated_core")
             end,
         },

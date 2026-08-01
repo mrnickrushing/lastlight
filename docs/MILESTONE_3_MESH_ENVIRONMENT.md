@@ -113,6 +113,17 @@ the rebuilding residents use layered clothing, faces, role props, and distinct
 silhouettes rather than debug-man mannequin geometry. The complete reusable
 standard is [VISUAL_QUALITY_STANDARD.md](VISUAL_QUALITY_STANDARD.md).
 
+Build `0.37.0` corrects the Emberhollow cabin replacement after Studio evidence
+showed the optional six-MeshPart cabin rendering as a blown-out white box. The
+cabins now use an adapted version of the supplied Place6 construction pattern
+directly: raised cobblestone foundation, segmented wall panels around three
+framed windows and an open door, four full-width rafters, opposing wedge roof
+halves, four entry steps, and a full-height stone fireplace/chimney. Last Light
+retains its own dimensions, palette, signs, furnishings, and restrained lighting.
+The optional cabin mesh no longer hides this complete physical assembly.
+Its registry entry remains for provenance and measurement history but is marked
+`retired_visual_failure`; agents must not place it as visible world dressing.
+
 Hollow Farm and Foxfire Mill use the same replacement contract as Emberhollow:
 their authored meshes replace only visible structural shells. Invisible
 procedural collision remains authoritative, while farmhouse windows, field
@@ -143,7 +154,7 @@ failed asset request simply leaves the complete procedural landmark visible.
 - A failed asset request produces the established procedural equivalent.
 - Studio review covers phone, tablet, desktop, low graphics, and maximum
   graphics before the mesh kit replaces additional forest bands.
-- Studio Output reports client build `0.36.0`, world version
-  `bramblewake-blackout-v17`, `mesh_dressing_ready ... fallbacks=0`, and
+- Studio Output reports client build `0.37.0`, world version
+  `bramblewake-blackout-v18`, `mesh_dressing_ready ... fallbacks=0`, and
   `expedition_mesh_dressing_ready ... fallbacks=0` before the landmarks are
   accepted as live visual evidence.

@@ -64,6 +64,11 @@ physical geometry.
 - A facade with side walls but open sky is not a finished room.
 - Construction sites show materials, tools, supports, and the shape of work in
   progress. Completed buildings retain structural and occupational details.
+- For Emberhollow cabins, the supplied Place6 cabin is the approved construction
+  template: preserve its segmented-wall, gabled-roof, rafter, framed-window,
+  doorway, stair, foundation, and chimney layering. Adapt dimensions, palette,
+  props, and identifying details to Last Light. Do not replace that assembly
+  with a low-detail mesh unless Studio evidence proves equal or better quality.
 
 ### Routes and terrain
 
