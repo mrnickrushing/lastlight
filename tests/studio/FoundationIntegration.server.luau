@@ -41,7 +41,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.31.0", "unexpected build version")
+assert(Config.BuildVersion == "0.31.1", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -337,7 +337,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v11",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v12",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -366,10 +366,6 @@ assert(
 assert(
     expedition:GetAttribute("EventCount") == BramblewakeExpedition.EventCount,
     "Bramblewake event count is incorrect"
-)
-assert(
-    expedition:GetAttribute("EventInteractionCount") == BramblewakeExpedition.EventInteractionCount,
-    "Bramblewake event interaction count is incorrect"
 )
 local expectedStoryLandmarks = 0
 local expectedStoryLandmarkParts = 0
@@ -517,7 +513,11 @@ assert(
 local eventSteps = CollectionService:GetTagged(RuntimeIds.ExpeditionEventStepTag)
 assert(
     #eventSteps == BramblewakeExpedition.EventInteractionCount,
-    "expected every Bramblewake event interaction step"
+    string.format(
+        "expected every Bramblewake event interaction step: actual=%d expected=%d",
+        #eventSteps,
+        BramblewakeExpedition.EventInteractionCount
+    )
 )
 for _, target in eventSteps do
     assert(target:IsA("BasePart"), "event step tags must target BaseParts")

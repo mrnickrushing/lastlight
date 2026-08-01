@@ -1548,12 +1548,21 @@ function WorldService._buildMeshDressing(self: WorldService)
             if forest.Parent == nil then
                 return
             end
-            local model = self._meshTemplateLoader:place(
+            local placed, result = pcall(
+                self._meshTemplateLoader.place,
+                self._meshTemplateLoader,
                 placement.assetId,
                 forest,
                 CFrame.new(placement.position) * CFrame.Angles(0, placement.yaw, 0),
                 placement.scale
             )
+            local model = if placed then result else nil
+            if not placed then
+                self._logger:info("mesh_placement_failed", {
+                    assetId = placement.assetId,
+                    error = tostring(result),
+                })
+            end
             if model == nil then
                 buildMeshFallback(forest, placement)
                 fallbacks += 1
@@ -2439,7 +2448,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v11")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v12")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -2539,7 +2548,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v11",
+        worldVersion = "bramblewake-blackout-v12",
     })
 end
 

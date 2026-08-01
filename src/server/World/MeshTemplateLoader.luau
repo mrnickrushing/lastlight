@@ -32,8 +32,6 @@ local function sanitize(model: Model): number
             descendant.CastShadow = true
             descendant.Massless = true
             if descendant:IsA("MeshPart") then
-                descendant.CollisionFidelity = Enum.CollisionFidelity.Box
-                descendant.RenderFidelity = Enum.RenderFidelity.Automatic
                 meshParts += 1
             end
         elseif

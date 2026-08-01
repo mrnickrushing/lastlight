@@ -2,7 +2,7 @@
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.31.0",
+    BuildVersion = "0.31.1",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
