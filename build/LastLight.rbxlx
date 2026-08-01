@@ -13995,14 +13995,8 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     self._sessions[player] = session
     self._worldService:setTownConsequence(self._profileService:townConsequence(player))
 
-    if
-        stage == "build"
-        or stage == "prepare"
-        or stage == "survive"
-        or stage == "reveal"
-        or stage == "complete"
-    then
-        self._worldService:buildBarricade()
+    if stage == "prepare" or stage == "survive" or stage == "reveal" or stage == "complete" then
+        self._worldService:buildBarricade(false)
     end
     if stage == "survive" then
         if self._phaseService:hasCompletedFirstNight() then
@@ -14224,7 +14218,7 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         end
     elseif actionId == self._runtimeIds.Actions.Build then
         session.resources -= 3
-        self._worldService:buildBarricade()
+        self._worldService:buildBarricade(true)
         self:_setToast(player, "BARRICADE COMPLETE")
     elseif actionId == self._runtimeIds.Actions.Prepare then
         self:_setToast(player, "THE FIRST LANTERN BURNS")
@@ -17540,35 +17534,135 @@ function WorldService.isInRange(
     return (root.Position - target.Position).Magnitude <= prompt.MaxActivationDistance + 3
 end
 
-function WorldService.buildBarricade(self: WorldService)
+function WorldService.buildBarricade(self: WorldService, animated: boolean?)
     if self._barricadeBuilt then
         return
     end
     self._barricadeBuilt = true
     local world = assert(self._world, "world service has not initialized")
+    local shouldAnimate = animated == true
+
+    local prompt = self._interactions[self._runtimeIds.InteractionIds.Barricade]
+    if prompt ~= nil then
+        prompt.Enabled = false
+        local target = prompt.Parent
+        if target ~= nil and target:IsA("BasePart") then
+            target.CanCollide = false
+            target.CanQuery = false
+            TweenService
+                :Create(
+                    target,
+                    TweenInfo.new(if shouldAnimate then 0.35 else 0),
+                    { Transparency = 1 }
+                )
+                :Play()
+            local label = target:FindFirstChild("WorldLabel")
+            if label ~= nil then
+                label:Destroy()
+            end
+        end
+    end
 
     for index = -4, 4 do
         local height = if index % 2 == 0 then 8 else 7
-        part(
+        local targetCFrame = CFrame.new(-20 + index * 1.8, height / 2, -88)
+            * CFrame.Angles(0, 0, math.rad(index * 2))
+        local stake = part(
             world,
             "BarricadeStake",
             Vector3.new(1.3, height, 1.3),
-            CFrame.new(-20 + index * 1.8, height / 2, -88)
-                * CFrame.Angles(0, 0, math.rad(index * 2)),
+            if shouldAnimate then targetCFrame - Vector3.new(0, height + 1, 0) else targetCFrame,
             BARK,
-            Enum.Material.WoodPlanks
+            Enum.Material.WoodPlanks,
+            not shouldAnimate
         )
+        if shouldAnimate then
+            stake.Transparency = 0.2
+            task.delay((index + 4) * 0.055, function()
+                if stake.Parent == nil then
+                    return
+                end
+                TweenService
+                    :Create(
+                        stake,
+                        TweenInfo.new(0.34, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+                        { CFrame = targetCFrame, Transparency = 0 }
+                    )
+                    :Play()
+                task.delay(0.36, function()
+                    if stake.Parent ~= nil then
+                        stake.CanCollide = true
+                        stake.CanQuery = true
+                        stake.CanTouch = true
+                    end
+                end)
+            end)
+        end
     end
     for level = 1, 2 do
-        part(
+        local targetCFrame = CFrame.new(-20, 2 + level * 2.2, -87.3)
+            * CFrame.Angles(0, 0, math.rad(if level == 1 then 8 else -8))
+        local brace = part(
             world,
             "BarricadeBrace",
             Vector3.new(18, 1, 1),
-            CFrame.new(-20, 2 + level * 2.2, -87.3)
-                * CFrame.Angles(0, 0, math.rad(if level == 1 then 8 else -8)),
+            if shouldAnimate then targetCFrame + Vector3.new(0, 0, 5) else targetCFrame,
             Color3.fromRGB(105, 69, 45),
-            Enum.Material.WoodPlanks
+            Enum.Material.WoodPlanks,
+            not shouldAnimate
         )
+        if shouldAnimate then
+            brace.Transparency = 0.2
+            task.delay(0.55 + level * 0.12, function()
+                if brace.Parent == nil then
+                    return
+                end
+                TweenService
+                    :Create(
+                        brace,
+                        TweenInfo.new(0.28, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+                        { CFrame = targetCFrame, Transparency = 0 }
+                    )
+                    :Play()
+                task.delay(0.3, function()
+                    if brace.Parent ~= nil then
+                        brace.CanCollide = true
+                        brace.CanQuery = true
+                        brace.CanTouch = true
+                    end
+                end)
+            end)
+        end
+    end
+
+    if shouldAnimate then
+        task.delay(0.9, function()
+            if world.Parent == nil then
+                return
+            end
+            local pulse = part(
+                world,
+                "BarricadeCompletePulse",
+                Vector3.new(0.14, 4, 4),
+                CFrame.new(-20, 0.18, -88) * CFrame.Angles(0, 0, math.rad(90)),
+                AMBER,
+                Enum.Material.Glass,
+                false
+            )
+            pulse.Shape = Enum.PartType.Cylinder
+            pulse.Transparency = 0.45
+            pulse.CastShadow = false
+            TweenService:Create(
+                pulse,
+                TweenInfo.new(0.48, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                { Size = Vector3.new(0.14, 20, 20), Transparency = 1 }
+            ):Play()
+            task.delay(0.55, function()
+                if pulse.Parent ~= nil then
+                    pulse:Destroy()
+                end
+            end)
+        end)
     end
 end
 

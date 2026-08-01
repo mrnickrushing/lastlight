@@ -302,14 +302,8 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     self._sessions[player] = session
     self._worldService:setTownConsequence(self._profileService:townConsequence(player))
 
-    if
-        stage == "build"
-        or stage == "prepare"
-        or stage == "survive"
-        or stage == "reveal"
-        or stage == "complete"
-    then
-        self._worldService:buildBarricade()
+    if stage == "prepare" or stage == "survive" or stage == "reveal" or stage == "complete" then
+        self._worldService:buildBarricade(false)
     end
     if stage == "survive" then
         if self._phaseService:hasCompletedFirstNight() then
@@ -531,7 +525,7 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         end
     elseif actionId == self._runtimeIds.Actions.Build then
         session.resources -= 3
-        self._worldService:buildBarricade()
+        self._worldService:buildBarricade(true)
         self:_setToast(player, "BARRICADE COMPLETE")
     elseif actionId == self._runtimeIds.Actions.Prepare then
         self:_setToast(player, "THE FIRST LANTERN BURNS")
