@@ -33,6 +33,8 @@ export type WorldService = typeof(setmetatable(
         _barricadeBuilt: boolean,
         _dusk: boolean,
         _duskSignals: { BasePart },
+        _nightDefenseSignals: { BasePart },
+        _breachActive: boolean,
         _night: boolean,
         _blackoutLightingActive: boolean,
         _expeditionEntry: CFrame?,
@@ -916,6 +918,8 @@ function WorldService.new(logger: Logger, extractionPayoff: any): WorldService
         _barricadeBuilt = false,
         _dusk = false,
         _duskSignals = {},
+        _nightDefenseSignals = {},
+        _breachActive = false,
         _night = false,
         _blackoutLightingActive = false,
         _expeditionEntry = nil,
@@ -1268,6 +1272,77 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             table.insert(_self._duskSignals, eye)
         end
     end
+
+    local defenseRoute = Instance.new("Folder")
+    defenseRoute.Name = "NightDefenseRoute"
+    defenseRoute.Parent = geometry
+    for markerIndex = 1, 7 do
+        local marker = part(
+            defenseRoute,
+            "DefenseTrailMarker",
+            Vector3.new(5.8, 0.18, 1.1),
+            CFrame.new(if markerIndex % 2 == 0 then 4.6 else -4.6, 0.3, -151 + markerIndex * 5),
+            AMBER,
+            Enum.Material.Glass,
+            false
+        )
+        marker.Transparency = 1
+        marker.CastShadow = false
+        marker:SetAttribute("SignalRole", "trail")
+        table.insert(_self._nightDefenseSignals, marker)
+    end
+    for side = -1, 1, 2 do
+        local towerCenter = Vector3.new(side * 10.5, 0, -143)
+        for postSide = -1, 1, 2 do
+            part(
+                defenseRoute,
+                "WatchPost",
+                Vector3.new(0.85, 8.5, 0.85),
+                CFrame.new(towerCenter + Vector3.new(postSide * 2.2, 4.25, 0)),
+                WET_BARK,
+                Enum.Material.Wood
+            )
+        end
+        part(
+            defenseRoute,
+            "WatchPlatform",
+            Vector3.new(6.2, 0.65, 5.2),
+            CFrame.new(towerCenter + Vector3.new(0, 7.1, 0)),
+            Color3.fromRGB(83, 61, 43),
+            Enum.Material.WoodPlanks
+        )
+        local brazier = part(
+            defenseRoute,
+            "WatchSignalFire",
+            Vector3.new(1.55, 2.2, 1.55),
+            CFrame.new(towerCenter + Vector3.new(0, 8.8, 0)),
+            AMBER,
+            Enum.Material.Neon,
+            false
+        )
+        brazier.Shape = Enum.PartType.Ball
+        brazier.Transparency = 1
+        brazier.CastShadow = false
+        brazier:SetAttribute("SignalRole", "fire")
+        local signalLight = Instance.new("PointLight")
+        signalLight.Name = "WatchSignalLight"
+        signalLight.Color = AMBER
+        signalLight.Brightness = 0
+        signalLight.Range = 24
+        signalLight.Shadows = false
+        signalLight.Parent = brazier
+        table.insert(_self._nightDefenseSignals, brazier)
+    end
+    local warningBoard = part(
+        defenseRoute,
+        "NightWatchBoard",
+        Vector3.new(13, 2.8, 0.55),
+        CFrame.new(0, 4.6, -146.8),
+        BARK,
+        Enum.Material.WoodPlanks,
+        false
+    )
+    addBillboard(warningBoard, "NIGHT WATCH · HOLD THE LANTERN ROAD", CREAM)
 end
 
 function WorldService._buildMara(self: WorldService, world: Model)
@@ -3431,6 +3506,130 @@ function WorldService._setDuskSignals(self: WorldService, visible: boolean)
     end
 end
 
+local function nightThemeColor(theme: string?): Color3
+    return if theme == "MIRETIDE"
+        then Color3.fromRGB(90, 192, 170)
+        elseif theme == "ROOTMOON" then Color3.fromRGB(174, 128, 205)
+        elseif theme == "ASHEN VEIL" then Color3.fromRGB(218, 132, 91)
+        else AMBER
+end
+
+function WorldService._setNightDefenseState(self: WorldService, state: string, theme: string?)
+    local accent = if state == "breach" then Color3.fromRGB(255, 91, 58) else nightThemeColor(theme)
+    for _, signal in self._nightDefenseSignals do
+        if signal.Parent ~= nil then
+            local role = signal:GetAttribute("SignalRole")
+            local transparency = if state == "day"
+                then 1
+                elseif state == "dusk" then (if role == "fire" then 0.28 else 0.74)
+                elseif state == "breach" then (if role == "fire" then 0.02 else 0.2)
+                else (if role == "fire" then 0.1 else 0.46)
+            signal.Color = accent
+            TweenService:Create(
+                signal,
+                TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                { Transparency = transparency }
+            ):Play()
+            local signalLight = signal:FindFirstChild("WatchSignalLight")
+            if signalLight ~= nil and signalLight:IsA("PointLight") then
+                signalLight.Color = accent
+                signalLight.Brightness = if state == "day"
+                    then 0
+                    elseif state == "dusk" then 0.8
+                    elseif state == "breach" then 2.8
+                    else 1.7
+            end
+        end
+    end
+    local world = self._world
+    if world ~= nil then
+        world:SetAttribute("NightDefenseState", state)
+        world:SetAttribute("NightDefenseTheme", theme or "")
+    end
+end
+
+function WorldService.signalNightWave(
+    self: WorldService,
+    enemyId: string?,
+    wave: number?,
+    theme: string?
+)
+    local world = self._world
+    if world == nil or not self._night then
+        return
+    end
+    local accent = nightThemeColor(theme)
+    local start = Vector3.new(0, 0.34, -149)
+    local finish = Vector3.new(0, 0.34, -116)
+    local lane = part(
+        world,
+        "NightWaveApproach",
+        Vector3.new(10, 0.16, (finish - start).Magnitude),
+        CFrame.lookAt((start + finish) / 2, finish),
+        accent,
+        Enum.Material.Neon,
+        false
+    )
+    lane.Transparency = 0.72
+    lane.CastShadow = false
+    lane:SetAttribute("EnemyId", enemyId or "unknown")
+    lane:SetAttribute("Wave", wave or 0)
+    local enemyLabel = string.upper(string.gsub(enemyId or "forest threat", "enemy_", ""))
+    enemyLabel = string.gsub(enemyLabel, "_", " ")
+    addBillboard(lane, string.format("WAVE %d · %s INBOUND", wave or 0, enemyLabel), accent)
+    TweenService:Create(
+        lane,
+        TweenInfo.new(1.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { Transparency = 1, Size = Vector3.new(13, 0.16, lane.Size.Z) }
+    ):Play()
+    task.delay(1.3, function()
+        if lane.Parent ~= nil then
+            lane:Destroy()
+        end
+    end)
+end
+
+function WorldService.setTownBreach(self: WorldService, enabled: boolean, theme: string?)
+    self._breachActive = enabled
+    local world = self._world
+    if world == nil then
+        return
+    end
+    world:SetAttribute("TownBreachActive", enabled)
+    self:_setNightDefenseState(
+        if enabled then "breach" else (if self._night then "night" else "day"),
+        theme
+    )
+    if not enabled then
+        return
+    end
+    local accent = Color3.fromRGB(255, 91, 58)
+    for _, center in { Vector3.new(0, 0.4, -148), Vector3.new(0, 0.4, -112) } do
+        local pulse = part(
+            world,
+            "TownBreachPulse",
+            Vector3.new(0.14, 4, 4),
+            CFrame.new(center) * CFrame.Angles(0, 0, math.rad(90)),
+            accent,
+            Enum.Material.Glass,
+            false
+        )
+        pulse.Shape = Enum.PartType.Cylinder
+        pulse.Transparency = 0.28
+        pulse.CastShadow = false
+        TweenService:Create(
+            pulse,
+            TweenInfo.new(0.9, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            { Size = Vector3.new(0.14, 25, 25), Transparency = 1 }
+        ):Play()
+        task.delay(1, function()
+            if pulse.Parent ~= nil then
+                pulse:Destroy()
+            end
+        end)
+    end
+end
+
 function WorldService._applyDuskLighting(_self: WorldService)
     Lighting.ClockTime = 18.15
     Lighting.Brightness = 1.42
@@ -3462,6 +3661,7 @@ end
 function WorldService.setDusk(self: WorldService, enabled: boolean)
     self._dusk = enabled
     self:_setDuskSignals(enabled)
+    self:_setNightDefenseState(if enabled then "dusk" else "day", nil)
     if self._blackoutLightingActive or self._night then
         return
     end
@@ -3537,8 +3737,10 @@ function WorldService._applyTownLighting(_self: WorldService, night: boolean)
     end
 end
 
-function WorldService.setNight(self: WorldService, enabled: boolean)
+function WorldService.setNight(self: WorldService, enabled: boolean, theme: string?)
     self._night = enabled
+    self._breachActive = false
+    self:_setNightDefenseState(if enabled then "night" else "day", theme)
     if enabled then
         self._dusk = false
         self:_setDuskSignals(false)
