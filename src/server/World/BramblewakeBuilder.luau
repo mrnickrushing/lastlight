@@ -566,10 +566,13 @@ local function moduleDressing(parent: Instance, center: Vector3, seed: number, r
     )
 end
 
-local function buildFarm(parent: Instance, center: Vector3)
+local function buildFarm(parent: Instance, center: Vector3): Model
+    local shell = Instance.new("Model")
+    shell.Name = "ProceduralCrookedFarmhouseShell"
+    shell.Parent = parent
     local housePosition = center + Vector3.new(21, 5.5, 20)
     part(
-        parent,
+        shell,
         "Farmhouse",
         Vector3.new(16, 11, 12),
         CFrame.new(housePosition),
@@ -577,7 +580,7 @@ local function buildFarm(parent: Instance, center: Vector3)
         Enum.Material.WoodPlanks
     )
     local roof = part(
-        parent,
+        shell,
         "RainDarkRoof",
         Vector3.new(20, 2, 8.5),
         CFrame.new(housePosition + Vector3.new(0, 7.2, -4.2)) * CFrame.Angles(0, 0, math.rad(-24)),
@@ -586,7 +589,7 @@ local function buildFarm(parent: Instance, center: Vector3)
     )
     roof.CanQuery = false
     local roof2 = part(
-        parent,
+        shell,
         "RainDarkRoof",
         Vector3.new(20, 2, 8.5),
         CFrame.new(housePosition + Vector3.new(0, 7.2, 4.2)) * CFrame.Angles(0, 0, math.rad(24)),
@@ -606,7 +609,7 @@ local function buildFarm(parent: Instance, center: Vector3)
     window(parent, housePosition + Vector3.new(-5, 1.3, -6.25), 0)
     window(parent, housePosition + Vector3.new(5, 1.3, -6.25), 0)
     part(
-        parent,
+        shell,
         "FarmChimney",
         Vector3.new(2.2, 5, 2.2),
         CFrame.new(housePosition + Vector3.new(4.5, 9, 1.5)),
@@ -639,11 +642,15 @@ local function buildFarm(parent: Instance, center: Vector3)
             false
         )
     end
+    return shell
 end
 
-local function buildWindmill(parent: Instance, center: Vector3, ambientMotionTag: string)
+local function buildWindmill(parent: Instance, center: Vector3, ambientMotionTag: string): Model
+    local shell = Instance.new("Model")
+    shell.Name = "ProceduralFoxfireMillTowerShell"
+    shell.Parent = parent
     local tower = part(
-        parent,
+        shell,
         "WindmillTower",
         Vector3.new(9, 30, 9),
         CFrame.new(center + Vector3.new(22, 15, 20)),
@@ -659,7 +666,7 @@ local function buildWindmill(parent: Instance, center: Vector3, ambientMotionTag
         Enum.Material.Metal
     )
     local cap = part(
-        parent,
+        shell,
         "WindmillCap",
         Vector3.new(11, 3, 11),
         CFrame.new(tower.Position + Vector3.new(0, 16, 0)),
@@ -671,7 +678,7 @@ local function buildWindmill(parent: Instance, center: Vector3, ambientMotionTag
     cap.CFrame *= CFrame.Angles(0, 0, math.rad(90))
     for side = -1, 1, 2 do
         part(
-            parent,
+            shell,
             "WindmillBrace",
             Vector3.new(1.1, 28, 1.1),
             CFrame.new(tower.Position + Vector3.new(side * 3.3, 0, -4.6))
@@ -720,6 +727,7 @@ local function buildWindmill(parent: Instance, center: Vector3, ambientMotionTag
         )
     end
     CollectionService:AddTag(rotor, ambientMotionTag)
+    return shell
 end
 
 local function buildStoryLandmark(
@@ -926,7 +934,12 @@ local function buildStoryLandmark(
     return count
 end
 
-local function buildModuleVisual(parent: Instance, visual: string, center: Vector3, runtimeIds: any)
+local function buildModuleVisual(
+    parent: Instance,
+    visual: string,
+    center: Vector3,
+    runtimeIds: any
+): any?
     if visual == "lantern_gate" then
         rootArch(parent, center, 1)
         lantern(parent, center + Vector3.new(-14, 0, 13), 1, runtimeIds.AmbientLightTag)
@@ -963,7 +976,18 @@ local function buildModuleVisual(parent: Instance, visual: string, center: Vecto
             glow.CanQuery = false
         end
     elseif visual == "farm" then
-        buildFarm(parent, center)
+        local shell = buildFarm(parent, center)
+        return {
+            assetId = "mesh_crooked_farmhouse_a",
+            fallbackKind = "placeholder",
+            position = center + Vector3.new(21, 0, 20),
+            scale = 1,
+            yaw = 0,
+            seed = 2101,
+            swayTag = nil,
+            parent = parent,
+            fallbackInstance = shell,
+        }
     elseif visual == "briar_ring" then
         for index = 1, 8 do
             local angle = (index / 8) * math.pi * 2 + math.pi / 8
@@ -1000,7 +1024,18 @@ local function buildModuleVisual(parent: Instance, visual: string, center: Vecto
             end
         end
     elseif visual == "windmill" then
-        buildWindmill(parent, center, runtimeIds.AmbientMotionTag)
+        local shell = buildWindmill(parent, center, runtimeIds.AmbientMotionTag)
+        return {
+            assetId = "mesh_foxfire_windmill_tower_a",
+            fallbackKind = "placeholder",
+            position = center + Vector3.new(22, 0, 20),
+            scale = 1,
+            yaw = 0,
+            seed = 2201,
+            swayTag = nil,
+            parent = parent,
+            fallbackInstance = shell,
+        }
     elseif visual == "bridge" then
         for index = -4, 4 do
             part(
@@ -1856,6 +1891,7 @@ function BramblewakeBuilder.build(
     local eliteArena = nil
     local oldGrowthCenter: Vector3? = nil
     local extractionTarget: BasePart? = nil
+    local meshPlacements = {}
     for _, placement in manifest.modules do
         centers[placement.index] = ORIGIN
             + Vector3.new(placement.cellX * catalog.CellSize, 0, placement.cellZ * catalog.CellSize)
@@ -1909,7 +1945,10 @@ function BramblewakeBuilder.build(
             local z = if cornerIndex <= 2 then -27 else 27
             tree(module, center + Vector3.new(x, 0, z), 0.62 + (cornerIndex % 2) * 0.08)
         end
-        buildModuleVisual(module, definition.visual, center, runtimeIds)
+        local meshPlacement = buildModuleVisual(module, definition.visual, center, runtimeIds)
+        if meshPlacement ~= nil then
+            table.insert(meshPlacements, meshPlacement)
+        end
         if
             type(definition.storyLandmark) == "string"
             and type(definition.storyTitle) == "string"
@@ -2057,6 +2096,7 @@ function BramblewakeBuilder.build(
         eliteArena = assert(eliteArena, "Old Growth elite arena is missing"),
         bossArena = bossArena,
         blackout = blackout,
+        meshPlacements = meshPlacements,
         moduleCenters = moduleCenters,
         partCount = generatedParts,
     }

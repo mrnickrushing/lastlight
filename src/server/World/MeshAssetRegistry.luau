@@ -107,6 +107,24 @@ local ENTRIES: { Entry } = {
         placementBand = "curated_core",
         pbr = false,
     },
+    {
+        id = "mesh_crooked_farmhouse_a",
+        assetId = 117710597512522,
+        targetLongestDimension = 24,
+        maxTriangles = 5000,
+        maxMaterialSlots = 6,
+        placementBand = "curated_expedition",
+        pbr = false,
+    },
+    {
+        id = "mesh_foxfire_windmill_tower_a",
+        assetId = 116166738568510,
+        targetLongestDimension = 36,
+        maxTriangles = 3200,
+        maxMaterialSlots = 6,
+        placementBand = "curated_expedition",
+        pbr = false,
+    },
 }
 
 local BY_ID: { [string]: Entry } = {}

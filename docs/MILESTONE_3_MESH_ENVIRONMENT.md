@@ -72,6 +72,8 @@ fish -c 'source ~/.secrets/roblox.fish; python3 scripts/upload_mesh_assets.py --
 | `mesh_hollow_lantern_shrine_a` | Walk-through arrival sanctuary | 28 studs | Curated arrival landmark only |
 | `mesh_wayfarer_cabin_a` | Open-front gabled camp shelter | 20 studs | Two arrival shelters |
 | `mesh_lantern_post_a` | Crooked caged safe-route light | 9 studs | Arrival road rhythm |
+| `mesh_crooked_farmhouse_a` | Rooted abandoned farmhouse | 24 studs | Hollow Farm landmark |
+| `mesh_foxfire_windmill_tower_a` | Root-swallowed mill tower | 36 studs | Windmill Copse landmark |
 
 The hollow lantern shrine starts from the committed original concept in
 `assets/meshes/concepts`, then the deterministic Blender pipeline authors the
@@ -84,6 +86,12 @@ back to the procedural root-arch language if Roblox asset loading fails.
 Far forest bands continue using the inexpensive procedural silhouettes. This
 keeps the horizon full without spending unique mesh, texture, collision, or
 shadow budget where the player cannot inspect the asset.
+
+Hollow Farm and Foxfire Mill use the same replacement contract as Emberhollow:
+their authored meshes replace only visible structural shells. Invisible
+procedural collision remains authoritative, while farmhouse windows, field
+props, the mill hub, and its separately animated rotor stay functional. A
+failed asset request simply leaves the complete procedural landmark visible.
 
 ## Runtime rules
 
@@ -109,6 +117,7 @@ shadow budget where the player cannot inspect the asset.
 - A failed asset request produces the established procedural equivalent.
 - Studio review covers phone, tablet, desktop, low graphics, and maximum
   graphics before the mesh kit replaces additional forest bands.
-- Studio Output reports client build `0.32.0`, world version
-  `bramblewake-blackout-v13`, and an `AuthoredMeshFallbackCount` of zero before
-  the shrine is accepted as live visual evidence.
+- Studio Output reports client build `0.33.0`, world version
+  `bramblewake-blackout-v14`, `mesh_dressing_ready ... fallbacks=0`, and
+  `expedition_mesh_dressing_ready ... fallbacks=0` before the landmarks are
+  accepted as live visual evidence.

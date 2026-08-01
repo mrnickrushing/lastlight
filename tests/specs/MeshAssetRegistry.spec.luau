@@ -10,7 +10,7 @@ return {
             name = "keeps stable and unique uploaded asset mappings",
             run = function()
                 local entries = MeshAssetRegistry.all()
-                TestRunner.equal(#entries, 10)
+                TestRunner.equal(#entries, 12)
                 local stableIds = {}
                 local robloxIds = {}
                 for _, entry in entries do
@@ -63,6 +63,24 @@ return {
                 TestRunner.equal((lantern :: MeshAssetRegistry.Entry).targetLongestDimension, 9)
                 TestRunner.equal((cabin :: MeshAssetRegistry.Entry).placementBand, "curated_core")
                 TestRunner.equal((lantern :: MeshAssetRegistry.Entry).placementBand, "curated_core")
+            end,
+        },
+        {
+            name = "keeps expedition landmarks measured and curated",
+            run = function()
+                local farm = MeshAssetRegistry.get("mesh_crooked_farmhouse_a")
+                local mill = MeshAssetRegistry.get("mesh_foxfire_windmill_tower_a")
+                TestRunner.truthy(farm ~= nil and mill ~= nil)
+                TestRunner.equal((farm :: MeshAssetRegistry.Entry).targetLongestDimension, 24)
+                TestRunner.equal((mill :: MeshAssetRegistry.Entry).targetLongestDimension, 36)
+                TestRunner.equal(
+                    (farm :: MeshAssetRegistry.Entry).placementBand,
+                    "curated_expedition"
+                )
+                TestRunner.equal(
+                    (mill :: MeshAssetRegistry.Entry).placementBand,
+                    "curated_expedition"
+                )
             end,
         },
     },
