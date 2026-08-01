@@ -1168,40 +1168,267 @@ local function buildPointOfInterest(
     definition: any,
     runtimeIds: any
 )
+    local landmark = Instance.new("Model")
+    landmark.Name = "PhysicalPOI_" .. definition.id
+    landmark:SetAttribute("ContentId", definition.id)
+    landmark:SetAttribute("DisplayName", definition.displayName)
+    landmark:SetAttribute("VisualKind", definition.visual)
+    landmark.Parent = parent
+    local origin = center + Vector3.new(-21, 0, -18)
     local anchor = part(
-        parent,
+        landmark,
         "PointOfInterest",
-        Vector3.new(9, 2, 9),
-        CFrame.new(center + Vector3.new(-21, 1, -18)),
+        Vector3.new(4, 1, 4),
+        CFrame.new(origin + Vector3.new(0, 0.5, 0)),
         STONE,
-        Enum.Material.Slate
+        Enum.Material.Slate,
+        false
     )
+    anchor.Transparency = 1
+    anchor.CastShadow = false
     anchor:SetAttribute("ContentId", definition.id)
     anchor:SetAttribute("DisplayName", definition.displayName)
     CollectionService:AddTag(anchor, runtimeIds.ExpeditionPointOfInterestTag)
+
+    local physicalParts = 0
+    local function detail(
+        name: string,
+        size: Vector3,
+        at: CFrame,
+        color: Color3,
+        material: Enum.Material,
+        shape: Enum.PartType?
+    ): Part
+        physicalParts += 1
+        local created = part(landmark, name, size, at, color, material, false)
+        if shape ~= nil then
+            created.Shape = shape
+        end
+        return created
+    end
+
+    if definition.visual == "ruined_homestead" then
+        detail(
+            "ReedsteadFoundation",
+            Vector3.new(13, 0.65, 10),
+            CFrame.new(origin + Vector3.new(0, 0.32, 0)),
+            Color3.fromRGB(76, 78, 72),
+            Enum.Material.Cobblestone,
+            nil
+        )
+        for side = -1, 1, 2 do
+            detail(
+                "ReedsteadBrokenPost",
+                Vector3.new(0.85, if side < 0 then 7.5 else 5.6, 0.85),
+                CFrame.new(origin + Vector3.new(side * 5.3, if side < 0 then 4 else 3, 3.8))
+                    * CFrame.Angles(0, 0, math.rad(side * 7)),
+                DARK_BARK,
+                Enum.Material.Wood,
+                nil
+            )
+            detail(
+                "ReedsteadWallFragment",
+                Vector3.new(4.8, 4.1 + side * 0.4, 0.55),
+                CFrame.new(origin + Vector3.new(side * 2.8, 2.35, 4.6))
+                    * CFrame.Angles(0, 0, math.rad(side * 4)),
+                BARK,
+                Enum.Material.WoodPlanks,
+                nil
+            )
+        end
+        detail(
+            "ReedsteadCollapsedRafter",
+            Vector3.new(12.5, 0.75, 1),
+            CFrame.new(origin + Vector3.new(0, 3.2, -0.4))
+                * CFrame.Angles(math.rad(12), math.rad(-18), math.rad(9)),
+            WET_EARTH,
+            Enum.Material.Wood,
+            nil
+        )
+        detail(
+            "ReedsteadColdHearth",
+            Vector3.new(3.5, 2.6, 2.4),
+            CFrame.new(origin + Vector3.new(3.8, 1.3, 2.8)),
+            STONE,
+            Enum.Material.Cobblestone,
+            nil
+        )
+        for crateIndex = -1, 1 do
+            detail(
+                "ReedsteadSupplyCrate",
+                Vector3.new(2.2, 1.8 + math.abs(crateIndex) * 0.3, 2.2),
+                CFrame.new(origin + Vector3.new(crateIndex * 2.6, 1, -3.2))
+                    * CFrame.Angles(0, math.rad(crateIndex * 9), 0),
+                if crateIndex == 0 then Color3.fromRGB(108, 124, 74) else Color3.fromRGB(91, 62, 40),
+                Enum.Material.WoodPlanks,
+                nil
+            )
+        end
+    elseif definition.visual == "moth_well" then
+        for stoneIndex = 1, 10 do
+            local angle = stoneIndex * math.pi * 2 / 10
+            detail(
+                "MothwellRimStone",
+                Vector3.new(2.2, 1.25, 1.55),
+                CFrame.new(origin + Vector3.new(math.cos(angle) * 4.2, 0.65, math.sin(angle) * 4.2))
+                    * CFrame.Angles(0, -angle, math.rad((stoneIndex % 3 - 1) * 4)),
+                if stoneIndex % 2 == 0 then STONE else Color3.fromRGB(65, 74, 72),
+                Enum.Material.Slate,
+                nil
+            )
+        end
+        for side = -1, 1, 2 do
+            detail(
+                "MothwellPost",
+                Vector3.new(0.65, 7.2, 0.65),
+                CFrame.new(origin + Vector3.new(side * 4.9, 3.6, 0))
+                    * CFrame.Angles(0, 0, math.rad(side * 4)),
+                DARK_BARK,
+                Enum.Material.Wood,
+                nil
+            )
+        end
+        detail(
+            "MothwellCrossbeam",
+            Vector3.new(10.8, 0.7, 0.7),
+            CFrame.new(origin + Vector3.new(0, 6.8, 0)),
+            BARK,
+            Enum.Material.Wood,
+            nil
+        )
+        detail(
+            "MothwellBucket",
+            Vector3.new(2, 2.2, 2),
+            CFrame.new(origin + Vector3.new(0, 2.1, 0)),
+            Color3.fromRGB(93, 70, 50),
+            Enum.Material.WoodPlanks,
+            Enum.PartType.Cylinder
+        )
+        for mothIndex = 1, 5 do
+            local angle = mothIndex * 2.2
+            local moth = detail(
+                "MothwellLanternMoth",
+                Vector3.new(0.55, 0.35, 0.18),
+                CFrame.new(
+                    origin
+                        + Vector3.new(
+                            math.cos(angle) * (3.2 + mothIndex * 0.3),
+                            3.2 + mothIndex * 0.55,
+                            math.sin(angle) * (3.2 + mothIndex * 0.3)
+                        )
+                ),
+                FOXFIRE,
+                Enum.Material.Glass,
+                nil
+            )
+            moth.Transparency = 0.12
+            CollectionService:AddTag(moth, runtimeIds.AmbientMoteTag)
+        end
+    elseif definition.visual == "sap_grove" then
+        for trunkIndex = -1, 1 do
+            local x = trunkIndex * 4.6
+            detail(
+                "SapglassTrunk",
+                Vector3.new(2.6, 8 + math.abs(trunkIndex) * 2.2, 2.6),
+                CFrame.new(origin + Vector3.new(x, 4.3 + math.abs(trunkIndex), 1.5))
+                    * CFrame.Angles(0, 0, math.rad(trunkIndex * 7)),
+                DARK_BARK,
+                Enum.Material.Wood,
+                nil
+            )
+            local sap = detail(
+                "SapglassVein",
+                Vector3.new(0.7, 4.8, 0.32),
+                CFrame.new(origin + Vector3.new(x, 4.2, 0.1)),
+                AMBER,
+                Enum.Material.Glass,
+                nil
+            )
+            sap.Transparency = 0.12
+        end
+        detail(
+            "SapglassCollector",
+            Vector3.new(9.5, 1.4, 3.2),
+            CFrame.new(origin + Vector3.new(0, 0.7, -3.8)),
+            Color3.fromRGB(87, 64, 45),
+            Enum.Material.WoodPlanks,
+            nil
+        )
+        for vialIndex = -2, 2 do
+            local vial = detail(
+                "SapglassVial",
+                Vector3.new(0.85, 1.45, 0.85),
+                CFrame.new(origin + Vector3.new(vialIndex * 1.55, 1.95, -3.8)),
+                AMBER,
+                Enum.Material.Glass,
+                Enum.PartType.Cylinder
+            )
+            vial.Transparency = 0.16
+        end
+    else
+        for side = -1, 1, 2 do
+            detail(
+                "RootChapelPillar",
+                Vector3.new(1.2, 9.5, 1.2),
+                CFrame.new(origin + Vector3.new(side * 4.2, 4.6, 2.6))
+                    * CFrame.Angles(0, 0, math.rad(-side * 11)),
+                DARK_BARK,
+                Enum.Material.Wood,
+                nil
+            )
+            detail(
+                "RootChapelCrown",
+                Vector3.new(1.0, 7.2, 1.0),
+                CFrame.new(origin + Vector3.new(side * 2.1, 8.2, 2.6))
+                    * CFrame.Angles(0, 0, math.rad(side * 58)),
+                BARK,
+                Enum.Material.Wood,
+                nil
+            )
+            detail(
+                "RootChapelBench",
+                Vector3.new(5.8, 0.65, 1.45),
+                CFrame.new(origin + Vector3.new(side * 3.4, 1.05, -2.5)),
+                Color3.fromRGB(92, 65, 44),
+                Enum.Material.WoodPlanks,
+                nil
+            )
+        end
+        detail(
+            "RootChapelAltar",
+            Vector3.new(5.2, 2.6, 3.2),
+            CFrame.new(origin + Vector3.new(0, 1.3, 2.9)),
+            Color3.fromRGB(72, 78, 74),
+            Enum.Material.Slate,
+            nil
+        )
+        for candleIndex = -1, 1 do
+            local candle = detail(
+                "RootChapelMemoryCandle",
+                Vector3.new(0.65, 1.25, 0.65),
+                CFrame.new(origin + Vector3.new(candleIndex * 1.4, 3.15, 2.7)),
+                if candleIndex == 0 then AMBER else FOXFIRE,
+                Enum.Material.Glass,
+                Enum.PartType.Cylinder
+            )
+            candle.Transparency = 0.1
+        end
+    end
+
     local memory = orb(
-        parent,
-        "MemoryLight",
-        anchor.Position + Vector3.new(0, 4, 0),
-        3.2,
+        landmark,
+        "POIMemoryLantern",
+        origin + Vector3.new(0, 4.6, -0.8),
+        1.35,
         FOXFIRE,
-        Enum.Material.Neon
+        Enum.Material.Glass
     )
-    light(memory, FOXFIRE, 1.4, 18)
+    physicalParts += 1
+    memory.Transparency = 0.1
+    light(memory, FOXFIRE, 0.85, 13)
     billboard(memory, string.upper(definition.displayName), FOXFIRE)
     objectIcon(memory, "memory", FOXFIRE)
-    for index = 1, 6 do
-        local angle = (index / 6) * math.pi * 2
-        local marker = orb(
-            parent,
-            "MemoryRune",
-            anchor.Position + Vector3.new(math.cos(angle) * 5.5, 0.45, math.sin(angle) * 5.5),
-            0.35,
-            FOXFIRE,
-            Enum.Material.Neon
-        )
-        marker.CanQuery = false
-    end
+    landmark:SetAttribute("PhysicalPartCount", physicalParts)
 end
 
 local function buildEventSocket(

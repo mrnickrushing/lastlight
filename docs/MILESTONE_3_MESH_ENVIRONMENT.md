@@ -87,6 +87,23 @@ Far forest bands continue using the inexpensive procedural silhouettes. This
 keeps the horizon full without spending unique mesh, texture, collision, or
 shadow budget where the player cannot inspect the asset.
 
+## Construction-density pass
+
+Build `0.35.0` uses the same lesson as strong part-built Roblox references:
+finish comes from layered construction and recognizable activity, not mesh
+count alone. Emberhollow's two open-front cabins retain their measured authored
+shells, then add separate interior rafters, stone hearths, restrained practical
+lights, rugs, shelves, supplies, stools, and exterior firewood. A communal
+table and visible material stacks make the settlement read as inhabited and
+actively rebuilding.
+
+The four Bramblewake POIs no longer share a slate block and floating rune ring.
+Each now has an original physical silhouette tied to its content definition:
+Reedstead Ruin is a collapsed homestead, Mothwell is a timber well with orbiting
+moths, Sapglass Grove has tapped trunks and collection vials, and Root Chapel
+has a root arch, benches, altar, and memory candles. Labels remain secondary;
+the objects must be recognizable without reading them.
+
 Hollow Farm and Foxfire Mill use the same replacement contract as Emberhollow:
 their authored meshes replace only visible structural shells. Invisible
 procedural collision remains authoritative, while farmhouse windows, field
@@ -117,7 +134,7 @@ failed asset request simply leaves the complete procedural landmark visible.
 - A failed asset request produces the established procedural equivalent.
 - Studio review covers phone, tablet, desktop, low graphics, and maximum
   graphics before the mesh kit replaces additional forest bands.
-- Studio Output reports client build `0.34.0`, world version
-  `bramblewake-blackout-v15`, `mesh_dressing_ready ... fallbacks=0`, and
+- Studio Output reports client build `0.35.0`, world version
+  `bramblewake-blackout-v16`, `mesh_dressing_ready ... fallbacks=0`, and
   `expedition_mesh_dressing_ready ... fallbacks=0` before the landmarks are
   accepted as live visual evidence.
