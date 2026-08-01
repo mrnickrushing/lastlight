@@ -52,8 +52,13 @@ local ORDER = table.freeze({
 
 function MeshMaterialPlan.groupForPart(partName: string): string?
     local normalized = string.lower(partName)
+    -- The stable asset ID may itself contain a cue name (for example,
+    -- `mesh_foxfire_windmill_tower_a`). Imported part names put the authored
+    -- material group after `__`; match that segment so the asset prefix cannot
+    -- turn ordinary iron or moss into Neon.
+    local materialSegment = string.match(normalized, ".*__(.+)$") or normalized
     for _, group in ORDER do
-        if string.find(normalized, group, 1, true) ~= nil then
+        if string.find(materialSegment, group, 1, true) ~= nil then
             return group
         end
     end
