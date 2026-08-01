@@ -172,6 +172,10 @@ quest milestones are in
 
 The current UI direction is documented in the
 [Last Light mobile gameplay HUD report](https://www.lazyweb.com/report/lazyweb/a5059523-0d43-4386-b0f5-bda12ca3d7ea/?source=create).
+The cross-agent requirements for original environment construction, residents,
+interaction props, mesh sizing, restrained VFX, performance, and visual evidence
+are in the [visual quality standard](docs/VISUAL_QUALITY_STANDARD.md). Read it
+before doing any player-visible world work.
 The implementation-specific onboarding refinement is in the
 [First-Ten-Minutes mobile HUD report](https://www.lazyweb.com/report/lazyweb/a34ce67d-041e-434b-acb6-0afd4ccf7ef4/?source=create).
 The non-modal rescue presentation is grounded in the

@@ -104,6 +104,15 @@ moths, Sapglass Grove has tapped trunks and collection vials, and Root Chapel
 has a root arch, benches, altar, and memory candles. Labels remain secondary;
 the objects must be recognizable without reading them.
 
+Build `0.36.0` extends this requirement to the rest of the first-world
+interaction layer. Stable tool and crafting anchors are now invisible beneath
+physical open supply crates and supported worktables with recognizable recipe
+samples. Expedition events own distinct scene models instead of displaying a
+generic platform, and reward pallets have visible rails and bindings. Mara and
+the rebuilding residents use layered clothing, faces, role props, and distinct
+silhouettes rather than debug-man mannequin geometry. The complete reusable
+standard is [VISUAL_QUALITY_STANDARD.md](VISUAL_QUALITY_STANDARD.md).
+
 Hollow Farm and Foxfire Mill use the same replacement contract as Emberhollow:
 their authored meshes replace only visible structural shells. Invisible
 procedural collision remains authoritative, while farmhouse windows, field
@@ -134,7 +143,7 @@ failed asset request simply leaves the complete procedural landmark visible.
 - A failed asset request produces the established procedural equivalent.
 - Studio review covers phone, tablet, desktop, low graphics, and maximum
   graphics before the mesh kit replaces additional forest bands.
-- Studio Output reports client build `0.35.0`, world version
-  `bramblewake-blackout-v16`, `mesh_dressing_ready ... fallbacks=0`, and
+- Studio Output reports client build `0.36.0`, world version
+  `bramblewake-blackout-v17`, `mesh_dressing_ready ... fallbacks=0`, and
   `expedition_mesh_dressing_ready ... fallbacks=0` before the landmarks are
   accepted as live visual evidence.

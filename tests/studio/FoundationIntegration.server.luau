@@ -41,7 +41,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.35.0", "unexpected build version")
+assert(Config.BuildVersion == "0.36.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -337,14 +337,36 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v16",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v17",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
 assert(world:FindFirstChild("Mara", true) ~= nil, "Mara is missing")
+local mara = world:FindFirstChild("Mara", true)
+assert(mara ~= nil and mara:IsA("Model"), "Mara must be a physical resident model")
+assert(mara:FindFirstChild("CoatShoulder") ~= nil, "Mara needs a layered clothing silhouette")
+assert(mara:FindFirstChild("Nose") ~= nil, "Mara needs a readable face")
+assert(mara:FindFirstChild("FieldSatchel") ~= nil, "Mara needs her role-specific field prop")
 assert(world:FindFirstChild("HeartwoodStump", true) ~= nil, "gather node is missing")
 assert(world:FindFirstChild("ConstructionPlot", true) ~= nil, "construction plot is missing")
 assert(world:FindFirstChild("FirstLantern", true) ~= nil, "First Lantern is missing")
+local heroDetailCounts = {
+    HeartwoodRoot = 0,
+    HeartwoodShard = 0,
+    BarricadeWorkPost = 0,
+    FirstLanternCagePost = 0,
+    ArchiveNotice = 0,
+}
+for _, descendant in world:GetDescendants() do
+    if heroDetailCounts[descendant.Name] ~= nil then
+        heroDetailCounts[descendant.Name] += 1
+    end
+end
+assert(heroDetailCounts.HeartwoodRoot == 6, "Heartwood needs a rooted physical silhouette")
+assert(heroDetailCounts.HeartwoodShard == 3, "Heartwood needs faceted gathered material")
+assert(heroDetailCounts.BarricadeWorkPost == 5, "construction plot needs visible work in progress")
+assert(heroDetailCounts.FirstLanternCagePost == 4, "First Lantern needs a physical metal cage")
+assert(heroDetailCounts.ArchiveNotice == 5, "archive needs readable physical field notices")
 local roadSegments = 0
 local roadEdgeStones = 0
 for _, descendant in world:GetDescendants() do
@@ -379,6 +401,26 @@ assert(cabinHearths == 2, "both cabins need a practical stone hearth")
 assert(cabinFirewood == 10, "both cabin exteriors need stocked firewood")
 assert(cabinRugs == 2, "both cabins need an inhabited interior floor layer")
 assert(campCommons == 1, "Emberhollow needs one physical communal gathering area")
+local toolDisplays = 0
+local craftingDisplays = 0
+for _, descendant in world:GetDescendants() do
+    if descendant:IsA("Model") and string.sub(descendant.Name, 1, 12) == "ToolDisplay_" then
+        toolDisplays += 1
+        assert(
+            descendant:FindFirstChild("ToolDisplayCrate") ~= nil
+                and descendant:FindFirstChild("ToolDisplayOpenLid") ~= nil,
+            "starter tools need physical open supply displays"
+        )
+    elseif descendant:IsA("Model") and string.sub(descendant.Name, 1, 16) == "CraftingDisplay_" then
+        craftingDisplays += 1
+        assert(
+            descendant:FindFirstChild("CraftingTableTop") ~= nil and #descendant:GetChildren() >= 10,
+            "crafting recipes need supported worktables and physical samples"
+        )
+    end
+end
+assert(toolDisplays == 3, "all three starter tools need physical displays")
+assert(craftingDisplays == 4, "all four starter recipes need physical displays")
 local builderMaterialSets = 0
 local completedBuildingFrames = 0
 for _, descendant in world:GetDescendants() do
@@ -654,6 +696,17 @@ for _, socket in CollectionService:GetTagged(RuntimeIds.ExpeditionEventTag) do
     assert(
         socket:GetAttribute("ProgressTotal") >= 2,
         "event must require multiple readable interactions"
+    )
+    assert(socket.Transparency == 1 and not socket.CanCollide, "event anchors must stay invisible")
+    local scene = socket.Parent
+        and socket.Parent:FindFirstChild(
+            "EventScene_" .. tostring(socket:GetAttribute("ContentId"))
+        )
+    assert(scene ~= nil and scene:IsA("Model"), "event needs a dedicated physical scene")
+    assert(
+        type(scene:GetAttribute("VisualKind")) == "string"
+            and (tonumber(scene:GetAttribute("PhysicalPartCount")) or 0) >= 4,
+        "event scene needs a distinct visual kind and enough physical construction"
     )
 end
 local eliteTargets = CollectionService:GetTagged(RuntimeIds.ExpeditionEliteTag)

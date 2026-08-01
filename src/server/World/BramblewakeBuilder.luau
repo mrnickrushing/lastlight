@@ -1451,36 +1451,111 @@ local function buildEventSocket(
     anchor:SetAttribute("Status", "dormant")
     anchor:SetAttribute("Progress", 0)
     anchor:SetAttribute("ProgressTotal", #definition.steps)
+    anchor.Transparency = 1
+    anchor.CanCollide = false
+    anchor.CastShadow = false
     CollectionService:AddTag(anchor, runtimeIds.ExpeditionEventTag)
     billboard(anchor, string.upper(definition.displayName), AMBER)
     objectIcon(anchor, "event", AMBER)
     destinationRing(parent, anchor.Position, AMBER, 5.5)
 
+    local scene = Instance.new("Model")
+    scene.Name = "EventScene_" .. definition.id
+    scene:SetAttribute("VisualKind", definition.visual)
+    scene.Parent = parent
+
     if definition.visual == "wagon" then
         part(
-            parent,
+            scene,
             "LostWagon",
             Vector3.new(10, 5, 7),
             CFrame.new(anchor.Position + Vector3.new(0, 3, 0)) * CFrame.Angles(0, 0.35, 0.14),
             Color3.fromRGB(104, 69, 42),
             Enum.Material.WoodPlanks
         )
+        for wheelSide = -1, 1, 2 do
+            local wheel = part(
+                scene,
+                "LostWagonWheel",
+                Vector3.new(0.7, 5.3, 5.3),
+                CFrame.new(anchor.Position + Vector3.new(wheelSide * 5.15, 2.6, 0))
+                    * CFrame.Angles(0, math.rad(90), 0.14),
+                Color3.fromRGB(64, 47, 36),
+                Enum.Material.Wood
+            )
+            wheel.Shape = Enum.PartType.Cylinder
+            for spokeIndex = 1, 4 do
+                part(
+                    scene,
+                    "LostWagonSpoke",
+                    Vector3.new(0.28, 4.6, 0.28),
+                    wheel.CFrame * CFrame.Angles(math.rad(spokeIndex * 45), 0, 0),
+                    Color3.fromRGB(91, 65, 44),
+                    Enum.Material.Wood,
+                    false
+                )
+            end
+        end
+        for shaftSide = -1, 1, 2 do
+            part(
+                scene,
+                "LostWagonShaft",
+                Vector3.new(0.52, 0.52, 10),
+                CFrame.new(anchor.Position + Vector3.new(shaftSide * 2.5, 1.8, -7.2))
+                    * CFrame.Angles(math.rad(5), 0, 0),
+                Color3.fromRGB(78, 54, 38),
+                Enum.Material.Wood,
+                false
+            )
+        end
+        for cargoIndex = -1, 1 do
+            part(
+                scene,
+                "LostWagonCargo",
+                Vector3.new(2.7, 2.2, 2.5),
+                CFrame.new(anchor.Position + Vector3.new(cargoIndex * 2.5, 5.5, 0.2)),
+                if cargoIndex == 0 then Color3.fromRGB(83, 102, 75) else Color3.fromRGB(94, 68, 45),
+                if cargoIndex == 0 then Enum.Material.Fabric else Enum.Material.WoodPlanks,
+                false
+            )
+        end
     elseif definition.visual == "hedge" then
         part(
-            parent,
+            scene,
             "MovingHedge",
             Vector3.new(18, 9, 5),
             CFrame.new(anchor.Position + Vector3.new(0, 4.5, 0)),
             DEEP_GRASS,
             Enum.Material.Grass
         )
+        for branchIndex = -3, 3 do
+            part(
+                scene,
+                "MovingHedgeBranch",
+                Vector3.new(0.55, 8.5 + math.abs(branchIndex % 2), 0.55),
+                CFrame.new(anchor.Position + Vector3.new(branchIndex * 2.7, 4.2, 0.4))
+                    * CFrame.Angles(0, 0, math.rad(branchIndex * 7)),
+                DARK_BARK,
+                Enum.Material.Wood,
+                false
+            )
+            local leaf = orb(
+                scene,
+                "MovingHedgeCrown",
+                anchor.Position + Vector3.new(branchIndex * 2.7, 6 + math.abs(branchIndex % 2), 0),
+                2.3 + (math.abs(branchIndex) % 2) * 0.5,
+                if branchIndex % 2 == 0 then DEEP_GRASS else MOSS,
+                Enum.Material.Grass
+            )
+            leaf.CanQuery = false
+        end
     elseif definition.visual == "root_bridge" then
-        rootArch(parent, anchor.Position, 0.52)
+        rootArch(scene, anchor.Position, 0.52)
     elseif definition.visual == "pollen_storm" then
         for moteIndex = 1, 7 do
             local angle = (moteIndex / 7) * math.pi * 2
             local mote = orb(
-                parent,
+                scene,
                 "PollenStormMote",
                 anchor.Position
                     + Vector3.new(math.cos(angle) * 7, 3 + moteIndex % 3, math.sin(angle) * 5),
@@ -1493,7 +1568,7 @@ local function buildEventSocket(
         end
     elseif definition.visual == "hungry_homestead" then
         part(
-            parent,
+            scene,
             "HomesteadPorch",
             Vector3.new(16, 0.7, 9),
             CFrame.new(anchor.Position + Vector3.new(0, 0.35, 1)),
@@ -1502,7 +1577,7 @@ local function buildEventSocket(
         )
         for side = -1, 1, 2 do
             part(
-                parent,
+                scene,
                 "HomesteadPost",
                 Vector3.new(0.7, 7, 0.7),
                 CFrame.new(anchor.Position + Vector3.new(side * 7, 3.5, -3)),
@@ -1511,17 +1586,52 @@ local function buildEventSocket(
             )
         end
         part(
-            parent,
+            scene,
             "HomesteadRoof",
             Vector3.new(18, 0.7, 11),
             CFrame.new(anchor.Position + Vector3.new(0, 7.2, 1)) * CFrame.Angles(0, 0, math.rad(3)),
             Color3.fromRGB(55, 61, 50),
             Enum.Material.Slate
         )
+        part(
+            scene,
+            "HomesteadBackWall",
+            Vector3.new(15.5, 6.8, 0.7),
+            CFrame.new(anchor.Position + Vector3.new(0, 3.4, 5)),
+            Color3.fromRGB(77, 55, 40),
+            Enum.Material.WoodPlanks
+        )
+        for side = -1, 1, 2 do
+            part(
+                scene,
+                "HomesteadSideWall",
+                Vector3.new(0.7, 6.8, 8.5),
+                CFrame.new(anchor.Position + Vector3.new(side * 7.5, 3.4, 1)),
+                Color3.fromRGB(77, 55, 40),
+                Enum.Material.WoodPlanks
+            )
+            part(
+                scene,
+                "HomesteadSupplyCrate",
+                Vector3.new(2.8, 2.4, 2.7),
+                CFrame.new(anchor.Position + Vector3.new(side * 4.9, 1.55, 3.1)),
+                Color3.fromRGB(96, 67, 43),
+                Enum.Material.WoodPlanks,
+                false
+            )
+        end
+        part(
+            scene,
+            "HomesteadTable",
+            Vector3.new(5.8, 0.55, 2.8),
+            CFrame.new(anchor.Position + Vector3.new(0, 2.7, 3)),
+            Color3.fromRGB(91, 63, 43),
+            Enum.Material.WoodPlanks
+        )
     elseif definition.visual == "stag_tracks" then
         for side = -1, 1, 2 do
             part(
-                parent,
+                scene,
                 "WardenTrackAntler",
                 Vector3.new(0.6, 6.5, 0.6),
                 CFrame.new(anchor.Position + Vector3.new(side * 2.2, 4.2, 4))
@@ -1531,10 +1641,26 @@ local function buildEventSocket(
                 false
             )
         end
+        for trackIndex = 1, 5 do
+            local track = part(
+                scene,
+                "WardenTrackPrint",
+                Vector3.new(1.1, 0.18, 1.8),
+                CFrame.new(
+                    anchor.Position
+                        + Vector3.new((trackIndex % 2) * 1.8 - 0.9, 0.12, -7 + trackIndex * 2.2)
+                )
+                    * CFrame.Angles(0, math.rad(-12 + trackIndex * 4), 0),
+                Color3.fromRGB(53, 48, 40),
+                Enum.Material.Mud,
+                false
+            )
+            track.Shape = Enum.PartType.Ball
+        end
     elseif definition.visual == "wildfire_choice" then
         for side = -1, 1, 2 do
             local flame = orb(
-                parent,
+                scene,
                 "WildfireFront",
                 anchor.Position + Vector3.new(side * 8, 2.2, 4),
                 2.6,
@@ -1544,7 +1670,7 @@ local function buildEventSocket(
             flame.Transparency = 0.12
             flame.CanQuery = false
             part(
-                parent,
+                scene,
                 "CharredSapling",
                 Vector3.new(0.7, 6, 0.7),
                 CFrame.new(anchor.Position + Vector3.new(side * 8, 2.8, 6))
@@ -1562,11 +1688,11 @@ local function buildEventSocket(
         local position = anchor.Position + Vector3.new(offset.x, offset.y, offset.z)
         local target: Part
         if definition.visual == "foxlight" then
-            target = orb(parent, "Foxlight_" .. step.id, position, 2.2, FOXFIRE, Enum.Material.Neon)
+            target = orb(scene, "Foxlight_" .. step.id, position, 2.2, FOXFIRE, Enum.Material.Neon)
             target.Transparency = 0.16
             light(target, FOXFIRE, 1.1, 14)
             part(
-                parent,
+                scene,
                 "FoxlightStem_" .. step.id,
                 Vector3.new(0.35, 2.2, 0.35),
                 CFrame.new(position - Vector3.new(0, 1.4, 0)) * CFrame.Angles(0, 0, math.rad(12)),
@@ -1575,13 +1701,13 @@ local function buildEventSocket(
                 false
             )
         elseif definition.visual == "root_bridge" then
-            target = orb(parent, "RootKnot_" .. step.id, position, 2.7, AMBER, Enum.Material.Wood)
+            target = orb(scene, "RootKnot_" .. step.id, position, 2.7, AMBER, Enum.Material.Wood)
             target.Shape = Enum.PartType.Cylinder
             target.CFrame *= CFrame.Angles(0, 0, math.rad(90))
             target.Size = Vector3.new(1.5, 2.7, 1.5)
             for rootIndex = -1, 1 do
                 part(
-                    parent,
+                    scene,
                     "RootBridgeBranch_" .. step.id,
                     Vector3.new(0.45, 2.8, 0.45),
                     CFrame.new(position + Vector3.new(rootIndex * 0.8, 0.4, 0.8))
@@ -1593,7 +1719,7 @@ local function buildEventSocket(
             end
         elseif definition.visual == "wagon" then
             target = part(
-                parent,
+                scene,
                 "WagonBrace_" .. step.id,
                 Vector3.new(2.8, 1.4, 2.8),
                 CFrame.new(position) * CFrame.Angles(0, index * 0.55, math.rad(8)),
@@ -1603,7 +1729,7 @@ local function buildEventSocket(
             )
         elseif definition.visual == "pollen_storm" then
             target = part(
-                parent,
+                scene,
                 "PollenScreen_" .. step.id,
                 Vector3.new(4.2, 5.2, 0.45),
                 CFrame.new(position) * CFrame.Angles(0, index * 0.18 - 0.36, 0),
@@ -1613,7 +1739,7 @@ local function buildEventSocket(
             )
             for postSide = -1, 1, 2 do
                 part(
-                    parent,
+                    scene,
                     "PollenScreenPost_" .. step.id,
                     Vector3.new(0.35, 5.8, 0.35),
                     target.CFrame * CFrame.new(postSide * 2.2, 0, 0),
@@ -1624,7 +1750,7 @@ local function buildEventSocket(
             end
         elseif definition.visual == "hungry_homestead" then
             target = part(
-                parent,
+                scene,
                 "HomesteadStore_" .. step.id,
                 if step.id == "fill_water"
                     then Vector3.new(2.7, 3.4, 2.7)
@@ -1641,7 +1767,7 @@ local function buildEventSocket(
             end
         elseif definition.visual == "stag_tracks" then
             target = part(
-                parent,
+                scene,
                 "WardenSign_" .. step.id,
                 if step.id == "study_scrape"
                     then Vector3.new(1.1, 4.2, 1.1)
@@ -1657,7 +1783,7 @@ local function buildEventSocket(
             end
         elseif definition.visual == "wildfire_choice" then
             target = part(
-                parent,
+                scene,
                 "WetFirebreak_" .. step.id,
                 Vector3.new(4.8, 1.2, 3.4),
                 CFrame.new(position) * CFrame.Angles(0, index * 0.28, 0),
@@ -1668,7 +1794,7 @@ local function buildEventSocket(
             target.Shape = Enum.PartType.Ball
         else
             target = part(
-                parent,
+                scene,
                 "HedgeLatch_" .. step.id,
                 Vector3.new(1.4, 3.2, 1.4),
                 CFrame.new(position) * CFrame.Angles(0, 0, math.rad(index * 8 - 16)),
@@ -1692,6 +1818,14 @@ local function buildEventSocket(
             target = target,
         })
     end
+
+    local physicalParts = 0
+    for _, descendant in scene:GetDescendants() do
+        if descendant:IsA("BasePart") then
+            physicalParts += 1
+        end
+    end
+    scene:SetAttribute("PhysicalPartCount", physicalParts)
 
     return {
         interactions = interactions,

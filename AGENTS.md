@@ -47,3 +47,10 @@ For practical Roblox implementation details, also read
 generated-place provenance, mesh/PBR sizing, streaming, moving-platform
 physics, mobile layout, remotes, persistence, commerce, and Open Cloud
 publishing.
+
+Before creating or changing any player-visible environment, character, prop,
+mesh, reward, lighting, or VFX, read and satisfy
+[docs/VISUAL_QUALITY_STANDARD.md](docs/VISUAL_QUALITY_STANDARD.md). The entire
+Emberhollow and Bramblewake first-world slice is the minimum quality reference
+for later content. Plain blocks, floating markers, decorative glow, labels, and
+recolors are not substitutes for recognizable physical construction.
