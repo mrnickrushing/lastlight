@@ -320,6 +320,29 @@ function AnalyticsService.professionAbility(
     end
 end
 
+function AnalyticsService.professionMasteryRank(
+    self: AnalyticsService,
+    player: Player,
+    professionId: string,
+    level: number,
+    rankName: string
+)
+    self._logger:info("profession_mastery_rank", {
+        level = level,
+        player = player.UserId,
+        profession = string.sub(professionId, 1, 32),
+        rank = string.sub(rankName, 1, 24),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "ProfessionMasteryRank", level, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = professionId,
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = rankName,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.crafted(
     self: AnalyticsService,
     player: Player,

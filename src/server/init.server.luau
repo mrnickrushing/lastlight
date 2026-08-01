@@ -25,6 +25,7 @@ local OldGrowthEncounter = require(root.OldGrowthEncounter)
 local WardenStagEncounter = require(root.WardenStagEncounter)
 local BramblewakeBlackout = require(root.BramblewakeBlackout)
 local ProfessionCatalog = require(root.ProfessionCatalog)
+local ProfessionMastery = require(root.ProfessionMastery)
 local ProfessionState = require(root.ProfessionState)
 local RateLimiter = require(root.RateLimiter)
 local ResidentDialogue = require(root.ResidentDialogue)
@@ -119,6 +120,7 @@ local professionService = ProfessionService.new(
     logger,
     ProfessionCatalog,
     ProfessionState,
+    ProfessionMastery,
     featureFlags,
     profileService,
     survivalService,

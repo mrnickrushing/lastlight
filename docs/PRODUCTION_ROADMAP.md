@@ -118,7 +118,7 @@ dedicated keyboard/gamepad/touch bindings, and a first set of three silent
 quest milestones that auto-claim a material reward the moment their
 already-tracked objective is met. Head/feet equipment slots now provide
 server-authoritative damage-reduction and stamina-regeneration passives.
-Profession mastery/specializations, additional equipment families and 3D gear
+Profession specialization selection/effects, additional equipment families and 3D gear
 visuals, a recipe-browsing UI and quest-board UI, branching quests, the full
 recipe/inventory/quest catalog, deeper per-night events beyond the four tactical profiles,
 consequences visibly changing future town/region content, town tier, final
@@ -129,6 +129,7 @@ See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md)
 [MILESTONE_3_PLAYER_SURVIVAL.md](MILESTONE_3_PLAYER_SURVIVAL.md), and
 [MILESTONE_3_COMBAT_MOBILITY.md](MILESTONE_3_COMBAT_MOBILITY.md), and
 [MILESTONE_3_PROFESSION_KITS.md](MILESTONE_3_PROFESSION_KITS.md), and
+[MILESTONE_3_PROFESSION_MASTERY.md](MILESTONE_3_PROFESSION_MASTERY.md), and
 [MILESTONE_3_BRAMBLEWAKE_ENEMIES.md](MILESTONE_3_BRAMBLEWAKE_ENEMIES.md), and
 [MILESTONE_3_OLD_GROWTH_ELITE.md](MILESTONE_3_OLD_GROWTH_ELITE.md), and
 [MILESTONE_3_WARDEN_STAG_BOSS.md](MILESTONE_3_WARDEN_STAG_BOSS.md), and
