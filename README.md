@@ -28,6 +28,8 @@ mastery-scaled Medic/Warden rescue utility; four rotating physical normal-night
 incidents now interrupt the defense with
 short cooperative town emergencies; failed expeditions now create persistent,
 owner-only recovery satchels for a deterministic half of larger unbanked pouches;
+level-10 masters can choose one of three persistent paths per profession at
+physical mastery altars, with twelve distinct server-owned effects;
 Studio and device exit gates remain pending.**
 
 The repository currently contains:
@@ -43,7 +45,7 @@ The repository currently contains:
   a known-good fallback, beacon entry, route progress, and expedition fall recovery;
 - eight active optional Bramblewake events with 25 shared interaction steps,
   timeout-safe routes, durable unbanked rewards, kill switch, and telemetry;
-- save-schema-v10 inventory/profession/mastery/story/town-night/condition/gear/equipment/quest/recovery migration,
+- save-schema-v11 inventory/profession/mastery/story/town-night/condition/gear/equipment/quest/recovery migration,
   run-specific reward tombstones, Wayhome extraction, atomic banking,
   retry-safe settlement, and town return streaming;
 - server-owned health, six distinct readable enemy attacks, 30-second downed crawl,
@@ -66,7 +68,7 @@ The repository currently contains:
 - dawn consequences derived from the First Lantern's ending health, three
   physical building-damage states, and server-owned daylight repairs that
   persist and reconcile across connected players;
-- a first pair of town crafting recipes that atomically convert banked
+- four starter town crafting recipes that atomically convert banked
   expedition materials into named gear recorded on a player's own profile,
   gated to server-owned benches once First Light is complete;
 - a first pair of consumable gear effects — a stacking damage-reduction
@@ -80,8 +82,8 @@ The repository currently contains:
 - persistent free-town selection for Scout, Warden, Engineer, and Medic, with
   server-owned reveal/slow, guard, lantern-repair, and area-heal abilities;
 - ten persistent mastery levels per playable profession, six earned rank names,
-  bounded effect/range/duration/cooldown bonuses, and three stable level-10
-  specialization paths per kit ready for a future selection increment;
+  bounded effect/range/duration/cooldown bonuses, and three persistent level-10
+  specialization paths per kit selected through physical mastery stones;
 - server-owned tutorial ordering, input validation, sprint, combat, building,
   analytics, save normalization, and published-place tutorial persistence;
 - mobile, keyboard/mouse, and controller actions through Roblox's Input Action
@@ -90,7 +92,7 @@ The repository currently contains:
   phase countdown, lantern health, dialogue, progress, and pickup feedback;
 - typed environment, logging, feature-flag, service-lifecycle, content-registry,
   networking, save-schema, rate-limit, tutorial, and phase foundations;
-- 254 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
+- 260 pure Luau tests, including 1,000 expedition seeds, plus an expanded Studio
   integration-test place;
 - automated documentation, format, lint, type, test, and build validation;
 - hosted visual direction reports for the general gameplay, focused
@@ -118,6 +120,8 @@ The profession selection, authority, balance, persistence, and device gates are 
 [the profession-kit runbook](docs/MILESTONE_3_PROFESSION_KITS.md).
 The mastery ranks, earned bonuses, specialization foundation, and balance gates
 are in [the profession-mastery runbook](docs/MILESTONE_3_PROFESSION_MASTERY.md).
+The physical path selection, persistence, twelve bounded effects, and abuse gates
+are in [the profession-specialization runbook](docs/MILESTONE_3_PROFESSION_SPECIALIZATIONS.md).
 The Medic rescue-speed/recovery bonuses and Warden recovery-ward support are in
 [the profession rescue runbook](docs/MILESTONE_3_PROFESSION_RESCUE.md).
 The six-enemy sequence, mechanic, readability, solo-balance, and device gates are in

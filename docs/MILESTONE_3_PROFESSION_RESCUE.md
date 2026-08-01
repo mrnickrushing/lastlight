@@ -22,6 +22,10 @@ strict caps. The Medic never completes faster than 1.25 seconds, restores above
 65 health, or grants more than six seconds of invulnerability. Warden support
 never exceeds the Medic's recovery ward at the same rank.
 
+At mastery rank 10, **Oathbound** adds a bounded 1.5-second Warden ward bonus.
+**Wayhome Tender** shortens the Medic channel further and restores eight more
+health within the existing hard caps. Other paths leave rescue behavior alone.
+
 ## Authority and lifecycle
 
 `ProfessionRescue` is a pure, bounded tuning contract. `ProfessionService`

@@ -263,6 +263,31 @@ function ProfileService.masterySnapshot(self: ProfileService, player: Player): a
     return self._saveSchema.masterySnapshot(profile)
 end
 
+function ProfileService.selectProfessionSpecialization(
+    self: ProfileService,
+    player: Player,
+    professionId: string,
+    specializationId: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { applied = false, reason = "profile_unavailable" }
+    end
+    local nextProfile, result = self._saveSchema.withProfessionSpecialization(
+        profile,
+        professionId,
+        specializationId,
+        os.time()
+    )
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
 function ProfileService.setNightNumber(
     self: ProfileService,
     player: Player,

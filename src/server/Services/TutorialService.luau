@@ -489,6 +489,16 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self:_publish(player)
         return
     end
+    if actionId == self._runtimeIds.Actions.SelectProfessionSpecialization then
+        local specializationId = prompt:GetAttribute("Payload")
+        if type(specializationId) ~= "string" then
+            return
+        end
+        local result = self._professionService:selectSpecialization(player, specializationId)
+        self:_setToast(player, result.message)
+        self:_publish(player)
+        return
+    end
     if actionId == self._runtimeIds.Actions.TalkResident then
         local residentId = prompt:GetAttribute("Payload")
         local response = self._residentDialogue.respond(

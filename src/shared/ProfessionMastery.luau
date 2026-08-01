@@ -7,9 +7,23 @@ local ProfessionMastery = {}
 export type Entry = {
     xp: number,
     level: number,
+    specializationId: string?,
 }
 
 export type State = { [string]: Entry }
+
+export type Specialization = {
+    id: string,
+    name: string,
+    description: string,
+    effectAmountBonus: number?,
+    effectRadiusBonus: number?,
+    activeSecondsBonus: number?,
+    cooldownReduction: number?,
+    rescueDurationMultiplier: number?,
+    rescueHealthBonus: number?,
+    rescueWardBonus: number?,
+}
 
 local MAX_LEVEL = 10
 local XP_PER_LEVEL = 100
@@ -24,28 +38,111 @@ local RANKS = table.freeze({
     table.freeze({ level = 10, name = "MASTER" }),
 })
 
-local SPECIALIZATIONS = table.freeze({
+local function specialization(definition: any): Specialization
+    return table.freeze({
+        id = assert(definition.id, "specialization ID is required"),
+        name = assert(definition.name, "specialization name is required"),
+        description = assert(definition.description, "specialization description is required"),
+        effectAmountBonus = tonumber(definition.effectAmountBonus) or 0,
+        effectRadiusBonus = tonumber(definition.effectRadiusBonus) or 0,
+        activeSecondsBonus = tonumber(definition.activeSecondsBonus) or 0,
+        cooldownReduction = tonumber(definition.cooldownReduction) or 0,
+        rescueDurationMultiplier = tonumber(definition.rescueDurationMultiplier) or 1,
+        rescueHealthBonus = tonumber(definition.rescueHealthBonus) or 0,
+        rescueWardBonus = tonumber(definition.rescueWardBonus) or 0,
+    })
+end
+
+local SPECIALIZATIONS: { [string]: { Specialization } } = table.freeze({
     profession_scout = table.freeze({
-        table.freeze({ id = "specialization_pathfinder", name = "PATHFINDER" }),
-        table.freeze({ id = "specialization_foxfire_trapper", name = "FOXFIRE TRAPPER" }),
-        table.freeze({ id = "specialization_trailseer", name = "TRAILSEER" }),
+        specialization({
+            id = "specialization_pathfinder",
+            name = "PATHFINDER",
+            description = "Foxfire Mark reaches 8 studs farther.",
+            effectRadiusBonus = 8,
+        }),
+        specialization({
+            id = "specialization_foxfire_trapper",
+            name = "FOXFIRE TRAPPER",
+            description = "Foxfire Mark lasts 3 seconds longer.",
+            activeSecondsBonus = 3,
+        }),
+        specialization({
+            id = "specialization_trailseer",
+            name = "TRAILSEER",
+            description = "Foxfire Mark recharges 4 seconds faster.",
+            cooldownReduction = 4,
+        }),
     }),
     profession_warden = table.freeze({
-        table.freeze({ id = "specialization_bulwark", name = "BULWARK" }),
-        table.freeze({ id = "specialization_greenkeeper", name = "GREENKEEPER" }),
-        table.freeze({ id = "specialization_oathbound", name = "OATHBOUND" }),
+        specialization({
+            id = "specialization_bulwark",
+            name = "BULWARK",
+            description = "Lantern Guard reduces 10% more incoming damage.",
+            effectAmountBonus = 10,
+        }),
+        specialization({
+            id = "specialization_greenkeeper",
+            name = "GREENKEEPER",
+            description = "Lantern Guard lasts 3 seconds longer.",
+            activeSecondsBonus = 3,
+        }),
+        specialization({
+            id = "specialization_oathbound",
+            name = "OATHBOUND",
+            description = "Warden rescues grant 1.5 more ward seconds.",
+            rescueWardBonus = 1.5,
+        }),
     }),
     profession_engineer = table.freeze({
-        table.freeze({ id = "specialization_lamplighter", name = "LAMPLIGHTER" }),
-        table.freeze({ id = "specialization_rootwright", name = "ROOTWRIGHT" }),
-        table.freeze({ id = "specialization_salvager", name = "SALVAGER" }),
+        specialization({
+            id = "specialization_lamplighter",
+            name = "LAMPLIGHTER",
+            description = "Emergency Patch restores 10 more lantern health.",
+            effectAmountBonus = 10,
+        }),
+        specialization({
+            id = "specialization_rootwright",
+            name = "ROOTWRIGHT",
+            description = "Emergency Patch reaches 10 studs farther.",
+            effectRadiusBonus = 10,
+        }),
+        specialization({
+            id = "specialization_salvager",
+            name = "SALVAGER",
+            description = "Emergency Patch recharges 5 seconds faster.",
+            cooldownReduction = 5,
+        }),
     }),
     profession_medic = table.freeze({
-        table.freeze({ id = "specialization_dawnmender", name = "DAWNMENDER" }),
-        table.freeze({ id = "specialization_wayhome_tender", name = "WAYHOME TENDER" }),
-        table.freeze({ id = "specialization_brightcap_herbalist", name = "BRIGHTCAP HERBALIST" }),
+        specialization({
+            id = "specialization_dawnmender",
+            name = "DAWNMENDER",
+            description = "Guiding Pulse restores 10 more health.",
+            effectAmountBonus = 10,
+        }),
+        specialization({
+            id = "specialization_wayhome_tender",
+            name = "WAYHOME TENDER",
+            description = "Medic rescues are faster and restore 8 more health.",
+            rescueDurationMultiplier = 0.82,
+            rescueHealthBonus = 8,
+        }),
+        specialization({
+            id = "specialization_brightcap_herbalist",
+            name = "BRIGHTCAP HERBALIST",
+            description = "Guiding Pulse reaches 10 studs farther.",
+            effectRadiusBonus = 10,
+        }),
     }),
 })
+
+local SPECIALIZATION_PROFESSIONS: { [string]: string } = {}
+for professionId, definitions in SPECIALIZATIONS do
+    for _, definition in definitions do
+        SPECIALIZATION_PROFESSIONS[definition.id] = professionId
+    end
+end
 
 local function levelForXp(xp: number): number
     return math.clamp(math.floor(xp / XP_PER_LEVEL) + 1, 1, MAX_LEVEL)
@@ -76,7 +173,17 @@ function ProfessionMastery.normalize(value: any): State
             local xp = if type(raw.xp) == "number"
                 then math.clamp(math.floor(raw.xp), 0, MAX_XP)
                 else 0
-            result[definition.id] = { xp = xp, level = levelForXp(xp) }
+            local level = levelForXp(xp)
+            local specializationId = if level >= MAX_LEVEL
+                    and type(raw.specializationId) == "string"
+                    and SPECIALIZATION_PROFESSIONS[raw.specializationId] == definition.id
+                then raw.specializationId
+                else nil
+            result[definition.id] = {
+                xp = xp,
+                level = level,
+                specializationId = specializationId,
+            }
         end
     end
     return result
@@ -87,13 +194,19 @@ function ProfessionMastery.award(state: State, professionId: any, amount: number
         return state, { applied = false, reason = "invalid_mastery_award" }
     end
     local nextState = ProfessionMastery.normalize(state)
-    local current = nextState[professionId] or {
-        xp = 0,
-        level = 1,
-    }
+    local current = nextState[professionId]
+        or {
+            xp = 0,
+            level = 1,
+            specializationId = nil,
+        }
     local nextXp = math.min(MAX_XP, current.xp + math.floor(amount))
     local nextLevel = levelForXp(nextXp)
-    nextState[professionId] = { xp = nextXp, level = nextLevel }
+    nextState[professionId] = {
+        xp = nextXp,
+        level = nextLevel,
+        specializationId = current.specializationId,
+    }
     return nextState,
         {
             applied = true,
@@ -106,19 +219,102 @@ function ProfessionMastery.award(state: State, professionId: any, amount: number
         }
 end
 
+function ProfessionMastery.selectSpecialization(
+    state: State,
+    professionId: any,
+    specializationId: any
+): (State, any)
+    if not ProfessionCatalog.isValid(professionId) then
+        return state, { applied = false, reason = "unknown_profession" }
+    end
+    if
+        type(specializationId) ~= "string"
+        or SPECIALIZATION_PROFESSIONS[specializationId] ~= professionId
+    then
+        return state, { applied = false, reason = "invalid_specialization" }
+    end
+    local normalized = ProfessionMastery.normalize(state)
+    local current = normalized[professionId] or { xp = 0, level = 1, specializationId = nil }
+    if current.level < MAX_LEVEL then
+        return state, { applied = false, reason = "specialization_locked" }
+    end
+    if current.specializationId == specializationId then
+        return state,
+            {
+                applied = false,
+                duplicate = true,
+                professionId = professionId,
+                reason = "already_selected",
+                specializationId = specializationId,
+            }
+    end
+    local nextState = table.clone(normalized)
+    nextState[professionId] = {
+        xp = current.xp,
+        level = current.level,
+        specializationId = specializationId,
+    }
+    return nextState,
+        {
+            applied = true,
+            professionId = professionId,
+            specializationId = specializationId,
+        }
+end
+
+function ProfessionMastery.specializationProfession(specializationId: any): string?
+    return if type(specializationId) == "string"
+        then SPECIALIZATION_PROFESSIONS[specializationId]
+        else nil
+end
+
+function ProfessionMastery.specializationDefinition(specializationId: any): any
+    local professionId = ProfessionMastery.specializationProfession(specializationId)
+    if professionId == nil then
+        return nil
+    end
+    for _, definition in SPECIALIZATIONS[professionId] do
+        if definition.id == specializationId then
+            return definition
+        end
+    end
+    return nil
+end
+
 function ProfessionMastery.tuning(state: State, professionId: any): any
     local normalized = ProfessionMastery.normalize(state)
     local entry = if ProfessionCatalog.isValid(professionId)
-        then normalized[professionId] or { xp = 0, level = 1 }
-        else { xp = 0, level = 1 }
+        then normalized[professionId] or { xp = 0, level = 1, specializationId = nil }
+        else { xp = 0, level = 1, specializationId = nil }
     local rewardSteps = math.floor(entry.level / 2)
+    local selectedSpecialization =
+        ProfessionMastery.specializationDefinition(entry.specializationId)
     return {
         level = entry.level,
         rankName = rankName(entry.level),
-        effectAmountBonus = rewardSteps * 2,
-        effectRadiusBonus = rewardSteps * 1.5,
-        activeSecondsBonus = rewardSteps * 0.35,
-        cooldownReduction = rewardSteps * 0.4,
+        effectAmountBonus = rewardSteps * 2 + (if selectedSpecialization == nil
+            then 0
+            else selectedSpecialization.effectAmountBonus or 0),
+        effectRadiusBonus = rewardSteps * 1.5 + (if selectedSpecialization == nil
+            then 0
+            else selectedSpecialization.effectRadiusBonus or 0),
+        activeSecondsBonus = rewardSteps * 0.35 + (if selectedSpecialization == nil
+            then 0
+            else selectedSpecialization.activeSecondsBonus or 0),
+        cooldownReduction = rewardSteps * 0.4 + (if selectedSpecialization == nil
+            then 0
+            else selectedSpecialization.cooldownReduction or 0),
+        rescueDurationMultiplier = if selectedSpecialization == nil
+            then 1
+            else selectedSpecialization.rescueDurationMultiplier or 1,
+        rescueHealthBonus = if selectedSpecialization == nil
+            then 0
+            else selectedSpecialization.rescueHealthBonus or 0,
+        rescueWardBonus = if selectedSpecialization == nil
+            then 0
+            else selectedSpecialization.rescueWardBonus or 0,
+        specialization = selectedSpecialization,
+        specializationId = entry.specializationId,
         specializationUnlocked = entry.level >= MAX_LEVEL,
         specializationUnlockLevel = MAX_LEVEL,
         specializations = if ProfessionCatalog.isValid(professionId)
@@ -131,7 +327,7 @@ function ProfessionMastery.snapshot(state: State): { [string]: any }
     local normalized = ProfessionMastery.normalize(state)
     local result = {}
     for _, definition in ProfessionCatalog.list() do
-        local entry = normalized[definition.id] or { xp = 0, level = 1 }
+        local entry = normalized[definition.id] or { xp = 0, level = 1, specializationId = nil }
         local tuning = ProfessionMastery.tuning(normalized, definition.id)
         result[definition.id] = {
             xp = entry.xp,
@@ -143,6 +339,8 @@ function ProfessionMastery.snapshot(state: State): { [string]: any }
             effectRadiusBonus = tuning.effectRadiusBonus,
             activeSecondsBonus = tuning.activeSecondsBonus,
             cooldownReduction = tuning.cooldownReduction,
+            specialization = tuning.specialization,
+            specializationId = tuning.specializationId,
             specializationUnlocked = tuning.specializationUnlocked,
             specializationUnlockLevel = tuning.specializationUnlockLevel,
             specializations = tuning.specializations,

@@ -53,6 +53,7 @@ local RuntimeIds = {
         RepairTown = "repair_town",
         ResolveTownIncident = "resolve_town_incident",
         RecoverExpeditionCache = "recover_expedition_cache",
+        SelectProfessionSpecialization = "select_profession_specialization",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -94,6 +95,20 @@ local RuntimeIds = {
         "town_repair_archive",
         "town_repair_workshop",
         "town_repair_inn",
+    }),
+    ProfessionSpecializationInteractionIds = table.freeze({
+        "mastery_specialization_pathfinder",
+        "mastery_specialization_foxfire_trapper",
+        "mastery_specialization_trailseer",
+        "mastery_specialization_bulwark",
+        "mastery_specialization_greenkeeper",
+        "mastery_specialization_oathbound",
+        "mastery_specialization_lamplighter",
+        "mastery_specialization_rootwright",
+        "mastery_specialization_salvager",
+        "mastery_specialization_dawnmender",
+        "mastery_specialization_wayhome_tender",
+        "mastery_specialization_brightcap_herbalist",
     }),
 }
 

@@ -65,7 +65,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 10,
+        schemaVersion = 11,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -192,7 +192,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 10
+    profile.schemaVersion = 11
     return profile
 end
 
@@ -237,6 +237,28 @@ function SaveSchema.withMasteryAward(
 ): (Profile, any)
     local nextMastery, result =
         ProfessionMastery.award(profile.profession.mastery, professionId, amount)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.profession = table.clone(profile.profession)
+    nextProfile.profession.mastery = nextMastery
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.withProfessionSpecialization(
+    profile: Profile,
+    professionId: string,
+    specializationId: string,
+    now: number
+): (Profile, any)
+    local nextMastery, result = ProfessionMastery.selectSpecialization(
+        profile.profession.mastery,
+        professionId,
+        specializationId
+    )
     if not result.applied then
         return profile, result
     end

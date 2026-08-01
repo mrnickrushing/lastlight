@@ -343,6 +343,23 @@ function AnalyticsService.professionMasteryRank(
     end
 end
 
+function AnalyticsService.professionSpecializationSelected(
+    self: AnalyticsService,
+    player: Player,
+    professionId: string,
+    specializationId: string,
+    accepted: boolean,
+    reason: string?
+)
+    self._logger:info("profession_specialization_selected", {
+        accepted = accepted,
+        player = player.UserId,
+        profession = professionId,
+        reason = reason,
+        specialization = specializationId,
+    })
+end
+
 function AnalyticsService.townNightConsequence(
     self: AnalyticsService,
     nightNumber: number,

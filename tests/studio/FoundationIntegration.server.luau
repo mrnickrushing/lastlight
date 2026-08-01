@@ -37,8 +37,8 @@ local OldGrowthBuilder = require(serverRoot.World.OldGrowthBuilder)
 local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
-assert(Config.SaveSchemaVersion == 10, "unexpected save schema version")
-assert(Config.BuildVersion == "0.25.0", "unexpected build version")
+assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
+assert(Config.BuildVersion == "0.26.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -95,6 +95,14 @@ assert(
 assert(
     RuntimeIds.Actions.RecoverExpeditionCache == "recover_expedition_cache",
     "recovery-cache action ID changed"
+)
+assert(
+    RuntimeIds.Actions.SelectProfessionSpecialization == "select_profession_specialization",
+    "profession specialization action ID changed"
+)
+assert(
+    #RuntimeIds.ProfessionSpecializationInteractionIds == 12,
+    "profession specialization interaction catalog is incomplete"
 )
 assert(
     TownNightIncident.forTheme("EMBERFALL").id == "incident_emberfall_cinders",
