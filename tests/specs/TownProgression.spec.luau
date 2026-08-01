@@ -24,6 +24,8 @@ return {
                 TestRunner.equal(consequence.landscapeKind, "community_orchard")
                 TestRunner.equal(consequence.memorialKind, "living_antlers")
                 TestRunner.equal(consequence.growthStage, 2)
+                TestRunner.equal(consequence.buildingStages.building_archive, 2)
+                TestRunner.equal(consequence.buildingStages.building_inn, 1)
             end,
         },
         {
@@ -34,6 +36,9 @@ return {
                 TestRunner.equal(consequence.title, "EMBERHOLLOW AWAKENS")
                 TestRunner.equal(consequence.landscapeKind, "seed_ground")
                 TestRunner.equal(consequence.memorialKind, "unmarked_stone")
+                TestRunner.equal(consequence.buildingStages.building_archive, 0)
+                TestRunner.equal(consequence.buildingStages.building_town_board, 1)
+                TestRunner.equal(consequence.buildingStages.building_inn, 0)
             end,
         },
         {
@@ -66,6 +71,17 @@ return {
                 })
                 TestRunner.equal(consequence.landscapeKind, "living_grove")
                 TestRunner.equal(consequence.memorialKind, "broken_antlers")
+            end,
+        },
+        {
+            name = "caps mature building stages at tier three",
+            run = function()
+                local consequence = TownProgression.resolve({
+                    town = { nightNumber = 100 },
+                })
+                TestRunner.equal(consequence.tier, 3)
+                TestRunner.equal(consequence.buildingStages.building_archive, 3)
+                TestRunner.equal(consequence.buildingStages.building_inn, 2)
             end,
         },
     },

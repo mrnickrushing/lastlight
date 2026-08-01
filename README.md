@@ -18,9 +18,9 @@ playable game exists.
 four active events, durable extraction settlement, player rescue, combat
 mobility, six-enemy first-night roster, four basic profession kits, Old Growth,
 the Warden Stag, the Bramblewake Blackout, permanent chapter-one resolution, a
-repeating town normal-night cycle, a first pair of crafting recipes, a
-first pair of consumable gear effects, and a first set of silent quest
-milestones implemented; Studio and device exit gates remain pending.**
+repeating town normal-night cycle, four starter recipes, consumable and passive
+gear effects, silent quest milestones, and physical town-tier building growth
+implemented; Studio and device exit gates remain pending.**
 
 The repository currently contains:
 

@@ -11,7 +11,22 @@ export type Consequence = {
     landscapeKind: string,
     memorialKind: string,
     growthStage: number,
+    buildingStages: { [string]: number },
 }
+
+local function buildingStages(tier: number): { [string]: number }
+    -- Stage zero is a readable construction site, while stages one through
+    -- three are increasingly complete buildings. Core services arrive first;
+    -- the inn opens only after the town has survived enough nights to support
+    -- visitors instead of appearing fully formed on a fresh save.
+    return {
+        building_first_lantern = math.max(1, tier),
+        building_archive = tier,
+        building_town_board = math.max(1, tier),
+        building_workbench = math.max(1, tier),
+        building_inn = math.max(0, tier - 1),
+    }
+end
 
 function TownProgression.resolve(profile: any): Consequence
     local chapter = if type(profile) == "table" and type(profile.story) == "table"
@@ -58,6 +73,7 @@ function TownProgression.resolve(profile: any): Consequence
         landscapeKind = landscapeKind,
         memorialKind = memorialKind,
         growthStage = tier,
+        buildingStages = buildingStages(tier),
     }
 end
 

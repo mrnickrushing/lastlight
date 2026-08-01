@@ -2725,6 +2725,369 @@ local function buildTownConsequenceLandscape(parent: Instance, consequence: any)
     parent:SetAttribute("GrowthStage", growthStage)
 end
 
+local function buildTownProgressionBuildings(parent: Instance, consequence: any)
+    local stages = if type(consequence.buildingStages) == "table"
+        then consequence.buildingStages
+        else {}
+
+    local function stageFor(id: string): number
+        return math.clamp(math.floor(tonumber(stages[id]) or 0), 0, 3)
+    end
+
+    local function constructionSite(id: string, displayName: string, center: Vector3, size: Vector3)
+        local model = Instance.new("Model")
+        model.Name = id
+        model:SetAttribute("BuildingId", id)
+        model:SetAttribute("BuildingStage", 0)
+        model:SetAttribute("BuildingState", "construction")
+        model.Parent = parent
+        part(
+            model,
+            "StoneFooting",
+            Vector3.new(size.X, 0.65, size.Z),
+            CFrame.new(center + Vector3.new(0, 0.32, 0)),
+            Color3.fromRGB(73, 76, 72),
+            Enum.Material.Slate,
+            false
+        )
+        for sideX = -1, 1, 2 do
+            for sideZ = -1, 1, 2 do
+                part(
+                    model,
+                    "ScaffoldPost",
+                    Vector3.new(0.55, 7.5, 0.55),
+                    CFrame.new(
+                        center + Vector3.new(sideX * (size.X * 0.45), 3.9, sideZ * (size.Z * 0.42))
+                    ),
+                    Color3.fromRGB(94, 69, 46),
+                    Enum.Material.Wood,
+                    false
+                )
+            end
+        end
+        for sideZ = -1, 1, 2 do
+            part(
+                model,
+                "ScaffoldRail",
+                Vector3.new(size.X * 0.92, 0.4, 0.4),
+                CFrame.new(center + Vector3.new(0, 5.7, sideZ * (size.Z * 0.42))),
+                Color3.fromRGB(102, 75, 49),
+                Enum.Material.Wood,
+                false
+            )
+        end
+        local tarp = part(
+            model,
+            "BuilderTarp",
+            Vector3.new(size.X * 0.7, 0.16, size.Z * 0.62),
+            CFrame.new(center + Vector3.new(0, 7.55, 0)) * CFrame.Angles(0, 0, math.rad(4)),
+            Color3.fromRGB(105, 119, 91),
+            Enum.Material.Fabric,
+            false
+        )
+        tarp.Transparency = 0.08
+        local sign = part(
+            model,
+            "ConstructionSign",
+            Vector3.new(8.5, 2.2, 0.45),
+            CFrame.new(center + Vector3.new(0, 2.5, -(size.Z * 0.5 + 0.5))),
+            BARK,
+            Enum.Material.WoodPlanks,
+            false
+        )
+        addBillboard(sign, displayName .. " · PLANNED", CREAM)
+        return model
+    end
+
+    local function buildingShell(
+        id: string,
+        displayName: string,
+        center: Vector3,
+        size: Vector3,
+        stage: number,
+        accent: Color3
+    ): Model
+        if stage == 0 then
+            return constructionSite(id, displayName, center, size)
+        end
+        local model = Instance.new("Model")
+        model.Name = id
+        model:SetAttribute("BuildingId", id)
+        model:SetAttribute("BuildingStage", stage)
+        model:SetAttribute("BuildingState", if stage == 3 then "flourishing" else "complete")
+        model.Parent = parent
+        local wallHeight = 7.5 + stage * 0.75
+        local halfX = size.X * 0.5
+        local halfZ = size.Z * 0.5
+        part(
+            model,
+            "Floor",
+            Vector3.new(size.X, 0.55, size.Z),
+            CFrame.new(center + Vector3.new(0, 0.28, 0)),
+            Color3.fromRGB(83, 61, 42),
+            Enum.Material.WoodPlanks
+        )
+        part(
+            model,
+            "BackWall",
+            Vector3.new(size.X, wallHeight, 0.7),
+            CFrame.new(center + Vector3.new(0, wallHeight * 0.5, halfZ - 0.35)),
+            Color3.fromRGB(69, 48, 36),
+            Enum.Material.WoodPlanks
+        )
+        for side = -1, 1, 2 do
+            part(
+                model,
+                "SideWall",
+                Vector3.new(0.7, wallHeight, size.Z),
+                CFrame.new(center + Vector3.new(side * (halfX - 0.35), wallHeight * 0.5, 0)),
+                Color3.fromRGB(69, 48, 36),
+                Enum.Material.WoodPlanks
+            )
+            part(
+                model,
+                "FrontWall",
+                Vector3.new((size.X - 5) * 0.5, wallHeight, 0.7),
+                CFrame.new(
+                    center
+                        + Vector3.new(side * (halfX * 0.5 + 1.25), wallHeight * 0.5, -halfZ + 0.35)
+                ),
+                Color3.fromRGB(69, 48, 36),
+                Enum.Material.WoodPlanks
+            )
+            local window = part(
+                model,
+                "Window",
+                Vector3.new(0.18, 2.4, 2.8),
+                CFrame.new(center + Vector3.new(side * (halfX - 0.72), 4.5, 1.6)),
+                accent,
+                Enum.Material.Glass,
+                false
+            )
+            window.Transparency = 0.25
+        end
+        part(
+            model,
+            "DoorHeader",
+            Vector3.new(5, 1.1, 0.85),
+            CFrame.new(center + Vector3.new(0, wallHeight - 0.55, -halfZ + 0.3)),
+            WET_BARK,
+            Enum.Material.Wood
+        )
+        part(
+            model,
+            "Roof",
+            Vector3.new(size.X + 2.2, 0.8, size.Z + 2.2),
+            CFrame.new(center + Vector3.new(0, wallHeight + 0.65, 0))
+                * CFrame.Angles(0, 0, math.rad(if stage >= 2 then 3 else 1)),
+            if stage >= 2 then Color3.fromRGB(48, 55, 49) else Color3.fromRGB(59, 58, 51),
+            Enum.Material.Slate
+        )
+        local sign = part(
+            model,
+            "BuildingSign",
+            Vector3.new(8.8, 1.7, 0.38),
+            CFrame.new(center + Vector3.new(0, wallHeight - 1.7, -halfZ - 0.18)),
+            WET_BARK,
+            Enum.Material.WoodPlanks,
+            false
+        )
+        addBillboard(sign, displayName, accent)
+        local lightAnchor = part(
+            model,
+            "WarmInterior",
+            Vector3.new(0.25, 0.25, 0.25),
+            CFrame.new(center + Vector3.new(0, 4.5, 1.5)),
+            accent,
+            Enum.Material.Neon,
+            false
+        )
+        lightAnchor.Transparency = 1
+        local light = Instance.new("PointLight")
+        light.Color = accent
+        light.Brightness = 0.55 + stage * 0.2
+        light.Range = 12 + stage * 3
+        light.Shadows = false
+        light.Parent = lightAnchor
+        if stage >= 2 then
+            local awning = part(
+                model,
+                "FrontAwning",
+                Vector3.new(10, 0.4, 4),
+                CFrame.new(center + Vector3.new(0, wallHeight - 2.2, -halfZ - 2))
+                    * CFrame.Angles(math.rad(-8), 0, 0),
+                Color3.fromRGB(96, 105, 77),
+                Enum.Material.Fabric,
+                false
+            )
+            awning.Transparency = 0.04
+        end
+        if stage >= 3 then
+            for side = -1, 1, 2 do
+                local planter = part(
+                    model,
+                    "WindowPlanter",
+                    Vector3.new(3.4, 0.7, 0.85),
+                    CFrame.new(center + Vector3.new(side * (halfX + 0.15), 3, 1.6)),
+                    Color3.fromRGB(91, 65, 43),
+                    Enum.Material.WoodPlanks,
+                    false
+                )
+                for flower = -1, 1 do
+                    local bloom = part(
+                        model,
+                        "WindowBloom",
+                        Vector3.new(0.5, 0.5, 0.5),
+                        planter.CFrame + Vector3.new(0, 0.58, flower * 0.85),
+                        if flower == 0 then accent else FOXFIRE,
+                        Enum.Material.SmoothPlastic,
+                        false
+                    )
+                    bloom.Shape = Enum.PartType.Ball
+                end
+            end
+        end
+        return model
+    end
+
+    local archiveStage = stageFor("building_archive")
+    local archive = buildingShell(
+        "building_archive",
+        "MEMORY ARCHIVE",
+        Vector3.new(-40, 0, -88),
+        Vector3.new(17, 0, 14),
+        archiveStage,
+        FOXFIRE
+    )
+    if archiveStage > 0 then
+        for shelf = -1, 1, 2 do
+            part(
+                archive,
+                "ArchiveShelf",
+                Vector3.new(4.8, 5.2, 0.75),
+                CFrame.new(-40 + shelf * 5.3, 2.85, -83.1),
+                Color3.fromRGB(85, 61, 42),
+                Enum.Material.WoodPlanks,
+                false
+            )
+        end
+        for jarIndex = -2, 2 do
+            local jar = part(
+                archive,
+                "ArchiveMemoryJar",
+                Vector3.new(0.65, 0.9, 0.65),
+                CFrame.new(-40 + jarIndex * 1.4, 1.1, -88),
+                if jarIndex % 2 == 0 then FOXFIRE else AMBER,
+                Enum.Material.Glass,
+                false
+            )
+            jar.Shape = Enum.PartType.Ball
+            jar.Transparency = 0.18
+        end
+    end
+
+    local workbenchStage = stageFor("building_workbench")
+    local workshop = buildingShell(
+        "building_workbench",
+        "LANTERN WORKBENCH",
+        Vector3.new(39, 0, -87),
+        Vector3.new(18, 0, 14),
+        workbenchStage,
+        AMBER
+    )
+    if workbenchStage > 0 then
+        local bench = part(
+            workshop,
+            "CraftingBench",
+            Vector3.new(8, 1.2, 3.2),
+            CFrame.new(39, 1.3, -83.3),
+            Color3.fromRGB(104, 73, 46),
+            Enum.Material.WoodPlanks,
+            false
+        )
+        for toolIndex = -1, 1 do
+            part(
+                workshop,
+                "WorkbenchTool",
+                Vector3.new(0.35, 2.4, 0.35),
+                bench.CFrame + Vector3.new(toolIndex * 2.2, 1.65, 0),
+                if toolIndex == 0 then Color3.fromRGB(141, 150, 153) else BARK,
+                if toolIndex == 0 then Enum.Material.Metal else Enum.Material.Wood,
+                false
+            )
+        end
+    end
+
+    local boardStage = stageFor("building_town_board")
+    local boardModel = Instance.new("Model")
+    boardModel.Name = "building_town_board"
+    boardModel:SetAttribute("BuildingId", "building_town_board")
+    boardModel:SetAttribute("BuildingStage", boardStage)
+    boardModel:SetAttribute("BuildingState", "complete")
+    boardModel.Parent = parent
+    for side = -1, 1, 2 do
+        part(
+            boardModel,
+            "TownBoardPost",
+            Vector3.new(0.8, 7.2, 0.8),
+            CFrame.new(12 + side * 5.2, 3.6, -86),
+            WET_BARK,
+            Enum.Material.Wood
+        )
+    end
+    local board = part(
+        boardModel,
+        "TownBoard",
+        Vector3.new(11.5, 5.5, 0.65),
+        CFrame.new(12, 5.2, -86),
+        Color3.fromRGB(90, 64, 42),
+        Enum.Material.WoodPlanks,
+        false
+    )
+    addBillboard(board, string.format("EMBERHOLLOW · TIER %d", consequence.tier or 0), CREAM)
+    for notice = -1, 1 do
+        local paper = part(
+            boardModel,
+            "TownNotice",
+            Vector3.new(2.5, 2.1, 0.08),
+            CFrame.new(12 + notice * 3.3, 4.6 + math.abs(notice) * 0.35, -86.38)
+                * CFrame.Angles(0, 0, math.rad(notice * 4)),
+            if notice == 0 then Color3.fromRGB(223, 205, 161) else Color3.fromRGB(184, 164, 126),
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        paper.CastShadow = false
+    end
+
+    local innStage = stageFor("building_inn")
+    local inn = buildingShell(
+        "building_inn",
+        "WAYFARER INN",
+        Vector3.new(-40, 0, -132),
+        Vector3.new(18, 0, 14),
+        innStage,
+        Color3.fromRGB(219, 151, 77)
+    )
+    if innStage > 0 then
+        for side = -1, 1, 2 do
+            part(
+                inn,
+                "InnTable",
+                Vector3.new(4.5, 0.55, 3),
+                CFrame.new(-40 + side * 5, 2.1, -128.5),
+                Color3.fromRGB(100, 69, 45),
+                Enum.Material.WoodPlanks,
+                false
+            )
+        end
+    end
+
+    parent:SetAttribute("BuildingCount", 4)
+    parent:SetAttribute("ArchiveStage", archiveStage)
+    parent:SetAttribute("WorkbenchStage", workbenchStage)
+    parent:SetAttribute("InnStage", innStage)
+end
+
 function WorldService.setTownConsequence(self: WorldService, consequence: any)
     self._townConsequence = consequence
     local world = self._world
@@ -2735,10 +3098,18 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
     if existing ~= nil then
         existing:Destroy()
     end
+    local existingBuildings = world:FindFirstChild("TownProgressionBuildings")
+    if existingBuildings ~= nil then
+        existingBuildings:Destroy()
+    end
     local landscape = Instance.new("Model")
     landscape.Name = "GreenwardConsequence"
     landscape.Parent = world
     buildTownConsequenceLandscape(landscape, consequence)
+    local buildings = Instance.new("Model")
+    buildings.Name = "TownProgressionBuildings"
+    buildings.Parent = world
+    buildTownProgressionBuildings(buildings, consequence)
     local visualPartCount = 0
     for _, descendant in landscape:GetDescendants() do
         if descendant:IsA("BasePart") then
