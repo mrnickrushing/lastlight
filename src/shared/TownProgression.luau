@@ -8,6 +8,9 @@ export type Consequence = {
     detail: string,
     decision: string?,
     wardenOutcome: string?,
+    landscapeKind: string,
+    memorialKind: string,
+    growthStage: number,
 }
 
 function TownProgression.resolve(profile: any): Consequence
@@ -36,12 +39,25 @@ function TownProgression.resolve(profile: any): Consequence
         elseif outcome == "scarred" then "Scored roots mark a harder road through the forest."
         elseif outcome == "harmed" then "Broken antlers leave the town under a watchful shadow."
         else "Every safe night makes the lantern town stronger."
+    local landscapeKind = if decision == "restore_farmland"
+        then "cultivated_fields"
+        elseif decision == "wild_regrowth" then "living_grove"
+        elseif decision == "shared_agroforest" then "community_orchard"
+        else "seed_ground"
+    local memorialKind = if outcome == "preserved"
+        then "living_antlers"
+        elseif outcome == "scarred" then "scarred_antlers"
+        elseif outcome == "harmed" then "broken_antlers"
+        else "unmarked_stone"
     return {
         tier = tier,
         title = title,
         detail = detail,
         decision = decision,
         wardenOutcome = outcome,
+        landscapeKind = landscapeKind,
+        memorialKind = memorialKind,
+        growthStage = tier,
     }
 end
 

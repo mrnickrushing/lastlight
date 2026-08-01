@@ -2355,27 +2355,322 @@ function WorldService.setLanternHealth(self: WorldService, health: number)
     end)
 end
 
+local function buildTownConsequenceLandscape(parent: Instance, consequence: any)
+    local center = Vector3.new(52, 0, -112)
+    local landscapeKind = tostring(consequence.landscapeKind or "seed_ground")
+    local memorialKind = tostring(consequence.memorialKind or "unmarked_stone")
+    local growthStage = math.clamp(math.floor(tonumber(consequence.growthStage) or 0), 0, 3)
+
+    local ground = part(
+        parent,
+        "GreenwardGround",
+        Vector3.new(34, 0.45, 30),
+        CFrame.new(center + Vector3.new(0, 0.1, 0)),
+        if landscapeKind == "cultivated_fields"
+            then Color3.fromRGB(73, 58, 39)
+            elseif landscapeKind == "living_grove" then Color3.fromRGB(38, 69, 43)
+            else Color3.fromRGB(53, 68, 43),
+        if landscapeKind == "cultivated_fields" then Enum.Material.Mud else Enum.Material.Ground,
+        false
+    )
+    ground.CanQuery = false
+
+    local borderColor = if landscapeKind == "living_grove" then MOSS else BARK
+    for side = -1, 1, 2 do
+        part(
+            parent,
+            "GreenwardBoundary",
+            Vector3.new(1, 2.2, 30),
+            CFrame.new(center + Vector3.new(side * 16.5, 1.1, 0)),
+            borderColor,
+            Enum.Material.Wood,
+            false
+        )
+    end
+
+    local function cropRow(x: number, z: number, accent: Color3)
+        part(
+            parent,
+            "CultivatedBed",
+            Vector3.new(6.6, 0.7, 8.5),
+            CFrame.new(center + Vector3.new(x, 0.45, z)),
+            Color3.fromRGB(92, 67, 42),
+            Enum.Material.Ground,
+            false
+        )
+        for cropIndex = -2, 2 do
+            local stem = part(
+                parent,
+                "CropStem",
+                Vector3.new(0.28, 1.25 + growthStage * 0.12, 0.28),
+                CFrame.new(center + Vector3.new(x + cropIndex * 1.05, 1.15, z)),
+                Color3.fromRGB(71, 123, 63),
+                Enum.Material.Grass,
+                false
+            )
+            stem.CanQuery = false
+            local crop = part(
+                parent,
+                "HarvestCrop",
+                Vector3.new(0.72, 0.72, 0.72),
+                stem.CFrame + Vector3.new(0, 0.78, 0),
+                accent,
+                Enum.Material.SmoothPlastic,
+                false
+            )
+            crop.Shape = Enum.PartType.Ball
+            crop.CanQuery = false
+        end
+    end
+
+    local function orchardTree(x: number, z: number, accent: Color3)
+        local trunk = part(
+            parent,
+            "OrchardTrunk",
+            Vector3.new(1.1, 5.5 + growthStage * 0.5, 1.1),
+            CFrame.new(center + Vector3.new(x, 2.75, z)),
+            BARK,
+            Enum.Material.Wood,
+            false
+        )
+        trunk.CanQuery = false
+        local crown = part(
+            parent,
+            "OrchardCrown",
+            Vector3.new(5.4 + growthStage * 0.4, 4.2, 5.4 + growthStage * 0.4),
+            trunk.CFrame + Vector3.new(0, 4.15, 0),
+            Color3.fromRGB(55, 103, 58),
+            Enum.Material.Grass,
+            false
+        )
+        crown.Shape = Enum.PartType.Ball
+        crown.CanQuery = false
+        for fruitIndex = -1, 1 do
+            local fruit = part(
+                parent,
+                "OrchardFruit",
+                Vector3.new(0.55, 0.55, 0.55),
+                crown.CFrame + Vector3.new(fruitIndex * 1.25, -0.25, 2.1),
+                accent,
+                Enum.Material.SmoothPlastic,
+                false
+            )
+            fruit.Shape = Enum.PartType.Ball
+            fruit.CanQuery = false
+        end
+    end
+
+    if landscapeKind == "cultivated_fields" then
+        cropRow(-8.5, -5.2, Color3.fromRGB(205, 149, 72))
+        cropRow(0, -5.2, Color3.fromRGB(169, 86, 58))
+        cropRow(8.5, -5.2, Color3.fromRGB(220, 188, 90))
+        cropRow(-8.5, 5.2, Color3.fromRGB(193, 118, 67))
+        cropRow(0, 5.2, Color3.fromRGB(219, 178, 81))
+        cropRow(8.5, 5.2, Color3.fromRGB(151, 92, 61))
+        local trough = part(
+            parent,
+            "IrrigationTrough",
+            Vector3.new(28, 0.55, 1.5),
+            CFrame.new(center + Vector3.new(0, 0.45, 0)),
+            Color3.fromRGB(72, 94, 94),
+            Enum.Material.Glass,
+            false
+        )
+        trough.Transparency = 0.18
+    elseif landscapeKind == "living_grove" then
+        for treeIndex, offset in
+            {
+                Vector3.new(-9, 0, -6),
+                Vector3.new(0, 0, -3),
+                Vector3.new(9, 0, -6),
+                Vector3.new(-6, 0, 6),
+                Vector3.new(7, 0, 6),
+            }
+        do
+            orchardTree(offset.X, offset.Z, if treeIndex % 2 == 0 then FOXFIRE else AMBER)
+        end
+        for archIndex = -1, 1 do
+            local archCenter = center + Vector3.new(archIndex * 10, 0, 10)
+            for side = -1, 1, 2 do
+                part(
+                    parent,
+                    "LivingRootArch",
+                    Vector3.new(1.2, 7.5, 1.2),
+                    CFrame.new(archCenter + Vector3.new(side * 3.1, 3.6, 0))
+                        * CFrame.Angles(0, 0, math.rad(-side * 13)),
+                    BARK,
+                    Enum.Material.Wood,
+                    false
+                )
+            end
+            part(
+                parent,
+                "LivingRootCrown",
+                Vector3.new(7, 1.1, 1.1),
+                CFrame.new(archCenter + Vector3.new(0, 7.1, 0)),
+                MOSS,
+                Enum.Material.Wood,
+                false
+            )
+        end
+    elseif landscapeKind == "community_orchard" then
+        cropRow(-9, -5.5, Color3.fromRGB(213, 157, 73))
+        cropRow(9, -5.5, Color3.fromRGB(171, 94, 61))
+        orchardTree(-9, 6, AMBER)
+        orchardTree(0, 7.5, FOXFIRE)
+        orchardTree(9, 6, AMBER)
+        local tableTop = part(
+            parent,
+            "CommonsTable",
+            Vector3.new(10, 0.55, 3.3),
+            CFrame.new(center + Vector3.new(0, 2.5, -0.2)),
+            Color3.fromRGB(102, 73, 47),
+            Enum.Material.WoodPlanks,
+            false
+        )
+        tableTop.CanQuery = false
+        for side = -1, 1, 2 do
+            part(
+                parent,
+                "CommonsBench",
+                Vector3.new(10, 0.5, 1.3),
+                CFrame.new(center + Vector3.new(0, 1.4, -0.2 + side * 3)),
+                Color3.fromRGB(89, 63, 43),
+                Enum.Material.WoodPlanks,
+                false
+            )
+        end
+    else
+        for markerIndex = -2, 2 do
+            local marker = part(
+                parent,
+                "SeedGroundMarker",
+                Vector3.new(1.1, 0.55, 1.1),
+                CFrame.new(center + Vector3.new(markerIndex * 4.5, 0.42, markerIndex % 2 * 3)),
+                Color3.fromRGB(92, 98, 80),
+                Enum.Material.Slate,
+                false
+            )
+            marker.Shape = Enum.PartType.Ball
+        end
+    end
+
+    local memorialCenter = center + Vector3.new(0, 0, 12)
+    local plinth = part(
+        parent,
+        "WardenMemorialPlinth",
+        Vector3.new(7.5, 1.2, 4.2),
+        CFrame.new(memorialCenter + Vector3.new(0, 0.6, 0)),
+        if memorialKind == "broken_antlers" then WET_BARK else Color3.fromRGB(76, 84, 79),
+        if memorialKind == "living_antlers" then Enum.Material.Ground else Enum.Material.Slate,
+        false
+    )
+    plinth.CanQuery = false
+    local antlerColor = if memorialKind == "living_antlers"
+        then Color3.fromRGB(92, 137, 77)
+        elseif memorialKind == "broken_antlers" then Color3.fromRGB(45, 35, 32)
+        else Color3.fromRGB(113, 106, 91)
+    for side = -1, 1, 2 do
+        local brokenSide = memorialKind == "broken_antlers" and side == 1
+        local height = if brokenSide then 3.4 else 6.8
+        part(
+            parent,
+            if brokenSide then "BrokenWardenAntler" else "WardenAntler",
+            Vector3.new(0.7, height, 0.7),
+            CFrame.new(memorialCenter + Vector3.new(side * 1.45, 1 + height * 0.5, 0))
+                * CFrame.Angles(0, 0, math.rad(-side * 18)),
+            antlerColor,
+            Enum.Material.Wood,
+            false
+        )
+        if not brokenSide and memorialKind ~= "unmarked_stone" then
+            for tineIndex = 1, 2 do
+                part(
+                    parent,
+                    "WardenAntlerTine",
+                    Vector3.new(0.48, 2.8, 0.48),
+                    CFrame.new(
+                        memorialCenter
+                            + Vector3.new(side * (2 + tineIndex * 0.65), 3.3 + tineIndex * 1.2, 0)
+                    ) * CFrame.Angles(0, 0, math.rad(-side * 48)),
+                    antlerColor,
+                    Enum.Material.Wood,
+                    false
+                )
+            end
+        end
+    end
+    if memorialKind == "living_antlers" then
+        local memoryLight = part(
+            parent,
+            "WardenMemoryLight",
+            Vector3.new(1.1, 1.1, 1.1),
+            CFrame.new(memorialCenter + Vector3.new(0, 5.8, 0)),
+            FOXFIRE,
+            Enum.Material.Glass,
+            false
+        )
+        memoryLight.Shape = Enum.PartType.Ball
+        memoryLight.Transparency = 0.14
+        local glow = Instance.new("PointLight")
+        glow.Color = FOXFIRE
+        glow.Brightness = 0.75
+        glow.Range = 11
+        glow.Shadows = false
+        glow.Parent = memoryLight
+    elseif memorialKind == "scarred_antlers" then
+        for scarIndex = -1, 1, 2 do
+            local scar = part(
+                parent,
+                "WardenScar",
+                Vector3.new(0.15, 1.9, 2.5),
+                CFrame.new(memorialCenter + Vector3.new(scarIndex * 1.6, 1.25, -2.12))
+                    * CFrame.Angles(0, 0, math.rad(scarIndex * 19)),
+                Color3.fromRGB(187, 111, 65),
+                Enum.Material.Neon,
+                false
+            )
+            scar.Transparency = 0.22
+        end
+    end
+
+    local sign = part(
+        parent,
+        "GreenwardConsequenceSign",
+        Vector3.new(13, 3.2, 0.6),
+        CFrame.new(center + Vector3.new(0, 4.2, -15.2)),
+        BARK,
+        Enum.Material.WoodPlanks,
+        false
+    )
+    addBillboard(sign, string.format("TIER %d · %s", consequence.tier, consequence.title), CREAM)
+    sign:SetAttribute("Consequence", consequence.detail)
+    parent:SetAttribute("LandscapeKind", landscapeKind)
+    parent:SetAttribute("MemorialKind", memorialKind)
+    parent:SetAttribute("GrowthStage", growthStage)
+end
+
 function WorldService.setTownConsequence(self: WorldService, consequence: any)
     self._townConsequence = consequence
     local world = self._world
     if world == nil or type(consequence) ~= "table" then
         return
     end
-    local existing = world:FindFirstChild("TownConsequenceBanner")
+    local existing = world:FindFirstChild("GreenwardConsequence")
     if existing ~= nil then
         existing:Destroy()
     end
-    local banner = part(
-        world,
-        "TownConsequenceBanner",
-        Vector3.new(12, 3.5, 0.6),
-        CFrame.new(0, 6, -8),
-        if consequence.tier >= 2 then Color3.fromRGB(104, 187, 166) else AMBER,
-        Enum.Material.WoodPlanks,
-        false
-    )
-    addBillboard(banner, string.format("TIER %d · %s", consequence.tier, consequence.title), CREAM)
-    banner:SetAttribute("Consequence", consequence.detail)
+    local landscape = Instance.new("Model")
+    landscape.Name = "GreenwardConsequence"
+    landscape.Parent = world
+    buildTownConsequenceLandscape(landscape, consequence)
+    local visualPartCount = 0
+    for _, descendant in landscape:GetDescendants() do
+        if descendant:IsA("BasePart") then
+            visualPartCount += 1
+        end
+    end
+    landscape:SetAttribute("VisualPartCount", visualPartCount)
     world:SetAttribute("TownTier", consequence.tier)
     world:SetAttribute("TownDecision", tostring(consequence.decision or "unresolved"))
     world:SetAttribute("WardenOutcome", tostring(consequence.wardenOutcome or "unresolved"))
