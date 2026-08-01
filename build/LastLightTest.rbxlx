@@ -8301,6 +8301,111 @@ function EnemyService._showSpawnPulse(_self: EnemyService, position: Vector3, co
     end)
 end
 
+function EnemyService._showDamageFeedback(
+    self: EnemyService,
+    enemy: Enemy,
+    damage: number,
+    strikeResult: string
+)
+    local primary = enemy.model.PrimaryPart
+    if primary == nil then
+        return
+    end
+
+    local revision = (tonumber(enemy.model:GetAttribute("HitRevision")) or 0) + 1
+    enemy.model:SetAttribute("HitRevision", revision)
+    local highlight = enemy.model:FindFirstChild("ThreatOutline")
+    if highlight ~= nil and highlight:IsA("Highlight") then
+        highlight.FillColor = Color3.fromRGB(255, 238, 188)
+        highlight.FillTransparency = 0.18
+        highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+        task.delay(0.13, function()
+            if
+                enemy.model.Parent ~= nil
+                and enemy.model:GetAttribute("HitRevision") == revision
+            then
+                self:_setMarkedVisual(enemy, workspace:GetServerTimeNow() < enemy.markedUntil)
+            end
+        end)
+    end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "DamageFeedback"
+    billboard.Adornee = primary
+    billboard.AlwaysOnTop = true
+    billboard.LightInfluence = 0
+    billboard.MaxDistance = 95
+    billboard.Size = UDim2.fromOffset(130, 48)
+    billboard.StudsOffsetWorldSpace = Vector3.new(0, 4.8, 0)
+    billboard.Parent = primary
+
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Font = Enum.Font.GothamBlack
+    label.Text = if strikeResult == "flanked"
+        then string.format("FLANK  -%d", damage)
+        elseif strikeResult == "shielded" then string.format("BLOCK  -%d", damage)
+        else string.format("-%d", damage)
+    label.TextColor3 = if strikeResult == "flanked"
+        then Color3.fromRGB(255, 213, 105)
+        elseif strikeResult == "shielded" then Color3.fromRGB(169, 201, 188)
+        else Color3.fromRGB(255, 238, 205)
+    label.TextScaled = true
+    label.TextStrokeColor3 = Color3.fromRGB(31, 25, 22)
+    label.TextStrokeTransparency = 0.2
+    label.Parent = billboard
+
+    TweenService:Create(
+        billboard,
+        TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { StudsOffsetWorldSpace = Vector3.new(0, 7.2, 0) }
+    ):Play()
+    TweenService:Create(
+        label,
+        TweenInfo.new(0.55, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        { TextTransparency = 1, TextStrokeTransparency = 1 }
+    ):Play()
+    task.delay(0.62, function()
+        if billboard.Parent ~= nil then
+            billboard:Destroy()
+        end
+    end)
+end
+
+function EnemyService._defeatActive(self: EnemyService, enemy: Enemy)
+    self:_clearAttack(enemy)
+    if self._active == enemy then
+        self._active = nil
+    end
+    enemy.model:SetAttribute("Defeated", true)
+    local pivot = enemy.model:GetPivot().Position
+    self:_showSpawnPulse(pivot, Color3.fromRGB(255, 194, 105))
+
+    for _, descendant in enemy.model:GetDescendants() do
+        if descendant:IsA("BasePart") then
+            descendant.CanCollide = false
+            descendant.CanQuery = false
+            descendant.CanTouch = false
+            TweenService
+                :Create(
+                    descendant,
+                    TweenInfo.new(0.48, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+                    {
+                        Position = descendant.Position + Vector3.new(0, 1.4, 0),
+                        Transparency = 1,
+                    }
+                )
+                :Play()
+        end
+    end
+    task.delay(0.55, function()
+        if enemy.model.Parent ~= nil then
+            enemy.model:Destroy()
+        end
+    end)
+end
+
 function EnemyService._clearAttack(_self: EnemyService, enemy: Enemy)
     local attack = enemy.attack
     if attack == nil then
@@ -8951,9 +9056,10 @@ function EnemyService.damageNearest(self: EnemyService, player: Player): (boolea
     local damage, strikeResult = self._enemyCombatRules.strikeDamage(enemy.definition, facingDot)
     enemy.health -= damage
     enemy.model:SetAttribute("EnemyHealth", math.max(0, enemy.health))
+    self:_showDamageFeedback(enemy, damage, strikeResult)
     if enemy.health <= 0 then
         local defeatedId = enemy.definition.id
-        self:_destroyActive()
+        self:_defeatActive(enemy)
         self._nextSpawnAt = workspace:GetServerTimeNow() + 1.25
         self._logger:info("bramblewake_enemy_defeated", {
             enemy = defeatedId,
