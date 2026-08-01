@@ -44,6 +44,10 @@ assert(
     "game build is missing ExpeditionRewardLedger"
 )
 assert(
+    sharedRoot:FindFirstChild("ExtractionPayoff") ~= nil,
+    "game build is missing ExtractionPayoff"
+)
+assert(
     sharedRoot:FindFirstChild("ExpeditionInventory") ~= nil,
     "game build is missing ExpeditionInventory"
 )

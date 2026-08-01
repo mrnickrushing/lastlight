@@ -395,7 +395,11 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
             sessionPending.transactionIds
         )
     end
-    if not self._worldService:exitBramblewake(player) then
+    if
+        not self._worldService:exitBramblewake(player, function()
+            self._worldService:showExtractionPayoff(player, settlement.materials or {})
+        end)
+    then
         return {
             accepted = false,
             message = "REWARDS BANKED — WAYHOME TRANSITION WILL RETRY",

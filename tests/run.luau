@@ -17,6 +17,7 @@ TestRunner.run({
     require("./specs/ExpeditionGenerator.spec"),
     require("./specs/ExpeditionInventory.spec"),
     require("./specs/ExpeditionRewardLedger.spec"),
+    require("./specs/ExtractionPayoff.spec"),
     require("./specs/FeatureFlagService.spec"),
     require("./specs/NightSchedule.spec"),
     require("./specs/OldGrowthEncounter.spec"),
