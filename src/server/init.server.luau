@@ -16,6 +16,7 @@ local CombatState = require(root.CombatState)
 local EnemyAttackFlow = require(root.EnemyAttackFlow)
 local EnemyCombatRules = require(root.EnemyCombatRules)
 local EnemyMotion = require(root.EnemyMotion)
+local EngineerBrace = require(root.EngineerBrace)
 local Environment = require(root.Environment)
 local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
@@ -26,6 +27,7 @@ local OldGrowthEncounter = require(root.OldGrowthEncounter)
 local WardenStagEncounter = require(root.WardenStagEncounter)
 local BramblewakeBlackout = require(root.BramblewakeBlackout)
 local ProfessionCatalog = require(root.ProfessionCatalog)
+local ProfessionAbilityVisuals = require(root.ProfessionAbilityVisuals)
 local ProfessionMastery = require(root.ProfessionMastery)
 local ProfessionRescue = require(root.ProfessionRescue)
 local ProfessionState = require(root.ProfessionState)
@@ -84,7 +86,8 @@ local networkService = NetworkService.new(logger)
 local profileService = ProfileService.new(logger, environmentConfig.UsePersistentData)
 local gearVisualService = GearVisualService.new(logger, profileService, GearVisualPlan)
 local analyticsService = AnalyticsService.new(logger)
-local worldService = WorldService.new(logger, ExtractionPayoff, TownProgression)
+local worldService =
+    WorldService.new(logger, ExtractionPayoff, TownProgression, ProfessionAbilityVisuals)
 local expeditionService = ExpeditionService.new(
     logger,
     worldService,
@@ -133,6 +136,7 @@ local professionService = ProfessionService.new(
     ProfessionRescue,
     featureFlags,
     profileService,
+    worldService,
     survivalService,
     analyticsService
 )
@@ -154,6 +158,7 @@ local enemyService = EnemyService.new(
     BramblewakeEnemies,
     EnemyCombatRules,
     EnemyMotion,
+    EngineerBrace,
     BramblewakeEnemyBuilder,
     analyticsService
 )

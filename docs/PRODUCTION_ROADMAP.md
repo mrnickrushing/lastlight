@@ -126,6 +126,10 @@ rescue path.
 Level-10 masters can choose one of three persistent paths per profession at four
 physical Emberhollow altars. The twelve choices add distinct bounded ability or
 rescue effects without making any path required for traversal.
+All four current abilities now produce distinct short-lived physical world
+motifs. Engineer Emergency Patch also deploys one non-stacking 12-second
+Rootline Brace that absorbs up to 14 First Lantern pressure across normal enemy,
+spark-theft, and incident damage paths.
 Additional equipment families, a
 recipe-browsing UI and quest-board UI, branching quests, the full
 recipe/inventory/quest catalog, additional incident mechanics beyond the first
@@ -140,6 +144,7 @@ See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md)
 [MILESTONE_3_PROFESSION_KITS.md](MILESTONE_3_PROFESSION_KITS.md), and
 [MILESTONE_3_PROFESSION_MASTERY.md](MILESTONE_3_PROFESSION_MASTERY.md), and
 [MILESTONE_3_PROFESSION_SPECIALIZATIONS.md](MILESTONE_3_PROFESSION_SPECIALIZATIONS.md), and
+[MILESTONE_3_PROFESSION_IDENTITY.md](MILESTONE_3_PROFESSION_IDENTITY.md), and
 [MILESTONE_3_BRAMBLEWAKE_ENEMIES.md](MILESTONE_3_BRAMBLEWAKE_ENEMIES.md), and
 [MILESTONE_3_OLD_GROWTH_ELITE.md](MILESTONE_3_OLD_GROWTH_ELITE.md), and
 [MILESTONE_3_WARDEN_STAG_BOSS.md](MILESTONE_3_WARDEN_STAG_BOSS.md), and

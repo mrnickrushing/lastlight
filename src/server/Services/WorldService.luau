@@ -23,6 +23,7 @@ export type WorldService = typeof(setmetatable(
         _logger: Logger,
         _extractionPayoff: any,
         _townProgression: any,
+        _professionAbilityVisuals: any,
         _runtimeIds: any,
         _world: Model?,
         _interactions: { [string]: ProximityPrompt },
@@ -53,6 +54,7 @@ export type WorldService = typeof(setmetatable(
         _townCondition: any,
         _townResidents: { [string]: any },
         _townIncidentModel: Model?,
+        _engineerBraceModel: Model?,
     },
     WorldService
 ))
@@ -907,12 +909,18 @@ local function _addObjectIcon(partInstance: BasePart, kind: string, accent: Colo
     end
 end
 
-function WorldService.new(logger: Logger, extractionPayoff: any, townProgression: any): WorldService
+function WorldService.new(
+    logger: Logger,
+    extractionPayoff: any,
+    townProgression: any,
+    professionAbilityVisuals: any
+): WorldService
     return setmetatable({
         Name = WorldService.Name,
         _logger = logger,
         _extractionPayoff = extractionPayoff,
         _townProgression = townProgression,
+        _professionAbilityVisuals = professionAbilityVisuals,
         _runtimeIds = nil,
         _world = nil,
         _interactions = {},
@@ -943,6 +951,7 @@ function WorldService.new(logger: Logger, extractionPayoff: any, townProgression
         _townCondition = { integrity = 100, damageLevel = 0, repairsRemaining = 0 },
         _townResidents = {},
         _townIncidentModel = nil,
+        _engineerBraceModel = nil,
     }, WorldService)
 end
 
@@ -2169,7 +2178,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v6")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v7")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -2264,7 +2273,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v6",
+        worldVersion = "bramblewake-blackout-v7",
     })
 end
 
@@ -2513,6 +2522,303 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
         task.delay(1.25, function()
             if pulse.Parent ~= nil then
                 pulse:Destroy()
+            end
+        end)
+    end
+end
+
+function WorldService.showProfessionAbility(
+    self: WorldService,
+    player: Player,
+    professionId: string,
+    effectRadius: number,
+    activeSeconds: number
+)
+    local world = self._world
+    local visual = self._professionAbilityVisuals.get(professionId)
+    local character = player.Character
+    local root = if character == nil then nil else character:FindFirstChild("HumanoidRootPart")
+    if world == nil or visual == nil or root == nil or not root:IsA("BasePart") then
+        return
+    end
+
+    local effects = world:FindFirstChild("ProfessionAbilityEffects")
+    if effects == nil then
+        effects = Instance.new("Folder")
+        effects.Name = "ProfessionAbilityEffects"
+        effects.Parent = world
+    end
+    local effectName = string.format("Ability_%d_%s", player.UserId, professionId)
+    local previous = effects:FindFirstChild(effectName)
+    if previous ~= nil then
+        previous:Destroy()
+    end
+
+    local model = Instance.new("Model")
+    model.Name = effectName
+    model:SetAttribute("ProfessionId", professionId)
+    model:SetAttribute("Motif", visual.motif)
+    model:SetAttribute("OwnerUserId", player.UserId)
+    model.Parent = effects
+
+    local color = Color3.fromRGB(visual.color[1], visual.color[2], visual.color[3])
+    local accent = Color3.fromRGB(visual.accent[1], visual.accent[2], visual.accent[3])
+    local origin = if professionId == "profession_engineer"
+        then self:lanternPosition() - Vector3.new(0, 5.75, 0)
+        else root.Position - Vector3.new(0, 2.8, 0)
+    local radius = math.clamp(math.max(effectRadius, visual.minimumRadius), 8, 24)
+    local pulse = part(
+        model,
+        "AbilityGroundSignal",
+        Vector3.new(0.12, 2, 2),
+        CFrame.new(origin + Vector3.new(0, 0.16, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+        color,
+        Enum.Material.Glass,
+        false
+    )
+    pulse.Shape = Enum.PartType.Cylinder
+    pulse.Transparency = 0.3
+    pulse.CastShadow = false
+    TweenService:Create(
+        pulse,
+        TweenInfo.new(visual.pulseLifetime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        { Size = Vector3.new(0.12, radius * 2, radius * 2), Transparency = 1 }
+    ):Play()
+
+    if visual.motif == "foxfire_compass" then
+        for index = 1, 4 do
+            local angle = math.rad((index - 1) * 90)
+            local direction = Vector3.new(math.cos(angle), 0, math.sin(angle))
+            local marker = part(
+                model,
+                "FoxfireCompassNeedle_" .. tostring(index),
+                Vector3.new(0.35, 0.18, 4.6),
+                CFrame.lookAt(
+                    origin + direction * 3.1 + Vector3.new(0, 0.22, 0),
+                    origin + direction * 8 + Vector3.new(0, 0.22, 0)
+                ),
+                if index == 1 then accent else color,
+                Enum.Material.Neon,
+                false
+            )
+            marker.Transparency = 0.12
+        end
+    elseif visual.motif == "root_ward" then
+        for index = 1, 6 do
+            local angle = math.rad(index * 60)
+            local stake = part(
+                model,
+                "WardenRootStake_" .. tostring(index),
+                Vector3.new(0.42, 3.4, 0.42),
+                CFrame.new(origin + Vector3.new(math.cos(angle) * 4.4, 1.3, math.sin(angle) * 4.4))
+                    * CFrame.Angles(math.rad(-8), angle, math.rad(index % 2 == 0 and 10 or -10)),
+                if index % 2 == 0 then color else accent,
+                Enum.Material.Wood,
+                false
+            )
+            stake.Transparency = 0.08
+        end
+        local existingGuard = character:FindFirstChild("LastLightWardenGuardVisual")
+        if existingGuard ~= nil then
+            existingGuard:Destroy()
+        end
+        local guard = Instance.new("Highlight")
+        guard.Name = "LastLightWardenGuardVisual"
+        guard.Adornee = character
+        guard.DepthMode = Enum.HighlightDepthMode.Occluded
+        guard.FillColor = color
+        guard.FillTransparency = 0.78
+        guard.OutlineColor = accent
+        guard.OutlineTransparency = 0.12
+        guard.Parent = character
+        task.delay(math.clamp(activeSeconds, 0.5, 12), function()
+            if guard.Parent ~= nil then
+                guard:Destroy()
+            end
+        end)
+    elseif visual.motif == "rootline_gear" then
+        for index = 1, 6 do
+            local angle = math.rad(index * 60)
+            local tooth = part(
+                model,
+                "RootlineGearTooth_" .. tostring(index),
+                Vector3.new(0.8, 0.34, 2.7),
+                CFrame.new(origin + Vector3.new(math.cos(angle) * 5.8, 0.28, math.sin(angle) * 5.8))
+                    * CFrame.Angles(0, -angle, 0),
+                if index % 2 == 0 then color else accent,
+                Enum.Material.Metal,
+                false
+            )
+            tooth.Transparency = 0.06
+        end
+    elseif visual.motif == "brightcap_bloom" then
+        for index = 1, 6 do
+            local angle = math.rad(index * 60)
+            local bloomPosition = origin
+                + Vector3.new(math.cos(angle) * 4.5, 0.55, math.sin(angle) * 4.5)
+            part(
+                model,
+                "BrightcapStem_" .. tostring(index),
+                Vector3.new(0.24, 1.2, 0.24),
+                CFrame.new(bloomPosition),
+                accent,
+                Enum.Material.Grass,
+                false
+            )
+            local cap = part(
+                model,
+                "BrightcapBloom_" .. tostring(index),
+                Vector3.new(1.3, 0.55, 1.3),
+                CFrame.new(bloomPosition + Vector3.new(0, 0.72, 0)),
+                color,
+                Enum.Material.Glass,
+                false
+            )
+            cap.Shape = Enum.PartType.Ball
+            cap.Transparency = 0.12
+        end
+    end
+
+    task.delay(visual.pulseLifetime + 0.2, function()
+        if model.Parent ~= nil then
+            model:Destroy()
+        end
+    end)
+end
+
+function WorldService.setEngineerBrace(self: WorldService, snapshot: any, absorbed: number?)
+    local world = self._world
+    if world == nil then
+        return
+    end
+    local active = type(snapshot) == "table" and snapshot.active == true
+    local current = self._engineerBraceModel
+    if not active then
+        if current ~= nil and current.Parent ~= nil then
+            current:Destroy()
+        end
+        self._engineerBraceModel = nil
+        return
+    end
+
+    local revision = math.max(0, math.floor(tonumber(snapshot.revision) or 0))
+    if
+        current == nil
+        or current.Parent == nil
+        or current:GetAttribute("BraceRevision") ~= revision
+    then
+        if current ~= nil and current.Parent ~= nil then
+            current:Destroy()
+        end
+        current = Instance.new("Model")
+        current.Name = "EngineerRootlineBrace"
+        current:SetAttribute("BraceRevision", revision)
+        current.Parent = world
+        self._engineerBraceModel = current
+
+        local center = self:lanternPosition() - Vector3.new(0, 5.75, 0)
+        for index = 1, 4 do
+            local angle = math.rad(45 + (index - 1) * 90)
+            local railAngle = angle - math.rad(45)
+            part(
+                current,
+                "RootlineGroundRail_" .. tostring(index),
+                Vector3.new(0.42, 0.28, 10.8),
+                CFrame.new(
+                    center
+                        + Vector3.new(math.cos(railAngle) * 5.45, 0.24, math.sin(railAngle) * 5.45)
+                ) * CFrame.Angles(0, -railAngle, 0),
+                Color3.fromRGB(191, 137, 73),
+                Enum.Material.Metal,
+                false
+            )
+            part(
+                current,
+                "RootlineBraceStrut_" .. tostring(index),
+                Vector3.new(0.62, 4.8, 0.62),
+                CFrame.new(center + Vector3.new(math.cos(angle) * 5.2, 2.1, math.sin(angle) * 5.2))
+                    * CFrame.Angles(math.rad(12), -angle, math.rad(index % 2 == 0 and 12 or -12)),
+                Color3.fromRGB(91, 62, 40),
+                Enum.Material.Wood,
+                false
+            )
+        end
+        local core = part(
+            current,
+            "RootlineCapacityCore",
+            Vector3.new(1.8, 1.8, 1.8),
+            CFrame.new(center + Vector3.new(5.6, 1.15, 0)),
+            Color3.fromRGB(255, 206, 112),
+            Enum.Material.Glass,
+            false
+        )
+        core.Shape = Enum.PartType.Ball
+        core.Transparency = 0.12
+        local light = Instance.new("PointLight")
+        light.Color = core.Color
+        light.Brightness = 1.15
+        light.Range = 13
+        light.Parent = core
+
+        local delaySeconds = math.clamp(tonumber(snapshot.remainingSeconds) or 0, 0.1, 30)
+        task.delay(delaySeconds + 0.1, function()
+            if
+                self._engineerBraceModel == current
+                and current.Parent ~= nil
+                and current:GetAttribute("BraceRevision") == revision
+            then
+                current:Destroy()
+                self._engineerBraceModel = nil
+            end
+        end)
+    end
+
+    current:SetAttribute("Capacity", math.max(0, math.floor(tonumber(snapshot.capacity) or 0)))
+    current:SetAttribute(
+        "MaxCapacity",
+        math.max(1, math.floor(tonumber(snapshot.maxCapacity) or 1))
+    )
+    current:SetAttribute(
+        "OwnerUserId",
+        math.max(0, math.floor(tonumber(snapshot.ownerUserId) or 0))
+    )
+    current:SetAttribute("ActiveUntil", tonumber(snapshot.activeUntil) or 0)
+    local core = current:FindFirstChild("RootlineCapacityCore")
+    if core ~= nil and core:IsA("BasePart") then
+        local ratio = math.clamp(
+            (tonumber(snapshot.capacity) or 0) / math.max(1, tonumber(snapshot.maxCapacity) or 1),
+            0,
+            1
+        )
+        TweenService
+            :Create(core, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+                Color = Color3.fromRGB(255, 112, 78):Lerp(Color3.fromRGB(255, 206, 112), ratio),
+                Size = Vector3.new(1.05, 1.05, 1.05):Lerp(Vector3.new(1.8, 1.8, 1.8), ratio),
+            })
+            :Play()
+    end
+    if (absorbed or 0) > 0 then
+        local center = self:lanternPosition() - Vector3.new(0, 5.6, 0)
+        local impact = part(
+            current,
+            "RootlineImpactPulse",
+            Vector3.new(0.16, 14, 14),
+            CFrame.new(center + Vector3.new(0, 0.22, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+            Color3.fromRGB(255, 206, 112),
+            Enum.Material.Neon,
+            false
+        )
+        impact.Shape = Enum.PartType.Cylinder
+        impact.Transparency = 0.16
+        impact.CastShadow = false
+        TweenService:Create(
+            impact,
+            TweenInfo.new(0.38, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            { Size = Vector3.new(0.16, 20, 20), Transparency = 1 }
+        ):Play()
+        task.delay(0.45, function()
+            if impact.Parent ~= nil then
+                impact:Destroy()
             end
         end)
     end

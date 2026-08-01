@@ -2,7 +2,7 @@
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.27.1",
+    BuildVersion = "0.28.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -39,6 +39,8 @@ return table.freeze({
     InteractionDistance = 14,
     ReviveDistance = 12,
     ReviveChannelSeconds = 2.5,
+    EngineerBraceSeconds = 12,
+    EngineerBraceCapacity = 14,
     ActionRatePerSecond = 8,
     ProductionPlaceIds = table.freeze({}),
     FeatureFlags = table.freeze({
