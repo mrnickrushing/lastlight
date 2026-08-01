@@ -2035,7 +2035,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             },
         },
         {
-            center = Vector3.new(47, 0, -105),
+            center = Vector3.new(78, 0, -105),
             color = Color3.fromRGB(112, 151, 119),
             name = "WARDEN",
             paths = {
@@ -2065,6 +2065,29 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             },
         },
     }
+    local authoredInteractionIds = {}
+    local authoredInteractionCount = 0
+    for _, altar in professionAltars do
+        for _, path in altar.paths do
+            local interactionId = "mastery_" .. path.id
+            assert(
+                authoredInteractionIds[interactionId] == nil,
+                "duplicate authored mastery interaction ID: " .. interactionId
+            )
+            authoredInteractionIds[interactionId] = true
+            authoredInteractionCount += 1
+        end
+    end
+    assert(
+        authoredInteractionCount == #self._runtimeIds.ProfessionSpecializationInteractionIds,
+        "mastery grove and runtime interaction catalogs differ in size"
+    )
+    for _, interactionId in self._runtimeIds.ProfessionSpecializationInteractionIds do
+        assert(
+            authoredInteractionIds[interactionId] == true,
+            "mastery grove is missing runtime interaction ID: " .. interactionId
+        )
+    end
     for _, altar in professionAltars do
         local dais = part(
             masteryGrove,
@@ -2095,7 +2118,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             local xOffset = (pathIndex - 2) * 3.7
             local stone = part(
                 masteryGrove,
-                altar.name .. "PathStone",
+                altar.name .. "PathStone_" .. path.id,
                 Vector3.new(2.6, 3.8, 2.6),
                 CFrame.new(altar.center + Vector3.new(xOffset, 2.55, -0.5))
                     * CFrame.Angles(
@@ -2108,7 +2131,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             )
             local crest = part(
                 masteryGrove,
-                altar.name .. "PathCrest",
+                altar.name .. "PathCrest_" .. path.id,
                 Vector3.new(1.15, 1.15, 0.22),
                 stone.CFrame * CFrame.new(0, 0.45, -1.38),
                 altar.color,
@@ -2118,9 +2141,12 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             crest.Shape = Enum.PartType.Ball
             crest.Transparency = 0.1
             addBillboard(stone, path.name, altar.color)
+            local interactionId =
+                self._runtimeIds.ProfessionSpecializationInteractionIdBySpecialization[path.id]
+            assert(interactionId ~= nil, "missing mastery runtime ID for " .. path.id)
             self:_registerInteraction(
                 stone,
-                "mastery_" .. path.id,
+                interactionId,
                 self._runtimeIds.Actions.SelectProfessionSpecialization,
                 "CHOOSE PATH",
                 path.name,

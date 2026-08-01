@@ -1219,7 +1219,7 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.27.0",
+    BuildVersion = "0.27.1",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -5277,8 +5277,19 @@ local SPECIALIZATIONS: { [string]: { Specialization } } = table.freeze({
 local SPECIALIZATION_PROFESSIONS: { [string]: string } = {}
 for professionId, definitions in SPECIALIZATIONS do
     for _, definition in definitions do
+        assert(
+            SPECIALIZATION_PROFESSIONS[definition.id] == nil,
+            "duplicate specialization ID: " .. definition.id
+        )
         SPECIALIZATION_PROFESSIONS[definition.id] = professionId
     end
+end
+
+local function specializationBonus(definition: any, field: string): number
+    if definition == nil then
+        return 0
+    end
+    return tonumber(definition[field]) or 0
 end
 
 local function levelForXp(xp: number): number
@@ -5418,6 +5429,16 @@ function ProfessionMastery.specializationDefinition(specializationId: any): any
     return nil
 end
 
+function ProfessionMastery.specializationIds(): { string }
+    local result = {}
+    for _, profession in ProfessionCatalog.list() do
+        for _, definition in SPECIALIZATIONS[profession.id] do
+            table.insert(result, definition.id)
+        end
+    end
+    return result
+end
+
 function ProfessionMastery.tuning(state: State, professionId: any): any
     local normalized = ProfessionMastery.normalize(state)
     local entry = if ProfessionCatalog.isValid(professionId)
@@ -5429,18 +5450,14 @@ function ProfessionMastery.tuning(state: State, professionId: any): any
     return {
         level = entry.level,
         rankName = rankName(entry.level),
-        effectAmountBonus = rewardSteps * 2 + (if selectedSpecialization == nil
-            then 0
-            else selectedSpecialization.effectAmountBonus or 0),
-        effectRadiusBonus = rewardSteps * 1.5 + (if selectedSpecialization == nil
-            then 0
-            else selectedSpecialization.effectRadiusBonus or 0),
-        activeSecondsBonus = rewardSteps * 0.35 + (if selectedSpecialization == nil
-            then 0
-            else selectedSpecialization.activeSecondsBonus or 0),
-        cooldownReduction = rewardSteps * 0.4 + (if selectedSpecialization == nil
-            then 0
-            else selectedSpecialization.cooldownReduction or 0),
+        effectAmountBonus = rewardSteps * 2
+            + specializationBonus(selectedSpecialization, "effectAmountBonus"),
+        effectRadiusBonus = rewardSteps * 1.5
+            + specializationBonus(selectedSpecialization, "effectRadiusBonus"),
+        activeSecondsBonus = rewardSteps * 0.35
+            + specializationBonus(selectedSpecialization, "activeSecondsBonus"),
+        cooldownReduction = rewardSteps * 0.4
+            + specializationBonus(selectedSpecialization, "cooldownReduction"),
         rescueDurationMultiplier = if selectedSpecialization == nil
             then 1
             else selectedSpecialization.rescueDurationMultiplier or 1,
@@ -6227,6 +6244,19 @@ return table.freeze(ReviveFlow)
           <string name="Source"><![CDATA[--!strict
 
 local ExpeditionEventFlow = require("./ExpeditionEventFlow")
+local ProfessionMastery = require("./ProfessionMastery")
+
+local professionSpecializationInteractionIds = {}
+local professionSpecializationInteractionIdBySpecialization = {}
+for _, specializationId in ProfessionMastery.specializationIds() do
+    local interactionId = "mastery_" .. specializationId
+    assert(
+        professionSpecializationInteractionIdBySpecialization[specializationId] == nil,
+        "duplicate profession specialization runtime ID: " .. specializationId
+    )
+    table.insert(professionSpecializationInteractionIds, interactionId)
+    professionSpecializationInteractionIdBySpecialization[specializationId] = interactionId
+end
 
 local RuntimeIds = {
     FolderName = "LastLightRuntime",
@@ -6322,20 +6352,10 @@ local RuntimeIds = {
         "town_repair_workshop",
         "town_repair_inn",
     }),
-    ProfessionSpecializationInteractionIds = table.freeze({
-        "mastery_specialization_pathfinder",
-        "mastery_specialization_foxfire_trapper",
-        "mastery_specialization_trailseer",
-        "mastery_specialization_bulwark",
-        "mastery_specialization_greenkeeper",
-        "mastery_specialization_oathbound",
-        "mastery_specialization_lamplighter",
-        "mastery_specialization_rootwright",
-        "mastery_specialization_salvager",
-        "mastery_specialization_dawnmender",
-        "mastery_specialization_wayhome_tender",
-        "mastery_specialization_brightcap_herbalist",
-    }),
+    ProfessionSpecializationInteractionIds = table.freeze(professionSpecializationInteractionIds),
+    ProfessionSpecializationInteractionIdBySpecialization = table.freeze(
+        professionSpecializationInteractionIdBySpecialization
+    ),
 }
 
 return table.freeze(RuntimeIds)
@@ -15379,37 +15399,46 @@ function ProfessionService.selectSpecialization(
     player: Player,
     specializationId: string
 ): any
+    local professionId = self._professionMastery.specializationProfession(specializationId)
+    local analyticsProfessionId = professionId or "unknown_profession"
+    local function reject(message: string, reason: string): any
+        self._analyticsService:professionSpecializationSelected(
+            player,
+            analyticsProfessionId,
+            specializationId,
+            false,
+            reason
+        )
+        return {
+            accepted = false,
+            message = message,
+            reason = reason,
+        }
+    end
+
+    if not self._featureFlags:isEnabled("profession_kits_enabled") then
+        return reject("PROFESSIONS ARE TEMPORARILY UNAVAILABLE", "feature_disabled")
+    end
     local state = self._states[player]
     if state == nil then
-        return {
-            accepted = false,
-            message = "YOUR PROFESSION MASTERY IS STILL LOADING",
-            reason = "player_loading",
-        }
+        return reject("YOUR PROFESSION MASTERY IS STILL LOADING", "player_loading")
     end
     local snapshot = self._professionState.snapshot(state, workspace:GetServerTimeNow())
-    local professionId = self._professionMastery.specializationProfession(specializationId)
     if professionId == nil then
-        return {
-            accepted = false,
-            message = "THAT MASTERY PATH DOES NOT EXIST",
-            reason = "invalid_specialization",
-        }
+        return reject("THAT MASTERY PATH DOES NOT EXIST", "invalid_specialization")
     end
     if snapshot.selectedId ~= professionId then
-        return {
-            accepted = false,
-            message = "EQUIP THE MATCHING PROFESSION BEFORE CHOOSING THIS PATH",
-            reason = "profession_mismatch",
-        }
+        return reject(
+            "EQUIP THE MATCHING PROFESSION BEFORE CHOOSING THIS PATH",
+            "profession_mismatch"
+        )
     end
     local canSwitch, unavailableMessage = self:_switchAvailability(player)
     if not canSwitch then
-        return {
-            accepted = false,
-            message = unavailableMessage or "MASTERY PATHS CAN ONLY CHANGE IN SAFE DAYLIGHT",
-            reason = "switch_unavailable",
-        }
+        return reject(
+            unavailableMessage or "MASTERY PATHS CAN ONLY CHANGE IN SAFE DAYLIGHT",
+            "switch_unavailable"
+        )
     end
     local result =
         self._profileService:selectProfessionSpecialization(player, professionId, specializationId)
@@ -15418,16 +15447,20 @@ function ProfessionService.selectSpecialization(
         local message = if result.duplicate
             then string.format("%s IS ALREADY YOUR MASTERY PATH", definition.name)
             elseif result.reason == "specialization_locked" then "REACH MASTERY RANK 10 FIRST"
+            elseif
+                result.reason == "profile_unavailable"
+            then "YOUR PROFILE IS STILL LOADING OR READ-ONLY — TRY AGAIN"
             else "THAT MASTERY PATH CANNOT BE CHOSEN"
+        local accepted = result.duplicate == true
         self._analyticsService:professionSpecializationSelected(
             player,
             professionId,
             specializationId,
-            false,
+            accepted,
             result.reason
         )
         return {
-            accepted = result.duplicate == true,
+            accepted = accepted,
             changed = false,
             message = message,
             reason = result.reason,
@@ -21024,7 +21057,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             },
         },
         {
-            center = Vector3.new(47, 0, -105),
+            center = Vector3.new(78, 0, -105),
             color = Color3.fromRGB(112, 151, 119),
             name = "WARDEN",
             paths = {
@@ -21054,6 +21087,29 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             },
         },
     }
+    local authoredInteractionIds = {}
+    local authoredInteractionCount = 0
+    for _, altar in professionAltars do
+        for _, path in altar.paths do
+            local interactionId = "mastery_" .. path.id
+            assert(
+                authoredInteractionIds[interactionId] == nil,
+                "duplicate authored mastery interaction ID: " .. interactionId
+            )
+            authoredInteractionIds[interactionId] = true
+            authoredInteractionCount += 1
+        end
+    end
+    assert(
+        authoredInteractionCount == #self._runtimeIds.ProfessionSpecializationInteractionIds,
+        "mastery grove and runtime interaction catalogs differ in size"
+    )
+    for _, interactionId in self._runtimeIds.ProfessionSpecializationInteractionIds do
+        assert(
+            authoredInteractionIds[interactionId] == true,
+            "mastery grove is missing runtime interaction ID: " .. interactionId
+        )
+    end
     for _, altar in professionAltars do
         local dais = part(
             masteryGrove,
@@ -21084,7 +21140,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             local xOffset = (pathIndex - 2) * 3.7
             local stone = part(
                 masteryGrove,
-                altar.name .. "PathStone",
+                altar.name .. "PathStone_" .. path.id,
                 Vector3.new(2.6, 3.8, 2.6),
                 CFrame.new(altar.center + Vector3.new(xOffset, 2.55, -0.5))
                     * CFrame.Angles(
@@ -21097,7 +21153,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             )
             local crest = part(
                 masteryGrove,
-                altar.name .. "PathCrest",
+                altar.name .. "PathCrest_" .. path.id,
                 Vector3.new(1.15, 1.15, 0.22),
                 stone.CFrame * CFrame.new(0, 0.45, -1.38),
                 altar.color,
@@ -21107,9 +21163,12 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             crest.Shape = Enum.PartType.Ball
             crest.Transparency = 0.1
             addBillboard(stone, path.name, altar.color)
+            local interactionId =
+                self._runtimeIds.ProfessionSpecializationInteractionIdBySpecialization[path.id]
+            assert(interactionId ~= nil, "missing mastery runtime ID for " .. path.id)
             self:_registerInteraction(
                 stone,
-                "mastery_" .. path.id,
+                interactionId,
                 self._runtimeIds.Actions.SelectProfessionSpecialization,
                 "CHOOSE PATH",
                 path.name,
@@ -27189,7 +27248,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.27.0", "unexpected build version")
+assert(Config.BuildVersion == "0.27.1", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 
@@ -27525,9 +27584,34 @@ assert(
 
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
-    #tagged == 26 + BramblewakeExpedition.EventInteractionCount,
-    "expected tutorial, event, elite, boss, extraction, and crafting-bench interaction prompts"
+    #tagged
+        == 26
+            + BramblewakeExpedition.EventInteractionCount
+            + #RuntimeIds.ProfessionSpecializationInteractionIds,
+    "expected tutorial, event, elite, boss, extraction, crafting, and mastery prompts"
 )
+local taggedByInteractionId = {}
+for _, prompt in tagged do
+    local interactionId = prompt:GetAttribute("InteractionId")
+    if type(interactionId) == "string" then
+        assert(taggedByInteractionId[interactionId] == nil, "duplicate interaction prompt ID")
+        taggedByInteractionId[interactionId] = prompt
+    end
+end
+for specializationId, interactionId in
+    RuntimeIds.ProfessionSpecializationInteractionIdBySpecialization
+do
+    local prompt = taggedByInteractionId[interactionId]
+    assert(prompt ~= nil, "generated mastery prompt is missing: " .. interactionId)
+    assert(
+        prompt:GetAttribute("ActionId") == RuntimeIds.Actions.SelectProfessionSpecialization,
+        "generated mastery prompt routes to the wrong action"
+    )
+    assert(
+        prompt:GetAttribute("Payload") == specializationId,
+        "generated mastery prompt has the wrong specialization payload"
+    )
+end
 assert(
     #CollectionService:GetTagged(RuntimeIds.PlayerDownedTag) == 0,
     "players must not begin the test downed"

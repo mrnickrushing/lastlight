@@ -140,8 +140,19 @@ local SPECIALIZATIONS: { [string]: { Specialization } } = table.freeze({
 local SPECIALIZATION_PROFESSIONS: { [string]: string } = {}
 for professionId, definitions in SPECIALIZATIONS do
     for _, definition in definitions do
+        assert(
+            SPECIALIZATION_PROFESSIONS[definition.id] == nil,
+            "duplicate specialization ID: " .. definition.id
+        )
         SPECIALIZATION_PROFESSIONS[definition.id] = professionId
     end
+end
+
+local function specializationBonus(definition: any, field: string): number
+    if definition == nil then
+        return 0
+    end
+    return tonumber(definition[field]) or 0
 end
 
 local function levelForXp(xp: number): number
@@ -281,6 +292,16 @@ function ProfessionMastery.specializationDefinition(specializationId: any): any
     return nil
 end
 
+function ProfessionMastery.specializationIds(): { string }
+    local result = {}
+    for _, profession in ProfessionCatalog.list() do
+        for _, definition in SPECIALIZATIONS[profession.id] do
+            table.insert(result, definition.id)
+        end
+    end
+    return result
+end
+
 function ProfessionMastery.tuning(state: State, professionId: any): any
     local normalized = ProfessionMastery.normalize(state)
     local entry = if ProfessionCatalog.isValid(professionId)
@@ -292,18 +313,14 @@ function ProfessionMastery.tuning(state: State, professionId: any): any
     return {
         level = entry.level,
         rankName = rankName(entry.level),
-        effectAmountBonus = rewardSteps * 2 + (if selectedSpecialization == nil
-            then 0
-            else selectedSpecialization.effectAmountBonus or 0),
-        effectRadiusBonus = rewardSteps * 1.5 + (if selectedSpecialization == nil
-            then 0
-            else selectedSpecialization.effectRadiusBonus or 0),
-        activeSecondsBonus = rewardSteps * 0.35 + (if selectedSpecialization == nil
-            then 0
-            else selectedSpecialization.activeSecondsBonus or 0),
-        cooldownReduction = rewardSteps * 0.4 + (if selectedSpecialization == nil
-            then 0
-            else selectedSpecialization.cooldownReduction or 0),
+        effectAmountBonus = rewardSteps * 2
+            + specializationBonus(selectedSpecialization, "effectAmountBonus"),
+        effectRadiusBonus = rewardSteps * 1.5
+            + specializationBonus(selectedSpecialization, "effectRadiusBonus"),
+        activeSecondsBonus = rewardSteps * 0.35
+            + specializationBonus(selectedSpecialization, "activeSecondsBonus"),
+        cooldownReduction = rewardSteps * 0.4
+            + specializationBonus(selectedSpecialization, "cooldownReduction"),
         rescueDurationMultiplier = if selectedSpecialization == nil
             then 1
             else selectedSpecialization.rescueDurationMultiplier or 1,
