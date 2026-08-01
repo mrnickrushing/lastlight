@@ -14,6 +14,7 @@ local BramblewakeEnemies = require(root.BramblewakeEnemies)
 local CombatState = require(root.CombatState)
 local EnemyAttackFlow = require(root.EnemyAttackFlow)
 local EnemyCombatRules = require(root.EnemyCombatRules)
+local EnemyMotion = require(root.EnemyMotion)
 local Environment = require(root.Environment)
 local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
@@ -123,6 +124,7 @@ local enemyService = EnemyService.new(
     EnemyAttackFlow,
     BramblewakeEnemies,
     EnemyCombatRules,
+    EnemyMotion,
     BramblewakeEnemyBuilder,
     analyticsService
 )
