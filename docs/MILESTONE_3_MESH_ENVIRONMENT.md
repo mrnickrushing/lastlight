@@ -135,6 +135,17 @@ districts outside the central circulation envelope. Studio integration checks
 now reject backwards cabin doors, compressed cabin spacing, hidden road layers,
 blocked square gates, and service districts intruding into the main street.
 
+Build `0.39.0` corrects the arrival area's navigation hierarchy after Studio
+evidence showed a visually improved town with no readable route through its
+tutorial props. The main trail is now a raised 19-stud dark-earth road with a
+high-contrast worn center, two ruts per segment, physical direction chevrons,
+and six repeated lantern posts. Heartwood, the starter tools, and the barricade
+worksite move onto separate side lots connected by short dirt spurs. The tool
+choices share one sheltered quartermaster yard, Heartwood gains an irregular
+bark silhouette and exposed core cavity, and decorative hero arches move to the
+clearing perimeter so they frame rather than compete with current objectives.
+General world labels now appear only at close inspection distance.
+
 Hollow Farm and Foxfire Mill use the same replacement contract as Emberhollow:
 their authored meshes replace only visible structural shells. Invisible
 procedural collision remains authoritative, while farmhouse windows, field
@@ -165,7 +176,7 @@ failed asset request simply leaves the complete procedural landmark visible.
 - A failed asset request produces the established procedural equivalent.
 - Studio review covers phone, tablet, desktop, low graphics, and maximum
   graphics before the mesh kit replaces additional forest bands.
-- Studio Output reports client build `0.38.0`, world version
-  `bramblewake-blackout-v19`, `mesh_dressing_ready ... fallbacks=0`, and
+- Studio Output reports client build `0.39.0`, world version
+  `bramblewake-blackout-v20`, `mesh_dressing_ready ... fallbacks=0`, and
   `expedition_mesh_dressing_ready ... fallbacks=0` before the landmarks are
   accepted as live visual evidence.
