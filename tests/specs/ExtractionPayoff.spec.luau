@@ -57,6 +57,16 @@ return {
             end,
         },
         {
+            name = "claims one retained payoff exactly once",
+            run = function()
+                local owner = {}
+                local pending = { [owner] = { materials = { material_heartwood = 4 } } }
+                local payoff = ExtractionPayoff.claim(pending, owner)
+                TestRunner.equal(payoff.materials.material_heartwood, 4)
+                TestRunner.equal(ExtractionPayoff.claim(pending, owner), nil)
+            end,
+        },
+        {
             name = "reports when every delivery slot is occupied",
             run = function()
                 local slot = ExtractionPayoff.firstAvailableSlot({ true, true, true }, 3)
