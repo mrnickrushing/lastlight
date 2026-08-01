@@ -32,6 +32,7 @@ TestRunner.run({
     require("./specs/StatusEffectState.spec"),
     require("./specs/TutorialFlow.spec"),
     require("./specs/WardenStagEncounter.spec"),
+    require("./specs/WeatherProfile.spec"),
     require("./specs/BramblewakeBlackout.spec"),
     require("./specs/TownNightSchedule.spec"),
     require("./specs/TownProgression.spec"),

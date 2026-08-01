@@ -10,11 +10,13 @@ local Config = require(root.Config)
 local AmbientMotion = require(root.AmbientMotion)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local RuntimeIds = require(root.RuntimeIds)
+local WeatherProfile = require(root.WeatherProfile)
 local AmbientController = require(script.Controllers.AmbientController)
 local HUDController = require(script.Controllers.HUDController)
 local InputController = require(script.Controllers.InputController)
 local InteractionController = require(script.Controllers.InteractionController)
 local WorldMotionController = require(script.Controllers.WorldMotionController)
+local WeatherController = require(script.Controllers.WeatherController)
 
 local runtime =
     ReplicatedStorage:WaitForChild(RuntimeIds.FolderName, Config.BootstrapTimeoutSeconds)
@@ -38,8 +40,10 @@ local ambient = AmbientController.new(RuntimeIds.AmbientMoteTag)
 local worldMotion = WorldMotionController.new(
     RuntimeIds.AmbientMotionTag,
     RuntimeIds.AmbientLightTag,
+    RuntimeIds.AmbientSwayTag,
     AmbientMotion
 )
+local weather = WeatherController.new(WeatherProfile)
 local interaction = InteractionController.new(RuntimeIds.InteractionTag, hud)
 
 local function send(kind: string, fields: { [string]: any }?)
@@ -86,6 +90,7 @@ stateChanged.OnClientEvent:Connect(function(snapshot: any)
     hud:update(snapshot)
     ambient:setPhase(tostring(snapshot.phase or "day"))
     worldMotion:setPhase(tostring(snapshot.phase or "day"))
+    weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
 end)
 
 task.spawn(function()
@@ -96,6 +101,7 @@ task.spawn(function()
         hud:update(snapshot)
         ambient:setPhase(tostring(snapshot.phase or "day"))
         worldMotion:setPhase(tostring(snapshot.phase or "day"))
+        weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
     end
 end)
 

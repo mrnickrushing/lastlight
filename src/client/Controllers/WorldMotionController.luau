@@ -24,13 +24,22 @@ type LightState = {
     active: boolean,
 }
 
+type SwayState = {
+    baseCFrame: CFrame,
+    phaseOffset: number,
+    position: Vector3,
+    active: boolean,
+}
+
 export type WorldMotionController = typeof(setmetatable(
     {} :: {
         _motionTag: string,
         _lightTag: string,
+        _swayTag: string,
         _ambientMotion: any,
         _motions: { [Model]: MotionState },
         _lights: { [BasePart]: LightState },
+        _sways: { [BasePart]: SwayState },
         _phase: string,
         _elapsed: number,
         _connection: RBXScriptConnection?,
@@ -39,6 +48,7 @@ export type WorldMotionController = typeof(setmetatable(
 ))
 
 local ACTIVE_DISTANCE = 190
+local SWAY_DISTANCE = 125
 local UPDATE_INTERVAL = 1 / 20
 
 local function phaseOffsetFor(instance: Instance): number
@@ -52,14 +62,17 @@ end
 function WorldMotionController.new(
     motionTag: string,
     lightTag: string,
+    swayTag: string,
     ambientMotion: any
 ): WorldMotionController
     local self = setmetatable({
         _motionTag = motionTag,
         _lightTag = lightTag,
+        _swayTag = swayTag,
         _ambientMotion = ambientMotion,
         _motions = {},
         _lights = {},
+        _sways = {},
         _phase = "day",
         _elapsed = 0,
         _connection = nil,
@@ -102,6 +115,22 @@ function WorldMotionController.new(
             self._lights[instance] = nil
         end
     end
+    local function registerSway(instance: Instance)
+        if not instance:IsA("BasePart") or self._sways[instance] ~= nil then
+            return
+        end
+        self._sways[instance] = {
+            baseCFrame = instance.CFrame,
+            phaseOffset = phaseOffsetFor(instance),
+            position = instance.Position,
+            active = false,
+        }
+    end
+    local function unregisterSway(instance: Instance)
+        if instance:IsA("BasePart") then
+            self._sways[instance] = nil
+        end
+    end
 
     for _, instance in CollectionService:GetTagged(motionTag) do
         registerMotion(instance)
@@ -109,10 +138,15 @@ function WorldMotionController.new(
     for _, instance in CollectionService:GetTagged(lightTag) do
         registerLight(instance)
     end
+    for _, instance in CollectionService:GetTagged(swayTag) do
+        registerSway(instance)
+    end
     CollectionService:GetInstanceAddedSignal(motionTag):Connect(registerMotion)
     CollectionService:GetInstanceRemovedSignal(motionTag):Connect(unregisterMotion)
     CollectionService:GetInstanceAddedSignal(lightTag):Connect(registerLight)
     CollectionService:GetInstanceRemovedSignal(lightTag):Connect(unregisterLight)
+    CollectionService:GetInstanceAddedSignal(swayTag):Connect(registerSway)
+    CollectionService:GetInstanceRemovedSignal(swayTag):Connect(unregisterSway)
 
     local accumulator = 0
     self._connection = RunService.RenderStepped:Connect(function(deltaTime: number)
@@ -181,6 +215,25 @@ function WorldMotionController._step(self: WorldMotionController, deltaTime: num
                 pointLight.Brightness = state.baseBrightness
                 pointLight.Range = state.baseRange
             end
+            state.active = false
+        end
+    end
+
+    for foliage, state in self._sways do
+        if foliage.Parent == nil then
+            self._sways[foliage] = nil
+            continue
+        end
+        local active = (state.position - cameraPosition).Magnitude <= SWAY_DISTANCE
+        if active then
+            local wind = math.sin(self._elapsed * 1.18 + state.phaseOffset)
+            local gust = math.sin(self._elapsed * 0.31 + state.phaseOffset * 0.47)
+            local angle = math.rad(1.8 + if self._phase == "night" then 1.1 else 0.4)
+            foliage.CFrame = state.baseCFrame
+                * CFrame.Angles(wind * angle * 0.22, 0, (wind + gust * 0.35) * angle)
+            state.active = true
+        elseif state.active then
+            foliage.CFrame = state.baseCFrame
             state.active = false
         end
     end

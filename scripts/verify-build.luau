@@ -20,6 +20,7 @@ assert(sharedRoot:FindFirstChild("TutorialFlow") ~= nil, "game build is missing 
 assert(sharedRoot:FindFirstChild("SaveSchema") ~= nil, "game build is missing SaveSchema")
 assert(sharedRoot:FindFirstChild("RuntimeIds") ~= nil, "game build is missing RuntimeIds")
 assert(sharedRoot:FindFirstChild("AmbientMotion") ~= nil, "game build is missing AmbientMotion")
+assert(sharedRoot:FindFirstChild("WeatherProfile") ~= nil, "game build is missing WeatherProfile")
 assert(sharedRoot:FindFirstChild("ReviveFlow") ~= nil, "game build is missing ReviveFlow")
 assert(sharedRoot:FindFirstChild("SurvivalState") ~= nil, "game build is missing SurvivalState")
 assert(sharedRoot:FindFirstChild("CombatState") ~= nil, "game build is missing CombatState")
@@ -127,6 +128,7 @@ for _, controllerName in
         "HUDController",
         "InputController",
         "InteractionController",
+        "WeatherController",
         "WorldMotionController",
     }
 do

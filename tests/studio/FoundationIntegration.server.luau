@@ -367,6 +367,13 @@ for _, target in ambientLightTargets do
     assert(target:IsA("BasePart"), "ambient light tags must target BaseParts")
     assert(not target.CanCollide, "ambient light motion cannot own collision")
 end
+local ambientSwayTargets = CollectionService:GetTagged(RuntimeIds.AmbientSwayTag)
+assert(#ambientSwayTargets >= 120, "expected authored foliage sway coverage")
+for _, target in ambientSwayTargets do
+    assert(target:IsA("BasePart"), "ambient sway tags must target BaseParts")
+    assert(not target.CanCollide, "ambient foliage motion cannot own collision")
+    assert(not target.CanQuery, "ambient foliage motion cannot affect targeting")
+end
 local blackoutLayer = expedition:FindFirstChild("BramblewakeBlackoutLayer")
 assert(blackoutLayer ~= nil and blackoutLayer:IsA("Model"), "Bramblewake Blackout layer is missing")
 assert(
