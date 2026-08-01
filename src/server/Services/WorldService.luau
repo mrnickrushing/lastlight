@@ -1613,25 +1613,20 @@ end
 -- Authored art is optional streaming dressing. Loading begins only after the
 -- spawn and interactions are ready, and a failed private asset immediately
 -- takes the procedural path above.
-function WorldService._buildMeshDressing(self: WorldService)
-    local world = self._world
-    if world == nil then
-        return
-    end
-
-    local geometry = world:FindFirstChild("Environment")
-    local forest = if geometry ~= nil then geometry:FindFirstChild("Forest") else nil
-    if forest == nil then
-        return
-    end
-
-    local placements = table.clone(self._meshPlacements)
+function WorldService._placeAuthoredMeshes(
+    self: WorldService,
+    placements: { MeshPlacement },
+    defaultParent: Instance,
+    attributeTarget: Instance,
+    readyEvent: string
+)
+    local queued = table.clone(placements)
     task.spawn(function()
         local authored = 0
         local fallbacks = 0
-        for index, placement in placements do
-            local placementParent = placement.parent or forest
-            if forest.Parent == nil or placementParent.Parent == nil then
+        for index, placement in queued do
+            local placementParent = placement.parent or defaultParent
+            if attributeTarget.Parent == nil or placementParent.Parent == nil then
                 return
             end
             local placed, result = pcall(
@@ -1665,14 +1660,27 @@ function WorldService._buildMeshDressing(self: WorldService)
             end
         end
 
-        world:SetAttribute("AuthoredMeshCount", authored)
-        world:SetAttribute("AuthoredMeshFallbackCount", fallbacks)
-        self._logger:info("mesh_dressing_ready", {
+        attributeTarget:SetAttribute("AuthoredMeshCount", authored)
+        attributeTarget:SetAttribute("AuthoredMeshFallbackCount", fallbacks)
+        self._logger:info(readyEvent, {
             authored = authored,
             fallbacks = fallbacks,
-            placements = #placements,
+            placements = #queued,
         })
     end)
+end
+
+function WorldService._buildMeshDressing(self: WorldService)
+    local world = self._world
+    if world == nil then
+        return
+    end
+    local geometry = world:FindFirstChild("Environment")
+    local forest = if geometry ~= nil then geometry:FindFirstChild("Forest") else nil
+    if forest == nil then
+        return
+    end
+    self:_placeAuthoredMeshes(self._meshPlacements, forest, world, "mesh_dressing_ready")
 end
 
 --[[
@@ -2539,7 +2547,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v13")
+    world:SetAttribute("WorldVersion", "bramblewake-blackout-v14")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -2639,7 +2647,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v13",
+        worldVersion = "bramblewake-blackout-v14",
     })
 end
 
@@ -4727,6 +4735,12 @@ function WorldService.buildBramblewake(
     self._blackoutArena = nil
 
     local result = BramblewakeBuilder.build(world, manifest, generator, catalog, self._runtimeIds)
+    self:_placeAuthoredMeshes(
+        result.meshPlacements,
+        result.model,
+        result.model,
+        "expedition_mesh_dressing_ready"
+    )
     self._expeditionEntry = result.entryCFrame
     self._expeditionManifest = manifest
     self._expeditionModuleCenters = result.moduleCenters

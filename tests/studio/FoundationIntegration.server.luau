@@ -41,7 +41,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.32.0", "unexpected build version")
+assert(Config.BuildVersion == "0.33.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -337,7 +337,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v13",
+    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v14",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -366,6 +366,30 @@ assert(
 local expedition = world:FindFirstChild("BramblewakeExpedition")
 assert(expedition ~= nil and expedition:IsA("Model"), "Bramblewake expedition is missing")
 assert(expedition:GetAttribute("Ready") == true, "Bramblewake expedition is not ready")
+assert(
+    expedition:FindFirstChild("ProceduralCrookedFarmhouseShell", true) ~= nil,
+    "Crooked Farm needs its collision-safe procedural shell"
+)
+assert(
+    expedition:FindFirstChild("ProceduralFoxfireMillTowerShell", true) ~= nil,
+    "Foxfire Mill needs its collision-safe procedural shell"
+)
+assert(
+    expedition:FindFirstChild("WindmillRotor", true) ~= nil,
+    "Foxfire Mill must retain its independently animated rotor"
+)
+local meshDeadline = os.clock() + 12
+while expedition:GetAttribute("AuthoredMeshCount") == nil and os.clock() < meshDeadline do
+    task.wait(0.1)
+end
+local expeditionAuthoredMeshes = expedition:GetAttribute("AuthoredMeshCount")
+local expeditionMeshFallbacks = expedition:GetAttribute("AuthoredMeshFallbackCount")
+assert(
+    type(expeditionAuthoredMeshes) == "number"
+        and type(expeditionMeshFallbacks) == "number"
+        and expeditionAuthoredMeshes + expeditionMeshFallbacks == 2,
+    "Bramblewake must resolve both curated landmark mesh placements"
+)
 assert(
     expedition:GetAttribute("ModuleCount") == BramblewakeExpedition.ModuleCount,
     "Bramblewake module count is incorrect"

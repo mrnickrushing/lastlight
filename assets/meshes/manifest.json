@@ -140,6 +140,32 @@
       "maxTriangles": 2200,
       "maxMaterialSlots": 4,
       "robloxAssetId": 129285000481750
+    },
+    {
+      "id": "mesh_crooked_farmhouse_a",
+      "displayName": "Bramblewake Crooked Farmhouse",
+      "role": "crooked_farm_landmark_shell",
+      "placementBand": "curated_expedition",
+      "source": "original_blender_procedural",
+      "provenance": "Original Last Light Crooked Farm landmark authored by the repository Blender pipeline from the established mesh style formula.",
+      "file": "generated/mesh_crooked_farmhouse_a.glb",
+      "targetLongestDimension": 24,
+      "maxTriangles": 5000,
+      "maxMaterialSlots": 6,
+      "robloxAssetId": 117710597512522
+    },
+    {
+      "id": "mesh_foxfire_windmill_tower_a",
+      "displayName": "Bramblewake Foxfire Mill Tower",
+      "role": "foxfire_mill_landmark_shell",
+      "placementBand": "curated_expedition",
+      "source": "original_blender_procedural",
+      "provenance": "Original Last Light Foxfire Mill landmark authored by the repository Blender pipeline from the established mesh style formula; the runtime rotor remains a separate functional model.",
+      "file": "generated/mesh_foxfire_windmill_tower_a.glb",
+      "targetLongestDimension": 36,
+      "maxTriangles": 3200,
+      "maxMaterialSlots": 6,
+      "robloxAssetId": 116166738568510
     }
   ]
 }

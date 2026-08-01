@@ -108,6 +108,35 @@
       ],
       "bytes": 59396
     },
+    "mesh_crooked_farmhouse_a": {
+      "boundsMin": [
+        -12.0,
+        -9.842,
+        0.0
+      ],
+      "boundsMax": [
+        12.0,
+        9.842,
+        18.0531
+      ],
+      "dimensions": [
+        24.0,
+        19.6841,
+        18.0531
+      ],
+      "longestDimension": 24.0,
+      "triangles": 1904,
+      "meshObjects": 6,
+      "materials": [
+        "LL_bark_cut",
+        "LL_bark_dark",
+        "LL_bark_mid",
+        "LL_moss",
+        "LL_stone",
+        "LL_stone_dark"
+      ],
+      "bytes": 150484
+    },
     "mesh_deadfall_a": {
       "boundsMin": [
         -8.5,
@@ -160,6 +189,35 @@
         "LL_leaf_mid"
       ],
       "bytes": 19772
+    },
+    "mesh_foxfire_windmill_tower_a": {
+      "boundsMin": [
+        -8.6539,
+        -8.1532,
+        -0.0
+      ],
+      "boundsMax": [
+        8.6539,
+        8.1532,
+        36.0
+      ],
+      "dimensions": [
+        17.3078,
+        16.3065,
+        36.0
+      ],
+      "longestDimension": 36.0,
+      "triangles": 472,
+      "meshObjects": 6,
+      "materials": [
+        "LL_bark_dark",
+        "LL_bark_mid",
+        "LL_foxfire",
+        "LL_iron",
+        "LL_moss",
+        "LL_stone_dark"
+      ],
+      "bytes": 41680
     },
     "mesh_hollow_lantern_shrine_a": {
       "boundsMin": [

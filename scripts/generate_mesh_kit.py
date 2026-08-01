@@ -37,6 +37,8 @@ TARGET_LONGEST_DIMENSIONS = {
     "mesh_hollow_lantern_shrine_a": 28.0,
     "mesh_wayfarer_cabin_a": 20.0,
     "mesh_lantern_post_a": 9.0,
+    "mesh_crooked_farmhouse_a": 24.0,
+    "mesh_foxfire_windmill_tower_a": 36.0,
 }
 
 
@@ -55,6 +57,7 @@ PALETTE = {
     "foxfire": ((0.075, 0.750, 0.760, 1), 0.58),
     "lantern_amber": ((1.000, 0.390, 0.055, 1), 0.42),
     "iron": ((0.105, 0.115, 0.125, 1), 0.72),
+    "meadow": ((0.515, 0.365, 0.095, 1), 0.92),
 }
 
 
@@ -557,6 +560,106 @@ def make_lantern_post(asset_id: str) -> None:
         )
 
 
+def make_crooked_farmhouse(asset_id: str) -> None:
+    """Build Bramblewake's abandoned farm as a rooted, handmade landmark."""
+    box(asset_id, "stone_foundation", (0, 0.3, 0.65), (18.5, 14.5, 1.3), (0, 0, 0), "stone_dark", 0.20)
+    box(asset_id, "timber_floor", (0, -0.2, 1.2), (17.2, 13.0, 0.55), (0, 0, 0), "bark_cut", 0.12)
+
+    # Uneven plank walls and an off-centre doorway make the facade readable at
+    # route distance without turning it into another rectangular Roblox box.
+    for index in range(9):
+        x = -7.2 + index * 1.8
+        height = 9.0 + (index % 3) * 0.35
+        if index not in {4, 5}:
+            box(
+                asset_id,
+                f"front_plank_{index}",
+                (x, -6.35, height * 0.5 + 1.1),
+                (1.65, 0.65, height),
+                (0, math.radians((index % 3 - 1) * 1.2), math.radians((index % 2 - 0.5) * 1.4)),
+                "bark_mid" if index % 3 else "bark_dark",
+                0.10,
+            )
+        box(
+            asset_id,
+            f"back_plank_{index}",
+            (x, 6.35, height * 0.5 + 1.1),
+            (1.65, 0.65, height),
+            (0, math.radians((index % 3 - 1) * -1.0), math.radians((index % 2 - 0.5) * -1.2)),
+            "bark_mid" if index % 2 else "bark_dark",
+            0.10,
+        )
+    for side in (-1, 1):
+        for index in range(7):
+            y = -5.25 + index * 1.75
+            height = 8.8 + (index % 2) * 0.45
+            box(
+                asset_id,
+                f"side_plank_{side}_{index}",
+                (side * 8.15, y, height * 0.5 + 1.1),
+                (0.65, 1.62, height),
+                (math.radians((index % 3 - 1) * 1.1), 0, math.radians(side * (index % 2) * 1.0)),
+                "bark_mid" if index % 3 else "bark_dark",
+                0.10,
+            )
+
+    for side in (-1, 1):
+        cone(asset_id, f"door_post_{side}", (side * 2.0, -6.7, 1.0), (side * 1.85, -6.65, 8.4), 0.38, 0.31, "bark_cut", 7)
+    cone(asset_id, "door_lintel", (-2.2, -6.65, 8.2), (2.2, -6.65, 8.4), 0.40, 0.36, "bark_cut", 7)
+
+    # Deep, asymmetrical gable with a repaired patch and chimney silhouette.
+    box(asset_id, "roof_left", (-4.15, 0, 11.4), (10.6, 16.2, 0.85), (0, math.radians(-31), 0), "stone_dark", 0.14)
+    box(asset_id, "roof_right", (4.15, 0, 11.4), (10.6, 16.2, 0.85), (0, math.radians(31), 0), "stone_dark", 0.14)
+    box(asset_id, "roof_patch", (-2.0, -2.6, 13.65), (4.0, 5.0, 0.28), (0, math.radians(-31), math.radians(5)), "bark_cut", 0.08)
+    box(asset_id, "chimney", (5.25, 2.8, 13.5), (2.1, 2.1, 6.2), (0, 0, math.radians(-2)), "stone", 0.20)
+    box(asset_id, "porch", (0, -8.0, 1.1), (10.5, 3.8, 0.48), (0, 0, 0), "bark_cut", 0.10)
+
+    for root_index in range(6):
+        angle = root_index * math.tau / 6 + 0.18
+        start = (math.cos(angle) * 7.6, math.sin(angle) * 5.9, 1.2)
+        end = (math.cos(angle) * 11.3, math.sin(angle) * 9.0, 0.08)
+        cone(asset_id, f"foundation_root_{root_index}", start, end, 0.46, 0.08, "bark_dark", 7)
+    for index, location in enumerate(((-5.2, 2.5, 14.0), (2.0, 5.0, 13.9), (6.8, -1.0, 10.8))):
+        irregular_ico(asset_id, f"roof_moss_{index}", location, (1.5, 0.8, 0.28), "moss", 1800 + index, 1)
+
+
+def make_foxfire_windmill_tower(asset_id: str) -> None:
+    """Build a root-swallowed mill tower while leaving its rotor functional."""
+    cone(asset_id, "tapered_tower", (0, 0, 0.4), (0.35, 0.2, 29.0), 4.8, 3.45, "bark_mid", 10)
+    for side in (-1, 1):
+        for depth in (-1, 1):
+            cone(
+                asset_id,
+                f"tower_brace_{side}_{depth}",
+                (side * 3.7, depth * 3.25, 0.5),
+                (side * 2.7, depth * 2.65, 28.2),
+                0.36,
+                0.24,
+                "bark_dark",
+                7,
+            )
+    cone(asset_id, "mill_cap", (0.35, 0.2, 28.5), (0.35, 0.2, 35.0), 6.0, 0.8, "stone_dark", 10)
+    box(asset_id, "rotor_mount", (0.35, -4.0, 23.0), (3.3, 2.0, 3.3), (math.radians(5), 0, 0), "iron", 0.20)
+
+    # Living roots visibly claim the mill without blocking the authored route.
+    for index in range(5):
+        angle = index * math.tau / 5 + 0.35
+        cone(
+            asset_id,
+            f"swallowing_root_{index}",
+            (math.cos(angle) * 3.4, math.sin(angle) * 3.4, 8.0 + (index % 2) * 3.5),
+            (math.cos(angle) * 8.4, math.sin(angle) * 8.4, 0.08),
+            0.95,
+            0.12,
+            "bark_dark",
+            8,
+        )
+    for index, location in enumerate(((-3.2, 1.4, 18.0), (2.5, 2.7, 26.5), (0.5, -2.8, 31.0))):
+        irregular_ico(asset_id, f"tower_moss_{index}", location, (1.2, 0.65, 0.3), "moss", 1900 + index, 1)
+    for index, location in enumerate(((-3.5, -3.7, 13.0), (3.0, -3.4, 19.0), (0.4, -4.5, 27.0))):
+        irregular_ico(asset_id, f"foxfire_memory_{index}", location, (0.24, 0.18, 0.42), "foxfire", 1950 + index, 1)
+
+
 def asset_bounds(objects: list[bpy.types.Object]) -> tuple[Vector, Vector]:
     points = [obj.matrix_world @ Vector(corner) for obj in objects for corner in obj.bound_box]
     minimum = Vector((min(p.x for p in points), min(p.y for p in points), min(p.z for p in points)))
@@ -647,8 +750,10 @@ def make_preview() -> None:
         "mesh_broadleaf_hero_a": (-2, 8, 0),
         "mesh_root_arch_a": (17, 8, 0),
         "mesh_hollow_lantern_shrine_a": (34, 8, 0),
-        "mesh_wayfarer_cabin_a": (-4, 28, 0),
+        "mesh_wayfarer_cabin_a": (-15, 30, 0),
         "mesh_lantern_post_a": (24, -10, 0),
+        "mesh_crooked_farmhouse_a": (10, 31, 0),
+        "mesh_foxfire_windmill_tower_a": (38, 25, 0),
         "mesh_boulder_cluster_a": (-18, -10, 0),
         "mesh_deadfall_a": (0, -10, 0),
         "mesh_fern_cluster_a": (15, -10, 0),
@@ -694,9 +799,9 @@ def make_preview() -> None:
     moon.data.color = (0.38, 0.55, 0.82)
     moon.rotation_euler = (math.radians(32), math.radians(-18), math.radians(-28))
 
-    bpy.ops.object.camera_add(location=(72, -100, 50))
+    bpy.ops.object.camera_add(location=(86, -126, 58))
     camera = bpy.context.object
-    direction = Vector((3, 3, 8.5)) - camera.location
+    direction = Vector((3, 5, 9.0)) - camera.location
     camera.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
     camera.data.lens = 52
     bpy.context.scene.camera = camera
@@ -731,6 +836,8 @@ def main() -> None:
     make_hollow_lantern_shrine("mesh_hollow_lantern_shrine_a")
     make_wayfarer_cabin("mesh_wayfarer_cabin_a")
     make_lantern_post("mesh_lantern_post_a")
+    make_crooked_farmhouse("mesh_crooked_farmhouse_a")
+    make_foxfire_windmill_tower("mesh_foxfire_windmill_tower_a")
     consolidate_assets_by_material()
     normalize_assets()
     measurements = export_assets()
