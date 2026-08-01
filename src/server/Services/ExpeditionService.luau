@@ -30,6 +30,7 @@ export type ExpeditionService = typeof(setmetatable(
         _rewardLedgerState: any,
         _eventsEnabled: boolean,
         _runId: string,
+        _pendingExtractionPayoffs: { [Player]: any },
     },
     ExpeditionService
 ))
@@ -64,6 +65,7 @@ function ExpeditionService.new(
         _rewardLedgerState = rewardLedger.create(),
         _eventsEnabled = false,
         _runId = "",
+        _pendingExtractionPayoffs = {},
     }, ExpeditionService)
 end
 
@@ -108,6 +110,9 @@ function ExpeditionService.Start(self: ExpeditionService)
         seed = manifest.seed,
         source = manifest.source,
     })
+    Players.PlayerRemoving:Connect(function(player: Player)
+        self._pendingExtractionPayoffs[player] = nil
+    end)
 end
 
 function ExpeditionService.enter(self: ExpeditionService, player: Player): boolean
@@ -338,6 +343,17 @@ function ExpeditionService._combinedPending(self: ExpeditionService, player: Pla
     }
 end
 
+function ExpeditionService._exitWithPayoff(self: ExpeditionService, player: Player): boolean
+    return self._worldService:exitBramblewake(player, function()
+        local payoff = self._pendingExtractionPayoffs[player]
+        if payoff == nil then
+            return
+        end
+        self._pendingExtractionPayoffs[player] = nil
+        self._worldService:showExtractionPayoff(player, payoff.materials)
+    end)
+end
+
 function ExpeditionService.extract(self: ExpeditionService, player: Player): any
     if player:GetAttribute("LastLightInExpedition") ~= true then
         return {
@@ -351,10 +367,13 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
     local sessionPending = self._rewardLedger.pending(self._rewardLedgerState, player.UserId)
     local combinedPending = self:_combinedPending(player)
     if #combinedPending.rewards == 0 then
-        if not self._worldService:exitBramblewake(player) then
+        local pendingPayoff = self._pendingExtractionPayoffs[player]
+        if not self:_exitWithPayoff(player) then
             return {
                 accepted = false,
-                message = "WAYHOME TRANSITION WILL RETRY",
+                message = if pendingPayoff ~= nil
+                    then "REWARDS BANKED — WAYHOME TRANSITION WILL RETRY"
+                    else "WAYHOME TRANSITION WILL RETRY",
                 reason = "transition_unavailable",
             }
         end
@@ -362,8 +381,10 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
         return {
             accepted = true,
             banked = combinedPending.banked,
-            message = "RETURNING TO EMBERHOLLOW — POUCH EMPTY",
-            settlementId = nil,
+            message = if pendingPayoff ~= nil
+                then "RETURNING TO EMBERHOLLOW — BANKED DELIVERY READY"
+                else "RETURNING TO EMBERHOLLOW — POUCH EMPTY",
+            settlementId = if pendingPayoff ~= nil then pendingPayoff.settlementId else nil,
         }
     end
 
@@ -395,11 +416,11 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
             sessionPending.transactionIds
         )
     end
-    if
-        not self._worldService:exitBramblewake(player, function()
-            self._worldService:showExtractionPayoff(player, settlement.materials or {})
-        end)
-    then
+    self._pendingExtractionPayoffs[player] = {
+        materials = settlement.materials or {},
+        settlementId = settlement.settlementId,
+    }
+    if not self:_exitWithPayoff(player) then
         return {
             accepted = false,
             message = "REWARDS BANKED — WAYHOME TRANSITION WILL RETRY",

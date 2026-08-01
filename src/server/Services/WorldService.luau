@@ -61,6 +61,17 @@ local BARK = Color3.fromRGB(62, 39, 30)
 local WET_BARK = Color3.fromRGB(36, 26, 24)
 local MOSS = Color3.fromRGB(58, 91, 54)
 local WET_EARTH = Color3.fromRGB(67, 55, 39)
+local WAYHOME_DELIVERY_LIFETIME = 180
+local WAYHOME_DELIVERY_ORIGINS = table.freeze({
+    Vector3.new(-27, 0, -13),
+    Vector3.new(-18, 0, -13),
+    Vector3.new(-9, 0, -13),
+    Vector3.new(9, 0, -13),
+    Vector3.new(18, 0, -13),
+    Vector3.new(27, 0, -13),
+    Vector3.new(-27, 0, -21),
+    Vector3.new(27, 0, -21),
+})
 
 local function part(
     parent: Instance,
@@ -1992,6 +2003,14 @@ function WorldService.Start(self: WorldService)
 
     Players.PlayerRemoving:Connect(function(player: Player)
         self._characterRoots[player] = nil
+        local world = self._world
+        local deliveries = if world ~= nil then world:FindFirstChild("WayhomeDeliveries") else nil
+        local delivery = if deliveries ~= nil
+            then deliveries:FindFirstChild("WayhomeDelivery_" .. tostring(player.UserId))
+            else nil
+        if delivery ~= nil then
+            delivery:Destroy()
+        end
     end)
 
     local accumulator = 0
@@ -2377,18 +2396,39 @@ function WorldService.showExtractionPayoff(self: WorldService, player: Player, m
     end
     local deliveryName = "WayhomeDelivery_" .. tostring(player.UserId)
     local existing = deliveries:FindFirstChild(deliveryName)
+    local existingSlot = if existing ~= nil then existing:GetAttribute("DeliverySlot") else nil
     if existing ~= nil then
         existing:Destroy()
+    end
+
+    local occupied: { [number]: boolean } = {}
+    for _, candidate in deliveries:GetChildren() do
+        local candidateSlot = candidate:GetAttribute("DeliverySlot")
+        if type(candidateSlot) == "number" then
+            occupied[candidateSlot] = true
+        end
+    end
+    local slot = if type(existingSlot) == "number"
+            and existingSlot >= 1
+            and existingSlot <= #WAYHOME_DELIVERY_ORIGINS
+        then existingSlot
+        else self._extractionPayoff.firstAvailableSlot(occupied, #WAYHOME_DELIVERY_ORIGINS)
+    if slot == nil then
+        self._logger:info("wayhome_delivery_skipped", {
+            player = player.UserId,
+            reason = "delivery_slots_full",
+        })
+        return
     end
 
     local delivery = Instance.new("Model")
     delivery.Name = deliveryName
     delivery:SetAttribute("OwnerUserId", player.UserId)
     delivery:SetAttribute("MaterialCount", total)
+    delivery:SetAttribute("DeliverySlot", slot)
     delivery.Parent = deliveries
 
-    local slot = player.UserId % 4
-    local origin = Vector3.new(-24 + slot * 8, 0, -13)
+    local origin = WAYHOME_DELIVERY_ORIGINS[slot]
     local pallet = part(
         delivery,
         "WayhomePallet",
@@ -2532,6 +2572,11 @@ function WorldService.showExtractionPayoff(self: WorldService, player: Player, m
         TweenInfo.new(0.85, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
         { Size = Vector3.new(0.14, 13, 13), Transparency = 1 }
     ):Play()
+    task.delay(WAYHOME_DELIVERY_LIFETIME, function()
+        if delivery.Parent ~= nil then
+            delivery:Destroy()
+        end
+    end)
     task.delay(1, function()
         if pulse.Parent ~= nil then
             pulse:Destroy()
@@ -3005,7 +3050,7 @@ function WorldService.exitBramblewake(
         return false
     end
     if player:GetAttribute("LastLightExpeditionTransition") == true then
-        return true
+        return false
     end
 
     local destination = self:spawnCFrame()

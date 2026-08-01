@@ -26,7 +26,7 @@ function ExtractionPayoff.summarize(materials: any): ({ Entry }, number)
     for materialId, amount in materials do
         local presentation = PRESENTATION[materialId]
         if presentation ~= nil and type(amount) == "number" and amount > 0 then
-            local safeAmount = math.clamp(math.floor(amount), 1, 100)
+            local safeAmount = math.max(1, math.floor(amount))
             total += safeAmount
             table.insert(entries, {
                 amount = safeAmount,
@@ -40,6 +40,18 @@ function ExtractionPayoff.summarize(materials: any): ({ Entry }, number)
         return left.id < right.id
     end)
     return entries, total
+end
+
+function ExtractionPayoff.firstAvailableSlot(occupied: any, slotCount: number): number?
+    if type(occupied) ~= "table" or slotCount < 1 then
+        return nil
+    end
+    for slot = 1, math.floor(slotCount) do
+        if occupied[slot] ~= true then
+            return slot
+        end
+    end
+    return nil
 end
 
 return table.freeze(ExtractionPayoff)

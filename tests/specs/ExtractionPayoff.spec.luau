@@ -42,11 +42,25 @@ return {
             end,
         },
         {
-            name = "caps one delivery stack to the expedition reward limit",
+            name = "preserves an aggregate banked material total",
             run = function()
                 local entries, total = ExtractionPayoff.summarize({ material_heartwood = 1000 })
-                TestRunner.equal(entries[1].amount, 100)
-                TestRunner.equal(total, 100)
+                TestRunner.equal(entries[1].amount, 1000)
+                TestRunner.equal(total, 1000)
+            end,
+        },
+        {
+            name = "allocates the first open delivery slot",
+            run = function()
+                local slot = ExtractionPayoff.firstAvailableSlot({ [1] = true, [3] = true }, 4)
+                TestRunner.equal(slot, 2)
+            end,
+        },
+        {
+            name = "reports when every delivery slot is occupied",
+            run = function()
+                local slot = ExtractionPayoff.firstAvailableSlot({ true, true, true }, 3)
+                TestRunner.equal(slot, nil)
             end,
         },
     },
