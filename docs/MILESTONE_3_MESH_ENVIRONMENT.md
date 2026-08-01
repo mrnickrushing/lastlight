@@ -69,6 +69,15 @@ fish -c 'source ~/.secrets/roblox.fish; python3 scripts/upload_mesh_assets.py --
 | `mesh_deadfall_a` | Fallen-log path framing | 17 studs | Core and near forest |
 | `mesh_root_arch_a` | Hero landmark and route gate | 25 studs | Curated core location only |
 | `mesh_fern_cluster_a` | Ground silhouette breakup | 5 studs | Core forest only |
+| `mesh_hollow_lantern_shrine_a` | Walk-through arrival sanctuary | 28 studs | Curated arrival landmark only |
+
+The hollow lantern shrine starts from the committed original concept in
+`assets/meshes/concepts`, then the deterministic Blender pipeline authors the
+shipping geometry. Its 28-stud measured silhouette, open centre, stone
+threshold, timber braces, moss, and three restrained amber cues make the arrival
+clearing recognizable without adding collision or blocking world readiness. It
+loads through the same sanitized template cache as the rest of the kit and falls
+back to the procedural root-arch language if Roblox asset loading fails.
 
 Far forest bands continue using the inexpensive procedural silhouettes. This
 keeps the horizon full without spending unique mesh, texture, collision, or
@@ -98,3 +107,6 @@ shadow budget where the player cannot inspect the asset.
 - A failed asset request produces the established procedural equivalent.
 - Studio review covers phone, tablet, desktop, low graphics, and maximum
   graphics before the mesh kit replaces additional forest bands.
+- Studio Output reports client build `0.31.0`, world version
+  `bramblewake-blackout-v11`, and an `AuthoredMeshFallbackCount` of zero before
+  the shrine is accepted as live visual evidence.

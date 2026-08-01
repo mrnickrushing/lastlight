@@ -34,6 +34,7 @@ TARGET_LONGEST_DIMENSIONS = {
     "mesh_deadfall_a": 17.0,
     "mesh_root_arch_a": 25.0,
     "mesh_fern_cluster_a": 5.0,
+    "mesh_hollow_lantern_shrine_a": 28.0,
 }
 
 
@@ -50,6 +51,7 @@ PALETTE = {
     "stone_dark": ((0.105, 0.125, 0.145, 1), 0.98),
     "fungus": ((0.530, 0.235, 0.085, 1), 0.84),
     "foxfire": ((0.075, 0.750, 0.760, 1), 0.58),
+    "lantern_amber": ((1.000, 0.390, 0.055, 1), 0.42),
 }
 
 
@@ -65,9 +67,9 @@ def material(name: str) -> bpy.types.Material:
     shader.inputs["Base Color"].default_value = color
     shader.inputs["Roughness"].default_value = roughness
     shader.inputs["Metallic"].default_value = 0.0
-    if name == "foxfire":
+    if name in {"foxfire", "lantern_amber"}:
         shader.inputs["Emission Color"].default_value = color
-        shader.inputs["Emission Strength"].default_value = 1.4
+        shader.inputs["Emission Strength"].default_value = 1.4 if name == "foxfire" else 2.1
     MATERIALS[name] = mat
     return mat
 
@@ -294,6 +296,112 @@ def make_fern(asset_id: str) -> None:
                 leaf_plane(asset_id, f"leaf_{frond}_{leaflet}_{side}", center, leaf_tip, 0.14, "leaf_mid")
 
 
+def make_hollow_lantern_shrine(asset_id: str) -> None:
+    """Build a walk-through stump sanctuary from thick, readable forms."""
+    pillars = [
+        ((-4.7, -2.1, 0.0), (-4.0, -1.7, 12.2), 2.25, 1.35),
+        ((4.7, -2.1, 0.0), (4.0, -1.7, 11.4), 2.30, 1.30),
+        ((-4.5, 2.7, 0.0), (-3.8, 2.2, 11.0), 2.10, 1.20),
+        ((4.5, 2.7, 0.0), (3.9, 2.2, 12.6), 2.15, 1.25),
+        ((-6.0, 0.3, 0.0), (-5.1, 0.2, 9.5), 1.85, 1.05),
+        ((6.0, 0.4, 0.0), (5.2, 0.1, 10.2), 1.90, 1.00),
+    ]
+    for index, (start, end, radius_start, radius_end) in enumerate(pillars):
+        cone(
+            asset_id,
+            f"hollow_trunk_{index}",
+            start,
+            end,
+            radius_start,
+            radius_end,
+            "bark_dark" if index % 3 == 0 else "bark_mid",
+            9,
+        )
+
+    # Broken crown pieces bridge above both entrances while preserving a
+    # player-sized opening through the centre of the landmark.
+    crown_segments = [
+        ((-4.0, -1.7, 11.7), (-1.0, -1.6, 15.7), 1.35, 0.95),
+        ((4.0, -1.7, 10.9), (0.8, -1.6, 15.5), 1.30, 0.90),
+        ((-3.8, 2.2, 10.5), (-0.8, 2.0, 14.8), 1.25, 0.82),
+        ((3.9, 2.2, 12.1), (0.7, 2.0, 15.0), 1.30, 0.88),
+        ((-1.0, -1.6, 15.7), (-0.5, -1.5, 18.0), 0.95, 0.36),
+        ((0.8, -1.6, 15.5), (1.5, -1.4, 17.2), 0.90, 0.30),
+    ]
+    for index, (start, end, radius_start, radius_end) in enumerate(crown_segments):
+        cone(asset_id, f"broken_crown_{index}", start, end, radius_start, radius_end, "bark_mid", 9)
+
+    # Buttress roots keep the silhouette grounded from every camera angle.
+    root_origins = [(-4.7, -2.1), (4.7, -2.1), (-4.5, 2.7), (4.5, 2.7), (-6.0, 0.3), (6.0, 0.4)]
+    for index, (x, y) in enumerate(root_origins):
+        outward = Vector((x, y, 0)).normalized()
+        for fan in (-0.42, 0.42):
+            direction = Vector(
+                (
+                    outward.x * math.cos(fan) - outward.y * math.sin(fan),
+                    outward.x * math.sin(fan) + outward.y * math.cos(fan),
+                    0,
+                )
+            )
+            cone(
+                asset_id,
+                f"buttress_root_{index}_{fan}",
+                (x, y, 0.8),
+                (x + direction.x * 5.0, y + direction.y * 5.0, 0.08),
+                0.72,
+                0.10,
+                "bark_dark",
+                7,
+            )
+
+    # Hand-fitted braces tell the player this is shelter, not merely a tree.
+    braces = [
+        ((-6.0, -2.5, 3.2), (-3.8, -2.6, 7.9)),
+        ((6.0, -2.5, 3.0), (3.8, -2.6, 7.4)),
+        ((-5.8, 3.0, 3.5), (-3.7, 3.1, 7.7)),
+        ((5.8, 3.0, 3.4), (3.8, 3.1, 8.0)),
+    ]
+    for index, (start, end) in enumerate(braces):
+        cone(asset_id, f"timber_brace_{index}", start, end, 0.36, 0.29, "bark_cut", 6)
+
+    # A fractured stone threshold makes the route through the shrine legible.
+    for index, x in enumerate((-2.8, -0.9, 1.0, 2.9)):
+        irregular_ico(
+            asset_id,
+            f"threshold_stone_{index}",
+            (x, -2.4 + (index % 2) * 0.25, 0.28),
+            (1.35, 1.1, 0.32),
+            "stone" if index % 2 == 0 else "stone_dark",
+            1200 + index,
+            1,
+        )
+
+    # Three restrained lights create a memorable safe landmark without neon
+    # washing the whole forest.
+    lanterns = [(-4.9, -3.15, 6.5), (4.8, -3.12, 5.8), (0.0, -2.05, 13.9)]
+    for index, location in enumerate(lanterns):
+        irregular_ico(
+            asset_id,
+            f"lantern_glass_{index}",
+            location,
+            (0.38, 0.24, 0.62),
+            "lantern_amber",
+            1300 + index,
+            1,
+        )
+
+    for index, location in enumerate(((-5.2, -2.0, 9.0), (5.3, 0.0, 7.5), (-3.6, 2.3, 12.0))):
+        irregular_ico(
+            asset_id,
+            f"shrine_moss_{index}",
+            location,
+            (1.25, 0.65, 0.30),
+            "moss",
+            1400 + index,
+            1,
+        )
+
+
 def asset_bounds(objects: list[bpy.types.Object]) -> tuple[Vector, Vector]:
     points = [obj.matrix_world @ Vector(corner) for obj in objects for corner in obj.bound_box]
     minimum = Vector((min(p.x for p in points), min(p.y for p in points), min(p.z for p in points)))
@@ -379,13 +487,14 @@ def export_assets() -> dict[str, dict[str, object]]:
 
 def make_preview() -> None:
     placements = {
-        "mesh_conifer_hero_a": (-25, 5, 0),
-        "mesh_conifer_hero_b": (-13, 6, 0),
-        "mesh_broadleaf_hero_a": (1, 8, 0),
-        "mesh_root_arch_a": (21, 8, 0),
-        "mesh_boulder_cluster_a": (-14, -10, 0),
-        "mesh_deadfall_a": (1, -10, 0),
-        "mesh_fern_cluster_a": (17, -10, 0),
+        "mesh_conifer_hero_a": (-28, 6, 0),
+        "mesh_conifer_hero_b": (-16, 6, 0),
+        "mesh_broadleaf_hero_a": (-2, 8, 0),
+        "mesh_root_arch_a": (17, 8, 0),
+        "mesh_hollow_lantern_shrine_a": (34, 8, 0),
+        "mesh_boulder_cluster_a": (-18, -10, 0),
+        "mesh_deadfall_a": (0, -10, 0),
+        "mesh_fern_cluster_a": (15, -10, 0),
     }
     for asset_id, objects in ASSETS.items():
         offset = Vector(placements[asset_id])
@@ -394,7 +503,7 @@ def make_preview() -> None:
         for obj in objects:
             obj.location += offset
 
-    bpy.ops.mesh.primitive_plane_add(size=90, location=(0, 0, -0.03))
+    bpy.ops.mesh.primitive_plane_add(size=110, location=(0, 0, -0.03))
     ground = bpy.context.object
     ground.data.materials.append(material("stone_dark"))
 
@@ -426,9 +535,9 @@ def make_preview() -> None:
     moon.data.color = (0.38, 0.55, 0.82)
     moon.rotation_euler = (math.radians(32), math.radians(-18), math.radians(-28))
 
-    bpy.ops.object.camera_add(location=(62, -86, 45))
+    bpy.ops.object.camera_add(location=(72, -100, 50))
     camera = bpy.context.object
-    direction = Vector((0, 2, 8.5)) - camera.location
+    direction = Vector((3, 3, 8.5)) - camera.location
     camera.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
     camera.data.lens = 52
     bpy.context.scene.camera = camera
@@ -460,6 +569,7 @@ def main() -> None:
     make_deadfall("mesh_deadfall_a")
     make_root_arch("mesh_root_arch_a")
     make_fern("mesh_fern_cluster_a")
+    make_hollow_lantern_shrine("mesh_hollow_lantern_shrine_a")
     consolidate_assets_by_material()
     normalize_assets()
     measurements = export_assets()
