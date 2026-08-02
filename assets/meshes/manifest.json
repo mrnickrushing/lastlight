@@ -726,6 +726,46 @@
         "normal"
       ],
       "robloxAssetId": 137970350583998
+    },
+    {
+      "id": "mesh_heartwood_stump_a",
+      "displayName": "Heartwood Stump",
+      "role": "tutorial_gather_node",
+      "placementBand": "curated_core",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc3ea-2cd2-76ee-bd69-66c88b6e255e (nano-banana-pro multi-view) then multi-image-to-3d task 019fc3ec-1769-775a-b6ed-b328dde00834 (front + back, PBR). Normalized and budgeted by the repository Blender pipeline. Replaces the generic mesh_creator_stump_a shell on the Heartwood gather node.",
+      "file": "generated/mesh_heartwood_stump_a.glb",
+      "previewFile": "previews/mesh-heartwood-stump.png",
+      "targetLongestDimension": 7,
+      "maxTriangles": 6000,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 140476842967550
+    },
+    {
+      "id": "mesh_first_lantern_a",
+      "displayName": "The First Lantern",
+      "role": "hero_civic_landmark",
+      "placementBand": "curated_hero",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc3ea-2edd-7a6a-ae05-e1f6c08f6907 (nano-banana-pro multi-view) then multi-image-to-3d task 019fc3ec-1f6f-7bdc-96f8-1bf6a1e2aa10 (front + back, PBR). Normalized and budgeted by the repository Blender pipeline. The town's civic centrepiece; includes its own stepped stone plinth. Replaces the small scaled-up Creator Store lantern.",
+      "file": "generated/mesh_first_lantern_a.glb",
+      "previewFile": "previews/mesh-first-lantern.png",
+      "targetLongestDimension": 11,
+      "maxTriangles": 7000,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 84319358349776
     }
   ]
 }
