@@ -759,7 +759,17 @@ local function buildEmberhollowSanctuary(
             table.insert(meshPlacements, {
                 assetId = "mesh_creator_wayfarer_bed_a",
                 fallbackKind = "asset_replacement",
-                position = cabinCFrame(4.2, -1.75, 3.5).Position,
+                -- MeshTemplateLoader normalizes the model's pivot to the
+                -- bottom of its bounding box, so this Y is where the bed's
+                -- underside lands, not its centre. 0.62 matches the interior
+                -- floor (CabinWovenRug rests with its own bottom at the same
+                -- height); -1.75 is the EXTERIOR ground level the barrel and
+                -- crate correctly use a few lines below, since those sit
+                -- outside the cabin footprint at x = -14.5 / 13.8. Copying
+                -- that value here put the bed 2.36 studs under the interior
+                -- floor -- fully invisible, since even its own top (0.53)
+                -- never reached the floor it was meant to rest on (0.61).
+                position = cabinCFrame(4.2, 0.62, 3.5).Position,
                 scale = 1,
                 yaw = yaw + math.rad(90),
                 seed = 9831,
@@ -842,7 +852,11 @@ local function buildEmberhollowSanctuary(
                 table.insert(meshPlacements, {
                     assetId = "mesh_creator_wayfarer_bed_a",
                     fallbackKind = "asset_replacement",
-                    position = cabinCFrame(3.5 + bedIndex * 3.6, -1.75, 3.8).Position,
+                    -- Same floor-height correction as Mara's bed above: 0.62
+                    -- is the interior floor (WayfarerBedroll's own bottom
+                    -- lands at ~0.73, in the same range); -1.75 is the
+                    -- exterior ground level the barrel and crate use.
+                    position = cabinCFrame(3.5 + bedIndex * 3.6, 0.62, 3.8).Position,
                     scale = 1,
                     yaw = yaw + math.rad(90),
                     seed = 9840 + bedIndex,
