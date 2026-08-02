@@ -770,14 +770,8 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         actionButton(canvas, "UseTool", "STRIKE", 84, UDim2.new(1, -158, 1, -40), Vector2.new(1, 1))
     tool.Visible = false
     stroke(tool, COLORS.danger, 0.2)
-    local sprint = actionButton(
-        canvas,
-        "Sprint",
-        "HOLD\nRUN",
-        80,
-        UDim2.new(0, 166, 1, -34),
-        Vector2.new(0, 1)
-    )
+    local sprint =
+        actionButton(canvas, "Sprint", "RUN", 80, UDim2.new(0, 166, 1, -34), Vector2.new(0, 1))
     sprint.Visible = UserInputService.TouchEnabled
     stroke(sprint, COLORS.blue, 0.2)
     local dodge =
@@ -2135,6 +2129,11 @@ function HUDController.update(self: HUDController, state: any)
     end
     self._currentState = state
     self:_updateLobby(state)
+    -- Sprint is a toggle, not a hold, so the button has to show which it is.
+    local combat = state.combat
+    local running = type(combat) == "table" and combat.sprinting == true
+    self._sprint.Text = if running then "RUNNING" else "RUN"
+    self._sprint.BackgroundColor3 = if running then COLORS.blue else COLORS.panel
     local survival = state.survival
     local selfSurvival = if type(survival) == "table" then survival.self else nil
     self._playerDowned = type(selfSurvival) == "table" and selfSurvival.downed == true
