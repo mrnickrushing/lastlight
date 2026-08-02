@@ -16035,15 +16035,30 @@ function PlayerSurvivalService._stepLanternRegen(self: PlayerSurvivalService, no
         return
     end
 
+    -- Anyone currently channeling a revive is excluded. SurvivalState.heal
+    -- bumps the healed player's revision, and ReviveFlow.evaluate cancels a
+    -- channel with reviver_state_changed the moment the reviver's revision
+    -- differs from the one captured at revive start. Since a whole point lands
+    -- roughly every 0.6s and a revive runs 2.5s, an injured player reviving an
+    -- ally inside the safe zone would have the channel cancelled out from
+    -- under them every single time -- and the town, next to the lantern, is
+    -- exactly where reviving is most likely to happen.
+    local reviving: { [Player]: boolean } = {}
+    for _, channel in self._channels do
+        reviving[channel.reviver] = true
+    end
+
+    local healedAny = false
     for player, state in self._states do
         local root = rootPart(player)
-        -- Standing out of the light, being downed, and already sitting at full
-        -- health all mean the same thing here: bank nothing and drop whatever
-        -- fractional progress was carried, so leaving and returning does not
-        -- resume mid-point.
+        -- Out of the light, downed, mid-revive, and already at full health all
+        -- mean the same thing here: bank nothing and drop whatever fractional
+        -- progress was carried, so leaving and returning does not resume
+        -- mid-point.
         local eligible = root ~= nil
             and (root.Position - center).Magnitude <= radius
             and self._survivalState.canAct(state)
+            and not reviving[player]
             and state.health < state.maxHealth
         if not eligible then
             self._regenCarry[player] = nil
@@ -16056,9 +16071,19 @@ function PlayerSurvivalService._stepLanternRegen(self: PlayerSurvivalService, no
                 if result.applied then
                     self._states[player] = nextState
                     self:_syncPlayer(player)
+                    healedAny = true
                 end
             end
         end
+    end
+
+    -- _syncPlayer only writes attributes and the Humanoid. The HUD renders
+    -- from the survival snapshot published through the changed handler, so
+    -- without this the health pill sits at its stale value while the
+    -- authoritative state climbs, then jumps when some unrelated event
+    -- finally triggers a publish.
+    if healedAny then
+        self:_notify(nil, nil)
     end
 end
 

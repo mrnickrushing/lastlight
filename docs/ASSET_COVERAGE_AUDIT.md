@@ -14,9 +14,13 @@ snapshot, not a live view.
 | --- | ---: |
 | Distinct primitive object kinds | 410 |
 | Reviewed assets in the manifest | 32 |
-| Assets actually placed in the world | 31 |
+| Assets actually placed in the world | 30 |
 | Asset placements | 53 |
 | Fallback wrappers (primitive hidden when its asset loads) | 13 |
+
+30 of 32, not 31: both `mesh_lantern_post_a` and `mesh_wayfarer_cabin_a` are
+absent from the world, and the two unplaced entries below are the whole of the
+difference.
 
 410 against 53 is the headline. Most of the world is still primitives. That is
 not automatically wrong — terrain, roads, floors, walls, roofs, collision
@@ -80,6 +84,13 @@ audit:
 2. **A mention is not a placement.** `mesh_lantern_post_a` appears in
    `WorldService.luau` only inside `placement.assetId == "mesh_lantern_post_a"`,
    a comparison that tunes jitter. Counting mentions makes it look placed.
+
+3. **Not every quoted snake_case string is an asset ID.** A regex that scrapes
+   quoted identifiers out of the neighbourhood of `assetId` also collects
+   `mesh_asset_load_failed`, `mesh_asset_retired`, and `retired_visual_failure`
+   — log event names and a placement band, none of them assets. That inflated
+   the placed count in the first draft of this document. Intersect against the
+   manifest before counting anything.
 
 ## What "no blocky placeholders" actually requires
 
