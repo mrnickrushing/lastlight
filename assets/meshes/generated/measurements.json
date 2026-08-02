@@ -1258,30 +1258,30 @@
       "textures": [
         {
           "name": "Image_0",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         },
         {
           "name": "Image_1",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         },
         {
           "name": "Image_3",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         },
         {
           "name": "normal",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         }
       ],
-      "bytes": 11751292
+      "bytes": 4151436
     },
     "mesh_heartwood_stump_a": {
       "boundsMin": [
@@ -1308,30 +1308,30 @@
       "textures": [
         {
           "name": "Image_0",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         },
         {
           "name": "Image_1",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         },
         {
           "name": "Image_3",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         },
         {
           "name": "normal",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         }
       ],
-      "bytes": 10142132
+      "bytes": 3862820
     },
     "mesh_first_lantern_a": {
       "boundsMin": [
@@ -1358,30 +1358,30 @@
       "textures": [
         {
           "name": "Image_0",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         },
         {
           "name": "Image_1",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         },
         {
           "name": "Image_3",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         },
         {
           "name": "normal",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         }
       ],
-      "bytes": 12742852
+      "bytes": 4780344
     },
     "mesh_blacksmith_hammer_a": {
       "boundsMin": [
@@ -1408,30 +1408,30 @@
       "textures": [
         {
           "name": "Image_0",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         },
         {
           "name": "Image_1",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         },
         {
           "name": "Image_3",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         },
         {
           "name": "normal",
-          "width": 2048,
-          "height": 2048,
+          "width": 1024,
+          "height": 1024,
           "packed": true
         }
       ],
-      "bytes": 11071428
+      "bytes": 3839264
     }
   }
 }

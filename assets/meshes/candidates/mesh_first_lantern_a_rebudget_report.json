@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_first_lantern_a",
+  "source": "assets/meshes/generated/mesh_first_lantern_a.glb",
+  "output": "assets/meshes/generated/mesh_first_lantern_a.glb",
+  "targetLongestDimension": 11.0,
+  "boundsMin": [
+    -2.4823,
+    -2.4826,
+    0.0
+  ],
+  "boundsMax": [
+    2.4823,
+    2.4826,
+    11.0
+  ],
+  "dimensions": [
+    4.9647,
+    4.9652,
+    11.0
+  ],
+  "longestDimension": 11.0,
+  "trianglesBefore": 6079,
+  "trianglesAfter": 6079,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    }
+  ],
+  "bytes": 4780344
+}

@@ -187,6 +187,18 @@ clarity. Cosmetic geometry must not alter authoritative combat bounds.
    `MeshTemplateLoader` repeats the sanitization at runtime as defense in depth.
 5. Keep material slots and triangle counts bounded. Use high detail only where
    players can inspect it.
+5a. Keep texture maps bounded too. Generators return 2048-square PBR sets by
+   default; four of those on one prop is real memory on a phone for detail no
+   player sees at gameplay distance. Downscale to 1024 unless an asset is
+   genuinely inspected close up:
+
+   ```bash
+   blender --background --python scripts/downscale_mesh_textures.py -- \
+     --input assets/meshes/generated/<id>.glb --max-size 1024
+   ```
+
+   Re-run `prepare_mesh_candidate.py` afterwards so the manifest's measured
+   byte count matches what is on disk, then upload with `--update-existing`.
 6. Built-in Roblox materials already provide PBR response. Add custom
    `SurfaceAppearance` maps only when they match the mesh UVs and materially
    improve a hero asset.
