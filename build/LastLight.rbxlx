@@ -1824,7 +1824,10 @@ return table.freeze({
     EngineerBraceSeconds = 12,
     EngineerBraceCapacity = 14,
     ActionRatePerSecond = 8,
-    ProductionPlaceIds = table.freeze({}),
+    -- The Last Light universe (10611704810) and its start place. Registered
+    -- per the publishing runbook so environment checks can tell a real
+    -- production place from an unregistered one.
+    ProductionPlaceIds = table.freeze({ 115897110071287 }),
     FeatureFlags = table.freeze({
         bounded_join = true,
         first_ten_minutes = true,
