@@ -5844,14 +5844,19 @@ local REGIONS: { [string]: RegionScore } = {
             0.18,
             0.52
         ),
+        -- Night in Emberhollow is a defence, not a lullaby: this is the
+        -- phase creatures come for the lantern. "The Night's Serenade" was
+        -- pretty and completely at odds with what is happening on screen.
+        -- Slightly louder than the day and dusk cues, because it should
+        -- arrive as a change you notice.
         night = track(
             "music_emberhollow_night",
-            111317209034361,
-            "The Night's Serenade",
+            124064284287798,
+            "Hollowtide",
             "Epic Fantasy Music",
-            218,
-            0.18,
-            0.76
+            146,
+            0.2,
+            0.82
         ),
     }),
     region_bramblewake = table.freeze({
@@ -21673,11 +21678,19 @@ local MOSS = Color3.fromRGB(58, 91, 54)
 local WET_EARTH = Color3.fromRGB(67, 55, 39)
 local HEARTWOOD_CENTER = Vector3.new(38, 0, -48)
 local TOOL_YARD_CENTER = Vector3.new(-42, 0, -68)
--- Across the arrival road just past the spawn, so the thing the player is
--- asked to build visibly defends the way they came in. It used to sit 44
--- studs off the route in an empty field, where building it read as busywork
--- with nothing behind it.
-local BARRICADE_CENTER = Vector3.new(-2, 0, -18)
+--[[
+    Across the arrival road just past the spawn, so the thing the player is
+    asked to build visibly defends the way they came in. It used to sit 44
+    studs off the route in an empty field, where building it read as busywork
+    with nothing behind it.
+
+    Raised clear of the road surface. The whole assembly is built relative to
+    this point, and at ground level the construction plot spanned y 0 to 0.5
+    while the arrival road surface sits around 0.24 to 0.60 -- so the road was
+    drawn straight over the plot. There was nothing to see and nothing for a
+    click to land on, which stranded the tutorial at the build step.
+]]
+local BARRICADE_CENTER = Vector3.new(-2, 0.62, -18)
 -- Staging yard, north of the arrival clearing and clear of the route that
 -- leaves it. Inside the flat valley bowl (x -190..190, z -260..90), so every
 -- authored coordinate here sits on level ground.

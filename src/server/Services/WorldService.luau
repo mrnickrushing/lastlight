@@ -85,11 +85,19 @@ local MOSS = Color3.fromRGB(58, 91, 54)
 local WET_EARTH = Color3.fromRGB(67, 55, 39)
 local HEARTWOOD_CENTER = Vector3.new(38, 0, -48)
 local TOOL_YARD_CENTER = Vector3.new(-42, 0, -68)
--- Across the arrival road just past the spawn, so the thing the player is
--- asked to build visibly defends the way they came in. It used to sit 44
--- studs off the route in an empty field, where building it read as busywork
--- with nothing behind it.
-local BARRICADE_CENTER = Vector3.new(-2, 0, -18)
+--[[
+    Across the arrival road just past the spawn, so the thing the player is
+    asked to build visibly defends the way they came in. It used to sit 44
+    studs off the route in an empty field, where building it read as busywork
+    with nothing behind it.
+
+    Raised clear of the road surface. The whole assembly is built relative to
+    this point, and at ground level the construction plot spanned y 0 to 0.5
+    while the arrival road surface sits around 0.24 to 0.60 -- so the road was
+    drawn straight over the plot. There was nothing to see and nothing for a
+    click to land on, which stranded the tutorial at the build step.
+]]
+local BARRICADE_CENTER = Vector3.new(-2, 0.62, -18)
 -- Staging yard, north of the arrival clearing and clear of the route that
 -- leaves it. Inside the flat valley bowl (x -190..190, z -260..90), so every
 -- authored coordinate here sits on level ground.
