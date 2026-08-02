@@ -786,6 +786,26 @@
         "normal"
       ],
       "robloxAssetId": 80321423425082
+    },
+    {
+      "id": "mesh_hand_axe_a",
+      "displayName": "Woodcutter's Hand Axe",
+      "role": "starter_tool_display",
+      "placementBand": "curated_core",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc4a0-0c50-7b67-8661-a22695f2fd29 (nano-banana-pro multi-view) then multi-image-to-3d task 019fc4a3-3b7b-7523-a1f5-27955a97160b (two views, PBR), textures downscaled to 1024. Replaces mesh_creator_hand_axe_a, whose source measured 199.5 studs and was squeezed 66x down to 3, which is what made it render wrong on mobile.",
+      "file": "generated/mesh_hand_axe_a.glb",
+      "previewFile": "previews/mesh-hand-axe.png",
+      "targetLongestDimension": 3,
+      "maxTriangles": 3500,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 70394272147624
     }
   ]
 }

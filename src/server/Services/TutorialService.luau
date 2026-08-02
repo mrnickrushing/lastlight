@@ -57,6 +57,8 @@ export type TutorialService = typeof(setmetatable(
         _craftingCatalog: any,
         _equipmentCatalog: any,
         _residentDialogue: any,
+        _actionProgress: any,
+        _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
         _expeditionEventRevision: { [Player]: number },
@@ -89,7 +91,8 @@ function TutorialService.new(
     analyticsService: any,
     craftingCatalog: any,
     equipmentCatalog: any,
-    residentDialogue: any
+    residentDialogue: any,
+    actionProgress: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -116,6 +119,8 @@ function TutorialService.new(
         _craftingCatalog = craftingCatalog,
         _equipmentCatalog = equipmentCatalog,
         _residentDialogue = residentDialogue,
+        _actionProgress = actionProgress,
+        _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
         _expeditionEventRevision = {},
@@ -260,6 +265,18 @@ function TutorialService.Start(self: TutorialService)
         end
     end
 
+    -- Timed actions need a finer tick than the expedition poll below, because
+    -- the whole point is a bar that visibly fills over a second or two.
+    local actionAccumulator = 0
+    RunService.Heartbeat:Connect(function(deltaTime: number)
+        actionAccumulator += deltaTime
+        if actionAccumulator < 0.1 then
+            return
+        end
+        actionAccumulator = 0
+        self:_stepActions()
+    end)
+
     local expeditionAccumulator = 0
     RunService.Heartbeat:Connect(function(deltaTime: number)
         expeditionAccumulator += deltaTime
@@ -391,7 +408,87 @@ function TutorialService._advance(
     return true, nil
 end
 
-function TutorialService._interact(self: TutorialService, player: Player, interactionId: string)
+--[[
+    Timed actions.
+
+    Gathering and building used to resolve the instant the button was pressed,
+    which gave the player no sense of having done anything. They now start a
+    short server-owned action: the character swings its tool, a progress bar
+    runs, and the reward lands only when ActionProgress says the clock is up.
+    A client cannot shorten it -- it only ever asks to start one.
+]]
+function TutorialService._beginTimedAction(
+    self: TutorialService,
+    player: Player,
+    actionId: string,
+    interactionId: string
+): boolean
+    if self._actionProgress.durationFor(actionId) == nil then
+        return false
+    end
+    local now = workspace:GetServerTimeNow()
+    local nextState, result =
+        self._actionProgress.begin(self._actions[player], actionId, interactionId, now)
+    self._actions[player] = nextState
+    if not result.accepted then
+        if result.reason == "already_working" then
+            self:_setToast(player, "ALREADY WORKING")
+            self:_publish(player)
+        end
+        return true
+    end
+    self._worldService:playToolAction(player, actionId, result.duration, result.swings)
+    self:_setToast(player, result.label .. "...")
+    self:_publish(player)
+    return true
+end
+
+-- Cancel a player's action when they can no longer be doing it.
+function TutorialService.cancelAction(self: TutorialService, player: Player)
+    if self._actions[player] ~= nil then
+        self._actions[player] = self._actionProgress.cancel(self._actions[player])
+        self:_publish(player)
+    end
+end
+
+function TutorialService._stepActions(self: TutorialService)
+    local now = workspace:GetServerTimeNow()
+    for player, state in self._actions do
+        local nextState, result = self._actionProgress.tick(state, now)
+        self._actions[player] = nextState
+        if result.complete then
+            self:_interact(player, result.interactionId, true)
+        end
+    end
+end
+
+function TutorialService.actionSnapshot(self: TutorialService, player: Player): any
+    return self._actionProgress.snapshot(self._actions[player], workspace:GetServerTimeNow())
+end
+
+-- Entry point for tapping a world object. Goes through the same rate limiter
+-- and the same validated interaction path as the HUD button, so clicking is
+-- another way to ask, not a way around any check.
+function TutorialService.interactFromClick(
+    self: TutorialService,
+    player: Player,
+    interactionId: string
+)
+    if type(interactionId) ~= "string" or #interactionId > 64 then
+        return
+    end
+    if not self._limiter:allow(tostring(player.UserId), os.clock(), 1) then
+        return
+    end
+    self:_interact(player, interactionId)
+end
+
+function TutorialService._interact(
+    self: TutorialService,
+    player: Player,
+    interactionId: string,
+    skipTimer: boolean?
+)
     local revivePrompt = self._survivalService:interaction(interactionId)
     if revivePrompt ~= nil then
         local result = self._survivalService:beginRevive(player, interactionId)
@@ -578,6 +675,23 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         return
     end
 
+    --[[
+        Gate timed actions here, after the resource and stage guards above but
+        before _advance, which mutates. tutorialFlow.advance is pure, so the
+        action can be checked for validity without committing to it: an
+        invalid interaction still refuses immediately instead of making the
+        player swing an axe and only then be told it was the wrong objective.
+    ]]
+    if not skipTimer and self._actionProgress.durationFor(actionId) ~= nil then
+        local timedSession = self._sessions[player]
+        local wouldAdvance = if timedSession == nil
+            then nil
+            else self._tutorialFlow.advance(timedSession.stage, actionId)
+        if wouldAdvance ~= nil and self:_beginTimedAction(player, actionId, interactionId) then
+            return
+        end
+    end
+
     local ok, reason = self:_advance(player, actionId)
     if not ok then
         local expected = self._tutorialFlow.definition(session.stage).objective
@@ -597,6 +711,8 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
         self._worldService:moveMara(Vector3.new(2, 1.1, -38))
         self:_setToast(player, "MARA IS SAFE")
     elseif actionId == self._runtimeIds.Actions.Gather then
+        -- Handled by the timed-action path below, which swings the tool and
+        -- runs the progress bar before granting anything.
         session.resources = 3
         self:_setToast(player, "+3 HEARTWOOD")
     elseif actionId == self._runtimeIds.Actions.ChooseTool then
@@ -1017,6 +1133,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         status = "ready",
         worldReady = true,
         lobby = self._lobbyService:snapshot(),
+        action = self:actionSnapshot(player),
         departed = self._lobbyService:isDeparted(player),
         stage = session.stage,
         tutorialComplete = session.stage == "complete",

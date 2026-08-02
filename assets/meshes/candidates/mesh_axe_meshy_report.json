@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_hand_axe_a",
+  "source": "assets/meshes/candidates/mesh_axe_meshy.glb",
+  "output": "assets/meshes/generated/mesh_hand_axe_a.glb",
+  "targetLongestDimension": 3.0,
+  "boundsMin": [
+    -0.795,
+    -0.191,
+    0.0
+  ],
+  "boundsMax": [
+    0.795,
+    0.191,
+    3.0
+  ],
+  "dimensions": [
+    1.59,
+    0.382,
+    3.0
+  ],
+  "longestDimension": 3.0,
+  "trianglesBefore": 2493,
+  "trianglesAfter": 2493,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    }
+  ],
+  "bytes": 3241104
+}

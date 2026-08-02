@@ -43,6 +43,7 @@ local TownNightIncident = require(root.TownNightIncident)
 local TownCondition = require(root.TownCondition)
 local TownGuardLastStand = require(root.TownGuardLastStand)
 local LobbyDeparture = require(root.LobbyDeparture)
+local ActionProgress = require(root.ActionProgress)
 local TownProgression = require(root.TownProgression)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
@@ -280,7 +281,8 @@ local tutorialService = TutorialService.new(
     analyticsService,
     CraftingCatalog,
     Equipment,
-    ResidentDialogue
+    ResidentDialogue,
+    ActionProgress
 )
 
 local services = ServiceRegistry.new({
@@ -313,6 +315,9 @@ services:register(townNightService)
 -- froze at "DEPARTING IN 10" while the server counted down and launched.
 lobbyService:setChangedHandler(function(toast: string?)
     tutorialService:broadcastLobby(toast)
+end)
+worldService:setClickHandler(function(clicker: Player, interactionId: string)
+    tutorialService:interactFromClick(clicker, interactionId)
 end)
 services:register(tutorialService)
 services:initialize()
