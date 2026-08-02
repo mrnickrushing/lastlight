@@ -356,6 +356,18 @@ assert(mara ~= nil and mara:IsA("Model"), "Mara must be a physical resident mode
 assert(mara:FindFirstChild("CoatShoulder") ~= nil, "Mara needs a layered clothing silhouette")
 assert(mara:FindFirstChild("Nose") ~= nil, "Mara needs a readable face")
 assert(mara:FindFirstChild("FieldSatchel") ~= nil, "Mara needs her role-specific field prop")
+-- A rig from CreateHumanoidModelFromDescription arrives unanchored, and every
+-- part of hers is deliberately CanCollide = false, so an unanchored part here
+-- means she falls through the valley floor on build and never stops.
+for _, maraPart in mara:GetDescendants() do
+    if maraPart:IsA("BasePart") then
+        assert(maraPart.Anchored, "Mara's rig must stay anchored or she falls through the world")
+    end
+end
+assert(
+    world:FindFirstChild("MaraFallenRoots", true) ~= nil,
+    "Mara needs something physical to be freed from before the rescue"
+)
 assert(world:FindFirstChild("HeartwoodStump", true) ~= nil, "gather node is missing")
 assert(world:FindFirstChild("ConstructionPlot", true) ~= nil, "construction plot is missing")
 assert(world:FindFirstChild("FirstLantern", true) ~= nil, "First Lantern is missing")
