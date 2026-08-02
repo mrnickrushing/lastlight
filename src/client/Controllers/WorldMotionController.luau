@@ -11,6 +11,7 @@ type MotionState = {
     basePivot: CFrame,
     kind: string,
     lastPivot: CFrame,
+    poseOffset: CFrame,
     position: Vector3,
     phaseOffset: number,
     speed: number,
@@ -89,6 +90,7 @@ function WorldMotionController.new(
             basePivot = pivot,
             kind = tostring(instance:GetAttribute("MotionKind") or "rotor"),
             lastPivot = pivot,
+            poseOffset = CFrame.identity,
             position = pivot.Position,
             phaseOffset = phaseOffsetFor(instance),
             speed = math.max(0, tonumber(instance:GetAttribute("MotionSpeed")) or 0.34),
@@ -183,11 +185,21 @@ function WorldMotionController._step(self: WorldMotionController, deltaTime: num
             continue
         end
         if state.kind == "resident" then
+            --[[
+                A resident the server has walked somewhere has to be re-based,
+                but `current` is the POSED pivot -- base times the bob and turn
+                applied last frame. Adopting it wholesale folds that offset into
+                the new base, and then the next frame applies the pose on top of
+                it again. While the server is moving a resident every frame, as
+                the rescue walk does, that compounds once per frame and sinks
+                her into the floor. Undoing the last pose first recovers the
+                true standing base.
+            ]]
             local current = model:GetPivot()
             if (current.Position - state.lastPivot.Position).Magnitude > 0.08 then
-                state.basePivot = current
+                state.basePivot = current * state.poseOffset:Inverse()
                 state.lastPivot = current
-                state.position = current.Position
+                state.position = state.basePivot.Position
             end
         end
         local active = (state.position - cameraPosition).Magnitude <= ACTIVE_DISTANCE
@@ -196,9 +208,8 @@ function WorldMotionController._step(self: WorldMotionController, deltaTime: num
             if state.kind == "resident" then
                 local pose =
                     self._ambientMotion.residentPose(self._elapsed, state.speed, state.phaseOffset)
-                targetPivot = state.basePivot
-                    * CFrame.new(0, pose.height, 0)
-                    * CFrame.Angles(0, pose.yaw, 0)
+                state.poseOffset = CFrame.new(0, pose.height, 0) * CFrame.Angles(0, pose.yaw, 0)
+                targetPivot = state.basePivot * state.poseOffset
             else
                 local angle =
                     self._ambientMotion.rotorAngle(self._elapsed, state.speed, state.phaseOffset)
@@ -210,6 +221,7 @@ function WorldMotionController._step(self: WorldMotionController, deltaTime: num
         elseif state.active then
             model:PivotTo(state.basePivot)
             state.lastPivot = state.basePivot
+            state.poseOffset = CFrame.identity
             state.active = false
         end
     end
