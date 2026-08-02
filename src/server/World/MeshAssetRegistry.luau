@@ -182,9 +182,18 @@ local ENTRIES: { Entry } = {
         preserveSourceMaterials = true,
         creatorStore = true,
     },
+    -- mesh_creator_wood_arch_a is stored as 1.88 x 27.70 x 30.19 (X x Y x Z):
+    -- the doorway span is authored along Z, not X. Every call site places
+    -- this with yaw = 0 expecting the span to run across X (perpendicular to
+    -- the path you walk through it on), so left uncorrected the arch reads
+    -- as a flat panel lying along the road instead of a gateway standing
+    -- across it. measure_source_yaw reports 0 here because the parts are
+    -- axis-aligned -- it only catches off-axis rotation, not this kind of
+    -- simple 90-degree span/thickness swap.
     {
         id = "mesh_creator_wood_arch_a",
         assetId = 11084945828,
+        sourceYawDegrees = 90,
         targetLongestDimension = 12,
         maxTriangles = 2000,
         maxMaterialSlots = 4,
