@@ -36,8 +36,8 @@ def main() -> None:
         data = path.read_bytes()
         creator_store_model = asset.get("source") == "roblox_creator_store_model"
         if creator_store_model:
-            if len(data) < 16 or not data.startswith(b"<roblox!"):
-                fail(f"{stable_id}: downloaded Creator Store source is not a Roblox binary model")
+            if len(data) < 16 or not data.startswith(b"<roblox"):
+                fail(f"{stable_id}: downloaded Creator Store source is not a Roblox model")
             if measured.get("scripts") != 0:
                 fail(f"{stable_id}: Creator Store source must be script-free")
             if not asset.get("preserveSourceMaterials"):
@@ -46,6 +46,9 @@ def main() -> None:
                 "https://create.roblox.com/store/asset/"
             ):
                 fail(f"{stable_id}: Creator Store source URL is missing")
+            preview_file = asset.get("previewFile")
+            if preview_file and not (MESH_ROOT / preview_file).is_file():
+                fail(f"{stable_id}: inspected Creator Store thumbnail is missing")
         else:
             if (
                 len(data) < 12

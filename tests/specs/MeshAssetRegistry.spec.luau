@@ -10,7 +10,7 @@ return {
             name = "keeps stable and unique uploaded asset mappings",
             run = function()
                 local entries = MeshAssetRegistry.all()
-                TestRunner.equal(#entries, 16)
+                TestRunner.equal(#entries, 32)
                 local stableIds = {}
                 local robloxIds = {}
                 for _, entry in entries do
@@ -46,6 +46,38 @@ return {
                         true
                     )
                     TestRunner.equal((entry :: MeshAssetRegistry.Entry).creatorStore, true)
+                end
+            end,
+        },
+        {
+            name = "covers the full first-world asset replacement kit",
+            run = function()
+                local expected = {
+                    "mesh_creator_wood_arch_a",
+                    "mesh_creator_rustic_fence_a",
+                    "mesh_creator_workbench_a",
+                    "mesh_creator_forest_sign_a",
+                    "mesh_creator_tool_set_a",
+                    "mesh_creator_barrel_a",
+                    "mesh_creator_road_stones_a",
+                    "mesh_creator_barricade_a",
+                    "mesh_creator_notice_board_a",
+                    "mesh_creator_stump_a",
+                    "mesh_creator_market_stall_a",
+                    "mesh_creator_wheat_cluster_a",
+                    "mesh_creator_picnic_table_a",
+                    "mesh_creator_watchtower_a",
+                    "mesh_creator_crate_a",
+                    "mesh_creator_field_rows_a",
+                }
+                for _, stableId in expected do
+                    local entry = MeshAssetRegistry.get(stableId)
+                    TestRunner.truthy(entry ~= nil, "missing first-world asset " .. stableId)
+                    TestRunner.equal((entry :: MeshAssetRegistry.Entry).creatorStore, true)
+                    TestRunner.equal(
+                        (entry :: MeshAssetRegistry.Entry).preserveSourceMaterials,
+                        true
+                    )
                 end
             end,
         },

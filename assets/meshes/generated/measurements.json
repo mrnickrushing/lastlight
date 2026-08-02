@@ -2,49 +2,105 @@
   "schemaVersion": 1,
   "assets": {
     "mesh_creator_kerosene_lantern_a": {
-      "boundsMin": [250.5543, 0.0, 351.2274],
-      "boundsMax": [251.4673, 1.9893, 352.1405],
-      "dimensions": [0.9131, 1.9893, 0.9131],
+      "boundsMin": [
+        250.5543,
+        0.0,
+        351.2274
+      ],
+      "boundsMax": [
+        251.4673,
+        1.9893,
+        352.1405
+      ],
+      "dimensions": [
+        0.9131,
+        1.9893,
+        0.9131
+      ],
       "longestDimension": 1.9893,
       "triangles": 3600,
       "meshObjects": 3,
-      "materials": ["creator_source_preserved"],
+      "materials": [
+        "creator_source_preserved"
+      ],
       "baseParts": 3,
       "scripts": 0,
       "bytes": 48550
     },
     "mesh_creator_first_lantern_a": {
-      "boundsMin": [-167.2, 11.2, -154.4],
-      "boundsMax": [-166.2, 13.4, -153.4],
-      "dimensions": [1.0, 2.2, 1.0],
+      "boundsMin": [
+        -167.2,
+        11.2,
+        -154.4
+      ],
+      "boundsMax": [
+        -166.2,
+        13.4,
+        -153.4
+      ],
+      "dimensions": [
+        1.0,
+        2.2,
+        1.0
+      ],
       "longestDimension": 2.2,
       "triangles": 3302,
       "meshObjects": 13,
-      "materials": ["creator_source_preserved"],
+      "materials": [
+        "creator_source_preserved"
+      ],
       "baseParts": 13,
       "scripts": 0,
       "bytes": 6996
     },
     "mesh_creator_street_lantern_a": {
-      "boundsMin": [-86.7364, -191.6874, -101.1669],
-      "boundsMax": [-77.1084, -169.3448, -91.0632],
-      "dimensions": [9.6281, 22.3427, 10.1036],
+      "boundsMin": [
+        -86.7364,
+        -191.6874,
+        -101.1669
+      ],
+      "boundsMax": [
+        -77.1084,
+        -169.3448,
+        -91.0632
+      ],
+      "dimensions": [
+        9.6281,
+        22.3427,
+        10.1036
+      ],
       "longestDimension": 22.3427,
       "triangles": 700,
       "meshObjects": 8,
-      "materials": ["creator_source_preserved"],
+      "materials": [
+        "creator_source_preserved"
+      ],
       "baseParts": 8,
       "scripts": 0,
       "bytes": 25530
     },
     "mesh_creator_campfire_a": {
-      "boundsMin": [38.5493, -0.8905, 2.3538],
-      "boundsMax": [43.5433, 1.2596, 7.123],
-      "dimensions": [4.994, 2.1501, 4.7692],
+      "boundsMin": [
+        38.5493,
+        -0.8905,
+        2.3538
+      ],
+      "boundsMax": [
+        43.5433,
+        1.2596,
+        7.123
+      ],
+      "dimensions": [
+        4.994,
+        2.1501,
+        4.7692
+      ],
       "longestDimension": 4.994,
       "triangles": 2982,
       "meshObjects": 24,
-      "materials": ["creator_source_preserved"],
+      "materials": [
+        "creator_source_preserved"
+      ],
       "baseParts": 26,
       "scripts": 0,
       "bytes": 142649
@@ -396,6 +452,422 @@
         "LL_stone_dark"
       ],
       "bytes": 68940
+    },
+    "mesh_creator_wood_arch_a": {
+      "boundsMin": [
+        -84.1988,
+        0.4292,
+        -147.8665
+      ],
+      "boundsMax": [
+        -82.3219,
+        28.1329,
+        -117.6769
+      ],
+      "dimensions": [
+        1.877,
+        27.7037,
+        30.1896
+      ],
+      "longestDimension": 30.1896,
+      "triangles": 1584,
+      "meshObjects": 4,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 4,
+      "scripts": 0,
+      "bytes": 21700
+    },
+    "mesh_creator_rustic_fence_a": {
+      "boundsMin": [
+        -692.0,
+        0.0,
+        -435.5043
+      ],
+      "boundsMax": [
+        -684.0764,
+        3.749,
+        -432.8347
+      ],
+      "dimensions": [
+        7.9236,
+        3.749,
+        2.6695
+      ],
+      "longestDimension": 7.9236,
+      "triangles": 396,
+      "meshObjects": 2,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 2,
+      "scripts": 0,
+      "bytes": 51381
+    },
+    "mesh_creator_workbench_a": {
+      "boundsMin": [
+        -423.4429,
+        74.999,
+        696.7675
+      ],
+      "boundsMax": [
+        -416.1922,
+        86.1249,
+        700.4792
+      ],
+      "dimensions": [
+        7.2507,
+        11.1259,
+        3.7117
+      ],
+      "longestDimension": 11.1259,
+      "triangles": 6766,
+      "meshObjects": 16,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 16,
+      "scripts": 0,
+      "bytes": 97548
+    },
+    "mesh_creator_forest_sign_a": {
+      "boundsMin": [
+        -130.4548,
+        -172.1997,
+        -37.7127
+      ],
+      "boundsMax": [
+        126.6819,
+        79.5853,
+        8.5511
+      ],
+      "dimensions": [
+        257.1367,
+        251.785,
+        46.2638
+      ],
+      "longestDimension": 257.1367,
+      "triangles": 436,
+      "meshObjects": 1,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 1,
+      "scripts": 0,
+      "bytes": 20943
+    },
+    "mesh_creator_tool_set_a": {
+      "boundsMin": [
+        15.1618,
+        0.02,
+        113.5544
+      ],
+      "boundsMax": [
+        24.9367,
+        9.665,
+        114.8719
+      ],
+      "dimensions": [
+        9.7749,
+        9.645,
+        1.3175
+      ],
+      "longestDimension": 9.7749,
+      "triangles": 1448,
+      "meshObjects": 3,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 3,
+      "scripts": 0,
+      "bytes": 36985
+    },
+    "mesh_creator_barrel_a": {
+      "boundsMin": [
+        519.2139,
+        659.0662,
+        110.5297
+      ],
+      "boundsMax": [
+        522.1893,
+        662.1268,
+        113.5051
+      ],
+      "dimensions": [
+        2.9755,
+        3.0607,
+        2.9754
+      ],
+      "longestDimension": 3.0607,
+      "triangles": 432,
+      "meshObjects": 3,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 3,
+      "scripts": 0,
+      "bytes": 23021
+    },
+    "mesh_creator_road_stones_a": {
+      "boundsMin": [
+        -6.7987,
+        0.0,
+        -62.1373
+      ],
+      "boundsMax": [
+        5.6944,
+        0.6099,
+        -25.8879
+      ],
+      "dimensions": [
+        12.4931,
+        0.6099,
+        36.2494
+      ],
+      "longestDimension": 36.2494,
+      "triangles": 468,
+      "meshObjects": 13,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 13,
+      "scripts": 0,
+      "bytes": 5942
+    },
+    "mesh_creator_barricade_a": {
+      "boundsMin": [
+        -138.4056,
+        2.1671,
+        28.6023
+      ],
+      "boundsMax": [
+        -131.5944,
+        6.6928,
+        32.8272
+      ],
+      "dimensions": [
+        6.8112,
+        4.5257,
+        4.225
+      ],
+      "longestDimension": 6.8112,
+      "triangles": 168,
+      "meshObjects": 15,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 15,
+      "scripts": 0,
+      "bytes": 5234
+    },
+    "mesh_creator_notice_board_a": {
+      "boundsMin": [
+        -84.5348,
+        5.65,
+        -182.6017
+      ],
+      "boundsMax": [
+        -79.8382,
+        10.6,
+        -182.1622
+      ],
+      "dimensions": [
+        4.6966,
+        4.95,
+        0.4396
+      ],
+      "longestDimension": 4.95,
+      "triangles": 1020,
+      "meshObjects": 8,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 8,
+      "scripts": 0,
+      "bytes": 9189
+    },
+    "mesh_creator_stump_a": {
+      "boundsMin": [
+        -95.5136,
+        216.8643,
+        445.6204
+      ],
+      "boundsMax": [
+        -86.4445,
+        224.5648,
+        458.0537
+      ],
+      "dimensions": [
+        9.069,
+        7.7005,
+        12.4333
+      ],
+      "longestDimension": 12.4333,
+      "triangles": 638,
+      "meshObjects": 6,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 9,
+      "scripts": 0,
+      "bytes": 64105
+    },
+    "mesh_creator_market_stall_a": {
+      "boundsMin": [
+        -20.1789,
+        -2.15,
+        -19.2239
+      ],
+      "boundsMax": [
+        7.8305,
+        16.6975,
+        -3.6296
+      ],
+      "dimensions": [
+        28.0094,
+        18.8475,
+        15.5943
+      ],
+      "longestDimension": 28.0094,
+      "triangles": 3102,
+      "meshObjects": 66,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 66,
+      "scripts": 0,
+      "bytes": 100550
+    },
+    "mesh_creator_wheat_cluster_a": {
+      "boundsMin": [
+        -2.9636,
+        0.0261,
+        9.1639
+      ],
+      "boundsMax": [
+        0.088,
+        3.0452,
+        11.986
+      ],
+      "dimensions": [
+        3.0515,
+        3.0191,
+        2.8221
+      ],
+      "longestDimension": 3.0515,
+      "triangles": 804,
+      "meshObjects": 67,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 67,
+      "scripts": 0,
+      "bytes": 4865
+    },
+    "mesh_creator_picnic_table_a": {
+      "boundsMin": [
+        -52.6997,
+        0.0,
+        -86.5412
+      ],
+      "boundsMax": [
+        -44.1893,
+        3.0705,
+        -77.3793
+      ],
+      "dimensions": [
+        8.5103,
+        3.0704,
+        9.1619
+      ],
+      "longestDimension": 9.1619,
+      "triangles": 276,
+      "meshObjects": 23,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 23,
+      "scripts": 0,
+      "bytes": 3274
+    },
+    "mesh_creator_watchtower_a": {
+      "boundsMin": [
+        -756.5193,
+        45.1586,
+        40.7273
+      ],
+      "boundsMax": [
+        -711.8951,
+        104.3371,
+        85.3514
+      ],
+      "dimensions": [
+        44.6241,
+        59.1785,
+        44.6241
+      ],
+      "longestDimension": 59.1785,
+      "triangles": 2036,
+      "meshObjects": 1,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 1,
+      "scripts": 0,
+      "bytes": 46886
+    },
+    "mesh_creator_crate_a": {
+      "boundsMin": [
+        -38.9491,
+        9.3164,
+        93.338
+      ],
+      "boundsMax": [
+        -34.6775,
+        11.8469,
+        95.8847
+      ],
+      "dimensions": [
+        4.2717,
+        2.5305,
+        2.5467
+      ],
+      "longestDimension": 4.2717,
+      "triangles": 336,
+      "meshObjects": 1,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 1,
+      "scripts": 0,
+      "bytes": 23943
+    },
+    "mesh_creator_field_rows_a": {
+      "boundsMin": [
+        81.0,
+        4.0,
+        -47.0
+      ],
+      "boundsMax": [
+        153.0,
+        4.8,
+        -2.0
+      ],
+      "dimensions": [
+        72.0,
+        0.8,
+        45.0
+      ],
+      "longestDimension": 72.0,
+      "triangles": 276,
+      "meshObjects": 23,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 23,
+      "scripts": 0,
+      "bytes": 48028
     }
   }
 }
