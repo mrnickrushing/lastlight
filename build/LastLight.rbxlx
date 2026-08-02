@@ -37922,6 +37922,7 @@ end
 export type HUDController = typeof(setmetatable(
     {} :: {
         _gui: ScreenGui,
+        _canvas: Frame,
         _scale: UIScale,
         _phaseFrame: Frame,
         _phase: TextLabel,
@@ -38018,6 +38019,17 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     end)
     gui.Parent = playerGui
 
+    --[[
+        The canvas is sized in _layout to compensate for its own UIScale.
+
+        A UIScale shrinks its subtree toward the top-left corner, so at 0.78 a
+        full-screen canvas only paints the top-left 78% of the screen. Every
+        bottom-anchored control -- run, dodge, strike, the primary action --
+        was therefore floating roughly a fifth of the way up the screen on a
+        phone, over the play area and the player's own character, while
+        Roblox's jump button stayed at the true bottom edge. Growing the canvas
+        by the inverse of the scale puts its edges back on the screen edges.
+    ]]
     local canvas = Instance.new("Frame")
     canvas.Name = "SafeCanvas"
     canvas.BackgroundTransparency = 1
@@ -38888,6 +38900,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _lobbySizes = lobbySizes,
         _lobbySizeButtons = lobbySizeButtons,
         _onLobbyDepart = nil,
+        _canvas = canvas,
         _scale = scale,
         _phaseFrame = phaseFrame,
         _phase = phase,
@@ -39481,8 +39494,18 @@ end
 function HUDController._layout(self: HUDController)
     local camera = workspace.CurrentCamera
     local viewport = if camera == nil then Vector2.new(1280, 720) else camera.ViewportSize
-    local narrow = viewport.X < 700
-    self._scale.Scale = math.clamp(math.min(viewport.X, viewport.Y) / 720, 0.78, 1)
+    --[[
+        Treat any touch device, and any short viewport, as the touch layout.
+
+        Deciding on width alone put a landscape phone -- wide but only ~430
+        points tall -- on the desktop layout, which tucks the objective panel
+        into the top-left corner that Roblox's own menu, chat, and microphone
+        buttons already occupy.
+    ]]
+    local narrow = viewport.X < 700 or viewport.Y < 560 or UserInputService.TouchEnabled
+    local scale = math.clamp(math.min(viewport.X, viewport.Y) / 720, 0.78, 1)
+    self._scale.Scale = scale
+    self._canvas.Size = UDim2.fromScale(1 / scale, 1 / scale)
 
     if narrow then
         self._objectiveFrame.Position = UDim2.fromOffset(18, 70)
@@ -39525,7 +39548,21 @@ function HUDController._layout(self: HUDController)
         self._useCharm.Position = UDim2.new(1, -18, 0, professionY + 46)
         self._useSatchel.Position = UDim2.new(1, -18, 0, professionY + 92)
         self._professionPanel.Size = UDim2.new(1, -24, 0, 440)
-        self._ability.Position = UDim2.new(1, -158, 1, -138)
+        --[[
+            Thumb cluster, bottom-right, stacked in two rows.
+
+            Laid out in one row these ran far enough across the screen to sit
+            over the character and the ground the player is aiming at. The
+            primary action keeps the corner; strike, dodge, and ability sit
+            inboard and one row up, which keeps every control inside a right
+            thumb's reach without any of them covering the play area. Run stays
+            on the left, clear of Roblox's own thumbstick.
+        ]]
+        self._ability.Position = UDim2.new(1, -30, 1, -150)
+        self._tool.Position = UDim2.new(1, -128, 1, -150)
+        self._dodge.Position = UDim2.new(1, -226, 1, -150)
+        self._primary.Position = UDim2.new(1, -28, 1, -34)
+        self._sprint.Position = UDim2.new(0, 30, 1, -150)
     else
         self._objectiveFrame.Position = UDim2.fromOffset(18, 18)
         self._objectiveFrame.Size = if self._compactEnabled
