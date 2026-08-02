@@ -1496,7 +1496,11 @@ local function addBillboard(
     billboard.AlwaysOnTop = false
     billboard.LightInfluence = 0.35
     billboard.Size = UDim2.fromOffset(165, 38)
-    billboard.StudsOffsetWorldSpace = Vector3.new(0, 3.6, 0)
+    -- Labels used to sit ~3.6 studs up, which on a waist-high display put the
+    -- card directly over the object it was naming. Sitting them well clear
+    -- keeps the prop readable, which is the order the visual standard asks
+    -- for: recognize the object first, read the label second.
+    billboard.StudsOffsetWorldSpace = Vector3.new(0, 7.4, 0)
     billboard.MaxDistance = maxDistance or 20
     billboard.Parent = partInstance
 
@@ -1952,6 +1956,7 @@ local ROUTE_HALF_WIDTH = 26
     just its base intersecting one.
 ]]
 local FOLIAGE_KEEP_OUT = table.freeze({
+    table.freeze({ x = 0, z = 62, radius = 52 }), -- the departure lodge and its clearing
     table.freeze({ x = -36, z = -112, radius = 30 }), -- Wayfarer cabin lot
     table.freeze({ x = 36, z = -112, radius = 30 }), -- Mara's shelter lot
     table.freeze({ x = 0, z = -112, radius = 36 }), -- lantern square
@@ -3227,9 +3232,13 @@ function WorldService._buildLobby(self: WorldService, world: Model)
             lamp.CastShadow = false
             lamp.CanQuery = false
             local lampLight = Instance.new("PointLight")
+            -- Four lamps at 1.5/42 plus the hearth plus the platform washed
+            -- the whole room to flat yellow and hid every material in it.
+            -- Wall lamps now only pool light near the walls; the hearth and
+            -- the platform are what the eye should actually go to.
             lampLight.Color = AMBER
-            lampLight.Brightness = 1.5
-            lampLight.Range = 42
+            lampLight.Brightness = 0.5
+            lampLight.Range = 20
             lampLight.Parent = lamp
             CollectionService:AddTag(lamp, self._runtimeIds.AmbientLightTag)
         end
@@ -3254,6 +3263,47 @@ function WorldService._buildLobby(self: WorldService, world: Model)
         Enum.Material.Wood,
         false
     )
+    part(
+        lobby,
+        "LodgeChimneyBreast",
+        Vector3.new(9, wallHeight - 8, 3),
+        CFrame.new(hearthAt + Vector3.new(0, 8.2 + (wallHeight - 8) / 2, 1.4)),
+        Color3.fromRGB(70, 74, 70),
+        Enum.Material.Slate,
+        false
+    )
+    for jambSide = -1, 1, 2 do
+        part(
+            lobby,
+            "LodgeHearthJamb",
+            Vector3.new(2.2, 6, 3.4),
+            CFrame.new(hearthAt + Vector3.new(jambSide * 5.4, 3, 0.9)),
+            Color3.fromRGB(88, 92, 88),
+            Enum.Material.Slate,
+            false
+        )
+    end
+    part(
+        lobby,
+        "LodgeHearthFender",
+        Vector3.new(11, 0.6, 3),
+        CFrame.new(hearthAt + Vector3.new(0, 1.3, -1.6)),
+        Color3.fromRGB(58, 62, 58),
+        Enum.Material.Slate,
+        false
+    )
+    for logIndex = -1, 1 do
+        part(
+            lobby,
+            "LodgeHearthLog",
+            Vector3.new(0.9, 0.9, 4.4),
+            CFrame.new(hearthAt + Vector3.new(logIndex * 1.1, 1.6, 0.2))
+                * CFrame.Angles(0, math.rad(logIndex * 14), math.rad(90)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+    end
     local hearthFire = part(
         lobby,
         "LodgeHearthFire",
@@ -3266,8 +3316,8 @@ function WorldService._buildLobby(self: WorldService, world: Model)
     hearthFire.CastShadow = false
     local hearthLight = Instance.new("PointLight")
     hearthLight.Color = AMBER
-    hearthLight.Brightness = 2.4
-    hearthLight.Range = 48
+    hearthLight.Brightness = 1.5
+    hearthLight.Range = 30
     hearthLight.Parent = hearthFire
     CollectionService:AddTag(hearthFire, self._runtimeIds.AmbientLightTag)
 
@@ -3346,8 +3396,8 @@ function WorldService._buildLobby(self: WorldService, world: Model)
     platformGlow.CanQuery = false
     local platformLight = Instance.new("PointLight")
     platformLight.Color = AMBER
-    platformLight.Brightness = 2
-    platformLight.Range = 34
+    platformLight.Brightness = 1.1
+    platformLight.Range = 22
     platformLight.Parent = platformGlow
     CollectionService:AddTag(platformGlow, self._runtimeIds.AmbientLightTag)
     for postIndex = 0, 3 do
@@ -3380,58 +3430,68 @@ function WorldService._buildLobby(self: WorldService, world: Model)
         lampGlow.CanQuery = false
         local lampLight = Instance.new("PointLight")
         lampLight.Color = AMBER
-        lampLight.Brightness = 1.3
-        lampLight.Range = 24
+        lampLight.Brightness = 0.6
+        lampLight.Range = 14
         lampLight.Parent = lampGlow
     end
     addBillboard(platform, "STAND HERE TO DEPART", AMBER, 120)
 
     -- Everything a staging room needs, indoors: work surfaces, supplies, a
     -- table to gather at, beds along the back, and the notice board.
+    --[[
+        Furnishing, arranged rather than scattered.
+
+        Everything sits against a wall on a defined side of the room, so the
+        centre floor stays clear for the platform and a party walking to it.
+        Loose barrels dropped in the middle of the floor is what made the first
+        pass read as a storeroom someone had emptied out.
+
+          west wall  -- the work side: bench, anvil, shelf, tool rack
+          east wall  -- the rest side: beds, table, notice board
+          front wall -- stores stacked either side of the doorway
+    ]]
     local props = {
-        { asset = "mesh_creator_workbench_a", at = Vector3.new(-20, 0, 12), yaw = 96, scale = 1 },
-        { asset = "mesh_creator_anvil_a", at = Vector3.new(-24, 0, 4), yaw = 40, scale = 1 },
+        -- West wall: work.
+        { asset = "mesh_creator_workbench_a", at = Vector3.new(-25, 0, 6), yaw = 90, scale = 1 },
+        { asset = "mesh_creator_tool_set_a", at = Vector3.new(-25, 2.7, 6), yaw = 90, scale = 0.7 },
+        { asset = "mesh_creator_anvil_a", at = Vector3.new(-25.5, 0, 13), yaw = 90, scale = 1 },
         {
             asset = "mesh_creator_potion_shelf_a",
-            at = Vector3.new(-27, 0, 16),
+            at = Vector3.new(-27.5, 0, 0),
             yaw = 90,
+            scale = 1,
+        },
+        { asset = "mesh_creator_crate_a", at = Vector3.new(-27, 0, -8), yaw = 90, scale = 1 },
+        { asset = "mesh_creator_barrel_a", at = Vector3.new(-27, 0, -13), yaw = 0, scale = 1 },
+        -- East wall: rest.
+        {
+            asset = "mesh_creator_wayfarer_bed_a",
+            at = Vector3.new(25.5, 0, 14),
+            yaw = -90,
+            scale = 1,
+        },
+        {
+            asset = "mesh_creator_wayfarer_bed_a",
+            at = Vector3.new(25.5, 0, 5),
+            yaw = -90,
             scale = 1,
         },
         {
             asset = "mesh_creator_picnic_table_a",
-            at = Vector3.new(19, 0, 10),
-            yaw = -74,
+            at = Vector3.new(23, 0, -6),
+            yaw = 0,
             scale = 1.1,
         },
         {
             asset = "mesh_creator_notice_board_a",
-            at = Vector3.new(26, 0, -2),
-            yaw = -96,
+            at = Vector3.new(27, 0, -15),
+            yaw = -90,
             scale = 0.9,
         },
-        {
-            asset = "mesh_creator_wayfarer_bed_a",
-            at = Vector3.new(23, 0, 18),
-            yaw = 180,
-            scale = 1,
-        },
-        {
-            asset = "mesh_creator_wayfarer_bed_a",
-            at = Vector3.new(14, 0, 18),
-            yaw = 180,
-            scale = 1,
-        },
-        { asset = "mesh_creator_crate_a", at = Vector3.new(-14, 0, 19), yaw = 24, scale = 1 },
-        { asset = "mesh_creator_crate_a", at = Vector3.new(-9, 0, 20), yaw = -38, scale = 1 },
-        { asset = "mesh_creator_barrel_a", at = Vector3.new(-17, 0, -14), yaw = 12, scale = 1 },
-        { asset = "mesh_creator_barrel_a", at = Vector3.new(-21, 0, -12), yaw = 66, scale = 1 },
-        { asset = "mesh_creator_crate_a", at = Vector3.new(22, 0, -14), yaw = -18, scale = 1 },
-        {
-            asset = "mesh_creator_tool_set_a",
-            at = Vector3.new(-20, 2.6, 12),
-            yaw = 96,
-            scale = 0.7,
-        },
+        -- Either side of the doorway: stores.
+        { asset = "mesh_creator_crate_a", at = Vector3.new(-13, 0, -20), yaw = 0, scale = 1 },
+        { asset = "mesh_creator_barrel_a", at = Vector3.new(-17, 0, -20), yaw = 0, scale = 1 },
+        { asset = "mesh_creator_crate_a", at = Vector3.new(15, 0, -20), yaw = 0, scale = 1 },
     }
     for propIndex, prop in props do
         table.insert(self._meshPlacements, {
@@ -4210,7 +4270,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             tool = "hammer",
             position = TOOL_YARD_CENTER,
             color = AMBER,
-            assetId = "mesh_creator_blacksmith_hammer_a",
+            assetId = "mesh_blacksmith_hammer_a",
             seed = 9896,
         },
         {
@@ -4626,14 +4686,43 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         false
     )
     flame.Shape = Enum.PartType.Wedge
+
+    --[[
+        The lantern's fire lives outside the fallback on purpose.
+
+        Everything above belongs to firstLanternFallback, which is exactly what
+        hideProceduralPlaceholder blanks once the authored lantern loads: it
+        sets Transparency to 1 and disables every Light beneath it. The flame
+        used to be part of that, so lighting the First Lantern -- the object the
+        entire night defense is built around, whose health this drives -- turned
+        it dark instead of lighting it.
+
+        This core sits at the height of the authored lantern's glass and stays
+        visible whichever way the placement resolves, so self._lantern always
+        points at something that can actually glow.
+    ]]
+    local lanternCore = part(
+        interactables,
+        "FirstLanternCore",
+        Vector3.new(2.3, 3.1, 2.3),
+        CFrame.new(0, 6.3, -112),
+        AMBER,
+        Enum.Material.Neon,
+        false
+    )
+    lanternCore.Shape = Enum.PartType.Ball
+    lanternCore.Transparency = 0.28
+    lanternCore.CastShadow = false
+    lanternCore.CanQuery = false
     local light = Instance.new("PointLight")
     light.Color = AMBER
     light.Brightness = 1.5
     light.Range = 30
     light.Shadows = true
-    light.Parent = flame
-    addBillboard(flame, "THE FIRST LANTERN", AMBER, 32)
-    self._lantern = flame
+    light.Parent = lanternCore
+    addBillboard(lanternCore, "THE FIRST LANTERN", AMBER, 32)
+    CollectionService:AddTag(lanternCore, self._runtimeIds.AmbientLightTag)
+    self._lantern = lanternCore
     table.insert(self._meshPlacements, {
         assetId = "mesh_first_lantern_a",
         fallbackKind = "placeholder",
@@ -5618,6 +5707,11 @@ function WorldService.Init(self: WorldService, context: any)
     spawn.CanCollide = true
     spawn.Neutral = true
     spawn.Duration = 0
+    -- The lodge owns spawning now. Leaving this enabled let Roblox choose
+    -- between the two, which is why a fresh session could still start on the
+    -- arrival road. It stays in the world as the launch destination and as the
+    -- anchor the Studio test looks for.
+    spawn.Enabled = false
     spawn.Parent = world
     self._spawn = spawn
 

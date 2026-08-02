@@ -836,6 +836,21 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
     end
 end
 
+-- Push lobby state to every client. The countdown changes once a second and
+-- is the same for everyone, so it broadcasts rather than publishing per-player
+-- on a timer.
+function TutorialService.broadcastLobby(self: TutorialService, toast: string?)
+    if toast ~= nil then
+        for player, session in self._sessions do
+            session.toast = toast
+            session.toastRevision += 1
+            self:_publish(player)
+        end
+        return
+    end
+    self:_publishAll()
+end
+
 function TutorialService.snapshot(self: TutorialService, player: Player): any
     local session = self._sessions[player]
     if session == nil then

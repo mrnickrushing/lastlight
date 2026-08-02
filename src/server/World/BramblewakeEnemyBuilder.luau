@@ -407,11 +407,16 @@ function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target:
     model.PrimaryPart = core
 
     local highlight = Instance.new("Highlight")
+    -- The outline is the enemy's readability, not decoration: at night, a dark
+    -- creature against dark forest was disappearing entirely. A fully opaque
+    -- rim and a little more body tint make the silhouette legible without
+    -- lighting the world or showing enemies through terrain -- Occluded is
+    -- kept deliberately so nothing is visible through geometry.
     highlight.Name = "ThreatOutline"
-    highlight.FillColor = Color3.fromRGB(80, 29, 29)
-    highlight.FillTransparency = 0.76
-    highlight.OutlineColor = Color3.fromRGB(255, 143, 91)
-    highlight.OutlineTransparency = 0.16
+    highlight.FillColor = Color3.fromRGB(96, 34, 34)
+    highlight.FillTransparency = 0.6
+    highlight.OutlineColor = Color3.fromRGB(255, 168, 120)
+    highlight.OutlineTransparency = 0
     highlight.DepthMode = Enum.HighlightDepthMode.Occluded
     highlight.Parent = model
 

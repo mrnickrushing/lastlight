@@ -766,6 +766,26 @@
         "normal"
       ],
       "robloxAssetId": 84319358349776
+    },
+    {
+      "id": "mesh_blacksmith_hammer_a",
+      "displayName": "Blacksmith Hammer",
+      "role": "starter_tool_display",
+      "placementBand": "curated_core",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc444-96ac-735d-9a43-48b016a6de7a (nano-banana-pro multi-view) then multi-image-to-3d task 019fc446-04d4-7725-b3f0-597353667f24 (side + end views, PBR). Normalized and budgeted by the repository Blender pipeline. Replaces mesh_creator_blacksmith_hammer_a, whose Creator Store source read poorly at display scale.",
+      "file": "generated/mesh_blacksmith_hammer_a.glb",
+      "previewFile": "previews/mesh-blacksmith-hammer.png",
+      "targetLongestDimension": 3,
+      "maxTriangles": 3500,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 80321423425082
     }
   ]
 }
