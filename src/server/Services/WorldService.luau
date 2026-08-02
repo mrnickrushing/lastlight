@@ -5008,6 +5008,24 @@ function WorldService.setEngineerBrace(self: WorldService, snapshot: any, absorb
     end
 end
 
+--[[
+    Centre of the First Lantern's safe zone, or nil before the world is built.
+
+    Read from the live part rather than a constant so the safe zone cannot
+    drift away from the lantern players can actually see if it is ever moved.
+]]
+function WorldService.lanternSafeCenter(self: WorldService): Vector3?
+    local world = self._world
+    if world == nil then
+        return nil
+    end
+    local base = world:FindFirstChild("FirstLantern", true)
+    if base == nil or not base:IsA("BasePart") then
+        return nil
+    end
+    return base.Position
+end
+
 function WorldService.setLanternHealth(self: WorldService, health: number)
     local flame = self._lantern
     if flame == nil then

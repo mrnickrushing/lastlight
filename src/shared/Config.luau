@@ -34,6 +34,12 @@ return table.freeze({
     DownedSeconds = 30,
     ReviveHealth = 35,
     RecoveryHealth = 50,
+    -- Standing in the First Lantern's light is the only way a player who is
+    -- not a Medic can recover health. Deliberately slow: a reason to come home
+    -- between runs, not a substitute for the Medic's burst heal, which stays
+    -- the only healing available out in the field.
+    LanternSafeRadius = 34,
+    LanternRegenPerSecond = 1.6,
     ReviveInvulnerabilitySeconds = 3,
     RecoveryInvulnerabilitySeconds = 5,
     InteractionDistance = 14,
