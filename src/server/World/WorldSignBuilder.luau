@@ -35,6 +35,20 @@ local function part(
     return instance
 end
 
+-- Both the shadow and the face copy must be laid out identically. TextScaled
+-- sizes glyphs to fill whatever box the label ends up with, so giving only one
+-- of them padding makes the two copies render at different sizes -- the shadow
+-- spills out from behind the letters and the sign reads as doubled, mirrored
+-- garbage rather than as a drop shadow. Keep the padding on both.
+local function applySignTextPadding(label: TextLabel)
+    local padding = Instance.new("UIPadding")
+    padding.PaddingTop = UDim.new(0.16, 0)
+    padding.PaddingBottom = UDim.new(0.16, 0)
+    padding.PaddingLeft = UDim.new(0.08, 0)
+    padding.PaddingRight = UDim.new(0.08, 0)
+    padding.Parent = label
+end
+
 local function addSurfaceText(board: BasePart, title: string, accent: Color3)
     local surface = Instance.new("SurfaceGui")
     surface.Name = "PhysicalSignText"
@@ -55,6 +69,7 @@ local function addSurfaceText(board: BasePart, title: string, accent: Color3)
     shadow.TextScaled = true
     shadow.TextWrapped = true
     shadow.Parent = surface
+    applySignTextPadding(shadow)
 
     local label = Instance.new("TextLabel")
     label.Name = "SignLetters"
@@ -66,13 +81,7 @@ local function addSurfaceText(board: BasePart, title: string, accent: Color3)
     label.TextScaled = true
     label.TextWrapped = true
     label.Parent = surface
-
-    local padding = Instance.new("UIPadding")
-    padding.PaddingTop = UDim.new(0.16, 0)
-    padding.PaddingBottom = UDim.new(0.16, 0)
-    padding.PaddingLeft = UDim.new(0.08, 0)
-    padding.PaddingRight = UDim.new(0.08, 0)
-    padding.Parent = label
+    applySignTextPadding(label)
 end
 
 local function addBoardFrame(board: BasePart, style: string): Folder

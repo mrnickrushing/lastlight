@@ -66,7 +66,7 @@ export type WorldService = typeof(setmetatable(
 ))
 
 local DAY_AMBIENT = Color3.fromRGB(50, 63, 58)
-local NIGHT_AMBIENT = Color3.fromRGB(13, 18, 33)
+local NIGHT_AMBIENT = Color3.fromRGB(19, 26, 43)
 local AMBER = Color3.fromRGB(255, 181, 76)
 local FOXFIRE = Color3.fromRGB(94, 206, 176)
 local CREAM = Color3.fromRGB(244, 230, 197)
@@ -650,8 +650,8 @@ local function buildEmberhollowSanctuary(
         ember.CFrame *= CFrame.Angles(0, math.rad(28), math.rad(-7))
         local hearthLight = Instance.new("PointLight")
         hearthLight.Color = accent
-        hearthLight.Brightness = 0.45
-        hearthLight.Range = 8
+        hearthLight.Brightness = 1.05
+        hearthLight.Range = 15
         hearthLight.Shadows = true
         hearthLight.Parent = hearthFire
         CollectionService:AddTag(hearthFire, "LastLightAmbientLight")
@@ -669,8 +669,8 @@ local function buildEmberhollowSanctuary(
 
         local windowLight = Instance.new("PointLight")
         windowLight.Color = accent
-        windowLight.Brightness = 0.22
-        windowLight.Range = 10
+        windowLight.Brightness = 0.55
+        windowLight.Range = 15
         windowLight.Shadows = false
         local lightAnchor = part(
             cabinFolder,
@@ -1216,8 +1216,8 @@ local function lantern(
     glow.Transparency = 0.08
     local light = Instance.new("PointLight")
     light.Color = AMBER
-    light.Brightness = 1.15
-    light.Range = 17 * scale
+    light.Brightness = 1.95
+    light.Range = 27 * scale
     -- Keep the sanctuary's key lantern as the only strong shadow source. The
     -- route lights are guidance, not a second sun, which keeps mobile scenes
     -- readable and avoids a wall of competing shadows.
@@ -2935,8 +2935,8 @@ function WorldService._buildMara(self: WorldService, world: Model)
     handFlame.Shape = Enum.PartType.Wedge
     local handLight = Instance.new("PointLight")
     handLight.Color = AMBER
-    handLight.Brightness = 0.55
-    handLight.Range = 9
+    handLight.Brightness = 1.25
+    handLight.Range = 15
     handLight.Shadows = false
     handLight.Parent = handFlame
     CollectionService:AddTag(handFlame, self._runtimeIds.AmbientLightTag)
@@ -3125,8 +3125,8 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     end
     local heartLight = Instance.new("PointLight")
     heartLight.Color = AMBER
-    heartLight.Brightness = 1.1
-    heartLight.Range = 12
+    heartLight.Brightness = 1.5
+    heartLight.Range = 18
     heartLight.Parent = heart
     addBillboard(heart, "HEARTWOOD", AMBER, 18)
     table.insert(self._meshPlacements, {
@@ -3351,8 +3351,8 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             flame.Shape = Enum.PartType.Ball
             local flameLight = Instance.new("PointLight")
             flameLight.Color = definition.color
-            flameLight.Brightness = 1.5
-            flameLight.Range = 12
+            flameLight.Brightness = 2.0
+            flameLight.Range = 18
             flameLight.Parent = flame
             CollectionService:AddTag(flame, self._runtimeIds.AmbientLightTag)
         end
@@ -3798,11 +3798,19 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         lamp.Transparency = 0.14
         local lampLight = Instance.new("PointLight")
         lampLight.Color = accent
-        lampLight.Brightness = 0.85
-        lampLight.Range = 15
+        lampLight.Brightness = 1.5
+        lampLight.Range = 21
         lampLight.Shadows = false
         lampLight.Parent = lamp
-        labelSign(workshop, CFrame.new(centerX, 5.4, workshopZ - 6.95), title)
+        -- The bay's back wall is at workshopZ - 6.65 and its open front at
+        -- workshopZ + 6.65, so a sign behind the back wall faces away from the
+        -- players walking in. Stand it beside the entrance, turned to face the
+        -- arrival direction like every other labelSign in this file.
+        labelSign(
+            workshop,
+            CFrame.new(centerX - 10.5, 3.2, workshopZ + 8.6) * CFrame.Angles(0, math.pi, 0),
+            title
+        )
     end
     workshopBay(-42, "ROOTWORKS", Color3.fromRGB(133, 176, 108))
     workshopBay(42, "OUTFITTER", AMBER)
@@ -4004,8 +4012,8 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         end
         local markerLight = Instance.new("PointLight")
         markerLight.Color = definition.color
-        markerLight.Brightness = 0.75
-        markerLight.Range = 9
+        markerLight.Brightness = 1.15
+        markerLight.Range = 14
         markerLight.Parent = marker
         addBillboard(marker, definition.label, definition.color)
         self:_registerInteraction(
@@ -4941,9 +4949,9 @@ function WorldService.setLanternHealth(self: WorldService, health: number)
     if light ~= nil then
         TweenService
             :Create(light, TweenInfo.new(0.32, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-                Brightness = 0.45 + strength * 1.05,
+                Brightness = 0.9 + strength * 1.7,
                 Color = targetColor,
-                Range = 16 + strength * 14,
+                Range = 26 + strength * 22,
             })
             :Play()
     end
@@ -5398,8 +5406,8 @@ local function buildTownConsequenceLandscape(
         memoryLight.Transparency = 0.14
         local glow = Instance.new("PointLight")
         glow.Color = FOXFIRE
-        glow.Brightness = 0.75
-        glow.Range = 11
+        glow.Brightness = 1.25
+        glow.Range = 16
         glow.Shadows = false
         glow.Parent = memoryLight
     elseif memorialKind == "scarred_antlers" then
@@ -5589,7 +5597,30 @@ local function buildTownProgressionBuildings(
         return math.clamp(math.floor(tonumber(stages[id]) or 0), 0, 3)
     end
 
-    local function constructionSite(id: string, displayName: string, center: Vector3, size: Vector3)
+    -- Yaw that turns a building's entrance toward `to`. A part's Front face is
+    -- -Z, and CFrame.Angles(0, theta, 0) has look vector (-sin, 0, -cos), so
+    -- the yaw pointing Front along `delta` is atan2(-dx, -dz).
+    local function yawToward(from: Vector3, to: Vector3): number
+        local delta = to - from
+        if delta.Magnitude < 0.05 then
+            return 0
+        end
+        return math.atan2(-delta.X, -delta.Z)
+    end
+
+    local function constructionSite(
+        id: string,
+        displayName: string,
+        center: Vector3,
+        size: Vector3,
+        facingYaw: number
+    )
+        -- Authored in the building's own frame so the entrance, sign, and
+        -- worksite face the street from whichever lot the building sits on.
+        local base = CFrame.new(center) * CFrame.Angles(0, facingYaw, 0)
+        local function at(offset: Vector3): CFrame
+            return base * CFrame.new(offset)
+        end
         local model = Instance.new("Model")
         model.Name = id
         model:SetAttribute("BuildingId", id)
@@ -5600,7 +5631,7 @@ local function buildTownProgressionBuildings(
             model,
             "StoneFooting",
             Vector3.new(size.X, 0.65, size.Z),
-            CFrame.new(center + Vector3.new(0, 0.32, 0)),
+            at(Vector3.new(0, 0.32, 0)),
             Color3.fromRGB(73, 76, 72),
             Enum.Material.Slate,
             false
@@ -5611,9 +5642,7 @@ local function buildTownProgressionBuildings(
                     model,
                     "ScaffoldPost",
                     Vector3.new(0.55, 7.5, 0.55),
-                    CFrame.new(
-                        center + Vector3.new(sideX * (size.X * 0.45), 3.9, sideZ * (size.Z * 0.42))
-                    ),
+                    at(Vector3.new(sideX * (size.X * 0.45), 3.9, sideZ * (size.Z * 0.42))),
                     Color3.fromRGB(94, 69, 46),
                     Enum.Material.Wood,
                     false
@@ -5625,7 +5654,7 @@ local function buildTownProgressionBuildings(
                 model,
                 "ScaffoldRail",
                 Vector3.new(size.X * 0.92, 0.4, 0.4),
-                CFrame.new(center + Vector3.new(0, 5.7, sideZ * (size.Z * 0.42))),
+                at(Vector3.new(0, 5.7, sideZ * (size.Z * 0.42))),
                 Color3.fromRGB(102, 75, 49),
                 Enum.Material.Wood,
                 false
@@ -5636,7 +5665,7 @@ local function buildTownProgressionBuildings(
                 model,
                 "BuilderTarp",
                 Vector3.new(size.X * 0.72, 0.12, size.Z * 0.36),
-                CFrame.new(center + Vector3.new(0, 7.3, tarpSide * size.Z * 0.16))
+                at(Vector3.new(0, 7.3, tarpSide * size.Z * 0.16))
                     * CFrame.Angles(math.rad(tarpSide * 12), 0, math.rad(tarpSide * 1.5)),
                 if tarpSide < 0 then Color3.fromRGB(91, 107, 82) else Color3.fromRGB(111, 121, 91),
                 Enum.Material.Fabric,
@@ -5652,9 +5681,8 @@ local function buildTownProgressionBuildings(
                 materials,
                 "ConstructionLumber",
                 Vector3.new(size.X * 0.38, 0.42, 0.72),
-                CFrame.new(
-                    center + Vector3.new(-size.X * 0.23, 0.55 + lumberIndex * 0.36, size.Z * 0.34)
-                ) * CFrame.Angles(0, math.rad((lumberIndex % 2) * 2), 0),
+                at(Vector3.new(-size.X * 0.23, 0.55 + lumberIndex * 0.36, size.Z * 0.34))
+                    * CFrame.Angles(0, math.rad((lumberIndex % 2) * 2), 0),
                 if lumberIndex % 2 == 0 then BARK else WET_BARK,
                 Enum.Material.WoodPlanks,
                 false
@@ -5666,13 +5694,12 @@ local function buildTownProgressionBuildings(
                 materials,
                 "ConstructionStone",
                 Vector3.new(2.3, 1.05, 1.7),
-                CFrame.new(
-                    center
-                        + Vector3.new(
-                            size.X * 0.3 + ((stoneIndex - 1) % 2) * 2.5,
-                            0.55 + row * 1.05,
-                            size.Z * 0.3
-                        )
+                at(
+                    Vector3.new(
+                        size.X * 0.3 + ((stoneIndex - 1) % 2) * 2.5,
+                        0.55 + row * 1.05,
+                        size.Z * 0.3
+                    )
                 )
                     * CFrame.Angles(0, math.rad(stoneIndex * 7), math.rad((stoneIndex % 2) * 2)),
                 if stoneIndex % 2 == 0
@@ -5686,7 +5713,7 @@ local function buildTownProgressionBuildings(
             materials,
             "BuilderSawhorse",
             Vector3.new(5.2, 0.5, 1.2),
-            CFrame.new(center + Vector3.new(0, 2.45, -size.Z * 0.3)),
+            at(Vector3.new(0, 2.45, -size.Z * 0.3)),
             Color3.fromRGB(99, 70, 46),
             Enum.Material.WoodPlanks,
             false
@@ -5710,7 +5737,7 @@ local function buildTownProgressionBuildings(
             model,
             "ConstructionSign",
             Vector3.new(8.5, 2.2, 0.45),
-            CFrame.new(center + Vector3.new(0, 2.5, -(size.Z * 0.5 + 0.5))),
+            at(Vector3.new(0, 2.5, -(size.Z * 0.5 + 0.5))),
             BARK,
             Enum.Material.WoodPlanks,
             false
@@ -5725,25 +5752,34 @@ local function buildTownProgressionBuildings(
         center: Vector3,
         size: Vector3,
         stage: number,
-        accent: Color3
+        accent: Color3,
+        facingYaw: number
     ): Model
         if stage == 0 then
-            return constructionSite(id, displayName, center, size)
+            return constructionSite(id, displayName, center, size, facingYaw)
         end
         local model = Instance.new("Model")
         model.Name = id
         model:SetAttribute("BuildingId", id)
         model:SetAttribute("BuildingStage", stage)
         model:SetAttribute("BuildingState", if stage == 3 then "flourishing" else "complete")
+        model:SetAttribute("BuildingFacingYaw", facingYaw)
         model.Parent = parent
         local wallHeight = 7.5 + stage * 0.75
         local halfX = size.X * 0.5
         local halfZ = size.Z * 0.5
+        -- Same local-frame contract as constructionSite: the door gap in
+        -- FrontWall, DoorHeader, BuildingSign, and FrontAwning all sit on -Z
+        -- here, and the yaw turns that whole face toward the street.
+        local base = CFrame.new(center) * CFrame.Angles(0, facingYaw, 0)
+        local function at(offset: Vector3): CFrame
+            return base * CFrame.new(offset)
+        end
         part(
             model,
             "Floor",
             Vector3.new(size.X, 0.55, size.Z),
-            CFrame.new(center + Vector3.new(0, 0.28, 0)),
+            at(Vector3.new(0, 0.28, 0)),
             Color3.fromRGB(83, 61, 42),
             Enum.Material.WoodPlanks
         )
@@ -5751,7 +5787,7 @@ local function buildTownProgressionBuildings(
             model,
             "BackWall",
             Vector3.new(size.X, wallHeight, 0.7),
-            CFrame.new(center + Vector3.new(0, wallHeight * 0.5, halfZ - 0.35)),
+            at(Vector3.new(0, wallHeight * 0.5, halfZ - 0.35)),
             Color3.fromRGB(69, 48, 36),
             Enum.Material.WoodPlanks
         )
@@ -5760,7 +5796,7 @@ local function buildTownProgressionBuildings(
                 model,
                 "SideWall",
                 Vector3.new(0.7, wallHeight, size.Z),
-                CFrame.new(center + Vector3.new(side * (halfX - 0.35), wallHeight * 0.5, 0)),
+                at(Vector3.new(side * (halfX - 0.35), wallHeight * 0.5, 0)),
                 Color3.fromRGB(69, 48, 36),
                 Enum.Material.WoodPlanks
             )
@@ -5768,10 +5804,7 @@ local function buildTownProgressionBuildings(
                 model,
                 "FrontWall",
                 Vector3.new((size.X - 5) * 0.5, wallHeight, 0.7),
-                CFrame.new(
-                    center
-                        + Vector3.new(side * (halfX * 0.5 + 1.25), wallHeight * 0.5, -halfZ + 0.35)
-                ),
+                at(Vector3.new(side * (halfX * 0.5 + 1.25), wallHeight * 0.5, -halfZ + 0.35)),
                 Color3.fromRGB(69, 48, 36),
                 Enum.Material.WoodPlanks
             )
@@ -5779,7 +5812,7 @@ local function buildTownProgressionBuildings(
                 model,
                 "Window",
                 Vector3.new(0.18, 2.4, 2.8),
-                CFrame.new(center + Vector3.new(side * (halfX - 0.72), 4.5, 1.6)),
+                at(Vector3.new(side * (halfX - 0.72), 4.5, 1.6)),
                 accent,
                 Enum.Material.Glass,
                 false
@@ -5792,14 +5825,8 @@ local function buildTownProgressionBuildings(
                     model,
                     "BuildingCornerPost",
                     Vector3.new(0.72, wallHeight + 0.5, 0.72),
-                    CFrame.new(
-                        center
-                            + Vector3.new(
-                                sideX * (halfX - 0.2),
-                                wallHeight * 0.5,
-                                sideZ * (halfZ - 0.2)
-                            )
-                    ) * CFrame.Angles(0, 0, math.rad(sideX * sideZ * 1.5)),
+                    at(Vector3.new(sideX * (halfX - 0.2), wallHeight * 0.5, sideZ * (halfZ - 0.2)))
+                        * CFrame.Angles(0, 0, math.rad(sideX * sideZ * 1.5)),
                     WET_BARK,
                     Enum.Material.Wood,
                     false
@@ -5810,7 +5837,7 @@ local function buildTownProgressionBuildings(
             model,
             "DoorHeader",
             Vector3.new(5, 1.1, 0.85),
-            CFrame.new(center + Vector3.new(0, wallHeight - 0.55, -halfZ + 0.3)),
+            at(Vector3.new(0, wallHeight - 0.55, -halfZ + 0.3)),
             WET_BARK,
             Enum.Material.Wood
         )
@@ -5819,7 +5846,7 @@ local function buildTownProgressionBuildings(
                 model,
                 "RoofPlane",
                 Vector3.new(size.X + 2.2, 0.42, size.Z * 0.62),
-                CFrame.new(center + Vector3.new(0, wallHeight + 1.25, roofSide * (size.Z * 0.25)))
+                at(Vector3.new(0, wallHeight + 1.25, roofSide * (size.Z * 0.25)))
                     * CFrame.Angles(math.rad(roofSide * 24), 0, 0),
                 if stage >= 2 then Color3.fromRGB(48, 55, 49) else Color3.fromRGB(59, 58, 51),
                 Enum.Material.Slate
@@ -5829,7 +5856,7 @@ local function buildTownProgressionBuildings(
             model,
             "RoofRidgeBeam",
             Vector3.new(size.X + 2.4, 0.48, 0.48),
-            CFrame.new(center + Vector3.new(0, wallHeight + 2.65, 0)),
+            at(Vector3.new(0, wallHeight + 2.65, 0)),
             WET_BARK,
             Enum.Material.Wood,
             false
@@ -5838,7 +5865,7 @@ local function buildTownProgressionBuildings(
             model,
             "BuildingSign",
             Vector3.new(8.8, 1.7, 0.38),
-            CFrame.new(center + Vector3.new(0, wallHeight - 1.7, -halfZ - 0.18)),
+            at(Vector3.new(0, wallHeight - 1.7, -halfZ - 0.18)),
             WET_BARK,
             Enum.Material.WoodPlanks,
             false
@@ -5848,7 +5875,7 @@ local function buildTownProgressionBuildings(
             model,
             "WarmInterior",
             Vector3.new(0.25, 0.25, 0.25),
-            CFrame.new(center + Vector3.new(0, 4.5, 1.5)),
+            at(Vector3.new(0, 4.5, 1.5)),
             accent,
             Enum.Material.Neon,
             false
@@ -5856,15 +5883,15 @@ local function buildTownProgressionBuildings(
         lightAnchor.Transparency = 1
         local light = Instance.new("PointLight")
         light.Color = accent
-        light.Brightness = 0.55 + stage * 0.2
-        light.Range = 12 + stage * 3
+        light.Brightness = 1.05 + stage * 0.3
+        light.Range = 17 + stage * 4
         light.Shadows = false
         light.Parent = lightAnchor
         local interiorCounter = part(
             model,
             "BuildingInteriorCounter",
             Vector3.new(size.X * 0.48, 1.25, 2.4),
-            CFrame.new(center + Vector3.new(0, 1.25, halfZ - 1.8)),
+            at(Vector3.new(0, 1.25, halfZ - 1.8)),
             Color3.fromRGB(96, 68, 45),
             Enum.Material.WoodPlanks,
             false
@@ -5875,7 +5902,7 @@ local function buildTownProgressionBuildings(
                 model,
                 "BuildingSupplyCrate",
                 Vector3.new(2.4, 1.9, 2.2),
-                CFrame.new(center + Vector3.new(crateIndex * (halfX * 0.52), 0.95, -0.5)),
+                at(Vector3.new(crateIndex * (halfX * 0.52), 0.95, -0.5)),
                 if crateIndex < 0 then Color3.fromRGB(89, 63, 42) else Color3.fromRGB(102, 87, 56),
                 Enum.Material.WoodPlanks,
                 false
@@ -5887,8 +5914,7 @@ local function buildTownProgressionBuildings(
                 model,
                 "FrontAwning",
                 Vector3.new(10, 0.4, 4),
-                CFrame.new(center + Vector3.new(0, wallHeight - 2.2, -halfZ - 2))
-                    * CFrame.Angles(math.rad(-8), 0, 0),
+                at(Vector3.new(0, wallHeight - 2.2, -halfZ - 2)) * CFrame.Angles(math.rad(-8), 0, 0),
                 Color3.fromRGB(96, 105, 77),
                 Enum.Material.Fabric,
                 false
@@ -5901,7 +5927,7 @@ local function buildTownProgressionBuildings(
                     model,
                     "WindowPlanter",
                     Vector3.new(3.4, 0.7, 0.85),
-                    CFrame.new(center + Vector3.new(side * (halfX + 0.15), 3, 1.6)),
+                    at(Vector3.new(side * (halfX + 0.15), 3, 1.6)),
                     Color3.fromRGB(91, 65, 43),
                     Enum.Material.WoodPlanks,
                     false
@@ -5911,7 +5937,7 @@ local function buildTownProgressionBuildings(
                         model,
                         "WindowBloom",
                         Vector3.new(0.5, 0.5, 0.5),
-                        planter.CFrame + Vector3.new(0, 0.58, flower * 0.85),
+                        planter.CFrame * CFrame.new(0, 0.58, flower * 0.85),
                         if flower == 0 then accent else FOXFIRE,
                         Enum.Material.SmoothPlastic,
                         false
@@ -5930,7 +5956,8 @@ local function buildTownProgressionBuildings(
         Vector3.new(-92, 0, -144),
         Vector3.new(17, 0, 14),
         archiveStage,
-        FOXFIRE
+        FOXFIRE,
+        yawToward(Vector3.new(-92, 0, -144), Vector3.new(0, 0, -144))
     )
     if archiveStage > 0 then
         local archivePropsFallback = Instance.new("Model")
@@ -5988,7 +6015,8 @@ local function buildTownProgressionBuildings(
         Vector3.new(92, 0, -126),
         Vector3.new(18, 0, 14),
         workbenchStage,
-        AMBER
+        AMBER,
+        yawToward(Vector3.new(92, 0, -126), Vector3.new(0, 0, -126))
     )
     if workbenchStage > 0 then
         local workbenchFallback = Instance.new("Model")
@@ -6078,7 +6106,8 @@ local function buildTownProgressionBuildings(
         Vector3.new(-92, 0, -184),
         Vector3.new(18, 0, 14),
         innStage,
-        Color3.fromRGB(219, 151, 77)
+        Color3.fromRGB(219, 151, 77),
+        yawToward(Vector3.new(-92, 0, -184), Vector3.new(0, 0, -184))
     )
     if innStage > 0 then
         local innFurnitureFallback = Instance.new("Model")
@@ -6473,8 +6502,8 @@ local function buildTownProgressionBuildings(
         nightLantern:SetAttribute("NightOnly", true)
         local lanternLight = Instance.new("PointLight")
         lanternLight.Color = AMBER
-        lanternLight.Brightness = 0.75
-        lanternLight.Range = 12
+        lanternLight.Brightness = 1.4
+        lanternLight.Range = 19
         lanternLight.Shadows = false
         lanternLight.Enabled = false
         lanternLight.Parent = nightLantern
@@ -8300,13 +8329,13 @@ function WorldService._applyTownLighting(_self: WorldService, night: boolean)
         Lighting.ClockTime = 0.15
         Lighting.Brightness = 0.82
         Lighting.Ambient = NIGHT_AMBIENT
-        Lighting.OutdoorAmbient = Color3.fromRGB(18, 27, 47)
-        Lighting.ExposureCompensation = -0.62
+        Lighting.OutdoorAmbient = Color3.fromRGB(25, 35, 56)
+        Lighting.ExposureCompensation = -0.38
         if atmosphere ~= nil and atmosphere:IsA("Atmosphere") then
             atmosphere.Color = Color3.fromRGB(82, 106, 126)
             atmosphere.Decay = Color3.fromRGB(12, 18, 36)
-            atmosphere.Density = 0.48
-            atmosphere.Haze = 2.35
+            atmosphere.Density = 0.4
+            atmosphere.Haze = 1.75
             atmosphere.Glare = 0.08
         end
         if tone ~= nil and tone:IsA("ColorCorrectionEffect") then

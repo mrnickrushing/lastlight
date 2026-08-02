@@ -236,6 +236,16 @@ lighting, multi-asset composition, or anything a player would see in place — i
 only proves whether the mesh itself is shaped and shaded correctly before a
 placement is spent on it.
 
+**The thumbnail will look gray, and that is correct.** Roblox's model thumbnail
+renderer falls back to gray SmoothPlastic; it does not apply the runtime
+material and color that `MeshMaterialPlan.luau` assigns at placement time (pine
+green, bark brown, slate, lantern amber, and so on). A gray render is therefore
+evidence about *silhouette, topology, and shading only*. Do not read gray as a
+missing texture, do not "fix" a mesh because its thumbnail is colorless, and do
+not use this endpoint to judge palette — palette is a Studio question. What a
+thumbnail can legitimately catch is faceted or flat-shaded geometry, wrong
+proportions, missing pieces, and an unrecognizable silhouette.
+
 There is no equivalent endpoint for scenes, terrain, or lighting.
 `assets-thumbnail-3d` exists but returned `state: "Error"` for every Model-type
 asset in this kit tested against it and cannot be relied on. There is no
