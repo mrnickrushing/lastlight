@@ -523,10 +523,19 @@ local function enablePlay(message: string)
 
     playButton.Visible = true
     local grow = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    TweenService:Create(playButton, grow, { Size = UDim2.fromScale(1, 0.78) }):Play()
-    pcall(function()
-        GuiService.SelectedObject = playButton
+    local growTween = TweenService:Create(playButton, grow, { Size = UDim2.fromScale(1, 0.78) })
+    -- Wait for the button to have a size before handing it controller focus.
+    -- Selecting it while it is still scaled to zero logs "Setting
+    -- GuiService.SelectedObject to invalid GuiObject" and the focus does not
+    -- take, which would leave a gamepad player unable to reach PLAY.
+    growTween.Completed:Connect(function()
+        if playButton.Parent ~= nil and playButton.Visible then
+            pcall(function()
+                GuiService.SelectedObject = playButton
+            end)
+        end
     end)
+    growTween:Play()
 end
 
 local function dismiss()
