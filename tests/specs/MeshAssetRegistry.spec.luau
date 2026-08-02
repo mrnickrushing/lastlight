@@ -10,7 +10,7 @@ return {
             name = "keeps stable and unique uploaded asset mappings",
             run = function()
                 local entries = MeshAssetRegistry.all()
-                TestRunner.equal(#entries, 34)
+                TestRunner.equal(#entries, 44)
                 local stableIds = {}
                 local robloxIds = {}
                 for _, entry in entries do
@@ -22,6 +22,39 @@ return {
                     stableIds[entry.id] = true
                     robloxIds[entry.assetId] = true
                 end
+            end,
+        },
+        {
+            name = "keeps reviewed enemy shells cosmetic and source-preserved",
+            run = function()
+                for _, stableId in
+                    {
+                        "mesh_creator_hollow_rootling_a",
+                        "mesh_creator_earth_golem_a",
+                        "mesh_creator_blossom_spirit_a",
+                        "mesh_creator_raven_a",
+                        "mesh_creator_predatory_flower_a",
+                        "mesh_creator_wood_ibex_a",
+                        "mesh_creator_bark_ram_a",
+                    }
+                do
+                    local entry = MeshAssetRegistry.get(stableId)
+                    TestRunner.truthy(entry ~= nil, "missing enemy visual asset " .. stableId)
+                    TestRunner.equal(
+                        (entry :: MeshAssetRegistry.Entry).placementBand,
+                        "curated_enemy"
+                    )
+                    TestRunner.equal(
+                        (entry :: MeshAssetRegistry.Entry).preserveSourceMaterials,
+                        true
+                    )
+                end
+                local reliquary = MeshAssetRegistry.get("mesh_creator_memory_reliquary_a")
+                TestRunner.truthy(reliquary ~= nil)
+                TestRunner.equal(
+                    (reliquary :: MeshAssetRegistry.Entry).placementBand,
+                    "curated_hero"
+                )
             end,
         },
         {

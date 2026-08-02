@@ -182,6 +182,18 @@ function WardenStagBuilder.setState(
             end
         end
     end
+    if model:GetAttribute("EnemyVisualReady") == true then
+        local authored = model:FindFirstChild("AuthoredEnemyVisual")
+        for _, descendant in model:GetDescendants() do
+            if
+                descendant:IsA("BasePart")
+                and (authored == nil or not descendant:IsDescendantOf(authored))
+            then
+                descendant.Transparency = 1
+                descendant.CastShadow = false
+            end
+        end
+    end
 end
 
 return table.freeze(WardenStagBuilder)

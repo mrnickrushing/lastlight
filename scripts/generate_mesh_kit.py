@@ -66,6 +66,18 @@ PRESERVED_ASSET_IDS = {
     "mesh_creator_watchtower_a",
     "mesh_creator_crate_a",
     "mesh_creator_field_rows_a",
+    "mesh_creator_wayfarer_bed_a",
+    "mesh_creator_anvil_a",
+    "mesh_creator_hollow_rootling_a",
+    "mesh_creator_earth_golem_a",
+    "mesh_creator_blossom_spirit_a",
+    "mesh_creator_raven_a",
+    "mesh_creator_predatory_flower_a",
+    "mesh_creator_wood_ibex_a",
+    "mesh_creator_memory_reliquary_a",
+    "mesh_creator_bark_ram_a",
+    "mesh_creator_old_growth_a",
+    "mesh_creator_potion_shelf_a",
 }
 
 

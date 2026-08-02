@@ -777,8 +777,11 @@ local function buildEmberhollowSanctuary(
                 parent = cabinFolder,
                 fallbackInstance = cotFallback,
             })
+            local supplyFallback = Instance.new("Model")
+            supplyFallback.Name = "MaraSupplyShelfFallback"
+            supplyFallback.Parent = cabinFolder
             local tableTop = part(
-                cabinFolder,
+                supplyFallback,
                 "MaraWorkTable",
                 Vector3.new(4.2, 0.45, 2.5),
                 cabinCFrame(4.5, 2.15, -3.2),
@@ -791,7 +794,7 @@ local function buildEmberhollowSanctuary(
             for legX = -1, 1, 2 do
                 for legZ = -1, 1, 2 do
                     local leg = part(
-                        cabinFolder,
+                        supplyFallback,
                         "MaraWorkTableLeg",
                         Vector3.new(0.3, 1.7, 0.3),
                         cabinCFrame(4.5 + legX * 1.75, 1.28, -3.2 + legZ * 0.95),
@@ -804,7 +807,7 @@ local function buildEmberhollowSanctuary(
             end
             for jarIndex = -1, 1 do
                 local jar = part(
-                    cabinFolder,
+                    supplyFallback,
                     "MemoryJar",
                     -- A Roblox Cylinder extends along its LOCAL X axis, so the
                     -- first component is the jar's height and the other two its
@@ -820,7 +823,7 @@ local function buildEmberhollowSanctuary(
                 jar.Transparency = 0.22
                 jar.CanQuery = false
                 local lid = part(
-                    cabinFolder,
+                    supplyFallback,
                     "MemoryJarLid",
                     Vector3.new(0.16, 0.76, 0.76),
                     cabinCFrame(4.5 + jarIndex * 1.1, 3.46, -3.2)
@@ -832,6 +835,17 @@ local function buildEmberhollowSanctuary(
                 lid.Shape = Enum.PartType.Cylinder
                 lid.CanQuery = false
             end
+            table.insert(meshPlacements, {
+                assetId = "mesh_creator_potion_shelf_a",
+                fallbackKind = "asset_replacement",
+                position = cabinCFrame(4.5, 0.62, -3.2).Position,
+                scale = 1,
+                yaw = yaw + math.rad(90),
+                seed = 9851,
+                swayTag = nil,
+                parent = cabinFolder,
+                fallbackInstance = supplyFallback,
+            })
         else
             for bedIndex = -1, 1, 2 do
                 local bedrollFallback = Instance.new("Model")
@@ -865,8 +879,11 @@ local function buildEmberhollowSanctuary(
                     fallbackInstance = bedrollFallback,
                 })
             end
+            local trunkFallback = Instance.new("Model")
+            trunkFallback.Name = "WayfarerTrunkFallback"
+            trunkFallback.Parent = cabinFolder
             local trunk = part(
-                cabinFolder,
+                trunkFallback,
                 "WayfarerTrunk",
                 Vector3.new(4.4, 2.3, 2.5),
                 cabinCFrame(5.2, 1.2, -3.6),
@@ -875,6 +892,17 @@ local function buildEmberhollowSanctuary(
                 false
             )
             trunk.CanQuery = false
+            table.insert(meshPlacements, {
+                assetId = "mesh_creator_crate_a",
+                fallbackKind = "asset_replacement",
+                position = cabinCFrame(5.2, 0.62, -3.6).Position,
+                scale = 1,
+                yaw = yaw + math.rad(12),
+                seed = 9861,
+                swayTag = nil,
+                parent = cabinFolder,
+                fallbackInstance = trunkFallback,
+            })
         end
 
         local rug = part(
@@ -2697,11 +2725,25 @@ local function hideProceduralPlaceholder(placeholder: Instance)
             or instance:IsA("Sparkles")
             or instance:IsA("Trail")
             or instance:IsA("Beam")
+            or instance:IsA("LayerCollector")
         then
             instance.Enabled = false
         end
     end
     placeholder:SetAttribute("ReplacedByAuthoredMesh", true)
+end
+
+local function keepReplacedAnchorHidden(target: BasePart)
+    if target:GetAttribute("ReplacedByAuthoredMesh") ~= true then
+        return
+    end
+    target.Transparency = 1
+    target.CastShadow = false
+    for _, child in target:GetChildren() do
+        if child:IsA("LayerCollector") then
+            child.Enabled = false
+        end
+    end
 end
 
 -- Authored art is optional streaming dressing. Loading begins only after the
@@ -2764,6 +2806,108 @@ function WorldService._placeAuthoredMeshes(
             placements = #queued,
         })
     end)
+end
+
+-- Dynamic enemies keep their original primitive geometry as an invisible,
+-- authoritative combat volume. Only the visible shell is replaced, so a
+-- cosmetic Creator Store model can never change reach, navigation, or hits.
+function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKey: string): boolean
+    local visualProfiles = {
+        rootling = {
+            assetId = "mesh_creator_hollow_rootling_a",
+            groundOffset = 2,
+            yaw = math.rad(8),
+            profile = Vector3.new(0.9, 1.06, 0.84),
+        },
+        briarback = {
+            assetId = "mesh_creator_earth_golem_a",
+            groundOffset = 2.4,
+            yaw = math.rad(-7),
+            profile = Vector3.new(1.08, 0.9, 1.12),
+        },
+        pollen_wisp = {
+            assetId = "mesh_creator_blossom_spirit_a",
+            groundOffset = 1.4,
+            yaw = math.rad(14),
+            profile = Vector3.new(0.88, 1.12, 0.92),
+            scale = 1.4,
+        },
+        hollow_crow = {
+            assetId = "mesh_creator_raven_a",
+            groundOffset = 1.1,
+            yaw = math.rad(180),
+            profile = Vector3.new(1.16, 0.9, 0.94),
+            scale = 2,
+        },
+        snapvine = {
+            assetId = "mesh_creator_predatory_flower_a",
+            groundOffset = 2,
+            yaw = math.rad(-11),
+            profile = Vector3.new(0.92, 1.08, 1.04),
+            scale = 1.25,
+        },
+        bark_ram = {
+            assetId = "mesh_creator_bark_ram_a",
+            groundOffset = 2.5,
+            yaw = math.rad(180),
+            profile = Vector3.new(1.12, 0.88, 1.05),
+            scale = 1.35,
+        },
+        old_growth = {
+            assetId = "mesh_creator_old_growth_a",
+            groundOffset = 9,
+            yaw = math.rad(180),
+            profile = Vector3.new(0.94, 1.08, 0.9),
+        },
+        warden_stag = {
+            assetId = "mesh_creator_wood_ibex_a",
+            groundOffset = 10,
+            yaw = math.rad(180),
+            profile = Vector3.new(1.08, 1.14, 0.94),
+            scale = 3,
+        },
+    }
+    local profile = visualProfiles[modelKey]
+    local core = model.PrimaryPart
+    if profile == nil or core == nil or model.Parent == nil then
+        return false
+    end
+
+    local fallbackParts = {}
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("BasePart") then
+            table.insert(fallbackParts, descendant)
+        end
+    end
+    local bottomPosition = core.Position - Vector3.new(0, profile.groundOffset, 0)
+    local at = CFrame.new(bottomPosition) * core.CFrame.Rotation * CFrame.Angles(0, profile.yaw, 0)
+    local placed, result = pcall(
+        self._meshTemplateLoader.place,
+        self._meshTemplateLoader,
+        profile.assetId,
+        model,
+        at,
+        profile.scale or 1,
+        profile.profile
+    )
+    local authored = if placed then result else nil
+    if authored == nil then
+        self._logger:info("enemy_asset_visual_failed", {
+            assetId = profile.assetId,
+            enemy = modelKey,
+            error = if placed then "asset_unavailable" else tostring(result),
+        })
+        return false
+    end
+    authored.Name = "AuthoredEnemyVisual"
+    for _, fallbackPart in fallbackParts do
+        fallbackPart.Transparency = 1
+        fallbackPart.CastShadow = false
+        fallbackPart:SetAttribute("AuthoritativeEnemyHitbox", fallbackPart == core)
+    end
+    model:SetAttribute("EnemyVisualAssetId", profile.assetId)
+    model:SetAttribute("EnemyVisualReady", true)
+    return true
 end
 
 function WorldService._buildMeshDressing(self: WorldService)
@@ -3842,7 +3986,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         interactables,
         "BramblewakeBeacon",
         Vector3.new(3.4, 5.4, 3.4),
-        CFrame.new(0, 6.2, -148),
+        CFrame.new(0, 3.9, -148),
         Color3.fromRGB(104, 187, 166),
         Enum.Material.Glass,
         false
@@ -3851,14 +3995,15 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     beacon.Transparency = 1
     beacon.CanQuery = false
     self._beacon = beacon
-    -- The beacon fades in from fully transparent, so before this it revealed
-    -- as a bare glowing sphere hanging in the middle of the gateway. The orb
-    -- stays the interaction anchor -- name, prompt, and reveal tween are
-    -- untouched -- but it now hangs in a physical cradle slung under the gate
-    -- crown, so what lights up reads as a memory lamp mounted in the arch
-    -- rather than an orb floating in mid-air.
+    -- The gameplay beacon remains an invisible interaction anchor. The visible
+    -- object is a thumbnail-reviewed crystal reliquary placed through
+    -- MeshTemplateLoader below; this fallback only appears if the reviewed
+    -- model cannot load.
+    local beaconFallback = Instance.new("Model")
+    beaconFallback.Name = "MemoryReliquaryFallback"
+    beaconFallback.Parent = interactables
     local beaconCradle = part(
-        interactables,
+        beaconFallback,
         "BeaconCradleMount",
         Vector3.new(0.34, 3.6, 0.34),
         CFrame.new(0, 10.4, -148),
@@ -3870,7 +4015,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     for armIndex = 0, 3 do
         local armAngle = (armIndex / 4) * math.pi * 2
         local arm = part(
-            interactables,
+            beaconFallback,
             "BeaconCradleArm",
             Vector3.new(0.26, 2.9, 0.26),
             CFrame.new(0, 8.05, -148)
@@ -3884,7 +4029,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         arm.CanQuery = false
     end
     local beaconCollar = part(
-        interactables,
+        beaconFallback,
         "BeaconCradleCollar",
         Vector3.new(0.3, 2.9, 2.9),
         CFrame.new(0, 8.6, -148) * CFrame.Angles(0, 0, math.rad(90)),
@@ -3894,6 +4039,17 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     )
     beaconCollar.Shape = Enum.PartType.Cylinder
     beaconCollar.CanQuery = false
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_memory_reliquary_a",
+        fallbackKind = "asset_replacement",
+        position = Vector3.new(0, 0.25, -148),
+        scale = 1,
+        yaw = math.pi,
+        seed = 9911,
+        swayTag = nil,
+        parent = interactables,
+        fallbackInstance = beaconFallback,
+    })
     self:_registerInteraction(
         beacon,
         self._runtimeIds.InteractionIds.Beacon,
@@ -4955,12 +5111,10 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
     if beacon == nil then
         return
     end
-    local becomingVisible = visible and beacon.Transparency >= 0.95
-    TweenService:Create(
-        beacon,
-        TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        { Transparency = if visible then 0.16 else 1 }
-    ):Play()
+    local becomingVisible = visible and beacon.CanQuery == false
+    -- Never reveal the procedural interaction sphere. Progression is conveyed
+    -- by the reliquary light and prompt, not a second orb or a floating label.
+    beacon.Transparency = 1
     beacon.CanQuery = visible
     local prompt = self._interactions[self._runtimeIds.InteractionIds.Beacon]
     if prompt ~= nil then
@@ -4976,8 +5130,9 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
         light.Parent = beacon
     end
     light.Enabled = visible
-    if visible and beacon:FindFirstChild("WorldLabel") == nil then
-        addBillboard(beacon, "THE BRAMBLEWAKE REMEMBERS", CREAM)
+    local oldLabel = beacon:FindFirstChild("WorldLabel")
+    if oldLabel ~= nil then
+        oldLabel:Destroy()
     end
 
     local world = self._world
@@ -7633,6 +7788,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
     arena.fireSource.Color = if relay then AMBER else Color3.fromRGB(94, 83, 64)
     arena.fireSource.Material = if relay then Enum.Material.Neon else Enum.Material.SmoothPlastic
     arena.fireSource.Transparency = if relay then 0.1 else 0.58
+    keepReplacedAnchorHidden(arena.fireSource)
     local firePrompt = self._interactions[self._runtimeIds.InteractionIds.BlackoutFireSource]
     if firePrompt ~= nil then
         firePrompt.Enabled = relay
@@ -7648,6 +7804,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
             then Enum.Material.Neon
             else Enum.Material.SmoothPlastic
         target.Transparency = if delivered then 0.28 elseif relay then 0.12 else 0.58
+        keepReplacedAnchorHidden(target)
         local prompt = target:FindFirstChildOfClass("ProximityPrompt")
         if prompt ~= nil then
             prompt.Enabled = relay
@@ -7714,6 +7871,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
                 target.Transparency = 0.78
             end
         end
+        keepReplacedAnchorHidden(target)
     end
 
     if world ~= nil then
@@ -7783,6 +7941,8 @@ function WorldService.setOldGrowthPresentation(self: WorldService, status: strin
         then Enum.Material.Neon
         else Enum.Material.SmoothPlastic
     arena.rootHeart.Transparency = if shielded or complete then 0.14 else 0.58
+    keepReplacedAnchorHidden(arena.fireSource)
+    keepReplacedAnchorHidden(arena.rootHeart)
 
     local firePrompt = self._interactions[self._runtimeIds.InteractionIds.OldGrowthFireSource]
     local heartPrompt = self._interactions[self._runtimeIds.InteractionIds.OldGrowthHeart]
@@ -7823,6 +7983,7 @@ function WorldService.setWardenStagPresentation(self: WorldService, state: any)
         then Enum.Material.Neon
         else Enum.Material.SmoothPlastic
     arena.seal.Transparency = if enabled then 0.24 else 0.72
+    keepReplacedAnchorHidden(arena.seal)
 
     for nodeId, target in arena.nodes do
         local cleansed = cleansedNodes[nodeId] == true
@@ -7834,6 +7995,7 @@ function WorldService.setWardenStagPresentation(self: WorldService, state: any)
             then Enum.Material.Neon
             else Enum.Material.SmoothPlastic
         target.Transparency = if cleansed then 0.46 elseif cleansing then 0.12 else 0.56
+        keepReplacedAnchorHidden(target)
         local interactionId = target:GetAttribute("InteractionId")
         local prompt = if type(interactionId) == "string"
             then self._interactions[interactionId]
@@ -7904,6 +8066,7 @@ function WorldService.setExpeditionEventState(self: WorldService, eventId: strin
             target.Material = Enum.Material.SmoothPlastic
             target.Transparency = 0.5
         end
+        keepReplacedAnchorHidden(target)
         local prompt = target:FindFirstChildOfClass("ProximityPrompt")
         if prompt ~= nil then
             prompt.Enabled = eventCanProgress and not complete

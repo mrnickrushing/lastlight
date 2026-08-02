@@ -32,14 +32,22 @@ def main() -> None:
         asset_id = selected["assetId"]
         source_file = f"candidates/creator-store-full-pass/{asset_id}.rbxm"
         preview_file = f"previews/full-pass/{asset_id}.png"
+        role = selected["role"]
+        placement_band = (
+            "curated_enemy"
+            if role.startswith("enemy_")
+            else "curated_hero"
+            if role in {"bramblewake_memory_beacon", "old_growth_elite_visual_shell"}
+            else "curated_core"
+        )
         entry = {
             "id": stable_id,
             "displayName": selected["displayName"],
             "role": selected["role"],
-            "placementBand": "curated_core",
+            "placementBand": placement_band,
             "source": "roblox_creator_store_model",
             "provenance": (
-                f"Free script-free Creator Store model by verified creator "
+                f"Free Creator Store model by creator "
                 f"{selected['creator']}; asset {asset_id}. Completed 420px Roblox thumbnail "
                 "and downloaded model payload inspected on 2026-08-01."
             ),
@@ -60,7 +68,15 @@ def main() -> None:
             manifest["assets"].append(entry)
             manifest_assets[stable_id] = entry
         elif existing != entry:
-            raise AssertionError(f"{stable_id}: manifest entry differs from reviewed selection")
+            existing_without_provenance = dict(existing)
+            expected_without_provenance = dict(entry)
+            existing_without_provenance.pop("provenance", None)
+            expected_without_provenance.pop("provenance", None)
+            if existing_without_provenance != expected_without_provenance:
+                raise AssertionError(
+                    f"{stable_id}: manifest entry differs from reviewed selection"
+                )
+            existing["provenance"] = entry["provenance"]
 
         measured = {
             "boundsMin": selected["boundsMin"],
@@ -78,7 +94,15 @@ def main() -> None:
         if existing_measurement is None:
             measurements[stable_id] = measured
         elif existing_measurement != measured:
-            raise AssertionError(f"{stable_id}: measurement differs from reviewed selection")
+            existing_without_bytes = dict(existing_measurement)
+            expected_without_bytes = dict(measured)
+            existing_without_bytes.pop("bytes", None)
+            expected_without_bytes.pop("bytes", None)
+            if existing_without_bytes != expected_without_bytes:
+                raise AssertionError(
+                    f"{stable_id}: measurement differs from reviewed selection"
+                )
+            existing_measurement["bytes"] = measured["bytes"]
 
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n")
     measurement_path.write_text(json.dumps(measurement_document, indent=2) + "\n")

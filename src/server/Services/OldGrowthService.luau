@@ -176,6 +176,11 @@ function OldGrowthService._spawnModel(self: OldGrowthService, target: Player)
     local model = self._builder.build(self._arena.center, lookAt, self._encounter.MaxHealth)
     model.Parent =
         assert(self._arena.fireSource.Parent, "Old Growth arena lost its streamed module")
+    task.spawn(function()
+        if model.Parent ~= nil then
+            self._worldService:placeEnemyVisual(model, "old_growth")
+        end
+    end)
     self._model = model
     self._builder.setState(model, self._state.health, false, false)
 end

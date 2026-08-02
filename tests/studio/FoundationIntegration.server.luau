@@ -43,7 +43,7 @@ local TerrainBuilder = require(serverRoot.World.TerrainBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.45.0", "unexpected build version")
+assert(Config.BuildVersion == "0.46.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#MusicCatalog.regionIds() == 8, "every playable world needs an adaptive score")
@@ -844,8 +844,8 @@ local expeditionMeshFallbacks = expedition:GetAttribute("AuthoredMeshFallbackCou
 assert(
     type(expeditionAuthoredMeshes) == "number"
         and type(expeditionMeshFallbacks) == "number"
-        and expeditionAuthoredMeshes + expeditionMeshFallbacks == 2,
-    "Bramblewake must resolve both curated landmark mesh placements"
+        and expeditionAuthoredMeshes + expeditionMeshFallbacks >= 14,
+    "Bramblewake must resolve its landmarks and inspectable interaction assets"
 )
 local townMeshDeadline = os.clock() + 12
 while world:GetAttribute("AuthoredMeshCount") == nil and os.clock() < townMeshDeadline do
@@ -886,6 +886,16 @@ local creatorAssetCounts: { [string]: number } = {
     mesh_creator_watchtower_a = 0,
     mesh_creator_crate_a = 0,
     mesh_creator_field_rows_a = 0,
+    mesh_creator_hollow_rootling_a = 0,
+    mesh_creator_earth_golem_a = 0,
+    mesh_creator_blossom_spirit_a = 0,
+    mesh_creator_raven_a = 0,
+    mesh_creator_predatory_flower_a = 0,
+    mesh_creator_wood_ibex_a = 0,
+    mesh_creator_memory_reliquary_a = 0,
+    mesh_creator_bark_ram_a = 0,
+    mesh_creator_old_growth_a = 0,
+    mesh_creator_potion_shelf_a = 0,
 }
 local stretchedRoadAssets = 0
 for _, descendant in world:GetDescendants() do
@@ -990,10 +1000,26 @@ assert(
     "the Dawn Gate needs the sourced asymmetrical timber arch"
 )
 assert(
+    creatorAssetCounts.mesh_creator_memory_reliquary_a >= 2,
+    "the Dawn Gate beacon and Warden seal need sourced memory reliquaries"
+)
+assert(
+    creatorAssetCounts.mesh_creator_hollow_rootling_a >= 4,
+    "Warden and Blackout living-root objects need sourced irregular tree assets"
+)
+assert(
+    creatorAssetCounts.mesh_creator_predatory_flower_a >= 2,
+    "Old Growth and chapter-choice root hearts need sourced plant assets"
+)
+assert(
     creatorAssetCounts.mesh_creator_tool_set_a >= 1
         and creatorAssetCounts.mesh_creator_crate_a >= 1
         and creatorAssetCounts.mesh_creator_barrel_a >= 1,
     "work areas need sourced tools, crates, and barrels"
+)
+assert(
+    creatorAssetCounts.mesh_creator_potion_shelf_a == 1,
+    "Mara's cabin supplies need the sourced potion shelf asset"
 )
 for _, descendant in world:GetDescendants() do
     if descendant:GetAttribute("ReplacedByAuthoredMesh") == true then
@@ -1007,6 +1033,14 @@ for _, descendant in world:GetDescendants() do
         end
     end
 end
+local bramblewakeBeacon = world:FindFirstChild("BramblewakeBeacon", true)
+assert(
+    bramblewakeBeacon ~= nil
+        and bramblewakeBeacon:IsA("BasePart")
+        and bramblewakeBeacon.Transparency == 1
+        and bramblewakeBeacon:FindFirstChild("WorldLabel") == nil,
+    "the Dawn Gate must use an invisible prompt anchor without a floating REMEMBER sign"
+)
 assert(
     expedition:GetAttribute("ModuleCount") == BramblewakeExpedition.ModuleCount,
     "Bramblewake module count is incorrect"
