@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_blacksmith_hammer_a",
+  "source": "assets/meshes/generated/mesh_blacksmith_hammer_a.glb",
+  "output": "assets/meshes/generated/mesh_blacksmith_hammer_a.glb",
+  "targetLongestDimension": 3.0,
+  "boundsMin": [
+    -0.6909,
+    -0.2909,
+    0.0
+  ],
+  "boundsMax": [
+    0.6909,
+    0.2909,
+    3.0
+  ],
+  "dimensions": [
+    1.3818,
+    0.5818,
+    3.0
+  ],
+  "longestDimension": 3.0,
+  "trianglesBefore": 2560,
+  "trianglesAfter": 2560,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    }
+  ],
+  "bytes": 3839264
+}

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_zombie_a",
+  "source": "assets/meshes/generated/mesh_zombie_a.glb",
+  "output": "assets/meshes/generated/mesh_zombie_a.glb",
+  "targetLongestDimension": 6.0,
+  "boundsMin": [
+    -1.9618,
+    -0.9717,
+    0.0
+  ],
+  "boundsMax": [
+    1.9618,
+    0.9717,
+    6.0
+  ],
+  "dimensions": [
+    3.9236,
+    1.9434,
+    6.0
+  ],
+  "longestDimension": 6.0,
+  "trianglesBefore": 6102,
+  "trianglesAfter": 6102,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    }
+  ],
+  "bytes": 4151436
+}
