@@ -16037,10 +16037,17 @@ function PlayerSurvivalService._stepLanternRegen(self: PlayerSurvivalService, no
 
     for player, state in self._states do
         local root = rootPart(player)
-        local inLight = root ~= nil and (root.Position - center).Magnitude <= radius
-        if not inLight or not self._survivalState.canAct(state) then
+        -- Standing out of the light, being downed, and already sitting at full
+        -- health all mean the same thing here: bank nothing and drop whatever
+        -- fractional progress was carried, so leaving and returning does not
+        -- resume mid-point.
+        local eligible = root ~= nil
+            and (root.Position - center).Magnitude <= radius
+            and self._survivalState.canAct(state)
+            and state.health < state.maxHealth
+        if not eligible then
             self._regenCarry[player] = nil
-        elseif state.health < state.maxHealth then
+        else
             local carried = (self._regenCarry[player] or 0) + rate * elapsed
             local whole = math.floor(carried)
             self._regenCarry[player] = carried - whole
@@ -16051,8 +16058,6 @@ function PlayerSurvivalService._stepLanternRegen(self: PlayerSurvivalService, no
                     self:_syncPlayer(player)
                 end
             end
-        else
-            self._regenCarry[player] = nil
         end
     end
 end
