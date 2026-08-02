@@ -39,6 +39,7 @@ local Regions = require(root.Content.Definitions.Regions)
 local ServiceRegistry = require(serverRoot.ServiceRegistry)
 local OldGrowthBuilder = require(serverRoot.World.OldGrowthBuilder)
 local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
+local TerrainBuilder = require(serverRoot.World.TerrainBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
@@ -741,6 +742,46 @@ for _, buildingId in { "building_archive", "building_workbench", "building_inn" 
         "building sign must sit on the street-facing wall: " .. buildingId
     )
 end
+-- The filled valley floor and the height every authored coordinate is placed
+-- against must be the same number. They silently disagreed once: the fill
+-- centred on the raw BEDROCK_DEPTH while sizing the voxel-rounded span, so the
+-- floor rendered a stud above surfaceHeight. No road layer is thicker than
+-- about 0.9 studs, so that one stud buried the entire road network -- main
+-- street, arrival route, and district roads -- under the grass, with nothing
+-- in the logs to say so.
+assert(
+    TerrainBuilder.valleyFloorTop() == TerrainBuilder.groundHeight(),
+    "valley floor must fill to exactly the authored ground height"
+)
+for _, sample in { { 0, 0 }, { 0, -112 }, { 0, -204 }, { 92, -126 }, { -92, -184 } } do
+    local sampleX, sampleZ = sample[1], sample[2]
+    assert(
+        TerrainBuilder.isInsidePlayableBowl(sampleX, sampleZ),
+        string.format("sample (%d, %d) should be inside the playable bowl", sampleX, sampleZ)
+    )
+    assert(
+        TerrainBuilder.surfaceHeight(sampleX, sampleZ) == TerrainBuilder.valleyFloorTop(),
+        string.format(
+            "terrain surface disagrees with the filled floor at (%d, %d)",
+            sampleX,
+            sampleZ
+        )
+    )
+end
+-- Reuses the mainStreet resolved and nil-checked with the rest of the street
+-- geometry above; existence is already asserted there, so this only has to
+-- prove the street clears the floor rather than sitting inside it.
+assert(
+    mainStreet.Position.Y + mainStreet.Size.Y * 0.5 > TerrainBuilder.valleyFloorTop(),
+    "the main street must sit above the terrain, not buried under it"
+)
+local routeGuides = 0
+for _, descendant in world:GetDescendants() do
+    if descendant.Name == "RouteGuideMarker" then
+        routeGuides += 1
+    end
+end
+assert(routeGuides >= 12, "the critical route needs a readable glowing trail")
 assert(world:GetAttribute("TownIntegrity") == 100, "new towns must begin fully repaired")
 assert(world:GetAttribute("TownDamageLevel") == 0, "new towns cannot begin visibly damaged")
 assert(

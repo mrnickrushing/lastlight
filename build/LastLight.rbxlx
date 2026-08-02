@@ -22190,6 +22190,48 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 edgeStone.CanQuery = false
             end
         end
+        -- Glowing waymarkers down the road centre. The route already has
+        -- lantern posts and chevrons, but nothing that reads as "this way" at
+        -- a glance in the dark, so the road can be underfoot and still not
+        -- answer where to go next. These are foxfire inlays set into the worn
+        -- centre, pointing along travel direction and brightening toward the
+        -- destination so the trail has a readable gradient rather than a flat
+        -- dotted line. Semantic, not decorative: they mark the critical route
+        -- only, never the side spurs.
+        local guideCount = math.max(2, math.floor(distance / 8))
+        -- Half-open [start, finish): the finish of one segment is the start of
+        -- the next, so an inclusive loop stacks two wedges and two PointLights
+        -- on the exact same spot at every bend, with different headings. That
+        -- reads as crossed, z-fighting arrows and a double-bright junction
+        -- rather than one continuous trail.
+        for guide = 0, guideCount - 1 do
+            local along = -distance * 0.5 + distance * guide / guideCount
+            local progress = (segment - 1 + guide / guideCount) / (#route - 1)
+            local wedge = part(
+                geometry,
+                "RouteGuideMarker",
+                Vector3.new(1.5, 0.1, 2.1),
+                -- The route frame sits at Y = 0.42 and the worn road surface
+                -- tops out at 0.91, so this offset puts the wedge's underside
+                -- at 0.89 -- inlaid into the road. At 0.94 it floated a full
+                -- 0.4 studs above the surface and pulsed in mid-air.
+                roadFrame * CFrame.new(0, 0.52, along) * CFrame.Angles(0, math.pi, 0),
+                FOXFIRE,
+                Enum.Material.Neon,
+                false
+            )
+            wedge.Shape = Enum.PartType.Wedge
+            wedge.Transparency = 0.34 - progress * 0.16
+            wedge.CastShadow = false
+            wedge.CanQuery = false
+            CollectionService:AddTag(wedge, _self._runtimeIds.AmbientLightTag)
+            local guideLight = Instance.new("PointLight")
+            guideLight.Color = FOXFIRE
+            guideLight.Brightness = 0.5 + progress * 0.45
+            guideLight.Range = 11
+            guideLight.Shadows = false
+            guideLight.Parent = wedge
+        end
         queueRoadAssetPlacements(
             arrivalRoadAssetPlacements,
             geometry,
@@ -23075,7 +23117,14 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     local stump = part(
         heartwoodFallback,
         "HeartwoodStump",
-        Vector3.new(7.6, 5.8, 7.6),
+        -- Rotated a quarter turn about Z below, so local X is the stump's
+        -- HEIGHT and Y/Z are its cross-section: (height, diameter, diameter).
+        -- Authored as (7.6, 5.8, 7.6) this came out 7.6 tall with a squashed
+        -- 5.8 x 7.6 oval cross-section instead of a 5.8-tall round stump. The
+        -- growth rings are the proof: they offset 3.05 along the axis, which
+        -- only reaches the cut face when the half-height is 2.9. At 3.8 they
+        -- sat buried three quarters of a stud inside the wood.
+        Vector3.new(5.8, 7.6, 7.6),
         CFrame.new(HEARTWOOD_CENTER + Vector3.new(0, 2.9, 0)),
         WET_BARK,
         Enum.Material.Wood
@@ -33332,9 +33381,19 @@ local function fillValleyFloor(terrain: Terrain, palette: Palette)
     local centerX = (BOWL_MIN_X + BOWL_MAX_X) / 2
     local centerZ = (BOWL_MIN_Z + BOWL_MAX_Z) / 2
 
+    -- Centre from the SAME rounded span that is passed as the size. Deriving
+    -- the centre from the raw BEDROCK_DEPTH while filling the voxel-rounded
+    -- span puts the floor half a voxel out: 90 rounds up to 92, so the surface
+    -- landed at GROUND_Y + 1 instead of GROUND_Y. Every road is only ~0.9
+    -- studs thick, so that one stud buried the entire road network -- main
+    -- street, arrival route, and district roads -- under the grass. The
+    -- surrounding column fill below already derives its centre this way, which
+    -- is why the hills sat correctly while the valley floor did not.
+    local depthSpan = toVoxelSpan(BEDROCK_DEPTH)
+
     terrain:FillBlock(
-        CFrame.new(centerX, GROUND_Y - BEDROCK_DEPTH / 2, centerZ),
-        Vector3.new(width, BEDROCK_DEPTH, depth),
+        CFrame.new(centerX, GROUND_Y - depthSpan / 2, centerZ),
+        Vector3.new(width, depthSpan, depth),
         palette.valley
     )
 end
@@ -33705,6 +33764,21 @@ end
 
 function TerrainBuilder.groundHeight(): number
     return GROUND_Y
+end
+
+--[[
+    The world-space Y of the valley floor's top face, derived the same way
+    fillValleyFloor derives it.
+
+    Exposed so a test can prove the filled surface and `surfaceHeight` agree.
+    They silently disagreed once: the fill centred on the raw BEDROCK_DEPTH
+    while sizing the voxel-rounded span, so the floor rendered one stud above
+    the height every authored coordinate was placed against, and the entire
+    road network -- none of it thicker than about 0.9 studs -- was buried under
+    the grass with nothing in the logs to say so.
+]]
+function TerrainBuilder.valleyFloorTop(): number
+    return (GROUND_Y - toVoxelSpan(BEDROCK_DEPTH) / 2) + toVoxelSpan(BEDROCK_DEPTH) / 2
 end
 
 return table.freeze(TerrainBuilder)

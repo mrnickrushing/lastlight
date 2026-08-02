@@ -136,9 +136,19 @@ local function fillValleyFloor(terrain: Terrain, palette: Palette)
     local centerX = (BOWL_MIN_X + BOWL_MAX_X) / 2
     local centerZ = (BOWL_MIN_Z + BOWL_MAX_Z) / 2
 
+    -- Centre from the SAME rounded span that is passed as the size. Deriving
+    -- the centre from the raw BEDROCK_DEPTH while filling the voxel-rounded
+    -- span puts the floor half a voxel out: 90 rounds up to 92, so the surface
+    -- landed at GROUND_Y + 1 instead of GROUND_Y. Every road is only ~0.9
+    -- studs thick, so that one stud buried the entire road network -- main
+    -- street, arrival route, and district roads -- under the grass. The
+    -- surrounding column fill below already derives its centre this way, which
+    -- is why the hills sat correctly while the valley floor did not.
+    local depthSpan = toVoxelSpan(BEDROCK_DEPTH)
+
     terrain:FillBlock(
-        CFrame.new(centerX, GROUND_Y - BEDROCK_DEPTH / 2, centerZ),
-        Vector3.new(width, BEDROCK_DEPTH, depth),
+        CFrame.new(centerX, GROUND_Y - depthSpan / 2, centerZ),
+        Vector3.new(width, depthSpan, depth),
         palette.valley
     )
 end
@@ -509,6 +519,21 @@ end
 
 function TerrainBuilder.groundHeight(): number
     return GROUND_Y
+end
+
+--[[
+    The world-space Y of the valley floor's top face, derived the same way
+    fillValleyFloor derives it.
+
+    Exposed so a test can prove the filled surface and `surfaceHeight` agree.
+    They silently disagreed once: the fill centred on the raw BEDROCK_DEPTH
+    while sizing the voxel-rounded span, so the floor rendered one stud above
+    the height every authored coordinate was placed against, and the entire
+    road network -- none of it thicker than about 0.9 studs -- was buried under
+    the grass with nothing in the logs to say so.
+]]
+function TerrainBuilder.valleyFloorTop(): number
+    return (GROUND_Y - toVoxelSpan(BEDROCK_DEPTH) / 2) + toVoxelSpan(BEDROCK_DEPTH) / 2
 end
 
 return table.freeze(TerrainBuilder)
