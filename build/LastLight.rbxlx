@@ -523,10 +523,19 @@ local function enablePlay(message: string)
 
     playButton.Visible = true
     local grow = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    TweenService:Create(playButton, grow, { Size = UDim2.fromScale(1, 0.78) }):Play()
-    pcall(function()
-        GuiService.SelectedObject = playButton
+    local growTween = TweenService:Create(playButton, grow, { Size = UDim2.fromScale(1, 0.78) })
+    -- Wait for the button to have a size before handing it controller focus.
+    -- Selecting it while it is still scaled to zero logs "Setting
+    -- GuiService.SelectedObject to invalid GuiObject" and the focus does not
+    -- take, which would leave a gamepad player unable to reach PLAY.
+    growTween.Completed:Connect(function()
+        if playButton.Parent ~= nil and playButton.Visible then
+            pcall(function()
+                GuiService.SelectedObject = playButton
+            end)
+        end
     end)
+    growTween:Play()
 end
 
 local function dismiss()
@@ -21234,6 +21243,7 @@ export type WorldService = typeof(setmetatable(
         _spawn: SpawnLocation?,
         _mara: Model?,
         _maraTrap: Model?,
+        _maraStandY: number,
         _lobby: Folder?,
         _lobbySpawn: SpawnLocation?,
         _departurePlatform: BasePart?,
@@ -22961,6 +22971,7 @@ function WorldService.new(
         _spawn = nil,
         _mara = nil,
         _maraTrap = nil,
+        _maraStandY = 3,
         _lobby = nil,
         _lobbySpawn = nil,
         _departurePlatform = nil,
@@ -25202,6 +25213,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
     self._maraTrap = trap
 
     self._mara = model
+    self._maraStandY = model:GetPivot().Position.Y
     self:_registerInteraction(
         torso,
         self._runtimeIds.InteractionIds.Mara,
@@ -27202,14 +27214,16 @@ function WorldService.moveMara(self: WorldService, destination: Vector3)
 
     task.spawn(function()
         local start = mara:GetPivot()
-        -- Keep her own standing height and only walk her across the ground.
+        -- Walk her across the ground at her recorded standing height. Reading
+        -- it back off the live pivot sampled whatever the ambient bob happened
+        -- to be applying at that instant, which biased the whole walk down.
         -- An R15 pivot sits about three studs above the floor, so the callers'
         -- waist-height destination Y (a leftover from the hand-stacked body
         -- this rig replaced, whose pivot sat much lower) buried her to the
         -- chest on arrival. The valley floor is flat at GROUND_Y here, so
         -- carrying her current height across is both correct and immune to the
         -- next caller passing a Y that means something else.
-        local target = CFrame.new(destination.X, start.Position.Y, destination.Z)
+        local target = CFrame.new(destination.X, self._maraStandY, destination.Z)
         for step = 1, 30 do
             mara:PivotTo(start:Lerp(target, step / 30))
             task.wait(0.035)
@@ -40589,6 +40603,7 @@ type MotionState = {
     basePivot: CFrame,
     kind: string,
     lastPivot: CFrame,
+    poseOffset: CFrame,
     position: Vector3,
     phaseOffset: number,
     speed: number,
@@ -40667,6 +40682,7 @@ function WorldMotionController.new(
             basePivot = pivot,
             kind = tostring(instance:GetAttribute("MotionKind") or "rotor"),
             lastPivot = pivot,
+            poseOffset = CFrame.identity,
             position = pivot.Position,
             phaseOffset = phaseOffsetFor(instance),
             speed = math.max(0, tonumber(instance:GetAttribute("MotionSpeed")) or 0.34),
@@ -40761,11 +40777,21 @@ function WorldMotionController._step(self: WorldMotionController, deltaTime: num
             continue
         end
         if state.kind == "resident" then
+            --[[
+                A resident the server has walked somewhere has to be re-based,
+                but `current` is the POSED pivot -- base times the bob and turn
+                applied last frame. Adopting it wholesale folds that offset into
+                the new base, and then the next frame applies the pose on top of
+                it again. While the server is moving a resident every frame, as
+                the rescue walk does, that compounds once per frame and sinks
+                her into the floor. Undoing the last pose first recovers the
+                true standing base.
+            ]]
             local current = model:GetPivot()
             if (current.Position - state.lastPivot.Position).Magnitude > 0.08 then
-                state.basePivot = current
+                state.basePivot = current * state.poseOffset:Inverse()
                 state.lastPivot = current
-                state.position = current.Position
+                state.position = state.basePivot.Position
             end
         end
         local active = (state.position - cameraPosition).Magnitude <= ACTIVE_DISTANCE
@@ -40774,9 +40800,8 @@ function WorldMotionController._step(self: WorldMotionController, deltaTime: num
             if state.kind == "resident" then
                 local pose =
                     self._ambientMotion.residentPose(self._elapsed, state.speed, state.phaseOffset)
-                targetPivot = state.basePivot
-                    * CFrame.new(0, pose.height, 0)
-                    * CFrame.Angles(0, pose.yaw, 0)
+                state.poseOffset = CFrame.new(0, pose.height, 0) * CFrame.Angles(0, pose.yaw, 0)
+                targetPivot = state.basePivot * state.poseOffset
             else
                 local angle =
                     self._ambientMotion.rotorAngle(self._elapsed, state.speed, state.phaseOffset)
@@ -40788,6 +40813,7 @@ function WorldMotionController._step(self: WorldMotionController, deltaTime: num
         elseif state.active then
             model:PivotTo(state.basePivot)
             state.lastPivot = state.basePivot
+            state.poseOffset = CFrame.identity
             state.active = false
         end
     end

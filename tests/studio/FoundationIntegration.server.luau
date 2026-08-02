@@ -156,9 +156,12 @@ assert(
 local combat = CombatState.create(200)
 local sprinting = CombatState.setSprint(combat, true, 200, true)
 local drained = CombatState.advance(sprinting, 201, true)
-assert(drained.stamina == 82 and drained.sprinting, "server sprint stamina contract failed")
+-- One second of sprint at SprintDrainPerSecond = 7, then a 35-cost dodge.
+-- These moved when sprint was retuned from an unusable five-second bar; they
+-- are derived from Config rather than copied from whatever the run printed.
+assert(drained.stamina == 93 and drained.sprinting, "server sprint stamina contract failed")
 local dodging = CombatState.dodge(drained, 201, true)
-assert(dodging.stamina == 47, "server dodge cost contract failed")
+assert(dodging.stamina == 58, "server dodge cost contract failed")
 assert(CombatState.avoidsDamage(dodging, 201.2), "dodge protection window is missing")
 local attack = EnemyAttackFlow.create(10, 201, Config.RootlingAttackWindupSeconds)
 local attackDecision = EnemyAttackFlow.evaluate(attack, attack.endsAt, {

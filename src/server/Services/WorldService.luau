@@ -34,6 +34,7 @@ export type WorldService = typeof(setmetatable(
         _spawn: SpawnLocation?,
         _mara: Model?,
         _maraTrap: Model?,
+        _maraStandY: number,
         _lobby: Folder?,
         _lobbySpawn: SpawnLocation?,
         _departurePlatform: BasePart?,
@@ -1761,6 +1762,7 @@ function WorldService.new(
         _spawn = nil,
         _mara = nil,
         _maraTrap = nil,
+        _maraStandY = 3,
         _lobby = nil,
         _lobbySpawn = nil,
         _departurePlatform = nil,
@@ -4002,6 +4004,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
     self._maraTrap = trap
 
     self._mara = model
+    self._maraStandY = model:GetPivot().Position.Y
     self:_registerInteraction(
         torso,
         self._runtimeIds.InteractionIds.Mara,
@@ -6002,14 +6005,16 @@ function WorldService.moveMara(self: WorldService, destination: Vector3)
 
     task.spawn(function()
         local start = mara:GetPivot()
-        -- Keep her own standing height and only walk her across the ground.
+        -- Walk her across the ground at her recorded standing height. Reading
+        -- it back off the live pivot sampled whatever the ambient bob happened
+        -- to be applying at that instant, which biased the whole walk down.
         -- An R15 pivot sits about three studs above the floor, so the callers'
         -- waist-height destination Y (a leftover from the hand-stacked body
         -- this rig replaced, whose pivot sat much lower) buried her to the
         -- chest on arrival. The valley floor is flat at GROUND_Y here, so
         -- carrying her current height across is both correct and immune to the
         -- next caller passing a Y that means something else.
-        local target = CFrame.new(destination.X, start.Position.Y, destination.Z)
+        local target = CFrame.new(destination.X, self._maraStandY, destination.Z)
         for step = 1, 30 do
             mara:PivotTo(start:Lerp(target, step / 30))
             task.wait(0.035)
