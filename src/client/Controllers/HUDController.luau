@@ -358,8 +358,8 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         "Objective",
         "FREE MARA",
         UDim2.new(1, -28, 0, 34),
-        UDim2.fromOffset(14, 32),
-        20,
+        UDim2.fromOffset(14, 30),
+        26,
         COLORS.cream
     )
     objective.Font = Enum.Font.GothamBold
@@ -367,9 +367,9 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         objectiveFrame,
         "Detail",
         "Follow the lantern path.",
-        UDim2.new(1, -28, 0, 48),
-        UDim2.fromOffset(14, 70),
-        14,
+        UDim2.new(1, -28, 0, 42),
+        UDim2.fromOffset(14, 66),
+        18,
         COLORS.muted
     )
     detail.TextYAlignment = Enum.TextYAlignment.Top
@@ -1829,7 +1829,7 @@ function HUDController._layout(self: HUDController)
 
     if narrow then
         self._objectiveFrame.Position = UDim2.fromOffset(18, 70)
-        self._objectiveFrame.Size = UDim2.new(1, -36, 0, if self._compactEnabled then 76 else 132)
+        self._objectiveFrame.Size = UDim2.fromOffset(470, if self._compactEnabled then 78 else 112)
         self._resource.Position = UDim2.fromOffset(18, if self._compactEnabled then 158 else 218)
         self._compact.Size = UDim2.fromOffset(44, 38)
         self._compact.Text = if self._compactEnabled then "+" else "−"
@@ -2259,7 +2259,13 @@ function HUDController.update(self: HUDController, state: any)
     self._resource.Visible = not nightActive
         and not blackoutActive
         and ((tonumber(state.resources) or 0) > 0 or state.selectedTool ~= nil)
-    self._tool.Visible = (nightActive or eliteActive or bossActive or blackoutActive)
+    -- FIND and STRIKE now live on the world objects: tap the stump, tap the
+    -- creature. Dead buttons cost the thing a phone screen has least of, so
+    -- they stay hidden. Run, dodge, and ability remain because they have no
+    -- target to tap.
+    self._primary.Visible = false
+    self._tool.Visible = false
+        and (nightActive or eliteActive or bossActive or blackoutActive)
         and not self._playerDowned
     self._sprint.Visible = self._inputMode == "touch" and not self._playerDowned
     self._dodge.Visible = not self._playerDowned

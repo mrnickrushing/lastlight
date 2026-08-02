@@ -62,11 +62,19 @@ function CombatState.create(now: number): State
     }
 end
 
+--[[
+    `moving` defaults to true so existing callers keep their behaviour, but the
+    service passes the player's real movement. Standing still with run toggled
+    on used to drain the bar to nothing while the character had not gone
+    anywhere, which reads as a bug and punishes a player for pausing to look
+    around. Sprint now only costs while actually sprinting somewhere.
+]]
 function CombatState.advance(
     state: State,
     now: number,
     canAct: boolean,
-    staminaRegenMultiplier: number?
+    staminaRegenMultiplier: number?,
+    moving: boolean?
 ): State
     assert(finiteNumber(now), "combat state time is invalid")
     local nextState = copyAt(state, now)
@@ -78,7 +86,8 @@ function CombatState.advance(
         changed = true
     end
 
-    if nextState.sprinting and canAct then
+    local spending = nextState.sprinting and canAct and moving ~= false
+    if spending then
         local stamina = math.max(0, state.stamina - SPRINT_DRAIN_PER_SECOND * delta)
         if stamina ~= state.stamina then
             nextState.stamina = stamina

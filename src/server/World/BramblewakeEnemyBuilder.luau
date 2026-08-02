@@ -420,6 +420,21 @@ function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target:
     highlight.DepthMode = Enum.HighlightDepthMode.Occluded
     highlight.Parent = model
 
+    --[[
+        Tap the creature to hit it.
+
+        Combat used to require finding a STRIKE button while a telegraph was
+        winding up. Putting the control on the enemy itself makes attacking
+        the same gesture as everything else in the game, and it aims: the
+        server still resolves range and damage, so this only decides which
+        creature the player meant.
+    ]]
+    local click = Instance.new("ClickDetector")
+    click.Name = "StrikeClick"
+    click.MaxActivationDistance = 26
+    click.CursorIcon = ""
+    click.Parent = core
+
     local flatTarget = Vector3.new(target.X, core.Position.Y, target.Z)
     if (flatTarget - core.Position).Magnitude > 0.01 then
         model:PivotTo(CFrame.lookAt(core.Position, flatTarget))

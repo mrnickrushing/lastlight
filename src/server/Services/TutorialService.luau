@@ -39,6 +39,7 @@ export type TutorialService = typeof(setmetatable(
         _runtimeIds: any,
         _tutorialFlow: any,
         _rateLimiter: any,
+        _featureFlags: any,
         _networkService: any,
         _profileService: any,
         _worldService: any,
@@ -74,6 +75,7 @@ function TutorialService.new(
     runtimeIds: any,
     tutorialFlow: any,
     rateLimiter: any,
+    featureFlags: any,
     networkService: any,
     profileService: any,
     worldService: any,
@@ -101,6 +103,7 @@ function TutorialService.new(
         _runtimeIds = runtimeIds,
         _tutorialFlow = tutorialFlow,
         _rateLimiter = rateLimiter,
+        _featureFlags = featureFlags,
         _networkService = networkService,
         _profileService = profileService,
         _worldService = worldService,
@@ -315,7 +318,19 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
         return
     end
 
-    local stage = profile.tutorial.stage
+    --[[
+        Every session starts a fresh run.
+
+        The tutorial stage is still written to the profile, and the flag below
+        can restore it, but with tutorial_persistence off a player who leaves
+        and comes back begins at the lodge again rather than resuming mid-way
+        through a run they have already left. Rejoining to find yourself
+        halfway through the first night, holding an axe you do not remember
+        picking, reads as the game having lost track rather than as progress.
+    ]]
+    local stage = if self._featureFlags:isEnabled("tutorial_persistence")
+        then profile.tutorial.stage
+        else self._tutorialFlow.firstStage()
     player:SetAttribute("LastLightTutorialSurvivalReady", isCombatEligibleStage(stage))
     local session: Session = {
         stage = stage,
@@ -469,6 +484,28 @@ end
 -- Entry point for tapping a world object. Goes through the same rate limiter
 -- and the same validated interaction path as the HUD button, so clicking is
 -- another way to ask, not a way around any check.
+-- Shared by the tool action and by tapping a creature. Every guard stays on
+-- the server: a click only says which enemy the player meant.
+function TutorialService.strike(self: TutorialService, player: Player)
+    local session = self._sessions[player]
+    if
+        session ~= nil
+        and self._survivalService:canAct(player)
+        and (session.stage == "survive" or player:GetAttribute("LastLightInExpedition") == true)
+    then
+        local _, message = self._enemyService:damageNearest(player)
+        self:_setToast(player, message)
+        self:_publishAll()
+    end
+end
+
+function TutorialService.strikeFromClick(self: TutorialService, player: Player)
+    if not self._limiter:allow(tostring(player.UserId), os.clock(), 2) then
+        return
+    end
+    self:strike(player)
+end
+
 function TutorialService.interactFromClick(
     self: TutorialService,
     player: Player,
@@ -899,16 +936,7 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             self:_interact(player, interactionId)
         end
     elseif kind == self._runtimeIds.Actions.UseTool then
-        local session = self._sessions[player]
-        if
-            session ~= nil
-            and self._survivalService:canAct(player)
-            and (session.stage == "survive" or player:GetAttribute("LastLightInExpedition") == true)
-        then
-            local _, message = self._enemyService:damageNearest(player)
-            self:_setToast(player, message)
-            self:_publishAll()
-        end
+        self:strike(player)
     elseif kind == self._runtimeIds.Actions.Sprint and type(payload.enabled) == "boolean" then
         self._combatService:setSprint(player, payload.enabled)
     elseif kind == self._runtimeIds.Actions.Dodge then

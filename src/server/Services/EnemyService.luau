@@ -59,6 +59,7 @@ export type EnemyService = typeof(setmetatable(
         _queue: { string },
         _nextSpawnAt: number,
         _nightActive: boolean,
+        _strikeHandler: ((Player) -> ())?,
         _lanternHealth: number,
         _breachMultiplier: number,
         _nightModifiers: any,
@@ -110,6 +111,7 @@ function EnemyService.new(
         _queue = {},
         _nextSpawnAt = 0,
         _nightActive = false,
+        _strikeHandler = nil,
         _lanternHealth = 100,
         _breachMultiplier = 1,
         _nightModifiers = {
@@ -472,6 +474,7 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
             self._worldService:placeEnemyVisual(model, definition.modelKey)
         end
     end)
+    self:bindStrikeClicks(model)
     local spawnedAt = workspace:GetServerTimeNow()
     local basePosition = model:GetPivot().Position
     local themedHealth =
@@ -1156,6 +1159,30 @@ function EnemyService.spendLanternStrength(self: EnemyService, amount: number, s
         reason = if spent > 0 then "spent" else "minimum_health",
         spent = spent,
     }
+end
+
+-- Wire every spawned enemy's ClickDetector to the strike handler. The click
+-- only says which creature the player meant; damageNearest still resolves
+-- range, night state, and damage on the server exactly as the button did.
+function EnemyService.bindStrikeClicks(self: EnemyService, model: Model)
+    local core = model.PrimaryPart
+    if core == nil then
+        return
+    end
+    local click = core:FindFirstChild("StrikeClick")
+    if click == nil or not click:IsA("ClickDetector") then
+        return
+    end
+    click.MouseClick:Connect(function(clicker: Player)
+        local handler = self._strikeHandler
+        if handler ~= nil then
+            handler(clicker)
+        end
+    end)
+end
+
+function EnemyService.setStrikeHandler(self: EnemyService, handler: (Player) -> ())
+    self._strikeHandler = handler
 end
 
 function EnemyService.damageNearest(self: EnemyService, player: Player): (boolean, string)

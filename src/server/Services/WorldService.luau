@@ -3163,6 +3163,27 @@ function WorldService._buildLobby(self: WorldService, world: Model)
         Vector3.new(14, wallHeight - 11, 1.2),
         Vector3.new(0, wallHeight - (wallHeight - 11) / 2, -halfDepth)
     )
+    --[[
+        The doorway is a view, not an exit.
+
+        The lodge is a staging room: the platform is how you leave, and a
+        player who simply ran out through the door skipped the entire
+        departure and arrived in the world alone. An invisible pane across
+        the opening keeps the doorway readable as a way out -- you can see the
+        road you are about to be sent to -- while making the platform the only
+        thing that actually gets you there.
+    ]]
+    local doorSeal = part(
+        lobby,
+        "LodgeDoorSeal",
+        Vector3.new(14, 11, 1),
+        CFrame.new(LOBBY_CENTER + Vector3.new(0, 5.5, -halfDepth)),
+        Color3.fromRGB(255, 181, 76),
+        Enum.Material.Neon
+    )
+    doorSeal.Transparency = 0.94
+    doorSeal.CastShadow = false
+    doorSeal.CanQuery = false
 
     -- Log courses and corner posts so the walls read as built timber.
     for courseIndex = 1, 5 do
