@@ -393,12 +393,15 @@ for _, descendant in world:GetDescendants() do
     end
 end
 assert(firstLanternGlassPanels == 4, "First Lantern needs four readable glass cage panels")
-local maraLantern = mara:FindFirstChild("MaraLantern")
+-- Recursive: the constructed lantern now hangs under a MaraLanternFallback
+-- wrapper so a sourced lantern asset can hide the whole fallback as one unit.
+-- A shallow lookup reports "glowing ball" for a lantern that is fully built.
+local maraLantern = mara:FindFirstChild("MaraLantern", true)
 assert(
     maraLantern ~= nil
         and maraLantern:IsA("BasePart")
         and maraLantern.Shape ~= Enum.PartType.Ball
-        and mara:FindFirstChild("MaraLanternRail") ~= nil,
+        and mara:FindFirstChild("MaraLanternRail", true) ~= nil,
     "Mara needs a constructed hand lantern instead of a glowing ball"
 )
 assert(heroDetailCounts.ArchiveNotice == 5, "archive needs readable physical field notices")
