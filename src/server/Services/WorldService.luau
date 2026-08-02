@@ -222,14 +222,14 @@ local function queueRoadAssetPlacements(
         table.insert(placements, {
             assetId = "mesh_creator_road_stones_a",
             fallbackKind = "asset_dressing",
-            position = Vector3.new(position.X, 0.92, position.Z),
+            position = Vector3.new(position.X, 2.42, position.Z),
             scale = 1,
             yaw = yaw,
             seed = seedBase + index,
             swayTag = nil,
             parent = parent,
             fallbackInstance = nil,
-            profileScale = Vector3.new(1, 1, chunkLength / 18),
+            profileScale = Vector3.new(1.12, 0.92, chunkLength / 18),
         })
     end
 end
@@ -780,8 +780,11 @@ local function buildEmberhollowSanctuary(
                 parent = cabinFolder,
                 fallbackInstance = cotFallback,
             })
+            local supplyFallback = Instance.new("Model")
+            supplyFallback.Name = "MaraSupplyShelfFallback"
+            supplyFallback.Parent = cabinFolder
             local tableTop = part(
-                cabinFolder,
+                supplyFallback,
                 "MaraWorkTable",
                 Vector3.new(4.2, 0.45, 2.5),
                 cabinCFrame(4.5, 2.15, -3.2),
@@ -794,7 +797,7 @@ local function buildEmberhollowSanctuary(
             for legX = -1, 1, 2 do
                 for legZ = -1, 1, 2 do
                     local leg = part(
-                        cabinFolder,
+                        supplyFallback,
                         "MaraWorkTableLeg",
                         Vector3.new(0.3, 1.7, 0.3),
                         cabinCFrame(4.5 + legX * 1.75, 1.28, -3.2 + legZ * 0.95),
@@ -807,7 +810,7 @@ local function buildEmberhollowSanctuary(
             end
             for jarIndex = -1, 1 do
                 local jar = part(
-                    cabinFolder,
+                    supplyFallback,
                     "MemoryJar",
                     -- A Roblox Cylinder extends along its LOCAL X axis, so the
                     -- first component is the jar's height and the other two its
@@ -823,7 +826,7 @@ local function buildEmberhollowSanctuary(
                 jar.Transparency = 0.22
                 jar.CanQuery = false
                 local lid = part(
-                    cabinFolder,
+                    supplyFallback,
                     "MemoryJarLid",
                     Vector3.new(0.16, 0.76, 0.76),
                     cabinCFrame(4.5 + jarIndex * 1.1, 3.46, -3.2)
@@ -835,6 +838,17 @@ local function buildEmberhollowSanctuary(
                 lid.Shape = Enum.PartType.Cylinder
                 lid.CanQuery = false
             end
+            table.insert(meshPlacements, {
+                assetId = "mesh_creator_potion_shelf_a",
+                fallbackKind = "asset_replacement",
+                position = cabinCFrame(4.5, 0.62, -3.2).Position,
+                scale = 1,
+                yaw = yaw + math.rad(90),
+                seed = 9851,
+                swayTag = nil,
+                parent = cabinFolder,
+                fallbackInstance = supplyFallback,
+            })
         else
             for bedIndex = -1, 1, 2 do
                 local bedrollFallback = Instance.new("Model")
@@ -868,8 +882,11 @@ local function buildEmberhollowSanctuary(
                     fallbackInstance = bedrollFallback,
                 })
             end
+            local trunkFallback = Instance.new("Model")
+            trunkFallback.Name = "WayfarerTrunkFallback"
+            trunkFallback.Parent = cabinFolder
             local trunk = part(
-                cabinFolder,
+                trunkFallback,
                 "WayfarerTrunk",
                 Vector3.new(4.4, 2.3, 2.5),
                 cabinCFrame(5.2, 1.2, -3.6),
@@ -878,6 +895,17 @@ local function buildEmberhollowSanctuary(
                 false
             )
             trunk.CanQuery = false
+            table.insert(meshPlacements, {
+                assetId = "mesh_creator_crate_a",
+                fallbackKind = "asset_replacement",
+                position = cabinCFrame(5.2, 0.62, -3.6).Position,
+                scale = 1,
+                yaw = yaw + math.rad(12),
+                seed = 9861,
+                swayTag = nil,
+                parent = cabinFolder,
+                fallbackInstance = trunkFallback,
+            })
         end
 
         local rug = part(
@@ -1066,9 +1094,9 @@ local function buildEmberhollowSanctuary(
         parent,
         "TownMainStreetFoundation",
         Vector3.new(18, 0.34, 206),
-        CFrame.new(0, 0.31, -102),
-        Color3.fromRGB(72, 65, 53),
-        Enum.Material.Cobblestone,
+        CFrame.new(0, 1.81, -102),
+        Color3.fromRGB(38, 41, 39),
+        Enum.Material.Slate,
         false
     )
     streetFoundation.CanQuery = false
@@ -1076,19 +1104,19 @@ local function buildEmberhollowSanctuary(
         parent,
         "TownMainStreet",
         Vector3.new(15.5, 0.32, 204),
-        CFrame.new(0, 0.59, -102),
-        Color3.fromRGB(126, 82, 45),
-        Enum.Material.Ground,
+        CFrame.new(0, 2.17, -102),
+        Color3.fromRGB(183, 143, 91),
+        Enum.Material.Cobblestone,
         false
     )
     townStreet.CanQuery = false
     local streetWear = part(
         parent,
         "TownMainStreetWear",
-        Vector3.new(5.4, 0.12, 202),
-        CFrame.new(0, 0.81, -102),
-        Color3.fromRGB(162, 116, 67),
-        Enum.Material.Pebble,
+        Vector3.new(3.8, 0.12, 202),
+        CFrame.new(0, 2.42, -102),
+        Color3.fromRGB(88, 58, 37),
+        Enum.Material.Mud,
         false
     )
     streetWear.CanQuery = false
@@ -1097,7 +1125,7 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownStreetRut",
             Vector3.new(0.68, 0.08, 200),
-            CFrame.new(rutSide * 2.4, 0.89, -102),
+            CFrame.new(rutSide * 2.4, 2.5, -102),
             Color3.fromRGB(61, 43, 30),
             Enum.Material.Mud,
             false
@@ -1120,9 +1148,9 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownDistrictRoadFoundation",
             Vector3.new(8.6, 0.26, delta.Magnitude + 1.2),
-            frame,
-            Color3.fromRGB(59, 57, 50),
-            Enum.Material.Cobblestone,
+            frame * CFrame.new(0, 1.5, 0),
+            Color3.fromRGB(38, 41, 39),
+            Enum.Material.Slate,
             false
         )
         base.CanQuery = false
@@ -1130,23 +1158,29 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownDistrictRoad",
             Vector3.new(7.2, 0.24, delta.Magnitude + 0.8),
-            frame * CFrame.new(0, 0.24, 0),
-            Color3.fromRGB(126, 82, 45),
-            Enum.Material.Ground,
+            frame * CFrame.new(0, 1.81, 0),
+            Color3.fromRGB(176, 137, 87),
+            Enum.Material.Cobblestone,
             false
         )
         surface.CanQuery = false
         local wear = part(
             parent,
             "TownDistrictRoadWear",
-            Vector3.new(2.6, 0.08, delta.Magnitude + 0.5),
-            frame * CFrame.new(0, 0.41, 0),
-            Color3.fromRGB(135, 99, 59),
-            Enum.Material.Ground,
+            Vector3.new(2.1, 0.08, delta.Magnitude + 0.5),
+            frame * CFrame.new(0, 2.01, 0),
+            Color3.fromRGB(79, 52, 34),
+            Enum.Material.Mud,
             false
         )
         wear.CanQuery = false
-        queueRoadAssetPlacements(meshPlacements, parent, start, finish, 9700 + #meshPlacements)
+        queueRoadAssetPlacements(
+            meshPlacements,
+            parent,
+            start + Vector3.new(0, 1.38, 0),
+            finish + Vector3.new(0, 1.38, 0),
+            9700 + #meshPlacements
+        )
     end
     townSideRoad(Vector3.new(0, 0.45, -144), Vector3.new(-80, 0.45, -144))
     townSideRoad(Vector3.new(0, 0.45, -126), Vector3.new(80, 0.45, -126))
@@ -2153,6 +2187,9 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     )
 
     local route = {
+        -- Extend behind ArrivalSpawn so the opening camera visibly starts on
+        -- the route instead of looking across an unbroken foreground of grass.
+        Vector3.new(0, 0.42, 18),
         Vector3.new(0, 0.42, 0),
         Vector3.new(-3, 0.42, -28),
         Vector3.new(20, 0.42, -48),
@@ -2175,9 +2212,9 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             geometry,
             "EmberhollowRoadFoundation",
             Vector3.new(17.2, 0.28, distance + 4),
-            roadFrame * CFrame.new(0, -0.08, 0),
-            Color3.fromRGB(72, 65, 53),
-            Enum.Material.Cobblestone,
+            roadFrame * CFrame.new(0, 1.42, 0),
+            Color3.fromRGB(38, 41, 39),
+            Enum.Material.Slate,
             false
         )
         foundation.CanQuery = false
@@ -2185,9 +2222,13 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             geometry,
             "EmberhollowRoad",
             Vector3.new(15.2, 0.36, distance + 3.6),
-            roadFrame * CFrame.new(0, 0.18, 0),
-            Color3.fromRGB(126, 82, 45),
-            Enum.Material.Ground,
+            -- Studio verification showed the voxel-rendered valley surface
+            -- occluding the authored y=0 plane by about 1.5 studs. Keeping the
+            -- route non-colliding while lifting its visual skin preserves the
+            -- gameplay plane and makes the road actually render underfoot.
+            roadFrame * CFrame.new(0, 1.77, 0),
+            Color3.fromRGB(190, 149, 94),
+            Enum.Material.Cobblestone,
             false
         )
         trail.CanQuery = false
@@ -2195,20 +2236,36 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         local wornCenter = part(
             geometry,
             "EmberhollowRoadWear",
-            Vector3.new(6.2, 0.12, distance + 2.8),
-            roadFrame * CFrame.new(0, 0.43, 0),
-            Color3.fromRGB(162, 116, 67),
-            Enum.Material.Pebble,
+            Vector3.new(3.6, 0.12, distance + 2.8),
+            roadFrame * CFrame.new(0, 2.05, 0),
+            Color3.fromRGB(78, 51, 33),
+            Enum.Material.Mud,
             false
         )
         wornCenter.CanQuery = false
+
+        -- A continuous dark shoulder on both sides makes the path silhouette
+        -- survive fog, grass texture, and the low morning camera angle. Sparse
+        -- edge stones alone disappeared into the meadow between placements.
+        for shoulderSide = -1, 1, 2 do
+            local shoulder = part(
+                geometry,
+                "RoadShoulder",
+                Vector3.new(1.15, 0.3, distance + 3.2),
+                roadFrame * CFrame.new(shoulderSide * 7.45, 1.83, 0),
+                Color3.fromRGB(57, 62, 59),
+                Enum.Material.Slate,
+                false
+            )
+            shoulder.CanQuery = false
+        end
 
         for rutSide = -1, 1, 2 do
             local rut = part(
                 geometry,
                 "RoadRut",
                 Vector3.new(0.62, 0.08, distance + 1),
-                roadFrame * CFrame.new(rutSide * 2.25, 0.52, 0),
+                roadFrame * CFrame.new(rutSide * 2.25, 2.14, 0),
                 Color3.fromRGB(57, 40, 28),
                 Enum.Material.Mud,
                 false
@@ -2223,13 +2280,13 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 local edgeStone = part(
                     geometry,
                     "RoadEdgeStone",
-                    Vector3.new(0.9, 0.38, 1.35),
+                    Vector3.new(1.3, 0.62, 1.75),
                     roadFrame
-                        * CFrame.new(side * 7.85, 0.37, along)
+                        * CFrame.new(side * 7.85, 2.13, along)
                         * CFrame.Angles(0, math.rad(side * (marker % 2) * 7), 0),
                     if marker % 3 == 0
-                        then Color3.fromRGB(107, 101, 86)
-                        else Color3.fromRGB(75, 83, 79),
+                        then Color3.fromRGB(132, 124, 101)
+                        else Color3.fromRGB(84, 94, 89),
                     Enum.Material.Slate,
                     false
                 )
@@ -2256,12 +2313,12 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             local wedge = part(
                 geometry,
                 "RouteGuideMarker",
-                Vector3.new(1.5, 0.1, 2.1),
+                Vector3.new(1.9, 0.12, 2.65),
                 -- The route frame sits at Y = 0.42 and the worn road surface
                 -- tops out at 0.91, so this offset puts the wedge's underside
                 -- at 0.89 -- inlaid into the road. At 0.94 it floated a full
                 -- 0.4 studs above the surface and pulsed in mid-air.
-                roadFrame * CFrame.new(0, 0.52, along) * CFrame.Angles(0, math.pi, 0),
+                roadFrame * CFrame.new(0, 2.15, along) * CFrame.Angles(0, math.pi, 0),
                 FOXFIRE,
                 Enum.Material.Neon,
                 false
@@ -2432,6 +2489,10 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         CFrame.new(7, 3, -14) * CFrame.Angles(0, math.pi, 0),
         "FOLLOW THE LANTERNS"
     )
+    -- The sourced sign has its own two-board silhouette. Keeping the legacy
+    -- fallback SurfaceGui after replacement projects one wide sentence across
+    -- both irregular boards and clips it into unreadable fragments.
+    routeSign:SetAttribute("HideSemanticGuiOnReplacement", true)
     table.insert(_self._meshPlacements, {
         assetId = "mesh_creator_forest_sign_a",
         fallbackKind = "asset_replacement",
@@ -2686,10 +2747,13 @@ local function buildMeshFallback(parent: Instance, placement: MeshPlacement)
 end
 
 local function hideProceduralPlaceholder(placeholder: Instance)
+    local removeSemanticGui = placeholder:GetAttribute("HideSemanticGuiOnReplacement") == true
     local instances = placeholder:GetDescendants()
     table.insert(instances, placeholder)
     for _, instance in instances do
-        if instance:IsA("BasePart") then
+        if removeSemanticGui and (instance:IsA("SurfaceGui") or instance:IsA("BillboardGui")) then
+            instance:Destroy()
+        elseif instance:IsA("BasePart") then
             instance.Transparency = 1
             instance.CastShadow = false
         elseif
@@ -2700,11 +2764,25 @@ local function hideProceduralPlaceholder(placeholder: Instance)
             or instance:IsA("Sparkles")
             or instance:IsA("Trail")
             or instance:IsA("Beam")
+            or instance:IsA("LayerCollector")
         then
             instance.Enabled = false
         end
     end
     placeholder:SetAttribute("ReplacedByAuthoredMesh", true)
+end
+
+local function keepReplacedAnchorHidden(target: BasePart)
+    if target:GetAttribute("ReplacedByAuthoredMesh") ~= true then
+        return
+    end
+    target.Transparency = 1
+    target.CastShadow = false
+    for _, child in target:GetChildren() do
+        if child:IsA("LayerCollector") then
+            child.Enabled = false
+        end
+    end
 end
 
 -- Authored art is optional streaming dressing. Loading begins only after the
@@ -2767,6 +2845,108 @@ function WorldService._placeAuthoredMeshes(
             placements = #queued,
         })
     end)
+end
+
+-- Dynamic enemies keep their original primitive geometry as an invisible,
+-- authoritative combat volume. Only the visible shell is replaced, so a
+-- cosmetic Creator Store model can never change reach, navigation, or hits.
+function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKey: string): boolean
+    local visualProfiles = {
+        rootling = {
+            assetId = "mesh_creator_hollow_rootling_a",
+            groundOffset = 2,
+            yaw = math.rad(8),
+            profile = Vector3.new(0.9, 1.06, 0.84),
+        },
+        briarback = {
+            assetId = "mesh_creator_earth_golem_a",
+            groundOffset = 2.4,
+            yaw = math.rad(-7),
+            profile = Vector3.new(1.08, 0.9, 1.12),
+        },
+        pollen_wisp = {
+            assetId = "mesh_creator_blossom_spirit_a",
+            groundOffset = 1.4,
+            yaw = math.rad(14),
+            profile = Vector3.new(0.88, 1.12, 0.92),
+            scale = 1.4,
+        },
+        hollow_crow = {
+            assetId = "mesh_creator_raven_a",
+            groundOffset = 1.1,
+            yaw = math.rad(180),
+            profile = Vector3.new(1.16, 0.9, 0.94),
+            scale = 2,
+        },
+        snapvine = {
+            assetId = "mesh_creator_predatory_flower_a",
+            groundOffset = 2,
+            yaw = math.rad(-11),
+            profile = Vector3.new(0.92, 1.08, 1.04),
+            scale = 1.25,
+        },
+        bark_ram = {
+            assetId = "mesh_creator_bark_ram_a",
+            groundOffset = 2.5,
+            yaw = math.rad(180),
+            profile = Vector3.new(1.12, 0.88, 1.05),
+            scale = 1.35,
+        },
+        old_growth = {
+            assetId = "mesh_creator_old_growth_a",
+            groundOffset = 9,
+            yaw = math.rad(180),
+            profile = Vector3.new(0.94, 1.08, 0.9),
+        },
+        warden_stag = {
+            assetId = "mesh_creator_wood_ibex_a",
+            groundOffset = 10,
+            yaw = math.rad(180),
+            profile = Vector3.new(1.08, 1.14, 0.94),
+            scale = 3,
+        },
+    }
+    local profile = visualProfiles[modelKey]
+    local core = model.PrimaryPart
+    if profile == nil or core == nil or model.Parent == nil then
+        return false
+    end
+
+    local fallbackParts = {}
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("BasePart") then
+            table.insert(fallbackParts, descendant)
+        end
+    end
+    local bottomPosition = core.Position - Vector3.new(0, profile.groundOffset, 0)
+    local at = CFrame.new(bottomPosition) * core.CFrame.Rotation * CFrame.Angles(0, profile.yaw, 0)
+    local placed, result = pcall(
+        self._meshTemplateLoader.place,
+        self._meshTemplateLoader,
+        profile.assetId,
+        model,
+        at,
+        profile.scale or 1,
+        profile.profile
+    )
+    local authored = if placed then result else nil
+    if authored == nil then
+        self._logger:info("enemy_asset_visual_failed", {
+            assetId = profile.assetId,
+            enemy = modelKey,
+            error = if placed then "asset_unavailable" else tostring(result),
+        })
+        return false
+    end
+    authored.Name = "AuthoredEnemyVisual"
+    for _, fallbackPart in fallbackParts do
+        fallbackPart.Transparency = 1
+        fallbackPart.CastShadow = false
+        fallbackPart:SetAttribute("AuthoritativeEnemyHitbox", fallbackPart == core)
+    end
+    model:SetAttribute("EnemyVisualAssetId", profile.assetId)
+    model:SetAttribute("EnemyVisualReady", true)
+    return true
 end
 
 function WorldService._buildMeshDressing(self: WorldService)
@@ -3845,7 +4025,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         interactables,
         "BramblewakeBeacon",
         Vector3.new(3.4, 5.4, 3.4),
-        CFrame.new(0, 6.2, -148),
+        CFrame.new(0, 3.9, -148),
         Color3.fromRGB(104, 187, 166),
         Enum.Material.Glass,
         false
@@ -3854,14 +4034,15 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     beacon.Transparency = 1
     beacon.CanQuery = false
     self._beacon = beacon
-    -- The beacon fades in from fully transparent, so before this it revealed
-    -- as a bare glowing sphere hanging in the middle of the gateway. The orb
-    -- stays the interaction anchor -- name, prompt, and reveal tween are
-    -- untouched -- but it now hangs in a physical cradle slung under the gate
-    -- crown, so what lights up reads as a memory lamp mounted in the arch
-    -- rather than an orb floating in mid-air.
+    -- The gameplay beacon remains an invisible interaction anchor. The visible
+    -- object is a thumbnail-reviewed crystal reliquary placed through
+    -- MeshTemplateLoader below; this fallback only appears if the reviewed
+    -- model cannot load.
+    local beaconFallback = Instance.new("Model")
+    beaconFallback.Name = "MemoryReliquaryFallback"
+    beaconFallback.Parent = interactables
     local beaconCradle = part(
-        interactables,
+        beaconFallback,
         "BeaconCradleMount",
         Vector3.new(0.34, 3.6, 0.34),
         CFrame.new(0, 10.4, -148),
@@ -3873,7 +4054,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     for armIndex = 0, 3 do
         local armAngle = (armIndex / 4) * math.pi * 2
         local arm = part(
-            interactables,
+            beaconFallback,
             "BeaconCradleArm",
             Vector3.new(0.26, 2.9, 0.26),
             CFrame.new(0, 8.05, -148)
@@ -3887,7 +4068,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         arm.CanQuery = false
     end
     local beaconCollar = part(
-        interactables,
+        beaconFallback,
         "BeaconCradleCollar",
         Vector3.new(0.3, 2.9, 2.9),
         CFrame.new(0, 8.6, -148) * CFrame.Angles(0, 0, math.rad(90)),
@@ -3897,6 +4078,40 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     )
     beaconCollar.Shape = Enum.PartType.Cylinder
     beaconCollar.CanQuery = false
+    local fallbackLens = part(
+        beaconFallback,
+        "BeaconFallbackLens",
+        Vector3.new(2.2, 2.6, 2.6),
+        CFrame.new(0, 6.25, -148) * CFrame.Angles(0, 0, math.rad(90)),
+        FOXFIRE,
+        Enum.Material.Glass,
+        false
+    )
+    fallbackLens.Shape = Enum.PartType.Cylinder
+    fallbackLens.Transparency = 0.22
+    fallbackLens.CanQuery = false
+    local fallbackFlame = part(
+        beaconFallback,
+        "BeaconFallbackFlame",
+        Vector3.new(0.72, 1.55, 0.64),
+        CFrame.new(0, 6.18, -148) * CFrame.Angles(0, math.rad(18), 0),
+        FOXFIRE,
+        Enum.Material.Neon,
+        false
+    )
+    fallbackFlame.Shape = Enum.PartType.Wedge
+    fallbackFlame.CanQuery = false
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_memory_reliquary_a",
+        fallbackKind = "asset_replacement",
+        position = Vector3.new(0, 0.25, -148),
+        scale = 1,
+        yaw = math.pi,
+        seed = 9911,
+        swayTag = nil,
+        parent = interactables,
+        fallbackInstance = beaconFallback,
+    })
     self:_registerInteraction(
         beacon,
         self._runtimeIds.InteractionIds.Beacon,
@@ -4670,7 +4885,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "emberhollow-adaptive-music-v27")
+    world:SetAttribute("WorldVersion", "emberhollow-runtime-visual-v28")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -4770,7 +4985,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "emberhollow-adaptive-music-v27",
+        worldVersion = "emberhollow-runtime-visual-v28",
     })
 end
 
@@ -4958,12 +5173,10 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
     if beacon == nil then
         return
     end
-    local becomingVisible = visible and beacon.Transparency >= 0.95
-    TweenService:Create(
-        beacon,
-        TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        { Transparency = if visible then 0.16 else 1 }
-    ):Play()
+    local becomingVisible = visible and beacon.CanQuery == false
+    -- Never reveal the procedural interaction sphere. Progression is conveyed
+    -- by the reliquary light and prompt, not a second orb or a floating label.
+    beacon.Transparency = 1
     beacon.CanQuery = visible
     local prompt = self._interactions[self._runtimeIds.InteractionIds.Beacon]
     if prompt ~= nil then
@@ -4979,8 +5192,9 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
         light.Parent = beacon
     end
     light.Enabled = visible
-    if visible and beacon:FindFirstChild("WorldLabel") == nil then
-        addBillboard(beacon, "THE BRAMBLEWAKE REMEMBERS", CREAM)
+    local oldLabel = beacon:FindFirstChild("WorldLabel")
+    if oldLabel ~= nil then
+        oldLabel:Destroy()
     end
 
     local world = self._world
@@ -5003,7 +5217,7 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
             assert(beacon.Parent, "beacon parent is missing"),
             "DawnRevealPulse",
             Vector3.new(0.16, 5, 5),
-            CFrame.new(beacon.Position - Vector3.new(0, 5.95, 0))
+            CFrame.new(beacon.Position.X, 0.24, beacon.Position.Z)
                 * CFrame.Angles(0, 0, math.rad(90)),
             FOXFIRE,
             Enum.Material.Neon,
@@ -7636,6 +7850,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
     arena.fireSource.Color = if relay then AMBER else Color3.fromRGB(94, 83, 64)
     arena.fireSource.Material = if relay then Enum.Material.Neon else Enum.Material.SmoothPlastic
     arena.fireSource.Transparency = if relay then 0.1 else 0.58
+    keepReplacedAnchorHidden(arena.fireSource)
     local firePrompt = self._interactions[self._runtimeIds.InteractionIds.BlackoutFireSource]
     if firePrompt ~= nil then
         firePrompt.Enabled = relay
@@ -7651,6 +7866,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
             then Enum.Material.Neon
             else Enum.Material.SmoothPlastic
         target.Transparency = if delivered then 0.28 elseif relay then 0.12 else 0.58
+        keepReplacedAnchorHidden(target)
         local prompt = target:FindFirstChildOfClass("ProximityPrompt")
         if prompt ~= nil then
             prompt.Enabled = relay
@@ -7717,6 +7933,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
                 target.Transparency = 0.78
             end
         end
+        keepReplacedAnchorHidden(target)
     end
 
     if world ~= nil then
@@ -7786,6 +8003,8 @@ function WorldService.setOldGrowthPresentation(self: WorldService, status: strin
         then Enum.Material.Neon
         else Enum.Material.SmoothPlastic
     arena.rootHeart.Transparency = if shielded or complete then 0.14 else 0.58
+    keepReplacedAnchorHidden(arena.fireSource)
+    keepReplacedAnchorHidden(arena.rootHeart)
 
     local firePrompt = self._interactions[self._runtimeIds.InteractionIds.OldGrowthFireSource]
     local heartPrompt = self._interactions[self._runtimeIds.InteractionIds.OldGrowthHeart]
@@ -7826,6 +8045,7 @@ function WorldService.setWardenStagPresentation(self: WorldService, state: any)
         then Enum.Material.Neon
         else Enum.Material.SmoothPlastic
     arena.seal.Transparency = if enabled then 0.24 else 0.72
+    keepReplacedAnchorHidden(arena.seal)
 
     for nodeId, target in arena.nodes do
         local cleansed = cleansedNodes[nodeId] == true
@@ -7837,6 +8057,7 @@ function WorldService.setWardenStagPresentation(self: WorldService, state: any)
             then Enum.Material.Neon
             else Enum.Material.SmoothPlastic
         target.Transparency = if cleansed then 0.46 elseif cleansing then 0.12 else 0.56
+        keepReplacedAnchorHidden(target)
         local interactionId = target:GetAttribute("InteractionId")
         local prompt = if type(interactionId) == "string"
             then self._interactions[interactionId]
@@ -7907,6 +8128,7 @@ function WorldService.setExpeditionEventState(self: WorldService, eventId: strin
             target.Material = Enum.Material.SmoothPlastic
             target.Transparency = 0.5
         end
+        keepReplacedAnchorHidden(target)
         local prompt = target:FindFirstChildOfClass("ProximityPrompt")
         if prompt ~= nil then
             prompt.Enabled = eventCanProgress and not complete

@@ -181,7 +181,10 @@ clarity. Cosmetic geometry must not alter authoritative combat bounds.
    for a newer compressed format is an unknown measurement, not proof that the
    asset is restricted or empty.
 4. Author hero assets around stable collision shells. Sanitize loaded models and
-   remove scripts, prompts, constraints, and unapproved descendants.
+   remove scripts, prompts, constraints, sounds, body movers, post-processing,
+   and unapproved descendants. Run downloaded Creator Store payloads through
+   `lune run scripts/sanitize_creator_store_model <file.rbxm>` before commit;
+   `MeshTemplateLoader` repeats the sanitization at runtime as defense in depth.
 5. Keep material slots and triangle counts bounded. Use high detail only where
    players can inspect it.
 6. Built-in Roblox materials already provide PBR response. Add custom
@@ -197,7 +200,8 @@ machine-readable source of truth, not memory or a screenshot. Each entry's `id`
 is the stable ID used everywhere else (registry, loader, logs, clone
 attributes); its `robloxAssetId` is the numeric Roblox asset, present only after
 Open Cloud finishes processing an upload. `placementBand` (`core`, `core_near`,
-`core_near_town_edge`, `curated_core`, `curated_expedition`) is an advisory hint
+`core_near_town_edge`, `curated_core`, `curated_expedition`, `curated_enemy`,
+`curated_hero`) is an advisory hint
 for where in the world the asset was authored to live — nothing at runtime
 enforces it, so respecting it is the placing agent's responsibility, not a
 guardrail that will catch a mistake.
