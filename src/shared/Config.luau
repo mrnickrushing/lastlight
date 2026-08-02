@@ -19,8 +19,12 @@ return table.freeze({
     BaseJumpPower = 50,
     SprintWalkSpeed = 24,
     MaxStamina = 100,
-    SprintDrainPerSecond = 18,
-    StaminaRegenPerSecond = 24,
+    -- A full bar used to empty in about five seconds, which made sprinting
+    -- feel broken rather than costly. At 7/s a full bar carries roughly
+    -- fourteen seconds of running, long enough to cross the arrival clearing
+    -- or break away from a wave, while still forcing a decision in a fight.
+    SprintDrainPerSecond = 7,
+    StaminaRegenPerSecond = 16,
     StaminaRegenDelaySeconds = 0.75,
     MinSprintStamina = 10,
     DodgeStaminaCost = 35,

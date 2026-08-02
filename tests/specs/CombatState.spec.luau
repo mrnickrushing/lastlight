@@ -26,7 +26,7 @@ return {
                 TestRunner.equal(result.applied, true)
                 TestRunner.equal(state.sprinting, false)
                 TestRunner.equal(sprinting.sprinting, true)
-                TestRunner.equal(CombatState.snapshot(drained, 2).stamina, 64)
+                TestRunner.equal(CombatState.snapshot(drained, 2).stamina, 86)
             end,
         },
         {
@@ -34,8 +34,8 @@ return {
             run = function()
                 local state = CombatState.create(0)
                 state = CombatState.setSprint(state, true, 0, true)
-                state = CombatState.advance(state, 10, true)
-                local snapshot = CombatState.snapshot(state, 10)
+                state = CombatState.advance(state, 16, true)
+                local snapshot = CombatState.snapshot(state, 16)
                 TestRunner.equal(snapshot.stamina, 0)
                 TestRunner.equal(snapshot.sprinting, false)
             end,
@@ -49,7 +49,7 @@ return {
                 state = CombatState.setSprint(state, false, 1, true)
                 local waiting = CombatState.advance(state, 1.5, true)
                 local recovered = CombatState.advance(waiting, 2.5, true)
-                TestRunner.equal(CombatState.snapshot(waiting, 1.5).stamina, 82)
+                TestRunner.equal(CombatState.snapshot(waiting, 1.5).stamina, 93)
                 TestRunner.equal(CombatState.snapshot(recovered, 2.5).stamina, 100)
             end,
         },
@@ -61,9 +61,9 @@ return {
                 local normal = CombatState.advance(state, 1, true, 1)
                 local equipped = CombatState.advance(state, 1, true, 1.1)
                 local clamped = CombatState.advance(state, 1, true, 99)
-                TestRunner.equal(CombatState.snapshot(normal, 1).stamina, 64)
-                TestRunner.equal(CombatState.snapshot(equipped, 1).stamina, 66)
-                TestRunner.equal(CombatState.snapshot(clamped, 1).stamina, 76)
+                TestRunner.equal(CombatState.snapshot(normal, 1).stamina, 56)
+                TestRunner.equal(CombatState.snapshot(equipped, 1).stamina, 57)
+                TestRunner.equal(CombatState.snapshot(clamped, 1).stamina, 64)
             end,
         },
         {
@@ -105,11 +105,11 @@ return {
             run = function()
                 local state = CombatState.create(0)
                 state = CombatState.setSprint(state, true, 0, true)
-                state = CombatState.advance(state, 4, true)
-                state = CombatState.setSprint(state, false, 4, true)
-                local unchanged, result = CombatState.dodge(state, 4, true)
+                state = CombatState.advance(state, 10, true)
+                state = CombatState.setSprint(state, false, 10, true)
+                local unchanged, result = CombatState.dodge(state, 10, true)
                 TestRunner.equal(result.reason, "insufficient_stamina")
-                TestRunner.equal(CombatState.snapshot(unchanged, 4).lowStamina, true)
+                TestRunner.equal(CombatState.snapshot(unchanged, 10).lowStamina, true)
             end,
         },
         {
