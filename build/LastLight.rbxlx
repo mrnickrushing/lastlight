@@ -1219,7 +1219,7 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.41.0",
+    BuildVersion = "0.42.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -20025,22 +20025,33 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
                 false
             )
         end
+        -- Thin pitched roof planes keep the gable readable. The previous pair
+        -- of six-stud-thick wedges became two enormous dark slabs at player
+        -- height and hid the walls, windows, doors, and the road behind them.
         for roofSide = -1, 1, 2 do
             local roof = referencePart(
                 shell,
-                "CabinRoof",
-                Vector3.new(36, 6, 12),
+                "CabinRoofPlane",
+                Vector3.new(36.5, 0.72, 13.5),
                 0,
-                10,
-                roofSide * 6,
+                9.65,
+                roofSide * 5.65,
                 roofColor,
                 Enum.Material.Slate
             )
-            roof.Shape = Enum.PartType.Wedge
-            if roofSide > 0 then
-                roof.CFrame *= CFrame.Angles(0, math.pi, 0)
-            end
+            roof.CFrame *= CFrame.Angles(math.rad(roofSide * 28), 0, 0)
             roof.CastShadow = true
+            referencePart(
+                shell,
+                "CabinEaveBeam",
+                Vector3.new(37, 0.75, 0.75),
+                0,
+                6.55,
+                roofSide * 11.55,
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
         end
         referencePart(
             shell,
@@ -20246,16 +20257,30 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
         local hearthFire = referencePart(
             fireplace,
             "CabinHearthFire",
-            Vector3.new(1.25, 1.45, 1.05),
+            Vector3.new(0.75, 1.7, 0.7),
             -9,
-            -3.7,
+            -3.55,
             12.2,
             accent,
             Enum.Material.Neon,
             false
         )
-        hearthFire.Shape = Enum.PartType.Ball
-        hearthFire.Transparency = 0.22
+        hearthFire.Shape = Enum.PartType.Wedge
+        hearthFire.CFrame *= CFrame.Angles(0, math.rad(-18), 0)
+        hearthFire.Transparency = 0.08
+        local ember = referencePart(
+            fireplace,
+            "CabinHearthEmber",
+            Vector3.new(0.48, 1.05, 0.5),
+            -8.65,
+            -3.85,
+            12.05,
+            Color3.fromRGB(255, 104, 48),
+            Enum.Material.Neon,
+            false
+        )
+        ember.Shape = Enum.PartType.Wedge
+        ember.CFrame *= CFrame.Angles(0, math.rad(28), math.rad(-7))
         local hearthLight = Instance.new("PointLight")
         hearthLight.Color = accent
         hearthLight.Brightness = 0.45
@@ -20463,7 +20488,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
     local commons = Instance.new("Model")
     commons.Name = "EmberhollowCampCommons"
     commons.Parent = parent
-    local commonsCenter = Vector3.new(70, 0, -132)
+    local commonsCenter = Vector3.new(62, 0, -198)
     local commonsTable = part(
         commons,
         "CampCommonsTable",
@@ -20515,26 +20540,87 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
         supply.CanQuery = false
     end
 
+    local streetFoundation = part(
+        parent,
+        "TownMainStreetFoundation",
+        Vector3.new(18, 0.34, 206),
+        CFrame.new(0, 0.31, -102),
+        Color3.fromRGB(58, 55, 48),
+        Enum.Material.Cobblestone,
+        false
+    )
+    streetFoundation.CanQuery = false
     local townStreet = part(
         parent,
         "TownMainStreet",
-        Vector3.new(16, 0.52, 116),
-        CFrame.new(0, 0.48, -116),
-        Color3.fromRGB(76, 55, 37),
-        Enum.Material.Ground,
+        Vector3.new(15.5, 0.32, 204),
+        CFrame.new(0, 0.59, -102),
+        Color3.fromRGB(91, 62, 38),
+        Enum.Material.Mud,
         false
     )
     townStreet.CanQuery = false
     local streetWear = part(
         parent,
         "TownMainStreetWear",
-        Vector3.new(6.5, 0.14, 114),
-        CFrame.new(0, 0.82, -116),
-        Color3.fromRGB(112, 82, 49),
-        Enum.Material.Mud,
+        Vector3.new(5.4, 0.12, 202),
+        CFrame.new(0, 0.81, -102),
+        Color3.fromRGB(132, 96, 57),
+        Enum.Material.Ground,
         false
     )
     streetWear.CanQuery = false
+    for rutSide = -1, 1, 2 do
+        local rut = part(
+            parent,
+            "TownStreetRut",
+            Vector3.new(0.68, 0.08, 200),
+            CFrame.new(rutSide * 2.4, 0.89, -102),
+            Color3.fromRGB(61, 43, 30),
+            Enum.Material.Mud,
+            false
+        )
+        rut.CanQuery = false
+    end
+    local function townSideRoad(start: Vector3, finish: Vector3)
+        local delta = finish - start
+        local frame = CFrame.lookAt((start + finish) / 2, finish)
+        local base = part(
+            parent,
+            "TownDistrictRoadFoundation",
+            Vector3.new(8.6, 0.26, delta.Magnitude + 1.2),
+            frame,
+            Color3.fromRGB(59, 57, 50),
+            Enum.Material.Cobblestone,
+            false
+        )
+        base.CanQuery = false
+        local surface = part(
+            parent,
+            "TownDistrictRoad",
+            Vector3.new(7.2, 0.24, delta.Magnitude + 0.8),
+            frame * CFrame.new(0, 0.24, 0),
+            Color3.fromRGB(96, 67, 41),
+            Enum.Material.Mud,
+            false
+        )
+        surface.CanQuery = false
+        local wear = part(
+            parent,
+            "TownDistrictRoadWear",
+            Vector3.new(2.6, 0.08, delta.Magnitude + 0.5),
+            frame * CFrame.new(0, 0.41, 0),
+            Color3.fromRGB(135, 99, 59),
+            Enum.Material.Ground,
+            false
+        )
+        wear.CanQuery = false
+    end
+    townSideRoad(Vector3.new(0, 0.45, -144), Vector3.new(-80, 0.45, -144))
+    townSideRoad(Vector3.new(0, 0.45, -126), Vector3.new(80, 0.45, -126))
+    townSideRoad(Vector3.new(0, 0.45, -184), Vector3.new(-80, 0.45, -184))
+    townSideRoad(Vector3.new(0, 0.45, -164), Vector3.new(80, 0.45, -164))
+    townSideRoad(Vector3.new(0, 0.45, -198), Vector3.new(50, 0.45, -198))
     local square = part(
         parent,
         "FirstLanternTownSquare",
@@ -20636,21 +20722,71 @@ local function lantern(
         BARK,
         Enum.Material.Wood
     )
+    local arm = part(
+        model,
+        "LanternArm",
+        Vector3.new(2.2 * scale, 0.34 * scale, 0.34 * scale),
+        CFrame.new(at + Vector3.new(0.78 * scale, 6.65 * scale, 0))
+            * CFrame.Angles(0, 0, math.rad(-8)),
+        WET_BARK,
+        Enum.Material.Wood,
+        false
+    )
+    arm.CanQuery = false
+    local lanternCenter = at + Vector3.new(1.65 * scale, 5.55 * scale, 0)
+    local glass = part(
+        model,
+        "LanternGlass",
+        Vector3.new(1.15 * scale, 1.55 * scale, 1.15 * scale),
+        CFrame.new(lanternCenter),
+        Color3.fromRGB(202, 156, 84),
+        Enum.Material.Glass,
+        false
+    )
+    glass.Transparency = 0.52
+    for sideX = -1, 1, 2 do
+        for sideZ = -1, 1, 2 do
+            part(
+                model,
+                "LanternCageRail",
+                Vector3.new(0.1 * scale, 1.9 * scale, 0.1 * scale),
+                CFrame.new(
+                    lanternCenter + Vector3.new(sideX * 0.62 * scale, 0, sideZ * 0.62 * scale)
+                ) * CFrame.Angles(0, 0, math.rad(sideX * sideZ * 3)),
+                Color3.fromRGB(45, 49, 53),
+                Enum.Material.Metal,
+                false
+            )
+        end
+    end
+    for capY = -1, 1, 2 do
+        part(
+            model,
+            if capY < 0 then "LanternCageBase" else "LanternRainCap",
+            Vector3.new(1.6 * scale, 0.22 * scale, 1.6 * scale),
+            CFrame.new(lanternCenter + Vector3.new(0, capY * 1.02 * scale, 0))
+                * CFrame.Angles(0, math.rad(12), 0),
+            Color3.fromRGB(45, 49, 53),
+            Enum.Material.Metal,
+            false
+        )
+    end
     local glow = part(
         model,
-        "LanternGlow",
-        Vector3.new(2.1 * scale, 2.7 * scale, 2.1 * scale),
-        CFrame.new(at + Vector3.new(0, 6.2 * scale, 0)),
+        "LanternFlame",
+        Vector3.new(0.48 * scale, 0.88 * scale, 0.42 * scale),
+        CFrame.new(lanternCenter + Vector3.new(0, -0.12 * scale, 0))
+            * CFrame.Angles(0, math.rad(18), 0),
         AMBER,
         Enum.Material.Neon,
         false
     )
-    glow.Shape = Enum.PartType.Ball
-    glow.Transparency = 0.12
+    glow.Shape = Enum.PartType.Wedge
+    glow.Transparency = 0.08
     local light = Instance.new("PointLight")
     light.Color = AMBER
-    light.Brightness = 2.4
-    light.Range = 24 * scale
+    light.Brightness = 1.15
+    light.Range = 17 * scale
     -- Keep the sanctuary's key lantern as the only strong shadow source. The
     -- route lights are guidance, not a second sun, which keeps mobile scenes
     -- readable and avoids a wall of competing shadows.
@@ -21233,9 +21369,12 @@ local FOLIAGE_KEEP_OUT = table.freeze({
     table.freeze({ x = 78, z = -76, radius = 22 }), -- Warden mastery clearing
     table.freeze({ x = -78, z = -168, radius = 22 }), -- Engineer mastery clearing
     table.freeze({ x = 78, z = -168, radius = 22 }), -- Medic mastery clearing
-    table.freeze({ x = -70, z = -128, radius = 25 }), -- Wayfarer inn
-    table.freeze({ x = 72, z = -100, radius = 24 }), -- Greenward garden
-    table.freeze({ x = 70, z = -132, radius = 18 }), -- camp commons
+    table.freeze({ x = -92, z = -184, radius = 25 }), -- Wayfarer inn
+    table.freeze({ x = 96, z = -164, radius = 26 }), -- Greenward garden
+    table.freeze({ x = 62, z = -198, radius = 18 }), -- camp commons
+    table.freeze({ x = -92, z = -144, radius = 22 }), -- archive district
+    table.freeze({ x = 92, z = -126, radius = 22 }), -- workbench district
+    table.freeze({ x = 0, z = -158, radius = 16 }), -- town board turnout
     table.freeze({ x = -20, z = -132, radius = 10 }), -- field-book archive
     table.freeze({ x = 38, z = -48, radius = 12 }), -- Heartwood gathering lot
     table.freeze({ x = -42, z = -68, radius = 18 }), -- starter-tool yard
@@ -21245,6 +21384,14 @@ local FOLIAGE_KEEP_OUT = table.freeze({
     table.freeze({ x = -78, z = -44, radius = 24 }), -- hollow lantern shrine landmark
 })
 
+local TOWN_SIDE_ROAD_BOUNDS = table.freeze({
+    table.freeze({ minX = -84, maxX = 4, minZ = -149, maxZ = -139 }),
+    table.freeze({ minX = -4, maxX = 84, minZ = -131, maxZ = -121 }),
+    table.freeze({ minX = -84, maxX = 4, minZ = -189, maxZ = -179 }),
+    table.freeze({ minX = -4, maxX = 84, minZ = -169, maxZ = -159 }),
+    table.freeze({ minX = -4, maxX = 54, minZ = -203, maxZ = -193 }),
+})
+
 --[[
     True when a position is clear of the route corridor and every authored
     structure, so foliage may be planted there.
@@ -21252,6 +21399,12 @@ local FOLIAGE_KEEP_OUT = table.freeze({
 local function isFoliagePlantable(x: number, z: number): boolean
     if math.abs(x) <= ROUTE_HALF_WIDTH and z <= 20 and z >= -200 then
         return false
+    end
+
+    for _, bounds in TOWN_SIDE_ROAD_BOUNDS do
+        if x >= bounds.minX and x <= bounds.maxX and z >= bounds.minZ and z <= bounds.maxZ then
+            return false
+        end
     end
 
     for _, keepOut in FOLIAGE_KEEP_OUT do
@@ -21472,22 +21625,34 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         local distance = delta.Magnitude
         local midpoint = (start + finish) / 2
         local roadFrame = CFrame.lookAt(midpoint, finish)
+        local foundation = part(
+            geometry,
+            "EmberhollowRoadFoundation",
+            Vector3.new(17.2, 0.28, distance + 4),
+            roadFrame * CFrame.new(0, -0.08, 0),
+            Color3.fromRGB(58, 57, 51),
+            Enum.Material.Cobblestone,
+            false
+        )
+        foundation.CanQuery = false
         local trail = part(
             geometry,
             "EmberhollowRoad",
-            Vector3.new(19, 0.5, distance + 4),
-            roadFrame,
-            Color3.fromRGB(48, 34, 24),
-            Enum.Material.Ground
+            Vector3.new(15.2, 0.36, distance + 3.6),
+            roadFrame * CFrame.new(0, 0.18, 0),
+            Color3.fromRGB(91, 62, 38),
+            Enum.Material.Mud,
+            false
         )
+        trail.CanQuery = false
         trail.Reflectance = 0.02
         local wornCenter = part(
             geometry,
             "EmberhollowRoadWear",
-            Vector3.new(7.5, 0.12, distance + 2),
-            roadFrame * CFrame.new(0, 0.31, 0),
-            Color3.fromRGB(132, 94, 54),
-            Enum.Material.Mud,
+            Vector3.new(6.2, 0.12, distance + 2.8),
+            roadFrame * CFrame.new(0, 0.43, 0),
+            Color3.fromRGB(132, 96, 57),
+            Enum.Material.Ground,
             false
         )
         wornCenter.CanQuery = false
@@ -21497,27 +21662,12 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 geometry,
                 "RoadRut",
                 Vector3.new(0.62, 0.08, distance + 1),
-                roadFrame * CFrame.new(rutSide * 2.45, 0.39, 0),
-                Color3.fromRGB(71, 48, 31),
+                roadFrame * CFrame.new(rutSide * 2.25, 0.52, 0),
+                Color3.fromRGB(57, 40, 28),
                 Enum.Material.Mud,
                 false
             )
             rut.CanQuery = false
-        end
-
-        for chevronSide = -1, 1, 2 do
-            local chevron = part(
-                geometry,
-                "RoadChevron",
-                Vector3.new(3.2, 0.12, 0.58),
-                roadFrame
-                    * CFrame.new(chevronSide * 1.05, 0.43, 0)
-                    * CFrame.Angles(0, math.rad(chevronSide * 34), 0),
-                Color3.fromRGB(151, 107, 59),
-                Enum.Material.WoodPlanks,
-                false
-            )
-            chevron.CanQuery = false
         end
 
         local markerCount = math.max(2, math.floor(distance / 8))
@@ -21527,9 +21677,9 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 local edgeStone = part(
                     geometry,
                     "RoadEdgeStone",
-                    Vector3.new(1.4, 0.45, 2.6),
+                    Vector3.new(0.9, 0.38, 1.35),
                     roadFrame
-                        * CFrame.new(side * 8.6, 0.34, along)
+                        * CFrame.new(side * 7.85, 0.37, along)
                         * CFrame.Angles(0, math.rad(side * (marker % 2) * 7), 0),
                     if marker % 3 == 0
                         then Color3.fromRGB(107, 101, 86)
@@ -22236,21 +22386,54 @@ function WorldService._buildMara(self: WorldService, world: Model)
     local handLantern = part(
         model,
         "MaraLantern",
-        Vector3.new(0.95, 1.25, 0.95),
+        Vector3.new(0.82, 1.12, 0.82),
         CFrame.new(-1.2, 1.45, -30),
-        AMBER,
+        Color3.fromRGB(204, 154, 81),
         Enum.Material.Glass,
         false
     )
-    handLantern.Shape = Enum.PartType.Ball
-    handLantern.Transparency = 0.14
+    handLantern.Transparency = 0.48
+    for railX = -1, 1, 2 do
+        for railZ = -1, 1, 2 do
+            part(
+                model,
+                "MaraLanternRail",
+                Vector3.new(0.1, 1.42, 0.1),
+                handLantern.CFrame * CFrame.new(railX * 0.48, 0, railZ * 0.48),
+                Color3.fromRGB(47, 50, 52),
+                Enum.Material.Metal,
+                false
+            )
+        end
+    end
+    for capY = -1, 1, 2 do
+        part(
+            model,
+            "MaraLanternCap",
+            Vector3.new(1.15, 0.18, 1.15),
+            handLantern.CFrame * CFrame.new(0, capY * 0.7, 0),
+            Color3.fromRGB(47, 50, 52),
+            Enum.Material.Metal,
+            false
+        )
+    end
+    local handFlame = part(
+        model,
+        "MaraLanternFlame",
+        Vector3.new(0.32, 0.62, 0.28),
+        handLantern.CFrame * CFrame.new(0, -0.08, 0) * CFrame.Angles(0, math.rad(18), 0),
+        AMBER,
+        Enum.Material.Neon,
+        false
+    )
+    handFlame.Shape = Enum.PartType.Wedge
     local handLight = Instance.new("PointLight")
     handLight.Color = AMBER
-    handLight.Brightness = 0.65
-    handLight.Range = 10
+    handLight.Brightness = 0.55
+    handLight.Range = 9
     handLight.Shadows = false
-    handLight.Parent = handLantern
-    CollectionService:AddTag(handLantern, self._runtimeIds.AmbientLightTag)
+    handLight.Parent = handFlame
+    CollectionService:AddTag(handFlame, self._runtimeIds.AmbientLightTag)
     model.PrimaryPart = root
     model.Parent = world
     model:SetAttribute("MotionKind", "resident")
@@ -22723,21 +22906,63 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         end
     end
     for ringY = 3.1, 8.2, 5.1 do
+        for side = -1, 1, 2 do
+            part(
+                interactables,
+                "FirstLanternCageBand",
+                Vector3.new(5.2, 0.28, 0.28),
+                CFrame.new(0, ringY, -112 + side * 2.5),
+                Color3.fromRGB(86, 76, 59),
+                Enum.Material.Metal,
+                false
+            )
+            part(
+                interactables,
+                "FirstLanternCageBand",
+                Vector3.new(0.28, 0.28, 5.2),
+                CFrame.new(side * 2.5, ringY, -112),
+                Color3.fromRGB(86, 76, 59),
+                Enum.Material.Metal,
+                false
+            )
+        end
+    end
+    for side = -1, 1, 2 do
+        local frontGlass = part(
+            interactables,
+            "FirstLanternGlassPanel",
+            Vector3.new(4.35, 4.55, 0.13),
+            CFrame.new(0, 5.65, -112 + side * 2.34),
+            Color3.fromRGB(205, 158, 91),
+            Enum.Material.Glass,
+            false
+        )
+        frontGlass.Transparency = 0.64
+        local sideGlass = part(
+            interactables,
+            "FirstLanternGlassPanel",
+            Vector3.new(0.13, 4.55, 4.35),
+            CFrame.new(side * 2.34, 5.65, -112),
+            Color3.fromRGB(205, 158, 91),
+            Enum.Material.Glass,
+            false
+        )
+        sideGlass.Transparency = 0.64
         part(
             interactables,
-            "FirstLanternCageBand",
-            Vector3.new(5.45, 0.34, 5.45),
-            CFrame.new(0, ringY, -112),
-            Color3.fromRGB(86, 76, 59),
-            Enum.Material.Metal,
+            "FirstLanternRainHood",
+            Vector3.new(5.7, 0.34, 3.5),
+            CFrame.new(0, 9.22, -112 + side * 1.35) * CFrame.Angles(math.rad(side * 28), 0, 0),
+            Color3.fromRGB(55, 57, 53),
+            Enum.Material.Slate,
             false
         )
     end
     part(
         interactables,
         "FirstLanternCrown",
-        Vector3.new(4.9, 0.6, 4.9),
-        CFrame.new(0, 8.65, -112) * CFrame.Angles(0, math.rad(45), 0),
+        Vector3.new(0.42, 1.25, 0.42),
+        CFrame.new(0, 10.35, -112) * CFrame.Angles(0, 0, math.rad(5)),
         Color3.fromRGB(73, 67, 57),
         Enum.Material.Metal,
         false
@@ -22745,13 +22970,13 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     local flame = part(
         interactables,
         "FirstLanternFlame",
-        Vector3.new(2.4, 3.6, 2.4),
-        CFrame.new(0, 6, -112),
+        Vector3.new(1.05, 2.45, 0.82),
+        CFrame.new(0, 5.65, -112) * CFrame.Angles(0, math.rad(18), 0),
         AMBER,
         Enum.Material.Neon,
         false
     )
-    flame.Shape = Enum.PartType.Ball
+    flame.Shape = Enum.PartType.Wedge
     local light = Instance.new("PointLight")
     light.Color = AMBER
     light.Brightness = 1.5
@@ -23358,7 +23583,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "bramblewake-blackout-v23")
+    world:SetAttribute("WorldVersion", "emberhollow-arrival-v24")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -23458,7 +23683,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "bramblewake-blackout-v23",
+        worldVersion = "emberhollow-arrival-v24",
     })
 end
 
@@ -24021,7 +24246,7 @@ function WorldService.setLanternHealth(self: WorldService, health: number)
     local strength = clamped / 100
     local danger = Color3.fromRGB(255, 104, 76)
     local targetColor = danger:Lerp(AMBER, strength)
-    local targetSize = Vector3.new(1.4, 2.2, 1.4):Lerp(Vector3.new(2.4, 3.6, 2.4), strength)
+    local targetSize = Vector3.new(0.62, 1.35, 0.48):Lerp(Vector3.new(1.05, 2.45, 0.82), strength)
 
     TweenService:Create(
         flame,
@@ -24184,7 +24409,7 @@ function WorldService.showTownGuardRecovery(self: WorldService, players: { Playe
 end
 
 local function buildTownConsequenceLandscape(parent: Instance, consequence: any)
-    local center = Vector3.new(72, 0, -100)
+    local center = Vector3.new(96, 0, -164)
     local landscapeKind = tostring(consequence.landscapeKind or "seed_ground")
     local memorialKind = tostring(consequence.memorialKind or "unmarked_stone")
     local growthStage = math.clamp(math.floor(tonumber(consequence.growthStage) or 0), 0, 3)
@@ -24192,7 +24417,7 @@ local function buildTownConsequenceLandscape(parent: Instance, consequence: any)
     local ground = part(
         parent,
         "GreenwardGround",
-        Vector3.new(34, 0.45, 30),
+        Vector3.new(42, 0.28, 34),
         CFrame.new(center + Vector3.new(0, 0.1, 0)),
         if landscapeKind == "cultivated_fields"
             then Color3.fromRGB(73, 58, 39)
@@ -24205,49 +24430,79 @@ local function buildTownConsequenceLandscape(parent: Instance, consequence: any)
 
     local borderColor = if landscapeKind == "living_grove" then MOSS else BARK
     for side = -1, 1, 2 do
-        part(
-            parent,
-            "GreenwardBoundary",
-            Vector3.new(1, 2.2, 30),
-            CFrame.new(center + Vector3.new(side * 16.5, 1.1, 0)),
-            borderColor,
-            Enum.Material.Wood,
-            false
-        )
+        for postIndex = -1, 1 do
+            part(
+                parent,
+                "GreenwardFencePost",
+                Vector3.new(0.48, 2.6, 0.48),
+                CFrame.new(center + Vector3.new(side * 20.5, 1.3, postIndex * 13.5))
+                    * CFrame.Angles(0, 0, math.rad(side * postIndex * 3)),
+                borderColor,
+                Enum.Material.Wood,
+                false
+            )
+        end
+        for railY = 0.8, 1.75, 0.95 do
+            part(
+                parent,
+                "GreenwardFenceRail",
+                Vector3.new(0.32, 0.32, 27),
+                CFrame.new(center + Vector3.new(side * 20.5, railY, 0))
+                    * CFrame.Angles(math.rad(side * 1.5), 0, 0),
+                borderColor,
+                Enum.Material.Wood,
+                false
+            )
+        end
     end
 
     local function cropRow(x: number, z: number, accent: Color3)
         part(
             parent,
             "CultivatedBed",
-            Vector3.new(6.6, 0.7, 8.5),
-            CFrame.new(center + Vector3.new(x, 0.45, z)),
+            Vector3.new(6.6, 0.3, 8.5),
+            CFrame.new(center + Vector3.new(x, 0.28, z)),
             Color3.fromRGB(92, 67, 42),
-            Enum.Material.Ground,
+            Enum.Material.Mud,
             false
         )
-        for cropIndex = -2, 2 do
+        for furrow = -1, 1 do
+            part(
+                parent,
+                "CultivatedFurrow",
+                Vector3.new(0.32, 0.12, 7.7),
+                CFrame.new(center + Vector3.new(x + furrow * 1.7, 0.49, z)),
+                Color3.fromRGB(54, 42, 31),
+                Enum.Material.Ground,
+                false
+            )
+        end
+        for cropIndex = -1, 1 do
             local stem = part(
                 parent,
                 "CropStem",
-                Vector3.new(0.28, 1.25 + growthStage * 0.12, 0.28),
-                CFrame.new(center + Vector3.new(x + cropIndex * 1.05, 1.15, z)),
+                Vector3.new(0.24, 1.15 + growthStage * 0.12, 0.24),
+                CFrame.new(center + Vector3.new(x + cropIndex * 1.65, 1.05, z)),
                 Color3.fromRGB(71, 123, 63),
                 Enum.Material.Grass,
                 false
             )
             stem.CanQuery = false
-            local crop = part(
-                parent,
-                "HarvestCrop",
-                Vector3.new(0.72, 0.72, 0.72),
-                stem.CFrame + Vector3.new(0, 0.78, 0),
-                accent,
-                Enum.Material.SmoothPlastic,
-                false
-            )
-            crop.Shape = Enum.PartType.Ball
-            crop.CanQuery = false
+            for leafSide = -1, 1, 2 do
+                local leaf = part(
+                    parent,
+                    "HarvestCropLeaf",
+                    Vector3.new(0.78, 0.18, 0.48),
+                    stem.CFrame
+                        * CFrame.new(leafSide * 0.34, 0.38 + leafSide * 0.08, 0)
+                        * CFrame.Angles(0, math.rad(leafSide * 18), math.rad(-leafSide * 22)),
+                    if leafSide < 0 then accent else Color3.fromRGB(82, 131, 65),
+                    Enum.Material.LeafyGrass,
+                    false
+                )
+                leaf.Shape = Enum.PartType.Wedge
+                leaf.CanQuery = false
+            end
         end
     end
 
@@ -24369,21 +24624,33 @@ local function buildTownConsequenceLandscape(parent: Instance, consequence: any)
             )
         end
     else
-        for markerIndex = -2, 2 do
-            local marker = part(
+        cropRow(-9, -5.5, Color3.fromRGB(149, 122, 66))
+        cropRow(0, -5.5, Color3.fromRGB(113, 143, 71))
+        cropRow(9, -5.5, Color3.fromRGB(157, 102, 61))
+        for stakeIndex = -1, 1 do
+            local stake = part(
                 parent,
-                "SeedGroundMarker",
-                Vector3.new(1.1, 0.55, 1.1),
-                CFrame.new(center + Vector3.new(markerIndex * 4.5, 0.42, markerIndex % 2 * 3)),
-                Color3.fromRGB(92, 98, 80),
-                Enum.Material.Slate,
+                "SeedlingRowStake",
+                Vector3.new(0.34, 2.4, 0.34),
+                CFrame.new(center + Vector3.new(stakeIndex * 9, 1.2, 6))
+                    * CFrame.Angles(0, 0, math.rad(stakeIndex * 4)),
+                BARK,
+                Enum.Material.Wood,
                 false
             )
-            marker.Shape = Enum.PartType.Ball
+            part(
+                parent,
+                "SeedlingRowMarker",
+                Vector3.new(2.4, 0.9, 0.22),
+                stake.CFrame * CFrame.new(0, 0.55, -0.22),
+                Color3.fromRGB(126, 96, 58),
+                Enum.Material.WoodPlanks,
+                false
+            )
         end
     end
 
-    local memorialCenter = center + Vector3.new(0, 0, 12)
+    local memorialCenter = center + Vector3.new(0, 0, 14)
     local plinth = part(
         parent,
         "WardenMemorialPlinth",
@@ -24539,16 +24806,19 @@ local function buildTownProgressionBuildings(
                 false
             )
         end
-        local tarp = part(
-            model,
-            "BuilderTarp",
-            Vector3.new(size.X * 0.7, 0.16, size.Z * 0.62),
-            CFrame.new(center + Vector3.new(0, 7.55, 0)) * CFrame.Angles(0, 0, math.rad(4)),
-            Color3.fromRGB(105, 119, 91),
-            Enum.Material.Fabric,
-            false
-        )
-        tarp.Transparency = 0.08
+        for tarpSide = -1, 1, 2 do
+            local tarp = part(
+                model,
+                "BuilderTarp",
+                Vector3.new(size.X * 0.72, 0.12, size.Z * 0.36),
+                CFrame.new(center + Vector3.new(0, 7.3, tarpSide * size.Z * 0.16))
+                    * CFrame.Angles(math.rad(tarpSide * 12), 0, math.rad(tarpSide * 1.5)),
+                if tarpSide < 0 then Color3.fromRGB(91, 107, 82) else Color3.fromRGB(111, 121, 91),
+                Enum.Material.Fabric,
+                false
+            )
+            tarp.Transparency = 0.08
+        end
         local materials = Instance.new("Model")
         materials.Name = "BuilderMaterials"
         materials.Parent = model
@@ -24719,14 +24989,25 @@ local function buildTownProgressionBuildings(
             WET_BARK,
             Enum.Material.Wood
         )
+        for roofSide = -1, 1, 2 do
+            part(
+                model,
+                "RoofPlane",
+                Vector3.new(size.X + 2.2, 0.42, size.Z * 0.62),
+                CFrame.new(center + Vector3.new(0, wallHeight + 1.25, roofSide * (size.Z * 0.25)))
+                    * CFrame.Angles(math.rad(roofSide * 24), 0, 0),
+                if stage >= 2 then Color3.fromRGB(48, 55, 49) else Color3.fromRGB(59, 58, 51),
+                Enum.Material.Slate
+            )
+        end
         part(
             model,
-            "Roof",
-            Vector3.new(size.X + 2.2, 0.8, size.Z + 2.2),
-            CFrame.new(center + Vector3.new(0, wallHeight + 0.65, 0))
-                * CFrame.Angles(0, 0, math.rad(if stage >= 2 then 3 else 1)),
-            if stage >= 2 then Color3.fromRGB(48, 55, 49) else Color3.fromRGB(59, 58, 51),
-            Enum.Material.Slate
+            "RoofRidgeBeam",
+            Vector3.new(size.X + 2.4, 0.48, 0.48),
+            CFrame.new(center + Vector3.new(0, wallHeight + 2.65, 0)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
         )
         local sign = part(
             model,
@@ -24821,7 +25102,7 @@ local function buildTownProgressionBuildings(
     local archive = buildingShell(
         "building_archive",
         "MEMORY ARCHIVE",
-        Vector3.new(-40, 0, -88),
+        Vector3.new(-92, 0, -144),
         Vector3.new(17, 0, 14),
         archiveStage,
         FOXFIRE
@@ -24832,7 +25113,7 @@ local function buildTownProgressionBuildings(
                 archive,
                 "ArchiveShelf",
                 Vector3.new(4.8, 5.2, 0.75),
-                CFrame.new(-40 + shelf * 5.3, 2.85, -83.1),
+                CFrame.new(-92 + shelf * 5.3, 2.85, -139.1),
                 Color3.fromRGB(85, 61, 42),
                 Enum.Material.WoodPlanks,
                 false
@@ -24843,7 +25124,7 @@ local function buildTownProgressionBuildings(
                 archive,
                 "ArchiveMemoryJar",
                 Vector3.new(0.65, 0.9, 0.65),
-                CFrame.new(-40 + jarIndex * 1.4, 1.1, -88),
+                CFrame.new(-92 + jarIndex * 1.4, 1.1, -144),
                 if jarIndex % 2 == 0 then FOXFIRE else AMBER,
                 Enum.Material.Glass,
                 false
@@ -24857,7 +25138,7 @@ local function buildTownProgressionBuildings(
     local workshop = buildingShell(
         "building_workbench",
         "LANTERN WORKBENCH",
-        Vector3.new(39, 0, -87),
+        Vector3.new(92, 0, -126),
         Vector3.new(18, 0, 14),
         workbenchStage,
         AMBER
@@ -24867,7 +25148,7 @@ local function buildTownProgressionBuildings(
             workshop,
             "CraftingBench",
             Vector3.new(8, 1.2, 3.2),
-            CFrame.new(39, 1.3, -83.3),
+            CFrame.new(92, 1.3, -122.3),
             Color3.fromRGB(104, 73, 46),
             Enum.Material.WoodPlanks,
             false
@@ -24897,7 +25178,7 @@ local function buildTownProgressionBuildings(
             boardModel,
             "TownBoardPost",
             Vector3.new(0.8, 7.2, 0.8),
-            CFrame.new(12 + side * 5.2, 3.6, -86),
+            CFrame.new(side * 5.2, 3.6, -158),
             WET_BARK,
             Enum.Material.Wood
         )
@@ -24906,7 +25187,7 @@ local function buildTownProgressionBuildings(
         boardModel,
         "TownBoard",
         Vector3.new(11.5, 5.5, 0.65),
-        CFrame.new(12, 5.2, -86),
+        CFrame.new(0, 5.2, -158),
         Color3.fromRGB(90, 64, 42),
         Enum.Material.WoodPlanks,
         false
@@ -24922,7 +25203,7 @@ local function buildTownProgressionBuildings(
     local inn = buildingShell(
         "building_inn",
         "WAYFARER INN",
-        Vector3.new(-70, 0, -128),
+        Vector3.new(-92, 0, -184),
         Vector3.new(18, 0, 14),
         innStage,
         Color3.fromRGB(219, 151, 77)
@@ -24933,7 +25214,7 @@ local function buildTownProgressionBuildings(
                 inn,
                 "InnTable",
                 Vector3.new(4.5, 0.55, 3),
-                CFrame.new(-70 + side * 5, 2.1, -124.5),
+                CFrame.new(-92 + side * 5, 2.1, -180.5),
                 Color3.fromRGB(100, 69, 45),
                 Enum.Material.WoodPlanks,
                 false
@@ -24950,7 +25231,7 @@ local function buildTownProgressionBuildings(
             skin = Color3.fromRGB(177, 124, 87),
             hair = Color3.fromRGB(55, 40, 34),
             prop = "cookpot",
-            day = CFrame.new(-70, 3, -122) * CFrame.Angles(0, math.rad(180), 0),
+            day = CFrame.new(-92, 3, -178) * CFrame.Angles(0, math.rad(180), 0),
             dusk = CFrame.new(-10, 3, -128) * CFrame.Angles(0, math.rad(-10), 0),
             night = CFrame.new(-9, 3, -138) * CFrame.Angles(0, math.rad(-15), 0),
             dayDuty = "PREPARING SUPPLIES",
@@ -24963,7 +25244,7 @@ local function buildTownProgressionBuildings(
             skin = Color3.fromRGB(210, 157, 112),
             hair = Color3.fromRGB(111, 66, 43),
             prop = "route_map",
-            day = CFrame.new(12, 3, -81) * CFrame.Angles(0, math.rad(180), 0),
+            day = CFrame.new(0, 3, -151) * CFrame.Angles(0, math.rad(180), 0),
             dusk = CFrame.new(0, 3, -128),
             night = CFrame.new(0, 3, -139),
             dayDuty = "MAPPING SAFE ROUTES",
@@ -24976,7 +25257,7 @@ local function buildTownProgressionBuildings(
             skin = Color3.fromRGB(126, 87, 65),
             hair = Color3.fromRGB(41, 35, 29),
             prop = "seed_basket",
-            day = CFrame.new(72, 3, -82) * CFrame.Angles(0, math.rad(180), 0),
+            day = CFrame.new(96, 3, -146) * CFrame.Angles(0, math.rad(180), 0),
             dusk = CFrame.new(10, 3, -128) * CFrame.Angles(0, math.rad(10), 0),
             night = CFrame.new(9, 3, -138) * CFrame.Angles(0, math.rad(15), 0),
             dayDuty = "TENDING THE GREENWARD",

@@ -1,281 +1,6 @@
 {
   "schemaVersion": 1,
   "assets": {
-    "mesh_boulder_cluster_a": {
-      "boundsMin": [
-        -5.0,
-        -4.8415,
-        0.0
-      ],
-      "boundsMax": [
-        5.0,
-        4.8415,
-        5.71
-      ],
-      "dimensions": [
-        10.0,
-        9.683,
-        5.71
-      ],
-      "longestDimension": 10.0,
-      "triangles": 420,
-      "meshObjects": 3,
-      "materials": [
-        "LL_moss",
-        "LL_stone",
-        "LL_stone_dark"
-      ],
-      "bytes": 23192
-    },
-    "mesh_broadleaf_hero_a": {
-      "boundsMin": [
-        -9.3427,
-        -7.9137,
-        -0.0
-      ],
-      "boundsMax": [
-        9.3427,
-        7.9137,
-        23.0
-      ],
-      "dimensions": [
-        18.6854,
-        15.8274,
-        23.0
-      ],
-      "longestDimension": 23.0,
-      "triangles": 884,
-      "meshObjects": 4,
-      "materials": [
-        "LL_bark_dark",
-        "LL_bark_mid",
-        "LL_leaf_dark",
-        "LL_leaf_mid"
-      ],
-      "bytes": 47172
-    },
-    "mesh_conifer_hero_a": {
-      "boundsMin": [
-        -7.2801,
-        -7.2444,
-        -0.0
-      ],
-      "boundsMax": [
-        7.2801,
-        7.2444,
-        27.0
-      ],
-      "dimensions": [
-        14.5601,
-        14.4888,
-        27.0
-      ],
-      "longestDimension": 27.0,
-      "triangles": 672,
-      "meshObjects": 4,
-      "materials": [
-        "LL_bark_dark",
-        "LL_bark_mid",
-        "LL_pine_dark",
-        "LL_pine_mid"
-      ],
-      "bytes": 45824
-    },
-    "mesh_conifer_hero_b": {
-      "boundsMin": [
-        -7.3802,
-        -7.5777,
-        -0.0
-      ],
-      "boundsMax": [
-        7.3802,
-        7.5777,
-        24.0
-      ],
-      "dimensions": [
-        14.7605,
-        15.1554,
-        24.0
-      ],
-      "longestDimension": 24.0,
-      "triangles": 672,
-      "meshObjects": 4,
-      "materials": [
-        "LL_bark_dark",
-        "LL_bark_mid",
-        "LL_pine_dark",
-        "LL_pine_mid"
-      ],
-      "bytes": 45988
-    },
-    "mesh_crooked_farmhouse_a": {
-      "boundsMin": [
-        -12.0,
-        -9.842,
-        0.0
-      ],
-      "boundsMax": [
-        12.0,
-        9.842,
-        18.0531
-      ],
-      "dimensions": [
-        24.0,
-        19.6841,
-        18.0531
-      ],
-      "longestDimension": 24.0,
-      "triangles": 1904,
-      "meshObjects": 6,
-      "materials": [
-        "LL_bark_cut",
-        "LL_bark_dark",
-        "LL_bark_mid",
-        "LL_moss",
-        "LL_stone",
-        "LL_stone_dark"
-      ],
-      "bytes": 99264
-    },
-    "mesh_deadfall_a": {
-      "boundsMin": [
-        -8.5,
-        -4.4805,
-        0.0
-      ],
-      "boundsMax": [
-        8.5,
-        4.4805,
-        8.6385
-      ],
-      "dimensions": [
-        17.0,
-        8.961,
-        8.6385
-      ],
-      "longestDimension": 17.0,
-      "triangles": 540,
-      "meshObjects": 5,
-      "materials": [
-        "LL_bark_cut",
-        "LL_bark_dark",
-        "LL_bark_mid",
-        "LL_fungus",
-        "LL_moss"
-      ],
-      "bytes": 42516
-    },
-    "mesh_fern_cluster_a": {
-      "boundsMin": [
-        -2.5,
-        -2.4129,
-        -0.0
-      ],
-      "boundsMax": [
-        2.5,
-        2.4129,
-        4.7599
-      ],
-      "dimensions": [
-        5.0,
-        4.8257,
-        4.7599
-      ],
-      "longestDimension": 5.0,
-      "triangles": 288,
-      "meshObjects": 2,
-      "materials": [
-        "LL_leaf_dark",
-        "LL_leaf_mid"
-      ],
-      "bytes": 19772
-    },
-    "mesh_foxfire_windmill_tower_a": {
-      "boundsMin": [
-        -8.6539,
-        -8.1532,
-        -0.0
-      ],
-      "boundsMax": [
-        8.6539,
-        8.1532,
-        36.0
-      ],
-      "dimensions": [
-        17.3078,
-        16.3065,
-        36.0
-      ],
-      "longestDimension": 36.0,
-      "triangles": 472,
-      "meshObjects": 6,
-      "materials": [
-        "LL_bark_dark",
-        "LL_bark_mid",
-        "LL_foxfire",
-        "LL_iron",
-        "LL_moss",
-        "LL_stone_dark"
-      ],
-      "bytes": 34888
-    },
-    "mesh_hollow_lantern_shrine_a": {
-      "boundsMin": [
-        -14.0,
-        -9.9814,
-        0.0
-      ],
-      "boundsMax": [
-        14.0,
-        9.9814,
-        25.4634
-      ],
-      "dimensions": [
-        28.0,
-        19.9628,
-        25.4634
-      ],
-      "longestDimension": 28.0,
-      "triangles": 952,
-      "meshObjects": 7,
-      "materials": [
-        "LL_bark_cut",
-        "LL_bark_dark",
-        "LL_bark_mid",
-        "LL_lantern_amber",
-        "LL_moss",
-        "LL_stone",
-        "LL_stone_dark"
-      ],
-      "bytes": 63136
-    },
-    "mesh_lantern_post_a": {
-      "boundsMin": [
-        -2.1141,
-        -1.0163,
-        0.0
-      ],
-      "boundsMax": [
-        2.1141,
-        1.0163,
-        9.0
-      ],
-      "dimensions": [
-        4.2282,
-        2.0325,
-        9.0
-      ],
-      "longestDimension": 9.0,
-      "triangles": 332,
-      "meshObjects": 4,
-      "materials": [
-        "LL_bark_dark",
-        "LL_bark_mid",
-        "LL_iron",
-        "LL_lantern_amber"
-      ],
-      "bytes": 24804
-    },
     "mesh_root_arch_a": {
       "boundsMin": [
         -5.5953,
@@ -320,6 +45,281 @@
       ],
       "bytes": 854820
     },
+    "mesh_boulder_cluster_a": {
+      "boundsMin": [
+        -5.0,
+        -4.8415,
+        0.0
+      ],
+      "boundsMax": [
+        5.0,
+        4.8415,
+        5.71
+      ],
+      "dimensions": [
+        10.0,
+        9.683,
+        5.71
+      ],
+      "longestDimension": 10.0,
+      "triangles": 420,
+      "meshObjects": 3,
+      "materials": [
+        "LL_moss",
+        "LL_stone",
+        "LL_stone_dark"
+      ],
+      "bytes": 23244
+    },
+    "mesh_broadleaf_hero_a": {
+      "boundsMin": [
+        -9.3427,
+        -7.9137,
+        -0.0
+      ],
+      "boundsMax": [
+        9.3427,
+        7.9137,
+        23.0
+      ],
+      "dimensions": [
+        18.6854,
+        15.8274,
+        23.0
+      ],
+      "longestDimension": 23.0,
+      "triangles": 884,
+      "meshObjects": 4,
+      "materials": [
+        "LL_bark_dark",
+        "LL_bark_mid",
+        "LL_leaf_dark",
+        "LL_leaf_mid"
+      ],
+      "bytes": 47256
+    },
+    "mesh_conifer_hero_a": {
+      "boundsMin": [
+        -7.2801,
+        -7.2444,
+        -0.0
+      ],
+      "boundsMax": [
+        7.2801,
+        7.2444,
+        27.0
+      ],
+      "dimensions": [
+        14.5601,
+        14.4888,
+        27.0
+      ],
+      "longestDimension": 27.0,
+      "triangles": 672,
+      "meshObjects": 4,
+      "materials": [
+        "LL_bark_dark",
+        "LL_bark_mid",
+        "LL_pine_dark",
+        "LL_pine_mid"
+      ],
+      "bytes": 45908
+    },
+    "mesh_conifer_hero_b": {
+      "boundsMin": [
+        -7.3802,
+        -7.5777,
+        -0.0
+      ],
+      "boundsMax": [
+        7.3802,
+        7.5777,
+        24.0
+      ],
+      "dimensions": [
+        14.7605,
+        15.1554,
+        24.0
+      ],
+      "longestDimension": 24.0,
+      "triangles": 672,
+      "meshObjects": 4,
+      "materials": [
+        "LL_bark_dark",
+        "LL_bark_mid",
+        "LL_pine_dark",
+        "LL_pine_mid"
+      ],
+      "bytes": 46064
+    },
+    "mesh_crooked_farmhouse_a": {
+      "boundsMin": [
+        -12.0,
+        -9.842,
+        0.0
+      ],
+      "boundsMax": [
+        12.0,
+        9.842,
+        18.0531
+      ],
+      "dimensions": [
+        24.0,
+        19.6841,
+        18.0531
+      ],
+      "longestDimension": 24.0,
+      "triangles": 1904,
+      "meshObjects": 6,
+      "materials": [
+        "LL_bark_cut",
+        "LL_bark_dark",
+        "LL_bark_mid",
+        "LL_moss",
+        "LL_stone",
+        "LL_stone_dark"
+      ],
+      "bytes": 99412
+    },
+    "mesh_deadfall_a": {
+      "boundsMin": [
+        -8.5,
+        -4.4805,
+        0.0
+      ],
+      "boundsMax": [
+        8.5,
+        4.4805,
+        8.6385
+      ],
+      "dimensions": [
+        17.0,
+        8.961,
+        8.6385
+      ],
+      "longestDimension": 17.0,
+      "triangles": 540,
+      "meshObjects": 5,
+      "materials": [
+        "LL_bark_cut",
+        "LL_bark_dark",
+        "LL_bark_mid",
+        "LL_fungus",
+        "LL_moss"
+      ],
+      "bytes": 42584
+    },
+    "mesh_fern_cluster_a": {
+      "boundsMin": [
+        -2.5,
+        -2.4129,
+        -0.0
+      ],
+      "boundsMax": [
+        2.5,
+        2.4129,
+        4.7599
+      ],
+      "dimensions": [
+        5.0,
+        4.8257,
+        4.7599
+      ],
+      "longestDimension": 5.0,
+      "triangles": 288,
+      "meshObjects": 2,
+      "materials": [
+        "LL_leaf_dark",
+        "LL_leaf_mid"
+      ],
+      "bytes": 19812
+    },
+    "mesh_foxfire_windmill_tower_a": {
+      "boundsMin": [
+        -8.6539,
+        -8.1532,
+        -0.0
+      ],
+      "boundsMax": [
+        8.6539,
+        8.1532,
+        36.0
+      ],
+      "dimensions": [
+        17.3078,
+        16.3065,
+        36.0
+      ],
+      "longestDimension": 36.0,
+      "triangles": 472,
+      "meshObjects": 6,
+      "materials": [
+        "LL_bark_dark",
+        "LL_bark_mid",
+        "LL_foxfire",
+        "LL_iron",
+        "LL_moss",
+        "LL_stone_dark"
+      ],
+      "bytes": 35060
+    },
+    "mesh_hollow_lantern_shrine_a": {
+      "boundsMin": [
+        -14.0,
+        -9.9814,
+        0.0
+      ],
+      "boundsMax": [
+        14.0,
+        9.9814,
+        25.4634
+      ],
+      "dimensions": [
+        28.0,
+        19.9628,
+        25.4634
+      ],
+      "longestDimension": 28.0,
+      "triangles": 952,
+      "meshObjects": 7,
+      "materials": [
+        "LL_bark_cut",
+        "LL_bark_dark",
+        "LL_bark_mid",
+        "LL_lantern_amber",
+        "LL_moss",
+        "LL_stone",
+        "LL_stone_dark"
+      ],
+      "bytes": 63328
+    },
+    "mesh_lantern_post_a": {
+      "boundsMin": [
+        -2.1141,
+        -1.0163,
+        0.0
+      ],
+      "boundsMax": [
+        2.1141,
+        1.0163,
+        9.0
+      ],
+      "dimensions": [
+        4.2282,
+        2.0325,
+        9.0
+      ],
+      "longestDimension": 9.0,
+      "triangles": 332,
+      "meshObjects": 4,
+      "materials": [
+        "LL_bark_dark",
+        "LL_bark_mid",
+        "LL_iron",
+        "LL_lantern_amber"
+      ],
+      "bytes": 24884
+    },
     "mesh_wayfarer_cabin_a": {
       "boundsMin": [
         -9.2106,
@@ -347,7 +347,7 @@
         "LL_stone",
         "LL_stone_dark"
       ],
-      "bytes": 68808
+      "bytes": 68940
     }
   }
 }

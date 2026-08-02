@@ -38,6 +38,18 @@ def main() -> None:
             fail(f"{stable_id}: file is not a glTF 2 binary")
         if struct.unpack_from("<I", data, 8)[0] != len(data):
             fail(f"{stable_id}: GLB header length does not match file size")
+        json_length, json_type = struct.unpack_from("<II", data, 12)
+        if json_type != 0x4E4F534A:
+            fail(f"{stable_id}: first GLB chunk is not JSON")
+        gltf = json.loads(data[20 : 20 + json_length].decode("utf-8").rstrip(" \x00"))
+        mesh_names = [str(mesh.get("name", "")) for mesh in gltf.get("meshes", [])]
+        expected_prefix = f"{stable_id}__"
+        if not asset.get("pbrMaps") and (
+            not mesh_names or any(not name.startswith(expected_prefix) for name in mesh_names)
+        ):
+            fail(
+                f"{stable_id}: exported mesh datablock names must preserve the authored material group"
+            )
         if measured["bytes"] != len(data):
             fail(f"{stable_id}: measured byte count is stale")
         if abs(measured["longestDimension"] - asset["targetLongestDimension"]) > 0.001:
@@ -59,6 +71,8 @@ def main() -> None:
             fail(f"{stable_id}: runtime Roblox ID differs from manifest")
         if f"targetLongestDimension = {asset['targetLongestDimension']}" not in registry_block:
             fail(f"{stable_id}: runtime target size differs from manifest")
+        if f'placementBand = "{asset["placementBand"]}"' not in registry_block:
+            fail(f"{stable_id}: runtime placement band differs from manifest")
         expected_pbr = "pbr = true" if asset.get("pbrMaps") else "pbr = false"
         if expected_pbr not in registry_block:
             fail(f"{stable_id}: runtime PBR classification differs from manifest")

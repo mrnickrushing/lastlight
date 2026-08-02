@@ -41,6 +41,11 @@ TARGET_LONGEST_DIMENSIONS = {
     "mesh_foxfire_windmill_tower_a": 36.0,
 }
 
+# The root arch is a separately normalized, UV-authored PBR asset. Rebuilding
+# it from the procedural fallback destroys its matching texture set and exceeds
+# its one-slot manifest budget, so the general kit generator must preserve it.
+PRESERVED_ASSET_IDS = {"mesh_root_arch_a"}
+
 
 PALETTE = {
     "bark_dark": ((0.105, 0.050, 0.025, 1), 0.93),
@@ -134,6 +139,13 @@ def smooth_by_angle(obj: bpy.types.Object) -> None:
 def register(asset_id: str, obj: bpy.types.Object, mat_name: str) -> bpy.types.Object:
     obj.name = f"{asset_id}__{obj.name}"
     if obj.type == "MESH":
+        # Roblox names imported MeshParts from the mesh datablock, not the
+        # Blender object/node. Keeping Blender's generic Cone.###/Cube.###
+        # datablock names made every live part miss MeshMaterialPlan and ship
+        # as gray SmoothPlastic even though the GLB node names were correct.
+        # Carry the authored material group through both names so the runtime
+        # loader can reliably assign tactile built-in Roblox materials.
+        obj.data.name = f"{asset_id}__{mat_name}"
         obj.data.materials.append(material(mat_name))
     obj["lastLightAssetId"] = asset_id
     ASSETS.setdefault(asset_id, []).append(obj)
@@ -762,7 +774,17 @@ def normalize_assets() -> None:
 
 
 def export_assets() -> dict[str, dict[str, object]]:
+    measurement_path = OUTPUT / "measurements.json"
     measurements: dict[str, dict[str, object]] = {}
+    if measurement_path.is_file():
+        previous = json.loads(measurement_path.read_text()).get("assets", {})
+        measurements.update(
+            {
+                asset_id: previous[asset_id]
+                for asset_id in PRESERVED_ASSET_IDS
+                if asset_id in previous
+            }
+        )
     for asset_id, objects in sorted(ASSETS.items()):
         bpy.ops.object.select_all(action="DESELECT")
         for obj in objects:
@@ -789,7 +811,7 @@ def export_assets() -> dict[str, dict[str, object]]:
             "materials": sorted({slot.material.name for obj in objects if obj.type == "MESH" for slot in obj.material_slots if slot.material}),
             "bytes": path.stat().st_size,
         }
-    (OUTPUT / "measurements.json").write_text(json.dumps({"schemaVersion": 1, "assets": measurements}, indent=2) + "\n")
+    measurement_path.write_text(json.dumps({"schemaVersion": 1, "assets": measurements}, indent=2) + "\n")
     return measurements
 
 
@@ -881,7 +903,7 @@ def main() -> None:
     make_broadleaf("mesh_broadleaf_hero_a")
     make_boulders("mesh_boulder_cluster_a")
     make_deadfall("mesh_deadfall_a")
-    make_root_arch("mesh_root_arch_a")
+    # mesh_root_arch_a is intentionally preserved; see PRESERVED_ASSET_IDS.
     make_fern("mesh_fern_cluster_a")
     make_hollow_lantern_shrine("mesh_hollow_lantern_shrine_a")
     make_wayfarer_cabin("mesh_wayfarer_cabin_a")
