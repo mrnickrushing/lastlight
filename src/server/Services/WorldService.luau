@@ -743,8 +743,11 @@ local function buildEmberhollowSanctuary(
         signText.Parent = surface
 
         if name == "MARA'S SHELTER" then
+            local cotFallback = Instance.new("Model")
+            cotFallback.Name = "MaraCotFallback"
+            cotFallback.Parent = cabinFolder
             local cot = part(
-                cabinFolder,
+                cotFallback,
                 "MaraCot",
                 Vector3.new(5.2, 0.55, 2.7),
                 cabinCFrame(4.2, 1.0, 3.5),
@@ -753,6 +756,17 @@ local function buildEmberhollowSanctuary(
                 false
             )
             cot.CanQuery = false
+            table.insert(meshPlacements, {
+                assetId = "mesh_creator_wayfarer_bed_a",
+                fallbackKind = "asset_replacement",
+                position = cabinCFrame(4.2, -1.75, 3.5).Position,
+                scale = 1,
+                yaw = yaw + math.rad(90),
+                seed = 9831,
+                swayTag = nil,
+                parent = cabinFolder,
+                fallbackInstance = cotFallback,
+            })
             local tableTop = part(
                 cabinFolder,
                 "MaraWorkTable",
@@ -810,8 +824,11 @@ local function buildEmberhollowSanctuary(
             end
         else
             for bedIndex = -1, 1, 2 do
+                local bedrollFallback = Instance.new("Model")
+                bedrollFallback.Name = "WayfarerBedrollFallback"
+                bedrollFallback.Parent = cabinFolder
                 local bedroll = part(
-                    cabinFolder,
+                    bedrollFallback,
                     "WayfarerBedroll",
                     Vector3.new(4.8, 0.45, 2.3),
                     cabinCFrame(3.5 + bedIndex * 3.6, 0.95, 3.8),
@@ -822,6 +839,17 @@ local function buildEmberhollowSanctuary(
                     false
                 )
                 bedroll.CanQuery = false
+                table.insert(meshPlacements, {
+                    assetId = "mesh_creator_wayfarer_bed_a",
+                    fallbackKind = "asset_replacement",
+                    position = cabinCFrame(3.5 + bedIndex * 3.6, -1.75, 3.8).Position,
+                    scale = 1,
+                    yaw = yaw + math.rad(90),
+                    seed = 9840 + bedIndex,
+                    swayTag = nil,
+                    parent = cabinFolder,
+                    fallbackInstance = bedrollFallback,
+                })
             end
             local trunk = part(
                 cabinFolder,
@@ -4495,21 +4523,32 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             supply.CanQuery = false
         end
         -- Restrained practical light, hung from the frame rather than floating.
+        -- The tie beam this hangs from is centred at y = 9.05 with a z = +3.9
+        -- half-length of 14.2/2 = 7.1, so its underside sits at 8.7 and any x
+        -- inside +/-7.1 sits below it. The chain top lands exactly on that
+        -- underside and the lantern hangs from the chain's bottom, so nothing
+        -- in this stack floats without a physical thing above it holding it up
+        -- -- the failure the first version had: its chain sat at z = 2.1, 1.8
+        -- studs clear of either beam, with its own top above the beam height,
+        -- so the lantern read as an unsupported glowing box.
+        local beamUnderside = 9.05 - 0.35
+        local chainLength = 1.0
         local hookChain = part(
             masteryGrove,
             altar.name .. "MasteryLanternChain",
-            Vector3.new(0.14, 1.3, 0.14),
-            shrineBase * CFrame.new(5.5, 8.65, 2.1),
-            Color3.fromRGB(47, 50, 52),
+            Vector3.new(0.22, chainLength, 0.22),
+            shrineBase * CFrame.new(5.7, beamUnderside - chainLength * 0.5, 3.9),
+            Color3.fromRGB(58, 62, 66),
             Enum.Material.Metal,
             false
         )
         hookChain.CanQuery = false
+        local lanternHeight = 1.05
         local hookLantern = part(
             masteryGrove,
             altar.name .. "MasteryLantern",
-            Vector3.new(0.78, 1.05, 0.78),
-            shrineBase * CFrame.new(5.5, 7.5, 2.1),
+            Vector3.new(0.78, lanternHeight, 0.78),
+            shrineBase * CFrame.new(5.7, beamUnderside - chainLength - lanternHeight * 0.5, 3.9),
             AMBER,
             Enum.Material.Neon,
             false
@@ -4523,6 +4562,19 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         masteryLight.Shadows = false
         masteryLight.Parent = hookLantern
         CollectionService:AddTag(hookLantern, self._runtimeIds.AmbientLightTag)
+        -- A reviewed anvil stands at the working end of each shrine, so the
+        -- craft has a recognizable tool rather than only stacked supply boxes.
+        table.insert(self._meshPlacements, {
+            assetId = "mesh_creator_anvil_a",
+            fallbackKind = "asset_dressing",
+            position = altar.center + Vector3.new(4.6, 0.8, 2.4),
+            scale = 1,
+            yaw = math.rad(-24),
+            seed = 9980 + #altar.name,
+            swayTag = nil,
+            parent = masteryGrove,
+            fallbackInstance = nil,
+        })
         labelSign(
             masteryGrove,
             CFrame.new(altar.center + Vector3.new(0, 4.8, 3.7)) * CFrame.Angles(0, math.pi, 0),

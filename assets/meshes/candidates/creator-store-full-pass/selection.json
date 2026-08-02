@@ -13,9 +13,21 @@
       "maxTriangles": 2000,
       "maxMaterialSlots": 4,
       "triangles": 1584,
-      "boundsMin": [-84.1988, 0.4292, -147.8665],
-      "boundsMax": [-82.3219, 28.1329, -117.6769],
-      "dimensions": [1.877, 27.7037, 30.1896],
+      "boundsMin": [
+        -84.1988,
+        0.4292,
+        -147.8665
+      ],
+      "boundsMax": [
+        -82.3219,
+        28.1329,
+        -117.6769
+      ],
+      "dimensions": [
+        1.877,
+        27.7037,
+        30.1896
+      ],
       "longestDimension": 30.1896,
       "meshObjects": 4,
       "baseParts": 4,
@@ -32,9 +44,21 @@
       "maxTriangles": 500,
       "maxMaterialSlots": 2,
       "triangles": 396,
-      "boundsMin": [-692.0, 0.0, -435.5043],
-      "boundsMax": [-684.0764, 3.749, -432.8347],
-      "dimensions": [7.9236, 3.749, 2.6695],
+      "boundsMin": [
+        -692.0,
+        0.0,
+        -435.5043
+      ],
+      "boundsMax": [
+        -684.0764,
+        3.749,
+        -432.8347
+      ],
+      "dimensions": [
+        7.9236,
+        3.749,
+        2.6695
+      ],
       "longestDimension": 7.9236,
       "meshObjects": 2,
       "baseParts": 2,
@@ -51,9 +75,21 @@
       "maxTriangles": 7000,
       "maxMaterialSlots": 16,
       "triangles": 6766,
-      "boundsMin": [-423.4429, 74.999, 696.7675],
-      "boundsMax": [-416.1922, 86.1249, 700.4792],
-      "dimensions": [7.2507, 11.1259, 3.7117],
+      "boundsMin": [
+        -423.4429,
+        74.999,
+        696.7675
+      ],
+      "boundsMax": [
+        -416.1922,
+        86.1249,
+        700.4792
+      ],
+      "dimensions": [
+        7.2507,
+        11.1259,
+        3.7117
+      ],
       "longestDimension": 11.1259,
       "meshObjects": 16,
       "baseParts": 16,
@@ -70,9 +106,21 @@
       "maxTriangles": 500,
       "maxMaterialSlots": 1,
       "triangles": 436,
-      "boundsMin": [-130.4548, -172.1997, -37.7127],
-      "boundsMax": [126.6819, 79.5853, 8.5511],
-      "dimensions": [257.1367, 251.785, 46.2638],
+      "boundsMin": [
+        -130.4548,
+        -172.1997,
+        -37.7127
+      ],
+      "boundsMax": [
+        126.6819,
+        79.5853,
+        8.5511
+      ],
+      "dimensions": [
+        257.1367,
+        251.785,
+        46.2638
+      ],
       "longestDimension": 257.1367,
       "meshObjects": 1,
       "baseParts": 1,
@@ -89,9 +137,21 @@
       "maxTriangles": 1600,
       "maxMaterialSlots": 3,
       "triangles": 1448,
-      "boundsMin": [15.1618, 0.02, 113.5544],
-      "boundsMax": [24.9367, 9.665, 114.8719],
-      "dimensions": [9.7749, 9.645, 1.3175],
+      "boundsMin": [
+        15.1618,
+        0.02,
+        113.5544
+      ],
+      "boundsMax": [
+        24.9367,
+        9.665,
+        114.8719
+      ],
+      "dimensions": [
+        9.7749,
+        9.645,
+        1.3175
+      ],
       "longestDimension": 9.7749,
       "meshObjects": 3,
       "baseParts": 3,
@@ -108,9 +168,21 @@
       "maxTriangles": 500,
       "maxMaterialSlots": 3,
       "triangles": 432,
-      "boundsMin": [519.2139, 659.0662, 110.5297],
-      "boundsMax": [522.1893, 662.1268, 113.5051],
-      "dimensions": [2.9755, 3.0607, 2.9754],
+      "boundsMin": [
+        519.2139,
+        659.0662,
+        110.5297
+      ],
+      "boundsMax": [
+        522.1893,
+        662.1268,
+        113.5051
+      ],
+      "dimensions": [
+        2.9755,
+        3.0607,
+        2.9754
+      ],
       "longestDimension": 3.0607,
       "meshObjects": 3,
       "baseParts": 3,
@@ -127,9 +199,21 @@
       "maxTriangles": 600,
       "maxMaterialSlots": 13,
       "triangles": 468,
-      "boundsMin": [-6.7987, 0.0, -62.1373],
-      "boundsMax": [5.6944, 0.6099, -25.8879],
-      "dimensions": [12.4931, 0.6099, 36.2494],
+      "boundsMin": [
+        -6.7987,
+        0.0,
+        -62.1373
+      ],
+      "boundsMax": [
+        5.6944,
+        0.6099,
+        -25.8879
+      ],
+      "dimensions": [
+        12.4931,
+        0.6099,
+        36.2494
+      ],
       "longestDimension": 36.2494,
       "meshObjects": 13,
       "baseParts": 13,
@@ -146,9 +230,21 @@
       "maxTriangles": 300,
       "maxMaterialSlots": 15,
       "triangles": 168,
-      "boundsMin": [-138.4056, 2.1671, 28.6023],
-      "boundsMax": [-131.5944, 6.6928, 32.8272],
-      "dimensions": [6.8112, 4.5257, 4.225],
+      "boundsMin": [
+        -138.4056,
+        2.1671,
+        28.6023
+      ],
+      "boundsMax": [
+        -131.5944,
+        6.6928,
+        32.8272
+      ],
+      "dimensions": [
+        6.8112,
+        4.5257,
+        4.225
+      ],
       "longestDimension": 6.8112,
       "meshObjects": 15,
       "baseParts": 15,
@@ -165,9 +261,21 @@
       "maxTriangles": 1200,
       "maxMaterialSlots": 8,
       "triangles": 1020,
-      "boundsMin": [-84.5348, 5.65, -182.6017],
-      "boundsMax": [-79.8382, 10.6, -182.1622],
-      "dimensions": [4.6966, 4.95, 0.4396],
+      "boundsMin": [
+        -84.5348,
+        5.65,
+        -182.6017
+      ],
+      "boundsMax": [
+        -79.8382,
+        10.6,
+        -182.1622
+      ],
+      "dimensions": [
+        4.6966,
+        4.95,
+        0.4396
+      ],
       "longestDimension": 4.95,
       "meshObjects": 8,
       "baseParts": 8,
@@ -184,9 +292,21 @@
       "maxTriangles": 800,
       "maxMaterialSlots": 6,
       "triangles": 638,
-      "boundsMin": [-95.5136, 216.8643, 445.6204],
-      "boundsMax": [-86.4445, 224.5648, 458.0537],
-      "dimensions": [9.069, 7.7005, 12.4333],
+      "boundsMin": [
+        -95.5136,
+        216.8643,
+        445.6204
+      ],
+      "boundsMax": [
+        -86.4445,
+        224.5648,
+        458.0537
+      ],
+      "dimensions": [
+        9.069,
+        7.7005,
+        12.4333
+      ],
       "longestDimension": 12.4333,
       "meshObjects": 6,
       "baseParts": 9,
@@ -203,9 +323,21 @@
       "maxTriangles": 3300,
       "maxMaterialSlots": 66,
       "triangles": 3102,
-      "boundsMin": [-20.1789, -2.15, -19.2239],
-      "boundsMax": [7.8305, 16.6975, -3.6296],
-      "dimensions": [28.0094, 18.8475, 15.5943],
+      "boundsMin": [
+        -20.1789,
+        -2.15,
+        -19.2239
+      ],
+      "boundsMax": [
+        7.8305,
+        16.6975,
+        -3.6296
+      ],
+      "dimensions": [
+        28.0094,
+        18.8475,
+        15.5943
+      ],
       "longestDimension": 28.0094,
       "meshObjects": 66,
       "baseParts": 66,
@@ -222,9 +354,21 @@
       "maxTriangles": 1000,
       "maxMaterialSlots": 67,
       "triangles": 804,
-      "boundsMin": [-2.9636, 0.0261, 9.1639],
-      "boundsMax": [0.088, 3.0452, 11.986],
-      "dimensions": [3.0515, 3.0191, 2.8221],
+      "boundsMin": [
+        -2.9636,
+        0.0261,
+        9.1639
+      ],
+      "boundsMax": [
+        0.088,
+        3.0452,
+        11.986
+      ],
+      "dimensions": [
+        3.0515,
+        3.0191,
+        2.8221
+      ],
       "longestDimension": 3.0515,
       "meshObjects": 67,
       "baseParts": 67,
@@ -241,9 +385,21 @@
       "maxTriangles": 400,
       "maxMaterialSlots": 23,
       "triangles": 276,
-      "boundsMin": [-52.6997, 0.0, -86.5412],
-      "boundsMax": [-44.1893, 3.0705, -77.3793],
-      "dimensions": [8.5103, 3.0704, 9.1619],
+      "boundsMin": [
+        -52.6997,
+        0.0,
+        -86.5412
+      ],
+      "boundsMax": [
+        -44.1893,
+        3.0705,
+        -77.3793
+      ],
+      "dimensions": [
+        8.5103,
+        3.0704,
+        9.1619
+      ],
       "longestDimension": 9.1619,
       "meshObjects": 23,
       "baseParts": 23,
@@ -260,9 +416,21 @@
       "maxTriangles": 2200,
       "maxMaterialSlots": 1,
       "triangles": 2036,
-      "boundsMin": [-756.5193, 45.1586, 40.7273],
-      "boundsMax": [-711.8951, 104.3371, 85.3514],
-      "dimensions": [44.6241, 59.1785, 44.6241],
+      "boundsMin": [
+        -756.5193,
+        45.1586,
+        40.7273
+      ],
+      "boundsMax": [
+        -711.8951,
+        104.3371,
+        85.3514
+      ],
+      "dimensions": [
+        44.6241,
+        59.1785,
+        44.6241
+      ],
       "longestDimension": 59.1785,
       "meshObjects": 1,
       "baseParts": 1,
@@ -279,9 +447,21 @@
       "maxTriangles": 500,
       "maxMaterialSlots": 1,
       "triangles": 336,
-      "boundsMin": [-38.9491, 9.3164, 93.338],
-      "boundsMax": [-34.6775, 11.8469, 95.8847],
-      "dimensions": [4.2717, 2.5305, 2.5467],
+      "boundsMin": [
+        -38.9491,
+        9.3164,
+        93.338
+      ],
+      "boundsMax": [
+        -34.6775,
+        11.8469,
+        95.8847
+      ],
+      "dimensions": [
+        4.2717,
+        2.5305,
+        2.5467
+      ],
       "longestDimension": 4.2717,
       "meshObjects": 1,
       "baseParts": 1,
@@ -298,13 +478,87 @@
       "maxTriangles": 400,
       "maxMaterialSlots": 23,
       "triangles": 276,
-      "boundsMin": [81.0, 4.0, -47.0],
-      "boundsMax": [153.0, 4.8, -2.0],
-      "dimensions": [72.0, 0.8, 45.0],
+      "boundsMin": [
+        81.0,
+        4.0,
+        -47.0
+      ],
+      "boundsMax": [
+        153.0,
+        4.8,
+        -2.0
+      ],
+      "dimensions": [
+        72.0,
+        0.8,
+        45.0
+      ],
       "longestDimension": 72.0,
       "meshObjects": 23,
       "baseParts": 23,
       "bytes": 48028
+    },
+    {
+      "id": "mesh_creator_wayfarer_bed_a",
+      "displayName": "Creator Store Timber Bed",
+      "role": "cabin_sleeping_berth",
+      "assetId": 5613094175,
+      "name": "Wooden Bed",
+      "creator": "wyattbro00",
+      "targetLongestDimension": 7.2,
+      "maxTriangles": 2200,
+      "maxMaterialSlots": 12,
+      "triangles": 0,
+      "boundsMin": [
+        4.9512,
+        90.7699,
+        290.0008
+      ],
+      "boundsMax": [
+        18.8052,
+        95.8362,
+        305.9699
+      ],
+      "dimensions": [
+        13.854,
+        5.0663,
+        15.9691
+      ],
+      "longestDimension": 15.9691,
+      "meshObjects": 12,
+      "baseParts": 12,
+      "bytes": 5452
+    },
+    {
+      "id": "mesh_creator_anvil_a",
+      "displayName": "Creator Store Iron Anvil",
+      "role": "mastery_smithing_anvil",
+      "assetId": 11946437830,
+      "name": "Anvil",
+      "creator": "IllusivePhantasm",
+      "targetLongestDimension": 3.1,
+      "maxTriangles": 1600,
+      "maxMaterialSlots": 4,
+      "triangles": 0,
+      "boundsMin": [
+        485.2884,
+        62.35,
+        299.6458
+      ],
+      "boundsMax": [
+        487.6411,
+        64.925,
+        303.9693
+      ],
+      "dimensions": [
+        2.3527,
+        2.575,
+        4.3235
+      ],
+      "longestDimension": 4.3235,
+      "meshObjects": 4,
+      "baseParts": 4,
+      "bytes": 24840
     }
   ]
 }
