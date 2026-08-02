@@ -24507,10 +24507,10 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     heartLight.Parent = heart
     addBillboard(heart, "HEARTWOOD", AMBER, 18)
     table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_stump_a",
+        assetId = "mesh_heartwood_stump_a",
         fallbackKind = "asset_replacement",
         position = HEARTWOOD_CENTER,
-        scale = 1.15,
+        scale = 1,
         yaw = math.rad(-18),
         seed = 9880,
         swayTag = nil,
@@ -24568,18 +24568,41 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         Enum.Material.Wood,
         false
     )
-    for roofSide = -1, 1, 2 do
-        local roof = part(
+    -- Open rafters, not a closed roof. Two solid slate wedges used to span the
+    -- full 28-stud length directly above the three tool displays, and from any
+    -- normal over-the-shoulder camera they covered the very thing the player
+    -- had walked over to look at. Camera sightline is one of the four
+    -- clearances the visual standard requires reserving before detail, and a
+    -- roofed interior that hides its own interaction fails that.
+    --
+    -- Paired rafters carried on the ridge beam keep the frame reading as a
+    -- built shelter -- posts, beam, rafters, believable support -- while
+    -- leaving open sky between them to see and reach through.
+    for rafterIndex = -4, 4 do
+        local rafterZ = rafterIndex * 3.2
+        for rafterSide = -1, 1, 2 do
+            part(
+                toolYard,
+                "ToolYardRafter",
+                Vector3.new(0.34, 0.34, 7.4),
+                CFrame.new(TOOL_YARD_CENTER + Vector3.new(rafterSide * 2.9, 9.3, rafterZ))
+                    * CFrame.Angles(0, math.rad(90), math.rad(rafterSide * 26)),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
+    end
+    for braceSide = -1, 1, 2 do
+        part(
             toolYard,
-            "ToolYardRoof",
-            Vector3.new(8.2, 3.1, 28.2),
-            CFrame.new(TOOL_YARD_CENTER + Vector3.new(roofSide * 3.55, 8.65, 0))
-                * CFrame.Angles(0, if roofSide < 0 then math.pi else 0, 0),
-            Color3.fromRGB(45, 51, 47),
-            Enum.Material.Slate,
+            "ToolYardEaveBeam",
+            Vector3.new(0.4, 0.4, 28),
+            CFrame.new(TOOL_YARD_CENTER + Vector3.new(braceSide * 5.6, 8.5, 0)),
+            WET_BARK,
+            Enum.Material.Wood,
             false
         )
-        roof.Shape = Enum.PartType.Wedge
     end
     local toolDisplayFallback = Instance.new("Model")
     toolDisplayFallback.Name = "ToolDisplayFallback"
@@ -24900,8 +24923,18 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         nil
     )
 
+    local firstLanternFallback = Instance.new("Model")
+    firstLanternFallback.Name = "FirstLanternVisualFallback"
+    firstLanternFallback.Parent = interactables
+
+    -- The authored lantern carries its own stepped stone plinth, so the
+    -- procedural block and steps belong to the fallback rather than standing
+    -- permanently under it -- otherwise the town centre grows a second plinth
+    -- the moment the mesh loads. They stay collidable while invisible, which
+    -- is what keeps players able to walk up onto the dais either way, and
+    -- lanternBase remains the interaction anchor exactly as before.
     local lanternBase = part(
-        interactables,
+        firstLanternFallback,
         "FirstLantern",
         Vector3.new(8, 3, 8),
         CFrame.new(0, 1.5, -112),
@@ -24910,7 +24943,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     )
     for stepIndex = 1, 3 do
         part(
-            interactables,
+            firstLanternFallback,
             "FirstLanternPlinth",
             Vector3.new(10.5 - stepIndex * 1.45, 0.52, 10.5 - stepIndex * 1.45),
             CFrame.new(0, 0.25 + stepIndex * 0.42, -112),
@@ -24918,9 +24951,6 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             Enum.Material.Slate
         )
     end
-    local firstLanternFallback = Instance.new("Model")
-    firstLanternFallback.Name = "FirstLanternVisualFallback"
-    firstLanternFallback.Parent = interactables
     for sideX = -1, 1, 2 do
         for sideZ = -1, 1, 2 do
             part(
@@ -25016,10 +25046,10 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     addBillboard(flame, "THE FIRST LANTERN", AMBER, 32)
     self._lantern = flame
     table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_first_lantern_a",
+        assetId = "mesh_first_lantern_a",
         fallbackKind = "placeholder",
-        position = Vector3.new(0, 3, -112),
-        scale = 1.25,
+        position = Vector3.new(0, 0, -112),
+        scale = 0.95,
         yaw = math.rad(8),
         seed = 9314,
         swayTag = nil,
@@ -34300,6 +34330,28 @@ local ENTRIES: { Entry } = {
         placementBand = "curated_core",
         pbr = false,
         preserveSourceMaterials = false,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_heartwood_stump_a",
+        assetId = 140476842967550,
+        targetLongestDimension = 7,
+        maxTriangles = 6000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_first_lantern_a",
+        assetId = 84319358349776,
+        targetLongestDimension = 11,
+        maxTriangles = 7000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_hero",
+        pbr = true,
+        preserveSourceMaterials = true,
         creatorStore = false,
     },
     {

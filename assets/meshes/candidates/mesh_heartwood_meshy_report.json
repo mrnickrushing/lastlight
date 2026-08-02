@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_heartwood_stump_a",
+  "source": "assets/meshes/candidates/mesh_heartwood_meshy.glb",
+  "output": "assets/meshes/generated/mesh_heartwood_stump_a.glb",
+  "targetLongestDimension": 7.0,
+  "boundsMin": [
+    -3.5,
+    -3.3809,
+    0.0
+  ],
+  "boundsMax": [
+    3.5,
+    3.3809,
+    5.3864
+  ],
+  "dimensions": [
+    7.0,
+    6.7618,
+    5.3864
+  ],
+  "longestDimension": 7.0,
+  "trianglesBefore": 5010,
+  "trianglesAfter": 5010,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    }
+  ],
+  "bytes": 10142132
+}
