@@ -43,7 +43,7 @@ local TerrainBuilder = require(serverRoot.World.TerrainBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.46.0", "unexpected build version")
+assert(Config.BuildVersion == "0.46.1", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#MusicCatalog.regionIds() == 8, "every playable world needs an adaptive score")
@@ -346,7 +346,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "emberhollow-adaptive-music-v27",
+    world:GetAttribute("WorldVersion") == "emberhollow-runtime-visual-v28",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -468,6 +468,14 @@ for _, descendant in world:GetDescendants() do
             descendant:IsA("BasePart") and descendant.Size.X >= 15,
             "arrival road needs a dominant gameplay-scale width"
         )
+        assert(
+            descendant:IsA("BasePart") and descendant.Material == Enum.Material.Cobblestone,
+            "arrival road needs a textured cobblestone surface that survives atmospheric tint"
+        )
+        assert(
+            descendant:IsA("BasePart") and descendant.Position.Y >= 2,
+            "arrival road visual skin must sit above the voxel-rendered valley surface"
+        )
     elseif descendant.Name == "EmberhollowRoadFoundation" then
         roadFoundations += 1
     elseif descendant.Name == "RoadEdgeStone" then
@@ -488,10 +496,10 @@ for _, descendant in world:GetDescendants() do
         )
     end
 end
-assert(roadSegments == 6, "arrival road must connect every authored route segment")
-assert(roadFoundations == 6, "each arrival road segment needs a contrasting physical foundation")
-assert(roadEdgeStones >= 40, "arrival road needs a repeated visible stone edge")
-assert(roadRuts == 12, "every road segment needs two readable travel ruts")
+assert(roadSegments == 7, "arrival road must begin behind spawn and connect every route segment")
+assert(roadFoundations == 7, "each arrival road segment needs a contrasting physical foundation")
+assert(roadEdgeStones >= 44, "arrival road needs a repeated visible stone edge")
+assert(roadRuts == 14, "every road segment needs two readable travel ruts")
 assert(roadChevrons == 0, "flat chevron slabs cannot substitute for a readable road surface")
 assert(tutorialSpurs == 3, "each early tutorial activity needs a path from the main road")
 local cabinRafters = 0
@@ -574,6 +582,10 @@ local streetWear = world:FindFirstChild("TownMainStreetWear", true)
 local townSquare = world:FindFirstChild("FirstLanternTownSquare", true)
 local courtyard = world:FindFirstChild("EmberhollowCourtyard", true)
 assert(mainStreet ~= nil and mainStreet:IsA("BasePart"), "town needs a visible main street")
+assert(
+    mainStreet:IsA("BasePart") and mainStreet.Material == Enum.Material.Cobblestone,
+    "town main street needs physical cobblestone texture instead of a ground-colored slab"
+)
 assert(
     mainStreetFoundation ~= nil and mainStreetFoundation:IsA("BasePart"),
     "town street needs a contrasting cobblestone foundation"

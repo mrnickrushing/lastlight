@@ -81,7 +81,17 @@ def main() -> None:
     if payload[:2] == b"\x1f\x8b":
         payload = gzip.decompress(payload)
 
-    # A binary .rbxm starts with "<roblox!"; the XML form starts with "<roblox".
+    # Lune's Roblox document reader accepts XML models rooted at <roblox>, but
+    # not the optional XML declaration some CDN payloads include. Normalize
+    # that transport variation before validation and storage.
+    if payload.startswith(b"<?xml"):
+        root_offset = payload.find(b"<roblox")
+        if root_offset == -1:
+            raise RuntimeError(f"{args.asset_id}: XML payload has no Roblox root")
+        payload = payload[root_offset:]
+
+    # A binary .rbxm starts with "<roblox!"; normalized XML starts with the
+    # Roblox root element.
     # Checking here means a bad download fails at the download, not three
     # steps later inside a Lune script.
     if not payload.startswith(b"<roblox"):

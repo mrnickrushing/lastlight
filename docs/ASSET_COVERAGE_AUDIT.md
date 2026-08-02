@@ -118,6 +118,32 @@ inspection cannot reveal.
 A static audit cannot tell you whether a placed asset *looks* right, only
 whether one is placed. Scale, orientation, and clipping need Studio.
 
+### Runtime visual follow-up (0.46.1)
+
+The first in-place Studio pass after the full object conversion found two
+composition defects that static registry validation could not catch:
+
+- Creator Store asset `14425476166` denied runtime access. It was removed and
+  replaced by thumbnail-reviewed, downloaded, sanitized medieval signpost
+  `82202632313902`; the replacement payload contains five physical parts and no
+  scripts.
+- Creator Store barrel `14875568455` also denied runtime access. It was removed
+  in favor of the thumbnail-reviewed, sanitized two-part barrel `4890213351`;
+  runtime insertion is part of the final Studio gate, not inferred from catalog
+  availability.
+- Creator Store crate `6332066686` was the final denied model. It was replaced
+  by thumbnail-reviewed, downloaded, sanitized crate `8314504894` (25 physical
+  parts, no scripts). The exact generated place now reports zero fallbacks in
+  town, expedition, and world dressing.
+- The arrival and town road geometry existed but was buried beneath the
+  voxel-rendered valley surface. A live neon elevation probe established the
+  occlusion height; the final non-colliding visual layers now sit 1.5 studs
+  higher and use Cobblestone surfaces, dark Slate foundations, warm Mud wear,
+  larger edge stones, and the reviewed road-stone asset layer.
+
+The REMEMBER interaction remains an invisible gameplay anchor with the crystal
+reliquary as its only visible centerpiece and no floating `WorldLabel`.
+
 ## Large fixed-size parts
 
 Useful when something enormous appears on screen and needs identifying. Largest

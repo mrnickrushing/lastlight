@@ -222,14 +222,14 @@ local function queueRoadAssetPlacements(
         table.insert(placements, {
             assetId = "mesh_creator_road_stones_a",
             fallbackKind = "asset_dressing",
-            position = Vector3.new(position.X, 0.92, position.Z),
+            position = Vector3.new(position.X, 2.42, position.Z),
             scale = 1,
             yaw = yaw,
             seed = seedBase + index,
             swayTag = nil,
             parent = parent,
             fallbackInstance = nil,
-            profileScale = Vector3.new(1, 1, chunkLength / 18),
+            profileScale = Vector3.new(1.12, 0.92, chunkLength / 18),
         })
     end
 end
@@ -1091,9 +1091,9 @@ local function buildEmberhollowSanctuary(
         parent,
         "TownMainStreetFoundation",
         Vector3.new(18, 0.34, 206),
-        CFrame.new(0, 0.31, -102),
-        Color3.fromRGB(72, 65, 53),
-        Enum.Material.Cobblestone,
+        CFrame.new(0, 1.81, -102),
+        Color3.fromRGB(38, 41, 39),
+        Enum.Material.Slate,
         false
     )
     streetFoundation.CanQuery = false
@@ -1101,19 +1101,19 @@ local function buildEmberhollowSanctuary(
         parent,
         "TownMainStreet",
         Vector3.new(15.5, 0.32, 204),
-        CFrame.new(0, 0.59, -102),
-        Color3.fromRGB(126, 82, 45),
-        Enum.Material.Ground,
+        CFrame.new(0, 2.17, -102),
+        Color3.fromRGB(183, 143, 91),
+        Enum.Material.Cobblestone,
         false
     )
     townStreet.CanQuery = false
     local streetWear = part(
         parent,
         "TownMainStreetWear",
-        Vector3.new(5.4, 0.12, 202),
-        CFrame.new(0, 0.81, -102),
-        Color3.fromRGB(162, 116, 67),
-        Enum.Material.Pebble,
+        Vector3.new(3.8, 0.12, 202),
+        CFrame.new(0, 2.42, -102),
+        Color3.fromRGB(88, 58, 37),
+        Enum.Material.Mud,
         false
     )
     streetWear.CanQuery = false
@@ -1122,7 +1122,7 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownStreetRut",
             Vector3.new(0.68, 0.08, 200),
-            CFrame.new(rutSide * 2.4, 0.89, -102),
+            CFrame.new(rutSide * 2.4, 2.5, -102),
             Color3.fromRGB(61, 43, 30),
             Enum.Material.Mud,
             false
@@ -1145,9 +1145,9 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownDistrictRoadFoundation",
             Vector3.new(8.6, 0.26, delta.Magnitude + 1.2),
-            frame,
-            Color3.fromRGB(59, 57, 50),
-            Enum.Material.Cobblestone,
+            frame * CFrame.new(0, 1.5, 0),
+            Color3.fromRGB(38, 41, 39),
+            Enum.Material.Slate,
             false
         )
         base.CanQuery = false
@@ -1155,23 +1155,29 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownDistrictRoad",
             Vector3.new(7.2, 0.24, delta.Magnitude + 0.8),
-            frame * CFrame.new(0, 0.24, 0),
-            Color3.fromRGB(126, 82, 45),
-            Enum.Material.Ground,
+            frame * CFrame.new(0, 1.81, 0),
+            Color3.fromRGB(176, 137, 87),
+            Enum.Material.Cobblestone,
             false
         )
         surface.CanQuery = false
         local wear = part(
             parent,
             "TownDistrictRoadWear",
-            Vector3.new(2.6, 0.08, delta.Magnitude + 0.5),
-            frame * CFrame.new(0, 0.41, 0),
-            Color3.fromRGB(135, 99, 59),
-            Enum.Material.Ground,
+            Vector3.new(2.1, 0.08, delta.Magnitude + 0.5),
+            frame * CFrame.new(0, 2.01, 0),
+            Color3.fromRGB(79, 52, 34),
+            Enum.Material.Mud,
             false
         )
         wear.CanQuery = false
-        queueRoadAssetPlacements(meshPlacements, parent, start, finish, 9700 + #meshPlacements)
+        queueRoadAssetPlacements(
+            meshPlacements,
+            parent,
+            start + Vector3.new(0, 1.38, 0),
+            finish + Vector3.new(0, 1.38, 0),
+            9700 + #meshPlacements
+        )
     end
     townSideRoad(Vector3.new(0, 0.45, -144), Vector3.new(-80, 0.45, -144))
     townSideRoad(Vector3.new(0, 0.45, -126), Vector3.new(80, 0.45, -126))
@@ -2178,6 +2184,9 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     )
 
     local route = {
+        -- Extend behind ArrivalSpawn so the opening camera visibly starts on
+        -- the route instead of looking across an unbroken foreground of grass.
+        Vector3.new(0, 0.42, 18),
         Vector3.new(0, 0.42, 0),
         Vector3.new(-3, 0.42, -28),
         Vector3.new(20, 0.42, -48),
@@ -2200,9 +2209,9 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             geometry,
             "EmberhollowRoadFoundation",
             Vector3.new(17.2, 0.28, distance + 4),
-            roadFrame * CFrame.new(0, -0.08, 0),
-            Color3.fromRGB(72, 65, 53),
-            Enum.Material.Cobblestone,
+            roadFrame * CFrame.new(0, 1.42, 0),
+            Color3.fromRGB(38, 41, 39),
+            Enum.Material.Slate,
             false
         )
         foundation.CanQuery = false
@@ -2210,9 +2219,13 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             geometry,
             "EmberhollowRoad",
             Vector3.new(15.2, 0.36, distance + 3.6),
-            roadFrame * CFrame.new(0, 0.18, 0),
-            Color3.fromRGB(126, 82, 45),
-            Enum.Material.Ground,
+            -- Studio verification showed the voxel-rendered valley surface
+            -- occluding the authored y=0 plane by about 1.5 studs. Keeping the
+            -- route non-colliding while lifting its visual skin preserves the
+            -- gameplay plane and makes the road actually render underfoot.
+            roadFrame * CFrame.new(0, 1.77, 0),
+            Color3.fromRGB(190, 149, 94),
+            Enum.Material.Cobblestone,
             false
         )
         trail.CanQuery = false
@@ -2220,20 +2233,36 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         local wornCenter = part(
             geometry,
             "EmberhollowRoadWear",
-            Vector3.new(6.2, 0.12, distance + 2.8),
-            roadFrame * CFrame.new(0, 0.43, 0),
-            Color3.fromRGB(162, 116, 67),
-            Enum.Material.Pebble,
+            Vector3.new(3.6, 0.12, distance + 2.8),
+            roadFrame * CFrame.new(0, 2.05, 0),
+            Color3.fromRGB(78, 51, 33),
+            Enum.Material.Mud,
             false
         )
         wornCenter.CanQuery = false
+
+        -- A continuous dark shoulder on both sides makes the path silhouette
+        -- survive fog, grass texture, and the low morning camera angle. Sparse
+        -- edge stones alone disappeared into the meadow between placements.
+        for shoulderSide = -1, 1, 2 do
+            local shoulder = part(
+                geometry,
+                "RoadShoulder",
+                Vector3.new(1.15, 0.3, distance + 3.2),
+                roadFrame * CFrame.new(shoulderSide * 7.45, 1.83, 0),
+                Color3.fromRGB(57, 62, 59),
+                Enum.Material.Slate,
+                false
+            )
+            shoulder.CanQuery = false
+        end
 
         for rutSide = -1, 1, 2 do
             local rut = part(
                 geometry,
                 "RoadRut",
                 Vector3.new(0.62, 0.08, distance + 1),
-                roadFrame * CFrame.new(rutSide * 2.25, 0.52, 0),
+                roadFrame * CFrame.new(rutSide * 2.25, 2.14, 0),
                 Color3.fromRGB(57, 40, 28),
                 Enum.Material.Mud,
                 false
@@ -2248,13 +2277,13 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 local edgeStone = part(
                     geometry,
                     "RoadEdgeStone",
-                    Vector3.new(0.9, 0.38, 1.35),
+                    Vector3.new(1.3, 0.62, 1.75),
                     roadFrame
-                        * CFrame.new(side * 7.85, 0.37, along)
+                        * CFrame.new(side * 7.85, 2.13, along)
                         * CFrame.Angles(0, math.rad(side * (marker % 2) * 7), 0),
                     if marker % 3 == 0
-                        then Color3.fromRGB(107, 101, 86)
-                        else Color3.fromRGB(75, 83, 79),
+                        then Color3.fromRGB(132, 124, 101)
+                        else Color3.fromRGB(84, 94, 89),
                     Enum.Material.Slate,
                     false
                 )
@@ -2281,12 +2310,12 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             local wedge = part(
                 geometry,
                 "RouteGuideMarker",
-                Vector3.new(1.5, 0.1, 2.1),
+                Vector3.new(1.9, 0.12, 2.65),
                 -- The route frame sits at Y = 0.42 and the worn road surface
                 -- tops out at 0.91, so this offset puts the wedge's underside
                 -- at 0.89 -- inlaid into the road. At 0.94 it floated a full
                 -- 0.4 studs above the surface and pulsed in mid-air.
-                roadFrame * CFrame.new(0, 0.52, along) * CFrame.Angles(0, math.pi, 0),
+                roadFrame * CFrame.new(0, 2.15, along) * CFrame.Angles(0, math.pi, 0),
                 FOXFIRE,
                 Enum.Material.Neon,
                 false
@@ -2457,6 +2486,10 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         CFrame.new(7, 3, -14) * CFrame.Angles(0, math.pi, 0),
         "FOLLOW THE LANTERNS"
     )
+    -- The sourced sign has its own two-board silhouette. Keeping the legacy
+    -- fallback SurfaceGui after replacement projects one wide sentence across
+    -- both irregular boards and clips it into unreadable fragments.
+    routeSign:SetAttribute("HideSemanticGuiOnReplacement", true)
     table.insert(_self._meshPlacements, {
         assetId = "mesh_creator_forest_sign_a",
         fallbackKind = "asset_replacement",
@@ -2711,10 +2744,13 @@ local function buildMeshFallback(parent: Instance, placement: MeshPlacement)
 end
 
 local function hideProceduralPlaceholder(placeholder: Instance)
+    local removeSemanticGui = placeholder:GetAttribute("HideSemanticGuiOnReplacement") == true
     local instances = placeholder:GetDescendants()
     table.insert(instances, placeholder)
     for _, instance in instances do
-        if instance:IsA("BasePart") then
+        if removeSemanticGui and (instance:IsA("SurfaceGui") or instance:IsA("BillboardGui")) then
+            instance:Destroy()
+        elseif instance:IsA("BasePart") then
             instance.Transparency = 1
             instance.CastShadow = false
         elseif
@@ -4846,7 +4882,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "emberhollow-adaptive-music-v27")
+    world:SetAttribute("WorldVersion", "emberhollow-runtime-visual-v28")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -4946,7 +4982,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "emberhollow-adaptive-music-v27",
+        worldVersion = "emberhollow-runtime-visual-v28",
     })
 end
 
