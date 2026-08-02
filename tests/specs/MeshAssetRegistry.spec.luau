@@ -40,6 +40,9 @@ return {
                 local anvil = MeshAssetRegistry.get("mesh_creator_anvil_a")
                 TestRunner.truthy(anvil ~= nil, "missing the sourced anvil")
                 TestRunner.equal((anvil :: MeshAssetRegistry.Entry).sourceYawDegrees, 85)
+                local table_ = MeshAssetRegistry.get("mesh_creator_picnic_table_a")
+                TestRunner.truthy(table_ ~= nil, "missing the sourced commons table")
+                TestRunner.equal((table_ :: MeshAssetRegistry.Entry).sourceYawDegrees, -165)
             end,
         },
         {

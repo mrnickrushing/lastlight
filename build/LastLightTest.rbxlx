@@ -33474,6 +33474,7 @@ local ENTRIES: { Entry } = {
     {
         id = "mesh_creator_picnic_table_a",
         assetId = 2671684461,
+        sourceYawDegrees = -165,
         targetLongestDimension = 8,
         maxTriangles = 400,
         maxMaterialSlots = 23,
