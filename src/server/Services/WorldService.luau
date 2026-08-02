@@ -33,6 +33,7 @@ export type WorldService = typeof(setmetatable(
         _interactions: { [string]: ProximityPrompt },
         _spawn: SpawnLocation?,
         _mara: Model?,
+        _maraTrap: Model?,
         _lantern: BasePart?,
         _lanternVisualHealth: number,
         _beacon: BasePart?,
@@ -1746,6 +1747,7 @@ function WorldService.new(
         _interactions = {},
         _spawn = nil,
         _mara = nil,
+        _maraTrap = nil,
         _lantern = nil,
         _lanternVisualHealth = 100,
         _beacon = nil,
@@ -3031,6 +3033,18 @@ function WorldService._buildMara(self: WorldService, world: Model)
     description.TorsoColor = coat
     description.LeftLegColor = coatDark
     description.RightLegColor = coatDark
+    -- The default R15 rig is a broad, blocky, androgynous silhouette that read
+    -- as male. Narrowing the shoulders and depth while easing the body toward
+    -- avatar proportions gives a feminine frame to hang her clothing on; the
+    -- long hair, waisted coat, and flared coat tails below do the rest. These
+    -- stay conservative on purpose -- pushed further the stock rig stretches
+    -- and reads uncanny rather than simply slimmer.
+    description.HeightScale = 0.99
+    description.WidthScale = 0.84
+    description.DepthScale = 0.9
+    description.HeadScale = 1.04
+    description.BodyTypeScale = 0.3
+    description.ProportionScale = 0.75
 
     local model = Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
     model.Name = "Mara"
@@ -3050,28 +3064,133 @@ function WorldService._buildMara(self: WorldService, world: Model)
     -- The old body was entirely non-colliding and non-queryable (interaction
     -- goes through _registerInteraction below, not physical touch/click), so
     -- keep the real rig's parts out of the way of players the same way.
+    --
+    -- Anchoring is what keeps her in the world at all. The hand-built body this
+    -- replaced was made of part() calls, which anchor by default; a rig from
+    -- CreateHumanoidModelFromDescription arrives unanchored, and because every
+    -- part here is also CanCollide = false there is nothing under her to stand
+    -- on. She fell through the valley floor the instant the world built and
+    -- kept going -- the rescue's PivotTo only appeared to fix it, yanking her
+    -- back up for the ~1s of the move loop before she resumed falling. She is
+    -- a static NPC repositioned exclusively through PivotTo (see moveMara and
+    -- the resident ambient motion), so nothing here needs physics.
     for _, descendant in model:GetDescendants() do
         if descendant:IsA("BasePart") then
+            descendant.Anchored = true
             descendant.CanCollide = false
             descendant.CanTouch = false
             descendant.CanQuery = false
         end
     end
 
-    local hair = part(
+    -- Welds are redundant while every part above is anchored, but they keep the
+    -- accessories attached to the body they were measured against if this rig
+    -- is ever put back under physics.
+    local function attach(piece: BasePart, to: BasePart)
+        local weld = Instance.new("WeldConstraint")
+        weld.Part0 = to
+        weld.Part1 = piece
+        weld.Parent = piece
+    end
+
+    -- Hair, in layers. One sphere on top of the skull is what the character
+    -- standard specifically calls out as not-a-hairstyle, and a cropped cap is
+    -- most of why she read as male at gameplay distance.
+    local hairCrown = part(
         model,
         "Hair",
-        Vector3.new(head.Size.X * 1.08, head.Size.Y * 0.55, head.Size.Z * 1.08),
-        head.CFrame * CFrame.new(0, head.Size.Y * 0.42, 0),
+        Vector3.new(head.Size.X * 1.12, head.Size.Y * 0.62, head.Size.Z * 1.12),
+        head.CFrame * CFrame.new(0, head.Size.Y * 0.36, 0),
         hairColor,
         Enum.Material.SmoothPlastic,
         false
     )
-    hair.Shape = Enum.PartType.Ball
-    local hairWeld = Instance.new("WeldConstraint")
-    hairWeld.Part0 = head
-    hairWeld.Part1 = hair
-    hairWeld.Parent = hair
+    hairCrown.Shape = Enum.PartType.Ball
+    attach(hairCrown, head)
+    local hairFall = part(
+        model,
+        "HairFall",
+        Vector3.new(head.Size.X * 1.02, head.Size.Y * 1.5, head.Size.Z * 0.66),
+        head.CFrame * CFrame.new(0, -head.Size.Y * 0.42, head.Size.Z * 0.5),
+        hairColor,
+        Enum.Material.SmoothPlastic,
+        false
+    )
+    attach(hairFall, head)
+    for hairSide = -1, 1, 2 do
+        local strand = part(
+            model,
+            "HairStrand",
+            Vector3.new(head.Size.X * 0.26, head.Size.Y * 1.15, head.Size.Z * 0.72),
+            head.CFrame
+                * CFrame.new(hairSide * head.Size.X * 0.46, -head.Size.Y * 0.2, 0)
+                * CFrame.Angles(0, 0, math.rad(hairSide * -4)),
+            hairColor,
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        attach(strand, head)
+    end
+    local braid = part(
+        model,
+        "HairBraid",
+        Vector3.new(head.Size.X * 0.34, head.Size.Y * 0.9, head.Size.Z * 0.34),
+        head.CFrame
+            * CFrame.new(0, -head.Size.Y * 1.15, head.Size.Z * 0.56)
+            * CFrame.Angles(math.rad(-9), 0, 0),
+        Color3.fromRGB(64, 34, 25),
+        Enum.Material.SmoothPlastic,
+        false
+    )
+    attach(braid, head)
+
+    -- A readable face. The standard requires eyes plus at least a nose and
+    -- mouth; the stock rig head ships with none of them. Roblox heads face -Z.
+    for eyeSide = -1, 1, 2 do
+        local eye = part(
+            model,
+            "Eye",
+            Vector3.new(head.Size.X * 0.15, head.Size.Y * 0.15, head.Size.Z * 0.1),
+            head.CFrame
+                * CFrame.new(eyeSide * head.Size.X * 0.22, head.Size.Y * 0.08, -head.Size.Z * 0.48),
+            Color3.fromRGB(38, 44, 42),
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        eye.Shape = Enum.PartType.Ball
+        attach(eye, head)
+        local brow = part(
+            model,
+            "Brow",
+            Vector3.new(head.Size.X * 0.22, head.Size.Y * 0.05, head.Size.Z * 0.08),
+            head.CFrame
+                * CFrame.new(eyeSide * head.Size.X * 0.22, head.Size.Y * 0.21, -head.Size.Z * 0.47),
+            Color3.fromRGB(64, 34, 25),
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        attach(brow, head)
+    end
+    local nose = part(
+        model,
+        "Nose",
+        Vector3.new(head.Size.X * 0.12, head.Size.Y * 0.16, head.Size.Z * 0.16),
+        head.CFrame * CFrame.new(0, -head.Size.Y * 0.04, -head.Size.Z * 0.52),
+        Color3.fromRGB(196, 143, 103),
+        Enum.Material.SmoothPlastic,
+        false
+    )
+    attach(nose, head)
+    local mouth = part(
+        model,
+        "Mouth",
+        Vector3.new(head.Size.X * 0.24, head.Size.Y * 0.06, head.Size.Z * 0.08),
+        head.CFrame * CFrame.new(0, -head.Size.Y * 0.26, -head.Size.Z * 0.48),
+        Color3.fromRGB(142, 84, 74),
+        Enum.Material.SmoothPlastic,
+        false
+    )
+    attach(mouth, head)
 
     local scarf = part(
         model,
@@ -3082,10 +3201,41 @@ function WorldService._buildMara(self: WorldService, world: Model)
         Enum.Material.Fabric,
         false
     )
-    local scarfWeld = Instance.new("WeldConstraint")
-    scarfWeld.Part0 = torso
-    scarfWeld.Part1 = scarf
-    scarfWeld.Parent = scarf
+    attach(scarf, torso)
+
+    -- Layered coat: shoulders, lapels, cuffs, waist, and flared tails. The
+    -- tails plus the belted waist are what turn a straight blocky torso into a
+    -- silhouette that reads feminine without touching the interaction anchor.
+    for shoulderSide = -1, 1, 2 do
+        local shoulder = part(
+            model,
+            "CoatShoulder",
+            Vector3.new(torso.Size.X * 0.46, torso.Size.Y * 0.3, torso.Size.Z * 1.24),
+            torso.CFrame
+                * CFrame.new(shoulderSide * torso.Size.X * 0.36, torso.Size.Y * 0.26, 0)
+                * CFrame.Angles(0, 0, math.rad(shoulderSide * 7)),
+            coatDark,
+            Enum.Material.Fabric,
+            false
+        )
+        attach(shoulder, torso)
+        local lapel = part(
+            model,
+            "CoatLapel",
+            Vector3.new(torso.Size.X * 0.2, torso.Size.Y * 0.68, torso.Size.Z * 0.22),
+            torso.CFrame
+                * CFrame.new(
+                    shoulderSide * torso.Size.X * 0.17,
+                    torso.Size.Y * 0.02,
+                    -torso.Size.Z * 0.52
+                )
+                * CFrame.Angles(0, 0, math.rad(shoulderSide * 9)),
+            coatDark,
+            Enum.Material.Fabric,
+            false
+        )
+        attach(lapel, torso)
+    end
 
     local belt = part(
         model,
@@ -3096,10 +3246,109 @@ function WorldService._buildMara(self: WorldService, world: Model)
         Enum.Material.Leather,
         false
     )
-    local beltWeld = Instance.new("WeldConstraint")
-    beltWeld.Part0 = torso
-    beltWeld.Part1 = belt
-    beltWeld.Parent = belt
+    attach(belt, torso)
+    local buckle = part(
+        model,
+        "CoatBuckle",
+        Vector3.new(0.26, 0.26, 0.12),
+        torso.CFrame * CFrame.new(0, -torso.Size.Y * 0.44, -torso.Size.Z * 0.58),
+        Color3.fromRGB(168, 137, 92),
+        Enum.Material.Metal,
+        false
+    )
+    attach(buckle, torso)
+
+    local lowerTorso = model:FindFirstChild("LowerTorso")
+    if lowerTorso ~= nil and lowerTorso:IsA("BasePart") then
+        for tailSide = -1, 1, 2 do
+            local tail = part(
+                model,
+                "CoatTail",
+                Vector3.new(lowerTorso.Size.X * 0.56, lowerTorso.Size.Y * 1.9, 0.3),
+                lowerTorso.CFrame
+                    * CFrame.new(
+                        tailSide * lowerTorso.Size.X * 0.3,
+                        -lowerTorso.Size.Y * 0.72,
+                        lowerTorso.Size.Z * 0.5
+                    )
+                    * CFrame.Angles(math.rad(4), 0, math.rad(tailSide * 5)),
+                coat,
+                Enum.Material.Fabric,
+                false
+            )
+            attach(tail, lowerTorso)
+        end
+        local skirt = part(
+            model,
+            "CoatSkirt",
+            Vector3.new(lowerTorso.Size.X * 1.32, lowerTorso.Size.Y * 1.25, lowerTorso.Size.Z * 1.3),
+            lowerTorso.CFrame * CFrame.new(0, -lowerTorso.Size.Y * 0.5, 0),
+            coat,
+            Enum.Material.Fabric,
+            false
+        )
+        attach(skirt, lowerTorso)
+    end
+
+    for cuffSide = -1, 1, 2 do
+        local lowerArm =
+            model:FindFirstChild(if cuffSide < 0 then "LeftLowerArm" else "RightLowerArm")
+        if lowerArm ~= nil and lowerArm:IsA("BasePart") then
+            local cuff = part(
+                model,
+                "CoatCuff",
+                Vector3.new(lowerArm.Size.X * 1.24, lowerArm.Size.Y * 0.3, lowerArm.Size.Z * 1.24),
+                lowerArm.CFrame * CFrame.new(0, -lowerArm.Size.Y * 0.34, 0),
+                coatDark,
+                Enum.Material.Fabric,
+                false
+            )
+            attach(cuff, lowerArm)
+        end
+    end
+
+    -- Her role-specific prop: the Greenward field satchel she carries herbs and
+    -- cuttings in, slung across the body so it reads from any angle.
+    local satchel = part(
+        model,
+        "FieldSatchel",
+        Vector3.new(1.05, 0.86, 0.44),
+        torso.CFrame * CFrame.new(torso.Size.X * 0.62, -torso.Size.Y * 0.52, torso.Size.Z * 0.16),
+        Color3.fromRGB(108, 76, 48),
+        Enum.Material.Leather,
+        false
+    )
+    attach(satchel, torso)
+    local satchelFlap = part(
+        model,
+        "FieldSatchelFlap",
+        Vector3.new(1.09, 0.34, 0.5),
+        satchel.CFrame * CFrame.new(0, 0.3, 0),
+        Color3.fromRGB(84, 58, 40),
+        Enum.Material.Leather,
+        false
+    )
+    attach(satchelFlap, satchel)
+    local satchelStrap = part(
+        model,
+        "FieldSatchelStrap",
+        Vector3.new(0.22, torso.Size.Y * 1.32, torso.Size.Z * 1.3),
+        torso.CFrame * CFrame.new(torso.Size.X * 0.12, 0, 0) * CFrame.Angles(0, 0, math.rad(24)),
+        Color3.fromRGB(84, 58, 40),
+        Enum.Material.Leather,
+        false
+    )
+    attach(satchelStrap, torso)
+    local sprig = part(
+        model,
+        "SatchelSprig",
+        Vector3.new(0.16, 0.5, 0.16),
+        satchel.CFrame * CFrame.new(-0.22, 0.52, 0) * CFrame.Angles(0, 0, math.rad(-14)),
+        MOSS,
+        Enum.Material.Grass,
+        false
+    )
+    attach(sprig, satchel)
 
     local leftHand = model:WaitForChild("LeftHand") :: BasePart
     local handLanternFallback = Instance.new("Model")
@@ -3174,32 +3423,67 @@ function WorldService._buildMara(self: WorldService, world: Model)
     CollectionService:AddTag(model, self._runtimeIds.AmbientMotionTag)
     addBillboard(head, "MARA · GREENWARD", AMBER, 46)
 
+    -- Mara has to look pinned, because the prompt on her reads FREE. The
+    -- deadfall used to be placed at y = -0.2 -- lying flat on the ground
+    -- alongside her, touching nothing -- and because it was wired as the
+    -- fallback's replacement it hid the arching FallenRoot geometry the moment
+    -- it loaded, which it does. The result was a rescue objective with visibly
+    -- nothing holding her. The trunk now lies across her at waist height,
+    -- carried on two broken stumps so it has believable support, and the whole
+    -- assembly is one model that freeMara clears when she is released.
+    local trap = Instance.new("Model")
+    trap.Name = "MaraFallenRoots"
+    trap.Parent = world
+    for stumpSide = -1, 1, 2 do
+        part(
+            trap,
+            "FallenRootStump",
+            Vector3.new(1.9, 2.2, 1.9),
+            CFrame.new(-3 + stumpSide * 5.4, 1.1, -30)
+                * CFrame.Angles(0, 0, math.rad(stumpSide * 6)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+    end
+
     local fallenRootsFallback = Instance.new("Model")
     fallenRootsFallback.Name = "MaraFallenRootsFallback"
-    fallenRootsFallback.Parent = world
-    for index = -1, 1 do
+    fallenRootsFallback.Parent = trap
+    part(
+        fallenRootsFallback,
+        "FallenRoot",
+        Vector3.new(13.6, 1.7, 1.7),
+        CFrame.new(-3, 2.55, -30) * CFrame.Angles(0, 0, math.rad(-5)),
+        BARK,
+        Enum.Material.Wood,
+        false
+    )
+    for limbIndex = -1, 1, 2 do
         part(
             fallenRootsFallback,
-            "FallenRoot",
-            Vector3.new(1.3, 10, 1.3),
-            CFrame.new(-3 + index * 2.6, 2, -30)
-                * CFrame.Angles(math.rad(72), 0, math.rad(index * 14)),
+            "FallenRootLimb",
+            Vector3.new(0.85, 5.4, 0.85),
+            CFrame.new(-3 + limbIndex * 2.2, 2.1, -30 + limbIndex * 0.7)
+                * CFrame.Angles(math.rad(limbIndex * 26), 0, math.rad(64)),
             BARK,
-            Enum.Material.Wood
+            Enum.Material.Wood,
+            false
         )
     end
     table.insert(self._meshPlacements, {
         assetId = "mesh_deadfall_a",
         fallbackKind = "asset_replacement",
-        position = Vector3.new(-3, -0.2, -30),
+        position = Vector3.new(-3, 1.9, -30),
         scale = 1.15,
-        yaw = math.rad(17),
+        yaw = math.rad(90),
         seed = 9320,
         swayTag = nil,
-        parent = world,
+        parent = trap,
         fallbackInstance = fallenRootsFallback,
         profileScale = Vector3.new(1.18, 0.92, 0.86),
     })
+    self._maraTrap = trap
 
     self._mara = model
     self:_registerInteraction(
@@ -5096,6 +5380,17 @@ function WorldService.buildBarricade(self: WorldService, animated: boolean?)
     end
 end
 
+-- Lift the fallen trunk off Mara. Called once, when she is actually freed, so
+-- the rescue has a visible physical consequence instead of only a toast.
+function WorldService.freeMara(self: WorldService)
+    local trap = self._maraTrap
+    if trap == nil then
+        return
+    end
+    self._maraTrap = nil
+    trap:Destroy()
+end
+
 function WorldService.moveMara(self: WorldService, destination: Vector3)
     local mara = self._mara
     if mara == nil or mara.PrimaryPart == nil then
@@ -5104,7 +5399,14 @@ function WorldService.moveMara(self: WorldService, destination: Vector3)
 
     task.spawn(function()
         local start = mara:GetPivot()
-        local target = CFrame.new(destination)
+        -- Keep her own standing height and only walk her across the ground.
+        -- An R15 pivot sits about three studs above the floor, so the callers'
+        -- waist-height destination Y (a leftover from the hand-stacked body
+        -- this rig replaced, whose pivot sat much lower) buried her to the
+        -- chest on arrival. The valley floor is flat at GROUND_Y here, so
+        -- carrying her current height across is both correct and immune to the
+        -- next caller passing a Y that means something else.
+        local target = CFrame.new(destination.X, start.Position.Y, destination.Z)
         for step = 1, 30 do
             mara:PivotTo(start:Lerp(target, step / 30))
             task.wait(0.035)

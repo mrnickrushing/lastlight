@@ -590,6 +590,7 @@ function TutorialService._interact(self: TutorialService, player: Player, intera
     end
 
     if actionId == self._runtimeIds.Actions.Rescue then
+        self._worldService:freeMara()
         self._worldService:moveMara(Vector3.new(2, 1.1, -38))
         self:_setToast(player, "MARA IS SAFE")
     elseif actionId == self._runtimeIds.Actions.Gather then
