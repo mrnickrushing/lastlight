@@ -771,7 +771,10 @@ local function buildEmberhollowSanctuary(
                 -- never reached the floor it was meant to rest on (0.61).
                 position = cabinCFrame(4.2, 0.62, 3.5).Position,
                 scale = 1,
-                yaw = yaw + math.rad(90),
+                -- No offset: the loader cancels the source model's stored
+                -- rotation, so the bed's long axis already runs along the
+                -- cabin's Z, head toward the back wall.
+                yaw = yaw,
                 seed = 9831,
                 swayTag = nil,
                 parent = cabinFolder,
@@ -858,7 +861,7 @@ local function buildEmberhollowSanctuary(
                     -- exterior ground level the barrel and crate use.
                     position = cabinCFrame(3.5 + bedIndex * 3.6, 0.62, 3.8).Position,
                     scale = 1,
-                    yaw = yaw + math.rad(90),
+                    yaw = yaw,
                     seed = 9840 + bedIndex,
                     swayTag = nil,
                     parent = cabinFolder,
@@ -4581,7 +4584,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         table.insert(self._meshPlacements, {
             assetId = "mesh_creator_anvil_a",
             fallbackKind = "asset_dressing",
-            position = altar.center + Vector3.new(4.6, 0.8, 2.4),
+            position = altar.center + Vector3.new(4.6, 1.08, 2.4),
             scale = 1,
             yaw = math.rad(-24),
             seed = 9980 + #altar.name,
