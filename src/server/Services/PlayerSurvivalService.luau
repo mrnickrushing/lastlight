@@ -50,6 +50,8 @@ export type PlayerSurvivalService = typeof(setmetatable(
         _prompts: { [string]: ProximityPrompt },
         _targets: { [string]: Player },
         _visuals: { [Player]: DownedVisual },
+        _regenCarry: { [Player]: number },
+        _lastRegenAt: number?,
         _onChanged: ((Player?, string?) -> ())?,
         _heartbeat: RBXScriptConnection?,
     },
@@ -102,6 +104,12 @@ function PlayerSurvivalService.new(
         _prompts = {},
         _targets = {},
         _visuals = {},
+        -- SurvivalState.heal only accepts whole positive points, so lantern
+        -- regen accumulates fractional progress here and spends it a point at
+        -- a time. Without the carry every tick would round to an invalid heal
+        -- and silently do nothing.
+        _regenCarry = {},
+        _lastRegenAt = nil,
         _onChanged = nil,
         _heartbeat = nil,
     }, PlayerSurvivalService)
@@ -430,6 +438,7 @@ function PlayerSurvivalService.Start(self: PlayerSurvivalService)
         self:_clearVisual(player)
         self._states[player] = nil
         self._spawned[player] = nil
+        self._regenCarry[player] = nil
         for target, channel in self._channels do
             if channel.reviver == player then
                 self:_cancelChannel(target, "reviver_left")
@@ -855,6 +864,58 @@ function PlayerSurvivalService._recover(self: PlayerSurvivalService, player: Pla
     self:_notify(player, retreatMessage or "SAFE RETREAT — UNBANKED POUCH RETAINED")
 end
 
+--[[
+    Slow health recovery for players standing in the First Lantern's light.
+
+    Without this a player who is not a Medic has no way back to full health at
+    all: the only other sources are the Medic's ability and the health granted
+    by a revive. Kept deliberately weak and anchored to the town so it does not
+    replace the Medic in the field.
+]]
+function PlayerSurvivalService._stepLanternRegen(self: PlayerSurvivalService, now: number)
+    local radius = tonumber(self._config.LanternSafeRadius)
+    local rate = tonumber(self._config.LanternRegenPerSecond)
+    if radius == nil or rate == nil or rate <= 0 then
+        return
+    end
+    local worldService = self._worldService
+    if worldService == nil or worldService.lanternSafeCenter == nil then
+        return
+    end
+    local center = worldService:lanternSafeCenter()
+    if center == nil then
+        return
+    end
+
+    -- Clamped so a long server hitch cannot bank a full heal in one tick.
+    local elapsed = math.clamp(now - (self._lastRegenAt or now), 0, 1)
+    self._lastRegenAt = now
+    if elapsed <= 0 then
+        return
+    end
+
+    for player, state in self._states do
+        local root = rootPart(player)
+        local inLight = root ~= nil and (root.Position - center).Magnitude <= radius
+        if not inLight or not self._survivalState.canAct(state) then
+            self._regenCarry[player] = nil
+        elseif state.health < state.maxHealth then
+            local carried = (self._regenCarry[player] or 0) + rate * elapsed
+            local whole = math.floor(carried)
+            self._regenCarry[player] = carried - whole
+            if whole >= 1 then
+                local nextState, result = self._survivalState.heal(state, whole)
+                if result.applied then
+                    self._states[player] = nextState
+                    self:_syncPlayer(player)
+                end
+            end
+        else
+            self._regenCarry[player] = nil
+        end
+    end
+end
+
 function PlayerSurvivalService._step(self: PlayerSurvivalService, now: number)
     for player, state in self._states do
         local activeHumanoid = humanoid(player)
@@ -871,6 +932,8 @@ function PlayerSurvivalService._step(self: PlayerSurvivalService, now: number)
             end
         end
     end
+
+    self:_stepLanternRegen(now)
 
     for target, channel in self._channels do
         local reviverState = self._states[channel.reviver]
