@@ -119,7 +119,7 @@
       "id": "mesh_wayfarer_cabin_a",
       "displayName": "Emberhollow Wayfarer Cabin",
       "role": "arrival_shelter_shell",
-      "placementBand": "curated_core",
+      "placementBand": "retired_visual_failure",
       "source": "original_blender_procedural",
       "provenance": "Original Last Light shelter authored by the repository Blender pipeline from the established mesh style formula.",
       "file": "generated/mesh_wayfarer_cabin_a.glb",

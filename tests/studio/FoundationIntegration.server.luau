@@ -41,7 +41,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.41.0", "unexpected build version")
+assert(Config.BuildVersion == "0.42.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -337,7 +337,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "bramblewake-blackout-v23",
+    world:GetAttribute("WorldVersion") == "emberhollow-arrival-v24",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -378,6 +378,29 @@ assert(heartwoodCrownPieces == 6, "Heartwood needs a recognizable split crown")
 assert(world:FindFirstChild("HeartwoodCavity", true) ~= nil, "Heartwood needs an exposed cavity")
 assert(heroDetailCounts.BarricadeWorkPost == 5, "construction plot needs visible work in progress")
 assert(heroDetailCounts.FirstLanternCagePost == 4, "First Lantern needs a physical metal cage")
+local firstLanternFlame = world:FindFirstChild("FirstLanternFlame", true)
+assert(
+    firstLanternFlame ~= nil
+        and firstLanternFlame:IsA("BasePart")
+        and firstLanternFlame.Shape == Enum.PartType.Wedge
+        and firstLanternFlame.Size.X <= 1.1,
+    "First Lantern needs a restrained flame inside its cage, not a glowing orb"
+)
+local firstLanternGlassPanels = 0
+for _, descendant in world:GetDescendants() do
+    if descendant.Name == "FirstLanternGlassPanel" then
+        firstLanternGlassPanels += 1
+    end
+end
+assert(firstLanternGlassPanels == 4, "First Lantern needs four readable glass cage panels")
+local maraLantern = mara:FindFirstChild("MaraLantern")
+assert(
+    maraLantern ~= nil
+        and maraLantern:IsA("BasePart")
+        and maraLantern.Shape ~= Enum.PartType.Ball
+        and mara:FindFirstChild("MaraLanternRail") ~= nil,
+    "Mara needs a constructed hand lantern instead of a glowing ball"
+)
 assert(heroDetailCounts.ArchiveNotice == 5, "archive needs readable physical field notices")
 local noticeArtwork = 0
 local townNotices = 0
@@ -407,6 +430,7 @@ assert(townNotices == 3, "Town Board needs three distinct illustrated notices")
 assert(noticeArtwork == 8, "first-world boards need all eight placed notice illustrations")
 assert(physicalNoticeBoards == 2, "archive and Town Board must both be physical notice boards")
 local roadSegments = 0
+local roadFoundations = 0
 local roadEdgeStones = 0
 local roadRuts = 0
 local roadChevrons = 0
@@ -415,9 +439,11 @@ for _, descendant in world:GetDescendants() do
     if descendant.Name == "EmberhollowRoad" then
         roadSegments += 1
         assert(
-            descendant:IsA("BasePart") and descendant.Size.X >= 19,
+            descendant:IsA("BasePart") and descendant.Size.X >= 15,
             "arrival road needs a dominant gameplay-scale width"
         )
+    elseif descendant.Name == "EmberhollowRoadFoundation" then
+        roadFoundations += 1
     elseif descendant.Name == "RoadEdgeStone" then
         roadEdgeStones += 1
     elseif descendant.Name == "RoadRut" then
@@ -437,12 +463,15 @@ for _, descendant in world:GetDescendants() do
     end
 end
 assert(roadSegments == 6, "arrival road must connect every authored route segment")
+assert(roadFoundations == 6, "each arrival road segment needs a contrasting physical foundation")
 assert(roadEdgeStones >= 40, "arrival road needs a repeated visible stone edge")
 assert(roadRuts == 12, "every road segment needs two readable travel ruts")
-assert(roadChevrons == 12, "every road segment needs a physical direction chevron")
+assert(roadChevrons == 0, "flat chevron slabs cannot substitute for a readable road surface")
 assert(tutorialSpurs == 3, "each early tutorial activity needs a path from the main road")
 local cabinRafters = 0
 local cabinHearths = 0
+local cabinRoofPlanes = 0
+local obsoleteCabinRoofWedges = 0
 local cabinFirewood = 0
 local cabinRugs = 0
 local campCommons = 0
@@ -451,6 +480,18 @@ for _, descendant in world:GetDescendants() do
         cabinRafters += 1
     elseif descendant.Name == "CabinHearthFire" then
         cabinHearths += 1
+        assert(
+            descendant:IsA("BasePart") and descendant.Shape == Enum.PartType.Wedge,
+            "cabin fire must use a flame silhouette instead of an orb"
+        )
+    elseif descendant.Name == "CabinRoofPlane" then
+        cabinRoofPlanes += 1
+        assert(
+            descendant:IsA("BasePart") and descendant.Size.Y < 1,
+            "cabin roof planes must stay thin enough to reveal the structure"
+        )
+    elseif descendant.Name == "CabinRoof" then
+        obsoleteCabinRoofWedges += 1
     elseif descendant.Name == "SplitFirewood" then
         cabinFirewood += 1
     elseif descendant.Name == "CabinWovenRug" then
@@ -461,6 +502,8 @@ for _, descendant in world:GetDescendants() do
 end
 assert(cabinRafters == 8, "both cabins need the four-rafter reference construction pattern")
 assert(cabinHearths == 2, "both cabins need a practical stone hearth")
+assert(cabinRoofPlanes == 4, "both cabins need two thin pitched roof planes")
+assert(obsoleteCabinRoofWedges == 0, "oversized solid cabin roof wedges must not return")
 assert(cabinFirewood == 10, "both cabin exteriors need stocked firewood")
 assert(cabinRugs == 2, "both cabins need an inhabited interior floor layer")
 assert(campCommons == 1, "Emberhollow needs one physical communal gathering area")
@@ -500,10 +543,15 @@ assert(
     "cabin lots need believable separation across the town square"
 )
 local mainStreet = world:FindFirstChild("TownMainStreet", true)
+local mainStreetFoundation = world:FindFirstChild("TownMainStreetFoundation", true)
 local streetWear = world:FindFirstChild("TownMainStreetWear", true)
 local townSquare = world:FindFirstChild("FirstLanternTownSquare", true)
 local courtyard = world:FindFirstChild("EmberhollowCourtyard", true)
 assert(mainStreet ~= nil and mainStreet:IsA("BasePart"), "town needs a visible main street")
+assert(
+    mainStreetFoundation ~= nil and mainStreetFoundation:IsA("BasePart"),
+    "town street needs a contrasting cobblestone foundation"
+)
 assert(streetWear ~= nil and streetWear:IsA("BasePart"), "town road needs a worn center line")
 assert(townSquare ~= nil and townSquare:IsA("BasePart"), "First Lantern needs a town square")
 assert(courtyard ~= nil and courtyard:IsA("BasePart"), "town needs its ground clearing")
@@ -518,6 +566,7 @@ assert(
     "worn road center must remain visible through the town square"
 )
 local entryPaths = 0
+local districtRoads = 0
 local squareEdgeStones = 0
 local workshopFloors = 0
 local masteryDaises = 0
@@ -525,6 +574,12 @@ for _, descendant in world:GetDescendants() do
     if descendant.Name == "CabinEntryPath" then
         entryPaths += 1
         assert(descendant:IsA("BasePart") and not descendant.CanCollide, "entry paths are visual")
+    elseif descendant.Name == "TownDistrictRoad" then
+        districtRoads += 1
+        assert(
+            descendant:IsA("BasePart") and not descendant.CanCollide,
+            "district roads are visual"
+        )
     elseif descendant.Name == "TownSquareEdgeStone" then
         squareEdgeStones += 1
         assert(
@@ -546,6 +601,7 @@ for _, descendant in world:GetDescendants() do
     end
 end
 assert(entryPaths == 2, "each cabin needs one visible path to the square")
+assert(districtRoads == 5, "every outlying town district needs a road from the main street")
 assert(squareEdgeStones == 12, "town square edging must preserve four circulation gates")
 assert(workshopFloors == 2, "town needs two separated workshop bays")
 assert(masteryDaises == 4, "all four mastery clearings must remain available")
@@ -556,8 +612,19 @@ assert(
     "field-book archive must sit off the main street"
 )
 assert(
-    greenwardGround ~= nil and greenwardGround:IsA("BasePart") and greenwardGround.Position.X >= 60,
+    greenwardGround ~= nil
+        and greenwardGround:IsA("BasePart")
+        and greenwardGround.Position.X >= 80
+        and greenwardGround.Position.Z <= -145,
     "Greenward garden must occupy its own eastern lot"
+)
+assert(
+    world:FindFirstChild("SeedGroundMarker", true) == nil,
+    "the farm cannot be represented by rocks"
+)
+assert(
+    world:FindFirstChild("SeedlingRowStake", true) ~= nil,
+    "the starting farm needs planted rows"
 )
 local toolDisplays = 0
 local craftingDisplays = 0
@@ -604,12 +671,29 @@ local completedBuildingFrames = 0
 for _, descendant in world:GetDescendants() do
     if descendant.Name == "BuilderMaterials" then
         builderMaterialSets += 1
+    elseif descendant.Name == "BuilderTarp" then
+        assert(
+            descendant:IsA("BasePart") and descendant.Size.Y <= 0.12,
+            "construction tarps must be thin pitched fabric, not overhead slabs"
+        )
     elseif descendant.Name == "BuildingCornerPost" then
         completedBuildingFrames += 1
     end
 end
 assert(builderMaterialSets >= 2, "fresh town construction sites need visible material stacks")
 assert(completedBuildingFrames >= 4, "completed town buildings need structural corner framing")
+for _, buildingId in { "building_archive", "building_workbench", "building_inn" } do
+    local building = world:FindFirstChild(buildingId, true)
+    assert(building ~= nil, "missing progression building " .. buildingId)
+    local anchor = building:FindFirstChild("StoneFooting") or building:FindFirstChild("Floor")
+    assert(
+        anchor ~= nil
+            and anchor:IsA("BasePart")
+            and math.abs(anchor.Position.X) >= 80
+            and anchor.Position.Z <= -120,
+        "progression buildings must stay out of the arrival cabin sightline: " .. buildingId
+    )
+end
 assert(world:GetAttribute("TownIntegrity") == 100, "new towns must begin fully repaired")
 assert(world:GetAttribute("TownDamageLevel") == 0, "new towns cannot begin visibly damaged")
 assert(
@@ -644,6 +728,32 @@ assert(
         and expeditionAuthoredMeshes + expeditionMeshFallbacks == 2,
     "Bramblewake must resolve both curated landmark mesh placements"
 )
+local townMeshDeadline = os.clock() + 12
+while world:GetAttribute("AuthoredMeshCount") == nil and os.clock() < townMeshDeadline do
+    task.wait(0.1)
+end
+local styledMeshParts = 0
+for _, descendant in world:GetDescendants() do
+    if descendant:IsA("Model") and descendant:GetAttribute("MeshAssetId") ~= nil then
+        local stableId = tostring(descendant:GetAttribute("MeshAssetId"))
+        assert(stableId ~= "mesh_wayfarer_cabin_a", "retired cabin mesh cannot be placed")
+        if stableId ~= "mesh_root_arch_a" then
+            for _, meshPart in descendant:GetDescendants() do
+                if meshPart:IsA("MeshPart") then
+                    assert(
+                        meshPart.Material ~= Enum.Material.SmoothPlastic,
+                        "authored mesh material group was not styled: "
+                            .. stableId
+                            .. "/"
+                            .. meshPart.Name
+                    )
+                    styledMeshParts += 1
+                end
+            end
+        end
+    end
+end
+assert(styledMeshParts > 0, "Studio needs at least one runtime-styled authored MeshPart")
 assert(
     expedition:GetAttribute("ModuleCount") == BramblewakeExpedition.ModuleCount,
     "Bramblewake module count is incorrect"
