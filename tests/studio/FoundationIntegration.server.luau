@@ -923,6 +923,9 @@ local creatorAssetCounts: { [string]: number } = {
     mesh_creator_bark_ram_a = 0,
     mesh_creator_old_growth_a = 0,
     mesh_creator_potion_shelf_a = 0,
+    mesh_first_lantern_a = 0,
+    mesh_heartwood_stump_a = 0,
+    mesh_blacksmith_hammer_a = 0,
 }
 local stretchedRoadAssets = 0
 for _, descendant in world:GetDescendants() do
@@ -975,7 +978,7 @@ assert(
     "Mara and the night watch must use inspected kerosene-lantern assets"
 )
 assert(
-    creatorAssetCounts.mesh_creator_first_lantern_a == 1,
+    creatorAssetCounts.mesh_first_lantern_a == 1,
     "the First Lantern must use the inspected endorsed lantern asset"
 )
 assert(
@@ -1045,7 +1048,15 @@ assert(
     "work areas need sourced tools, crates, and barrels"
 )
 assert(
-    creatorAssetCounts.mesh_creator_potion_shelf_a == 1,
+    creatorAssetCounts.mesh_heartwood_stump_a == 1,
+    "the Heartwood gather node must use its own authored stump, not the scenery stump"
+)
+assert(
+    creatorAssetCounts.mesh_blacksmith_hammer_a == 1,
+    "the starter hammer display must use the authored hammer"
+)
+assert(
+    creatorAssetCounts.mesh_creator_potion_shelf_a == 2,
     "Mara's cabin supplies need the sourced potion shelf asset"
 )
 for _, descendant in world:GetDescendants() do
