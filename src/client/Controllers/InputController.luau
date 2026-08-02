@@ -10,6 +10,7 @@ export type InputController = typeof(setmetatable(
         _hud: any,
         _context: Instance?,
         _connections: { RBXScriptConnection },
+        _running: boolean,
     },
     InputController
 ))
@@ -62,6 +63,7 @@ function InputController.new(
         _hud = hud,
         _context = nil,
         _connections = {},
+        _running = false,
     }, InputController)
 
     local ok = pcall(function()
@@ -126,7 +128,8 @@ function InputController.new(
             self._connections,
             (sprint :: any).Pressed:Connect(function()
                 if not hud:isProfessionMenuOpen() then
-                    onSprint(true)
+                    self._running = not self._running
+                    onSprint(self._running)
                 end
             end)
         )
@@ -163,12 +166,6 @@ function InputController.new(
                 if not hud:isProfessionMenuOpen() then
                     onUseSatchel()
                 end
-            end)
-        )
-        table.insert(
-            self._connections,
-            (sprint :: any).Released:Connect(function()
-                onSprint(false)
             end)
         )
     end)
@@ -246,13 +243,8 @@ function InputController._installFallback(
     table.insert(
         self._connections,
         self._hud:sprintButton().MouseButton1Down:Connect(function()
-            onSprint(true)
-        end)
-    )
-    table.insert(
-        self._connections,
-        self._hud:sprintButton().MouseButton1Up:Connect(function()
-            onSprint(false)
+            self._running = not self._running
+            onSprint(self._running)
         end)
     )
     table.insert(
@@ -274,7 +266,8 @@ function InputController._installFallback(
                 input.KeyCode == Enum.KeyCode.LeftShift
                 or input.KeyCode == Enum.KeyCode.ButtonL3
             then
-                onSprint(true)
+                self._running = not self._running
+                onSprint(self._running)
             elseif
                 input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.ButtonB
             then
@@ -292,17 +285,6 @@ function InputController._installFallback(
                 onUseCharm()
             elseif input.KeyCode == Enum.KeyCode.V or input.KeyCode == Enum.KeyCode.DPadDown then
                 onUseSatchel()
-            end
-        end)
-    )
-    table.insert(
-        self._connections,
-        UserInputService.InputEnded:Connect(function(input: InputObject)
-            if
-                input.KeyCode == Enum.KeyCode.LeftShift
-                or input.KeyCode == Enum.KeyCode.ButtonL3
-            then
-                onSprint(false)
             end
         end)
     )
