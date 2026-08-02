@@ -81,6 +81,10 @@ hud:setCompactHandler(function(enabled: boolean)
     send(RuntimeIds.Actions.CompactHud, { enabled = enabled })
 end)
 
+hud:setLobbyDepartHandler(function(partySize: number)
+    send(RuntimeIds.Actions.LobbyDepart, { partySize = partySize })
+end)
+
 hud:setProfessionHandler(function(professionId: string)
     send(RuntimeIds.Actions.SelectProfession, { professionId = professionId })
 end)

@@ -231,6 +231,23 @@ function AnalyticsService.playerRecovered(self: AnalyticsService, player: Player
     })
 end
 
+function AnalyticsService.lobbyDeparture(
+    self: AnalyticsService,
+    player: Player?,
+    action: string,
+    accepted: boolean,
+    reason: string?,
+    value: any
+)
+    self._logger:info("lobby_departure", {
+        action = action,
+        accepted = accepted,
+        reason = reason,
+        value = value,
+        player = if player ~= nil then player.UserId else nil,
+    })
+end
+
 function AnalyticsService.combatAction(
     self: AnalyticsService,
     player: Player,

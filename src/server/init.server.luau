@@ -42,6 +42,7 @@ local TownNightSchedule = require(root.TownNightSchedule)
 local TownNightIncident = require(root.TownNightIncident)
 local TownCondition = require(root.TownCondition)
 local TownGuardLastStand = require(root.TownGuardLastStand)
+local LobbyDeparture = require(root.LobbyDeparture)
 local TownProgression = require(root.TownProgression)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
@@ -60,6 +61,7 @@ local BramblewakeBlackoutService = require(script.Services.BramblewakeBlackoutSe
 local PhaseService = require(script.Services.PhaseService)
 local ProfileService = require(script.Services.ProfileService)
 local TownNightService = require(script.Services.TownNightService)
+local LobbyService = require(script.Services.LobbyService)
 local PlayerSurvivalService = require(script.Services.PlayerSurvivalService)
 local PlayerCombatService = require(script.Services.PlayerCombatService)
 local ProfessionService = require(script.Services.ProfessionService)
@@ -223,6 +225,8 @@ local phaseService = PhaseService.new(
     Config.FirstNightDuskSeconds,
     Config.FirstNightSeconds
 )
+local lobbyService =
+    LobbyService.new(logger, Config, LobbyDeparture, featureFlags, worldService, analyticsService)
 local townNightService = TownNightService.new(
     logger,
     Config,
@@ -268,6 +272,7 @@ local tutorialService = TutorialService.new(
     professionService,
     phaseService,
     townNightService,
+    lobbyService,
     expeditionService,
     oldGrowthService,
     wardenStagService,
@@ -301,6 +306,7 @@ services:register(oldGrowthService)
 services:register(wardenStagService)
 services:register(blackoutService)
 services:register(phaseService)
+services:register(lobbyService)
 services:register(townNightService)
 services:register(tutorialService)
 services:initialize()
