@@ -4039,6 +4039,29 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     )
     beaconCollar.Shape = Enum.PartType.Cylinder
     beaconCollar.CanQuery = false
+    local fallbackLens = part(
+        beaconFallback,
+        "BeaconFallbackLens",
+        Vector3.new(2.2, 2.6, 2.6),
+        CFrame.new(0, 6.25, -148) * CFrame.Angles(0, 0, math.rad(90)),
+        FOXFIRE,
+        Enum.Material.Glass,
+        false
+    )
+    fallbackLens.Shape = Enum.PartType.Cylinder
+    fallbackLens.Transparency = 0.22
+    fallbackLens.CanQuery = false
+    local fallbackFlame = part(
+        beaconFallback,
+        "BeaconFallbackFlame",
+        Vector3.new(0.72, 1.55, 0.64),
+        CFrame.new(0, 6.18, -148) * CFrame.Angles(0, math.rad(18), 0),
+        FOXFIRE,
+        Enum.Material.Neon,
+        false
+    )
+    fallbackFlame.Shape = Enum.PartType.Wedge
+    fallbackFlame.CanQuery = false
     table.insert(self._meshPlacements, {
         assetId = "mesh_creator_memory_reliquary_a",
         fallbackKind = "asset_replacement",
@@ -5155,7 +5178,7 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
             assert(beacon.Parent, "beacon parent is missing"),
             "DawnRevealPulse",
             Vector3.new(0.16, 5, 5),
-            CFrame.new(beacon.Position - Vector3.new(0, 5.95, 0))
+            CFrame.new(beacon.Position.X, 0.24, beacon.Position.Z)
                 * CFrame.Angles(0, 0, math.rad(90)),
             FOXFIRE,
             Enum.Material.Neon,

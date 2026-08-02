@@ -184,6 +184,34 @@ function WardenStagBuilder.setState(
     end
     if model:GetAttribute("EnemyVisualReady") == true then
         local authored = model:FindFirstChild("AuthoredEnemyVisual")
+        local hiddenAuthoredAntlerParts = 0
+        if authored ~= nil and authored:IsA("Model") then
+            local _, authoredBounds = authored:GetBoundingBox()
+            local authoredPivot = authored:GetPivot()
+            for _, descendant in authored:GetDescendants() do
+                if descendant:IsA("BasePart") then
+                    local relativePosition = authoredPivot:PointToObjectSpace(descendant.Position)
+                    local sourceTransparency = descendant:GetAttribute("WardenSourceTransparency")
+                    if type(sourceTransparency) ~= "number" then
+                        sourceTransparency = descendant.Transparency
+                        descendant:SetAttribute("WardenSourceTransparency", sourceTransparency)
+                    end
+                    local upperSilhouette = relativePosition.Y > authoredBounds.Y * 0.5
+                        and descendant.Size.Y
+                            > math.max(descendant.Size.X, descendant.Size.Z) * 1.35
+                    local brokenSide = (brokenAntlers.antler_left and relativePosition.Z < 0)
+                        or (brokenAntlers.antler_right and relativePosition.Z > 0)
+                    if upperSilhouette and brokenSide then
+                        descendant.Transparency = 1
+                        descendant.CastShadow = false
+                        hiddenAuthoredAntlerParts += 1
+                    else
+                        descendant.Transparency = sourceTransparency
+                    end
+                end
+            end
+        end
+        model:SetAttribute("AuthoredBrokenAntlerParts", hiddenAuthoredAntlerParts)
         for _, descendant in model:GetDescendants() do
             if
                 descendant:IsA("BasePart")
