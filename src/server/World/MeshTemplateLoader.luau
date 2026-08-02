@@ -181,6 +181,22 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
     local meshPartCount, basePartCount = sanitize(loaded)
     local styledParts, unstyledParts =
         applyBuiltInMaterials(loaded, entry.pbr, entry.preserveSourceMaterials)
+    -- Cancel the source model's stored rotation BEFORE measuring anything. A
+    -- model saved off-axis inflates its own axis-aligned bounding box -- the
+    -- bed reads 13.85 x 15.97 as stored but is really 8.04 x 14.28 -- so
+    -- normalizing against the inflated box quietly shrinks the asset while
+    -- targetLongestDimension still looks honoured. Correcting here rather than
+    -- at each call site also makes placement yaw mean what it says everywhere
+    -- the asset is used, instead of every caller carrying the same offset.
+    local sourceYaw = entry.sourceYawDegrees
+    if sourceYaw ~= nil and sourceYaw ~= 0 then
+        -- Post-multiply so the yaw is cancelled about the model's own pivot.
+        -- Pre-multiplying rotates about the world origin instead, which also
+        -- drags the model's position -- harmless while the pivot rotation is
+        -- identity, but wrong the moment a source model ships with a
+        -- PrimaryPart carrying its own rotation, which Creator Store models do.
+        loaded:PivotTo(loaded:GetPivot() * CFrame.Angles(0, -math.rad(sourceYaw), 0))
+    end
     local _, nativeSize = loaded:GetBoundingBox()
     local nativeLongest = longestDimension(nativeSize)
     local normalizationScale = MeshAssetRegistry.scaleFor(stableId, nativeLongest)

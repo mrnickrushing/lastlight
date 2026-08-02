@@ -25,6 +25,27 @@ return {
             end,
         },
         {
+            name = "records the stored rotation of off-axis source models",
+            run = function()
+                -- Creator Store models are often saved rotated off-axis. That
+                -- turns every placement by the same angle whatever yaw a call
+                -- site asks for, AND inflates the bounding box the loader
+                -- normalizes against, so the asset also loads too small --
+                -- both silently. These two were measured with
+                -- scripts/measure_source_yaw; if either value is lost the
+                -- asset goes back to sitting crooked and undersized.
+                local bed = MeshAssetRegistry.get("mesh_creator_wayfarer_bed_a")
+                TestRunner.truthy(bed ~= nil, "missing the sourced bed")
+                TestRunner.equal((bed :: MeshAssetRegistry.Entry).sourceYawDegrees, -32.85)
+                local anvil = MeshAssetRegistry.get("mesh_creator_anvil_a")
+                TestRunner.truthy(anvil ~= nil, "missing the sourced anvil")
+                TestRunner.equal((anvil :: MeshAssetRegistry.Entry).sourceYawDegrees, 85)
+                local table_ = MeshAssetRegistry.get("mesh_creator_picnic_table_a")
+                TestRunner.truthy(table_ ~= nil, "missing the sourced commons table")
+                TestRunner.equal((table_ :: MeshAssetRegistry.Entry).sourceYawDegrees, -165)
+            end,
+        },
+        {
             name = "keeps reviewed enemy shells cosmetic and source-preserved",
             run = function()
                 for _, stableId in

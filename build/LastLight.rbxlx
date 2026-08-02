@@ -20922,7 +20922,10 @@ local function buildEmberhollowSanctuary(
                 -- never reached the floor it was meant to rest on (0.61).
                 position = cabinCFrame(4.2, 0.62, 3.5).Position,
                 scale = 1,
-                yaw = yaw + math.rad(90),
+                -- No offset: the loader cancels the source model's stored
+                -- rotation, so the bed's long axis already runs along the
+                -- cabin's Z, head toward the back wall.
+                yaw = yaw,
                 seed = 9831,
                 swayTag = nil,
                 parent = cabinFolder,
@@ -21023,7 +21026,7 @@ local function buildEmberhollowSanctuary(
                     -- exterior ground level the barrel and crate use.
                     position = cabinCFrame(3.5 + bedIndex * 3.6, 0.62, 3.8).Position,
                     scale = 1,
-                    yaw = yaw + math.rad(90),
+                    yaw = yaw,
                     seed = 9840 + bedIndex,
                     swayTag = nil,
                     parent = cabinFolder,
@@ -24961,7 +24964,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         table.insert(self._meshPlacements, {
             assetId = "mesh_creator_anvil_a",
             fallbackKind = "asset_dressing",
-            position = altar.center + Vector3.new(4.6, 0.8, 2.4),
+            position = altar.center + Vector3.new(4.6, 1.08, 2.4),
             scale = 1,
             yaw = math.rad(-24),
             seed = 9980 + #altar.name,
@@ -33184,6 +33187,15 @@ export type Entry = {
     pbr: boolean,
     preserveSourceMaterials: boolean,
     creatorStore: boolean,
+    -- Yaw, in degrees, that the source model is stored at in the place it was
+    -- taken from. Creator Store models are frequently saved rotated off-axis,
+    -- which does two things at once: every placement comes out turned by that
+    -- angle no matter what yaw the call site asks for, and the axis-aligned
+    -- bounding box the loader normalizes against is inflated by the rotation,
+    -- so targetLongestDimension silently stops meaning the asset's real
+    -- longest dimension. The loader cancels this once at template load, so
+    -- call sites can specify the yaw they actually want.
+    sourceYawDegrees: number?,
 }
 
 local ENTRIES: { Entry } = {
@@ -33476,6 +33488,7 @@ local ENTRIES: { Entry } = {
     {
         id = "mesh_creator_picnic_table_a",
         assetId = 2671684461,
+        sourceYawDegrees = -165,
         targetLongestDimension = 8,
         maxTriangles = 400,
         maxMaterialSlots = 23,
@@ -33498,6 +33511,7 @@ local ENTRIES: { Entry } = {
     {
         id = "mesh_creator_wayfarer_bed_a",
         assetId = 5613094175,
+        sourceYawDegrees = -32.85,
         targetLongestDimension = 7.2,
         maxTriangles = 2200,
         maxMaterialSlots = 12,
@@ -33509,6 +33523,7 @@ local ENTRIES: { Entry } = {
     {
         id = "mesh_creator_anvil_a",
         assetId = 11946437830,
+        sourceYawDegrees = 85,
         targetLongestDimension = 3.1,
         maxTriangles = 1600,
         maxMaterialSlots = 4,
@@ -33971,6 +33986,22 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
     local meshPartCount, basePartCount = sanitize(loaded)
     local styledParts, unstyledParts =
         applyBuiltInMaterials(loaded, entry.pbr, entry.preserveSourceMaterials)
+    -- Cancel the source model's stored rotation BEFORE measuring anything. A
+    -- model saved off-axis inflates its own axis-aligned bounding box -- the
+    -- bed reads 13.85 x 15.97 as stored but is really 8.04 x 14.28 -- so
+    -- normalizing against the inflated box quietly shrinks the asset while
+    -- targetLongestDimension still looks honoured. Correcting here rather than
+    -- at each call site also makes placement yaw mean what it says everywhere
+    -- the asset is used, instead of every caller carrying the same offset.
+    local sourceYaw = entry.sourceYawDegrees
+    if sourceYaw ~= nil and sourceYaw ~= 0 then
+        -- Post-multiply so the yaw is cancelled about the model's own pivot.
+        -- Pre-multiplying rotates about the world origin instead, which also
+        -- drags the model's position -- harmless while the pivot rotation is
+        -- identity, but wrong the moment a source model ships with a
+        -- PrimaryPart carrying its own rotation, which Creator Store models do.
+        loaded:PivotTo(loaded:GetPivot() * CFrame.Angles(0, -math.rad(sourceYaw), 0))
+    end
     local _, nativeSize = loaded:GetBoundingBox()
     local nativeLongest = longestDimension(nativeSize)
     local normalizationScale = MeshAssetRegistry.scaleFor(stableId, nativeLongest)

@@ -16,6 +16,15 @@ export type Entry = {
     pbr: boolean,
     preserveSourceMaterials: boolean,
     creatorStore: boolean,
+    -- Yaw, in degrees, that the source model is stored at in the place it was
+    -- taken from. Creator Store models are frequently saved rotated off-axis,
+    -- which does two things at once: every placement comes out turned by that
+    -- angle no matter what yaw the call site asks for, and the axis-aligned
+    -- bounding box the loader normalizes against is inflated by the rotation,
+    -- so targetLongestDimension silently stops meaning the asset's real
+    -- longest dimension. The loader cancels this once at template load, so
+    -- call sites can specify the yaw they actually want.
+    sourceYawDegrees: number?,
 }
 
 local ENTRIES: { Entry } = {
@@ -308,6 +317,7 @@ local ENTRIES: { Entry } = {
     {
         id = "mesh_creator_picnic_table_a",
         assetId = 2671684461,
+        sourceYawDegrees = -165,
         targetLongestDimension = 8,
         maxTriangles = 400,
         maxMaterialSlots = 23,
@@ -330,6 +340,7 @@ local ENTRIES: { Entry } = {
     {
         id = "mesh_creator_wayfarer_bed_a",
         assetId = 5613094175,
+        sourceYawDegrees = -32.85,
         targetLongestDimension = 7.2,
         maxTriangles = 2200,
         maxMaterialSlots = 12,
@@ -341,6 +352,7 @@ local ENTRIES: { Entry } = {
     {
         id = "mesh_creator_anvil_a",
         assetId = 11946437830,
+        sourceYawDegrees = 85,
         targetLongestDimension = 3.1,
         maxTriangles = 1600,
         maxMaterialSlots = 4,
