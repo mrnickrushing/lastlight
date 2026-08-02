@@ -3698,18 +3698,41 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         Enum.Material.Wood,
         false
     )
-    for roofSide = -1, 1, 2 do
-        local roof = part(
+    -- Open rafters, not a closed roof. Two solid slate wedges used to span the
+    -- full 28-stud length directly above the three tool displays, and from any
+    -- normal over-the-shoulder camera they covered the very thing the player
+    -- had walked over to look at. Camera sightline is one of the four
+    -- clearances the visual standard requires reserving before detail, and a
+    -- roofed interior that hides its own interaction fails that.
+    --
+    -- Paired rafters carried on the ridge beam keep the frame reading as a
+    -- built shelter -- posts, beam, rafters, believable support -- while
+    -- leaving open sky between them to see and reach through.
+    for rafterIndex = -4, 4 do
+        local rafterZ = rafterIndex * 3.2
+        for rafterSide = -1, 1, 2 do
+            part(
+                toolYard,
+                "ToolYardRafter",
+                Vector3.new(0.34, 0.34, 7.4),
+                CFrame.new(TOOL_YARD_CENTER + Vector3.new(rafterSide * 2.9, 9.3, rafterZ))
+                    * CFrame.Angles(0, math.rad(90), math.rad(rafterSide * 26)),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
+    end
+    for braceSide = -1, 1, 2 do
+        part(
             toolYard,
-            "ToolYardRoof",
-            Vector3.new(8.2, 3.1, 28.2),
-            CFrame.new(TOOL_YARD_CENTER + Vector3.new(roofSide * 3.55, 8.65, 0))
-                * CFrame.Angles(0, if roofSide < 0 then math.pi else 0, 0),
-            Color3.fromRGB(45, 51, 47),
-            Enum.Material.Slate,
+            "ToolYardEaveBeam",
+            Vector3.new(0.4, 0.4, 28),
+            CFrame.new(TOOL_YARD_CENTER + Vector3.new(braceSide * 5.6, 8.5, 0)),
+            WET_BARK,
+            Enum.Material.Wood,
             false
         )
-        roof.Shape = Enum.PartType.Wedge
     end
     local toolDisplayFallback = Instance.new("Model")
     toolDisplayFallback.Name = "ToolDisplayFallback"
