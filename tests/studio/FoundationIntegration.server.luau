@@ -41,7 +41,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.43.0", "unexpected build version")
+assert(Config.BuildVersion == "0.44.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -337,7 +337,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "emberhollow-assets-v25",
+    world:GetAttribute("WorldVersion") == "emberhollow-full-assets-v26",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -746,13 +746,43 @@ local townMeshDeadline = os.clock() + 12
 while world:GetAttribute("AuthoredMeshCount") == nil and os.clock() < townMeshDeadline do
     task.wait(0.1)
 end
+local townBuildings = world:FindFirstChild("TownProgressionBuildings")
+assert(townBuildings ~= nil, "town progression buildings are missing")
+local townBuildingMeshDeadline = os.clock() + 12
+while
+    townBuildings:GetAttribute("AuthoredMeshCount") == nil
+    and os.clock() < townBuildingMeshDeadline
+do
+    task.wait(0.1)
+end
+assert(
+    townBuildings:GetAttribute("AuthoredMeshCount") ~= nil,
+    "town asset replacements did not finish loading"
+)
 local styledMeshParts = 0
 local creatorAssetCounts: { [string]: number } = {
     mesh_creator_kerosene_lantern_a = 0,
     mesh_creator_first_lantern_a = 0,
     mesh_creator_street_lantern_a = 0,
     mesh_creator_campfire_a = 0,
+    mesh_creator_wood_arch_a = 0,
+    mesh_creator_rustic_fence_a = 0,
+    mesh_creator_workbench_a = 0,
+    mesh_creator_forest_sign_a = 0,
+    mesh_creator_tool_set_a = 0,
+    mesh_creator_barrel_a = 0,
+    mesh_creator_road_stones_a = 0,
+    mesh_creator_barricade_a = 0,
+    mesh_creator_notice_board_a = 0,
+    mesh_creator_stump_a = 0,
+    mesh_creator_market_stall_a = 0,
+    mesh_creator_wheat_cluster_a = 0,
+    mesh_creator_picnic_table_a = 0,
+    mesh_creator_watchtower_a = 0,
+    mesh_creator_crate_a = 0,
+    mesh_creator_field_rows_a = 0,
 }
+local stretchedRoadAssets = 0
 for _, descendant in world:GetDescendants() do
     if descendant:IsA("Model") and descendant:GetAttribute("MeshAssetId") ~= nil then
         local stableId = tostring(descendant:GetAttribute("MeshAssetId"))
@@ -763,6 +793,12 @@ for _, descendant in world:GetDescendants() do
                 descendant:GetAttribute("SourceMaterialsPreserved") == true,
                 "Creator Store source materials were not preserved: " .. stableId
             )
+            if stableId == "mesh_creator_road_stones_a" then
+                local profileScale = descendant:GetAttribute("ProfileScale")
+                if typeof(profileScale) == "Vector3" and profileScale.Z > 1 then
+                    stretchedRoadAssets += 1
+                end
+            end
         end
         if
             stableId ~= "mesh_root_arch_a"
@@ -793,12 +829,66 @@ assert(
     "both cabin hearths must use the inspected campfire asset"
 )
 assert(
-    creatorAssetCounts.mesh_creator_kerosene_lantern_a == 1,
-    "Mara must carry the inspected kerosene-lantern asset"
+    creatorAssetCounts.mesh_creator_kerosene_lantern_a >= 1,
+    "Mara and the night watch must use inspected kerosene-lantern assets"
 )
 assert(
     creatorAssetCounts.mesh_creator_first_lantern_a == 1,
     "the First Lantern must use the inspected endorsed lantern asset"
+)
+assert(
+    creatorAssetCounts.mesh_creator_road_stones_a >= 12 and stretchedRoadAssets >= 6,
+    "arrival and town roads need a continuous, visibly stretched cobblestone asset layer"
+)
+assert(
+    creatorAssetCounts.mesh_creator_rustic_fence_a == 12,
+    "the Greenward perimeter must use twelve sourced fence sections"
+)
+assert(
+    creatorAssetCounts.mesh_creator_field_rows_a == 1,
+    "the Greenward farm must use the sourced cultivated-field asset"
+)
+assert(
+    creatorAssetCounts.mesh_creator_forest_sign_a >= 3,
+    "route, camp, and consequence signage need sourced sign silhouettes"
+)
+assert(
+    creatorAssetCounts.mesh_creator_stump_a >= 4,
+    "Heartwood and mastery clearings need sourced irregular stump silhouettes"
+)
+assert(
+    creatorAssetCounts.mesh_creator_workbench_a >= 4,
+    "starter tools, crafting, and Engineer mastery need sourced workbenches"
+)
+assert(
+    creatorAssetCounts.mesh_creator_watchtower_a == 2,
+    "both night-watch positions need sourced watchtower assets"
+)
+assert(
+    creatorAssetCounts.mesh_creator_barricade_a == 2,
+    "the barricade worksite needs two sourced barricade assets"
+)
+assert(
+    creatorAssetCounts.mesh_creator_market_stall_a == 2,
+    "both crafting bays need sourced timber market-stall assets"
+)
+assert(
+    creatorAssetCounts.mesh_creator_notice_board_a >= 3,
+    "archive, night watch, and Town Board need sourced physical board assets"
+)
+assert(
+    creatorAssetCounts.mesh_creator_picnic_table_a >= 1,
+    "the camp commons needs sourced furniture"
+)
+assert(
+    creatorAssetCounts.mesh_creator_wood_arch_a == 1,
+    "the Dawn Gate needs the sourced asymmetrical timber arch"
+)
+assert(
+    creatorAssetCounts.mesh_creator_tool_set_a >= 1
+        and creatorAssetCounts.mesh_creator_crate_a >= 1
+        and creatorAssetCounts.mesh_creator_barrel_a >= 1,
+    "work areas need sourced tools, crates, and barrels"
 )
 for _, descendant in world:GetDescendants() do
     if descendant:GetAttribute("ReplacedByAuthoredMesh") == true then

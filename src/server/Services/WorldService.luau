@@ -104,13 +104,14 @@ type MeshPlacement = {
     swayTag: string?,
     parent: Instance?,
     fallbackInstance: Instance?,
+    profileScale: Vector3?,
 }
 
 local function authoredPlacementTransform(placement: MeshPlacement): (CFrame, Vector3)
     local random = Random.new(placement.seed * 97 + 31)
     local pitch = 0
     local roll = 0
-    local profileScale = Vector3.one
+    local profileScale = placement.profileScale or Vector3.one
 
     -- Repeated organic assets keep the same measured mesh and collision-free
     -- template, but no two placements present the same upright silhouette.
@@ -198,8 +199,39 @@ local function part(
     return instance
 end
 
-local function labelSign(parent: Instance, at: CFrame, text: string)
-    WorldSignBuilder.createDirectionSign(parent, "TrailSign", at, text, CREAM)
+local function labelSign(parent: Instance, at: CFrame, text: string): Model
+    return WorldSignBuilder.createDirectionSign(parent, "TrailSign", at, text, CREAM)
+end
+
+local function queueRoadAssetPlacements(
+    placements: { MeshPlacement },
+    parent: Instance,
+    startPosition: Vector3,
+    finishPosition: Vector3,
+    seedBase: number
+)
+    local delta = finishPosition - startPosition
+    local distance = delta.Magnitude
+    local direction = delta.Unit
+    local count = math.max(1, math.ceil(distance / 42))
+    local chunkLength = distance / count
+    local yaw = math.atan2(-direction.X, -direction.Z)
+    for index = 1, count do
+        local alpha = (index - 0.5) / count
+        local position = startPosition:Lerp(finishPosition, alpha)
+        table.insert(placements, {
+            assetId = "mesh_creator_road_stones_a",
+            fallbackKind = "asset_dressing",
+            position = Vector3.new(position.X, 0.92, position.Z),
+            scale = 1,
+            yaw = yaw,
+            seed = seedBase + index,
+            swayTag = nil,
+            parent = parent,
+            fallbackInstance = nil,
+            profileScale = Vector3.new(1, 1, chunkLength / 18),
+        })
+    end
 end
 
 local function buildEmberhollowSanctuary(
@@ -813,6 +845,28 @@ local function buildEmberhollowSanctuary(
                 false
             )
         end
+        table.insert(meshPlacements, {
+            assetId = "mesh_creator_barrel_a",
+            fallbackKind = "asset_replacement",
+            position = cabinCFrame(-14.5, -1.75, 4).Position,
+            scale = 1,
+            yaw = yaw + math.rad(8),
+            seed = if name == "MARA'S SHELTER" then 9821 else 9822,
+            swayTag = nil,
+            parent = cabinFolder,
+            fallbackInstance = woodpile,
+        })
+        table.insert(meshPlacements, {
+            assetId = "mesh_creator_crate_a",
+            fallbackKind = "asset_dressing",
+            position = cabinCFrame(13.8, -1.75, 4.4).Position,
+            scale = 0.9,
+            yaw = yaw + math.rad(-7),
+            seed = if name == "MARA'S SHELTER" then 9823 else 9824,
+            swayTag = nil,
+            parent = cabinFolder,
+            fallbackInstance = nil,
+        })
         local physicalParts = 0
         for _, descendant in cabinFolder:GetDescendants() do
             if descendant:IsA("BasePart") then
@@ -885,13 +939,24 @@ local function buildEmberhollowSanctuary(
         )
         supply.CanQuery = false
     end
+    table.insert(meshPlacements, {
+        assetId = "mesh_creator_picnic_table_a",
+        fallbackKind = "asset_replacement",
+        position = commonsCenter,
+        scale = 1.15,
+        yaw = math.rad(90),
+        seed = 9830,
+        swayTag = nil,
+        parent = parent,
+        fallbackInstance = commons,
+    })
 
     local streetFoundation = part(
         parent,
         "TownMainStreetFoundation",
         Vector3.new(18, 0.34, 206),
         CFrame.new(0, 0.31, -102),
-        Color3.fromRGB(58, 55, 48),
+        Color3.fromRGB(72, 65, 53),
         Enum.Material.Cobblestone,
         false
     )
@@ -901,8 +966,8 @@ local function buildEmberhollowSanctuary(
         "TownMainStreet",
         Vector3.new(15.5, 0.32, 204),
         CFrame.new(0, 0.59, -102),
-        Color3.fromRGB(91, 62, 38),
-        Enum.Material.Mud,
+        Color3.fromRGB(126, 82, 45),
+        Enum.Material.Ground,
         false
     )
     townStreet.CanQuery = false
@@ -911,8 +976,8 @@ local function buildEmberhollowSanctuary(
         "TownMainStreetWear",
         Vector3.new(5.4, 0.12, 202),
         CFrame.new(0, 0.81, -102),
-        Color3.fromRGB(132, 96, 57),
-        Enum.Material.Ground,
+        Color3.fromRGB(162, 116, 67),
+        Enum.Material.Pebble,
         false
     )
     streetWear.CanQuery = false
@@ -928,6 +993,13 @@ local function buildEmberhollowSanctuary(
         )
         rut.CanQuery = false
     end
+    queueRoadAssetPlacements(
+        meshPlacements,
+        parent,
+        Vector3.new(0, 0.92, 0),
+        Vector3.new(0, 0.92, -204),
+        9600
+    )
     local function townSideRoad(start: Vector3, finish: Vector3)
         local delta = finish - start
         local frame = CFrame.lookAt((start + finish) / 2, finish)
@@ -946,8 +1018,8 @@ local function buildEmberhollowSanctuary(
             "TownDistrictRoad",
             Vector3.new(7.2, 0.24, delta.Magnitude + 0.8),
             frame * CFrame.new(0, 0.24, 0),
-            Color3.fromRGB(96, 67, 41),
-            Enum.Material.Mud,
+            Color3.fromRGB(126, 82, 45),
+            Enum.Material.Ground,
             false
         )
         surface.CanQuery = false
@@ -961,6 +1033,7 @@ local function buildEmberhollowSanctuary(
             false
         )
         wear.CanQuery = false
+        queueRoadAssetPlacements(meshPlacements, parent, start, finish, 9700 + #meshPlacements)
     end
     townSideRoad(Vector3.new(0, 0.45, -144), Vector3.new(-80, 0.45, -144))
     townSideRoad(Vector3.new(0, 0.45, -126), Vector3.new(80, 0.45, -126))
@@ -996,6 +1069,7 @@ local function buildEmberhollowSanctuary(
             false
         )
         entryPath.CanQuery = false
+        queueRoadAssetPlacements(meshPlacements, parent, start, finish, 9800 + #meshPlacements)
     end
 
     for index = 1, 16 do
@@ -1043,11 +1117,22 @@ local function buildEmberhollowSanctuary(
             support.CanQuery = false
         end
     end
-    labelSign(
+    local campSign = labelSign(
         parent,
         CFrame.new(0, 3.2, -95) * CFrame.Angles(0, math.pi, 0),
         "EMBERHOLLOW · SAFE CAMP"
     )
+    table.insert(meshPlacements, {
+        assetId = "mesh_creator_forest_sign_a",
+        fallbackKind = "asset_replacement",
+        position = Vector3.new(0, 0, -95),
+        scale = 1.2,
+        yaw = math.pi,
+        seed = 9840,
+        swayTag = nil,
+        parent = parent,
+        fallbackInstance = campSign,
+    })
     return shells
 end
 
@@ -1963,6 +2048,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         Vector3.new(0, 0.42, -112),
         Vector3.new(0, 0.42, -148),
     }
+    local arrivalRoadAssetPlacements: { MeshPlacement } = {}
 
     for segment = 1, #route - 1 do
         local start = route[segment]
@@ -1976,7 +2062,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             "EmberhollowRoadFoundation",
             Vector3.new(17.2, 0.28, distance + 4),
             roadFrame * CFrame.new(0, -0.08, 0),
-            Color3.fromRGB(58, 57, 51),
+            Color3.fromRGB(72, 65, 53),
             Enum.Material.Cobblestone,
             false
         )
@@ -1986,8 +2072,8 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             "EmberhollowRoad",
             Vector3.new(15.2, 0.36, distance + 3.6),
             roadFrame * CFrame.new(0, 0.18, 0),
-            Color3.fromRGB(91, 62, 38),
-            Enum.Material.Mud,
+            Color3.fromRGB(126, 82, 45),
+            Enum.Material.Ground,
             false
         )
         trail.CanQuery = false
@@ -1997,8 +2083,8 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             "EmberhollowRoadWear",
             Vector3.new(6.2, 0.12, distance + 2.8),
             roadFrame * CFrame.new(0, 0.43, 0),
-            Color3.fromRGB(132, 96, 57),
-            Enum.Material.Ground,
+            Color3.fromRGB(162, 116, 67),
+            Enum.Material.Pebble,
             false
         )
         wornCenter.CanQuery = false
@@ -2036,6 +2122,13 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 edgeStone.CanQuery = false
             end
         end
+        queueRoadAssetPlacements(
+            arrivalRoadAssetPlacements,
+            geometry,
+            start,
+            finish,
+            9400 + segment * 20
+        )
     end
 
     local function tutorialSpur(start: Vector3, finish: Vector3)
@@ -2090,6 +2183,9 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             swayTag = nil,
         },
     }
+    for _, placement in arrivalRoadAssetPlacements do
+        table.insert(_self._meshPlacements, placement)
+    end
 
     -- Only the near band is planted here. Bands 2 and 3 are scenery beyond the
     -- immediate clearing and are planted after the world is marked ready; see
@@ -2175,7 +2271,22 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             fallbackInstance = placeholder,
         })
     end
-    labelSign(geometry, CFrame.new(7, 3, -14) * CFrame.Angles(0, math.pi, 0), "FOLLOW THE LANTERNS")
+    local routeSign = labelSign(
+        geometry,
+        CFrame.new(7, 3, -14) * CFrame.Angles(0, math.pi, 0),
+        "FOLLOW THE LANTERNS"
+    )
+    table.insert(_self._meshPlacements, {
+        assetId = "mesh_creator_forest_sign_a",
+        fallbackKind = "asset_replacement",
+        position = Vector3.new(7, 0, -14),
+        scale = 1.2,
+        yaw = math.pi,
+        seed = 9841,
+        swayTag = nil,
+        parent = geometry,
+        fallbackInstance = routeSign,
+    })
     buildEmberhollowSanctuary(geometry, _self._meshPlacements)
 
     local warningFolder = Instance.new("Folder")
@@ -2254,9 +2365,12 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     end
     for side = -1, 1, 2 do
         local towerCenter = Vector3.new(side * 10.5, 0, -143)
+        local towerFallback = Instance.new("Model")
+        towerFallback.Name = "WatchtowerFallback"
+        towerFallback.Parent = defenseRoute
         for postSide = -1, 1, 2 do
             part(
-                defenseRoute,
+                towerFallback,
                 "WatchPost",
                 Vector3.new(0.85, 8.5, 0.85),
                 CFrame.new(towerCenter + Vector3.new(postSide * 2.2, 4.25, 0)),
@@ -2265,13 +2379,35 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             )
         end
         part(
-            defenseRoute,
+            towerFallback,
             "WatchPlatform",
             Vector3.new(6.2, 0.65, 5.2),
             CFrame.new(towerCenter + Vector3.new(0, 7.1, 0)),
             Color3.fromRGB(83, 61, 43),
             Enum.Material.WoodPlanks
         )
+        table.insert(_self._meshPlacements, {
+            assetId = "mesh_creator_watchtower_a",
+            fallbackKind = "asset_replacement",
+            position = towerCenter,
+            scale = 1,
+            yaw = if side < 0 then math.rad(12) else math.rad(-12),
+            seed = 9850 + side,
+            swayTag = nil,
+            parent = defenseRoute,
+            fallbackInstance = towerFallback,
+        })
+        table.insert(_self._meshPlacements, {
+            assetId = "mesh_creator_campfire_a",
+            fallbackKind = "asset_dressing",
+            position = towerCenter + Vector3.new(0, 15.4, 0),
+            scale = 0.65,
+            yaw = math.rad(side * 17),
+            seed = 9860 + side,
+            swayTag = nil,
+            parent = defenseRoute,
+            fallbackInstance = nil,
+        })
         local brazier = part(
             defenseRoute,
             "WatchSignalFire",
@@ -2309,6 +2445,17 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         CREAM,
         "warning"
     )
+    table.insert(_self._meshPlacements, {
+        assetId = "mesh_creator_notice_board_a",
+        fallbackKind = "asset_replacement",
+        position = Vector3.new(0, 1, -146.8),
+        scale = 0.7,
+        yaw = 0,
+        seed = 9870,
+        swayTag = nil,
+        parent = defenseRoute,
+        fallbackInstance = warningBoard,
+    })
 end
 
 -- Rebuilds the same placement from inexpensive geometry when an authored model
@@ -2811,9 +2958,12 @@ function WorldService._buildMara(self: WorldService, world: Model)
     CollectionService:AddTag(model, self._runtimeIds.AmbientMotionTag)
     addBillboard(head, "MARA · GREENWARD", AMBER, 46)
 
+    local fallenRootsFallback = Instance.new("Model")
+    fallenRootsFallback.Name = "MaraFallenRootsFallback"
+    fallenRootsFallback.Parent = world
     for index = -1, 1 do
         part(
-            world,
+            fallenRootsFallback,
             "FallenRoot",
             Vector3.new(1.3, 10, 1.3),
             CFrame.new(-3 + index * 2.6, 2, -30)
@@ -2822,6 +2972,18 @@ function WorldService._buildMara(self: WorldService, world: Model)
             Enum.Material.Wood
         )
     end
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_deadfall_a",
+        fallbackKind = "asset_replacement",
+        position = Vector3.new(-3, -0.2, -30),
+        scale = 1.15,
+        yaw = math.rad(17),
+        seed = 9320,
+        swayTag = nil,
+        parent = world,
+        fallbackInstance = fallenRootsFallback,
+        profileScale = Vector3.new(1.18, 0.92, 0.86),
+    })
 
     self._mara = model
     self:_registerInteraction(
@@ -2839,8 +3001,11 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     interactables.Name = "Interactables"
     interactables.Parent = world
 
+    local heartwoodFallback = Instance.new("Model")
+    heartwoodFallback.Name = "HeartwoodVisualFallback"
+    heartwoodFallback.Parent = interactables
     local stump = part(
-        interactables,
+        heartwoodFallback,
         "HeartwoodStump",
         Vector3.new(7.6, 5.8, 7.6),
         CFrame.new(HEARTWOOD_CENTER + Vector3.new(0, 2.9, 0)),
@@ -2852,7 +3017,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     for rootIndex = 1, 6 do
         local angle = (rootIndex / 6) * math.pi * 2
         part(
-            interactables,
+            heartwoodFallback,
             "HeartwoodRoot",
             Vector3.new(1.05, 1.15, 5.8),
             CFrame.new(
@@ -2867,7 +3032,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     for barkIndex = 1, 10 do
         local angle = (barkIndex / 10) * math.pi * 2
         local barkRib = part(
-            interactables,
+            heartwoodFallback,
             "HeartwoodBarkRib",
             Vector3.new(1.15, 4.8 + (barkIndex % 3) * 0.45, 0.62),
             CFrame.new(
@@ -2888,7 +3053,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     for crownIndex = 1, 6 do
         local angle = (crownIndex / 6) * math.pi * 2
         local crown = part(
-            interactables,
+            heartwoodFallback,
             "HeartwoodSplitCrown",
             Vector3.new(1.5, 2 + (crownIndex % 2) * 0.7, 1.2),
             CFrame.new(
@@ -2909,7 +3074,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     end
     for ringIndex = 1, 3 do
         local growthRing = part(
-            interactables,
+            heartwoodFallback,
             "HeartwoodGrowthRing",
             Vector3.new(0.16, 5.7 - ringIndex * 0.7, 5.7 - ringIndex * 0.7),
             stump.CFrame * CFrame.new(3.05, 0, 0),
@@ -2920,7 +3085,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         growthRing.Shape = Enum.PartType.Cylinder
     end
     local cavity = part(
-        interactables,
+        heartwoodFallback,
         "HeartwoodCavity",
         Vector3.new(3.9, 4.1, 0.5),
         CFrame.new(HEARTWOOD_CENTER + Vector3.new(0, 4.05, 3.42)),
@@ -2931,7 +3096,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     cavity.Shape = Enum.PartType.Ball
     cavity.CanQuery = false
     local heart = part(
-        interactables,
+        heartwoodFallback,
         "HeartwoodCore",
         Vector3.new(2.5, 2.9, 0.85),
         CFrame.new(HEARTWOOD_CENTER + Vector3.new(0, 4.15, 3.65)),
@@ -2943,7 +3108,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     heart.Transparency = 0.2
     for shardIndex = -1, 1 do
         local shard = part(
-            interactables,
+            heartwoodFallback,
             "HeartwoodShard",
             Vector3.new(0.65, 2.1 + math.abs(shardIndex) * 0.45, 0.55),
             CFrame.new(
@@ -2964,6 +3129,17 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     heartLight.Range = 12
     heartLight.Parent = heart
     addBillboard(heart, "HEARTWOOD", AMBER, 18)
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_stump_a",
+        fallbackKind = "asset_replacement",
+        position = HEARTWOOD_CENTER,
+        scale = 1.15,
+        yaw = math.rad(-18),
+        seed = 9880,
+        swayTag = nil,
+        parent = interactables,
+        fallbackInstance = heartwoodFallback,
+    })
     self:_registerInteraction(
         stump,
         self._runtimeIds.InteractionIds.Heartwood,
@@ -3022,6 +3198,9 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         )
         roof.Shape = Enum.PartType.Wedge
     end
+    local toolDisplayFallback = Instance.new("Model")
+    toolDisplayFallback.Name = "ToolDisplayFallback"
+    toolDisplayFallback.Parent = toolYard
     local tools = {
         {
             id = self._runtimeIds.InteractionIds.ToolAxe,
@@ -3047,7 +3226,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         local display = Instance.new("Model")
         display.Name = "ToolDisplay_" .. definition.tool
         display:SetAttribute("DisplayKind", "open_supply_crate")
-        display.Parent = interactables
+        display.Parent = toolDisplayFallback
         local pedestal = part(
             display,
             "Tool_" .. definition.tool,
@@ -3187,9 +3366,34 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             definition.tool
         )
     end
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_workbench_a",
+        fallbackKind = "asset_replacement",
+        position = TOOL_YARD_CENTER + Vector3.new(0, 0, -1.5),
+        scale = 1,
+        yaw = math.rad(90),
+        seed = 9890,
+        swayTag = nil,
+        parent = toolYard,
+        fallbackInstance = toolDisplayFallback,
+    })
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_tool_set_a",
+        fallbackKind = "asset_dressing",
+        position = TOOL_YARD_CENTER + Vector3.new(0, 2.7, 3.8),
+        scale = 0.8,
+        yaw = math.rad(90),
+        seed = 9891,
+        swayTag = nil,
+        parent = toolYard,
+        fallbackInstance = nil,
+    })
 
+    local barricadeFallback = Instance.new("Model")
+    barricadeFallback.Name = "BarricadeWorksiteFallback"
+    barricadeFallback.Parent = interactables
     local plot = part(
-        interactables,
+        barricadeFallback,
         "ConstructionPlot",
         Vector3.new(18, 0.5, 9),
         CFrame.new(BARRICADE_CENTER + Vector3.new(0, 0.25, 0)),
@@ -3200,7 +3404,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     for postIndex = -2, 2 do
         local height = 2.8 + (postIndex + 2) * 0.55
         part(
-            interactables,
+            barricadeFallback,
             "BarricadeWorkPost",
             Vector3.new(0.78, height, 0.78),
             CFrame.new(BARRICADE_CENTER + Vector3.new(postIndex * 3.6, height / 2, 0))
@@ -3211,7 +3415,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     end
     for braceIndex = -1, 1 do
         part(
-            interactables,
+            barricadeFallback,
             "BarricadeWorkBrace",
             Vector3.new(14.8, 0.55, 0.62),
             CFrame.new(BARRICADE_CENTER + Vector3.new(0, 1.7 + (braceIndex + 1) * 1.4, 0))
@@ -3223,7 +3427,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     end
     for supplyIndex = 1, 4 do
         part(
-            interactables,
+            barricadeFallback,
             "BarricadeLumber",
             Vector3.new(4.8 + supplyIndex * 0.45, 0.42, 0.58),
             CFrame.new(BARRICADE_CENTER + Vector3.new(-7.3, 0.45 + supplyIndex * 0.36, 2.6))
@@ -3234,6 +3438,30 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         )
     end
     addBillboard(plot, "BARRICADE WORKSITE", CREAM, 18)
+    for index = -1, 1, 2 do
+        table.insert(self._meshPlacements, {
+            assetId = "mesh_creator_barricade_a",
+            fallbackKind = "asset_replacement",
+            position = BARRICADE_CENTER + Vector3.new(index * 5.2, 0, 0),
+            scale = 1.05,
+            yaw = math.rad(index * 6),
+            seed = 9900 + index,
+            swayTag = nil,
+            parent = interactables,
+            fallbackInstance = if index < 0 then barricadeFallback else nil,
+        })
+    end
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_crate_a",
+        fallbackKind = "asset_dressing",
+        position = BARRICADE_CENTER + Vector3.new(-8, 0, 3.2),
+        scale = 0.9,
+        yaw = math.rad(-12),
+        seed = 9903,
+        swayTag = nil,
+        parent = interactables,
+        fallbackInstance = nil,
+    })
     self:_registerInteraction(
         plot,
         self._runtimeIds.InteractionIds.Barricade,
@@ -3431,6 +3659,17 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         marker.Transparency = 1
         marker.CastShadow = false
     end
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_wood_arch_a",
+        fallbackKind = "asset_replacement",
+        position = Vector3.new(0, 0, -148),
+        scale = 1,
+        yaw = 0,
+        seed = 9910,
+        swayTag = nil,
+        parent = interactables,
+        fallbackInstance = gate,
+    })
 
     local beacon = part(
         interactables,
@@ -3567,7 +3806,23 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     end
     workshopBay(-42, "ROOTWORKS", Color3.fromRGB(133, 176, 108))
     workshopBay(42, "OUTFITTER", AMBER)
+    for index, centerX in { -42, 42 } do
+        table.insert(self._meshPlacements, {
+            assetId = "mesh_creator_market_stall_a",
+            fallbackKind = "asset_replacement",
+            position = Vector3.new(centerX, 0, workshopZ),
+            scale = 1.15,
+            yaw = 0,
+            seed = 9920 + index,
+            swayTag = nil,
+            parent = interactables,
+            fallbackInstance = if index == 1 then workshop else nil,
+        })
+    end
 
+    local craftingFallback = Instance.new("Model")
+    craftingFallback.Name = "CraftingDisplayFallback"
+    craftingFallback.Parent = interactables
     local craftingBenches = {
         {
             id = self._runtimeIds.InteractionIds.CraftMeadowSatchel,
@@ -3603,7 +3858,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         display.Name = "CraftingDisplay_" .. definition.recipeId
         display:SetAttribute("RecipeId", definition.recipeId)
         display:SetAttribute("DisplayKind", "physical_recipe_sample")
-        display.Parent = interactables
+        display.Parent = craftingFallback
         local bench = part(
             display,
             "CraftingBench_" .. definition.recipeId,
@@ -3762,11 +4017,27 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             definition.recipeId
         )
     end
+    for index, centerX in { -42, 42 } do
+        table.insert(self._meshPlacements, {
+            assetId = "mesh_creator_workbench_a",
+            fallbackKind = "asset_replacement",
+            position = Vector3.new(centerX, 0, workshopZ + 1.5),
+            scale = 0.95,
+            yaw = math.pi,
+            seed = 9930 + index,
+            swayTag = nil,
+            parent = interactables,
+            fallbackInstance = if index == 1 then craftingFallback else nil,
+        })
+    end
 
     local archiveX = -20
     local archiveZ = -132
+    local archiveFallback = Instance.new("Model")
+    archiveFallback.Name = "ArchiveVisualFallback"
+    archiveFallback.Parent = interactables
     local archive = part(
-        interactables,
+        archiveFallback,
         "GreenwardArchive",
         Vector3.new(9, 6, 1),
         CFrame.new(archiveX, 3, archiveZ),
@@ -3775,7 +4046,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     )
     for side = -1, 1, 2 do
         part(
-            interactables,
+            archiveFallback,
             "ArchivePost",
             Vector3.new(0.75, 8.2, 0.75),
             CFrame.new(archiveX + side * 5.1, 4.1, archiveZ - 0.1)
@@ -3784,7 +4055,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             Enum.Material.Wood
         )
         part(
-            interactables,
+            archiveFallback,
             "ArchiveShelf",
             Vector3.new(3.8, 0.42, 1.9),
             CFrame.new(archiveX + side * 2.2, 1.65, archiveZ + 0.75),
@@ -3794,7 +4065,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         )
     end
     part(
-        interactables,
+        archiveFallback,
         "ArchiveCanopy",
         Vector3.new(12.2, 0.62, 4.1),
         CFrame.new(archiveX, 7.5, archiveZ + 0.6) * CFrame.Angles(math.rad(-6), 0, 0),
@@ -3808,6 +4079,17 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         "bramble_hazard",
         "lantern_maintenance",
         "supply_inventory",
+    })
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_notice_board_a",
+        fallbackKind = "asset_replacement",
+        position = Vector3.new(archiveX, 0, archiveZ),
+        scale = 1.05,
+        yaw = 0,
+        seed = 9940,
+        swayTag = nil,
+        parent = interactables,
+        fallbackInstance = archiveFallback,
     })
     self:_registerInteraction(
         archive,
@@ -3953,6 +4235,24 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             )
         end
         dais:SetAttribute("ProfessionId", "profession_" .. string.lower(altar.name))
+        table.insert(self._meshPlacements, {
+            assetId = if altar.name == "ENGINEER"
+                then "mesh_creator_workbench_a"
+                else "mesh_creator_stump_a",
+            fallbackKind = "asset_dressing",
+            position = altar.center + Vector3.new(0, 0.85, 2.1),
+            scale = if altar.name == "ENGINEER" then 0.58 else 0.44,
+            yaw = math.rad(
+                if altar.name == "SCOUT" then -11 elseif altar.name == "MEDIC" then 14 else 4
+            ),
+            seed = 9970 + #altar.name,
+            swayTag = nil,
+            parent = masteryGrove,
+            fallbackInstance = nil,
+            profileScale = if altar.name == "WARDEN"
+                then Vector3.new(1.12, 0.92, 0.88)
+                else Vector3.one,
+        })
     end
 end
 
@@ -3967,7 +4267,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "emberhollow-assets-v25")
+    world:SetAttribute("WorldVersion", "emberhollow-full-assets-v26")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -4067,7 +4367,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "emberhollow-assets-v25",
+        worldVersion = "emberhollow-full-assets-v26",
     })
 end
 
@@ -4792,7 +5092,12 @@ function WorldService.showTownGuardRecovery(self: WorldService, players: { Playe
     end)
 end
 
-local function buildTownConsequenceLandscape(parent: Instance, consequence: any)
+local function buildTownConsequenceLandscape(
+    parent: Instance,
+    consequence: any,
+    assetParent: Instance,
+    meshPlacements: { MeshPlacement }
+)
     local center = Vector3.new(96, 0, -164)
     local landscapeKind = tostring(consequence.landscapeKind or "seed_ground")
     local memorialKind = tostring(consequence.memorialKind or "unmarked_stone")
@@ -5129,6 +5434,140 @@ local function buildTownConsequenceLandscape(parent: Instance, consequence: any)
         "consequence"
     )
     sign:SetAttribute("Consequence", consequence.detail)
+
+    if landscapeKind == "living_grove" then
+        local groveOffsets = {
+            Vector3.new(-10, 0, -7),
+            Vector3.new(0, 0, -4),
+            Vector3.new(10, 0, -7),
+            Vector3.new(-7, 0, 7),
+            Vector3.new(8, 0, 7),
+        }
+        for index, offset in groveOffsets do
+            table.insert(meshPlacements, {
+                assetId = "mesh_broadleaf_hero_a",
+                fallbackKind = "asset_replacement",
+                position = center + offset,
+                scale = 0.48 + index * 0.025,
+                yaw = math.rad(index * 51),
+                seed = 10000 + index,
+                swayTag = nil,
+                parent = assetParent,
+                fallbackInstance = if index == 1 then parent else nil,
+            })
+        end
+    else
+        table.insert(meshPlacements, {
+            assetId = "mesh_creator_field_rows_a",
+            fallbackKind = "asset_replacement",
+            position = center,
+            scale = 1.12,
+            yaw = 0,
+            seed = 10010,
+            swayTag = nil,
+            parent = assetParent,
+            fallbackInstance = parent,
+        })
+        if landscapeKind == "cultivated_fields" or landscapeKind == "community_orchard" then
+            for index, offset in
+                {
+                    Vector3.new(-10, 0, -6),
+                    Vector3.new(0, 0, -5),
+                    Vector3.new(10, 0, -6),
+                }
+            do
+                table.insert(meshPlacements, {
+                    assetId = "mesh_creator_wheat_cluster_a",
+                    fallbackKind = "asset_dressing",
+                    position = center + offset,
+                    scale = 1,
+                    yaw = math.rad(index * 37),
+                    seed = 10020 + index,
+                    swayTag = nil,
+                    parent = assetParent,
+                    fallbackInstance = nil,
+                })
+            end
+        end
+        if landscapeKind == "community_orchard" then
+            for index, offset in
+                { Vector3.new(-10, 0, 7), Vector3.new(0, 0, 8), Vector3.new(10, 0, 7) }
+            do
+                table.insert(meshPlacements, {
+                    assetId = "mesh_broadleaf_hero_a",
+                    fallbackKind = "asset_dressing",
+                    position = center + offset,
+                    scale = 0.4,
+                    yaw = math.rad(index * 63),
+                    seed = 10030 + index,
+                    swayTag = nil,
+                    parent = assetParent,
+                    fallbackInstance = nil,
+                })
+            end
+            table.insert(meshPlacements, {
+                assetId = "mesh_creator_picnic_table_a",
+                fallbackKind = "asset_dressing",
+                position = center,
+                scale = 0.9,
+                yaw = math.rad(90),
+                seed = 10034,
+                swayTag = nil,
+                parent = assetParent,
+                fallbackInstance = nil,
+            })
+        end
+    end
+    for index, spec in
+        {
+            { position = center + Vector3.new(-20, 0, -10), yaw = math.rad(90) },
+            { position = center + Vector3.new(-20, 0, 0), yaw = math.rad(90) },
+            { position = center + Vector3.new(-20, 0, 10), yaw = math.rad(90) },
+            { position = center + Vector3.new(20, 0, -10), yaw = math.rad(90) },
+            { position = center + Vector3.new(20, 0, 0), yaw = math.rad(90) },
+            { position = center + Vector3.new(20, 0, 10), yaw = math.rad(90) },
+            { position = center + Vector3.new(-12, 0, -16), yaw = 0 },
+            { position = center + Vector3.new(0, 0, -16), yaw = 0 },
+            { position = center + Vector3.new(12, 0, -16), yaw = 0 },
+            { position = center + Vector3.new(-12, 0, 16), yaw = 0 },
+            { position = center + Vector3.new(0, 0, 16), yaw = 0 },
+            { position = center + Vector3.new(12, 0, 16), yaw = 0 },
+        }
+    do
+        table.insert(meshPlacements, {
+            assetId = "mesh_creator_rustic_fence_a",
+            fallbackKind = "asset_dressing",
+            position = spec.position,
+            scale = 1,
+            yaw = spec.yaw,
+            seed = 10040 + index,
+            swayTag = nil,
+            parent = assetParent,
+            fallbackInstance = nil,
+        })
+    end
+    table.insert(meshPlacements, {
+        assetId = "mesh_creator_stump_a",
+        fallbackKind = "asset_dressing",
+        position = memorialCenter,
+        scale = 0.82,
+        yaw = math.rad(-11),
+        seed = 10060,
+        swayTag = nil,
+        parent = assetParent,
+        fallbackInstance = nil,
+    })
+    table.insert(meshPlacements, {
+        assetId = "mesh_creator_forest_sign_a",
+        fallbackKind = "asset_dressing",
+        position = center + Vector3.new(0, 0, -15.2),
+        scale = 1.1,
+        yaw = 0,
+        seed = 10061,
+        swayTag = nil,
+        parent = assetParent,
+        fallbackInstance = nil,
+    })
     parent:SetAttribute("LandscapeKind", landscapeKind)
     parent:SetAttribute("MemorialKind", memorialKind)
     parent:SetAttribute("GrowthStage", growthStage)
@@ -5137,7 +5576,9 @@ end
 local function buildTownProgressionBuildings(
     parent: Instance,
     consequence: any,
-    runtimeIds: any
+    runtimeIds: any,
+    assetParent: Instance,
+    meshPlacements: { MeshPlacement }
 ): { [string]: any }
     local stages = if type(consequence.buildingStages) == "table"
         then consequence.buildingStages
@@ -5492,9 +5933,12 @@ local function buildTownProgressionBuildings(
         FOXFIRE
     )
     if archiveStage > 0 then
+        local archivePropsFallback = Instance.new("Model")
+        archivePropsFallback.Name = "ArchivePropsFallback"
+        archivePropsFallback.Parent = archive
         for shelf = -1, 1, 2 do
             part(
-                archive,
+                archivePropsFallback,
                 "ArchiveShelf",
                 Vector3.new(4.8, 5.2, 0.75),
                 CFrame.new(-92 + shelf * 5.3, 2.85, -139.1),
@@ -5505,7 +5949,7 @@ local function buildTownProgressionBuildings(
         end
         for jarIndex = -2, 2 do
             local jar = part(
-                archive,
+                archivePropsFallback,
                 "ArchiveMemoryJar",
                 Vector3.new(0.65, 0.9, 0.65),
                 CFrame.new(-92 + jarIndex * 1.4, 1.1, -144),
@@ -5515,6 +5959,25 @@ local function buildTownProgressionBuildings(
             )
             jar.Shape = Enum.PartType.Ball
             jar.Transparency = 0.18
+        end
+        for index, definition in
+            {
+                { assetId = "mesh_creator_crate_a", x = -96, yaw = -9 },
+                { assetId = "mesh_creator_barrel_a", x = -92, yaw = 7 },
+                { assetId = "mesh_creator_crate_a", x = -88, yaw = 12 },
+            }
+        do
+            table.insert(meshPlacements, {
+                assetId = definition.assetId,
+                fallbackKind = "asset_replacement",
+                position = Vector3.new(definition.x, 0, -140),
+                scale = 0.9,
+                yaw = math.rad(definition.yaw),
+                seed = 10100 + index,
+                swayTag = nil,
+                parent = assetParent,
+                fallbackInstance = if index == 1 then archivePropsFallback else nil,
+            })
         end
     end
 
@@ -5528,8 +5991,11 @@ local function buildTownProgressionBuildings(
         AMBER
     )
     if workbenchStage > 0 then
+        local workbenchFallback = Instance.new("Model")
+        workbenchFallback.Name = "TownWorkbenchFallback"
+        workbenchFallback.Parent = workshop
         local bench = part(
-            workshop,
+            workbenchFallback,
             "CraftingBench",
             Vector3.new(8, 1.2, 3.2),
             CFrame.new(92, 1.3, -122.3),
@@ -5539,7 +6005,7 @@ local function buildTownProgressionBuildings(
         )
         for toolIndex = -1, 1 do
             part(
-                workshop,
+                workbenchFallback,
                 "WorkbenchTool",
                 Vector3.new(0.35, 2.4, 0.35),
                 bench.CFrame + Vector3.new(toolIndex * 2.2, 1.65, 0),
@@ -5548,6 +6014,17 @@ local function buildTownProgressionBuildings(
                 false
             )
         end
+        table.insert(meshPlacements, {
+            assetId = "mesh_creator_workbench_a",
+            fallbackKind = "asset_replacement",
+            position = Vector3.new(92, 0, -122.3),
+            scale = 1,
+            yaw = math.pi,
+            seed = 10110,
+            swayTag = nil,
+            parent = assetParent,
+            fallbackInstance = workbenchFallback,
+        })
     end
 
     local boardStage = stageFor("building_town_board")
@@ -5582,6 +6059,17 @@ local function buildTownProgressionBuildings(
         CREAM,
         { "community_watch", "lantern_maintenance", "supply_inventory" }
     )
+    table.insert(meshPlacements, {
+        assetId = "mesh_creator_notice_board_a",
+        fallbackKind = "asset_replacement",
+        position = Vector3.new(0, 0, -158),
+        scale = 1.05,
+        yaw = 0,
+        seed = 10120,
+        swayTag = nil,
+        parent = assetParent,
+        fallbackInstance = boardModel,
+    })
 
     local innStage = stageFor("building_inn")
     local inn = buildingShell(
@@ -5593,9 +6081,12 @@ local function buildTownProgressionBuildings(
         Color3.fromRGB(219, 151, 77)
     )
     if innStage > 0 then
+        local innFurnitureFallback = Instance.new("Model")
+        innFurnitureFallback.Name = "InnFurnitureFallback"
+        innFurnitureFallback.Parent = inn
         for side = -1, 1, 2 do
             part(
-                inn,
+                innFurnitureFallback,
                 "InnTable",
                 Vector3.new(4.5, 0.55, 3),
                 CFrame.new(-92 + side * 5, 2.1, -180.5),
@@ -5603,6 +6094,17 @@ local function buildTownProgressionBuildings(
                 Enum.Material.WoodPlanks,
                 false
             )
+            table.insert(meshPlacements, {
+                assetId = "mesh_creator_picnic_table_a",
+                fallbackKind = "asset_replacement",
+                position = Vector3.new(-92 + side * 5, 0, -180.5),
+                scale = 0.7,
+                yaw = math.rad(90),
+                seed = 10130 + side,
+                swayTag = nil,
+                parent = assetParent,
+                fallbackInstance = if side < 0 then innFurnitureFallback else nil,
+            })
         end
     end
 
@@ -5979,6 +6481,19 @@ local function buildTownProgressionBuildings(
 
         model.PrimaryPart = root
         model:PivotTo(definition.day)
+        local dayPosition = definition.day.Position
+        table.insert(meshPlacements, {
+            assetId = "mesh_creator_kerosene_lantern_a",
+            fallbackKind = "asset_dressing",
+            position = dayPosition + Vector3.new(-2.15, -2.35, -0.1),
+            scale = 0.72,
+            yaw = math.rad(8 + (#residentId % 3) * 7),
+            seed = 10150 + #residentId,
+            swayTag = nil,
+            parent = model,
+            fallbackInstance = nil,
+            profileScale = Vector3.new(0.92, 1.08, 0.92),
+        })
         addBillboard(head, definition.displayName .. " · " .. definition.role, definition.accent)
         CollectionService:AddTag(model, runtimeIds.AmbientMotionTag)
         residents[residentId] = {
@@ -6062,11 +6577,19 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
     local landscape = Instance.new("Model")
     landscape.Name = "GreenwardConsequence"
     landscape.Parent = world
-    buildTownConsequenceLandscape(landscape, resolved)
+    local townMeshPlacements: { MeshPlacement } = {}
+    buildTownConsequenceLandscape(landscape, resolved, world, townMeshPlacements)
     local buildings = Instance.new("Model")
     buildings.Name = "TownProgressionBuildings"
     buildings.Parent = world
-    self._townResidents = buildTownProgressionBuildings(buildings, resolved, self._runtimeIds)
+    self._townResidents = buildTownProgressionBuildings(
+        buildings,
+        resolved,
+        self._runtimeIds,
+        world,
+        townMeshPlacements
+    )
+    self:_placeAuthoredMeshes(townMeshPlacements, world, buildings, "town_mesh_dressing_ready")
     for residentId, resident in self._townResidents do
         local interactionId = self._runtimeIds.ResidentInteractionIds[residentId]
         if interactionId ~= nil and resident.interactionTarget ~= nil then
