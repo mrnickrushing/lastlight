@@ -710,6 +710,28 @@ for _, buildingId in { "building_archive", "building_workbench", "building_inn" 
             and anchor.Position.Z <= -120,
         "progression buildings must stay out of the arrival cabin sightline: " .. buildingId
     )
+    -- Orientation, not just position. Every check above verifies where a
+    -- building sits and none verified which way it faces, which is how
+    -- archive/workbench/inn all shipped presenting a blank wall to the street:
+    -- the shells were authored axis-aligned so their door gap, header, awning,
+    -- and sign always pointed at world -Z whatever lot they stood on.
+    local sign = building:FindFirstChild("BuildingSign", true)
+        or building:FindFirstChild("ConstructionSign", true)
+    assert(
+        sign ~= nil and sign:IsA("BasePart"),
+        "progression buildings need a readable sign: " .. buildingId
+    )
+    -- The main street runs along Z at x = 0, so the street lies in -sign(x).
+    local toStreet = Vector3.new(if anchor.Position.X > 0 then -1 else 1, 0, 0)
+    -- A SurfaceGui on Face = Front reads along the part's LookVector.
+    assert(
+        sign.CFrame.LookVector:Dot(toStreet) > 0.5,
+        "building sign must face the street, not away from it: " .. buildingId
+    )
+    assert(
+        math.abs(sign.Position.X) < math.abs(anchor.Position.X),
+        "building sign must sit on the street-facing wall: " .. buildingId
+    )
 end
 assert(world:GetAttribute("TownIntegrity") == 100, "new towns must begin fully repaired")
 assert(world:GetAttribute("TownDamageLevel") == 0, "new towns cannot begin visibly damaged")
