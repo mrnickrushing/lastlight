@@ -181,6 +181,11 @@ function WardenStagService._spawnModel(self: WardenStagService, target: Player)
         else targetRoot.Position
     local model = self._builder.build(self._arena.center, lookAt, self._encounter.MaxHealth)
     model.Parent = self._arena.model
+    task.spawn(function()
+        if model.Parent ~= nil then
+            self._worldService:placeEnemyVisual(model, "warden_stag")
+        end
+    end)
     self._model = model
     self:_syncModel()
 end

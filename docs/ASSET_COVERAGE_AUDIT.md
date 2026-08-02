@@ -13,20 +13,20 @@ snapshot, not a live view.
 | | Count |
 | --- | ---: |
 | Distinct primitive object kinds | 410 |
-| Reviewed assets in the manifest | 32 |
-| Assets actually placed in the world | 30 |
-| Asset placements | 53 |
-| Fallback wrappers (primitive hidden when its asset loads) | 13 |
+| Reviewed assets in the manifest | 44 |
+| Assets referenced by placement code | 42 |
+| Dynamic character asset shells | 8 |
+| Retired or superseded assets intentionally unplaced | 2 |
 
-30 of 32, not 31: both `mesh_lantern_post_a` and `mesh_wayfarer_cabin_a` are
+42 of 44: both `mesh_lantern_post_a` and `mesh_wayfarer_cabin_a` are
 absent from the world, and the two unplaced entries below are the whole of the
 difference.
 
-410 against 53 is the headline. Most of the world is still primitives. That is
-not automatically wrong — terrain, roads, floors, walls, roofs, collision
-shells, and invisible anchors are *supposed* to be purpose-built geometry, and
-`VISUAL_QUALITY_STANDARD.md` says so. What matters is the inspectable props, and
-those are covered unevenly.
+The 410 primitive names are no longer a count of visible placeholders: they now
+include terrain, roads, floors, walls, roofs, collision shells, invisible
+interaction anchors, and asset-load fallbacks. Those are *supposed* to remain
+purpose-built geometry under `VISUAL_QUALITY_STANDARD.md`. Inspectable item and
+character shells use the reviewed asset path.
 
 ### Primitive object kinds by builder
 
@@ -39,10 +39,11 @@ those are covered unevenly.
 | `OldGrowthBuilder.luau` | 7 |
 | `WardenStagBuilder.luau` | 6 |
 
-## Gap 1 — enemies have no assets at all
+## Enemy and encounter shell pass — resolved 2026-08-01
 
-`BramblewakeEnemyBuilder.luau` contains **zero** references to `assetId`,
-`MeshTemplateLoader`, or `MeshPart`. Every enemy is assembled from primitives:
+The combat builders still author the following primitive parts, but they are
+now invisible authoritative hitboxes and load-failure fallbacks rather than the
+rendered character:
 
 `BackThorn`, `BarkRamCore`, `BriarLeg`, `BriarbackCore`, `CrowBeak`, `CrowWing`,
 `DrowsyTrail`, `FrontShield`, `HollowCrowCore`, `JawThorn`, `MossBack`,
@@ -50,13 +51,25 @@ those are covered unevenly.
 `ReadableEye`, `RootArm`, `RootCore`, `ShieldTusk`, `SnapJaw`, `SnapvineRoot`,
 `StolenSpark`, `VineStem`
 
-This is the single largest coverage gap, and enemies are inspected at close
-range in combat. Note the constraint before replacing them: the standard
-requires cosmetic geometry never to alter authoritative combat bounds, so an
-enemy asset has to sit over the existing hitbox rather than become it — the same
-replace-only-the-visible-shell contract the landmarks already use.
+`WorldService:placeEnemyVisual` now places six distinct night-enemy shells plus
+the Old Growth and Warden Stag hero shells through `MeshTemplateLoader:place`.
+It captures the pre-existing BaseParts, places the sanitized cosmetic model,
+then hides those BaseParts without changing query bounds. State updates in the
+hero builders keep those fallbacks hidden.
 
-## Gap 2 — assets in the manifest that are never placed
+The same pass replaced inspectable expedition items: POI memory lanterns,
+event-step props, Old Growth fire and root heart, the Warden seal and root
+nodes, Blackout fire and relays, and the three chapter-choice objects. The
+primitive targets remain invisible interaction anchors. Structural terrain,
+roads, roofs, walls, and collision stay purpose-built as required by the visual
+standard.
+
+The Dawn Gate's `BramblewakeBeacon` is likewise an invisible prompt anchor. Its
+visible object is `mesh_creator_memory_reliquary_a`; the redundant floating
+world label was removed so the custom interaction prompt is the only text in
+that sightline.
+
+## Intentionally unplaced assets
 
 | Stable ID | Band | Status |
 | --- | --- | --- |
@@ -96,11 +109,11 @@ audit:
 
 The visual standard already draws the line: structural shells, collision,
 terrain, and roads may stay purpose-built; inspectable props and practical-light
-vessels must use reviewed art. Against that line the open work is:
-
-- enemies (Gap 1) — nothing sourced at all;
-- cabin interior smalls — shelf supplies and bedrolls are still plain boxes;
-- whatever a Studio pass turns up that this static read cannot see.
+vessels must use reviewed art. Against that line the static coverage pass is
+complete, including the cabin supply shelf and wayfarer trunk. The remaining
+gate is visual rather than architectural: a Studio walk-through must still
+catch scale, orientation, clipping, or a runtime-only one-off that source
+inspection cannot reveal.
 
 A static audit cannot tell you whether a placed asset *looks* right, only
 whether one is placed. Scale, orientation, and clipping need Studio.

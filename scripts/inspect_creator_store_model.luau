@@ -4,7 +4,11 @@ local fs = require("@lune/fs")
 local process = require("@lune/process")
 local roblox = require("@lune/roblox")
 
-local paths = process.args
+local paths = table.clone(process.args)
+local showParts = paths[1] == "--parts"
+if showParts then
+    table.remove(paths, 1)
+end
 assert(#paths > 0, "usage: lune run scripts/inspect_creator_store_model <model.rbxm> [...]")
 
 for _, path in paths do
@@ -55,24 +59,26 @@ for _, path in paths do
 
     local boundsSize = roblox.Vector3.new(maxX - minX, maxY - minY, maxZ - minZ)
 
-    print(string.format(
-        "%s roots=%d baseParts=%d meshParts=%d scripts=%d min=(%.4f, %.4f, %.4f) max=(%.4f, %.4f, %.4f) bounds=(%.4f, %.4f, %.4f) longest=%.4f",
-        path,
-        #roots,
-        baseParts,
-        meshParts,
-        scripts,
-        minX,
-        minY,
-        minZ,
-        maxX,
-        maxY,
-        maxZ,
-        boundsSize.X,
-        boundsSize.Y,
-        boundsSize.Z,
-        math.max(boundsSize.X, boundsSize.Y, boundsSize.Z)
-    ))
+    print(
+        string.format(
+            "%s roots=%d baseParts=%d meshParts=%d scripts=%d min=(%.4f, %.4f, %.4f) max=(%.4f, %.4f, %.4f) bounds=(%.4f, %.4f, %.4f) longest=%.4f",
+            path,
+            #roots,
+            baseParts,
+            meshParts,
+            scripts,
+            minX,
+            minY,
+            minZ,
+            maxX,
+            maxY,
+            maxZ,
+            boundsSize.X,
+            boundsSize.Y,
+            boundsSize.Z,
+            math.max(boundsSize.X, boundsSize.Y, boundsSize.Z)
+        )
+    )
     local names = {}
     for className in classCounts do
         table.insert(names, className)
@@ -80,5 +86,32 @@ for _, path in paths do
     table.sort(names)
     for _, className in names do
         print(string.format("  %s=%d", className, classCounts[className]))
+    end
+    if showParts then
+        local function printParts(instance: Instance)
+            if instance:IsA("BasePart") then
+                local position = instance.CFrame.Position
+                local size = instance.Size
+                print(
+                    string.format(
+                        "  part=%s class=%s position=(%.3f, %.3f, %.3f) size=(%.3f, %.3f, %.3f)",
+                        instance.Name,
+                        instance.ClassName,
+                        position.X,
+                        position.Y,
+                        position.Z,
+                        size.X,
+                        size.Y,
+                        size.Z
+                    )
+                )
+            end
+            for _, child in instance:GetChildren() do
+                printParts(child)
+            end
+        end
+        for _, root in roots do
+            printParts(root)
+        end
     end
 end

@@ -106,6 +106,32 @@ local function groundPatch(
     return patch
 end
 
+local function queueItemAsset(
+    placements: { any },
+    target: BasePart,
+    assetId: string,
+    scale: number,
+    seed: number,
+    yaw: number?,
+    bottomY: number?
+)
+    table.insert(placements, {
+        assetId = assetId,
+        fallbackKind = "asset_replacement",
+        position = Vector3.new(
+            target.Position.X,
+            bottomY or (target.Position.Y - target.Size.Y * 0.5),
+            target.Position.Z
+        ),
+        scale = scale,
+        yaw = yaw or 0,
+        seed = seed,
+        swayTag = nil,
+        parent = target.Parent,
+        fallbackInstance = target,
+    })
+end
+
 local function fernCluster(
     parent: Instance,
     center: Vector3,
@@ -1569,6 +1595,7 @@ local function buildPointOfInterest(
     billboard(memory, string.upper(definition.displayName), FOXFIRE)
     objectIcon(memory, "memory", FOXFIRE)
     landmark:SetAttribute("PhysicalPartCount", physicalParts)
+    return memory
 end
 
 local function buildEventSocket(
@@ -2580,6 +2607,24 @@ function BramblewakeBuilder.build(
                 fireSource = fireSource,
                 rootHeart = rootHeart,
             }
+            queueItemAsset(
+                meshPlacements,
+                fireSource,
+                "mesh_creator_kerosene_lantern_a",
+                1.15,
+                5200 + placement.index,
+                math.rad(12),
+                fireSource.Position.Y - 2.1
+            )
+            queueItemAsset(
+                meshPlacements,
+                rootHeart,
+                "mesh_creator_predatory_flower_a",
+                1.05,
+                5300 + placement.index,
+                math.rad(-16),
+                rootHeart.Position.Y - 2.35
+            )
         end
         if definition.role == "extraction" then
             local target = module:FindFirstChild("WayhomeLight")
@@ -2595,11 +2640,20 @@ function BramblewakeBuilder.build(
         end
 
         if placement.poiId ~= nil then
-            buildPointOfInterest(
+            local poiMemory = buildPointOfInterest(
                 module,
                 center,
                 generator.pointOfInterestDefinition(placement.poiId),
                 runtimeIds
+            )
+            queueItemAsset(
+                meshPlacements,
+                poiMemory,
+                "mesh_creator_kerosene_lantern_a",
+                0.95,
+                5400 + placement.index,
+                math.rad((placement.index % 3 - 1) * 9),
+                poiMemory.Position.Y - 1.35
             )
         elseif placement.eventId ~= nil then
             local eventResult = buildEventSocket(
@@ -2609,8 +2663,44 @@ function BramblewakeBuilder.build(
                 runtimeIds
             )
             eventSockets[placement.eventId] = eventResult.socket
-            for _, interaction in eventResult.interactions do
+            for interactionIndex, interaction in eventResult.interactions do
                 table.insert(eventInteractions, interaction)
+                local target = interaction.target
+                local targetName = target.Name
+                local assetId = "mesh_creator_crate_a"
+                local scale = 0.72
+                if string.find(targetName, "Foxlight", 1, true) ~= nil then
+                    assetId = "mesh_creator_blossom_spirit_a"
+                    scale = 0.72
+                elseif string.find(targetName, "RootKnot", 1, true) ~= nil then
+                    assetId = "mesh_creator_stump_a"
+                    scale = 0.58
+                elseif string.find(targetName, "PollenScreen", 1, true) ~= nil then
+                    assetId = "mesh_creator_barricade_a"
+                    scale = 0.6
+                elseif string.find(targetName, "HomesteadStore", 1, true) ~= nil then
+                    assetId = if string.find(targetName, "fill_water", 1, true) ~= nil
+                        then "mesh_creator_barrel_a"
+                        else "mesh_creator_crate_a"
+                    scale = 0.78
+                elseif string.find(targetName, "WardenSign", 1, true) ~= nil then
+                    assetId = "mesh_creator_forest_sign_a"
+                    scale = 0.72
+                elseif string.find(targetName, "WetFirebreak", 1, true) ~= nil then
+                    assetId = "mesh_creator_road_stones_a"
+                    scale = 0.28
+                elseif string.find(targetName, "HedgeLatch", 1, true) ~= nil then
+                    assetId = "mesh_creator_stump_a"
+                    scale = 0.48
+                end
+                queueItemAsset(
+                    meshPlacements,
+                    target,
+                    assetId,
+                    scale,
+                    6000 + placement.index * 10 + interactionIndex,
+                    math.rad((interactionIndex - 2) * 11)
+                )
             end
         end
 
@@ -2634,6 +2724,66 @@ function BramblewakeBuilder.build(
         runtimeIds
     )
     local blackout = buildBlackoutLayer(expedition, centers, bossArena.center, runtimeIds)
+    queueItemAsset(
+        meshPlacements,
+        bossArena.seal,
+        "mesh_creator_memory_reliquary_a",
+        1.12,
+        7101,
+        math.rad(180),
+        bossArena.center.Y + 0.28
+    )
+    for nodeIndex, node in bossArena.nodes do
+        queueItemAsset(
+            meshPlacements,
+            node,
+            "mesh_creator_hollow_rootling_a",
+            0.78,
+            7200 + string.len(nodeIndex),
+            math.rad(string.len(nodeIndex) * 7),
+            node.Position.Y - 2.6
+        )
+    end
+    queueItemAsset(
+        meshPlacements,
+        blackout.fireSource,
+        "mesh_creator_kerosene_lantern_a",
+        1.25,
+        7301,
+        math.rad(-9),
+        blackout.fireSource.Position.Y - 2.2
+    )
+    local relaySeed = 0
+    for _, node in blackout.relayNodes do
+        relaySeed += 1
+        queueItemAsset(
+            meshPlacements,
+            node,
+            "mesh_creator_hollow_rootling_a",
+            0.86,
+            7310 + relaySeed,
+            math.rad((relaySeed - 2) * 13),
+            node.Position.Y - 2.7
+        )
+    end
+    local decisionAssets = {
+        restore_farmland = "mesh_creator_wheat_cluster_a",
+        wild_regrowth = "mesh_creator_predatory_flower_a",
+        shared_agroforest = "mesh_creator_stump_a",
+    }
+    local decisionSeed = 0
+    for decisionId, target in blackout.decisions do
+        decisionSeed += 1
+        queueItemAsset(
+            meshPlacements,
+            target,
+            decisionAssets[decisionId],
+            1.05,
+            7400 + decisionSeed,
+            math.rad((decisionSeed - 2) * 15),
+            target.Position.Y - 2.2
+        )
+    end
     buildBackdrop(expedition, centers)
 
     local generatedParts = 0

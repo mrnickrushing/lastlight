@@ -467,6 +467,11 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
             else self._worldService:lanternPosition()
     )
     model.Parent = workspace
+    task.spawn(function()
+        if model.Parent ~= nil then
+            self._worldService:placeEnemyVisual(model, definition.modelKey)
+        end
+    end)
     local spawnedAt = workspace:GetServerTimeNow()
     local basePosition = model:GetPivot().Position
     local themedHealth =

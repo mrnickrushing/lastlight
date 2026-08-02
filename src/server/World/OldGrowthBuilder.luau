@@ -152,6 +152,18 @@ function OldGrowthBuilder.setState(model: Model, health: number, shielded: boole
             else Color3.fromRGB(255, 187, 76)
         highlight.FillTransparency = if marked then 0.62 else 0.82
     end
+    if model:GetAttribute("EnemyVisualReady") == true then
+        local authored = model:FindFirstChild("AuthoredEnemyVisual")
+        for _, descendant in model:GetDescendants() do
+            if
+                descendant:IsA("BasePart")
+                and (authored == nil or not descendant:IsDescendantOf(authored))
+            then
+                descendant.Transparency = 1
+                descendant.CastShadow = false
+            end
+        end
+    end
 end
 
 return table.freeze(OldGrowthBuilder)

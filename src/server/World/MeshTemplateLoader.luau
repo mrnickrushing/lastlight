@@ -51,6 +51,9 @@ local function sanitize(model: Model): (number, number)
             or descendant:IsA("JointInstance")
             or descendant:IsA("Humanoid")
             or descendant:IsA("AnimationController")
+            or descendant:IsA("Sound")
+            or descendant:IsA("PostEffect")
+            or descendant:IsA("BodyMover")
         then
             descendant:Destroy()
         end

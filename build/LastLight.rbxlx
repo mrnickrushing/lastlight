@@ -1225,7 +1225,7 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.45.0",
+    BuildVersion = "0.46.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -11565,6 +11565,11 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
             else self._worldService:lanternPosition()
     )
     model.Parent = workspace
+    task.spawn(function()
+        if model.Parent ~= nil then
+            self._worldService:placeEnemyVisual(model, definition.modelKey)
+        end
+    end)
     local spawnedAt = workspace:GetServerTimeNow()
     local basePosition = model:GetPivot().Position
     local themedHealth =
@@ -13748,6 +13753,11 @@ function OldGrowthService._spawnModel(self: OldGrowthService, target: Player)
     local model = self._builder.build(self._arena.center, lookAt, self._encounter.MaxHealth)
     model.Parent =
         assert(self._arena.fireSource.Parent, "Old Growth arena lost its streamed module")
+    task.spawn(function()
+        if model.Parent ~= nil then
+            self._worldService:placeEnemyVisual(model, "old_growth")
+        end
+    end)
     self._model = model
     self._builder.setState(model, self._state.health, false, false)
 end
@@ -19483,6 +19493,11 @@ function WardenStagService._spawnModel(self: WardenStagService, target: Player)
         else targetRoot.Position
     local model = self._builder.build(self._arena.center, lookAt, self._encounter.MaxHealth)
     model.Parent = self._arena.model
+    task.spawn(function()
+        if model.Parent ~= nil then
+            self._worldService:placeEnemyVisual(model, "warden_stag")
+        end
+    end)
     self._model = model
     self:_syncModel()
 end
@@ -20913,8 +20928,11 @@ local function buildEmberhollowSanctuary(
                 parent = cabinFolder,
                 fallbackInstance = cotFallback,
             })
+            local supplyFallback = Instance.new("Model")
+            supplyFallback.Name = "MaraSupplyShelfFallback"
+            supplyFallback.Parent = cabinFolder
             local tableTop = part(
-                cabinFolder,
+                supplyFallback,
                 "MaraWorkTable",
                 Vector3.new(4.2, 0.45, 2.5),
                 cabinCFrame(4.5, 2.15, -3.2),
@@ -20927,7 +20945,7 @@ local function buildEmberhollowSanctuary(
             for legX = -1, 1, 2 do
                 for legZ = -1, 1, 2 do
                     local leg = part(
-                        cabinFolder,
+                        supplyFallback,
                         "MaraWorkTableLeg",
                         Vector3.new(0.3, 1.7, 0.3),
                         cabinCFrame(4.5 + legX * 1.75, 1.28, -3.2 + legZ * 0.95),
@@ -20940,7 +20958,7 @@ local function buildEmberhollowSanctuary(
             end
             for jarIndex = -1, 1 do
                 local jar = part(
-                    cabinFolder,
+                    supplyFallback,
                     "MemoryJar",
                     -- A Roblox Cylinder extends along its LOCAL X axis, so the
                     -- first component is the jar's height and the other two its
@@ -20956,7 +20974,7 @@ local function buildEmberhollowSanctuary(
                 jar.Transparency = 0.22
                 jar.CanQuery = false
                 local lid = part(
-                    cabinFolder,
+                    supplyFallback,
                     "MemoryJarLid",
                     Vector3.new(0.16, 0.76, 0.76),
                     cabinCFrame(4.5 + jarIndex * 1.1, 3.46, -3.2)
@@ -20968,6 +20986,17 @@ local function buildEmberhollowSanctuary(
                 lid.Shape = Enum.PartType.Cylinder
                 lid.CanQuery = false
             end
+            table.insert(meshPlacements, {
+                assetId = "mesh_creator_potion_shelf_a",
+                fallbackKind = "asset_replacement",
+                position = cabinCFrame(4.5, 0.62, -3.2).Position,
+                scale = 1,
+                yaw = yaw + math.rad(90),
+                seed = 9851,
+                swayTag = nil,
+                parent = cabinFolder,
+                fallbackInstance = supplyFallback,
+            })
         else
             for bedIndex = -1, 1, 2 do
                 local bedrollFallback = Instance.new("Model")
@@ -21001,8 +21030,11 @@ local function buildEmberhollowSanctuary(
                     fallbackInstance = bedrollFallback,
                 })
             end
+            local trunkFallback = Instance.new("Model")
+            trunkFallback.Name = "WayfarerTrunkFallback"
+            trunkFallback.Parent = cabinFolder
             local trunk = part(
-                cabinFolder,
+                trunkFallback,
                 "WayfarerTrunk",
                 Vector3.new(4.4, 2.3, 2.5),
                 cabinCFrame(5.2, 1.2, -3.6),
@@ -21011,6 +21043,17 @@ local function buildEmberhollowSanctuary(
                 false
             )
             trunk.CanQuery = false
+            table.insert(meshPlacements, {
+                assetId = "mesh_creator_crate_a",
+                fallbackKind = "asset_replacement",
+                position = cabinCFrame(5.2, 0.62, -3.6).Position,
+                scale = 1,
+                yaw = yaw + math.rad(12),
+                seed = 9861,
+                swayTag = nil,
+                parent = cabinFolder,
+                fallbackInstance = trunkFallback,
+            })
         end
 
         local rug = part(
@@ -22833,11 +22876,25 @@ local function hideProceduralPlaceholder(placeholder: Instance)
             or instance:IsA("Sparkles")
             or instance:IsA("Trail")
             or instance:IsA("Beam")
+            or instance:IsA("LayerCollector")
         then
             instance.Enabled = false
         end
     end
     placeholder:SetAttribute("ReplacedByAuthoredMesh", true)
+end
+
+local function keepReplacedAnchorHidden(target: BasePart)
+    if target:GetAttribute("ReplacedByAuthoredMesh") ~= true then
+        return
+    end
+    target.Transparency = 1
+    target.CastShadow = false
+    for _, child in target:GetChildren() do
+        if child:IsA("LayerCollector") then
+            child.Enabled = false
+        end
+    end
 end
 
 -- Authored art is optional streaming dressing. Loading begins only after the
@@ -22900,6 +22957,108 @@ function WorldService._placeAuthoredMeshes(
             placements = #queued,
         })
     end)
+end
+
+-- Dynamic enemies keep their original primitive geometry as an invisible,
+-- authoritative combat volume. Only the visible shell is replaced, so a
+-- cosmetic Creator Store model can never change reach, navigation, or hits.
+function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKey: string): boolean
+    local visualProfiles = {
+        rootling = {
+            assetId = "mesh_creator_hollow_rootling_a",
+            groundOffset = 2,
+            yaw = math.rad(8),
+            profile = Vector3.new(0.9, 1.06, 0.84),
+        },
+        briarback = {
+            assetId = "mesh_creator_earth_golem_a",
+            groundOffset = 2.4,
+            yaw = math.rad(-7),
+            profile = Vector3.new(1.08, 0.9, 1.12),
+        },
+        pollen_wisp = {
+            assetId = "mesh_creator_blossom_spirit_a",
+            groundOffset = 1.4,
+            yaw = math.rad(14),
+            profile = Vector3.new(0.88, 1.12, 0.92),
+            scale = 1.4,
+        },
+        hollow_crow = {
+            assetId = "mesh_creator_raven_a",
+            groundOffset = 1.1,
+            yaw = math.rad(180),
+            profile = Vector3.new(1.16, 0.9, 0.94),
+            scale = 2,
+        },
+        snapvine = {
+            assetId = "mesh_creator_predatory_flower_a",
+            groundOffset = 2,
+            yaw = math.rad(-11),
+            profile = Vector3.new(0.92, 1.08, 1.04),
+            scale = 1.25,
+        },
+        bark_ram = {
+            assetId = "mesh_creator_bark_ram_a",
+            groundOffset = 2.5,
+            yaw = math.rad(180),
+            profile = Vector3.new(1.12, 0.88, 1.05),
+            scale = 1.35,
+        },
+        old_growth = {
+            assetId = "mesh_creator_old_growth_a",
+            groundOffset = 9,
+            yaw = math.rad(180),
+            profile = Vector3.new(0.94, 1.08, 0.9),
+        },
+        warden_stag = {
+            assetId = "mesh_creator_wood_ibex_a",
+            groundOffset = 10,
+            yaw = math.rad(180),
+            profile = Vector3.new(1.08, 1.14, 0.94),
+            scale = 3,
+        },
+    }
+    local profile = visualProfiles[modelKey]
+    local core = model.PrimaryPart
+    if profile == nil or core == nil or model.Parent == nil then
+        return false
+    end
+
+    local fallbackParts = {}
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("BasePart") then
+            table.insert(fallbackParts, descendant)
+        end
+    end
+    local bottomPosition = core.Position - Vector3.new(0, profile.groundOffset, 0)
+    local at = CFrame.new(bottomPosition) * core.CFrame.Rotation * CFrame.Angles(0, profile.yaw, 0)
+    local placed, result = pcall(
+        self._meshTemplateLoader.place,
+        self._meshTemplateLoader,
+        profile.assetId,
+        model,
+        at,
+        profile.scale or 1,
+        profile.profile
+    )
+    local authored = if placed then result else nil
+    if authored == nil then
+        self._logger:info("enemy_asset_visual_failed", {
+            assetId = profile.assetId,
+            enemy = modelKey,
+            error = if placed then "asset_unavailable" else tostring(result),
+        })
+        return false
+    end
+    authored.Name = "AuthoredEnemyVisual"
+    for _, fallbackPart in fallbackParts do
+        fallbackPart.Transparency = 1
+        fallbackPart.CastShadow = false
+        fallbackPart:SetAttribute("AuthoritativeEnemyHitbox", fallbackPart == core)
+    end
+    model:SetAttribute("EnemyVisualAssetId", profile.assetId)
+    model:SetAttribute("EnemyVisualReady", true)
+    return true
 end
 
 function WorldService._buildMeshDressing(self: WorldService)
@@ -23978,7 +24137,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         interactables,
         "BramblewakeBeacon",
         Vector3.new(3.4, 5.4, 3.4),
-        CFrame.new(0, 6.2, -148),
+        CFrame.new(0, 3.9, -148),
         Color3.fromRGB(104, 187, 166),
         Enum.Material.Glass,
         false
@@ -23987,14 +24146,15 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     beacon.Transparency = 1
     beacon.CanQuery = false
     self._beacon = beacon
-    -- The beacon fades in from fully transparent, so before this it revealed
-    -- as a bare glowing sphere hanging in the middle of the gateway. The orb
-    -- stays the interaction anchor -- name, prompt, and reveal tween are
-    -- untouched -- but it now hangs in a physical cradle slung under the gate
-    -- crown, so what lights up reads as a memory lamp mounted in the arch
-    -- rather than an orb floating in mid-air.
+    -- The gameplay beacon remains an invisible interaction anchor. The visible
+    -- object is a thumbnail-reviewed crystal reliquary placed through
+    -- MeshTemplateLoader below; this fallback only appears if the reviewed
+    -- model cannot load.
+    local beaconFallback = Instance.new("Model")
+    beaconFallback.Name = "MemoryReliquaryFallback"
+    beaconFallback.Parent = interactables
     local beaconCradle = part(
-        interactables,
+        beaconFallback,
         "BeaconCradleMount",
         Vector3.new(0.34, 3.6, 0.34),
         CFrame.new(0, 10.4, -148),
@@ -24006,7 +24166,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     for armIndex = 0, 3 do
         local armAngle = (armIndex / 4) * math.pi * 2
         local arm = part(
-            interactables,
+            beaconFallback,
             "BeaconCradleArm",
             Vector3.new(0.26, 2.9, 0.26),
             CFrame.new(0, 8.05, -148)
@@ -24020,7 +24180,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         arm.CanQuery = false
     end
     local beaconCollar = part(
-        interactables,
+        beaconFallback,
         "BeaconCradleCollar",
         Vector3.new(0.3, 2.9, 2.9),
         CFrame.new(0, 8.6, -148) * CFrame.Angles(0, 0, math.rad(90)),
@@ -24030,6 +24190,40 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     )
     beaconCollar.Shape = Enum.PartType.Cylinder
     beaconCollar.CanQuery = false
+    local fallbackLens = part(
+        beaconFallback,
+        "BeaconFallbackLens",
+        Vector3.new(2.2, 2.6, 2.6),
+        CFrame.new(0, 6.25, -148) * CFrame.Angles(0, 0, math.rad(90)),
+        FOXFIRE,
+        Enum.Material.Glass,
+        false
+    )
+    fallbackLens.Shape = Enum.PartType.Cylinder
+    fallbackLens.Transparency = 0.22
+    fallbackLens.CanQuery = false
+    local fallbackFlame = part(
+        beaconFallback,
+        "BeaconFallbackFlame",
+        Vector3.new(0.72, 1.55, 0.64),
+        CFrame.new(0, 6.18, -148) * CFrame.Angles(0, math.rad(18), 0),
+        FOXFIRE,
+        Enum.Material.Neon,
+        false
+    )
+    fallbackFlame.Shape = Enum.PartType.Wedge
+    fallbackFlame.CanQuery = false
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_memory_reliquary_a",
+        fallbackKind = "asset_replacement",
+        position = Vector3.new(0, 0.25, -148),
+        scale = 1,
+        yaw = math.pi,
+        seed = 9911,
+        swayTag = nil,
+        parent = interactables,
+        fallbackInstance = beaconFallback,
+    })
     self:_registerInteraction(
         beacon,
         self._runtimeIds.InteractionIds.Beacon,
@@ -25091,12 +25285,10 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
     if beacon == nil then
         return
     end
-    local becomingVisible = visible and beacon.Transparency >= 0.95
-    TweenService:Create(
-        beacon,
-        TweenInfo.new(0.7, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        { Transparency = if visible then 0.16 else 1 }
-    ):Play()
+    local becomingVisible = visible and beacon.CanQuery == false
+    -- Never reveal the procedural interaction sphere. Progression is conveyed
+    -- by the reliquary light and prompt, not a second orb or a floating label.
+    beacon.Transparency = 1
     beacon.CanQuery = visible
     local prompt = self._interactions[self._runtimeIds.InteractionIds.Beacon]
     if prompt ~= nil then
@@ -25112,8 +25304,9 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
         light.Parent = beacon
     end
     light.Enabled = visible
-    if visible and beacon:FindFirstChild("WorldLabel") == nil then
-        addBillboard(beacon, "THE BRAMBLEWAKE REMEMBERS", CREAM)
+    local oldLabel = beacon:FindFirstChild("WorldLabel")
+    if oldLabel ~= nil then
+        oldLabel:Destroy()
     end
 
     local world = self._world
@@ -25136,7 +25329,7 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
             assert(beacon.Parent, "beacon parent is missing"),
             "DawnRevealPulse",
             Vector3.new(0.16, 5, 5),
-            CFrame.new(beacon.Position - Vector3.new(0, 5.95, 0))
+            CFrame.new(beacon.Position.X, 0.24, beacon.Position.Z)
                 * CFrame.Angles(0, 0, math.rad(90)),
             FOXFIRE,
             Enum.Material.Neon,
@@ -27769,6 +27962,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
     arena.fireSource.Color = if relay then AMBER else Color3.fromRGB(94, 83, 64)
     arena.fireSource.Material = if relay then Enum.Material.Neon else Enum.Material.SmoothPlastic
     arena.fireSource.Transparency = if relay then 0.1 else 0.58
+    keepReplacedAnchorHidden(arena.fireSource)
     local firePrompt = self._interactions[self._runtimeIds.InteractionIds.BlackoutFireSource]
     if firePrompt ~= nil then
         firePrompt.Enabled = relay
@@ -27784,6 +27978,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
             then Enum.Material.Neon
             else Enum.Material.SmoothPlastic
         target.Transparency = if delivered then 0.28 elseif relay then 0.12 else 0.58
+        keepReplacedAnchorHidden(target)
         local prompt = target:FindFirstChildOfClass("ProximityPrompt")
         if prompt ~= nil then
             prompt.Enabled = relay
@@ -27850,6 +28045,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
                 target.Transparency = 0.78
             end
         end
+        keepReplacedAnchorHidden(target)
     end
 
     if world ~= nil then
@@ -27919,6 +28115,8 @@ function WorldService.setOldGrowthPresentation(self: WorldService, status: strin
         then Enum.Material.Neon
         else Enum.Material.SmoothPlastic
     arena.rootHeart.Transparency = if shielded or complete then 0.14 else 0.58
+    keepReplacedAnchorHidden(arena.fireSource)
+    keepReplacedAnchorHidden(arena.rootHeart)
 
     local firePrompt = self._interactions[self._runtimeIds.InteractionIds.OldGrowthFireSource]
     local heartPrompt = self._interactions[self._runtimeIds.InteractionIds.OldGrowthHeart]
@@ -27959,6 +28157,7 @@ function WorldService.setWardenStagPresentation(self: WorldService, state: any)
         then Enum.Material.Neon
         else Enum.Material.SmoothPlastic
     arena.seal.Transparency = if enabled then 0.24 else 0.72
+    keepReplacedAnchorHidden(arena.seal)
 
     for nodeId, target in arena.nodes do
         local cleansed = cleansedNodes[nodeId] == true
@@ -27970,6 +28169,7 @@ function WorldService.setWardenStagPresentation(self: WorldService, state: any)
             then Enum.Material.Neon
             else Enum.Material.SmoothPlastic
         target.Transparency = if cleansed then 0.46 elseif cleansing then 0.12 else 0.56
+        keepReplacedAnchorHidden(target)
         local interactionId = target:GetAttribute("InteractionId")
         local prompt = if type(interactionId) == "string"
             then self._interactions[interactionId]
@@ -28040,6 +28240,7 @@ function WorldService.setExpeditionEventState(self: WorldService, eventId: strin
             target.Material = Enum.Material.SmoothPlastic
             target.Transparency = 0.5
         end
+        keepReplacedAnchorHidden(target)
         local prompt = target:FindFirstChildOfClass("ProximityPrompt")
         if prompt ~= nil then
             prompt.Enabled = eventCanProgress and not complete
@@ -29101,6 +29302,32 @@ local function groundPatch(
     patch.Transparency = 0.07
     patch.CanQuery = false
     return patch
+end
+
+local function queueItemAsset(
+    placements: { any },
+    target: BasePart,
+    assetId: string,
+    scale: number,
+    seed: number,
+    yaw: number?,
+    bottomY: number?
+)
+    table.insert(placements, {
+        assetId = assetId,
+        fallbackKind = "asset_replacement",
+        position = Vector3.new(
+            target.Position.X,
+            bottomY or (target.Position.Y - target.Size.Y * 0.5),
+            target.Position.Z
+        ),
+        scale = scale,
+        yaw = yaw or 0,
+        seed = seed,
+        swayTag = nil,
+        parent = target.Parent,
+        fallbackInstance = target,
+    })
 end
 
 local function fernCluster(
@@ -30566,6 +30793,7 @@ local function buildPointOfInterest(
     billboard(memory, string.upper(definition.displayName), FOXFIRE)
     objectIcon(memory, "memory", FOXFIRE)
     landmark:SetAttribute("PhysicalPartCount", physicalParts)
+    return memory
 end
 
 local function buildEventSocket(
@@ -31577,6 +31805,24 @@ function BramblewakeBuilder.build(
                 fireSource = fireSource,
                 rootHeart = rootHeart,
             }
+            queueItemAsset(
+                meshPlacements,
+                fireSource,
+                "mesh_creator_kerosene_lantern_a",
+                1.15,
+                5200 + placement.index,
+                math.rad(12),
+                fireSource.Position.Y - 2.1
+            )
+            queueItemAsset(
+                meshPlacements,
+                rootHeart,
+                "mesh_creator_predatory_flower_a",
+                1.05,
+                5300 + placement.index,
+                math.rad(-16),
+                rootHeart.Position.Y - 2.35
+            )
         end
         if definition.role == "extraction" then
             local target = module:FindFirstChild("WayhomeLight")
@@ -31592,11 +31838,20 @@ function BramblewakeBuilder.build(
         end
 
         if placement.poiId ~= nil then
-            buildPointOfInterest(
+            local poiMemory = buildPointOfInterest(
                 module,
                 center,
                 generator.pointOfInterestDefinition(placement.poiId),
                 runtimeIds
+            )
+            queueItemAsset(
+                meshPlacements,
+                poiMemory,
+                "mesh_creator_kerosene_lantern_a",
+                0.95,
+                5400 + placement.index,
+                math.rad((placement.index % 3 - 1) * 9),
+                poiMemory.Position.Y - 1.35
             )
         elseif placement.eventId ~= nil then
             local eventResult = buildEventSocket(
@@ -31606,8 +31861,44 @@ function BramblewakeBuilder.build(
                 runtimeIds
             )
             eventSockets[placement.eventId] = eventResult.socket
-            for _, interaction in eventResult.interactions do
+            for interactionIndex, interaction in eventResult.interactions do
                 table.insert(eventInteractions, interaction)
+                local target = interaction.target
+                local targetName = target.Name
+                local assetId = "mesh_creator_crate_a"
+                local scale = 0.72
+                if string.find(targetName, "Foxlight", 1, true) ~= nil then
+                    assetId = "mesh_creator_blossom_spirit_a"
+                    scale = 0.72
+                elseif string.find(targetName, "RootKnot", 1, true) ~= nil then
+                    assetId = "mesh_creator_stump_a"
+                    scale = 0.58
+                elseif string.find(targetName, "PollenScreen", 1, true) ~= nil then
+                    assetId = "mesh_creator_barricade_a"
+                    scale = 0.6
+                elseif string.find(targetName, "HomesteadStore", 1, true) ~= nil then
+                    assetId = if string.find(targetName, "fill_water", 1, true) ~= nil
+                        then "mesh_creator_barrel_a"
+                        else "mesh_creator_crate_a"
+                    scale = 0.78
+                elseif string.find(targetName, "WardenSign", 1, true) ~= nil then
+                    assetId = "mesh_creator_forest_sign_a"
+                    scale = 0.72
+                elseif string.find(targetName, "WetFirebreak", 1, true) ~= nil then
+                    assetId = "mesh_creator_road_stones_a"
+                    scale = 0.28
+                elseif string.find(targetName, "HedgeLatch", 1, true) ~= nil then
+                    assetId = "mesh_creator_stump_a"
+                    scale = 0.48
+                end
+                queueItemAsset(
+                    meshPlacements,
+                    target,
+                    assetId,
+                    scale,
+                    6000 + placement.index * 10 + interactionIndex,
+                    math.rad((interactionIndex - 2) * 11)
+                )
             end
         end
 
@@ -31631,6 +31922,66 @@ function BramblewakeBuilder.build(
         runtimeIds
     )
     local blackout = buildBlackoutLayer(expedition, centers, bossArena.center, runtimeIds)
+    queueItemAsset(
+        meshPlacements,
+        bossArena.seal,
+        "mesh_creator_memory_reliquary_a",
+        1.12,
+        7101,
+        math.rad(180),
+        bossArena.center.Y + 0.28
+    )
+    for nodeIndex, node in bossArena.nodes do
+        queueItemAsset(
+            meshPlacements,
+            node,
+            "mesh_creator_hollow_rootling_a",
+            0.78,
+            7200 + string.len(nodeIndex),
+            math.rad(string.len(nodeIndex) * 7),
+            node.Position.Y - 2.6
+        )
+    end
+    queueItemAsset(
+        meshPlacements,
+        blackout.fireSource,
+        "mesh_creator_kerosene_lantern_a",
+        1.25,
+        7301,
+        math.rad(-9),
+        blackout.fireSource.Position.Y - 2.2
+    )
+    local relaySeed = 0
+    for _, node in blackout.relayNodes do
+        relaySeed += 1
+        queueItemAsset(
+            meshPlacements,
+            node,
+            "mesh_creator_hollow_rootling_a",
+            0.86,
+            7310 + relaySeed,
+            math.rad((relaySeed - 2) * 13),
+            node.Position.Y - 2.7
+        )
+    end
+    local decisionAssets = {
+        restore_farmland = "mesh_creator_wheat_cluster_a",
+        wild_regrowth = "mesh_creator_predatory_flower_a",
+        shared_agroforest = "mesh_creator_stump_a",
+    }
+    local decisionSeed = 0
+    for decisionId, target in blackout.decisions do
+        decisionSeed += 1
+        queueItemAsset(
+            meshPlacements,
+            target,
+            decisionAssets[decisionId],
+            1.05,
+            7400 + decisionSeed,
+            math.rad((decisionSeed - 2) * 15),
+            target.Position.Y - 2.2
+        )
+    end
     buildBackdrop(expedition, centers)
 
     local generatedParts = 0
@@ -33117,6 +33468,116 @@ local ENTRIES: { Entry } = {
         creatorStore = true,
     },
     {
+        id = "mesh_creator_hollow_rootling_a",
+        assetId = 17352052762,
+        targetLongestDimension = 5.8,
+        maxTriangles = 5000,
+        maxMaterialSlots = 2,
+        placementBand = "curated_enemy",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
+        id = "mesh_creator_earth_golem_a",
+        assetId = 103446417026847,
+        targetLongestDimension = 6.8,
+        maxTriangles = 9000,
+        maxMaterialSlots = 16,
+        placementBand = "curated_enemy",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
+        id = "mesh_creator_blossom_spirit_a",
+        assetId = 117383764863716,
+        targetLongestDimension = 2.8,
+        maxTriangles = 3500,
+        maxMaterialSlots = 1,
+        placementBand = "curated_enemy",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
+        id = "mesh_creator_raven_a",
+        assetId = 3288273307,
+        targetLongestDimension = 3.8,
+        maxTriangles = 2200,
+        maxMaterialSlots = 3,
+        placementBand = "curated_enemy",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
+        id = "mesh_creator_predatory_flower_a",
+        assetId = 11297917863,
+        targetLongestDimension = 4.8,
+        maxTriangles = 4200,
+        maxMaterialSlots = 1,
+        placementBand = "curated_enemy",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
+        id = "mesh_creator_wood_ibex_a",
+        assetId = 15544293525,
+        targetLongestDimension = 5.8,
+        maxTriangles = 5000,
+        maxMaterialSlots = 20,
+        placementBand = "curated_enemy",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
+        id = "mesh_creator_memory_reliquary_a",
+        assetId = 1427556463,
+        targetLongestDimension = 5.4,
+        maxTriangles = 5000,
+        maxMaterialSlots = 21,
+        placementBand = "curated_hero",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
+        id = "mesh_creator_bark_ram_a",
+        assetId = 128696568342856,
+        targetLongestDimension = 6.2,
+        maxTriangles = 9000,
+        maxMaterialSlots = 17,
+        placementBand = "curated_enemy",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
+        id = "mesh_creator_old_growth_a",
+        assetId = 119847195540502,
+        targetLongestDimension = 20,
+        maxTriangles = 6500,
+        maxMaterialSlots = 4,
+        placementBand = "curated_hero",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
+        id = "mesh_creator_potion_shelf_a",
+        assetId = 107193693143362,
+        targetLongestDimension = 5.4,
+        maxTriangles = 3200,
+        maxMaterialSlots = 19,
+        placementBand = "curated_core",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
         id = "mesh_creator_crate_a",
         assetId = 6332066686,
         targetLongestDimension = 4,
@@ -33330,6 +33791,9 @@ local function sanitize(model: Model): (number, number)
             or descendant:IsA("JointInstance")
             or descendant:IsA("Humanoid")
             or descendant:IsA("AnimationController")
+            or descendant:IsA("Sound")
+            or descendant:IsA("PostEffect")
+            or descendant:IsA("BodyMover")
         then
             descendant:Destroy()
         end
@@ -33683,6 +34147,18 @@ function OldGrowthBuilder.setState(model: Model, health: number, shielded: boole
             elseif marked then Color3.fromRGB(255, 222, 112)
             else Color3.fromRGB(255, 187, 76)
         highlight.FillTransparency = if marked then 0.62 else 0.82
+    end
+    if model:GetAttribute("EnemyVisualReady") == true then
+        local authored = model:FindFirstChild("AuthoredEnemyVisual")
+        for _, descendant in model:GetDescendants() do
+            if
+                descendant:IsA("BasePart")
+                and (authored == nil or not descendant:IsDescendantOf(authored))
+            then
+                descendant.Transparency = 1
+                descendant.CastShadow = false
+            end
+        end
     end
 end
 
@@ -34419,6 +34895,46 @@ function WardenStagBuilder.setState(
                 descendant.Transparency = if brokenAntlers.antler_left then 0.78 else 0
             elseif descendant.Name == "AntlerRight" then
                 descendant.Transparency = if brokenAntlers.antler_right then 0.78 else 0
+            end
+        end
+    end
+    if model:GetAttribute("EnemyVisualReady") == true then
+        local authored = model:FindFirstChild("AuthoredEnemyVisual")
+        local hiddenAuthoredAntlerParts = 0
+        if authored ~= nil and authored:IsA("Model") then
+            local _, authoredBounds = authored:GetBoundingBox()
+            local authoredPivot = authored:GetPivot()
+            for _, descendant in authored:GetDescendants() do
+                if descendant:IsA("BasePart") then
+                    local relativePosition = authoredPivot:PointToObjectSpace(descendant.Position)
+                    local sourceTransparency = descendant:GetAttribute("WardenSourceTransparency")
+                    if type(sourceTransparency) ~= "number" then
+                        sourceTransparency = descendant.Transparency
+                        descendant:SetAttribute("WardenSourceTransparency", sourceTransparency)
+                    end
+                    local upperSilhouette = relativePosition.Y > authoredBounds.Y * 0.5
+                        and descendant.Size.Y
+                            > math.max(descendant.Size.X, descendant.Size.Z) * 1.35
+                    local brokenSide = (brokenAntlers.antler_left and relativePosition.Z < 0)
+                        or (brokenAntlers.antler_right and relativePosition.Z > 0)
+                    if upperSilhouette and brokenSide then
+                        descendant.Transparency = 1
+                        descendant.CastShadow = false
+                        hiddenAuthoredAntlerParts += 1
+                    else
+                        descendant.Transparency = sourceTransparency
+                    end
+                end
+            end
+        end
+        model:SetAttribute("AuthoredBrokenAntlerParts", hiddenAuthoredAntlerParts)
+        for _, descendant in model:GetDescendants() do
+            if
+                descendant:IsA("BasePart")
+                and (authored == nil or not descendant:IsDescendantOf(authored))
+            then
+                descendant.Transparency = 1
+                descendant.CastShadow = false
             end
         end
     end
