@@ -22198,15 +22198,24 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         -- destination so the trail has a readable gradient rather than a flat
         -- dotted line. Semantic, not decorative: they mark the critical route
         -- only, never the side spurs.
-        local guideCount = math.max(2, math.floor(distance / 11))
-        for guide = 0, guideCount do
+        local guideCount = math.max(2, math.floor(distance / 8))
+        -- Half-open [start, finish): the finish of one segment is the start of
+        -- the next, so an inclusive loop stacks two wedges and two PointLights
+        -- on the exact same spot at every bend, with different headings. That
+        -- reads as crossed, z-fighting arrows and a double-bright junction
+        -- rather than one continuous trail.
+        for guide = 0, guideCount - 1 do
             local along = -distance * 0.5 + distance * guide / guideCount
             local progress = (segment - 1 + guide / guideCount) / (#route - 1)
             local wedge = part(
                 geometry,
                 "RouteGuideMarker",
                 Vector3.new(1.5, 0.1, 2.1),
-                roadFrame * CFrame.new(0, 0.94, along) * CFrame.Angles(0, math.pi, 0),
+                -- The route frame sits at Y = 0.42 and the worn road surface
+                -- tops out at 0.91, so this offset puts the wedge's underside
+                -- at 0.89 -- inlaid into the road. At 0.94 it floated a full
+                -- 0.4 studs above the surface and pulsed in mid-air.
+                roadFrame * CFrame.new(0, 0.52, along) * CFrame.Angles(0, math.pi, 0),
                 FOXFIRE,
                 Enum.Material.Neon,
                 false
