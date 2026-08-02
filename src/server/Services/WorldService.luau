@@ -4270,7 +4270,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             tool = "hammer",
             position = TOOL_YARD_CENTER,
             color = AMBER,
-            assetId = "mesh_creator_blacksmith_hammer_a",
+            assetId = "mesh_blacksmith_hammer_a",
             seed = 9896,
         },
         {

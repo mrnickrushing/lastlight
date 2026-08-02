@@ -139,6 +139,17 @@ local ENTRIES: { Entry } = {
         creatorStore = false,
     },
     {
+        id = "mesh_blacksmith_hammer_a",
+        assetId = 80321423425082,
+        targetLongestDimension = 3,
+        maxTriangles = 3500,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
         id = "mesh_heartwood_stump_a",
         assetId = 140476842967550,
         targetLongestDimension = 7,
