@@ -14,6 +14,8 @@ export type Entry = {
     maxMaterialSlots: number,
     placementBand: string,
     pbr: boolean,
+    preserveSourceMaterials: boolean,
+    creatorStore: boolean,
 }
 
 local ENTRIES: { Entry } = {
@@ -25,6 +27,8 @@ local ENTRIES: { Entry } = {
         maxMaterialSlots = 4,
         placementBand = "core_near",
         pbr = false,
+        preserveSourceMaterials = false,
+        creatorStore = false,
     },
     {
         id = "mesh_conifer_hero_b",
@@ -34,6 +38,8 @@ local ENTRIES: { Entry } = {
         maxMaterialSlots = 4,
         placementBand = "core_near",
         pbr = false,
+        preserveSourceMaterials = false,
+        creatorStore = false,
     },
     {
         id = "mesh_broadleaf_hero_a",
@@ -43,6 +49,8 @@ local ENTRIES: { Entry } = {
         maxMaterialSlots = 5,
         placementBand = "core_near_town_edge",
         pbr = false,
+        preserveSourceMaterials = false,
+        creatorStore = false,
     },
     {
         id = "mesh_boulder_cluster_a",
@@ -52,6 +60,8 @@ local ENTRIES: { Entry } = {
         maxMaterialSlots = 3,
         placementBand = "core_near",
         pbr = false,
+        preserveSourceMaterials = false,
+        creatorStore = false,
     },
     {
         id = "mesh_deadfall_a",
@@ -61,6 +71,8 @@ local ENTRIES: { Entry } = {
         maxMaterialSlots = 5,
         placementBand = "core_near",
         pbr = false,
+        preserveSourceMaterials = false,
+        creatorStore = false,
     },
     {
         id = "mesh_root_arch_a",
@@ -70,6 +82,8 @@ local ENTRIES: { Entry } = {
         maxMaterialSlots = 1,
         placementBand = "curated_core",
         pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
     },
     {
         id = "mesh_fern_cluster_a",
@@ -79,6 +93,8 @@ local ENTRIES: { Entry } = {
         maxMaterialSlots = 2,
         placementBand = "core",
         pbr = false,
+        preserveSourceMaterials = false,
+        creatorStore = false,
     },
     {
         id = "mesh_hollow_lantern_shrine_a",
@@ -88,6 +104,8 @@ local ENTRIES: { Entry } = {
         maxMaterialSlots = 7,
         placementBand = "curated_core",
         pbr = false,
+        preserveSourceMaterials = false,
+        creatorStore = false,
     },
     {
         id = "mesh_wayfarer_cabin_a",
@@ -97,6 +115,8 @@ local ENTRIES: { Entry } = {
         maxMaterialSlots = 6,
         placementBand = "retired_visual_failure",
         pbr = false,
+        preserveSourceMaterials = false,
+        creatorStore = false,
     },
     {
         id = "mesh_lantern_post_a",
@@ -106,6 +126,52 @@ local ENTRIES: { Entry } = {
         maxMaterialSlots = 4,
         placementBand = "curated_core",
         pbr = false,
+        preserveSourceMaterials = false,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_creator_kerosene_lantern_a",
+        assetId = 11865884168,
+        targetLongestDimension = 2.2,
+        maxTriangles = 4000,
+        maxMaterialSlots = 3,
+        placementBand = "curated_core",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
+        id = "mesh_creator_first_lantern_a",
+        assetId = 285454336,
+        targetLongestDimension = 4.8,
+        maxTriangles = 3400,
+        maxMaterialSlots = 13,
+        placementBand = "curated_core",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
+        id = "mesh_creator_street_lantern_a",
+        assetId = 8990192177,
+        targetLongestDimension = 9,
+        maxTriangles = 800,
+        maxMaterialSlots = 8,
+        placementBand = "curated_core",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
+        id = "mesh_creator_campfire_a",
+        assetId = 8752362543,
+        targetLongestDimension = 3.2,
+        maxTriangles = 3200,
+        maxMaterialSlots = 24,
+        placementBand = "curated_core",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
     },
     {
         id = "mesh_crooked_farmhouse_a",
@@ -115,6 +181,8 @@ local ENTRIES: { Entry } = {
         maxMaterialSlots = 6,
         placementBand = "curated_expedition",
         pbr = false,
+        preserveSourceMaterials = false,
+        creatorStore = false,
     },
     {
         id = "mesh_foxfire_windmill_tower_a",
@@ -124,6 +192,8 @@ local ENTRIES: { Entry } = {
         maxMaterialSlots = 6,
         placementBand = "curated_expedition",
         pbr = false,
+        preserveSourceMaterials = false,
+        creatorStore = false,
     },
 }
 

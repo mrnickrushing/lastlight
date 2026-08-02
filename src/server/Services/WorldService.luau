@@ -147,7 +147,10 @@ local function authoredPlacementTransform(placement: MeshPlacement): (CFrame, Ve
             random:NextNumber(0.88, 1.12),
             random:NextNumber(0.82, 1.18)
         )
-    elseif placement.assetId == "mesh_lantern_post_a" then
+    elseif
+        placement.assetId == "mesh_lantern_post_a"
+        or placement.assetId == "mesh_creator_street_lantern_a"
+    then
         pitch = random:NextNumber(math.rad(-2.5), math.rad(2.5))
         roll = random:NextNumber(math.rad(-3), math.rad(3))
     end
@@ -199,7 +202,10 @@ local function labelSign(parent: Instance, at: CFrame, text: string)
     WorldSignBuilder.createDirectionSign(parent, "TrailSign", at, text, CREAM)
 end
 
-local function buildEmberhollowSanctuary(parent: Instance): { Instance }
+local function buildEmberhollowSanctuary(
+    parent: Instance,
+    meshPlacements: { MeshPlacement }
+): { Instance }
     local courtyard = Vector3.new(0, 0, -112)
     local courtyardPatch = part(
         parent,
@@ -531,6 +537,9 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
         local fireplace = Instance.new("Model")
         fireplace.Name = "CabinFireplace"
         fireplace.Parent = cabinFolder
+        local hearthFallback = Instance.new("Model")
+        hearthFallback.Name = "CabinHearthFallback"
+        hearthFallback.Parent = fireplace
         local fireplaceParts = {
             { "CabinHearth", 8, 2, 2, -9, -6, 10 },
             { "CabinHearthSide", 1, 7, 1, -12.5, -4.5, 11.5 },
@@ -570,7 +579,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
             false
         )
         referencePart(
-            fireplace,
+            hearthFallback,
             "CabinBurningWood",
             Vector3.new(4, 0.65, 0.7),
             -9,
@@ -581,7 +590,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
             false
         )
         local hearthFire = referencePart(
-            fireplace,
+            hearthFallback,
             "CabinHearthFire",
             Vector3.new(0.75, 1.7, 0.7),
             -9,
@@ -595,7 +604,7 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
         hearthFire.CFrame *= CFrame.Angles(0, math.rad(-18), 0)
         hearthFire.Transparency = 0.08
         local ember = referencePart(
-            fireplace,
+            hearthFallback,
             "CabinHearthEmber",
             Vector3.new(0.48, 1.05, 0.5),
             -8.65,
@@ -614,6 +623,17 @@ local function buildEmberhollowSanctuary(parent: Instance): { Instance }
         hearthLight.Shadows = true
         hearthLight.Parent = hearthFire
         CollectionService:AddTag(hearthFire, "LastLightAmbientLight")
+        table.insert(meshPlacements, {
+            assetId = "mesh_creator_campfire_a",
+            fallbackKind = "placeholder",
+            position = referenceCFrame(-9, -4.6, 12.2).Position,
+            scale = 0.86,
+            yaw = yaw,
+            seed = if name == "MARA'S SHELTER" then 9311 else 9312,
+            swayTag = nil,
+            parent = fireplace,
+            fallbackInstance = hearthFallback,
+        })
 
         local windowLight = Instance.new("PointLight")
         windowLight.Color = accent
@@ -2144,7 +2164,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         local placeholder =
             lantern(geometry, spec.position, spec.scale, _self._runtimeIds.AmbientLightTag)
         table.insert(_self._meshPlacements, {
-            assetId = "mesh_lantern_post_a",
+            assetId = "mesh_creator_street_lantern_a",
             fallbackKind = "placeholder",
             position = spec.position,
             scale = spec.scale,
@@ -2156,7 +2176,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         })
     end
     labelSign(geometry, CFrame.new(7, 3, -14) * CFrame.Angles(0, math.pi, 0), "FOLLOW THE LANTERNS")
-    buildEmberhollowSanctuary(geometry)
+    buildEmberhollowSanctuary(geometry, _self._meshPlacements)
 
     local warningFolder = Instance.new("Folder")
     warningFolder.Name = "DuskTreelineWarnings"
@@ -2363,6 +2383,16 @@ local function hideProceduralPlaceholder(placeholder: Instance)
         if instance:IsA("BasePart") then
             instance.Transparency = 1
             instance.CastShadow = false
+        elseif
+            instance:IsA("Light")
+            or instance:IsA("ParticleEmitter")
+            or instance:IsA("Fire")
+            or instance:IsA("Smoke")
+            or instance:IsA("Sparkles")
+            or instance:IsA("Trail")
+            or instance:IsA("Beam")
+        then
+            instance.Enabled = false
         end
     end
     placeholder:SetAttribute("ReplacedByAuthoredMesh", true)
@@ -2709,8 +2739,11 @@ function WorldService._buildMara(self: WorldService, world: Model)
         Enum.Material.Leather,
         false
     )
+    local handLanternFallback = Instance.new("Model")
+    handLanternFallback.Name = "MaraLanternFallback"
+    handLanternFallback.Parent = model
     local handLantern = part(
-        model,
+        handLanternFallback,
         "MaraLantern",
         Vector3.new(0.82, 1.12, 0.82),
         CFrame.new(-1.2, 1.45, -30),
@@ -2722,7 +2755,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
     for railX = -1, 1, 2 do
         for railZ = -1, 1, 2 do
             part(
-                model,
+                handLanternFallback,
                 "MaraLanternRail",
                 Vector3.new(0.1, 1.42, 0.1),
                 handLantern.CFrame * CFrame.new(railX * 0.48, 0, railZ * 0.48),
@@ -2734,7 +2767,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
     end
     for capY = -1, 1, 2 do
         part(
-            model,
+            handLanternFallback,
             "MaraLanternCap",
             Vector3.new(1.15, 0.18, 1.15),
             handLantern.CFrame * CFrame.new(0, capY * 0.7, 0),
@@ -2744,7 +2777,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
         )
     end
     local handFlame = part(
-        model,
+        handLanternFallback,
         "MaraLanternFlame",
         Vector3.new(0.32, 0.62, 0.28),
         handLantern.CFrame * CFrame.new(0, -0.08, 0) * CFrame.Angles(0, math.rad(18), 0),
@@ -2760,6 +2793,17 @@ function WorldService._buildMara(self: WorldService, world: Model)
     handLight.Shadows = false
     handLight.Parent = handFlame
     CollectionService:AddTag(handFlame, self._runtimeIds.AmbientLightTag)
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_kerosene_lantern_a",
+        fallbackKind = "placeholder",
+        position = Vector3.new(-1.2, 0.35, -30),
+        scale = 1,
+        yaw = math.rad(-8),
+        seed = 9313,
+        swayTag = nil,
+        parent = model,
+        fallbackInstance = handLanternFallback,
+    })
     model.PrimaryPart = root
     model.Parent = world
     model:SetAttribute("MotionKind", "resident")
@@ -3217,10 +3261,13 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             Enum.Material.Slate
         )
     end
+    local firstLanternFallback = Instance.new("Model")
+    firstLanternFallback.Name = "FirstLanternVisualFallback"
+    firstLanternFallback.Parent = interactables
     for sideX = -1, 1, 2 do
         for sideZ = -1, 1, 2 do
             part(
-                interactables,
+                firstLanternFallback,
                 "FirstLanternCagePost",
                 Vector3.new(0.48, 6.2, 0.48),
                 CFrame.new(sideX * 2.35, 5.7, -112 + sideZ * 2.35)
@@ -3234,7 +3281,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     for ringY = 3.1, 8.2, 5.1 do
         for side = -1, 1, 2 do
             part(
-                interactables,
+                firstLanternFallback,
                 "FirstLanternCageBand",
                 Vector3.new(5.2, 0.28, 0.28),
                 CFrame.new(0, ringY, -112 + side * 2.5),
@@ -3243,7 +3290,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 false
             )
             part(
-                interactables,
+                firstLanternFallback,
                 "FirstLanternCageBand",
                 Vector3.new(0.28, 0.28, 5.2),
                 CFrame.new(side * 2.5, ringY, -112),
@@ -3255,7 +3302,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     end
     for side = -1, 1, 2 do
         local frontGlass = part(
-            interactables,
+            firstLanternFallback,
             "FirstLanternGlassPanel",
             Vector3.new(4.35, 4.55, 0.13),
             CFrame.new(0, 5.65, -112 + side * 2.34),
@@ -3265,7 +3312,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         )
         frontGlass.Transparency = 0.64
         local sideGlass = part(
-            interactables,
+            firstLanternFallback,
             "FirstLanternGlassPanel",
             Vector3.new(0.13, 4.55, 4.35),
             CFrame.new(side * 2.34, 5.65, -112),
@@ -3275,7 +3322,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         )
         sideGlass.Transparency = 0.64
         part(
-            interactables,
+            firstLanternFallback,
             "FirstLanternRainHood",
             Vector3.new(5.7, 0.34, 3.5),
             CFrame.new(0, 9.22, -112 + side * 1.35) * CFrame.Angles(math.rad(side * 28), 0, 0),
@@ -3285,7 +3332,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         )
     end
     part(
-        interactables,
+        firstLanternFallback,
         "FirstLanternCrown",
         Vector3.new(0.42, 1.25, 0.42),
         CFrame.new(0, 10.35, -112) * CFrame.Angles(0, 0, math.rad(5)),
@@ -3294,7 +3341,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         false
     )
     local flame = part(
-        interactables,
+        firstLanternFallback,
         "FirstLanternFlame",
         Vector3.new(1.05, 2.45, 0.82),
         CFrame.new(0, 5.65, -112) * CFrame.Angles(0, math.rad(18), 0),
@@ -3311,6 +3358,17 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     light.Parent = flame
     addBillboard(flame, "THE FIRST LANTERN", AMBER, 32)
     self._lantern = flame
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_first_lantern_a",
+        fallbackKind = "placeholder",
+        position = Vector3.new(0, 3, -112),
+        scale = 1.25,
+        yaw = math.rad(8),
+        seed = 9314,
+        swayTag = nil,
+        parent = interactables,
+        fallbackInstance = firstLanternFallback,
+    })
     self:_registerInteraction(
         lanternBase,
         self._runtimeIds.InteractionIds.Lantern,
@@ -3909,7 +3967,7 @@ function WorldService.Init(self: WorldService, context: any)
 
     local world = Instance.new("Model")
     world.Name = self._runtimeIds.WorldName
-    world:SetAttribute("WorldVersion", "emberhollow-arrival-v24")
+    world:SetAttribute("WorldVersion", "emberhollow-assets-v25")
     world:SetAttribute("Ready", false)
     world.Parent = workspace
     self._world = world
@@ -4009,7 +4067,7 @@ function WorldService.Start(self: WorldService)
 
     self._logger:info("world_started", {
         interactions = self:interactionCount(),
-        worldVersion = "emberhollow-arrival-v24",
+        worldVersion = "emberhollow-assets-v25",
     })
 end
 

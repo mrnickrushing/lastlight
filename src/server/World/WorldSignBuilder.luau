@@ -268,7 +268,7 @@ function WorldSignBuilder.dressNoticeBoard(
         local rotation = math.rad(((index * 7) % 9) - 4)
         local paper = part(
             details,
-            if board.Name == "TownBoard" then "TownNotice" else "ArchiveNotice",
+            if board.Name == "TownBoard" then "TownNotice_" .. panelId else "ArchiveNotice",
             Vector3.new(paperWidth, paperHeight, 0.1),
             board.CFrame
                 * CFrame.new(x, y, -(board.Size.Z * 0.5 + 0.22))

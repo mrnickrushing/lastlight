@@ -41,7 +41,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.42.0", "unexpected build version")
+assert(Config.BuildVersion == "0.43.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
@@ -337,7 +337,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "emberhollow-arrival-v24",
+    world:GetAttribute("WorldVersion") == "emberhollow-assets-v25",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
@@ -404,6 +404,7 @@ assert(
 assert(heroDetailCounts.ArchiveNotice == 5, "archive needs readable physical field notices")
 local noticeArtwork = 0
 local townNotices = 0
+local distinctTownNoticePanels: { [string]: boolean } = {}
 local physicalNoticeBoards = 0
 for _, descendant in world:GetDescendants() do
     if descendant:IsA("ImageLabel") and string.sub(descendant.Name, 1, 12) == "NoticeImage_" then
@@ -416,17 +417,30 @@ for _, descendant in world:GetDescendants() do
             descendant.ImageRectSize == Vector2.new(627, 418),
             "notice image does not use one measured atlas cell"
         )
-    elseif descendant:IsA("BasePart") and descendant.Name == "TownNotice" then
+    elseif descendant:IsA("BasePart") and string.sub(descendant.Name, 1, 11) == "TownNotice_" then
         townNotices += 1
         assert(descendant.Material == Enum.Material.Fabric, "town notices must read as paper")
-        assert(type(descendant:GetAttribute("NoticePanelId")) == "string", "town notice has no art")
+        local panelId = descendant:GetAttribute("NoticePanelId")
+        assert(type(panelId) == "string", "town notice has no art")
+        distinctTownNoticePanels[panelId] = true
     elseif
         descendant:IsA("BasePart") and descendant:GetAttribute("PhysicalNoticeBoard") == true
     then
         physicalNoticeBoards += 1
     end
 end
-assert(townNotices == 3, "Town Board needs three distinct illustrated notices")
+local distinctTownNoticeCount = 0
+for _ in distinctTownNoticePanels do
+    distinctTownNoticeCount += 1
+end
+assert(
+    townNotices == 3 and distinctTownNoticeCount == 3,
+    string.format(
+        "Town Board needs three distinct illustrated notices (found %d notices / %d panels)",
+        townNotices,
+        distinctTownNoticeCount
+    )
+)
 assert(noticeArtwork == 8, "first-world boards need all eight placed notice illustrations")
 assert(physicalNoticeBoards == 2, "archive and Town Board must both be physical notice boards")
 local roadSegments = 0
@@ -733,11 +747,27 @@ while world:GetAttribute("AuthoredMeshCount") == nil and os.clock() < townMeshDe
     task.wait(0.1)
 end
 local styledMeshParts = 0
+local creatorAssetCounts: { [string]: number } = {
+    mesh_creator_kerosene_lantern_a = 0,
+    mesh_creator_first_lantern_a = 0,
+    mesh_creator_street_lantern_a = 0,
+    mesh_creator_campfire_a = 0,
+}
 for _, descendant in world:GetDescendants() do
     if descendant:IsA("Model") and descendant:GetAttribute("MeshAssetId") ~= nil then
         local stableId = tostring(descendant:GetAttribute("MeshAssetId"))
         assert(stableId ~= "mesh_wayfarer_cabin_a", "retired cabin mesh cannot be placed")
-        if stableId ~= "mesh_root_arch_a" then
+        if creatorAssetCounts[stableId] ~= nil then
+            creatorAssetCounts[stableId] += 1
+            assert(
+                descendant:GetAttribute("SourceMaterialsPreserved") == true,
+                "Creator Store source materials were not preserved: " .. stableId
+            )
+        end
+        if
+            stableId ~= "mesh_root_arch_a"
+            and descendant:GetAttribute("SourceMaterialsPreserved") ~= true
+        then
             for _, meshPart in descendant:GetDescendants() do
                 if meshPart:IsA("MeshPart") then
                     assert(
@@ -754,6 +784,34 @@ for _, descendant in world:GetDescendants() do
     end
 end
 assert(styledMeshParts > 0, "Studio needs at least one runtime-styled authored MeshPart")
+assert(
+    creatorAssetCounts.mesh_creator_street_lantern_a == 6,
+    "all six route lights must use the inspected street-lantern asset"
+)
+assert(
+    creatorAssetCounts.mesh_creator_campfire_a == 2,
+    "both cabin hearths must use the inspected campfire asset"
+)
+assert(
+    creatorAssetCounts.mesh_creator_kerosene_lantern_a == 1,
+    "Mara must carry the inspected kerosene-lantern asset"
+)
+assert(
+    creatorAssetCounts.mesh_creator_first_lantern_a == 1,
+    "the First Lantern must use the inspected endorsed lantern asset"
+)
+for _, descendant in world:GetDescendants() do
+    if descendant:GetAttribute("ReplacedByAuthoredMesh") == true then
+        for _, fallbackPart in descendant:GetDescendants() do
+            if fallbackPart:IsA("BasePart") then
+                assert(
+                    fallbackPart.Transparency == 1,
+                    "a procedural fallback remained visible after its authored asset loaded"
+                )
+            end
+        end
+    end
+end
 assert(
     expedition:GetAttribute("ModuleCount") == BramblewakeExpedition.ModuleCount,
     "Bramblewake module count is incorrect"

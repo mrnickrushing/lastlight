@@ -1,5 +1,6 @@
 --!strict
 
+local AssetService = game:GetService("AssetService")
 local InsertService = game:GetService("InsertService")
 
 local MeshAssetRegistry = require(script.Parent.MeshAssetRegistry)
@@ -22,10 +23,12 @@ export type MeshTemplateLoader = typeof(setmetatable(
     MeshTemplateLoader
 ))
 
-local function sanitize(model: Model): number
+local function sanitize(model: Model): (number, number)
     local meshParts = 0
+    local baseParts = 0
     for _, descendant in model:GetDescendants() do
         if descendant:IsA("BasePart") then
+            baseParts += 1
             descendant.Anchored = true
             descendant.CanCollide = false
             descendant.CanTouch = false
@@ -48,7 +51,7 @@ local function sanitize(model: Model): number
             descendant:Destroy()
         end
     end
-    return meshParts
+    return meshParts, baseParts
 end
 
 local function longestDimension(size: Vector3): number
@@ -66,8 +69,12 @@ local ROBLOX_MATERIALS = table.freeze({
     WoodPlanks = Enum.Material.WoodPlanks,
 })
 
-local function applyBuiltInMaterials(model: Model, customPbr: boolean): (number, number)
-    if customPbr then
+local function applyBuiltInMaterials(
+    model: Model,
+    customPbr: boolean,
+    preserveSourceMaterials: boolean
+): (number, number)
+    if customPbr or preserveSourceMaterials then
         return 0, 0
     end
 
@@ -144,7 +151,12 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
         return nil
     end
 
-    local ok, loaded = pcall(InsertService.LoadAsset, InsertService, entry.assetId)
+    local ok, loaded
+    if entry.creatorStore then
+        ok, loaded = pcall(AssetService.LoadAssetAsync, AssetService, entry.assetId)
+    else
+        ok, loaded = pcall(InsertService.LoadAsset, InsertService, entry.assetId)
+    end
     if not ok or not loaded:IsA("Model") then
         if ok then
             loaded:Destroy()
@@ -159,17 +171,19 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
     end
 
     loaded.Name = "Template_" .. stableId
-    local meshPartCount = sanitize(loaded)
-    local styledParts, unstyledParts = applyBuiltInMaterials(loaded, entry.pbr)
+    local meshPartCount, basePartCount = sanitize(loaded)
+    local styledParts, unstyledParts =
+        applyBuiltInMaterials(loaded, entry.pbr, entry.preserveSourceMaterials)
     local _, nativeSize = loaded:GetBoundingBox()
     local nativeLongest = longestDimension(nativeSize)
     local normalizationScale = MeshAssetRegistry.scaleFor(stableId, nativeLongest)
-    if meshPartCount == 0 or normalizationScale == nil then
+    if basePartCount == 0 or normalizationScale == nil then
         loaded:Destroy()
         self._failed[stableId] = true
         self._logger:info("mesh_asset_invalid", {
             assetId = stableId,
             meshParts = meshPartCount,
+            baseParts = basePartCount,
             nativeLongestDimension = nativeLongest,
         })
         return nil
@@ -180,6 +194,7 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
     local boundsCFrame, boundsSize = loaded:GetBoundingBox()
     loaded.WorldPivot = CFrame.new(boundsCFrame.Position - Vector3.new(0, boundsSize.Y * 0.5, 0))
     loaded:PivotTo(CFrame.new())
+    loaded:SetAttribute("SourceMaterialsPreserved", entry.preserveSourceMaterials)
     loaded.Parent = nil
 
     self._templates[stableId] = loaded
@@ -188,8 +203,10 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
         assetId = stableId,
         robloxAssetId = entry.assetId,
         meshParts = meshPartCount,
+        baseParts = basePartCount,
         styledParts = styledParts,
         unstyledParts = unstyledParts,
+        preserveSourceMaterials = entry.preserveSourceMaterials,
         nativeLongestDimension = nativeLongest,
         targetLongestDimension = entry.targetLongestDimension,
     })

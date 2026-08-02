@@ -9,6 +9,10 @@ local function loadPlace(path: string)
 end
 
 local gamePlace = loadPlace("build/LastLight.rbxlx")
+assert(
+    gamePlace:GetService("AssetService").AllowInsertFreeAssets,
+    "Creator Store runtime assets must be enabled in the built place"
+)
 local replicatedStorage = gamePlace:GetService("ReplicatedStorage")
 local serverScriptService = gamePlace:GetService("ServerScriptService")
 
@@ -151,6 +155,10 @@ do
 end
 
 local testPlace = loadPlace("build/LastLightTest.rbxlx")
+assert(
+    testPlace:GetService("AssetService").AllowInsertFreeAssets,
+    "Creator Store runtime assets must be enabled in the test place"
+)
 local integrationScript =
     testPlace:GetService("ServerScriptService"):FindFirstChild("FoundationIntegration", true)
 assert(integrationScript ~= nil, "test build is missing FoundationIntegration")
