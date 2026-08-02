@@ -84,7 +84,11 @@ local MOSS = Color3.fromRGB(58, 91, 54)
 local WET_EARTH = Color3.fromRGB(67, 55, 39)
 local HEARTWOOD_CENTER = Vector3.new(38, 0, -48)
 local TOOL_YARD_CENTER = Vector3.new(-42, 0, -68)
-local BARRICADE_CENTER = Vector3.new(-44, 0, -92)
+-- Across the arrival road just past the spawn, so the thing the player is
+-- asked to build visibly defends the way they came in. It used to sit 44
+-- studs off the route in an empty field, where building it read as busywork
+-- with nothing behind it.
+local BARRICADE_CENTER = Vector3.new(-2, 0, -18)
 -- Staging yard, north of the arrival clearing and clear of the route that
 -- leaves it. Inside the flat valley bowl (x -190..190, z -260..90), so every
 -- authored coordinate here sits on level ground.
@@ -2674,11 +2678,16 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         signalLight.Parent = brazier
         table.insert(_self._nightDefenseSignals, brazier)
     end
+    -- Off the beacon and off the approach. A 13-stud board standing 1.2 studs
+    -- from the memory reliquary read as a wall boxing the orb in, which is
+    -- exactly what it looked like from the road. Moved to the east verge and
+    -- turned to face walkers coming up the lantern road, so it is still read
+    -- on the way in without standing on top of the thing it points at.
     local warningBoard = part(
         defenseRoute,
         "NightWatchBoard",
         Vector3.new(13, 2.8, 0.55),
-        CFrame.new(0, 4.6, -146.8),
+        CFrame.new(23, 4.6, -138) * CFrame.Angles(0, math.rad(-58), 0),
         BARK,
         Enum.Material.WoodPlanks,
         false
@@ -2692,9 +2701,9 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     table.insert(_self._meshPlacements, {
         assetId = "mesh_creator_notice_board_a",
         fallbackKind = "asset_replacement",
-        position = Vector3.new(0, 1, -146.8),
+        position = Vector3.new(23, 1, -138),
         scale = 0.7,
-        yaw = 0,
+        yaw = math.rad(-58),
         seed = 9870,
         swayTag = nil,
         parent = defenseRoute,
@@ -4481,17 +4490,10 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         parent = toolYard,
         fallbackInstance = nil,
     })
-    table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_tool_set_a",
-        fallbackKind = "asset_dressing",
-        position = TOOL_YARD_CENTER + Vector3.new(0, 2.7, 3.8),
-        scale = 0.8,
-        yaw = math.rad(90),
-        seed = 9891,
-        swayTag = nil,
-        parent = toolYard,
-        fallbackInstance = nil,
-    })
+    -- No extra tool rack here. The yard exists to present exactly three
+    -- choices -- axe, hammer, torch -- and a spare set of tools floating
+    -- alongside them just read as clutter the player had to visually discard
+    -- before finding the thing they were sent to pick.
 
     local barricadeFallback = Instance.new("Model")
     barricadeFallback.Name = "BarricadeWorksiteFallback"

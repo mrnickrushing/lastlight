@@ -1820,11 +1820,21 @@ function HUDController._layout(self: HUDController)
             thumb's reach without any of them covering the play area. Run stays
             on the left, clear of Roblox's own thumbstick.
         ]]
-        self._ability.Position = UDim2.new(1, -30, 1, -150)
-        self._tool.Position = UDim2.new(1, -128, 1, -150)
-        self._dodge.Position = UDim2.new(1, -226, 1, -150)
-        self._primary.Position = UDim2.new(1, -28, 1, -34)
-        self._sprint.Position = UDim2.new(0, 30, 1, -150)
+        --[[
+            One bottom row, inset from BOTH corners.
+
+            Roblox owns the bottom corners on touch: the thumbstick sits
+            bottom-left and the jump button bottom-right. Putting the primary
+            action in the bottom-right corner stacked it directly on top of
+            jump. The row starts well inboard of jump and ends well inboard of
+            the thumbstick, so every control is thumb-reachable without
+            fighting a Roblox one, and none of them sit over the character.
+        ]]
+        self._primary.Position = UDim2.new(1, -220, 1, -30)
+        self._tool.Position = UDim2.new(1, -330, 1, -30)
+        self._dodge.Position = UDim2.new(1, -440, 1, -30)
+        self._ability.Position = UDim2.new(1, -550, 1, -30)
+        self._sprint.Position = UDim2.new(1, -660, 1, -30)
     else
         self._objectiveFrame.Position = UDim2.fromOffset(18, 18)
         self._objectiveFrame.Size = if self._compactEnabled
