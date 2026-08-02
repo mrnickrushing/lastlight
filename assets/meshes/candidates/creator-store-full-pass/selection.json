@@ -97,34 +97,34 @@
     },
     {
       "id": "mesh_creator_forest_sign_a",
-      "displayName": "Creator Store Forest Signpost",
+      "displayName": "Creator Store Medieval Signpost",
       "role": "route_direction_sign",
-      "assetId": 14425476166,
-      "name": "Forest Sign",
-      "creator": "F1R3CPU Studio",
+      "assetId": 82202632313902,
+      "name": "Medieval Road Signpost Town Village Path Way",
+      "creator": "Turbo203Star",
       "targetLongestDimension": 6,
       "maxTriangles": 500,
-      "maxMaterialSlots": 1,
-      "triangles": 436,
+      "maxMaterialSlots": 5,
+      "triangles": 0,
       "boundsMin": [
-        -130.4548,
-        -172.1997,
-        -37.7127
+        237.6441,
+        106.6102,
+        -397.6183
       ],
       "boundsMax": [
-        126.6819,
-        79.5853,
-        8.5511
+        238.2906,
+        112.4105,
+        -393.0964
       ],
       "dimensions": [
-        257.1367,
-        251.785,
-        46.2638
+        0.6465,
+        5.8003,
+        4.5219
       ],
-      "longestDimension": 257.1367,
-      "meshObjects": 1,
-      "baseParts": 1,
-      "bytes": 20943
+      "longestDimension": 5.8003,
+      "meshObjects": 0,
+      "baseParts": 5,
+      "bytes": 8217
     },
     {
       "id": "mesh_creator_tool_set_a",
@@ -161,32 +161,32 @@
       "id": "mesh_creator_barrel_a",
       "displayName": "Creator Store Stylized Barrel",
       "role": "town_supply_barrel",
-      "assetId": 14875568455,
-      "name": "Lowpoly Barrel",
-      "creator": "Nucklm",
+      "assetId": 4890213351,
+      "name": "Barrel (Rex studio only)",
+      "creator": "Administrator_OM3GA",
       "targetLongestDimension": 3,
-      "maxTriangles": 500,
-      "maxMaterialSlots": 3,
-      "triangles": 432,
+      "maxTriangles": 1000,
+      "maxMaterialSlots": 2,
+      "triangles": 0,
       "boundsMin": [
-        519.2139,
-        659.0662,
-        110.5297
+        -37.25,
+        -0.6,
+        58.125
       ],
       "boundsMax": [
-        522.1893,
-        662.1268,
-        113.5051
+        -33.15,
+        4.1027,
+        62.225
       ],
       "dimensions": [
-        2.9755,
-        3.0607,
-        2.9754
+        4.1,
+        4.7027,
+        4.1
       ],
-      "longestDimension": 3.0607,
-      "meshObjects": 3,
-      "baseParts": 3,
-      "bytes": 23021
+      "longestDimension": 4.7027,
+      "meshObjects": 0,
+      "baseParts": 2,
+      "bytes": 22483
     },
     {
       "id": "mesh_creator_road_stones_a",
@@ -440,32 +440,32 @@
       "id": "mesh_creator_crate_a",
       "displayName": "Creator Store Wooden Crate",
       "role": "town_supply_crate",
-      "assetId": 6332066686,
-      "name": "wood crate 1",
-      "creator": "Myth_Proxy",
+      "assetId": 8314504894,
+      "name": "wooden box",
+      "creator": "Lis_Boris",
       "targetLongestDimension": 4,
       "maxTriangles": 500,
       "maxMaterialSlots": 1,
-      "triangles": 336,
+      "triangles": 0,
       "boundsMin": [
-        -38.9491,
-        9.3164,
-        93.338
+        -18.2182,
+        0.0,
+        -16.2444
       ],
       "boundsMax": [
-        -34.6775,
-        11.8469,
-        95.8847
+        -11.8543,
+        4.5,
+        -9.8804
       ],
       "dimensions": [
-        4.2717,
-        2.5305,
-        2.5467
+        6.364,
+        4.5,
+        6.364
       ],
-      "longestDimension": 4.2717,
-      "meshObjects": 1,
-      "baseParts": 1,
-      "bytes": 23943
+      "longestDimension": 6.364,
+      "meshObjects": 0,
+      "baseParts": 25,
+      "bytes": 4103
     },
     {
       "id": "mesh_creator_field_rows_a",
