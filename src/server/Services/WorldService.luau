@@ -2153,6 +2153,39 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 edgeStone.CanQuery = false
             end
         end
+        -- Glowing waymarkers down the road centre. The route already has
+        -- lantern posts and chevrons, but nothing that reads as "this way" at
+        -- a glance in the dark, so the road can be underfoot and still not
+        -- answer where to go next. These are foxfire inlays set into the worn
+        -- centre, pointing along travel direction and brightening toward the
+        -- destination so the trail has a readable gradient rather than a flat
+        -- dotted line. Semantic, not decorative: they mark the critical route
+        -- only, never the side spurs.
+        local guideCount = math.max(2, math.floor(distance / 11))
+        for guide = 0, guideCount do
+            local along = -distance * 0.5 + distance * guide / guideCount
+            local progress = (segment - 1 + guide / guideCount) / (#route - 1)
+            local wedge = part(
+                geometry,
+                "RouteGuideMarker",
+                Vector3.new(1.5, 0.1, 2.1),
+                roadFrame * CFrame.new(0, 0.94, along) * CFrame.Angles(0, math.pi, 0),
+                FOXFIRE,
+                Enum.Material.Neon,
+                false
+            )
+            wedge.Shape = Enum.PartType.Wedge
+            wedge.Transparency = 0.34 - progress * 0.16
+            wedge.CastShadow = false
+            wedge.CanQuery = false
+            CollectionService:AddTag(wedge, _self._runtimeIds.AmbientLightTag)
+            local guideLight = Instance.new("PointLight")
+            guideLight.Color = FOXFIRE
+            guideLight.Brightness = 0.5 + progress * 0.45
+            guideLight.Range = 11
+            guideLight.Shadows = false
+            guideLight.Parent = wedge
+        end
         queueRoadAssetPlacements(
             arrivalRoadAssetPlacements,
             geometry,

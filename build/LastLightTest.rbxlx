@@ -22190,6 +22190,39 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 edgeStone.CanQuery = false
             end
         end
+        -- Glowing waymarkers down the road centre. The route already has
+        -- lantern posts and chevrons, but nothing that reads as "this way" at
+        -- a glance in the dark, so the road can be underfoot and still not
+        -- answer where to go next. These are foxfire inlays set into the worn
+        -- centre, pointing along travel direction and brightening toward the
+        -- destination so the trail has a readable gradient rather than a flat
+        -- dotted line. Semantic, not decorative: they mark the critical route
+        -- only, never the side spurs.
+        local guideCount = math.max(2, math.floor(distance / 11))
+        for guide = 0, guideCount do
+            local along = -distance * 0.5 + distance * guide / guideCount
+            local progress = (segment - 1 + guide / guideCount) / (#route - 1)
+            local wedge = part(
+                geometry,
+                "RouteGuideMarker",
+                Vector3.new(1.5, 0.1, 2.1),
+                roadFrame * CFrame.new(0, 0.94, along) * CFrame.Angles(0, math.pi, 0),
+                FOXFIRE,
+                Enum.Material.Neon,
+                false
+            )
+            wedge.Shape = Enum.PartType.Wedge
+            wedge.Transparency = 0.34 - progress * 0.16
+            wedge.CastShadow = false
+            wedge.CanQuery = false
+            CollectionService:AddTag(wedge, _self._runtimeIds.AmbientLightTag)
+            local guideLight = Instance.new("PointLight")
+            guideLight.Color = FOXFIRE
+            guideLight.Brightness = 0.5 + progress * 0.45
+            guideLight.Range = 11
+            guideLight.Shadows = false
+            guideLight.Parent = wedge
+        end
         queueRoadAssetPlacements(
             arrivalRoadAssetPlacements,
             geometry,
@@ -33332,9 +33365,19 @@ local function fillValleyFloor(terrain: Terrain, palette: Palette)
     local centerX = (BOWL_MIN_X + BOWL_MAX_X) / 2
     local centerZ = (BOWL_MIN_Z + BOWL_MAX_Z) / 2
 
+    -- Centre from the SAME rounded span that is passed as the size. Deriving
+    -- the centre from the raw BEDROCK_DEPTH while filling the voxel-rounded
+    -- span puts the floor half a voxel out: 90 rounds up to 92, so the surface
+    -- landed at GROUND_Y + 1 instead of GROUND_Y. Every road is only ~0.9
+    -- studs thick, so that one stud buried the entire road network -- main
+    -- street, arrival route, and district roads -- under the grass. The
+    -- surrounding column fill below already derives its centre this way, which
+    -- is why the hills sat correctly while the valley floor did not.
+    local depthSpan = toVoxelSpan(BEDROCK_DEPTH)
+
     terrain:FillBlock(
-        CFrame.new(centerX, GROUND_Y - BEDROCK_DEPTH / 2, centerZ),
-        Vector3.new(width, BEDROCK_DEPTH, depth),
+        CFrame.new(centerX, GROUND_Y - depthSpan / 2, centerZ),
+        Vector3.new(width, depthSpan, depth),
         palette.valley
     )
 end
@@ -33705,6 +33748,21 @@ end
 
 function TerrainBuilder.groundHeight(): number
     return GROUND_Y
+end
+
+--[[
+    The world-space Y of the valley floor's top face, derived the same way
+    fillValleyFloor derives it.
+
+    Exposed so a test can prove the filled surface and `surfaceHeight` agree.
+    They silently disagreed once: the fill centred on the raw BEDROCK_DEPTH
+    while sizing the voxel-rounded span, so the floor rendered one stud above
+    the height every authored coordinate was placed against, and the entire
+    road network -- none of it thicker than about 0.9 studs -- was buried under
+    the grass with nothing in the logs to say so.
+]]
+function TerrainBuilder.valleyFloorTop(): number
+    return (GROUND_Y - toVoxelSpan(BEDROCK_DEPTH) / 2) + toVoxelSpan(BEDROCK_DEPTH) / 2
 end
 
 return table.freeze(TerrainBuilder)
@@ -34366,6 +34424,7 @@ local Regions = require(root.Content.Definitions.Regions)
 local ServiceRegistry = require(serverRoot.ServiceRegistry)
 local OldGrowthBuilder = require(serverRoot.World.OldGrowthBuilder)
 local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
+local TerrainBuilder = require(serverRoot.World.TerrainBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
@@ -35068,6 +35127,45 @@ for _, buildingId in { "building_archive", "building_workbench", "building_inn" 
         "building sign must sit on the street-facing wall: " .. buildingId
     )
 end
+-- The filled valley floor and the height every authored coordinate is placed
+-- against must be the same number. They silently disagreed once: the fill
+-- centred on the raw BEDROCK_DEPTH while sizing the voxel-rounded span, so the
+-- floor rendered a stud above surfaceHeight. No road layer is thicker than
+-- about 0.9 studs, so that one stud buried the entire road network -- main
+-- street, arrival route, and district roads -- under the grass, with nothing
+-- in the logs to say so.
+assert(
+    TerrainBuilder.valleyFloorTop() == TerrainBuilder.groundHeight(),
+    "valley floor must fill to exactly the authored ground height"
+)
+for _, sample in { { 0, 0 }, { 0, -112 }, { 0, -204 }, { 92, -126 }, { -92, -184 } } do
+    local sampleX, sampleZ = sample[1], sample[2]
+    assert(
+        TerrainBuilder.isInsidePlayableBowl(sampleX, sampleZ),
+        string.format("sample (%d, %d) should be inside the playable bowl", sampleX, sampleZ)
+    )
+    assert(
+        TerrainBuilder.surfaceHeight(sampleX, sampleZ) == TerrainBuilder.valleyFloorTop(),
+        string.format(
+            "terrain surface disagrees with the filled floor at (%d, %d)",
+            sampleX,
+            sampleZ
+        )
+    )
+end
+local mainStreet = world:FindFirstChild("TownMainStreet", true)
+assert(mainStreet ~= nil and mainStreet:IsA("BasePart"), "the town needs a visible main street")
+assert(
+    mainStreet.Position.Y + mainStreet.Size.Y * 0.5 > TerrainBuilder.valleyFloorTop(),
+    "the main street must sit above the terrain, not buried under it"
+)
+local routeGuides = 0
+for _, descendant in world:GetDescendants() do
+    if descendant.Name == "RouteGuideMarker" then
+        routeGuides += 1
+    end
+end
+assert(routeGuides >= 12, "the critical route needs a readable glowing trail")
 assert(world:GetAttribute("TownIntegrity") == 100, "new towns must begin fully repaired")
 assert(world:GetAttribute("TownDamageLevel") == 0, "new towns cannot begin visibly damaged")
 assert(
