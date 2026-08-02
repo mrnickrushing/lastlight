@@ -482,6 +482,38 @@
       "maxMaterialSlots": 23,
       "preserveSourceMaterials": true,
       "robloxAssetId": 84661463
+    },
+    {
+      "id": "mesh_creator_wayfarer_bed_a",
+      "displayName": "Creator Store Timber Bed",
+      "role": "cabin_sleeping_berth",
+      "placementBand": "curated_core",
+      "source": "roblox_creator_store_model",
+      "provenance": "Free script-free Creator Store model by verified creator wyattbro00; asset 5613094175. Completed 420px Roblox thumbnail and downloaded model payload inspected on 2026-08-01.",
+      "sourceUrl": "https://create.roblox.com/store/asset/5613094175/Wooden-Bed",
+      "file": "candidates/creator-store-full-pass/5613094175.rbxm",
+      "previewFile": "previews/full-pass/5613094175.png",
+      "targetLongestDimension": 7.2,
+      "maxTriangles": 2200,
+      "maxMaterialSlots": 12,
+      "preserveSourceMaterials": true,
+      "robloxAssetId": 5613094175
+    },
+    {
+      "id": "mesh_creator_anvil_a",
+      "displayName": "Creator Store Iron Anvil",
+      "role": "mastery_smithing_anvil",
+      "placementBand": "curated_core",
+      "source": "roblox_creator_store_model",
+      "provenance": "Free script-free Creator Store model by verified creator IllusivePhantasm; asset 11946437830. Completed 420px Roblox thumbnail and downloaded model payload inspected on 2026-08-01.",
+      "sourceUrl": "https://create.roblox.com/store/asset/11946437830/Anvil",
+      "file": "candidates/creator-store-full-pass/11946437830.rbxm",
+      "previewFile": "previews/full-pass/11946437830.png",
+      "targetLongestDimension": 3.1,
+      "maxTriangles": 1600,
+      "maxMaterialSlots": 4,
+      "preserveSourceMaterials": true,
+      "robloxAssetId": 11946437830
     }
   ]
 }

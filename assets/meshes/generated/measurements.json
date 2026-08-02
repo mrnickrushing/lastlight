@@ -868,6 +868,58 @@
       "baseParts": 23,
       "scripts": 0,
       "bytes": 48028
+    },
+    "mesh_creator_wayfarer_bed_a": {
+      "boundsMin": [
+        4.9512,
+        90.7699,
+        290.0008
+      ],
+      "boundsMax": [
+        18.8052,
+        95.8362,
+        305.9699
+      ],
+      "dimensions": [
+        13.854,
+        5.0663,
+        15.9691
+      ],
+      "longestDimension": 15.9691,
+      "triangles": 0,
+      "meshObjects": 12,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 12,
+      "scripts": 0,
+      "bytes": 5452
+    },
+    "mesh_creator_anvil_a": {
+      "boundsMin": [
+        485.2884,
+        62.35,
+        299.6458
+      ],
+      "boundsMax": [
+        487.6411,
+        64.925,
+        303.9693
+      ],
+      "dimensions": [
+        2.3527,
+        2.575,
+        4.3235
+      ],
+      "longestDimension": 4.3235,
+      "triangles": 0,
+      "meshObjects": 4,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 4,
+      "scripts": 0,
+      "bytes": 24840
     }
   }
 }

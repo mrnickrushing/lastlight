@@ -20879,8 +20879,11 @@ local function buildEmberhollowSanctuary(
         signText.Parent = surface
 
         if name == "MARA'S SHELTER" then
+            local cotFallback = Instance.new("Model")
+            cotFallback.Name = "MaraCotFallback"
+            cotFallback.Parent = cabinFolder
             local cot = part(
-                cabinFolder,
+                cotFallback,
                 "MaraCot",
                 Vector3.new(5.2, 0.55, 2.7),
                 cabinCFrame(4.2, 1.0, 3.5),
@@ -20889,6 +20892,17 @@ local function buildEmberhollowSanctuary(
                 false
             )
             cot.CanQuery = false
+            table.insert(meshPlacements, {
+                assetId = "mesh_creator_wayfarer_bed_a",
+                fallbackKind = "asset_replacement",
+                position = cabinCFrame(4.2, -1.75, 3.5).Position,
+                scale = 1,
+                yaw = yaw + math.rad(90),
+                seed = 9831,
+                swayTag = nil,
+                parent = cabinFolder,
+                fallbackInstance = cotFallback,
+            })
             local tableTop = part(
                 cabinFolder,
                 "MaraWorkTable",
@@ -20946,8 +20960,11 @@ local function buildEmberhollowSanctuary(
             end
         else
             for bedIndex = -1, 1, 2 do
+                local bedrollFallback = Instance.new("Model")
+                bedrollFallback.Name = "WayfarerBedrollFallback"
+                bedrollFallback.Parent = cabinFolder
                 local bedroll = part(
-                    cabinFolder,
+                    bedrollFallback,
                     "WayfarerBedroll",
                     Vector3.new(4.8, 0.45, 2.3),
                     cabinCFrame(3.5 + bedIndex * 3.6, 0.95, 3.8),
@@ -20958,6 +20975,17 @@ local function buildEmberhollowSanctuary(
                     false
                 )
                 bedroll.CanQuery = false
+                table.insert(meshPlacements, {
+                    assetId = "mesh_creator_wayfarer_bed_a",
+                    fallbackKind = "asset_replacement",
+                    position = cabinCFrame(3.5 + bedIndex * 3.6, -1.75, 3.8).Position,
+                    scale = 1,
+                    yaw = yaw + math.rad(90),
+                    seed = 9840 + bedIndex,
+                    swayTag = nil,
+                    parent = cabinFolder,
+                    fallbackInstance = bedrollFallback,
+                })
             end
             local trunk = part(
                 cabinFolder,
@@ -24659,6 +24687,19 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         masteryLight.Shadows = false
         masteryLight.Parent = hookLantern
         CollectionService:AddTag(hookLantern, self._runtimeIds.AmbientLightTag)
+        -- A reviewed anvil stands at the working end of each shrine, so the
+        -- craft has a recognizable tool rather than only stacked supply boxes.
+        table.insert(self._meshPlacements, {
+            assetId = "mesh_creator_anvil_a",
+            fallbackKind = "asset_dressing",
+            position = altar.center + Vector3.new(4.6, 0.8, 2.4),
+            scale = 1,
+            yaw = math.rad(-24),
+            seed = 9980 + #altar.name,
+            swayTag = nil,
+            parent = masteryGrove,
+            fallbackInstance = nil,
+        })
         labelSign(
             masteryGrove,
             CFrame.new(altar.center + Vector3.new(0, 4.8, 3.7)) * CFrame.Angles(0, math.pi, 0),
@@ -33023,6 +33064,28 @@ local ENTRIES: { Entry } = {
         targetLongestDimension = 18,
         maxTriangles = 2200,
         maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
+        id = "mesh_creator_wayfarer_bed_a",
+        assetId = 5613094175,
+        targetLongestDimension = 7.2,
+        maxTriangles = 2200,
+        maxMaterialSlots = 12,
+        placementBand = "curated_core",
+        pbr = false,
+        preserveSourceMaterials = true,
+        creatorStore = true,
+    },
+    {
+        id = "mesh_creator_anvil_a",
+        assetId = 11946437830,
+        targetLongestDimension = 3.1,
+        maxTriangles = 1600,
+        maxMaterialSlots = 4,
         placementBand = "curated_core",
         pbr = false,
         preserveSourceMaterials = true,
