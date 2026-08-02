@@ -1282,6 +1282,106 @@
         }
       ],
       "bytes": 11751292
+    },
+    "mesh_heartwood_stump_a": {
+      "boundsMin": [
+        -3.5,
+        -3.3809,
+        0.0
+      ],
+      "boundsMax": [
+        3.5,
+        3.3809,
+        5.3864
+      ],
+      "dimensions": [
+        7.0,
+        6.7618,
+        5.3864
+      ],
+      "longestDimension": 7.0,
+      "triangles": 5010,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "normal",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        }
+      ],
+      "bytes": 10142132
+    },
+    "mesh_first_lantern_a": {
+      "boundsMin": [
+        -2.4823,
+        -2.4826,
+        0.0
+      ],
+      "boundsMax": [
+        2.4823,
+        2.4826,
+        11.0
+      ],
+      "dimensions": [
+        4.9647,
+        4.9652,
+        11.0
+      ],
+      "longestDimension": 11.0,
+      "triangles": 6079,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "normal",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        }
+      ],
+      "bytes": 12742852
     }
   }
 }

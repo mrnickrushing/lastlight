@@ -3637,10 +3637,10 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     heartLight.Parent = heart
     addBillboard(heart, "HEARTWOOD", AMBER, 18)
     table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_stump_a",
+        assetId = "mesh_heartwood_stump_a",
         fallbackKind = "asset_replacement",
         position = HEARTWOOD_CENTER,
-        scale = 1.15,
+        scale = 1,
         yaw = math.rad(-18),
         seed = 9880,
         swayTag = nil,
@@ -4053,8 +4053,18 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         nil
     )
 
+    local firstLanternFallback = Instance.new("Model")
+    firstLanternFallback.Name = "FirstLanternVisualFallback"
+    firstLanternFallback.Parent = interactables
+
+    -- The authored lantern carries its own stepped stone plinth, so the
+    -- procedural block and steps belong to the fallback rather than standing
+    -- permanently under it -- otherwise the town centre grows a second plinth
+    -- the moment the mesh loads. They stay collidable while invisible, which
+    -- is what keeps players able to walk up onto the dais either way, and
+    -- lanternBase remains the interaction anchor exactly as before.
     local lanternBase = part(
-        interactables,
+        firstLanternFallback,
         "FirstLantern",
         Vector3.new(8, 3, 8),
         CFrame.new(0, 1.5, -112),
@@ -4063,7 +4073,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     )
     for stepIndex = 1, 3 do
         part(
-            interactables,
+            firstLanternFallback,
             "FirstLanternPlinth",
             Vector3.new(10.5 - stepIndex * 1.45, 0.52, 10.5 - stepIndex * 1.45),
             CFrame.new(0, 0.25 + stepIndex * 0.42, -112),
@@ -4071,9 +4081,6 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             Enum.Material.Slate
         )
     end
-    local firstLanternFallback = Instance.new("Model")
-    firstLanternFallback.Name = "FirstLanternVisualFallback"
-    firstLanternFallback.Parent = interactables
     for sideX = -1, 1, 2 do
         for sideZ = -1, 1, 2 do
             part(
@@ -4169,10 +4176,10 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     addBillboard(flame, "THE FIRST LANTERN", AMBER, 32)
     self._lantern = flame
     table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_first_lantern_a",
+        assetId = "mesh_first_lantern_a",
         fallbackKind = "placeholder",
-        position = Vector3.new(0, 3, -112),
-        scale = 1.25,
+        position = Vector3.new(0, 0, -112),
+        scale = 0.95,
         yaw = math.rad(8),
         seed = 9314,
         swayTag = nil,
