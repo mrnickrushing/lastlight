@@ -20765,12 +20765,31 @@ local function buildEmberhollowSanctuary(
                 false
             )
             tableTop.CanQuery = false
+            -- A tabletop needs something holding it up.
+            for legX = -1, 1, 2 do
+                for legZ = -1, 1, 2 do
+                    local leg = part(
+                        cabinFolder,
+                        "MaraWorkTableLeg",
+                        Vector3.new(0.3, 1.7, 0.3),
+                        cabinCFrame(4.5 + legX * 1.75, 1.28, -3.2 + legZ * 0.95),
+                        Color3.fromRGB(72, 51, 34),
+                        Enum.Material.Wood,
+                        false
+                    )
+                    leg.CanQuery = false
+                end
+            end
             for jarIndex = -1, 1 do
                 local jar = part(
                     cabinFolder,
                     "MemoryJar",
-                    Vector3.new(0.7, 1.05, 0.7),
-                    cabinCFrame(4.5 + jarIndex * 1.1, 2.9, -3.2),
+                    -- A Roblox Cylinder extends along its LOCAL X axis, so the
+                    -- first component is the jar's height and the other two its
+                    -- diameter. Sized (0.7, 1.05, 0.7) with no rotation these
+                    -- were squat discs lying on their sides, not standing jars.
+                    Vector3.new(1.05, 0.7, 0.7),
+                    cabinCFrame(4.5 + jarIndex * 1.1, 2.9, -3.2) * CFrame.Angles(0, 0, math.rad(90)),
                     if jarIndex == 0 then FOXFIRE else AMBER,
                     Enum.Material.Glass,
                     false
@@ -20778,6 +20797,18 @@ local function buildEmberhollowSanctuary(
                 jar.Shape = Enum.PartType.Cylinder
                 jar.Transparency = 0.22
                 jar.CanQuery = false
+                local lid = part(
+                    cabinFolder,
+                    "MemoryJarLid",
+                    Vector3.new(0.16, 0.76, 0.76),
+                    cabinCFrame(4.5 + jarIndex * 1.1, 3.46, -3.2)
+                        * CFrame.Angles(0, 0, math.rad(90)),
+                    Color3.fromRGB(72, 51, 34),
+                    Enum.Material.Wood,
+                    false
+                )
+                lid.Shape = Enum.PartType.Cylinder
+                lid.CanQuery = false
             end
         else
             for bedIndex = -1, 1, 2 do
@@ -23369,8 +23400,9 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             local cup = part(
                 display,
                 "TorchCup",
-                Vector3.new(1.2, 0.72, 1.2),
-                displayFrame * CFrame.new(0, 6.05, 0),
+                -- Cylinder axis is local X: (height, diameter, diameter).
+                Vector3.new(0.72, 1.2, 1.2),
+                displayFrame * CFrame.new(0, 6.05, 0) * CFrame.Angles(0, 0, math.rad(90)),
                 Color3.fromRGB(92, 71, 48),
                 Enum.Material.Metal,
                 false
@@ -26420,8 +26452,9 @@ local function buildTownProgressionBuildings(
             local pot = part(
                 model,
                 "QuartermasterCookpot",
-                Vector3.new(2.4, 1.5, 2.4),
-                CFrame.new(2.5, -0.8, -0.2),
+                -- Cylinder axis is local X: (height, diameter, diameter).
+                Vector3.new(1.5, 2.4, 2.4),
+                CFrame.new(2.5, -0.8, -0.2) * CFrame.Angles(0, 0, math.rad(90)),
                 Color3.fromRGB(87, 91, 88),
                 Enum.Material.Metal,
                 false
@@ -27694,8 +27727,9 @@ local function buildNightThemeDressing(parent: Instance, theme: string): Model
                 local basin = part(
                     model,
                     "EmberCatchBasin",
-                    Vector3.new(3.4, 0.7, 3.4),
-                    CFrame.new(center),
+                    -- Cylinder axis is local X: (height, diameter, diameter).
+                    Vector3.new(0.7, 3.4, 3.4),
+                    CFrame.new(center) * CFrame.Angles(0, 0, math.rad(90)),
                     Color3.fromRGB(72, 58, 49),
                     Enum.Material.Slate,
                     false
@@ -27704,8 +27738,9 @@ local function buildNightThemeDressing(parent: Instance, theme: string): Model
                 local coal = part(
                     model,
                     "CaughtEmbers",
-                    Vector3.new(2.2, 0.35, 2.2),
-                    CFrame.new(center + Vector3.new(0, 0.48, 0)),
+                    -- Cylinder axis is local X: (height, diameter, diameter).
+                    Vector3.new(0.35, 2.2, 2.2),
+                    CFrame.new(center + Vector3.new(0, 0.48, 0)) * CFrame.Angles(0, 0, math.rad(90)),
                     accent,
                     Enum.Material.Neon,
                     false
