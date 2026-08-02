@@ -10,12 +10,14 @@ export type Pose = {
 
 local HOVERING = table.freeze({
     hollow_crow = true,
-    pollen_wisp = true,
 })
 
 local function profile(modelKey: string): (number, number)
     if HOVERING[modelKey] then
         return 0.52, 2.45
+    elseif modelKey == "zombie" then
+        -- Slow, heavy, uneven: a shamble rather than a stride.
+        return 0.16, 3.1
     elseif modelKey == "bark_ram" then
         return 0.13, 7.2
     elseif modelKey == "briarback" then

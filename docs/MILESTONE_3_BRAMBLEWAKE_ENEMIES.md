@@ -34,7 +34,7 @@ later [elite increment](MILESTONE_3_OLD_GROWTH_ELITE.md).
 |---:|---|---|---|
 | 1 | `enemy_rootling` | readable circular swipe | leave the ring or dodge |
 | 2 | `enemy_briarback` | strong frontal shield and lane sweep | move to its side/back; frontal hits still deal bounded damage |
-| 3 | `enemy_pollen_wisp` | broad sleep cloud and 3-second movement slow | leave the cloud before resolve; keep moving while `DROWSY` |
+| 3 | `enemy_zombie` | broad rot miasma and 3-second movement slow | leave the miasma before resolve; keep moving while `DROWSY` |
 | 4 | `enemy_hollow_crow` | quick swoop that steals an exposed lantern spark | step out of the narrow lane and intercept the low-health crow |
 | 5 | `enemy_snapvine` | stationary route-denial ring | approach, bait the bite, retreat, and strike during recovery |
 | 6 | `enemy_bark_ram` | long charge lane and high structure pressure | clear the lane and defeat it before repeated lantern impacts |
@@ -96,7 +96,7 @@ animation loop, and a bounded 20 Hz server movement step.
    countdown, miss/dodge path, one hit, defeat, and next queued spawn.
 5. Strike the Briarback from front and rear. Require the explicit shield/flank
    messages and a possible solo defeat from either side.
-6. Let one Pollen Wisp cloud hit. Require sprint cancellation, slower movement,
+6. Let one Hollow Zombie miasma hit. Require sprint cancellation, slower movement,
    visible `DROWSY` time, natural expiry, and normal speed restoration.
 7. Let one Hollow Crow swoop hit. Require only temporary lantern damage—never
    banked inventory loss.
@@ -119,7 +119,7 @@ animation loop, and a bounded 20 Hz server movement step.
 | Touch | threat card and stamina rail avoid Roblox top bar, thumbstick, jump, STRIKE, DODGE, ability, and context controls |
 | Geometry | circle/lane visuals match server hit areas at every orientation and terrain height |
 | Briarback | frontal shield never creates invulnerability; flank detection cannot be forged |
-| Pollen Wisp | drowsy expires, cannot stack into immobility, and clears on respawn |
+| Hollow Zombie | drowsy expires, cannot stack into immobility, and clears on respawn |
 | Hollow Crow | only temporary lantern light is stolen; inventory and profile remain unchanged |
 | Snapvine | reachable from the trail and every strike position has an escape route |
 | Bark Ram | charge is avoidable and lantern failure remains recoverable |

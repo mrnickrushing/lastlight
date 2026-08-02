@@ -76,7 +76,7 @@ count, or the night number; it only renders the snapshot the server publishes.
 night 6 — the night immediately before the seventh-night Blackout threshold.
 Waves are spread deterministically across the middle 80% of the night
 (`5%–85%` of its duration) and cycle through the same six enemies
-(`enemy_rootling`, `enemy_briarback`, `enemy_pollen_wisp`, `enemy_hollow_crow`,
+(`enemy_rootling`, `enemy_briarback`, `enemy_zombie`, `enemy_hollow_crow`,
 `enemy_snapvine`, `enemy_bark_ram`) in a fixed order, with one `breach` beat
 placed after the midpoint wave. No randomness is involved, so a given night
 number always produces the same schedule — the same determinism guarantee the

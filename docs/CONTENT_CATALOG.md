@@ -54,7 +54,7 @@ geometry and gameplay affordances differ.
 |---|---|---|
 | enemy_rootling | Rootling | basic melee pressure with clear lunge |
 | enemy_briarback | Briarback | shielded front encourages flanking |
-| enemy_pollen_wisp | Pollen Wisp | sleep cloud and visibility pressure |
+| enemy_zombie | Hollow Zombie | rot miasma and visibility pressure |
 | enemy_hollow_crow | Hollow Crow | steals loose unbanked resource bundles |
 | enemy_snapvine | Snapvine | stationary route denial, cut or distract |
 | enemy_bark_ram | Bark Ram | telegraphed structure charge |

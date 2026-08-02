@@ -31,7 +31,7 @@ return {
             run = function()
                 local pending = NightSchedule.pending(120, 40)
                 TestRunner.equal(#pending, 5)
-                TestRunner.equal(pending[1].enemyId, "enemy_pollen_wisp")
+                TestRunner.equal(pending[1].enemyId, "enemy_zombie")
                 TestRunner.equal(pending[2].kind, "breach")
             end,
         },

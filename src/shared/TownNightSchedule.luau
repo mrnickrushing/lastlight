@@ -18,7 +18,7 @@ export type Beat = {
 local ROSTER: { string } = {
     "enemy_rootling",
     "enemy_briarback",
-    "enemy_pollen_wisp",
+    "enemy_zombie",
     "enemy_hollow_crow",
     "enemy_snapvine",
     "enemy_bark_ram",

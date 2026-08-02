@@ -12,7 +12,7 @@ local BEATS: { Beat } = {
     { at = 0, kind = "warning", enemyId = nil },
     { at = 4, kind = "spawn", enemyId = "enemy_rootling" },
     { at = 22, kind = "spawn", enemyId = "enemy_briarback" },
-    { at = 40, kind = "spawn", enemyId = "enemy_pollen_wisp" },
+    { at = 40, kind = "spawn", enemyId = "enemy_zombie" },
     { at = 56, kind = "breach", enemyId = nil },
     { at = 58, kind = "spawn", enemyId = "enemy_hollow_crow" },
     { at = 76, kind = "spawn", enemyId = "enemy_snapvine" },

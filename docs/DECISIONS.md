@@ -522,3 +522,31 @@ placeholder-quality production across seven regions would multiply rework and
 leave no proven bar. A finished vertical slice turns the remaining regions into
 a controlled content pipeline while preserving each region's own hazards,
 landmarks, and palette accents.
+
+## 2026-08-02 — The Pollen Wisp becomes the Hollow Zombie on an original mesh
+
+**Decision:** Retire `enemy_pollen_wisp` and its Creator Store shell
+`mesh_creator_blossom_spirit_a`. The third slot in the Bramblewake roster is now
+`enemy_zombie`, the Hollow Zombie, whose visual is `mesh_zombie_a` — an original
+asset generated from the style formula in VISUAL_QUALITY_STANDARD.md and
+normalized through the existing Blender pipeline. The encounter keeps its
+mechanics exactly: same health, speed, ranges, cooldown, circle telegraph, and
+the `drowsy` status. Only the fiction changes, from an inhaled sleep cloud to a
+rot miasma. The creature also stops hovering and walks.
+
+**Reason:** Roblox moderated the Creator Store model on 2026-08-02
+(`wasModerated: true`, 403 to a logged-in Studio user), so the enemy silently
+fell back to placeholder geometry in a shipped-quality slice. Re-sourcing from
+the store would carry the same risk again, and the store search returned no
+model at this quality bar: the one first-party zombie draws its detail from
+`CharacterMesh` objects that only render with a `Humanoid`, which
+`MeshTemplateLoader` strips by design. An original generated asset cannot be
+revoked by a third party, and the standard already prefers original sources.
+Preserving the mechanics keeps the roster's readability contract, the 1,000-seed
+invariants, and the drowsy balance tests intact, so this is a re-skin of an
+authored encounter rather than a new one.
+
+**Stable-ID note:** `enemy_pollen_wisp` is renamed rather than repurposed. It
+has never shipped in save data — enemy IDs live only in the night schedules and
+telemetry, not in the save schema — so no migration is required.
+

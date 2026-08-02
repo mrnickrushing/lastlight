@@ -973,32 +973,6 @@
       "scripts": 0,
       "bytes": 122841
     },
-    "mesh_creator_blossom_spirit_a": {
-      "boundsMin": [
-        21.4,
-        2.4,
-        -9.4
-      ],
-      "boundsMax": [
-        22.0,
-        3.0,
-        -8.8
-      ],
-      "dimensions": [
-        0.6,
-        0.6,
-        0.6
-      ],
-      "longestDimension": 0.6,
-      "triangles": 0,
-      "meshObjects": 1,
-      "materials": [
-        "creator_source_preserved"
-      ],
-      "baseParts": 1,
-      "scripts": 0,
-      "bytes": 2416
-    },
     "mesh_creator_raven_a": {
       "boundsMin": [
         -31.1978,
@@ -1258,6 +1232,56 @@
       "baseParts": 10,
       "scripts": 0,
       "bytes": 4488
+    },
+    "mesh_zombie_a": {
+      "boundsMin": [
+        -1.9618,
+        -0.9717,
+        0.0
+      ],
+      "boundsMax": [
+        1.9618,
+        0.9717,
+        6.0
+      ],
+      "dimensions": [
+        3.9236,
+        1.9434,
+        6.0
+      ],
+      "longestDimension": 6.0,
+      "triangles": 6102,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "normal",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        }
+      ],
+      "bytes": 11751292
     }
   }
 }

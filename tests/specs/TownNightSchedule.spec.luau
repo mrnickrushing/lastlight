@@ -81,7 +81,7 @@ return {
                 end
                 TestRunner.equal(seen.enemy_rootling, true)
                 TestRunner.equal(seen.enemy_briarback, true)
-                TestRunner.equal(seen.enemy_pollen_wisp, true)
+                TestRunner.equal(seen.enemy_zombie, true)
                 TestRunner.equal(seen.enemy_hollow_crow, true)
                 TestRunner.equal(seen.enemy_snapvine, true)
                 TestRunner.equal(seen.enemy_bark_ram, true)
