@@ -20370,6 +20370,41 @@ local function queueRoadAssetPlacements(
     end
 end
 
+--[[
+    Clear terrain above a road so nothing can bury it.
+
+    The whole road stack is under a stud tall -- foundation, surface, and worn
+    centre together top out around 0.9 -- while the valley floor fills to
+    GROUND_Y. That leaves almost no margin, and it has already gone wrong once:
+    a half-voxel error in the floor fill put the surface a stud high and every
+    road in the world vanished under the grass with nothing in the logs.
+
+    Rather than rely on the two numbers staying in agreement, cut the corridor
+    out. Terrain is filled before any road is placed, so clearing a box from
+    just above the floor upward removes anything that could sit over the
+    surface and is a harmless no-op when the floor is already correct. The cut
+    is kept narrower than the road so the edges still meet grass instead of
+    leaving a floating lip.
+]]
+local function clearRoadCorridor(startPosition: Vector3, finishPosition: Vector3, width: number)
+    local delta = finishPosition - startPosition
+    local length = delta.Magnitude
+    if length <= 0.05 or width <= 2 then
+        return
+    end
+    local midpoint = (startPosition + finishPosition) * 0.5
+    local frame = CFrame.lookAt(
+        Vector3.new(midpoint.X, 0, midpoint.Z),
+        Vector3.new(finishPosition.X, 0, finishPosition.Z)
+    )
+    local clearHeight = 14
+    Workspace.Terrain:FillBlock(
+        frame * CFrame.new(0, 0.1 + clearHeight * 0.5, 0),
+        Vector3.new(width - 2, clearHeight, length + 2),
+        Enum.Material.Air
+    )
+end
+
 local function buildEmberhollowSanctuary(
     parent: Instance,
     meshPlacements: { MeshPlacement }
@@ -21160,6 +21195,7 @@ local function buildEmberhollowSanctuary(
         )
         rut.CanQuery = false
     end
+    clearRoadCorridor(Vector3.new(0, 0, 1), Vector3.new(0, 0, -205), 18)
     queueRoadAssetPlacements(
         meshPlacements,
         parent,
@@ -21170,6 +21206,7 @@ local function buildEmberhollowSanctuary(
     local function townSideRoad(start: Vector3, finish: Vector3)
         local delta = finish - start
         local frame = CFrame.lookAt((start + finish) / 2, finish)
+        clearRoadCorridor(start, finish, 8.6)
         local base = part(
             parent,
             "TownDistrictRoadFoundation",
@@ -22224,6 +22261,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         local distance = delta.Magnitude
         local midpoint = (start + finish) / 2
         local roadFrame = CFrame.lookAt(midpoint, finish)
+        clearRoadCorridor(start, finish, 17.2)
         local foundation = part(
             geometry,
             "EmberhollowRoadFoundation",
@@ -22573,7 +22611,13 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         table.insert(_self._nightDefenseSignals, marker)
     end
     for side = -1, 1, 2 do
-        local towerCenter = Vector3.new(side * 10.5, 0, -143)
+        -- Gate towers flank the Dawn Gate at (0, -148). At x = +/-10.5 they
+        -- stood 21 studs apart across an 18-stud road -- effectively touching
+        -- the verges, with no room for the gate between them. Real gatehouse
+        -- towers sit outside the opening on the wall line, far enough apart
+        -- that traffic passes cleanly between and each tower covers the other's
+        -- approach. 38 studs apart, level with the gate.
+        local towerCenter = Vector3.new(side * 19, 0, -148)
         local towerFallback = Instance.new("Model")
         towerFallback.Name = "WatchtowerFallback"
         towerFallback.Parent = defenseRoute
@@ -23901,6 +23945,49 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     beacon.Transparency = 1
     beacon.CanQuery = false
     self._beacon = beacon
+    -- The beacon fades in from fully transparent, so before this it revealed
+    -- as a bare glowing sphere hanging in the middle of the gateway. The orb
+    -- stays the interaction anchor -- name, prompt, and reveal tween are
+    -- untouched -- but it now hangs in a physical cradle slung under the gate
+    -- crown, so what lights up reads as a memory lamp mounted in the arch
+    -- rather than an orb floating in mid-air.
+    local beaconCradle = part(
+        interactables,
+        "BeaconCradleMount",
+        Vector3.new(0.34, 3.6, 0.34),
+        CFrame.new(0, 10.4, -148),
+        Color3.fromRGB(47, 50, 52),
+        Enum.Material.Metal,
+        false
+    )
+    beaconCradle.CanQuery = false
+    for armIndex = 0, 3 do
+        local armAngle = (armIndex / 4) * math.pi * 2
+        local arm = part(
+            interactables,
+            "BeaconCradleArm",
+            Vector3.new(0.26, 2.9, 0.26),
+            CFrame.new(0, 8.05, -148)
+                * CFrame.Angles(0, armAngle, 0)
+                * CFrame.new(0, 0, -1.5)
+                * CFrame.Angles(math.rad(26), 0, 0),
+            Color3.fromRGB(47, 50, 52),
+            Enum.Material.Metal,
+            false
+        )
+        arm.CanQuery = false
+    end
+    local beaconCollar = part(
+        interactables,
+        "BeaconCradleCollar",
+        Vector3.new(0.3, 2.9, 2.9),
+        CFrame.new(0, 8.6, -148) * CFrame.Angles(0, 0, math.rad(90)),
+        Color3.fromRGB(47, 50, 52),
+        Enum.Material.Metal,
+        false
+    )
+    beaconCollar.Shape = Enum.PartType.Cylinder
+    beaconCollar.CanQuery = false
     self:_registerInteraction(
         beacon,
         self._runtimeIds.InteractionIds.Beacon,
@@ -24414,6 +24501,164 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             )
             rootRing.CanQuery = false
         end
+        -- A dais, two flat rings and a sign is not a hero location. The
+        -- standard forbids shipping an interaction as a plain block, pedestal,
+        -- orb, or ring, and this was all four at once. Every anchor below
+        -- keeps its name, attributes, and interaction IDs; what follows is
+        -- physical construction wrapped around them so a mastery clearing
+        -- reads as a built shrine rather than decoration on the floor.
+        local shrineBase = CFrame.new(altar.center)
+        for postX = -1, 1, 2 do
+            for postZ = -1, 1, 2 do
+                local post = part(
+                    masteryGrove,
+                    altar.name .. "MasteryPost",
+                    Vector3.new(0.85, 9.2, 0.85),
+                    shrineBase
+                        * CFrame.new(postX * 6.4, 4.6, postZ * 3.9)
+                        * CFrame.Angles(0, 0, math.rad(postX * 1.5)),
+                    WET_BARK,
+                    Enum.Material.Wood,
+                    false
+                )
+                post.CanQuery = false
+                local brace = part(
+                    masteryGrove,
+                    altar.name .. "MasteryBrace",
+                    Vector3.new(0.5, 3.1, 0.5),
+                    shrineBase
+                        * CFrame.new(postX * 5.6, 7.6, postZ * 3.3)
+                        * CFrame.Angles(math.rad(postZ * 34), 0, math.rad(-postX * 30)),
+                    BARK,
+                    Enum.Material.Wood,
+                    false
+                )
+                brace.CanQuery = false
+            end
+        end
+        for beamZ = -1, 1, 2 do
+            local beam = part(
+                masteryGrove,
+                altar.name .. "MasteryBeam",
+                Vector3.new(14.2, 0.7, 0.7),
+                shrineBase * CFrame.new(0, 9.05, beamZ * 3.9),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+            beam.CanQuery = false
+        end
+        for roofSide = -1, 1, 2 do
+            local roof = part(
+                masteryGrove,
+                altar.name .. "MasteryCanopy",
+                Vector3.new(15, 0.42, 5.4),
+                shrineBase
+                    * CFrame.new(0, 10.1, roofSide * 2.05)
+                    * CFrame.Angles(math.rad(roofSide * 21), 0, 0),
+                Color3.fromRGB(47, 53, 48),
+                Enum.Material.Slate,
+                false
+            )
+            roof.CanQuery = false
+        end
+        local ridge = part(
+            masteryGrove,
+            altar.name .. "MasteryRidge",
+            Vector3.new(15.4, 0.5, 0.5),
+            shrineBase * CFrame.new(0, 11.1, 0),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+        ridge.CanQuery = false
+        -- Profession colour belongs on cloth, not on a glowing shape.
+        local banner = part(
+            masteryGrove,
+            altar.name .. "MasteryBanner",
+            Vector3.new(4.6, 5.4, 0.16),
+            shrineBase * CFrame.new(0, 5.6, 3.72) * CFrame.Angles(math.rad(2), 0, 0),
+            altar.color,
+            Enum.Material.Fabric,
+            false
+        )
+        banner.CanQuery = false
+        local bannerRod = part(
+            masteryGrove,
+            altar.name .. "MasteryBannerRod",
+            Vector3.new(5.4, 0.24, 0.24),
+            shrineBase * CFrame.new(0, 8.35, 3.72),
+            Color3.fromRGB(47, 50, 52),
+            Enum.Material.Metal,
+            false
+        )
+        bannerRod.CanQuery = false
+        -- Somewhere to actually work, with the craft laid out on it.
+        local bench = part(
+            masteryGrove,
+            altar.name .. "MasteryBench",
+            Vector3.new(6.4, 0.42, 1.9),
+            shrineBase * CFrame.new(-3.4, 3.05, 2.5),
+            Color3.fromRGB(96, 68, 45),
+            Enum.Material.WoodPlanks,
+            false
+        )
+        bench.CanQuery = false
+        for legX = -1, 1, 2 do
+            local benchLeg = part(
+                masteryGrove,
+                altar.name .. "MasteryBenchLeg",
+                Vector3.new(0.34, 2.7, 0.34),
+                shrineBase * CFrame.new(-3.4 + legX * 2.7, 1.7, 2.5),
+                BARK,
+                Enum.Material.Wood,
+                false
+            )
+            benchLeg.CanQuery = false
+        end
+        for toolIndex = -1, 1 do
+            local supply = part(
+                masteryGrove,
+                altar.name .. "MasterySupply",
+                Vector3.new(0.95, 0.85, 0.95),
+                shrineBase
+                    * CFrame.new(-3.4 + toolIndex * 1.85, 3.68, 2.5)
+                    * CFrame.Angles(0, math.rad(toolIndex * 11), 0),
+                if toolIndex == 0 then Color3.fromRGB(121, 96, 58) else Color3.fromRGB(89, 63, 42),
+                Enum.Material.WoodPlanks,
+                false
+            )
+            supply.CanQuery = false
+        end
+        -- Restrained practical light, hung from the frame rather than floating.
+        local hookChain = part(
+            masteryGrove,
+            altar.name .. "MasteryLanternChain",
+            Vector3.new(0.14, 1.3, 0.14),
+            shrineBase * CFrame.new(5.5, 8.65, 2.1),
+            Color3.fromRGB(47, 50, 52),
+            Enum.Material.Metal,
+            false
+        )
+        hookChain.CanQuery = false
+        local hookLantern = part(
+            masteryGrove,
+            altar.name .. "MasteryLantern",
+            Vector3.new(0.78, 1.05, 0.78),
+            shrineBase * CFrame.new(5.5, 7.5, 2.1),
+            AMBER,
+            Enum.Material.Neon,
+            false
+        )
+        hookLantern.CanQuery = false
+        hookLantern.Transparency = 0.18
+        local masteryLight = Instance.new("PointLight")
+        masteryLight.Color = AMBER
+        masteryLight.Brightness = 1.2
+        masteryLight.Range = 17
+        masteryLight.Shadows = false
+        masteryLight.Parent = hookLantern
+        CollectionService:AddTag(hookLantern, self._runtimeIds.AmbientLightTag)
         labelSign(
             masteryGrove,
             CFrame.new(altar.center + Vector3.new(0, 4.8, 3.7)) * CFrame.Angles(0, math.pi, 0),
@@ -35300,6 +35545,37 @@ for _, descendant in world:GetDescendants() do
     end
 end
 assert(routeGuides >= 12, "the critical route needs a readable glowing trail")
+-- Gate towers stood 21 studs apart across an 18-stud road, touching the verges
+-- with no room for the gate between them. Nothing checked their separation.
+local watchtowers = {}
+for _, descendant in world:GetDescendants() do
+    if descendant.Name == "WatchtowerFallback" and descendant:IsA("Model") then
+        local pivot = descendant:GetPivot()
+        table.insert(watchtowers, pivot.Position)
+    end
+end
+assert(#watchtowers == 2, "the defense route needs two gate towers")
+assert(
+    math.abs(watchtowers[1].X - watchtowers[2].X) >= 30,
+    "gate towers must stand clear of the road, not shoulder to shoulder across it"
+)
+
+-- Each mastery clearing was a dais, two flat rings, and a sign. The standard
+-- forbids shipping an interaction as a plain block, pedestal, orb, or ring.
+local masteryPosts, masteryCanopies, masteryBanners = 0, 0, 0
+for _, descendant in world:GetDescendants() do
+    if string.find(descendant.Name, "MasteryPost", 1, true) ~= nil then
+        masteryPosts += 1
+    elseif string.find(descendant.Name, "MasteryCanopy", 1, true) ~= nil then
+        masteryCanopies += 1
+    elseif string.find(descendant.Name, "MasteryBanner", 1, true) ~= nil then
+        masteryBanners += 1
+    end
+end
+assert(masteryPosts >= 16, "mastery clearings need a standing timber frame")
+assert(masteryCanopies >= 8, "mastery clearings need a roof over the work area")
+assert(masteryBanners >= 4, "mastery clearings need a profession banner")
+
 assert(world:GetAttribute("TownIntegrity") == 100, "new towns must begin fully repaired")
 assert(world:GetAttribute("TownDamageLevel") == 0, "new towns cannot begin visibly damaged")
 assert(

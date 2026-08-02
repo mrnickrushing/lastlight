@@ -782,6 +782,37 @@ for _, descendant in world:GetDescendants() do
     end
 end
 assert(routeGuides >= 12, "the critical route needs a readable glowing trail")
+-- Gate towers stood 21 studs apart across an 18-stud road, touching the verges
+-- with no room for the gate between them. Nothing checked their separation.
+local watchtowers = {}
+for _, descendant in world:GetDescendants() do
+    if descendant.Name == "WatchtowerFallback" and descendant:IsA("Model") then
+        local pivot = descendant:GetPivot()
+        table.insert(watchtowers, pivot.Position)
+    end
+end
+assert(#watchtowers == 2, "the defense route needs two gate towers")
+assert(
+    math.abs(watchtowers[1].X - watchtowers[2].X) >= 30,
+    "gate towers must stand clear of the road, not shoulder to shoulder across it"
+)
+
+-- Each mastery clearing was a dais, two flat rings, and a sign. The standard
+-- forbids shipping an interaction as a plain block, pedestal, orb, or ring.
+local masteryPosts, masteryCanopies, masteryBanners = 0, 0, 0
+for _, descendant in world:GetDescendants() do
+    if string.find(descendant.Name, "MasteryPost", 1, true) ~= nil then
+        masteryPosts += 1
+    elseif string.find(descendant.Name, "MasteryCanopy", 1, true) ~= nil then
+        masteryCanopies += 1
+    elseif string.find(descendant.Name, "MasteryBanner", 1, true) ~= nil then
+        masteryBanners += 1
+    end
+end
+assert(masteryPosts >= 16, "mastery clearings need a standing timber frame")
+assert(masteryCanopies >= 8, "mastery clearings need a roof over the work area")
+assert(masteryBanners >= 4, "mastery clearings need a profession banner")
+
 assert(world:GetAttribute("TownIntegrity") == 100, "new towns must begin fully repaired")
 assert(world:GetAttribute("TownDamageLevel") == 0, "new towns cannot begin visibly damaged")
 assert(
