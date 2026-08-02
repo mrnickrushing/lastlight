@@ -1782,8 +1782,12 @@ return table.freeze({
     BaseJumpPower = 50,
     SprintWalkSpeed = 24,
     MaxStamina = 100,
-    SprintDrainPerSecond = 18,
-    StaminaRegenPerSecond = 24,
+    -- A full bar used to empty in about five seconds, which made sprinting
+    -- feel broken rather than costly. At 7/s a full bar carries roughly
+    -- fourteen seconds of running, long enough to cross the arrival clearing
+    -- or break away from a wave, while still forcing a decision in a fight.
+    SprintDrainPerSecond = 7,
+    StaminaRegenPerSecond = 16,
     StaminaRegenDelaySeconds = 0.75,
     MinSprintStamina = 10,
     DodgeStaminaCost = 35,
@@ -21263,8 +21267,8 @@ local BARRICADE_CENTER = Vector3.new(-44, 0, -92)
 -- leaves it. Inside the flat valley bowl (x -190..190, z -260..90), so every
 -- authored coordinate here sits on level ground.
 local LOBBY_CENTER = Vector3.new(0, 0, 62)
-local DEPARTURE_PLATFORM_CENTER = Vector3.new(0, 0, 44)
-local DEPARTURE_PLATFORM_RADIUS = 11
+local DEPARTURE_PLATFORM_CENTER = Vector3.new(0, 0, 54)
+local DEPARTURE_PLATFORM_RADIUS = 9
 -- Shared palette for the generated forest. Kept next to the existing colour
 -- anchors so the treeline and the town read as the same world.
 local FOLIAGE_TONE: FoliageBuilder.Tone = {
@@ -24222,388 +24226,420 @@ function WorldService._buildLobby(self: WorldService, world: Model)
     lobby.Parent = world
     self._lobby = lobby
 
+    -- Interior half-extents. The room is deliberately oversized for a cabin:
+    -- a third-person camera needs to orbit a whole party inside it without
+    -- clipping the walls, and the departure platform needs clear floor around
+    -- it so stepping on is an obvious, deliberate act.
+    local halfWidth = 32
+    local halfDepth = 24
+    local wallHeight = 18
+
     groundPatch(
         lobby,
-        LOBBY_CENTER + Vector3.new(0, 0, 4),
-        Vector3.new(76, 0.3, 74),
-        Color3.fromRGB(48, 57, 46),
+        LOBBY_CENTER,
+        Vector3.new(halfWidth * 2 + 20, 0.3, halfDepth * 2 + 20),
+        Color3.fromRGB(46, 55, 45),
         Enum.Material.LeafyGrass
     )
-    local court = part(
-        lobby,
-        "LobbyCourtyard",
-        Vector3.new(56, 0.34, 52),
-        CFrame.new(LOBBY_CENTER + Vector3.new(0, 0.2, 6)),
-        Color3.fromRGB(96, 99, 92),
-        Enum.Material.Slate,
-        false
-    )
-    court.CanQuery = false
-    for edgeIndex = -3, 3 do
-        for edgeSide = -1, 1, 2 do
-            local edge = part(
-                lobby,
-                "LobbyCourtEdge",
-                Vector3.new(3.4, 0.5, 3.4),
-                CFrame.new(LOBBY_CENTER + Vector3.new(edgeSide * 28.4, 0.25, 6 + edgeIndex * 7.6))
-                    * CFrame.Angles(0, math.rad(edgeIndex * 6), 0),
-                Color3.fromRGB(78, 82, 76),
-                Enum.Material.Slate,
-                false
-            )
-            edge.CanQuery = false
-        end
-    end
 
-    -- Departure platform: raised, banded, and ringed with lantern posts so it
-    -- reads as a threshold rather than a patch of floor.
-    local platform = part(
+    local floor = part(
         lobby,
-        "DeparturePlatform",
-        Vector3.new(DEPARTURE_PLATFORM_RADIUS * 2, 1.2, DEPARTURE_PLATFORM_RADIUS * 2),
-        CFrame.new(DEPARTURE_PLATFORM_CENTER + Vector3.new(0, 0.6, 0)),
-        Color3.fromRGB(74, 55, 40),
+        "LodgeFloor",
+        Vector3.new(halfWidth * 2, 1, halfDepth * 2),
+        CFrame.new(LOBBY_CENTER + Vector3.new(0, 0.5, 0)),
+        Color3.fromRGB(86, 62, 43),
         Enum.Material.WoodPlanks
     )
-    self._departurePlatform = platform
-    local platformRim = part(
-        lobby,
-        "DeparturePlatformRim",
-        Vector3.new(DEPARTURE_PLATFORM_RADIUS * 2 + 2.2, 0.55, DEPARTURE_PLATFORM_RADIUS * 2 + 2.2),
-        CFrame.new(DEPARTURE_PLATFORM_CENTER + Vector3.new(0, 0.28, 0)),
-        Color3.fromRGB(56, 60, 56),
-        Enum.Material.Slate,
-        false
-    )
-    platformRim.CanQuery = false
-    for plankIndex = -4, 4 do
+    floor.CanQuery = false
+    for plankIndex = -15, 15 do
         local plank = part(
             lobby,
-            "DeparturePlank",
-            Vector3.new(1.5, 0.12, DEPARTURE_PLATFORM_RADIUS * 1.9),
-            CFrame.new(DEPARTURE_PLATFORM_CENTER + Vector3.new(plankIndex * 2.3, 1.24, 0)),
-            if plankIndex % 2 == 0 then Color3.fromRGB(84, 62, 44) else Color3.fromRGB(69, 51, 37),
+            "LodgeFloorPlank",
+            Vector3.new(1.9, 0.08, halfDepth * 2 - 1),
+            CFrame.new(LOBBY_CENTER + Vector3.new(plankIndex * 2.05, 1.02, 0)),
+            if plankIndex % 2 == 0 then Color3.fromRGB(94, 68, 47) else Color3.fromRGB(78, 56, 39),
             Enum.Material.WoodPlanks,
             false
         )
         plank.CanQuery = false
     end
-    -- A ring inlaid into the deck: the standing mark, so a player can see
-    -- where "on the platform" actually is without a floating label.
-    for markIndex = 0, 23 do
-        local angle = (markIndex / 24) * math.pi * 2
-        local mark = part(
+
+    -- Walls stay collidable so the camera stops at them and the room reads as
+    -- an interior. The roof above is non-colliding, so the camera passes
+    -- through it instead of shoving itself into the player's back.
+    local function wall(name: string, size: Vector3, at: Vector3)
+        part(
             lobby,
-            "DepartureRing",
-            Vector3.new(1.1, 0.1, 0.5),
-            CFrame.new(
-                DEPARTURE_PLATFORM_CENTER
-                    + Vector3.new(
-                        math.cos(angle) * (DEPARTURE_PLATFORM_RADIUS - 1.4),
-                        1.3,
-                        math.sin(angle) * (DEPARTURE_PLATFORM_RADIUS - 1.4)
-                    )
-            ) * CFrame.Angles(0, -angle, 0),
-            AMBER,
-            Enum.Material.Neon,
-            false
+            name,
+            size,
+            CFrame.new(LOBBY_CENTER + at),
+            Color3.fromRGB(72, 52, 37),
+            Enum.Material.Wood
         )
-        mark.Transparency = 0.42
-        mark.CastShadow = false
-        mark.CanQuery = false
     end
-    for postIndex = 0, 3 do
-        local angle = (postIndex / 4) * math.pi * 2 + math.pi / 4
-        local postAt = DEPARTURE_PLATFORM_CENTER
-            + Vector3.new(
-                math.cos(angle) * (DEPARTURE_PLATFORM_RADIUS + 0.4),
-                0,
-                math.sin(angle) * (DEPARTURE_PLATFORM_RADIUS + 0.4)
+    wall(
+        "LodgeWallBack",
+        Vector3.new(halfWidth * 2, wallHeight, 1.2),
+        Vector3.new(0, wallHeight / 2, halfDepth)
+    )
+    for wallSide = -1, 1, 2 do
+        wall(
+            "LodgeWallSide",
+            Vector3.new(1.2, wallHeight, halfDepth * 2),
+            Vector3.new(wallSide * halfWidth, wallHeight / 2, 0)
+        )
+    end
+    -- Front wall with a wide doorway looking out toward Emberhollow.
+    for frontSide = -1, 1, 2 do
+        wall(
+            "LodgeWallFront",
+            Vector3.new(halfWidth - 7, wallHeight, 1.2),
+            Vector3.new(frontSide * (halfWidth + 7) / 2, wallHeight / 2, -halfDepth)
+        )
+    end
+    wall(
+        "LodgeDoorHeader",
+        Vector3.new(14, wallHeight - 11, 1.2),
+        Vector3.new(0, wallHeight - (wallHeight - 11) / 2, -halfDepth)
+    )
+
+    -- Log courses and corner posts so the walls read as built timber.
+    for courseIndex = 1, 5 do
+        for courseSide = -1, 1, 2 do
+            local course = part(
+                lobby,
+                "LodgeLogCourse",
+                Vector3.new(1.5, 1.5, halfDepth * 2),
+                CFrame.new(
+                    LOBBY_CENTER + Vector3.new(courseSide * (halfWidth - 0.4), courseIndex * 3.3, 0)
+                ),
+                if courseIndex % 2 == 0 then BARK else WET_BARK,
+                Enum.Material.Wood,
+                false
             )
-        local postFallback = Instance.new("Model")
-        postFallback.Name = "DepartureLanternFallback"
-        postFallback.Parent = lobby
-        part(
-            postFallback,
-            "DepartureLanternPost",
-            Vector3.new(0.6, 8.4, 0.6),
-            CFrame.new(postAt + Vector3.new(0, 4.2, 0)),
-            WET_BARK,
-            Enum.Material.Wood,
-            false
-        )
-        local lampGlow = part(
-            postFallback,
-            "DepartureLanternGlow",
-            Vector3.new(1.1, 1.4, 1.1),
-            CFrame.new(postAt + Vector3.new(0, 8.1, 0)),
-            AMBER,
-            Enum.Material.Neon,
-            false
-        )
-        lampGlow.CastShadow = false
-        local lampLight = Instance.new("PointLight")
-        lampLight.Color = AMBER
-        lampLight.Brightness = 1.35
-        lampLight.Range = 26
-        lampLight.Parent = lampGlow
-        CollectionService:AddTag(lampGlow, self._runtimeIds.AmbientLightTag)
-        table.insert(self._meshPlacements, {
-            assetId = "mesh_creator_street_lantern_a",
-            fallbackKind = "asset_replacement",
-            position = postAt,
-            scale = 0.92,
-            yaw = angle,
-            seed = 9401 + postIndex,
-            swayTag = nil,
-            parent = lobby,
-            fallbackInstance = postFallback,
-        })
+            course.CanQuery = false
+        end
     end
-
-    -- The gate the party leaves through, on the road south to the arrival.
-    local gateFallback = Instance.new("Model")
-    gateFallback.Name = "DepartureGateFallback"
-    gateFallback.Parent = lobby
-    for gateSide = -1, 1, 2 do
-        part(
-            gateFallback,
-            "DepartureGatePost",
-            Vector3.new(1.3, 12, 1.3),
-            CFrame.new(LOBBY_CENTER + Vector3.new(gateSide * 6, 6, -28)),
-            WET_BARK,
-            Enum.Material.Wood,
-            false
-        )
-    end
-    part(
-        gateFallback,
-        "DepartureGateLintel",
-        Vector3.new(13.4, 1.3, 1.3),
-        CFrame.new(LOBBY_CENTER + Vector3.new(0, 12, -28)),
-        BARK,
-        Enum.Material.WoodPlanks,
-        false
-    )
-    table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_wood_arch_a",
-        fallbackKind = "asset_replacement",
-        position = LOBBY_CENTER + Vector3.new(0, 0, -28),
-        scale = 1.1,
-        yaw = 0,
-        seed = 9410,
-        swayTag = nil,
-        parent = lobby,
-        fallbackInstance = gateFallback,
-    })
-    labelSign(
-        lobby,
-        CFrame.new(LOBBY_CENTER + Vector3.new(9.5, 0, -26)) * CFrame.Angles(0, math.rad(196), 0),
-        "TO EMBERHOLLOW"
-    )
-
-    -- Character hut: a real framed building with a roof, not an open slab.
-    local hutCenter = LOBBY_CENTER + Vector3.new(-21, 0, 18)
-    local hut = Instance.new("Folder")
-    hut.Name = "LobbyCharacterHut"
-    hut.Parent = lobby
-    local hutFloor = part(
-        hut,
-        "HutFloor",
-        Vector3.new(20, 0.5, 15),
-        CFrame.new(hutCenter + Vector3.new(0, 0.25, 0)),
-        Color3.fromRGB(88, 64, 45),
-        Enum.Material.WoodPlanks
-    )
-    hutFloor.CanQuery = false
-    for hutX = -1, 1, 2 do
-        for hutZ = -1, 1, 2 do
+    for cornerX = -1, 1, 2 do
+        for cornerZ = -1, 1, 2 do
             part(
-                hut,
-                "HutPost",
-                Vector3.new(0.9, 9, 0.9),
-                CFrame.new(hutCenter + Vector3.new(hutX * 9.2, 4.5, hutZ * 6.8)),
+                lobby,
+                "LodgeCornerPost",
+                Vector3.new(2.4, wallHeight + 1, 2.4),
+                CFrame.new(
+                    LOBBY_CENTER
+                        + Vector3.new(
+                            cornerX * halfWidth,
+                            (wallHeight + 1) / 2,
+                            cornerZ * halfDepth
+                        )
+                ),
                 WET_BARK,
                 Enum.Material.Wood,
                 false
             )
         end
     end
-    part(
-        hut,
-        "HutBackWall",
-        Vector3.new(20, 8.4, 0.6),
-        CFrame.new(hutCenter + Vector3.new(0, 4.2, 7)),
-        Color3.fromRGB(78, 58, 42),
-        Enum.Material.WoodPlanks
-    )
-    for wallSide = -1, 1, 2 do
-        part(
-            hut,
-            "HutSideWall",
-            Vector3.new(0.6, 8.4, 14),
-            CFrame.new(hutCenter + Vector3.new(wallSide * 9.7, 4.2, 0)),
-            Color3.fromRGB(78, 58, 42),
-            Enum.Material.WoodPlanks
-        )
-    end
-    part(
-        hut,
-        "HutRidgeBeam",
-        Vector3.new(20.6, 0.7, 0.7),
-        CFrame.new(hutCenter + Vector3.new(0, 10.4, 0)),
+
+    -- Roof: high, and non-colliding so the camera never fights it.
+    local ridgeHeight = wallHeight + 9
+    local ridge = part(
+        lobby,
+        "LodgeRidgeBeam",
+        Vector3.new(1.4, 1.4, halfDepth * 2 + 3),
+        CFrame.new(LOBBY_CENTER + Vector3.new(0, ridgeHeight, 0)),
         WET_BARK,
         Enum.Material.Wood,
         false
     )
+    ridge.CanQuery = false
     for roofSide = -1, 1, 2 do
         local roof = part(
-            hut,
-            "HutRoof",
-            Vector3.new(20.8, 2.6, 8.4),
-            CFrame.new(hutCenter + Vector3.new(0, 9.5, roofSide * 3.6))
+            lobby,
+            "LodgeRoof",
+            Vector3.new(halfWidth + 3, 10, halfDepth * 2 + 4),
+            CFrame.new(LOBBY_CENTER + Vector3.new(roofSide * (halfWidth / 2), wallHeight + 4.5, 0))
                 * CFrame.Angles(0, if roofSide < 0 then math.pi else 0, 0),
-            Color3.fromRGB(46, 52, 48),
+            Color3.fromRGB(48, 53, 49),
             Enum.Material.Slate,
             false
         )
         roof.Shape = Enum.PartType.Wedge
+        roof.CanQuery = false
     end
-    addBillboard(hutFloor, "CHOOSE YOUR CALLING", AMBER, 70)
+    for rafterIndex = -5, 5 do
+        for rafterSide = -1, 1, 2 do
+            local rafter = part(
+                lobby,
+                "LodgeRafter",
+                Vector3.new(0.5, 0.5, halfWidth * 0.72),
+                CFrame.new(
+                    LOBBY_CENTER
+                        + Vector3.new(
+                            rafterSide * halfWidth * 0.26,
+                            wallHeight + 4.6,
+                            rafterIndex * 4.3
+                        )
+                ) * CFrame.Angles(0, math.rad(90), math.rad(rafterSide * 30)),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+            rafter.CanQuery = false
+        end
+    end
 
-    -- One stand per profession, each with the prop that says what it does.
-    local callings = {
-        { id = "scout", label = "SCOUT", asset = "mesh_creator_forest_sign_a", tint = FOXFIRE },
-        { id = "warden", label = "WARDEN", asset = "mesh_creator_barricade_a", tint = AMBER },
-        { id = "engineer", label = "ENGINEER", asset = "mesh_creator_anvil_a", tint = CREAM },
-        {
-            id = "medic",
-            label = "MEDIC",
-            asset = "mesh_creator_potion_shelf_a",
-            tint = Color3.fromRGB(150, 196, 158),
-        },
-    }
-    for callingIndex, calling in callings do
-        local standAt = hutCenter + Vector3.new(-6.9 + (callingIndex - 1) * 4.6, 0.5, 2.6)
-        local standFallback = Instance.new("Model")
-        standFallback.Name = "CallingStandFallback_" .. calling.id
-        standFallback.Parent = hut
-        local pedestal = part(
-            standFallback,
-            "CallingPedestal",
-            Vector3.new(3, 2.6, 3),
-            CFrame.new(standAt + Vector3.new(0, 1.3, 0)),
-            Color3.fromRGB(70, 74, 70),
+    -- Warm interior light so the room is lit from inside, not by the sky.
+    for lampIndex = -1, 1, 2 do
+        for lampZ = -1, 1, 2 do
+            local lampAt = LOBBY_CENTER
+                + Vector3.new(lampIndex * (halfWidth - 9), wallHeight - 4, lampZ * (halfDepth - 8))
+            local lamp = part(
+                lobby,
+                "LodgeLamp",
+                Vector3.new(1.5, 1.8, 1.5),
+                CFrame.new(lampAt),
+                AMBER,
+                Enum.Material.Neon,
+                false
+            )
+            lamp.CastShadow = false
+            lamp.CanQuery = false
+            local lampLight = Instance.new("PointLight")
+            lampLight.Color = AMBER
+            lampLight.Brightness = 1.5
+            lampLight.Range = 42
+            lampLight.Parent = lamp
+            CollectionService:AddTag(lamp, self._runtimeIds.AmbientLightTag)
+        end
+    end
+
+    -- Hearth at the back wall: the reason a lodge feels occupied.
+    local hearthAt = LOBBY_CENTER + Vector3.new(0, 0, halfDepth - 4)
+    part(
+        lobby,
+        "LodgeHearth",
+        Vector3.new(13, 7, 4),
+        CFrame.new(hearthAt + Vector3.new(0, 4.5, 1.4)),
+        Color3.fromRGB(78, 82, 78),
+        Enum.Material.Slate
+    )
+    part(
+        lobby,
+        "LodgeHearthMantel",
+        Vector3.new(15, 0.8, 5.2),
+        CFrame.new(hearthAt + Vector3.new(0, 8.2, 1.2)),
+        WET_BARK,
+        Enum.Material.Wood,
+        false
+    )
+    local hearthFire = part(
+        lobby,
+        "LodgeHearthFire",
+        Vector3.new(4.5, 3, 1.8),
+        CFrame.new(hearthAt + Vector3.new(0, 2.6, 0.2)),
+        AMBER,
+        Enum.Material.Neon,
+        false
+    )
+    hearthFire.CastShadow = false
+    local hearthLight = Instance.new("PointLight")
+    hearthLight.Color = AMBER
+    hearthLight.Brightness = 2.4
+    hearthLight.Range = 48
+    hearthLight.Parent = hearthFire
+    CollectionService:AddTag(hearthFire, self._runtimeIds.AmbientLightTag)
+
+    --[[
+        The departure platform, in the middle of the floor and impossible to
+        miss: a raised timber dais on a stone base, ringed with a bright amber
+        inlay, lit from four corner posts, with a floating title above it.
+        Standing on it is the whole mechanic, so it is the brightest and most
+        deliberate object in the room.
+    ]]
+    local platform = part(
+        lobby,
+        "DeparturePlatform",
+        Vector3.new(DEPARTURE_PLATFORM_RADIUS * 2, 1.6, DEPARTURE_PLATFORM_RADIUS * 2),
+        CFrame.new(DEPARTURE_PLATFORM_CENTER + Vector3.new(0, 1.8, 0)),
+        Color3.fromRGB(84, 61, 43),
+        Enum.Material.WoodPlanks
+    )
+    self._departurePlatform = platform
+    local platformBase = part(
+        lobby,
+        "DeparturePlatformBase",
+        Vector3.new(DEPARTURE_PLATFORM_RADIUS * 2 + 3, 1.1, DEPARTURE_PLATFORM_RADIUS * 2 + 3),
+        CFrame.new(DEPARTURE_PLATFORM_CENTER + Vector3.new(0, 1.05, 0)),
+        Color3.fromRGB(66, 70, 66),
+        Enum.Material.Slate
+    )
+    platformBase.CanQuery = false
+    for stepSide = -1, 1, 2 do
+        local step = part(
+            lobby,
+            "DepartureStep",
+            Vector3.new(DEPARTURE_PLATFORM_RADIUS * 1.5, 0.6, 2.4),
+            CFrame.new(
+                DEPARTURE_PLATFORM_CENTER
+                    + Vector3.new(0, 0.8, stepSide * (DEPARTURE_PLATFORM_RADIUS + 2.4))
+            ),
+            Color3.fromRGB(74, 78, 74),
             Enum.Material.Slate
         )
-        local banner = part(
-            standFallback,
-            "CallingBanner",
-            Vector3.new(2.4, 3.4, 0.18),
-            CFrame.new(standAt + Vector3.new(0, 4.6, 0.9)),
-            calling.tint,
-            Enum.Material.Fabric,
+        step.CanQuery = false
+    end
+    for markIndex = 0, 31 do
+        local angle = (markIndex / 32) * math.pi * 2
+        local mark = part(
+            lobby,
+            "DepartureRing",
+            Vector3.new(1.3, 0.14, 0.6),
+            CFrame.new(
+                DEPARTURE_PLATFORM_CENTER
+                    + Vector3.new(
+                        math.cos(angle) * (DEPARTURE_PLATFORM_RADIUS - 1.5),
+                        2.66,
+                        math.sin(angle) * (DEPARTURE_PLATFORM_RADIUS - 1.5)
+                    )
+            ) * CFrame.Angles(0, -angle, 0),
+            AMBER,
+            Enum.Material.Neon,
             false
         )
-        banner.Transparency = 0.08
-        addBillboard(pedestal, calling.label, calling.tint, 44)
-        table.insert(self._meshPlacements, {
-            assetId = calling.asset,
-            fallbackKind = "asset_dressing",
-            position = standAt + Vector3.new(0, 2.6, 0),
-            scale = 0.5,
-            yaw = math.rad(180),
-            seed = 9420 + callingIndex,
-            swayTag = nil,
-            parent = hut,
-            fallbackInstance = nil,
-        })
+        mark.Transparency = 0.24
+        mark.CastShadow = false
+        mark.CanQuery = false
     end
+    local platformGlow = part(
+        lobby,
+        "DepartureGlow",
+        Vector3.new(DEPARTURE_PLATFORM_RADIUS * 1.7, 0.12, DEPARTURE_PLATFORM_RADIUS * 1.7),
+        CFrame.new(DEPARTURE_PLATFORM_CENTER + Vector3.new(0, 2.64, 0)),
+        AMBER,
+        Enum.Material.Neon,
+        false
+    )
+    platformGlow.Transparency = 0.72
+    platformGlow.CastShadow = false
+    platformGlow.CanQuery = false
+    local platformLight = Instance.new("PointLight")
+    platformLight.Color = AMBER
+    platformLight.Brightness = 2
+    platformLight.Range = 34
+    platformLight.Parent = platformGlow
+    CollectionService:AddTag(platformGlow, self._runtimeIds.AmbientLightTag)
+    for postIndex = 0, 3 do
+        local angle = (postIndex / 4) * math.pi * 2 + math.pi / 4
+        local postAt = DEPARTURE_PLATFORM_CENTER
+            + Vector3.new(
+                math.cos(angle) * (DEPARTURE_PLATFORM_RADIUS + 0.6),
+                0,
+                math.sin(angle) * (DEPARTURE_PLATFORM_RADIUS + 0.6)
+            )
+        part(
+            lobby,
+            "DepartureLanternPost",
+            Vector3.new(0.7, 9.5, 0.7),
+            CFrame.new(postAt + Vector3.new(0, 4.75, 0)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+        local lampGlow = part(
+            lobby,
+            "DepartureLanternGlow",
+            Vector3.new(1.2, 1.5, 1.2),
+            CFrame.new(postAt + Vector3.new(0, 9.2, 0)),
+            AMBER,
+            Enum.Material.Neon,
+            false
+        )
+        lampGlow.CastShadow = false
+        lampGlow.CanQuery = false
+        local lampLight = Instance.new("PointLight")
+        lampLight.Color = AMBER
+        lampLight.Brightness = 1.3
+        lampLight.Range = 24
+        lampLight.Parent = lampGlow
+    end
+    addBillboard(platform, "STAND HERE TO DEPART", AMBER, 120)
 
-    -- The other side of the yard: somewhere to look at, so the space reads as
-    -- a place people use rather than a corridor to the platform.
-    local stallAt = LOBBY_CENTER + Vector3.new(22, 0, 20)
-    table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_market_stall_a",
-        fallbackKind = "asset_dressing",
-        position = stallAt,
-        scale = 0.85,
-        yaw = math.rad(-118),
-        seed = 9430,
-        swayTag = nil,
-        parent = lobby,
-        fallbackInstance = nil,
-    })
-    table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_notice_board_a",
-        fallbackKind = "asset_dressing",
-        position = LOBBY_CENTER + Vector3.new(15, 0, 4),
-        scale = 0.85,
-        yaw = math.rad(-140),
-        seed = 9431,
-        swayTag = nil,
-        parent = lobby,
-        fallbackInstance = nil,
-    })
-    table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_campfire_a",
-        fallbackKind = "asset_dressing",
-        position = LOBBY_CENTER + Vector3.new(19, 0, 32),
-        scale = 1.15,
-        yaw = math.rad(24),
-        seed = 9432,
-        swayTag = nil,
-        parent = lobby,
-        fallbackInstance = nil,
-    })
-    table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_picnic_table_a",
-        fallbackKind = "asset_dressing",
-        position = LOBBY_CENTER + Vector3.new(24, 0, 32),
-        scale = 0.95,
-        yaw = math.rad(-42),
-        seed = 9433,
-        swayTag = nil,
-        parent = lobby,
-        fallbackInstance = nil,
-    })
-    for crateIndex = 1, 5 do
-        local crateSeed = 9440 + crateIndex
-        local crateAt = LOBBY_CENTER
-            + Vector3.new(-26 + ((crateIndex * 7) % 9) * 1.4, 0, -6 + ((crateIndex * 5) % 11) * 2.1)
-        table.insert(self._meshPlacements, {
-            assetId = if crateIndex % 2 == 0
-                then "mesh_creator_barrel_a"
-                else "mesh_creator_crate_a",
-            fallbackKind = "asset_dressing",
-            position = crateAt,
+    -- Everything a staging room needs, indoors: work surfaces, supplies, a
+    -- table to gather at, beds along the back, and the notice board.
+    local props = {
+        { asset = "mesh_creator_workbench_a", at = Vector3.new(-20, 0, 12), yaw = 96, scale = 1 },
+        { asset = "mesh_creator_anvil_a", at = Vector3.new(-24, 0, 4), yaw = 40, scale = 1 },
+        {
+            asset = "mesh_creator_potion_shelf_a",
+            at = Vector3.new(-27, 0, 16),
+            yaw = 90,
             scale = 1,
-            yaw = math.rad(crateIndex * 37),
-            seed = crateSeed,
+        },
+        {
+            asset = "mesh_creator_picnic_table_a",
+            at = Vector3.new(19, 0, 10),
+            yaw = -74,
+            scale = 1.1,
+        },
+        {
+            asset = "mesh_creator_notice_board_a",
+            at = Vector3.new(26, 0, -2),
+            yaw = -96,
+            scale = 0.9,
+        },
+        {
+            asset = "mesh_creator_wayfarer_bed_a",
+            at = Vector3.new(23, 0, 18),
+            yaw = 180,
+            scale = 1,
+        },
+        {
+            asset = "mesh_creator_wayfarer_bed_a",
+            at = Vector3.new(14, 0, 18),
+            yaw = 180,
+            scale = 1,
+        },
+        { asset = "mesh_creator_crate_a", at = Vector3.new(-14, 0, 19), yaw = 24, scale = 1 },
+        { asset = "mesh_creator_crate_a", at = Vector3.new(-9, 0, 20), yaw = -38, scale = 1 },
+        { asset = "mesh_creator_barrel_a", at = Vector3.new(-17, 0, -14), yaw = 12, scale = 1 },
+        { asset = "mesh_creator_barrel_a", at = Vector3.new(-21, 0, -12), yaw = 66, scale = 1 },
+        { asset = "mesh_creator_crate_a", at = Vector3.new(22, 0, -14), yaw = -18, scale = 1 },
+        {
+            asset = "mesh_creator_tool_set_a",
+            at = Vector3.new(-20, 2.6, 12),
+            yaw = 96,
+            scale = 0.7,
+        },
+    }
+    for propIndex, prop in props do
+        table.insert(self._meshPlacements, {
+            assetId = prop.asset,
+            fallbackKind = "asset_dressing",
+            position = LOBBY_CENTER + prop.at + Vector3.new(0, 1, 0),
+            scale = prop.scale,
+            yaw = math.rad(prop.yaw),
+            seed = 9460 + propIndex,
             swayTag = nil,
             parent = lobby,
             fallbackInstance = nil,
         })
     end
-    for fenceIndex = -3, 3 do
-        table.insert(self._meshPlacements, {
-            assetId = "mesh_creator_rustic_fence_a",
-            fallbackKind = "asset_dressing",
-            position = LOBBY_CENTER + Vector3.new(fenceIndex * 8, 0, 34),
-            scale = 1,
-            yaw = 0,
-            seed = 9450 + fenceIndex,
-            swayTag = nil,
-            parent = lobby,
-            fallbackInstance = nil,
-        })
-    end
 
-    -- Spawn inside the yard, facing the platform and the gate beyond it.
+    labelSign(
+        lobby,
+        CFrame.new(LOBBY_CENTER + Vector3.new(10, 0, -halfDepth + 3))
+            * CFrame.Angles(0, math.rad(180), 0),
+        "TO EMBERHOLLOW"
+    )
+
+    -- Spawn at the back of the room, facing the platform and the doorway
+    -- beyond it, so the first thing a player sees is where to go.
     local lobbySpawn = Instance.new("SpawnLocation")
     lobbySpawn.Name = "LobbySpawn"
-    lobbySpawn.Size = Vector3.new(14, 1, 14)
-    lobbySpawn.CFrame = CFrame.new(LOBBY_CENTER + Vector3.new(0, 0.5, 22))
+    lobbySpawn.Size = Vector3.new(16, 1, 10)
+    lobbySpawn.CFrame = CFrame.new(LOBBY_CENTER + Vector3.new(0, 1.5, halfDepth - 12))
+        * CFrame.Angles(0, math.rad(180), 0)
     lobbySpawn.Transparency = 1
     lobbySpawn.Anchored = true
     lobbySpawn.CanCollide = true
@@ -25279,8 +25315,8 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             part(
                 toolYard,
                 "ToolYardPost",
-                Vector3.new(0.7, 8.8, 0.7),
-                CFrame.new(TOOL_YARD_CENTER + Vector3.new(xSide * 5.8, 4.4, zSide * 12.4))
+                Vector3.new(0.7, 14.4, 0.7),
+                CFrame.new(TOOL_YARD_CENTER + Vector3.new(xSide * 5.8, 7.2, zSide * 12.4))
                     * CFrame.Angles(0, 0, math.rad(xSide * zSide * 2)),
                 WET_BARK,
                 Enum.Material.Wood,
@@ -25292,12 +25328,12 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         toolYard,
         "ToolYardRidgeBeam",
         Vector3.new(0.7, 0.7, 28),
-        CFrame.new(TOOL_YARD_CENTER + Vector3.new(0, 10.15, 0)),
+        CFrame.new(TOOL_YARD_CENTER + Vector3.new(0, 16.4, 0)),
         WET_BARK,
         Enum.Material.Wood,
         false
     )
-    -- Open rafters, not a closed roof. Two solid slate wedges used to span the
+    -- Open rafters carried high. Two solid slate wedges used to span the
     -- full 28-stud length directly above the three tool displays, and from any
     -- normal over-the-shoulder camera they covered the very thing the player
     -- had walked over to look at. Camera sightline is one of the four
@@ -25306,7 +25342,10 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     --
     -- Paired rafters carried on the ridge beam keep the frame reading as a
     -- built shelter -- posts, beam, rafters, believable support -- while
-    -- leaving open sky between them to see and reach through.
+    -- leaving open sky between them to see and reach through. The whole frame
+    -- also sits well above head height: at the original eaves the beams
+    -- themselves crossed the screen at eye level, which is no better than the
+    -- roof it replaced.
     for rafterIndex = -4, 4 do
         local rafterZ = rafterIndex * 3.2
         for rafterSide = -1, 1, 2 do
@@ -25314,7 +25353,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 toolYard,
                 "ToolYardRafter",
                 Vector3.new(0.34, 0.34, 7.4),
-                CFrame.new(TOOL_YARD_CENTER + Vector3.new(rafterSide * 2.9, 9.3, rafterZ))
+                CFrame.new(TOOL_YARD_CENTER + Vector3.new(rafterSide * 2.9, 15.5, rafterZ))
                     * CFrame.Angles(0, math.rad(90), math.rad(rafterSide * 26)),
                 WET_BARK,
                 Enum.Material.Wood,
@@ -25327,7 +25366,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             toolYard,
             "ToolYardEaveBeam",
             Vector3.new(0.4, 0.4, 28),
-            CFrame.new(TOOL_YARD_CENTER + Vector3.new(braceSide * 5.6, 8.5, 0)),
+            CFrame.new(TOOL_YARD_CENTER + Vector3.new(braceSide * 5.6, 14.7, 0)),
             WET_BARK,
             Enum.Material.Wood,
             false
