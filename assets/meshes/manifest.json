@@ -674,6 +674,54 @@
       "maxMaterialSlots": 19,
       "preserveSourceMaterials": true,
       "robloxAssetId": 107193693143362
+    },
+    {
+      "id": "mesh_creator_hand_axe_a",
+      "displayName": "Creator Store Battle Axe",
+      "role": "starter_tool_axe",
+      "placementBand": "curated_core",
+      "source": "roblox_creator_store_model",
+      "provenance": "Free Creator Store model by creator joseisbestie55; asset 103237554596713. Completed 420px Roblox thumbnail and downloaded model payload inspected on 2026-08-01.",
+      "sourceUrl": "https://create.roblox.com/store/asset/103237554596713/Battle-Axe",
+      "file": "candidates/creator-store-full-pass/103237554596713.rbxm",
+      "previewFile": "previews/full-pass/103237554596713.png",
+      "targetLongestDimension": 3,
+      "maxTriangles": 2000,
+      "maxMaterialSlots": 2,
+      "preserveSourceMaterials": true,
+      "robloxAssetId": 103237554596713
+    },
+    {
+      "id": "mesh_creator_blacksmith_hammer_a",
+      "displayName": "Creator Store Blacksmith Hammer",
+      "role": "starter_tool_hammer",
+      "placementBand": "curated_core",
+      "source": "roblox_creator_store_model",
+      "provenance": "Free Creator Store model by creator br45entei; asset 43904769. Completed 420px Roblox thumbnail and downloaded model payload inspected on 2026-08-01.",
+      "sourceUrl": "https://create.roblox.com/store/asset/43904769/Blacksmith-s-Hammer",
+      "file": "candidates/creator-store-full-pass/43904769.rbxm",
+      "previewFile": "previews/full-pass/43904769.png",
+      "targetLongestDimension": 3,
+      "maxTriangles": 800,
+      "maxMaterialSlots": 2,
+      "preserveSourceMaterials": true,
+      "robloxAssetId": 43904769
+    },
+    {
+      "id": "mesh_creator_handheld_torch_a",
+      "displayName": "Creator Store Handheld Torch",
+      "role": "starter_tool_torch",
+      "placementBand": "curated_core",
+      "source": "roblox_creator_store_model",
+      "provenance": "Free Creator Store model by creator AII_11; asset 8285874309. Completed 420px Roblox thumbnail and downloaded model payload inspected on 2026-08-01.",
+      "sourceUrl": "https://create.roblox.com/store/asset/8285874309/Torch",
+      "file": "candidates/creator-store-full-pass/8285874309.rbxm",
+      "previewFile": "previews/full-pass/8285874309.png",
+      "targetLongestDimension": 3.2,
+      "maxTriangles": 1200,
+      "maxMaterialSlots": 12,
+      "preserveSourceMaterials": true,
+      "robloxAssetId": 8285874309
     }
   ]
 }

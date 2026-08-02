@@ -1180,6 +1180,84 @@
       "baseParts": 19,
       "scripts": 0,
       "bytes": 6895
+    },
+    "mesh_creator_hand_axe_a": {
+      "boundsMin": [
+        -38.6821,
+        -99.8558,
+        -13.5119
+      ],
+      "boundsMax": [
+        38.6049,
+        99.6895,
+        13.7325
+      ],
+      "dimensions": [
+        77.287,
+        199.5453,
+        27.2444
+      ],
+      "longestDimension": 199.5453,
+      "triangles": 0,
+      "meshObjects": 1,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 1,
+      "scripts": 0,
+      "bytes": 112890
+    },
+    "mesh_creator_blacksmith_hammer_a": {
+      "boundsMin": [
+        63.3748,
+        5.9214,
+        -17.0461
+      ],
+      "boundsMax": [
+        64.5748,
+        7.442,
+        -12.949
+      ],
+      "dimensions": [
+        1.2,
+        1.5206,
+        4.0972
+      ],
+      "longestDimension": 4.0972,
+      "triangles": 0,
+      "meshObjects": 0,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 1,
+      "scripts": 0,
+      "bytes": 4033
+    },
+    "mesh_creator_handheld_torch_a": {
+      "boundsMin": [
+        -116.8,
+        56.9062,
+        -193.6109
+      ],
+      "boundsMax": [
+        -116.35,
+        60.9563,
+        -192.9465
+      ],
+      "dimensions": [
+        0.45,
+        4.05,
+        0.6644
+      ],
+      "longestDimension": 4.05,
+      "triangles": 0,
+      "meshObjects": 0,
+      "materials": [
+        "creator_source_preserved"
+      ],
+      "baseParts": 10,
+      "scripts": 0,
+      "bytes": 4488
     }
   }
 }

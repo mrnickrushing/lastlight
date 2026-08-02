@@ -3013,221 +3013,95 @@ function WorldService._buildDistantScenery(self: WorldService)
 end
 
 function WorldService._buildMara(self: WorldService, world: Model)
-    local model = Instance.new("Model")
+    -- A real R15 rig instead of ~30 hand-stacked primitive parts. Mara used
+    -- to read as a box with a sphere for a head because nothing gave
+    -- residents an actual articulated body; CreateHumanoidModelFromDescription
+    -- builds Roblox's own body meshes (rounded head, jointed limbs, real
+    -- hands and feet) tinted to her palette, with no external asset download
+    -- required.
+    local skin = Color3.fromRGB(205, 153, 111)
+    local coat = Color3.fromRGB(59, 83, 62)
+    local coatDark = Color3.fromRGB(45, 51, 48)
+    local hairColor = Color3.fromRGB(79, 43, 31)
+
+    local description = Instance.new("HumanoidDescription")
+    description.HeadColor = skin
+    description.LeftArmColor = coat
+    description.RightArmColor = coat
+    description.TorsoColor = coat
+    description.LeftLegColor = coatDark
+    description.RightLegColor = coatDark
+
+    local model = Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
     model.Name = "Mara"
     model:SetAttribute("ResidentId", "npc_mara")
+    model:PivotTo(CFrame.new(-3, 3, -30))
 
-    local root = part(
-        model,
-        "HumanoidRootPart",
-        Vector3.new(2.2, 2.2, 1.2),
-        CFrame.new(-3, 2.2, -30),
-        Color3.fromRGB(66, 83, 66),
-        Enum.Material.SmoothPlastic,
-        false
-    )
+    local maraHumanoid = model:WaitForChild("Humanoid") :: Humanoid
+    maraHumanoid.DisplayName = "Mara"
+    maraHumanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+    maraHumanoid.BreakJointsOnDeath = false
+    maraHumanoid.RequiresNeck = false
+
+    local root = model:WaitForChild("HumanoidRootPart") :: BasePart
     root.Transparency = 1
-    local torso = part(
-        model,
-        "Torso",
-        Vector3.new(2.4, 3.2, 1.3),
-        CFrame.new(-3, 3.4, -30),
-        Color3.fromRGB(59, 83, 62),
-        Enum.Material.Fabric,
-        false
-    )
-    local head = part(
-        model,
-        "Head",
-        Vector3.new(2, 2, 2),
-        CFrame.new(-3, 6, -30),
-        Color3.fromRGB(205, 153, 111),
-        Enum.Material.SmoothPlastic,
-        false
-    )
-    head.Shape = Enum.PartType.Ball
-    part(
+    local torso = model:WaitForChild("UpperTorso") :: BasePart
+    local head = model:WaitForChild("Head") :: BasePart
+    -- The old body was entirely non-colliding and non-queryable (interaction
+    -- goes through _registerInteraction below, not physical touch/click), so
+    -- keep the real rig's parts out of the way of players the same way.
+    for _, descendant in model:GetDescendants() do
+        if descendant:IsA("BasePart") then
+            descendant.CanCollide = false
+            descendant.CanTouch = false
+            descendant.CanQuery = false
+        end
+    end
+
+    local hair = part(
         model,
         "Hair",
-        Vector3.new(2.25, 1.2, 2.25),
-        CFrame.new(-3, 6.65, -30),
-        Color3.fromRGB(79, 43, 31),
+        Vector3.new(head.Size.X * 1.08, head.Size.Y * 0.55, head.Size.Z * 1.08),
+        head.CFrame * CFrame.new(0, head.Size.Y * 0.42, 0),
+        hairColor,
         Enum.Material.SmoothPlastic,
         false
-    ).Shape =
-        Enum.PartType.Ball
-    part(
+    )
+    hair.Shape = Enum.PartType.Ball
+    local hairWeld = Instance.new("WeldConstraint")
+    hairWeld.Part0 = head
+    hairWeld.Part1 = hair
+    hairWeld.Parent = hair
+
+    local scarf = part(
         model,
         "Scarf",
-        Vector3.new(2.6, 0.5, 1.5),
-        CFrame.new(-3, 5.05, -30),
+        Vector3.new(torso.Size.X * 0.94, 0.42, torso.Size.Z * 1.18),
+        torso.CFrame * CFrame.new(0, torso.Size.Y * 0.42, 0),
         AMBER,
         Enum.Material.Fabric,
         false
     )
-    for side = -1, 1, 2 do
-        local shoulder = part(
-            model,
-            "CoatShoulder",
-            Vector3.new(1.05, 1.05, 1.18),
-            CFrame.new(-3 + side * 1.3, 4.35, -30),
-            Color3.fromRGB(50, 72, 56),
-            Enum.Material.Fabric,
-            false
-        )
-        shoulder.Shape = Enum.PartType.Ball
-        part(
-            model,
-            "HairLock",
-            Vector3.new(0.42, 1.85, 0.5),
-            CFrame.new(-3 + side * 0.88, 5.78, -30.18) * CFrame.Angles(0, 0, math.rad(side * 8)),
-            Color3.fromRGB(79, 43, 31),
-            Enum.Material.SmoothPlastic,
-            false
-        )
-        part(
-            model,
-            "CoatTail",
-            Vector3.new(1.12, 2.25, 0.28),
-            CFrame.new(-3 + side * 0.68, 1.72, -29.13)
-                * CFrame.Angles(math.rad(-8), 0, math.rad(side * 5)),
-            Color3.fromRGB(42, 61, 49),
-            Enum.Material.Fabric,
-            false
-        )
-    end
-    part(
-        model,
-        "ScarfKnot",
-        Vector3.new(0.68, 0.68, 0.48),
-        CFrame.new(-3, 5.02, -30.83),
-        Color3.fromRGB(196, 134, 64),
-        Enum.Material.Fabric,
-        false
-    ).Shape =
-        Enum.PartType.Ball
-    part(
+    local scarfWeld = Instance.new("WeldConstraint")
+    scarfWeld.Part0 = torso
+    scarfWeld.Part1 = scarf
+    scarfWeld.Parent = scarf
+
+    local belt = part(
         model,
         "CoatBelt",
-        Vector3.new(2.75, 0.34, 1.5),
-        CFrame.new(-3, 2.52, -30),
+        Vector3.new(torso.Size.X * 1.05, 0.3, torso.Size.Z * 1.12),
+        torso.CFrame * CFrame.new(0, -torso.Size.Y * 0.44, 0),
         Color3.fromRGB(84, 58, 40),
         Enum.Material.Leather,
         false
     )
-    part(
-        model,
-        "CoatBuckle",
-        Vector3.new(0.52, 0.5, 0.2),
-        CFrame.new(-3, 2.5, -30.82),
-        AMBER,
-        Enum.Material.Metal,
-        false
-    )
-    part(
-        model,
-        "CoatSkirt",
-        Vector3.new(2.9, 2.5, 1.55),
-        CFrame.new(-3, 1.9, -30),
-        Color3.fromRGB(48, 68, 55),
-        Enum.Material.Fabric,
-        false
-    )
-    for side = -1, 1, 2 do
-        part(
-            model,
-            "Arm",
-            Vector3.new(0.72, 3.1, 0.72),
-            CFrame.new(-3 + side * 1.55, 3.45, -30) * CFrame.Angles(0, 0, math.rad(side * 9)),
-            Color3.fromRGB(54, 75, 59),
-            Enum.Material.Fabric,
-            false
-        )
-        local hand = part(
-            model,
-            "Hand",
-            Vector3.new(0.76, 0.76, 0.76),
-            CFrame.new(-3 + side * 1.78, 1.95, -30),
-            Color3.fromRGB(205, 153, 111),
-            Enum.Material.SmoothPlastic,
-            false
-        )
-        hand.Shape = Enum.PartType.Ball
-        part(
-            model,
-            "Leg",
-            Vector3.new(0.82, 2.1, 0.9),
-            CFrame.new(-3 + side * 0.68, 0.65, -30),
-            Color3.fromRGB(45, 51, 48),
-            Enum.Material.Fabric,
-            false
-        )
-        part(
-            model,
-            "Boot",
-            Vector3.new(1, 0.72, 1.5),
-            CFrame.new(-3 + side * 0.68, 0.36, -30.25),
-            Color3.fromRGB(54, 39, 31),
-            Enum.Material.Leather,
-            false
-        )
-        local eye = part(
-            model,
-            "Eye",
-            Vector3.new(0.28, 0.28, 0.16),
-            CFrame.new(-3 + side * 0.48, 6.18, -30.94),
-            Color3.fromRGB(55, 39, 34),
-            Enum.Material.SmoothPlastic,
-            false
-        )
-        eye.Shape = Enum.PartType.Ball
-    end
-    part(
-        model,
-        "Nose",
-        Vector3.new(0.3, 0.42, 0.34),
-        CFrame.new(-3, 5.98, -31.02),
-        Color3.fromRGB(190, 137, 99),
-        Enum.Material.SmoothPlastic,
-        false
-    ).Shape =
-        Enum.PartType.Ball
-    part(
-        model,
-        "Mouth",
-        Vector3.new(0.52, 0.12, 0.1),
-        CFrame.new(-3, 5.58, -31.02),
-        Color3.fromRGB(104, 59, 51),
-        Enum.Material.SmoothPlastic,
-        false
-    )
-    part(
-        model,
-        "HairBack",
-        Vector3.new(2.2, 2.6, 0.65),
-        CFrame.new(-3, 5.7, -29.8),
-        Color3.fromRGB(79, 43, 31),
-        Enum.Material.SmoothPlastic,
-        false
-    )
-    part(
-        model,
-        "FieldSatchel",
-        Vector3.new(1.55, 1.7, 0.8),
-        CFrame.new(-4.45, 2.85, -29.55) * CFrame.Angles(0, 0, math.rad(-8)),
-        Color3.fromRGB(113, 79, 49),
-        Enum.Material.Leather,
-        false
-    )
-    part(
-        model,
-        "SatchelStrap",
-        Vector3.new(0.24, 4.4, 0.24),
-        CFrame.new(-3.5, 3.85, -29.55) * CFrame.Angles(0, 0, math.rad(24)),
-        Color3.fromRGB(83, 57, 40),
-        Enum.Material.Leather,
-        false
-    )
+    local beltWeld = Instance.new("WeldConstraint")
+    beltWeld.Part0 = torso
+    beltWeld.Part1 = belt
+    beltWeld.Parent = belt
+
+    local leftHand = model:WaitForChild("LeftHand") :: BasePart
     local handLanternFallback = Instance.new("Model")
     handLanternFallback.Name = "MaraLanternFallback"
     handLanternFallback.Parent = model
@@ -3235,7 +3109,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
         handLanternFallback,
         "MaraLantern",
         Vector3.new(0.82, 1.12, 0.82),
-        CFrame.new(-1.2, 1.45, -30),
+        leftHand.CFrame * CFrame.new(0, -0.55, 0),
         Color3.fromRGB(204, 154, 81),
         Enum.Material.Glass,
         false
@@ -3285,7 +3159,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
     table.insert(self._meshPlacements, {
         assetId = "mesh_creator_kerosene_lantern_a",
         fallbackKind = "placeholder",
-        position = Vector3.new(-1.2, 0.35, -30),
+        position = handLantern.Position,
         scale = 1,
         yaw = math.rad(-8),
         seed = 9313,
@@ -3501,14 +3375,20 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     local toolYard = Instance.new("Model")
     toolYard.Name = "StarterToolYard"
     toolYard.Parent = interactables
+    -- Building floors are collidable in this codebase (see WorkshopFloor,
+    -- ArchiveFloor, etc) -- only open-world roads rely on Terrain underneath
+    -- a non-colliding visual skin. This floor was built with the road
+    -- pattern (CanCollide false) despite being a roofed building interior,
+    -- so wherever the procedural terrain dips even slightly below y=0 here,
+    -- there is nothing solid under it and a player standing on it falls
+    -- straight through into whatever is below the valley floor.
     local toolYardGround = part(
         toolYard,
         "ToolYardGround",
         Vector3.new(14, 0.38, 28),
         CFrame.new(TOOL_YARD_CENTER + Vector3.new(0, 0.19, 0)),
         Color3.fromRGB(71, 54, 39),
-        Enum.Material.Ground,
-        false
+        Enum.Material.Ground
     )
     toolYardGround.CanQuery = false
     for xSide = -1, 1, 2 do
@@ -3556,18 +3436,24 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             tool = "axe",
             position = TOOL_YARD_CENTER + Vector3.new(0, 0, 8),
             color = Color3.fromRGB(102, 154, 102),
+            assetId = "mesh_creator_hand_axe_a",
+            seed = 9895,
         },
         {
             id = self._runtimeIds.InteractionIds.ToolHammer,
             tool = "hammer",
             position = TOOL_YARD_CENTER,
             color = AMBER,
+            assetId = "mesh_creator_blacksmith_hammer_a",
+            seed = 9896,
         },
         {
             id = self._runtimeIds.InteractionIds.ToolTorch,
             tool = "torch",
             position = TOOL_YARD_CENTER + Vector3.new(0, 0, -8),
             color = Color3.fromRGB(111, 154, 184),
+            assetId = "mesh_creator_handheld_torch_a",
+            seed = 9897,
         },
     }
     for _, definition in tools do
@@ -3644,8 +3530,16 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             Enum.Material.SmoothPlastic,
             false
         )
-        local marker = part(
-            display,
+        -- The tool shape itself (handle + head/flame) is a disposable
+        -- fallback -- the reviewed Creator Store axe/hammer/torch mesh
+        -- replaces it below. The crate, cushion, bands, and plaque above
+        -- stay as the permanent display stand regardless.
+        local toolFallback = Instance.new("Model")
+        toolFallback.Name = "ToolFallback"
+        toolFallback.Parent = display
+        local toolAnchor = displayFrame * CFrame.new(0, 5.4, 0)
+        part(
+            toolFallback,
             "ToolHandle",
             Vector3.new(0.45, 4.2, 0.45),
             displayFrame
@@ -3657,7 +3551,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         )
         if definition.tool == "axe" then
             local head = part(
-                display,
+                toolFallback,
                 "AxeHead",
                 Vector3.new(2.25, 0.65, 0.38),
                 displayFrame * CFrame.new(-0.28, 5.82, 0) * CFrame.Angles(0, 0, math.rad(28)),
@@ -3668,7 +3562,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             head.Shape = Enum.PartType.Wedge
         elseif definition.tool == "hammer" then
             local head = part(
-                display,
+                toolFallback,
                 "HammerHead",
                 Vector3.new(2.15, 0.78, 0.9),
                 displayFrame * CFrame.new(0, 5.85, 0) * CFrame.Angles(0, 0, math.rad(90)),
@@ -3679,7 +3573,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             head.Shape = Enum.PartType.Cylinder
         else
             local cup = part(
-                display,
+                toolFallback,
                 "TorchCup",
                 -- Cylinder axis is local X: (height, diameter, diameter).
                 Vector3.new(0.72, 1.2, 1.2),
@@ -3690,7 +3584,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             )
             cup.Shape = Enum.PartType.Cylinder
             local flame = part(
-                display,
+                toolFallback,
                 "TorchFlame",
                 Vector3.new(1.15, 1.55, 1.15),
                 displayFrame * CFrame.new(0, 6.95, 0),
@@ -3706,7 +3600,32 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             flameLight.Parent = flame
             CollectionService:AddTag(flame, self._runtimeIds.AmbientLightTag)
         end
-        addBillboard(marker, string.upper(definition.tool), definition.color)
+        table.insert(self._meshPlacements, {
+            assetId = definition.assetId,
+            fallbackKind = "asset_replacement",
+            position = (toolAnchor * CFrame.new(0, -0.3, 0)).Position,
+            scale = 1,
+            yaw = math.rad(90),
+            seed = definition.seed,
+            swayTag = nil,
+            parent = display,
+            fallbackInstance = toolFallback,
+        })
+        -- A dedicated, always-visible anchor for the name label, since the
+        -- tool shape it used to hang from gets hidden once the reviewed
+        -- mesh replaces it.
+        local labelAnchor = part(
+            display,
+            "ToolLabelAnchor",
+            Vector3.new(0.2, 0.2, 0.2),
+            toolAnchor,
+            definition.color,
+            Enum.Material.SmoothPlastic,
+            false
+        )
+        labelAnchor.Transparency = 1
+        labelAnchor.CanQuery = false
+        addBillboard(labelAnchor, string.upper(definition.tool), definition.color)
         self:_registerInteraction(
             pedestal,
             definition.id,
