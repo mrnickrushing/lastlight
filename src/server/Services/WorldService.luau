@@ -3713,6 +3713,12 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             definition.tool
         )
     end
+    -- toolDisplayFallback is not scratch geometry for this workbench prop --
+    -- it holds the three real, interactive axe/hammer/torch displays players
+    -- choose their starting tool from. Wiring it as this placement's
+    -- fallbackInstance meant hideProceduralPlaceholder wiped all three
+    -- displays the moment the (unrelated) workbench mesh finished loading,
+    -- leaving the building with nothing visible to select.
     table.insert(self._meshPlacements, {
         assetId = "mesh_creator_workbench_a",
         fallbackKind = "asset_replacement",
@@ -3722,7 +3728,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         seed = 9890,
         swayTag = nil,
         parent = toolYard,
-        fallbackInstance = toolDisplayFallback,
+        fallbackInstance = nil,
     })
     table.insert(self._meshPlacements, {
         assetId = "mesh_creator_tool_set_a",
@@ -3953,6 +3959,14 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         nil
     )
 
+    -- The gate reads as a threshold you walk through on the way in, not a
+    -- cage wrapped around the beacon. Sitting it at the same z as the beacon
+    -- (both at -148) put the crossed braces directly around the glowing
+    -- reliquary, which read as clutter crowding the memory orb. Pulling it
+    -- 28 studs back to the start of the approach (before the path markers
+    -- and steps that already lead up to the beacon) keeps the arch as an
+    -- entrance and leaves the beacon itself uncluttered.
+    local GATE_Z = -120
     local gate = Instance.new("Folder")
     gate.Name = "BramblewakeDawnGate"
     gate.Parent = interactables
@@ -3961,7 +3975,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             gate,
             "DawnGateRoot",
             Vector3.new(1.35, 11, 1.35),
-            CFrame.new(side * 5.2, 5.5, -148) * CFrame.Angles(0, 0, math.rad(side * 7)),
+            CFrame.new(side * 5.2, 5.5, GATE_Z) * CFrame.Angles(0, 0, math.rad(side * 7)),
             WET_BARK,
             Enum.Material.Wood
         )
@@ -3969,7 +3983,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             gate,
             "DawnGateBrace",
             Vector3.new(0.8, 6.2, 0.8),
-            CFrame.new(side * 3.7, 10.8, -148) * CFrame.Angles(0, 0, math.rad(side * 62)),
+            CFrame.new(side * 3.7, 10.8, GATE_Z) * CFrame.Angles(0, 0, math.rad(side * 62)),
             BARK,
             Enum.Material.Wood
         )
@@ -3978,7 +3992,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         gate,
         "DawnGateLintel",
         Vector3.new(11.5, 1.2, 1.2),
-        CFrame.new(0, 11, -148),
+        CFrame.new(0, 11, GATE_Z),
         BARK,
         Enum.Material.WoodPlanks
     )
@@ -4009,7 +4023,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     table.insert(self._meshPlacements, {
         assetId = "mesh_creator_wood_arch_a",
         fallbackKind = "asset_replacement",
-        position = Vector3.new(0, 0, -148),
+        position = Vector3.new(0, 0, GATE_Z),
         scale = 1,
         yaw = 0,
         seed = 9910,
