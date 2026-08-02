@@ -139,44 +139,86 @@ local function briarback(model: Model, origin: Vector3): Part
     return core
 end
 
-local function pollenWisp(model: Model, origin: Vector3): Part
-    local hoverOrigin = origin + Vector3.new(0, 4.5, 0)
+local function zombie(model: Model, origin: Vector3): Part
+    -- A standing, ground-walking silhouette: torso mass, hunched shoulders,
+    -- hanging arms, and a forward-tilted head. Only ever seen if the authored
+    -- mesh fails to load, so it is built to read as the same creature at
+    -- gameplay distance rather than as a different enemy.
+    local torsoOrigin = origin + Vector3.new(0, 3.1, 0)
     local core = part(
         model,
-        "PollenHeart",
-        Vector3.new(3.2, 3.2, 3.2),
-        hoverOrigin,
-        Color3.fromRGB(255, 211, 91),
-        Enum.Material.Neon,
-        Enum.PartType.Ball,
-        nil
+        "ZombieTorso",
+        Vector3.new(2.5, 3.2, 1.5),
+        torsoOrigin,
+        Color3.fromRGB(63, 74, 60),
+        Enum.Material.Fabric,
+        Enum.PartType.Block,
+        CFrame.Angles(math.rad(9), 0, 0)
     )
-    for index = 1, 6 do
-        local angle = (index - 1) * math.pi / 3
-        local offset = Vector3.new(math.cos(angle) * 2.7, math.sin(angle) * 2.7, 0.3)
-        part(
-            model,
-            "PollenPetal",
-            Vector3.new(2.4, 1.1, 0.7),
-            hoverOrigin + offset,
-            Color3.fromRGB(231, 181, 83),
-            Enum.Material.SmoothPlastic,
-            Enum.PartType.Ball,
-            CFrame.Angles(0, 0, angle)
-        )
-    end
     part(
         model,
-        "DrowsyTrail",
-        Vector3.new(1.5, 4.5, 1.5),
-        hoverOrigin + Vector3.new(0, -3.1, 0),
-        Color3.fromRGB(120, 163, 105),
-        Enum.Material.Neon,
-        Enum.PartType.Ball,
-        nil
-    ).Transparency =
-        0.35
-    addEye(model, hoverOrigin + Vector3.new(0, 0.3, -1.58), Color3.fromRGB(37, 45, 39))
+        "ZombieRibcage",
+        Vector3.new(1.7, 1.5, 0.5),
+        torsoOrigin + Vector3.new(0, 0.35, -0.72),
+        Color3.fromRGB(206, 200, 182),
+        Enum.Material.SmoothPlastic,
+        Enum.PartType.Block,
+        CFrame.Angles(math.rad(9), 0, 0)
+    )
+    part(
+        model,
+        "ZombieCloak",
+        Vector3.new(2.9, 2.1, 1.9),
+        torsoOrigin + Vector3.new(0, 0.8, 0.24),
+        Color3.fromRGB(44, 48, 44),
+        Enum.Material.Fabric,
+        Enum.PartType.Block,
+        CFrame.Angles(math.rad(11), 0, 0)
+    )
+    part(
+        model,
+        "ZombieMossPad",
+        Vector3.new(1.25, 0.6, 1.2),
+        torsoOrigin + Vector3.new(0.72, 1.5, 0.1),
+        Color3.fromRGB(74, 104, 66),
+        Enum.Material.Grass,
+        Enum.PartType.Block,
+        CFrame.Angles(0, 0, math.rad(-13))
+    )
+    local head = part(
+        model,
+        "ZombieHead",
+        Vector3.new(1.25, 1.4, 1.3),
+        torsoOrigin + Vector3.new(0, 2.35, -0.28),
+        Color3.fromRGB(126, 133, 121),
+        Enum.Material.SmoothPlastic,
+        Enum.PartType.Block,
+        CFrame.Angles(math.rad(17), math.rad(-8), 0)
+    )
+    for armSide = -1, 1, 2 do
+        part(
+            model,
+            "ZombieArm",
+            Vector3.new(0.6, 3.4, 0.6),
+            torsoOrigin + Vector3.new(armSide * 1.6, -0.5, -0.35),
+            Color3.fromRGB(112, 120, 108),
+            Enum.Material.SmoothPlastic,
+            Enum.PartType.Block,
+            CFrame.Angles(math.rad(-24), 0, math.rad(armSide * 7))
+        )
+        part(
+            model,
+            "ZombieLeg",
+            Vector3.new(0.72, 3.1, 0.72),
+            origin + Vector3.new(armSide * 0.62, 1.55, 0),
+            Color3.fromRGB(58, 74, 62),
+            Enum.Material.Fabric,
+            Enum.PartType.Block,
+            CFrame.Angles(0, 0, math.rad(armSide * 3))
+        )
+    end
+    addEye(model, head.Position + Vector3.new(-0.3, 0.12, -0.62), Color3.fromRGB(94, 206, 176))
+    addEye(model, head.Position + Vector3.new(0.3, 0.12, -0.62), Color3.fromRGB(94, 206, 176))
     return core
 end
 
@@ -351,8 +393,8 @@ function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target:
     local core: Part
     if definition.modelKey == "briarback" then
         core = briarback(model, origin)
-    elseif definition.modelKey == "pollen_wisp" then
-        core = pollenWisp(model, origin)
+    elseif definition.modelKey == "zombie" then
+        core = zombie(model, origin)
     elseif definition.modelKey == "hollow_crow" then
         core = hollowCrow(model, origin)
     elseif definition.modelKey == "snapvine" then

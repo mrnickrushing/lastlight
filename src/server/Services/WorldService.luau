@@ -2866,12 +2866,12 @@ function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKe
             yaw = math.rad(-7),
             profile = Vector3.new(1.08, 0.9, 1.12),
         },
-        pollen_wisp = {
-            assetId = "mesh_creator_blossom_spirit_a",
-            groundOffset = 1.4,
-            yaw = math.rad(14),
-            profile = Vector3.new(0.88, 1.12, 0.92),
-            scale = 1.4,
+        zombie = {
+            assetId = "mesh_zombie_a",
+            groundOffset = 2.9,
+            yaw = math.rad(180),
+            profile = Vector3.new(1, 1.04, 1),
+            scale = 1,
         },
         hollow_crow = {
             assetId = "mesh_creator_raven_a",

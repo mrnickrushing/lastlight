@@ -52,7 +52,7 @@ return {
                     {
                         "mesh_creator_hollow_rootling_a",
                         "mesh_creator_earth_golem_a",
-                        "mesh_creator_blossom_spirit_a",
+                        "mesh_zombie_a",
                         "mesh_creator_raven_a",
                         "mesh_creator_predatory_flower_a",
                         "mesh_creator_wood_ibex_a",

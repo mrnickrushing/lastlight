@@ -548,22 +548,6 @@
       "robloxAssetId": 103446417026847
     },
     {
-      "id": "mesh_creator_blossom_spirit_a",
-      "displayName": "Creator Store Blossom Spirit",
-      "role": "enemy_pollen_wisp_visual_shell",
-      "placementBand": "curated_enemy",
-      "source": "roblox_creator_store_model",
-      "provenance": "Free Creator Store model by creator Silv3rD6Block7167591; asset 117383764863716. Completed 420px Roblox thumbnail and downloaded model payload inspected on 2026-08-01.",
-      "sourceUrl": "https://create.roblox.com/store/asset/117383764863716/Spring-Fairy-Blossom-Garden-Flower-Sprite",
-      "file": "candidates/creator-store-full-pass/117383764863716.rbxm",
-      "previewFile": "previews/full-pass/117383764863716.png",
-      "targetLongestDimension": 2.8,
-      "maxTriangles": 3500,
-      "maxMaterialSlots": 1,
-      "preserveSourceMaterials": true,
-      "robloxAssetId": 117383764863716
-    },
-    {
       "id": "mesh_creator_raven_a",
       "displayName": "Creator Store Hollow Raven",
       "role": "enemy_hollow_crow_visual_shell",
@@ -722,6 +706,26 @@
       "maxMaterialSlots": 12,
       "preserveSourceMaterials": true,
       "robloxAssetId": 8285874309
+    },
+    {
+      "id": "mesh_zombie_a",
+      "displayName": "Bramblewake Hollow Zombie",
+      "role": "enemy_zombie_visual_shell",
+      "placementBand": "curated_enemy",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset. Prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc3c2-da43-7bc9-8ff0-5b3528df179b (nano-banana-pro, multi-view a-pose design sheet) then multi-image-to-3d task 019fc3c5-42d4-7fb5-8c3f-f3c2e6a7acd7 (front + back views, PBR). Normalized and budgeted by the repository Blender pipeline. Replaces mesh_creator_blossom_spirit_a, whose Creator Store source was moderated on 2026-08-02. The normalized GLB in generated/ is the archival source; the raw Meshy download differed only by normalization metadata and was not duplicated into the repository.",
+      "file": "generated/mesh_zombie_a.glb",
+      "previewFile": "previews/mesh-zombie-a.png",
+      "targetLongestDimension": 6,
+      "maxTriangles": 8000,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 137970350583998
     }
   ]
 }

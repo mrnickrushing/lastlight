@@ -36,3 +36,10 @@ Thumbs.db
 # Python bytecode from scripts/
 __pycache__/
 *.pyc
+
+# Agent skills installed locally (npx skills add) — not game source
+.agents/
+.claude/
+skills-lock.json
+meshy_output/
+assets/meshes/candidates/mesh_zombie_meshy.glb

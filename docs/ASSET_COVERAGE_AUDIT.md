@@ -47,7 +47,7 @@ rendered character:
 
 `BackThorn`, `BarkRamCore`, `BriarLeg`, `BriarbackCore`, `CrowBeak`, `CrowWing`,
 `DrowsyTrail`, `FrontShield`, `HollowCrowCore`, `JawThorn`, `MossBack`,
-`MossCrown`, `PollenHeart`, `PollenPetal`, `RamBrow`, `RamHorn`, `RamLeg`,
+`MossCrown`, `ZombieTorso`, `ZombieCloak`, `RamBrow`, `RamHorn`, `RamLeg`,
 `ReadableEye`, `RootArm`, `RootCore`, `ShieldTusk`, `SnapJaw`, `SnapvineRoot`,
 `StolenSpark`, `VineStem`
 

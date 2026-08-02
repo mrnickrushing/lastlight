@@ -2670,8 +2670,8 @@ function BramblewakeBuilder.build(
                 local assetId = "mesh_creator_crate_a"
                 local scale = 0.72
                 if string.find(targetName, "Foxlight", 1, true) ~= nil then
-                    assetId = "mesh_creator_blossom_spirit_a"
-                    scale = 0.72
+                    assetId = "mesh_creator_kerosene_lantern_a"
+                    scale = 1
                 elseif string.find(targetName, "RootKnot", 1, true) ~= nil then
                     assetId = "mesh_creator_stump_a"
                     scale = 0.58

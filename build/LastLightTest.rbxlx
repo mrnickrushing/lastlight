@@ -1313,10 +1313,10 @@ local DEFINITIONS: { [string]: EnemyDefinition } = {
         statusMultiplier = nil,
         statusLanternDamage = nil,
     }),
-    enemy_pollen_wisp = freezeDefinition({
-        id = "enemy_pollen_wisp",
-        displayName = "Pollen Wisp",
-        modelKey = "pollen_wisp",
+    enemy_zombie = freezeDefinition({
+        id = "enemy_zombie",
+        displayName = "Hollow Zombie",
+        modelKey = "zombie",
         health = 68,
         speed = 6.8,
         attackRange = 12,
@@ -1325,9 +1325,9 @@ local DEFINITIONS: { [string]: EnemyDefinition } = {
         lanternDamage = 4,
         strikeRange = 11,
         strikeDamage = 34,
-        attackId = "pollen_sleep_cloud",
-        attackName = "SLEEP CLOUD",
-        instruction = "LEAVE THE CLOUD",
+        attackId = "zombie_rot_miasma",
+        attackName = "ROT MIASMA",
+        instruction = "LEAVE THE MIASMA",
         shape = "circle",
         radius = 10,
         width = nil,
@@ -1438,7 +1438,7 @@ local DEFINITIONS: { [string]: EnemyDefinition } = {
 local ORDER = table.freeze({
     "enemy_rootling",
     "enemy_briarback",
-    "enemy_pollen_wisp",
+    "enemy_zombie",
     "enemy_hollow_crow",
     "enemy_snapvine",
     "enemy_bark_ram",
@@ -3252,12 +3252,14 @@ export type Pose = {
 
 local HOVERING = table.freeze({
     hollow_crow = true,
-    pollen_wisp = true,
 })
 
 local function profile(modelKey: string): (number, number)
     if HOVERING[modelKey] then
         return 0.52, 2.45
+    elseif modelKey == "zombie" then
+        -- Slow, heavy, uneven: a shamble rather than a stride.
+        return 0.16, 3.1
     elseif modelKey == "bark_ram" then
         return 0.13, 7.2
     elseif modelKey == "briarback" then
@@ -5775,7 +5777,7 @@ local BEATS: { Beat } = {
     { at = 0, kind = "warning", enemyId = nil },
     { at = 4, kind = "spawn", enemyId = "enemy_rootling" },
     { at = 22, kind = "spawn", enemyId = "enemy_briarback" },
-    { at = 40, kind = "spawn", enemyId = "enemy_pollen_wisp" },
+    { at = 40, kind = "spawn", enemyId = "enemy_zombie" },
     { at = 56, kind = "breach", enemyId = nil },
     { at = 58, kind = "spawn", enemyId = "enemy_hollow_crow" },
     { at = 76, kind = "spawn", enemyId = "enemy_snapvine" },
@@ -8971,7 +8973,7 @@ export type Beat = {
 local ROSTER: { string } = {
     "enemy_rootling",
     "enemy_briarback",
-    "enemy_pollen_wisp",
+    "enemy_zombie",
     "enemy_hollow_crow",
     "enemy_snapvine",
     "enemy_bark_ram",
@@ -23558,12 +23560,12 @@ function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKe
             yaw = math.rad(-7),
             profile = Vector3.new(1.08, 0.9, 1.12),
         },
-        pollen_wisp = {
-            assetId = "mesh_creator_blossom_spirit_a",
-            groundOffset = 1.4,
-            yaw = math.rad(14),
-            profile = Vector3.new(0.88, 1.12, 0.92),
-            scale = 1.4,
+        zombie = {
+            assetId = "mesh_zombie_a",
+            groundOffset = 2.9,
+            yaw = math.rad(180),
+            profile = Vector3.new(1, 1.04, 1),
+            scale = 1,
         },
         hollow_crow = {
             assetId = "mesh_creator_raven_a",
@@ -32694,8 +32696,8 @@ function BramblewakeBuilder.build(
                 local assetId = "mesh_creator_crate_a"
                 local scale = 0.72
                 if string.find(targetName, "Foxlight", 1, true) ~= nil then
-                    assetId = "mesh_creator_blossom_spirit_a"
-                    scale = 0.72
+                    assetId = "mesh_creator_kerosene_lantern_a"
+                    scale = 1
                 elseif string.find(targetName, "RootKnot", 1, true) ~= nil then
                     assetId = "mesh_creator_stump_a"
                     scale = 0.58
@@ -32999,44 +33001,86 @@ local function briarback(model: Model, origin: Vector3): Part
     return core
 end
 
-local function pollenWisp(model: Model, origin: Vector3): Part
-    local hoverOrigin = origin + Vector3.new(0, 4.5, 0)
+local function zombie(model: Model, origin: Vector3): Part
+    -- A standing, ground-walking silhouette: torso mass, hunched shoulders,
+    -- hanging arms, and a forward-tilted head. Only ever seen if the authored
+    -- mesh fails to load, so it is built to read as the same creature at
+    -- gameplay distance rather than as a different enemy.
+    local torsoOrigin = origin + Vector3.new(0, 3.1, 0)
     local core = part(
         model,
-        "PollenHeart",
-        Vector3.new(3.2, 3.2, 3.2),
-        hoverOrigin,
-        Color3.fromRGB(255, 211, 91),
-        Enum.Material.Neon,
-        Enum.PartType.Ball,
-        nil
+        "ZombieTorso",
+        Vector3.new(2.5, 3.2, 1.5),
+        torsoOrigin,
+        Color3.fromRGB(63, 74, 60),
+        Enum.Material.Fabric,
+        Enum.PartType.Block,
+        CFrame.Angles(math.rad(9), 0, 0)
     )
-    for index = 1, 6 do
-        local angle = (index - 1) * math.pi / 3
-        local offset = Vector3.new(math.cos(angle) * 2.7, math.sin(angle) * 2.7, 0.3)
-        part(
-            model,
-            "PollenPetal",
-            Vector3.new(2.4, 1.1, 0.7),
-            hoverOrigin + offset,
-            Color3.fromRGB(231, 181, 83),
-            Enum.Material.SmoothPlastic,
-            Enum.PartType.Ball,
-            CFrame.Angles(0, 0, angle)
-        )
-    end
     part(
         model,
-        "DrowsyTrail",
-        Vector3.new(1.5, 4.5, 1.5),
-        hoverOrigin + Vector3.new(0, -3.1, 0),
-        Color3.fromRGB(120, 163, 105),
-        Enum.Material.Neon,
-        Enum.PartType.Ball,
-        nil
-    ).Transparency =
-        0.35
-    addEye(model, hoverOrigin + Vector3.new(0, 0.3, -1.58), Color3.fromRGB(37, 45, 39))
+        "ZombieRibcage",
+        Vector3.new(1.7, 1.5, 0.5),
+        torsoOrigin + Vector3.new(0, 0.35, -0.72),
+        Color3.fromRGB(206, 200, 182),
+        Enum.Material.SmoothPlastic,
+        Enum.PartType.Block,
+        CFrame.Angles(math.rad(9), 0, 0)
+    )
+    part(
+        model,
+        "ZombieCloak",
+        Vector3.new(2.9, 2.1, 1.9),
+        torsoOrigin + Vector3.new(0, 0.8, 0.24),
+        Color3.fromRGB(44, 48, 44),
+        Enum.Material.Fabric,
+        Enum.PartType.Block,
+        CFrame.Angles(math.rad(11), 0, 0)
+    )
+    part(
+        model,
+        "ZombieMossPad",
+        Vector3.new(1.25, 0.6, 1.2),
+        torsoOrigin + Vector3.new(0.72, 1.5, 0.1),
+        Color3.fromRGB(74, 104, 66),
+        Enum.Material.Grass,
+        Enum.PartType.Block,
+        CFrame.Angles(0, 0, math.rad(-13))
+    )
+    local head = part(
+        model,
+        "ZombieHead",
+        Vector3.new(1.25, 1.4, 1.3),
+        torsoOrigin + Vector3.new(0, 2.35, -0.28),
+        Color3.fromRGB(126, 133, 121),
+        Enum.Material.SmoothPlastic,
+        Enum.PartType.Block,
+        CFrame.Angles(math.rad(17), math.rad(-8), 0)
+    )
+    for armSide = -1, 1, 2 do
+        part(
+            model,
+            "ZombieArm",
+            Vector3.new(0.6, 3.4, 0.6),
+            torsoOrigin + Vector3.new(armSide * 1.6, -0.5, -0.35),
+            Color3.fromRGB(112, 120, 108),
+            Enum.Material.SmoothPlastic,
+            Enum.PartType.Block,
+            CFrame.Angles(math.rad(-24), 0, math.rad(armSide * 7))
+        )
+        part(
+            model,
+            "ZombieLeg",
+            Vector3.new(0.72, 3.1, 0.72),
+            origin + Vector3.new(armSide * 0.62, 1.55, 0),
+            Color3.fromRGB(58, 74, 62),
+            Enum.Material.Fabric,
+            Enum.PartType.Block,
+            CFrame.Angles(0, 0, math.rad(armSide * 3))
+        )
+    end
+    addEye(model, head.Position + Vector3.new(-0.3, 0.12, -0.62), Color3.fromRGB(94, 206, 176))
+    addEye(model, head.Position + Vector3.new(0.3, 0.12, -0.62), Color3.fromRGB(94, 206, 176))
     return core
 end
 
@@ -33211,8 +33255,8 @@ function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target:
     local core: Part
     if definition.modelKey == "briarback" then
         core = briarback(model, origin)
-    elseif definition.modelKey == "pollen_wisp" then
-        core = pollenWisp(model, origin)
+    elseif definition.modelKey == "zombie" then
+        core = zombie(model, origin)
     elseif definition.modelKey == "hollow_crow" then
         core = hollowCrow(model, origin)
     elseif definition.modelKey == "snapvine" then
@@ -34337,15 +34381,15 @@ local ENTRIES: { Entry } = {
         creatorStore = true,
     },
     {
-        id = "mesh_creator_blossom_spirit_a",
-        assetId = 117383764863716,
-        targetLongestDimension = 2.8,
-        maxTriangles = 3500,
+        id = "mesh_zombie_a",
+        assetId = 137970350583998,
+        targetLongestDimension = 6,
+        maxTriangles = 8000,
         maxMaterialSlots = 1,
         placementBand = "curated_enemy",
-        pbr = false,
+        pbr = true,
         preserveSourceMaterials = true,
-        creatorStore = true,
+        creatorStore = false,
     },
     {
         id = "mesh_creator_raven_a",
@@ -37175,7 +37219,7 @@ local creatorAssetCounts: { [string]: number } = {
     mesh_creator_field_rows_a = 0,
     mesh_creator_hollow_rootling_a = 0,
     mesh_creator_earth_golem_a = 0,
-    mesh_creator_blossom_spirit_a = 0,
+    mesh_zombie_a = 0,
     mesh_creator_raven_a = 0,
     mesh_creator_predatory_flower_a = 0,
     mesh_creator_wood_ibex_a = 0,
