@@ -3071,7 +3071,14 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     local stump = part(
         heartwoodFallback,
         "HeartwoodStump",
-        Vector3.new(7.6, 5.8, 7.6),
+        -- Rotated a quarter turn about Z below, so local X is the stump's
+        -- HEIGHT and Y/Z are its cross-section: (height, diameter, diameter).
+        -- Authored as (7.6, 5.8, 7.6) this came out 7.6 tall with a squashed
+        -- 5.8 x 7.6 oval cross-section instead of a 5.8-tall round stump. The
+        -- growth rings are the proof: they offset 3.05 along the axis, which
+        -- only reaches the cut face when the half-height is 2.9. At 3.8 they
+        -- sat buried three quarters of a stud inside the wood.
+        Vector3.new(5.8, 7.6, 7.6),
         CFrame.new(HEARTWOOD_CENTER + Vector3.new(0, 2.9, 0)),
         WET_BARK,
         Enum.Material.Wood
