@@ -34,6 +34,9 @@ export type WorldService = typeof(setmetatable(
         _spawn: SpawnLocation?,
         _mara: Model?,
         _maraTrap: Model?,
+        _lobby: Folder?,
+        _lobbySpawn: SpawnLocation?,
+        _departurePlatform: BasePart?,
         _lantern: BasePart?,
         _lanternVisualHealth: number,
         _beacon: BasePart?,
@@ -81,6 +84,12 @@ local WET_EARTH = Color3.fromRGB(67, 55, 39)
 local HEARTWOOD_CENTER = Vector3.new(38, 0, -48)
 local TOOL_YARD_CENTER = Vector3.new(-42, 0, -68)
 local BARRICADE_CENTER = Vector3.new(-44, 0, -92)
+-- Staging yard, north of the arrival clearing and clear of the route that
+-- leaves it. Inside the flat valley bowl (x -190..190, z -260..90), so every
+-- authored coordinate here sits on level ground.
+local LOBBY_CENTER = Vector3.new(0, 0, 62)
+local DEPARTURE_PLATFORM_CENTER = Vector3.new(0, 0, 44)
+local DEPARTURE_PLATFORM_RADIUS = 11
 -- Shared palette for the generated forest. Kept next to the existing colour
 -- anchors so the treeline and the town read as the same world.
 local FOLIAGE_TONE: FoliageBuilder.Tone = {
@@ -1748,6 +1757,9 @@ function WorldService.new(
         _spawn = nil,
         _mara = nil,
         _maraTrap = nil,
+        _lobby = nil,
+        _lobbySpawn = nil,
+        _departurePlatform = nil,
         _lantern = nil,
         _lanternVisualHealth = 100,
         _beacon = nil,
@@ -3012,6 +3024,418 @@ function WorldService._buildDistantScenery(self: WorldService)
         end
         self._logger:info("distant_scenery_ready", {})
     end)
+end
+
+--[[
+    The Emberhollow departure yard.
+
+    Where a session starts: a lantern-lit staging courtyard with a character
+    hut on one side, a notice board and stall on the other, and a raised
+    departure platform at its south edge facing the road out to the arrival
+    clearing. Standing on that platform is what puts a player in the party;
+    the countdown and the launch itself belong to LobbyService.
+
+    Built to the same standard as the rest of the world rather than as a grey
+    box: layered ground, a real timber-framed hut with a roof and rafters,
+    banded platform edging, practical lantern light, and reviewed props. The
+    platform reads as a threshold you deliberately step onto -- raised, ringed,
+    and pointed at the gate -- because that is the whole mechanic.
+]]
+function WorldService._buildLobby(self: WorldService, world: Model)
+    local lobby = Instance.new("Folder")
+    lobby.Name = "EmberhollowLobby"
+    lobby.Parent = world
+    self._lobby = lobby
+
+    groundPatch(
+        lobby,
+        LOBBY_CENTER + Vector3.new(0, 0, 4),
+        Vector3.new(76, 0.3, 74),
+        Color3.fromRGB(48, 57, 46),
+        Enum.Material.LeafyGrass
+    )
+    local court = part(
+        lobby,
+        "LobbyCourtyard",
+        Vector3.new(56, 0.34, 52),
+        CFrame.new(LOBBY_CENTER + Vector3.new(0, 0.2, 6)),
+        Color3.fromRGB(96, 99, 92),
+        Enum.Material.Slate,
+        false
+    )
+    court.CanQuery = false
+    for edgeIndex = -3, 3 do
+        for edgeSide = -1, 1, 2 do
+            local edge = part(
+                lobby,
+                "LobbyCourtEdge",
+                Vector3.new(3.4, 0.5, 3.4),
+                CFrame.new(LOBBY_CENTER + Vector3.new(edgeSide * 28.4, 0.25, 6 + edgeIndex * 7.6))
+                    * CFrame.Angles(0, math.rad(edgeIndex * 6), 0),
+                Color3.fromRGB(78, 82, 76),
+                Enum.Material.Slate,
+                false
+            )
+            edge.CanQuery = false
+        end
+    end
+
+    -- Departure platform: raised, banded, and ringed with lantern posts so it
+    -- reads as a threshold rather than a patch of floor.
+    local platform = part(
+        lobby,
+        "DeparturePlatform",
+        Vector3.new(DEPARTURE_PLATFORM_RADIUS * 2, 1.2, DEPARTURE_PLATFORM_RADIUS * 2),
+        CFrame.new(DEPARTURE_PLATFORM_CENTER + Vector3.new(0, 0.6, 0)),
+        Color3.fromRGB(74, 55, 40),
+        Enum.Material.WoodPlanks
+    )
+    self._departurePlatform = platform
+    local platformRim = part(
+        lobby,
+        "DeparturePlatformRim",
+        Vector3.new(DEPARTURE_PLATFORM_RADIUS * 2 + 2.2, 0.55, DEPARTURE_PLATFORM_RADIUS * 2 + 2.2),
+        CFrame.new(DEPARTURE_PLATFORM_CENTER + Vector3.new(0, 0.28, 0)),
+        Color3.fromRGB(56, 60, 56),
+        Enum.Material.Slate,
+        false
+    )
+    platformRim.CanQuery = false
+    for plankIndex = -4, 4 do
+        local plank = part(
+            lobby,
+            "DeparturePlank",
+            Vector3.new(1.5, 0.12, DEPARTURE_PLATFORM_RADIUS * 1.9),
+            CFrame.new(DEPARTURE_PLATFORM_CENTER + Vector3.new(plankIndex * 2.3, 1.24, 0)),
+            if plankIndex % 2 == 0 then Color3.fromRGB(84, 62, 44) else Color3.fromRGB(69, 51, 37),
+            Enum.Material.WoodPlanks,
+            false
+        )
+        plank.CanQuery = false
+    end
+    -- A ring inlaid into the deck: the standing mark, so a player can see
+    -- where "on the platform" actually is without a floating label.
+    for markIndex = 0, 23 do
+        local angle = (markIndex / 24) * math.pi * 2
+        local mark = part(
+            lobby,
+            "DepartureRing",
+            Vector3.new(1.1, 0.1, 0.5),
+            CFrame.new(
+                DEPARTURE_PLATFORM_CENTER
+                    + Vector3.new(
+                        math.cos(angle) * (DEPARTURE_PLATFORM_RADIUS - 1.4),
+                        1.3,
+                        math.sin(angle) * (DEPARTURE_PLATFORM_RADIUS - 1.4)
+                    )
+            ) * CFrame.Angles(0, -angle, 0),
+            AMBER,
+            Enum.Material.Neon,
+            false
+        )
+        mark.Transparency = 0.42
+        mark.CastShadow = false
+        mark.CanQuery = false
+    end
+    for postIndex = 0, 3 do
+        local angle = (postIndex / 4) * math.pi * 2 + math.pi / 4
+        local postAt = DEPARTURE_PLATFORM_CENTER
+            + Vector3.new(
+                math.cos(angle) * (DEPARTURE_PLATFORM_RADIUS + 0.4),
+                0,
+                math.sin(angle) * (DEPARTURE_PLATFORM_RADIUS + 0.4)
+            )
+        local postFallback = Instance.new("Model")
+        postFallback.Name = "DepartureLanternFallback"
+        postFallback.Parent = lobby
+        part(
+            postFallback,
+            "DepartureLanternPost",
+            Vector3.new(0.6, 8.4, 0.6),
+            CFrame.new(postAt + Vector3.new(0, 4.2, 0)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+        local lampGlow = part(
+            postFallback,
+            "DepartureLanternGlow",
+            Vector3.new(1.1, 1.4, 1.1),
+            CFrame.new(postAt + Vector3.new(0, 8.1, 0)),
+            AMBER,
+            Enum.Material.Neon,
+            false
+        )
+        lampGlow.CastShadow = false
+        local lampLight = Instance.new("PointLight")
+        lampLight.Color = AMBER
+        lampLight.Brightness = 1.35
+        lampLight.Range = 26
+        lampLight.Parent = lampGlow
+        CollectionService:AddTag(lampGlow, self._runtimeIds.AmbientLightTag)
+        table.insert(self._meshPlacements, {
+            assetId = "mesh_creator_street_lantern_a",
+            fallbackKind = "asset_replacement",
+            position = postAt,
+            scale = 0.92,
+            yaw = angle,
+            seed = 9401 + postIndex,
+            swayTag = nil,
+            parent = lobby,
+            fallbackInstance = postFallback,
+        })
+    end
+
+    -- The gate the party leaves through, on the road south to the arrival.
+    local gateFallback = Instance.new("Model")
+    gateFallback.Name = "DepartureGateFallback"
+    gateFallback.Parent = lobby
+    for gateSide = -1, 1, 2 do
+        part(
+            gateFallback,
+            "DepartureGatePost",
+            Vector3.new(1.3, 12, 1.3),
+            CFrame.new(LOBBY_CENTER + Vector3.new(gateSide * 6, 6, -28)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+    end
+    part(
+        gateFallback,
+        "DepartureGateLintel",
+        Vector3.new(13.4, 1.3, 1.3),
+        CFrame.new(LOBBY_CENTER + Vector3.new(0, 12, -28)),
+        BARK,
+        Enum.Material.WoodPlanks,
+        false
+    )
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_wood_arch_a",
+        fallbackKind = "asset_replacement",
+        position = LOBBY_CENTER + Vector3.new(0, 0, -28),
+        scale = 1.1,
+        yaw = 0,
+        seed = 9410,
+        swayTag = nil,
+        parent = lobby,
+        fallbackInstance = gateFallback,
+    })
+    labelSign(
+        lobby,
+        CFrame.new(LOBBY_CENTER + Vector3.new(9.5, 0, -26)) * CFrame.Angles(0, math.rad(196), 0),
+        "TO EMBERHOLLOW"
+    )
+
+    -- Character hut: a real framed building with a roof, not an open slab.
+    local hutCenter = LOBBY_CENTER + Vector3.new(-21, 0, 18)
+    local hut = Instance.new("Folder")
+    hut.Name = "LobbyCharacterHut"
+    hut.Parent = lobby
+    local hutFloor = part(
+        hut,
+        "HutFloor",
+        Vector3.new(20, 0.5, 15),
+        CFrame.new(hutCenter + Vector3.new(0, 0.25, 0)),
+        Color3.fromRGB(88, 64, 45),
+        Enum.Material.WoodPlanks
+    )
+    hutFloor.CanQuery = false
+    for hutX = -1, 1, 2 do
+        for hutZ = -1, 1, 2 do
+            part(
+                hut,
+                "HutPost",
+                Vector3.new(0.9, 9, 0.9),
+                CFrame.new(hutCenter + Vector3.new(hutX * 9.2, 4.5, hutZ * 6.8)),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
+    end
+    part(
+        hut,
+        "HutBackWall",
+        Vector3.new(20, 8.4, 0.6),
+        CFrame.new(hutCenter + Vector3.new(0, 4.2, 7)),
+        Color3.fromRGB(78, 58, 42),
+        Enum.Material.WoodPlanks
+    )
+    for wallSide = -1, 1, 2 do
+        part(
+            hut,
+            "HutSideWall",
+            Vector3.new(0.6, 8.4, 14),
+            CFrame.new(hutCenter + Vector3.new(wallSide * 9.7, 4.2, 0)),
+            Color3.fromRGB(78, 58, 42),
+            Enum.Material.WoodPlanks
+        )
+    end
+    part(
+        hut,
+        "HutRidgeBeam",
+        Vector3.new(20.6, 0.7, 0.7),
+        CFrame.new(hutCenter + Vector3.new(0, 10.4, 0)),
+        WET_BARK,
+        Enum.Material.Wood,
+        false
+    )
+    for roofSide = -1, 1, 2 do
+        local roof = part(
+            hut,
+            "HutRoof",
+            Vector3.new(20.8, 2.6, 8.4),
+            CFrame.new(hutCenter + Vector3.new(0, 9.5, roofSide * 3.6))
+                * CFrame.Angles(0, if roofSide < 0 then math.pi else 0, 0),
+            Color3.fromRGB(46, 52, 48),
+            Enum.Material.Slate,
+            false
+        )
+        roof.Shape = Enum.PartType.Wedge
+    end
+    addBillboard(hutFloor, "CHOOSE YOUR CALLING", AMBER, 70)
+
+    -- One stand per profession, each with the prop that says what it does.
+    local callings = {
+        { id = "scout", label = "SCOUT", asset = "mesh_creator_forest_sign_a", tint = FOXFIRE },
+        { id = "warden", label = "WARDEN", asset = "mesh_creator_barricade_a", tint = AMBER },
+        { id = "engineer", label = "ENGINEER", asset = "mesh_creator_anvil_a", tint = CREAM },
+        {
+            id = "medic",
+            label = "MEDIC",
+            asset = "mesh_creator_potion_shelf_a",
+            tint = Color3.fromRGB(150, 196, 158),
+        },
+    }
+    for callingIndex, calling in callings do
+        local standAt = hutCenter + Vector3.new(-6.9 + (callingIndex - 1) * 4.6, 0.5, 2.6)
+        local standFallback = Instance.new("Model")
+        standFallback.Name = "CallingStandFallback_" .. calling.id
+        standFallback.Parent = hut
+        local pedestal = part(
+            standFallback,
+            "CallingPedestal",
+            Vector3.new(3, 2.6, 3),
+            CFrame.new(standAt + Vector3.new(0, 1.3, 0)),
+            Color3.fromRGB(70, 74, 70),
+            Enum.Material.Slate
+        )
+        local banner = part(
+            standFallback,
+            "CallingBanner",
+            Vector3.new(2.4, 3.4, 0.18),
+            CFrame.new(standAt + Vector3.new(0, 4.6, 0.9)),
+            calling.tint,
+            Enum.Material.Fabric,
+            false
+        )
+        banner.Transparency = 0.08
+        addBillboard(pedestal, calling.label, calling.tint, 44)
+        table.insert(self._meshPlacements, {
+            assetId = calling.asset,
+            fallbackKind = "asset_dressing",
+            position = standAt + Vector3.new(0, 2.6, 0),
+            scale = 0.5,
+            yaw = math.rad(180),
+            seed = 9420 + callingIndex,
+            swayTag = nil,
+            parent = hut,
+            fallbackInstance = nil,
+        })
+    end
+
+    -- The other side of the yard: somewhere to look at, so the space reads as
+    -- a place people use rather than a corridor to the platform.
+    local stallAt = LOBBY_CENTER + Vector3.new(22, 0, 20)
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_market_stall_a",
+        fallbackKind = "asset_dressing",
+        position = stallAt,
+        scale = 0.85,
+        yaw = math.rad(-118),
+        seed = 9430,
+        swayTag = nil,
+        parent = lobby,
+        fallbackInstance = nil,
+    })
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_notice_board_a",
+        fallbackKind = "asset_dressing",
+        position = LOBBY_CENTER + Vector3.new(15, 0, 4),
+        scale = 0.85,
+        yaw = math.rad(-140),
+        seed = 9431,
+        swayTag = nil,
+        parent = lobby,
+        fallbackInstance = nil,
+    })
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_campfire_a",
+        fallbackKind = "asset_dressing",
+        position = LOBBY_CENTER + Vector3.new(19, 0, 32),
+        scale = 1.15,
+        yaw = math.rad(24),
+        seed = 9432,
+        swayTag = nil,
+        parent = lobby,
+        fallbackInstance = nil,
+    })
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_picnic_table_a",
+        fallbackKind = "asset_dressing",
+        position = LOBBY_CENTER + Vector3.new(24, 0, 32),
+        scale = 0.95,
+        yaw = math.rad(-42),
+        seed = 9433,
+        swayTag = nil,
+        parent = lobby,
+        fallbackInstance = nil,
+    })
+    for crateIndex = 1, 5 do
+        local crateSeed = 9440 + crateIndex
+        local crateAt = LOBBY_CENTER
+            + Vector3.new(-26 + ((crateIndex * 7) % 9) * 1.4, 0, -6 + ((crateIndex * 5) % 11) * 2.1)
+        table.insert(self._meshPlacements, {
+            assetId = if crateIndex % 2 == 0
+                then "mesh_creator_barrel_a"
+                else "mesh_creator_crate_a",
+            fallbackKind = "asset_dressing",
+            position = crateAt,
+            scale = 1,
+            yaw = math.rad(crateIndex * 37),
+            seed = crateSeed,
+            swayTag = nil,
+            parent = lobby,
+            fallbackInstance = nil,
+        })
+    end
+    for fenceIndex = -3, 3 do
+        table.insert(self._meshPlacements, {
+            assetId = "mesh_creator_rustic_fence_a",
+            fallbackKind = "asset_dressing",
+            position = LOBBY_CENTER + Vector3.new(fenceIndex * 8, 0, 34),
+            scale = 1,
+            yaw = 0,
+            seed = 9450 + fenceIndex,
+            swayTag = nil,
+            parent = lobby,
+            fallbackInstance = nil,
+        })
+    end
+
+    -- Spawn inside the yard, facing the platform and the gate beyond it.
+    local lobbySpawn = Instance.new("SpawnLocation")
+    lobbySpawn.Name = "LobbySpawn"
+    lobbySpawn.Size = Vector3.new(14, 1, 14)
+    lobbySpawn.CFrame = CFrame.new(LOBBY_CENTER + Vector3.new(0, 0.5, 22))
+    lobbySpawn.Transparency = 1
+    lobbySpawn.Anchored = true
+    lobbySpawn.CanCollide = true
+    lobbySpawn.Neutral = true
+    lobbySpawn.Duration = 0
+    lobbySpawn.Parent = lobby
+    self._lobbySpawn = lobbySpawn
 end
 
 function WorldService._buildMara(self: WorldService, world: Model)
@@ -5162,6 +5586,7 @@ function WorldService.Init(self: WorldService, context: any)
     spawn.Parent = world
     self._spawn = spawn
 
+    self:_buildLobby(world)
     self:_buildMara(world)
     self:_buildInteractables(world)
     self:setTownCondition(self._townCondition)
@@ -5419,6 +5844,25 @@ function WorldService.freeMara(self: WorldService)
     end
     self._maraTrap = nil
     trap:Destroy()
+end
+
+-- The physical departure platform and where a launched party lands. Owned
+-- here because the geometry is authored here; LobbyService reads them rather
+-- than duplicating the coordinates.
+function WorldService.departurePlatform(self: WorldService): (Vector3, number)
+    local platform = self._departurePlatform
+    if platform == nil then
+        return DEPARTURE_PLATFORM_CENTER, DEPARTURE_PLATFORM_RADIUS
+    end
+    return platform.Position, DEPARTURE_PLATFORM_RADIUS
+end
+
+function WorldService.arrivalSpawnPosition(self: WorldService): Vector3
+    local spawn = self._spawn
+    if spawn == nil then
+        return Vector3.new(0, 4, 0)
+    end
+    return spawn.Position + Vector3.new(0, 3, 0)
 end
 
 function WorldService.moveMara(self: WorldService, destination: Vector3)

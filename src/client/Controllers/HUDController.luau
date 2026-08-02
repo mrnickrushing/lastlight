@@ -233,6 +233,12 @@ export type HUDController = typeof(setmetatable(
         _ability: TextButton,
         _compact: TextButton,
         _professionButton: TextButton,
+        _lobbyFrame: Frame,
+        _lobbyTitle: TextLabel,
+        _lobbyDetail: TextLabel,
+        _lobbySizes: Frame,
+        _lobbySizeButtons: { TextButton },
+        _onLobbyDepart: ((number) -> ())?,
         _progressButton: TextButton,
         _useCharm: TextButton,
         _useSatchel: TextButton,
@@ -1060,8 +1066,96 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         professionCards[professionOrder[2]].NextSelectionUp = professionClose
     end
 
+    -- Departure panel. Visible only while a player is still in the staging
+    -- yard, so it never competes with the survival HUD once the run starts.
+    local lobbyFrame = Instance.new("Frame")
+    lobbyFrame.Name = "LobbyPanel"
+    lobbyFrame.AnchorPoint = Vector2.new(0.5, 1)
+    lobbyFrame.Position = UDim2.new(0.5, 0, 1, -104)
+    lobbyFrame.Size = UDim2.fromOffset(360, 108)
+    lobbyFrame.BackgroundColor3 = Color3.fromRGB(16, 22, 26)
+    lobbyFrame.BackgroundTransparency = 0.12
+    lobbyFrame.BorderSizePixel = 0
+    lobbyFrame.Visible = false
+    lobbyFrame.ZIndex = 40
+    lobbyFrame.Parent = gui
+    local lobbyCorner = Instance.new("UICorner")
+    lobbyCorner.CornerRadius = UDim.new(0, 12)
+    lobbyCorner.Parent = lobbyFrame
+    local lobbyStroke = Instance.new("UIStroke")
+    lobbyStroke.Color = Color3.fromRGB(255, 181, 76)
+    lobbyStroke.Thickness = 1.5
+    lobbyStroke.Transparency = 0.45
+    lobbyStroke.Parent = lobbyFrame
+
+    local lobbyTitle = Instance.new("TextLabel")
+    lobbyTitle.Name = "LobbyTitle"
+    lobbyTitle.BackgroundTransparency = 1
+    lobbyTitle.Position = UDim2.fromOffset(14, 8)
+    lobbyTitle.Size = UDim2.new(1, -28, 0, 18)
+    lobbyTitle.Font = Enum.Font.GothamBold
+    lobbyTitle.Text = "DEPARTURE"
+    lobbyTitle.TextColor3 = Color3.fromRGB(255, 181, 76)
+    lobbyTitle.TextSize = 13
+    lobbyTitle.TextXAlignment = Enum.TextXAlignment.Left
+    lobbyTitle.ZIndex = 41
+    lobbyTitle.Parent = lobbyFrame
+
+    local lobbyDetail = Instance.new("TextLabel")
+    lobbyDetail.Name = "LobbyDetail"
+    lobbyDetail.BackgroundTransparency = 1
+    lobbyDetail.Position = UDim2.fromOffset(14, 26)
+    lobbyDetail.Size = UDim2.new(1, -28, 0, 18)
+    lobbyDetail.Font = Enum.Font.Gotham
+    lobbyDetail.Text = "STAND ON THE PLATFORM TO DEPART"
+    lobbyDetail.TextColor3 = Color3.fromRGB(178, 194, 183)
+    lobbyDetail.TextSize = 12
+    lobbyDetail.TextXAlignment = Enum.TextXAlignment.Left
+    lobbyDetail.ZIndex = 41
+    lobbyDetail.Parent = lobbyFrame
+
+    local lobbySizes = Instance.new("Frame")
+    lobbySizes.Name = "LobbySizes"
+    lobbySizes.BackgroundTransparency = 1
+    lobbySizes.Position = UDim2.fromOffset(14, 52)
+    lobbySizes.Size = UDim2.new(1, -28, 0, 44)
+    lobbySizes.ZIndex = 41
+    lobbySizes.Parent = lobbyFrame
+    local lobbyLayout = Instance.new("UIListLayout")
+    lobbyLayout.FillDirection = Enum.FillDirection.Horizontal
+    lobbyLayout.Padding = UDim.new(0, 6)
+    lobbyLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    lobbyLayout.Parent = lobbySizes
+
+    local lobbySizeButtons: { TextButton } = {}
+    for size = 1, 8 do
+        local sizeButton = Instance.new("TextButton")
+        sizeButton.Name = "PartySize_" .. size
+        sizeButton.LayoutOrder = size
+        sizeButton.Size = UDim2.new(0, 36, 1, 0)
+        sizeButton.BackgroundColor3 = Color3.fromRGB(31, 40, 44)
+        sizeButton.AutoButtonColor = true
+        sizeButton.Font = Enum.Font.GothamBold
+        sizeButton.Text = tostring(size)
+        sizeButton.TextColor3 = Color3.fromRGB(244, 230, 197)
+        sizeButton.TextSize = 15
+        sizeButton.Selectable = true
+        sizeButton.ZIndex = 42
+        sizeButton.Parent = lobbySizes
+        local sizeCorner = Instance.new("UICorner")
+        sizeCorner.CornerRadius = UDim.new(0, 8)
+        sizeCorner.Parent = sizeButton
+        table.insert(lobbySizeButtons, sizeButton)
+    end
+
     local self = setmetatable({
         _gui = gui,
+        _lobbyFrame = lobbyFrame,
+        _lobbyTitle = lobbyTitle,
+        _lobbyDetail = lobbyDetail,
+        _lobbySizes = lobbySizes,
+        _lobbySizeButtons = lobbySizeButtons,
+        _onLobbyDepart = nil,
         _scale = scale,
         _phaseFrame = phaseFrame,
         _phase = phase,
@@ -1256,6 +1350,43 @@ end
 
 function HUDController.setCompactHandler(self: HUDController, callback: (boolean) -> ())
     self._onCompact = callback
+end
+
+function HUDController.setLobbyDepartHandler(self: HUDController, callback: (number) -> ())
+    self._onLobbyDepart = callback
+    for size, button in self._lobbySizeButtons do
+        button.Activated:Connect(function()
+            local handler = self._onLobbyDepart
+            if handler ~= nil then
+                handler(size)
+            end
+        end)
+    end
+end
+
+function HUDController._updateLobby(self: HUDController, state: any)
+    local lobby = state.lobby
+    if type(lobby) ~= "table" or state.departed == true then
+        self._lobbyFrame.Visible = false
+        return
+    end
+    self._lobbyFrame.Visible = true
+    if lobby.counting then
+        self._lobbyTitle.Text = string.format("DEPARTING IN %d", lobby.secondsRemaining)
+        self._lobbyDetail.Text =
+            string.format("%d ON THE PLATFORM * PARTY OF %d", lobby.readyCount, lobby.partySize)
+        self._lobbySizes.Visible = false
+    else
+        self._lobbyTitle.Text = "DEPARTURE"
+        self._lobbyDetail.Text = if lobby.readyCount > 0
+            then string.format("%d ON THE PLATFORM * CHOOSE PARTY SIZE", lobby.readyCount)
+            else "STAND ON THE PLATFORM TO DEPART"
+        self._lobbySizes.Visible = true
+        local maximum = if type(lobby.maxPartySize) == "number" then lobby.maxPartySize else 8
+        for size, button in self._lobbySizeButtons do
+            button.Visible = size <= maximum
+        end
+    end
 end
 
 function HUDController.setProfessionHandler(self: HUDController, callback: (string) -> ())
@@ -1966,6 +2097,7 @@ function HUDController.update(self: HUDController, state: any)
         return
     end
     self._currentState = state
+    self:_updateLobby(state)
     local survival = state.survival
     local selfSurvival = if type(survival) == "table" then survival.self else nil
     self._playerDowned = type(selfSurvival) == "table" and selfSurvival.downed == true

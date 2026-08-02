@@ -550,3 +550,37 @@ authored encounter rather than a new one.
 has never shipped in save data — enemy IDs live only in the night schedules and
 telemetry, not in the save schema — so no migration is required.
 
+## 2026-08-02 — A session starts in a staging yard, not on the arrival road
+
+**Decision:** Players now spawn in the Emberhollow departure yard: a lantern-lit
+courtyard with a character hut, a notice board and stall, and a raised departure
+platform at its south edge facing the gate. Standing on that platform is what
+puts a player in the party. Any player on it may choose a party size, which
+starts one bounded ten-second countdown; when it reaches zero, everyone standing
+on the platform, up to the chosen size, is moved together to the arrival clearing
+where the tutorial begins and Mara is freed. Players not on the platform are not
+taken. The whole feature sits behind `lobby_departure_enabled`.
+
+**Reason:** The game needed a place to gather with friends and leave together
+rather than each player materializing alone on the arrival road. Building it as
+an in-world area inside the existing place, rather than a separate lobby place
+with a teleport, avoids teleport payloads, reconnect tokens, duplicate-reward
+handling, and a second published place — none of which the project needs to take
+on to get the moment it actually wanted. It is also reversible: the flag turns
+the yard back into ordinary scenery.
+
+**Authority:** All of the launch rules live in the pure `LobbyDeparture` module
+and are re-checked server-side on every request. Occupancy is measured from the
+server's own view of character positions, so a client cannot claim to be on the
+platform, and a forged or spammed party size cannot start, resize, or rush a
+countdown. An emptied platform cancels rather than launching nobody, and the
+departure state is consumed on launch so a duplicated remote cannot send a party
+twice. A departed player is kept in the game across respawns instead of being
+returned to the yard.
+
+**Deferred:** The character hut currently presents the four professions as
+readable stands; profession selection itself still happens at the existing town
+altars, and no cosmetic purchases exist yet. Selling professions outright, which
+has been discussed, would contradict the paid-power rule in AGENTS.md and needs
+its own decision before any implementation.
+

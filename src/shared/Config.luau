@@ -63,6 +63,7 @@ return table.freeze({
         warden_stag_boss_enabled = true,
         bramblewake_blackout_enabled = true,
         town_night_cycle_enabled = true,
+        lobby_departure_enabled = true,
         region_bramblewake_enabled = true,
         region_ironroot_enabled = false,
         region_mireglass_enabled = false,

@@ -1826,6 +1826,7 @@ return table.freeze({
         warden_stag_boss_enabled = true,
         bramblewake_blackout_enabled = true,
         town_night_cycle_enabled = true,
+        lobby_departure_enabled = true,
         region_bramblewake_enabled = true,
         region_ironroot_enabled = false,
         region_mireglass_enabled = false,
@@ -5406,6 +5407,182 @@ return table.freeze(GearVisualPlan)
       </Item>
       <Item class="ModuleScript" referent="30">
         <Properties>
+          <string name="Name">LobbyDeparture</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    Departure platform state for the Emberhollow lobby.
+
+    Pure logic: no Roblox instances, no players, no clock of its own. The
+    service layer owns "who is physically standing on the platform" and passes
+    that in as a count; everything about whether a departure may start, how long
+    is left, and whether it may launch lives here so it can be tested and can
+    never be decided by a client.
+
+    The rules the countdown has to hold:
+
+      * Only the platform counts. Players who are not standing on it when the
+        countdown reaches zero are not taken, which is the whole point of a
+        staging platform.
+      * A departure cannot be started, resized, or rushed by a client. The
+        client may only ask; every bound below is checked here.
+      * An emptied platform cancels the countdown rather than launching nobody.
+      * Launch happens exactly once per departure. The state is consumed on
+        launch so a duplicated remote or a retried tick cannot send a party
+        twice.
+]]
+
+local LobbyDeparture = {}
+
+export type State = {
+    partySize: number,
+    countdownEndsAt: number,
+    launchedAt: number,
+}
+
+export type Snapshot = {
+    partySize: number,
+    counting: boolean,
+    secondsRemaining: number,
+}
+
+local COUNTDOWN_SECONDS = 10
+local MIN_PARTY_SIZE = 1
+
+local function finite(value: any): boolean
+    return type(value) == "number" and value == value and value > -math.huge and value < math.huge
+end
+
+local function wholeAtLeast(value: any, minimum: number): boolean
+    return finite(value) and value >= minimum and value == math.floor(value)
+end
+
+function LobbyDeparture.countdownSeconds(): number
+    return COUNTDOWN_SECONDS
+end
+
+function LobbyDeparture.create(): State
+    return { partySize = 0, countdownEndsAt = 0, launchedAt = 0 }
+end
+
+function LobbyDeparture.normalize(value: any): State
+    if
+        type(value) ~= "table"
+        or not finite(value.partySize)
+        or not finite(value.countdownEndsAt)
+        or not finite(value.launchedAt)
+        or value.partySize < 0
+        or value.countdownEndsAt < 0
+        or value.launchedAt < 0
+    then
+        return LobbyDeparture.create()
+    end
+    return {
+        partySize = math.floor(value.partySize),
+        countdownEndsAt = value.countdownEndsAt,
+        launchedAt = value.launchedAt,
+    }
+end
+
+--[[
+    Ask to start a departure for `size` players.
+
+    `readyCount` is how many players are standing on the platform right now.
+    Requiring at least one means the button cannot start a countdown for an
+    empty platform, and `maxPartySize` is supplied by the caller so the bound
+    stays with Config rather than being duplicated here.
+]]
+function LobbyDeparture.requestDeparture(
+    state: State,
+    size: any,
+    now: number,
+    readyCount: any,
+    maxPartySize: any
+): (State, any)
+    local current = LobbyDeparture.normalize(state)
+    if not finite(now) or now < 0 then
+        return current, { accepted = false, reason = "invalid_time" }
+    end
+    if not wholeAtLeast(maxPartySize, MIN_PARTY_SIZE) then
+        return current, { accepted = false, reason = "invalid_capacity" }
+    end
+    if not wholeAtLeast(readyCount, 0) then
+        return current, { accepted = false, reason = "invalid_ready_count" }
+    end
+    if not wholeAtLeast(size, MIN_PARTY_SIZE) or size > maxPartySize then
+        return current, { accepted = false, reason = "invalid_party_size" }
+    end
+    if readyCount < 1 then
+        return current, { accepted = false, reason = "platform_empty" }
+    end
+    if current.countdownEndsAt > now then
+        return current, { accepted = false, reason = "already_counting" }
+    end
+
+    return {
+        partySize = size,
+        countdownEndsAt = now + COUNTDOWN_SECONDS,
+        launchedAt = 0,
+    }, {
+        accepted = true,
+        partySize = size,
+        secondsRemaining = COUNTDOWN_SECONDS,
+    }
+end
+
+--[[
+    Advance the countdown.
+
+    Returns `launch = true` exactly once, on the first tick at or after the
+    deadline, and only while someone is still standing on the platform. The
+    returned `capacity` is how many of those players may board.
+]]
+function LobbyDeparture.tick(state: State, now: number, readyCount: any): (State, any)
+    local current = LobbyDeparture.normalize(state)
+    if not finite(now) or not wholeAtLeast(readyCount, 0) then
+        return current, { launch = false, reason = "invalid_tick" }
+    end
+    if current.countdownEndsAt <= 0 then
+        return current, { launch = false, reason = "idle" }
+    end
+    if readyCount < 1 then
+        -- Everyone stepped off. Cancel rather than launch an empty party.
+        return LobbyDeparture.create(), { launch = false, reason = "platform_emptied" }
+    end
+    if now < current.countdownEndsAt then
+        return current, { launch = false, reason = "counting" }
+    end
+
+    return { partySize = 0, countdownEndsAt = 0, launchedAt = now }, {
+        launch = true,
+        capacity = math.min(current.partySize, readyCount),
+        partySize = current.partySize,
+    }
+end
+
+function LobbyDeparture.cancel(state: State): State
+    local _ = LobbyDeparture.normalize(state)
+    return LobbyDeparture.create()
+end
+
+function LobbyDeparture.snapshot(state: State, now: number): Snapshot
+    local current = LobbyDeparture.normalize(state)
+    if not finite(now) or current.countdownEndsAt <= now then
+        return { partySize = current.partySize, counting = false, secondsRemaining = 0 }
+    end
+    return {
+        partySize = current.partySize,
+        counting = true,
+        secondsRemaining = math.max(0, math.ceil(current.countdownEndsAt - now)),
+    }
+end
+
+return table.freeze(LobbyDeparture)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="31">
+        <Properties>
           <string name="Name">MusicCatalog</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -5760,7 +5937,7 @@ return table.freeze(MusicCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">NightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -5808,7 +5985,7 @@ return table.freeze(NightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">OldGrowthEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -6093,7 +6270,7 @@ return table.freeze(OldGrowthEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">ProfessionAbilityVisuals</string>
           <string name="Source"><![CDATA[--!strict
@@ -6163,7 +6340,7 @@ return table.freeze(ProfessionAbilityVisuals)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">ProfessionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -6273,7 +6450,7 @@ return table.freeze(ProfessionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">ProfessionMastery</string>
           <string name="Source"><![CDATA[--!strict
@@ -6654,7 +6831,7 @@ return table.freeze(ProfessionMastery)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">ProfessionRescue</string>
           <string name="Source"><![CDATA[--!strict
@@ -6733,7 +6910,7 @@ return table.freeze(ProfessionRescue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">ProfessionState</string>
           <string name="Source"><![CDATA[--!strict
@@ -6900,7 +7077,7 @@ return table.freeze(ProfessionState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">QuestCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -6971,7 +7148,7 @@ return table.freeze(QuestCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">Quests</string>
           <string name="Source"><![CDATA[--!strict
@@ -7088,7 +7265,7 @@ return table.freeze(Quests)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
@@ -7147,7 +7324,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
@@ -7264,7 +7441,7 @@ return table.freeze(ResidentDialogue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -7379,7 +7556,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -7445,6 +7622,7 @@ local RuntimeIds = {
         CraftItem = "craft_item",
         UseGear = "use_gear",
         EquipGear = "equip_gear",
+        LobbyDepart = "lobby_depart",
         OpenFieldBook = "open_field_book",
         TalkResident = "talk_resident",
         RepairTown = "repair_town",
@@ -7503,7 +7681,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -8109,7 +8287,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -8228,7 +8406,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -8485,7 +8663,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -8646,7 +8824,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -8738,7 +8916,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -8950,7 +9128,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -9103,7 +9281,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -9280,7 +9458,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -9424,7 +9602,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -9460,7 +9638,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -9842,7 +10020,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -9875,11 +10053,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="56">
+  <Item class="ServerScriptService" referent="57">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="57">
+    <Item class="Script" referent="58">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -9927,6 +10105,7 @@ local TownNightSchedule = require(root.TownNightSchedule)
 local TownNightIncident = require(root.TownNightIncident)
 local TownCondition = require(root.TownCondition)
 local TownGuardLastStand = require(root.TownGuardLastStand)
+local LobbyDeparture = require(root.LobbyDeparture)
 local TownProgression = require(root.TownProgression)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
@@ -9945,6 +10124,7 @@ local BramblewakeBlackoutService = require(script.Services.BramblewakeBlackoutSe
 local PhaseService = require(script.Services.PhaseService)
 local ProfileService = require(script.Services.ProfileService)
 local TownNightService = require(script.Services.TownNightService)
+local LobbyService = require(script.Services.LobbyService)
 local PlayerSurvivalService = require(script.Services.PlayerSurvivalService)
 local PlayerCombatService = require(script.Services.PlayerCombatService)
 local ProfessionService = require(script.Services.ProfessionService)
@@ -10108,6 +10288,8 @@ local phaseService = PhaseService.new(
     Config.FirstNightDuskSeconds,
     Config.FirstNightSeconds
 )
+local lobbyService =
+    LobbyService.new(logger, Config, LobbyDeparture, featureFlags, worldService, analyticsService)
 local townNightService = TownNightService.new(
     logger,
     Config,
@@ -10153,6 +10335,7 @@ local tutorialService = TutorialService.new(
     professionService,
     phaseService,
     townNightService,
+    lobbyService,
     expeditionService,
     oldGrowthService,
     wardenStagService,
@@ -10186,6 +10369,7 @@ services:register(oldGrowthService)
 services:register(wardenStagService)
 services:register(blackoutService)
 services:register(phaseService)
+services:register(lobbyService)
 services:register(townNightService)
 services:register(tutorialService)
 services:initialize()
@@ -10199,7 +10383,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -10297,11 +10481,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="59">
+      <Item class="Folder" referent="60">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="60">
+        <Item class="ModuleScript" referent="61">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -10534,6 +10718,23 @@ function AnalyticsService.playerRecovered(self: AnalyticsService, player: Player
     self._logger:info("player_recovered", {
         player = player.UserId,
         reason = reason,
+    })
+end
+
+function AnalyticsService.lobbyDeparture(
+    self: AnalyticsService,
+    player: Player?,
+    action: string,
+    accepted: boolean,
+    reason: string?,
+    value: any
+)
+    self._logger:info("lobby_departure", {
+        action = action,
+        accepted = accepted,
+        reason = reason,
+        value = value,
+        player = if player ~= nil then player.UserId else nil,
     })
 end
 
@@ -11137,7 +11338,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="61">
+        <Item class="ModuleScript" referent="62">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11635,7 +11836,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12902,7 +13103,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13514,7 +13715,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13618,7 +13819,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13807,7 +14008,272 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="67">
+          <Properties>
+            <string name="Name">LobbyService</string>
+            <string name="Source"><![CDATA[--!strict
+
+--[[
+    Drives the Emberhollow departure platform.
+
+    All the rules about whether a departure may start, how long is left, and
+    who may board live in the pure LobbyDeparture module. This service owns
+    only the parts that need the world: who is physically standing on the
+    platform, moving a launched party to the arrival clearing, and keeping a
+    departed player there across respawns.
+
+    Occupancy is measured server-side from character positions every tick. A
+    client cannot claim to be on the platform, and a client that asks for a
+    departure is only ever asking -- LobbyDeparture re-checks every bound.
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local LobbyService = {}
+LobbyService.__index = LobbyService
+LobbyService.Name = "LobbyService"
+
+export type Logger = {
+    info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+    warn: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+}
+
+export type LobbyService = typeof(setmetatable(
+    {} :: {
+        Name: string,
+        _logger: Logger,
+        _config: any,
+        _lobbyDeparture: any,
+        _featureFlags: any,
+        _worldService: any,
+        _analyticsService: any,
+        _state: any,
+        _departed: { [Player]: boolean },
+        _onChanged: ((string?) -> ())?,
+        _heartbeat: RBXScriptConnection?,
+        _lastPublishedSeconds: number,
+    },
+    LobbyService
+))
+
+local PLATFORM_VERTICAL_TOLERANCE = 12
+
+function LobbyService.new(
+    logger: Logger,
+    config: any,
+    lobbyDeparture: any,
+    featureFlags: any,
+    worldService: any,
+    analyticsService: any
+): LobbyService
+    return setmetatable({
+        Name = LobbyService.Name,
+        _logger = logger,
+        _config = config,
+        _lobbyDeparture = lobbyDeparture,
+        _featureFlags = featureFlags,
+        _worldService = worldService,
+        _analyticsService = analyticsService,
+        _state = lobbyDeparture.create(),
+        _departed = {},
+        _onChanged = nil,
+        _heartbeat = nil,
+        _lastPublishedSeconds = -1,
+    }, LobbyService)
+end
+
+function LobbyService.Init(_self: LobbyService, _context: any) end
+
+function LobbyService.setChangedHandler(self: LobbyService, callback: (string?) -> ())
+    self._onChanged = callback
+end
+
+function LobbyService._notify(self: LobbyService, message: string?)
+    local callback = self._onChanged
+    if callback ~= nil then
+        callback(message)
+    end
+end
+
+local function rootOf(player: Player): BasePart?
+    local character = player.Character
+    if character == nil then
+        return nil
+    end
+    local root = character:FindFirstChild("HumanoidRootPart")
+    return if root ~= nil and root:IsA("BasePart") then root else nil
+end
+
+--[[
+    Players physically standing on the platform.
+
+    Measured from the server's own view of character positions, never from a
+    client claim. A departed player is excluded so someone who walks back onto
+    the platform after launching cannot be counted into the next party while
+    still mid-transition.
+]]
+function LobbyService.readyPlayers(self: LobbyService): { Player }
+    local center, radius = self._worldService:departurePlatform()
+    local ready = {}
+    for _, player in Players:GetPlayers() do
+        if not self._departed[player] then
+            local root = rootOf(player)
+            if root ~= nil then
+                local offset = root.Position - center
+                local flat = Vector3.new(offset.X, 0, offset.Z)
+                if
+                    flat.Magnitude <= radius
+                    and math.abs(offset.Y) <= PLATFORM_VERTICAL_TOLERANCE
+                then
+                    table.insert(ready, player)
+                end
+            end
+        end
+    end
+    return ready
+end
+
+function LobbyService.isDeparted(self: LobbyService, player: Player): boolean
+    return self._departed[player] == true
+end
+
+--[[
+    A client asking to start a departure for `size` players.
+
+    Every bound is re-checked in LobbyDeparture against the server's own ready
+    count and the configured capacity, so a forged size or a spammed request
+    cannot start, resize, or rush a countdown.
+]]
+function LobbyService.requestDeparture(self: LobbyService, player: Player, size: any): any
+    if not self._featureFlags:isEnabled("lobby_departure_enabled") then
+        return { accepted = false, reason = "lobby_disabled" }
+    end
+    local ready = self:readyPlayers(self)
+    local readyCount = #ready
+    local now = workspace:GetServerTimeNow()
+    local nextState, result = self._lobbyDeparture.requestDeparture(
+        self._state,
+        size,
+        now,
+        readyCount,
+        self._config.MaxExpeditionPlayers
+    )
+    self._state = nextState
+    self._analyticsService:lobbyDeparture(player, "request", result.accepted, result.reason, size)
+    if result.accepted then
+        self:_notify(
+            string.format("DEPARTING IN %d — STAND ON THE PLATFORM", result.secondsRemaining)
+        )
+    elseif result.reason == "platform_empty" then
+        self:_notify("STAND ON THE PLATFORM TO DEPART")
+    elseif result.reason == "already_counting" then
+        self:_notify("A DEPARTURE IS ALREADY UNDER WAY")
+    end
+    return result
+end
+
+function LobbyService.snapshot(self: LobbyService): any
+    local now = workspace:GetServerTimeNow()
+    local view = self._lobbyDeparture.snapshot(self._state, now)
+    return {
+        counting = view.counting,
+        partySize = view.partySize,
+        secondsRemaining = view.secondsRemaining,
+        readyCount = #self:readyPlayers(self),
+        maxPartySize = self._config.MaxExpeditionPlayers,
+    }
+end
+
+--[[
+    Send a boarded party to the arrival clearing.
+
+    Players are placed in a small ring so a full party does not land inside one
+    another, and marked departed so a respawn keeps them in the game rather
+    than dropping them back into the lobby.
+]]
+function LobbyService._launch(self: LobbyService, boarding: { Player })
+    local destination = self._worldService:arrivalSpawnPosition()
+    for index, player in boarding do
+        local character = player.Character
+        if character ~= nil then
+            local angle = (index - 1) / math.max(1, #boarding) * math.pi * 2
+            local offset = Vector3.new(math.cos(angle) * 4, 0, math.sin(angle) * 4)
+            character:PivotTo(CFrame.new(destination + offset))
+        end
+        self._departed[player] = true
+    end
+    self._logger:info("lobby_departure_launched", { boarded = #boarding })
+    self._analyticsService:lobbyDeparture(nil, "launch", true, nil, #boarding)
+    self:_notify(string.format("THE PARTY OF %d HAS LEFT FOR EMBERHOLLOW", #boarding))
+end
+
+function LobbyService.Start(self: LobbyService)
+    Players.PlayerRemoving:Connect(function(player: Player)
+        self._departed[player] = nil
+    end)
+    Players.PlayerAdded:Connect(function(player: Player)
+        player.CharacterAdded:Connect(function(character: Model)
+            -- A player who already left keeps playing the game after a death
+            -- instead of being returned to the staging yard.
+            if not self._departed[player] then
+                return
+            end
+            task.defer(function()
+                if character.Parent ~= nil then
+                    character:PivotTo(CFrame.new(self._worldService:arrivalSpawnPosition()))
+                end
+            end)
+        end)
+    end)
+
+    local accumulator = 0
+    self._heartbeat = RunService.Heartbeat:Connect(function(deltaTime: number)
+        accumulator += deltaTime
+        if accumulator < 0.25 then
+            return
+        end
+        accumulator = 0
+        if not self._featureFlags:isEnabled("lobby_departure_enabled") then
+            return
+        end
+
+        local ready = self:readyPlayers(self)
+        local now = workspace:GetServerTimeNow()
+        local nextState, result = self._lobbyDeparture.tick(self._state, now, #ready)
+        self._state = nextState
+
+        if result.launch then
+            local boarding = {}
+            for index = 1, math.min(result.capacity, #ready) do
+                table.insert(boarding, ready[index])
+            end
+            self:_launch(boarding)
+            self._lastPublishedSeconds = -1
+            return
+        end
+
+        if result.reason == "platform_emptied" then
+            self:_notify("DEPARTURE CANCELLED — THE PLATFORM IS EMPTY")
+            self._lastPublishedSeconds = -1
+            return
+        end
+
+        -- Publish once per whole second so the countdown rail ticks without
+        -- pushing a snapshot every frame.
+        local view = self._lobbyDeparture.snapshot(nextState, now)
+        if view.counting and view.secondsRemaining ~= self._lastPublishedSeconds then
+            self._lastPublishedSeconds = view.secondsRemaining
+            self:_notify(nil)
+        end
+    end)
+end
+
+return LobbyService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -13901,7 +14367,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14114,7 +14580,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="68">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14943,7 +15409,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15122,7 +15588,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15688,7 +16154,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="73">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16787,7 +17253,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="72">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17312,7 +17778,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18288,7 +18754,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="74">
+        <Item class="ModuleScript" referent="76">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18788,7 +19254,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="75">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18841,6 +19307,7 @@ export type TutorialService = typeof(setmetatable(
         _professionService: any,
         _phaseService: any,
         _townNightService: any,
+        _lobbyService: any,
         _expeditionService: any,
         _oldGrowthService: any,
         _wardenStagService: any,
@@ -18873,6 +19340,7 @@ function TutorialService.new(
     professionService: any,
     phaseService: any,
     townNightService: any,
+    lobbyService: any,
     expeditionService: any,
     oldGrowthService: any,
     wardenStagService: any,
@@ -18898,6 +19366,7 @@ function TutorialService.new(
         _professionService = professionService,
         _phaseService = phaseService,
         _townNightService = townNightService,
+        _lobbyService = lobbyService,
         _expeditionService = expeditionService,
         _oldGrowthService = oldGrowthService,
         _wardenStagService = wardenStagService,
@@ -19538,6 +20007,8 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         or kind == self._runtimeIds.Actions.CompactHud
     then
         allowedFields.enabled = true
+    elseif kind == self._runtimeIds.Actions.LobbyDepart then
+        allowedFields.partySize = true
     end
     for key in payload do
         if type(key) ~= "string" or allowedFields[key] ~= true then
@@ -19557,7 +20028,15 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         return
     end
 
-    if kind == self._runtimeIds.Actions.Interact then
+    if kind == self._runtimeIds.Actions.LobbyDepart then
+        -- The client only ever asks. LobbyDeparture re-checks the size, the
+        -- server's own ready count, and the capacity before anything starts.
+        local result = self._lobbyService:requestDeparture(player, payload.partySize)
+        if not result.accepted and result.reason == "invalid_party_size" then
+            self:_setToast(player, "CHOOSE A PARTY SIZE FIRST")
+        end
+        self:_publishAll()
+    elseif kind == self._runtimeIds.Actions.Interact then
         local interactionId = payload.interactionId
         if type(interactionId) == "string" and #interactionId <= 64 then
             self:_interact(player, interactionId)
@@ -19781,6 +20260,8 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         schemaVersion = 1,
         status = "ready",
         worldReady = true,
+        lobby = self._lobbyService:snapshot(),
+        departed = self._lobbyService:isDeparted(player),
         stage = session.stage,
         tutorialComplete = session.stage == "complete",
         objective = objective,
@@ -19850,7 +20331,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="76">
+        <Item class="ModuleScript" referent="78">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20689,7 +21170,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="77">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20728,6 +21209,9 @@ export type WorldService = typeof(setmetatable(
         _spawn: SpawnLocation?,
         _mara: Model?,
         _maraTrap: Model?,
+        _lobby: Folder?,
+        _lobbySpawn: SpawnLocation?,
+        _departurePlatform: BasePart?,
         _lantern: BasePart?,
         _lanternVisualHealth: number,
         _beacon: BasePart?,
@@ -20775,6 +21259,12 @@ local WET_EARTH = Color3.fromRGB(67, 55, 39)
 local HEARTWOOD_CENTER = Vector3.new(38, 0, -48)
 local TOOL_YARD_CENTER = Vector3.new(-42, 0, -68)
 local BARRICADE_CENTER = Vector3.new(-44, 0, -92)
+-- Staging yard, north of the arrival clearing and clear of the route that
+-- leaves it. Inside the flat valley bowl (x -190..190, z -260..90), so every
+-- authored coordinate here sits on level ground.
+local LOBBY_CENTER = Vector3.new(0, 0, 62)
+local DEPARTURE_PLATFORM_CENTER = Vector3.new(0, 0, 44)
+local DEPARTURE_PLATFORM_RADIUS = 11
 -- Shared palette for the generated forest. Kept next to the existing colour
 -- anchors so the treeline and the town read as the same world.
 local FOLIAGE_TONE: FoliageBuilder.Tone = {
@@ -22442,6 +22932,9 @@ function WorldService.new(
         _spawn = nil,
         _mara = nil,
         _maraTrap = nil,
+        _lobby = nil,
+        _lobbySpawn = nil,
+        _departurePlatform = nil,
         _lantern = nil,
         _lanternVisualHealth = 100,
         _beacon = nil,
@@ -23706,6 +24199,418 @@ function WorldService._buildDistantScenery(self: WorldService)
         end
         self._logger:info("distant_scenery_ready", {})
     end)
+end
+
+--[[
+    The Emberhollow departure yard.
+
+    Where a session starts: a lantern-lit staging courtyard with a character
+    hut on one side, a notice board and stall on the other, and a raised
+    departure platform at its south edge facing the road out to the arrival
+    clearing. Standing on that platform is what puts a player in the party;
+    the countdown and the launch itself belong to LobbyService.
+
+    Built to the same standard as the rest of the world rather than as a grey
+    box: layered ground, a real timber-framed hut with a roof and rafters,
+    banded platform edging, practical lantern light, and reviewed props. The
+    platform reads as a threshold you deliberately step onto -- raised, ringed,
+    and pointed at the gate -- because that is the whole mechanic.
+]]
+function WorldService._buildLobby(self: WorldService, world: Model)
+    local lobby = Instance.new("Folder")
+    lobby.Name = "EmberhollowLobby"
+    lobby.Parent = world
+    self._lobby = lobby
+
+    groundPatch(
+        lobby,
+        LOBBY_CENTER + Vector3.new(0, 0, 4),
+        Vector3.new(76, 0.3, 74),
+        Color3.fromRGB(48, 57, 46),
+        Enum.Material.LeafyGrass
+    )
+    local court = part(
+        lobby,
+        "LobbyCourtyard",
+        Vector3.new(56, 0.34, 52),
+        CFrame.new(LOBBY_CENTER + Vector3.new(0, 0.2, 6)),
+        Color3.fromRGB(96, 99, 92),
+        Enum.Material.Slate,
+        false
+    )
+    court.CanQuery = false
+    for edgeIndex = -3, 3 do
+        for edgeSide = -1, 1, 2 do
+            local edge = part(
+                lobby,
+                "LobbyCourtEdge",
+                Vector3.new(3.4, 0.5, 3.4),
+                CFrame.new(LOBBY_CENTER + Vector3.new(edgeSide * 28.4, 0.25, 6 + edgeIndex * 7.6))
+                    * CFrame.Angles(0, math.rad(edgeIndex * 6), 0),
+                Color3.fromRGB(78, 82, 76),
+                Enum.Material.Slate,
+                false
+            )
+            edge.CanQuery = false
+        end
+    end
+
+    -- Departure platform: raised, banded, and ringed with lantern posts so it
+    -- reads as a threshold rather than a patch of floor.
+    local platform = part(
+        lobby,
+        "DeparturePlatform",
+        Vector3.new(DEPARTURE_PLATFORM_RADIUS * 2, 1.2, DEPARTURE_PLATFORM_RADIUS * 2),
+        CFrame.new(DEPARTURE_PLATFORM_CENTER + Vector3.new(0, 0.6, 0)),
+        Color3.fromRGB(74, 55, 40),
+        Enum.Material.WoodPlanks
+    )
+    self._departurePlatform = platform
+    local platformRim = part(
+        lobby,
+        "DeparturePlatformRim",
+        Vector3.new(DEPARTURE_PLATFORM_RADIUS * 2 + 2.2, 0.55, DEPARTURE_PLATFORM_RADIUS * 2 + 2.2),
+        CFrame.new(DEPARTURE_PLATFORM_CENTER + Vector3.new(0, 0.28, 0)),
+        Color3.fromRGB(56, 60, 56),
+        Enum.Material.Slate,
+        false
+    )
+    platformRim.CanQuery = false
+    for plankIndex = -4, 4 do
+        local plank = part(
+            lobby,
+            "DeparturePlank",
+            Vector3.new(1.5, 0.12, DEPARTURE_PLATFORM_RADIUS * 1.9),
+            CFrame.new(DEPARTURE_PLATFORM_CENTER + Vector3.new(plankIndex * 2.3, 1.24, 0)),
+            if plankIndex % 2 == 0 then Color3.fromRGB(84, 62, 44) else Color3.fromRGB(69, 51, 37),
+            Enum.Material.WoodPlanks,
+            false
+        )
+        plank.CanQuery = false
+    end
+    -- A ring inlaid into the deck: the standing mark, so a player can see
+    -- where "on the platform" actually is without a floating label.
+    for markIndex = 0, 23 do
+        local angle = (markIndex / 24) * math.pi * 2
+        local mark = part(
+            lobby,
+            "DepartureRing",
+            Vector3.new(1.1, 0.1, 0.5),
+            CFrame.new(
+                DEPARTURE_PLATFORM_CENTER
+                    + Vector3.new(
+                        math.cos(angle) * (DEPARTURE_PLATFORM_RADIUS - 1.4),
+                        1.3,
+                        math.sin(angle) * (DEPARTURE_PLATFORM_RADIUS - 1.4)
+                    )
+            ) * CFrame.Angles(0, -angle, 0),
+            AMBER,
+            Enum.Material.Neon,
+            false
+        )
+        mark.Transparency = 0.42
+        mark.CastShadow = false
+        mark.CanQuery = false
+    end
+    for postIndex = 0, 3 do
+        local angle = (postIndex / 4) * math.pi * 2 + math.pi / 4
+        local postAt = DEPARTURE_PLATFORM_CENTER
+            + Vector3.new(
+                math.cos(angle) * (DEPARTURE_PLATFORM_RADIUS + 0.4),
+                0,
+                math.sin(angle) * (DEPARTURE_PLATFORM_RADIUS + 0.4)
+            )
+        local postFallback = Instance.new("Model")
+        postFallback.Name = "DepartureLanternFallback"
+        postFallback.Parent = lobby
+        part(
+            postFallback,
+            "DepartureLanternPost",
+            Vector3.new(0.6, 8.4, 0.6),
+            CFrame.new(postAt + Vector3.new(0, 4.2, 0)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+        local lampGlow = part(
+            postFallback,
+            "DepartureLanternGlow",
+            Vector3.new(1.1, 1.4, 1.1),
+            CFrame.new(postAt + Vector3.new(0, 8.1, 0)),
+            AMBER,
+            Enum.Material.Neon,
+            false
+        )
+        lampGlow.CastShadow = false
+        local lampLight = Instance.new("PointLight")
+        lampLight.Color = AMBER
+        lampLight.Brightness = 1.35
+        lampLight.Range = 26
+        lampLight.Parent = lampGlow
+        CollectionService:AddTag(lampGlow, self._runtimeIds.AmbientLightTag)
+        table.insert(self._meshPlacements, {
+            assetId = "mesh_creator_street_lantern_a",
+            fallbackKind = "asset_replacement",
+            position = postAt,
+            scale = 0.92,
+            yaw = angle,
+            seed = 9401 + postIndex,
+            swayTag = nil,
+            parent = lobby,
+            fallbackInstance = postFallback,
+        })
+    end
+
+    -- The gate the party leaves through, on the road south to the arrival.
+    local gateFallback = Instance.new("Model")
+    gateFallback.Name = "DepartureGateFallback"
+    gateFallback.Parent = lobby
+    for gateSide = -1, 1, 2 do
+        part(
+            gateFallback,
+            "DepartureGatePost",
+            Vector3.new(1.3, 12, 1.3),
+            CFrame.new(LOBBY_CENTER + Vector3.new(gateSide * 6, 6, -28)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+    end
+    part(
+        gateFallback,
+        "DepartureGateLintel",
+        Vector3.new(13.4, 1.3, 1.3),
+        CFrame.new(LOBBY_CENTER + Vector3.new(0, 12, -28)),
+        BARK,
+        Enum.Material.WoodPlanks,
+        false
+    )
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_wood_arch_a",
+        fallbackKind = "asset_replacement",
+        position = LOBBY_CENTER + Vector3.new(0, 0, -28),
+        scale = 1.1,
+        yaw = 0,
+        seed = 9410,
+        swayTag = nil,
+        parent = lobby,
+        fallbackInstance = gateFallback,
+    })
+    labelSign(
+        lobby,
+        CFrame.new(LOBBY_CENTER + Vector3.new(9.5, 0, -26)) * CFrame.Angles(0, math.rad(196), 0),
+        "TO EMBERHOLLOW"
+    )
+
+    -- Character hut: a real framed building with a roof, not an open slab.
+    local hutCenter = LOBBY_CENTER + Vector3.new(-21, 0, 18)
+    local hut = Instance.new("Folder")
+    hut.Name = "LobbyCharacterHut"
+    hut.Parent = lobby
+    local hutFloor = part(
+        hut,
+        "HutFloor",
+        Vector3.new(20, 0.5, 15),
+        CFrame.new(hutCenter + Vector3.new(0, 0.25, 0)),
+        Color3.fromRGB(88, 64, 45),
+        Enum.Material.WoodPlanks
+    )
+    hutFloor.CanQuery = false
+    for hutX = -1, 1, 2 do
+        for hutZ = -1, 1, 2 do
+            part(
+                hut,
+                "HutPost",
+                Vector3.new(0.9, 9, 0.9),
+                CFrame.new(hutCenter + Vector3.new(hutX * 9.2, 4.5, hutZ * 6.8)),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+        end
+    end
+    part(
+        hut,
+        "HutBackWall",
+        Vector3.new(20, 8.4, 0.6),
+        CFrame.new(hutCenter + Vector3.new(0, 4.2, 7)),
+        Color3.fromRGB(78, 58, 42),
+        Enum.Material.WoodPlanks
+    )
+    for wallSide = -1, 1, 2 do
+        part(
+            hut,
+            "HutSideWall",
+            Vector3.new(0.6, 8.4, 14),
+            CFrame.new(hutCenter + Vector3.new(wallSide * 9.7, 4.2, 0)),
+            Color3.fromRGB(78, 58, 42),
+            Enum.Material.WoodPlanks
+        )
+    end
+    part(
+        hut,
+        "HutRidgeBeam",
+        Vector3.new(20.6, 0.7, 0.7),
+        CFrame.new(hutCenter + Vector3.new(0, 10.4, 0)),
+        WET_BARK,
+        Enum.Material.Wood,
+        false
+    )
+    for roofSide = -1, 1, 2 do
+        local roof = part(
+            hut,
+            "HutRoof",
+            Vector3.new(20.8, 2.6, 8.4),
+            CFrame.new(hutCenter + Vector3.new(0, 9.5, roofSide * 3.6))
+                * CFrame.Angles(0, if roofSide < 0 then math.pi else 0, 0),
+            Color3.fromRGB(46, 52, 48),
+            Enum.Material.Slate,
+            false
+        )
+        roof.Shape = Enum.PartType.Wedge
+    end
+    addBillboard(hutFloor, "CHOOSE YOUR CALLING", AMBER, 70)
+
+    -- One stand per profession, each with the prop that says what it does.
+    local callings = {
+        { id = "scout", label = "SCOUT", asset = "mesh_creator_forest_sign_a", tint = FOXFIRE },
+        { id = "warden", label = "WARDEN", asset = "mesh_creator_barricade_a", tint = AMBER },
+        { id = "engineer", label = "ENGINEER", asset = "mesh_creator_anvil_a", tint = CREAM },
+        {
+            id = "medic",
+            label = "MEDIC",
+            asset = "mesh_creator_potion_shelf_a",
+            tint = Color3.fromRGB(150, 196, 158),
+        },
+    }
+    for callingIndex, calling in callings do
+        local standAt = hutCenter + Vector3.new(-6.9 + (callingIndex - 1) * 4.6, 0.5, 2.6)
+        local standFallback = Instance.new("Model")
+        standFallback.Name = "CallingStandFallback_" .. calling.id
+        standFallback.Parent = hut
+        local pedestal = part(
+            standFallback,
+            "CallingPedestal",
+            Vector3.new(3, 2.6, 3),
+            CFrame.new(standAt + Vector3.new(0, 1.3, 0)),
+            Color3.fromRGB(70, 74, 70),
+            Enum.Material.Slate
+        )
+        local banner = part(
+            standFallback,
+            "CallingBanner",
+            Vector3.new(2.4, 3.4, 0.18),
+            CFrame.new(standAt + Vector3.new(0, 4.6, 0.9)),
+            calling.tint,
+            Enum.Material.Fabric,
+            false
+        )
+        banner.Transparency = 0.08
+        addBillboard(pedestal, calling.label, calling.tint, 44)
+        table.insert(self._meshPlacements, {
+            assetId = calling.asset,
+            fallbackKind = "asset_dressing",
+            position = standAt + Vector3.new(0, 2.6, 0),
+            scale = 0.5,
+            yaw = math.rad(180),
+            seed = 9420 + callingIndex,
+            swayTag = nil,
+            parent = hut,
+            fallbackInstance = nil,
+        })
+    end
+
+    -- The other side of the yard: somewhere to look at, so the space reads as
+    -- a place people use rather than a corridor to the platform.
+    local stallAt = LOBBY_CENTER + Vector3.new(22, 0, 20)
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_market_stall_a",
+        fallbackKind = "asset_dressing",
+        position = stallAt,
+        scale = 0.85,
+        yaw = math.rad(-118),
+        seed = 9430,
+        swayTag = nil,
+        parent = lobby,
+        fallbackInstance = nil,
+    })
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_notice_board_a",
+        fallbackKind = "asset_dressing",
+        position = LOBBY_CENTER + Vector3.new(15, 0, 4),
+        scale = 0.85,
+        yaw = math.rad(-140),
+        seed = 9431,
+        swayTag = nil,
+        parent = lobby,
+        fallbackInstance = nil,
+    })
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_campfire_a",
+        fallbackKind = "asset_dressing",
+        position = LOBBY_CENTER + Vector3.new(19, 0, 32),
+        scale = 1.15,
+        yaw = math.rad(24),
+        seed = 9432,
+        swayTag = nil,
+        parent = lobby,
+        fallbackInstance = nil,
+    })
+    table.insert(self._meshPlacements, {
+        assetId = "mesh_creator_picnic_table_a",
+        fallbackKind = "asset_dressing",
+        position = LOBBY_CENTER + Vector3.new(24, 0, 32),
+        scale = 0.95,
+        yaw = math.rad(-42),
+        seed = 9433,
+        swayTag = nil,
+        parent = lobby,
+        fallbackInstance = nil,
+    })
+    for crateIndex = 1, 5 do
+        local crateSeed = 9440 + crateIndex
+        local crateAt = LOBBY_CENTER
+            + Vector3.new(-26 + ((crateIndex * 7) % 9) * 1.4, 0, -6 + ((crateIndex * 5) % 11) * 2.1)
+        table.insert(self._meshPlacements, {
+            assetId = if crateIndex % 2 == 0
+                then "mesh_creator_barrel_a"
+                else "mesh_creator_crate_a",
+            fallbackKind = "asset_dressing",
+            position = crateAt,
+            scale = 1,
+            yaw = math.rad(crateIndex * 37),
+            seed = crateSeed,
+            swayTag = nil,
+            parent = lobby,
+            fallbackInstance = nil,
+        })
+    end
+    for fenceIndex = -3, 3 do
+        table.insert(self._meshPlacements, {
+            assetId = "mesh_creator_rustic_fence_a",
+            fallbackKind = "asset_dressing",
+            position = LOBBY_CENTER + Vector3.new(fenceIndex * 8, 0, 34),
+            scale = 1,
+            yaw = 0,
+            seed = 9450 + fenceIndex,
+            swayTag = nil,
+            parent = lobby,
+            fallbackInstance = nil,
+        })
+    end
+
+    -- Spawn inside the yard, facing the platform and the gate beyond it.
+    local lobbySpawn = Instance.new("SpawnLocation")
+    lobbySpawn.Name = "LobbySpawn"
+    lobbySpawn.Size = Vector3.new(14, 1, 14)
+    lobbySpawn.CFrame = CFrame.new(LOBBY_CENTER + Vector3.new(0, 0.5, 22))
+    lobbySpawn.Transparency = 1
+    lobbySpawn.Anchored = true
+    lobbySpawn.CanCollide = true
+    lobbySpawn.Neutral = true
+    lobbySpawn.Duration = 0
+    lobbySpawn.Parent = lobby
+    self._lobbySpawn = lobbySpawn
 end
 
 function WorldService._buildMara(self: WorldService, world: Model)
@@ -25856,6 +26761,7 @@ function WorldService.Init(self: WorldService, context: any)
     spawn.Parent = world
     self._spawn = spawn
 
+    self:_buildLobby(world)
     self:_buildMara(world)
     self:_buildInteractables(world)
     self:setTownCondition(self._townCondition)
@@ -26113,6 +27019,25 @@ function WorldService.freeMara(self: WorldService)
     end
     self._maraTrap = nil
     trap:Destroy()
+end
+
+-- The physical departure platform and where a launched party lands. Owned
+-- here because the geometry is authored here; LobbyService reads them rather
+-- than duplicating the coordinates.
+function WorldService.departurePlatform(self: WorldService): (Vector3, number)
+    local platform = self._departurePlatform
+    if platform == nil then
+        return DEPARTURE_PLATFORM_CENTER, DEPARTURE_PLATFORM_RADIUS
+    end
+    return platform.Position, DEPARTURE_PLATFORM_RADIUS
+end
+
+function WorldService.arrivalSpawnPosition(self: WorldService): Vector3
+    local spawn = self._spawn
+    if spawn == nil then
+        return Vector3.new(0, 4, 0)
+    end
+    return spawn.Position + Vector3.new(0, 3, 0)
 end
 
 function WorldService.moveMara(self: WorldService, destination: Vector3)
@@ -30047,11 +30972,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="78">
+      <Item class="Folder" referent="80">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="81">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -32887,7 +33812,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="80">
+        <Item class="ModuleScript" referent="82">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -33318,7 +34243,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="81">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -34013,7 +34938,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -34625,7 +35550,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -34711,7 +35636,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="86">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -34983,7 +35908,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="85">
+        <Item class="ModuleScript" referent="87">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -35158,7 +36083,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="86">
+        <Item class="ModuleScript" referent="88">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -35703,7 +36628,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="87">
+        <Item class="ModuleScript" referent="89">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -35936,7 +36861,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="88">
+        <Item class="ModuleScript" referent="90">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -36025,7 +36950,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="89">
+        <Item class="ModuleScript" referent="91">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -36349,11 +37274,11 @@ return table.freeze(WorldSignBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="90">
+    <Item class="Folder" referent="92">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="91">
+      <Item class="Script" referent="93">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -37754,15 +38679,15 @@ print("[Last Light] PASS FoundationIntegration")
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="92">
+  <Item class="StarterPlayer" referent="94">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="93">
+    <Item class="StarterPlayerScripts" referent="95">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="94">
+      <Item class="LocalScript" referent="96">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -37848,6 +38773,10 @@ hud:setCompactHandler(function(enabled: boolean)
     send(RuntimeIds.Actions.CompactHud, { enabled = enabled })
 end)
 
+hud:setLobbyDepartHandler(function(partySize: number)
+    send(RuntimeIds.Actions.LobbyDepart, { partySize = partySize })
+end)
+
 hud:setProfessionHandler(function(professionId: string)
     send(RuntimeIds.Actions.SelectProfession, { professionId = professionId })
 end)
@@ -37880,11 +38809,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="95">
+        <Item class="Folder" referent="97">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="96">
+          <Item class="ModuleScript" referent="98">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -38015,7 +38944,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="97">
+          <Item class="ModuleScript" referent="99">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -38253,6 +39182,12 @@ export type HUDController = typeof(setmetatable(
         _ability: TextButton,
         _compact: TextButton,
         _professionButton: TextButton,
+        _lobbyFrame: Frame,
+        _lobbyTitle: TextLabel,
+        _lobbyDetail: TextLabel,
+        _lobbySizes: Frame,
+        _lobbySizeButtons: { TextButton },
+        _onLobbyDepart: ((number) -> ())?,
         _progressButton: TextButton,
         _useCharm: TextButton,
         _useSatchel: TextButton,
@@ -39080,8 +40015,96 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         professionCards[professionOrder[2]].NextSelectionUp = professionClose
     end
 
+    -- Departure panel. Visible only while a player is still in the staging
+    -- yard, so it never competes with the survival HUD once the run starts.
+    local lobbyFrame = Instance.new("Frame")
+    lobbyFrame.Name = "LobbyPanel"
+    lobbyFrame.AnchorPoint = Vector2.new(0.5, 1)
+    lobbyFrame.Position = UDim2.new(0.5, 0, 1, -104)
+    lobbyFrame.Size = UDim2.fromOffset(360, 108)
+    lobbyFrame.BackgroundColor3 = Color3.fromRGB(16, 22, 26)
+    lobbyFrame.BackgroundTransparency = 0.12
+    lobbyFrame.BorderSizePixel = 0
+    lobbyFrame.Visible = false
+    lobbyFrame.ZIndex = 40
+    lobbyFrame.Parent = gui
+    local lobbyCorner = Instance.new("UICorner")
+    lobbyCorner.CornerRadius = UDim.new(0, 12)
+    lobbyCorner.Parent = lobbyFrame
+    local lobbyStroke = Instance.new("UIStroke")
+    lobbyStroke.Color = Color3.fromRGB(255, 181, 76)
+    lobbyStroke.Thickness = 1.5
+    lobbyStroke.Transparency = 0.45
+    lobbyStroke.Parent = lobbyFrame
+
+    local lobbyTitle = Instance.new("TextLabel")
+    lobbyTitle.Name = "LobbyTitle"
+    lobbyTitle.BackgroundTransparency = 1
+    lobbyTitle.Position = UDim2.fromOffset(14, 8)
+    lobbyTitle.Size = UDim2.new(1, -28, 0, 18)
+    lobbyTitle.Font = Enum.Font.GothamBold
+    lobbyTitle.Text = "DEPARTURE"
+    lobbyTitle.TextColor3 = Color3.fromRGB(255, 181, 76)
+    lobbyTitle.TextSize = 13
+    lobbyTitle.TextXAlignment = Enum.TextXAlignment.Left
+    lobbyTitle.ZIndex = 41
+    lobbyTitle.Parent = lobbyFrame
+
+    local lobbyDetail = Instance.new("TextLabel")
+    lobbyDetail.Name = "LobbyDetail"
+    lobbyDetail.BackgroundTransparency = 1
+    lobbyDetail.Position = UDim2.fromOffset(14, 26)
+    lobbyDetail.Size = UDim2.new(1, -28, 0, 18)
+    lobbyDetail.Font = Enum.Font.Gotham
+    lobbyDetail.Text = "STAND ON THE PLATFORM TO DEPART"
+    lobbyDetail.TextColor3 = Color3.fromRGB(178, 194, 183)
+    lobbyDetail.TextSize = 12
+    lobbyDetail.TextXAlignment = Enum.TextXAlignment.Left
+    lobbyDetail.ZIndex = 41
+    lobbyDetail.Parent = lobbyFrame
+
+    local lobbySizes = Instance.new("Frame")
+    lobbySizes.Name = "LobbySizes"
+    lobbySizes.BackgroundTransparency = 1
+    lobbySizes.Position = UDim2.fromOffset(14, 52)
+    lobbySizes.Size = UDim2.new(1, -28, 0, 44)
+    lobbySizes.ZIndex = 41
+    lobbySizes.Parent = lobbyFrame
+    local lobbyLayout = Instance.new("UIListLayout")
+    lobbyLayout.FillDirection = Enum.FillDirection.Horizontal
+    lobbyLayout.Padding = UDim.new(0, 6)
+    lobbyLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    lobbyLayout.Parent = lobbySizes
+
+    local lobbySizeButtons: { TextButton } = {}
+    for size = 1, 8 do
+        local sizeButton = Instance.new("TextButton")
+        sizeButton.Name = "PartySize_" .. size
+        sizeButton.LayoutOrder = size
+        sizeButton.Size = UDim2.new(0, 36, 1, 0)
+        sizeButton.BackgroundColor3 = Color3.fromRGB(31, 40, 44)
+        sizeButton.AutoButtonColor = true
+        sizeButton.Font = Enum.Font.GothamBold
+        sizeButton.Text = tostring(size)
+        sizeButton.TextColor3 = Color3.fromRGB(244, 230, 197)
+        sizeButton.TextSize = 15
+        sizeButton.Selectable = true
+        sizeButton.ZIndex = 42
+        sizeButton.Parent = lobbySizes
+        local sizeCorner = Instance.new("UICorner")
+        sizeCorner.CornerRadius = UDim.new(0, 8)
+        sizeCorner.Parent = sizeButton
+        table.insert(lobbySizeButtons, sizeButton)
+    end
+
     local self = setmetatable({
         _gui = gui,
+        _lobbyFrame = lobbyFrame,
+        _lobbyTitle = lobbyTitle,
+        _lobbyDetail = lobbyDetail,
+        _lobbySizes = lobbySizes,
+        _lobbySizeButtons = lobbySizeButtons,
+        _onLobbyDepart = nil,
         _scale = scale,
         _phaseFrame = phaseFrame,
         _phase = phase,
@@ -39276,6 +40299,43 @@ end
 
 function HUDController.setCompactHandler(self: HUDController, callback: (boolean) -> ())
     self._onCompact = callback
+end
+
+function HUDController.setLobbyDepartHandler(self: HUDController, callback: (number) -> ())
+    self._onLobbyDepart = callback
+    for size, button in self._lobbySizeButtons do
+        button.Activated:Connect(function()
+            local handler = self._onLobbyDepart
+            if handler ~= nil then
+                handler(size)
+            end
+        end)
+    end
+end
+
+function HUDController._updateLobby(self: HUDController, state: any)
+    local lobby = state.lobby
+    if type(lobby) ~= "table" or state.departed == true then
+        self._lobbyFrame.Visible = false
+        return
+    end
+    self._lobbyFrame.Visible = true
+    if lobby.counting then
+        self._lobbyTitle.Text = string.format("DEPARTING IN %d", lobby.secondsRemaining)
+        self._lobbyDetail.Text =
+            string.format("%d ON THE PLATFORM * PARTY OF %d", lobby.readyCount, lobby.partySize)
+        self._lobbySizes.Visible = false
+    else
+        self._lobbyTitle.Text = "DEPARTURE"
+        self._lobbyDetail.Text = if lobby.readyCount > 0
+            then string.format("%d ON THE PLATFORM * CHOOSE PARTY SIZE", lobby.readyCount)
+            else "STAND ON THE PLATFORM TO DEPART"
+        self._lobbySizes.Visible = true
+        local maximum = if type(lobby.maxPartySize) == "number" then lobby.maxPartySize else 8
+        for size, button in self._lobbySizeButtons do
+            button.Visible = size <= maximum
+        end
+    end
 end
 
 function HUDController.setProfessionHandler(self: HUDController, callback: (string) -> ())
@@ -39986,6 +41046,7 @@ function HUDController.update(self: HUDController, state: any)
         return
     end
     self._currentState = state
+    self:_updateLobby(state)
     local survival = state.survival
     local selfSurvival = if type(survival) == "table" then survival.self else nil
     self._playerDowned = type(selfSurvival) == "table" and selfSurvival.downed == true
@@ -40088,7 +41149,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="98">
+          <Item class="ModuleScript" referent="100">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -40387,7 +41448,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="99">
+          <Item class="ModuleScript" referent="101">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -40495,7 +41556,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="100">
+          <Item class="ModuleScript" referent="102">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -40614,7 +41675,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="101">
+          <Item class="ModuleScript" referent="103">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -40746,7 +41807,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="102">
+          <Item class="ModuleScript" referent="104">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -41022,7 +42083,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="103">
+  <Item class="Workspace" referent="105">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

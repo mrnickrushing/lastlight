@@ -48,6 +48,7 @@ export type TutorialService = typeof(setmetatable(
         _professionService: any,
         _phaseService: any,
         _townNightService: any,
+        _lobbyService: any,
         _expeditionService: any,
         _oldGrowthService: any,
         _wardenStagService: any,
@@ -80,6 +81,7 @@ function TutorialService.new(
     professionService: any,
     phaseService: any,
     townNightService: any,
+    lobbyService: any,
     expeditionService: any,
     oldGrowthService: any,
     wardenStagService: any,
@@ -105,6 +107,7 @@ function TutorialService.new(
         _professionService = professionService,
         _phaseService = phaseService,
         _townNightService = townNightService,
+        _lobbyService = lobbyService,
         _expeditionService = expeditionService,
         _oldGrowthService = oldGrowthService,
         _wardenStagService = wardenStagService,
@@ -745,6 +748,8 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         or kind == self._runtimeIds.Actions.CompactHud
     then
         allowedFields.enabled = true
+    elseif kind == self._runtimeIds.Actions.LobbyDepart then
+        allowedFields.partySize = true
     end
     for key in payload do
         if type(key) ~= "string" or allowedFields[key] ~= true then
@@ -764,7 +769,15 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         return
     end
 
-    if kind == self._runtimeIds.Actions.Interact then
+    if kind == self._runtimeIds.Actions.LobbyDepart then
+        -- The client only ever asks. LobbyDeparture re-checks the size, the
+        -- server's own ready count, and the capacity before anything starts.
+        local result = self._lobbyService:requestDeparture(player, payload.partySize)
+        if not result.accepted and result.reason == "invalid_party_size" then
+            self:_setToast(player, "CHOOSE A PARTY SIZE FIRST")
+        end
+        self:_publishAll()
+    elseif kind == self._runtimeIds.Actions.Interact then
         local interactionId = payload.interactionId
         if type(interactionId) == "string" and #interactionId <= 64 then
             self:_interact(player, interactionId)
@@ -988,6 +1001,8 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         schemaVersion = 1,
         status = "ready",
         worldReady = true,
+        lobby = self._lobbyService:snapshot(),
+        departed = self._lobbyService:isDeparted(player),
         stage = session.stage,
         tutorialComplete = session.stage == "complete",
         objective = objective,
