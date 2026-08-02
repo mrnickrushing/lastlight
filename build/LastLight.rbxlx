@@ -24040,12 +24040,20 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     -- and steps that already lead up to the beacon) keeps the arch as an
     -- entrance and leaves the beacon itself uncluttered.
     local GATE_Z = -120
-    local gate = Instance.new("Folder")
-    gate.Name = "BramblewakeDawnGate"
-    gate.Parent = interactables
+    -- gateFallback holds only the primitive arch shape -- it is wired as this
+    -- placement's fallbackInstance, so hideProceduralPlaceholder makes it
+    -- transparent the moment the reviewed arch mesh loads. The steps and path
+    -- markers below are unrelated, always-visible approach dressing; the tool
+    -- yard hit this same mistake (see the comment above the workbench
+    -- placement) when a shared folder doubled as both the real content and a
+    -- mesh's fallback, and hideProceduralPlaceholder wiped everything in it
+    -- the moment that one mesh loaded.
+    local gateFallback = Instance.new("Folder")
+    gateFallback.Name = "BramblewakeDawnGateFallback"
+    gateFallback.Parent = interactables
     for side = -1, 1, 2 do
         part(
-            gate,
+            gateFallback,
             "DawnGateRoot",
             Vector3.new(1.35, 11, 1.35),
             CFrame.new(side * 5.2, 5.5, GATE_Z) * CFrame.Angles(0, 0, math.rad(side * 7)),
@@ -24053,7 +24061,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             Enum.Material.Wood
         )
         part(
-            gate,
+            gateFallback,
             "DawnGateBrace",
             Vector3.new(0.8, 6.2, 0.8),
             CFrame.new(side * 3.7, 10.8, GATE_Z) * CFrame.Angles(0, 0, math.rad(side * 62)),
@@ -24062,13 +24070,16 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         )
     end
     part(
-        gate,
+        gateFallback,
         "DawnGateLintel",
         Vector3.new(11.5, 1.2, 1.2),
         CFrame.new(0, 11, GATE_Z),
         BARK,
         Enum.Material.WoodPlanks
     )
+    local gate = Instance.new("Folder")
+    gate.Name = "BramblewakeDawnGate"
+    gate.Parent = interactables
     for stepIndex = 1, 3 do
         part(
             gate,
@@ -24102,7 +24113,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         seed = 9910,
         swayTag = nil,
         parent = interactables,
-        fallbackInstance = gate,
+        fallbackInstance = gateFallback,
     })
 
     local beacon = part(
