@@ -50,4 +50,5 @@ TestRunner.run({
     require("./specs/TownCondition.spec"),
     require("./specs/TownGuardLastStand.spec"),
     require("./specs/LobbyDeparture.spec"),
+    require("./specs/ActionProgress.spec"),
 })

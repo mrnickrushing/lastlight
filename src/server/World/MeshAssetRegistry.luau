@@ -139,6 +139,17 @@ local ENTRIES: { Entry } = {
         creatorStore = false,
     },
     {
+        id = "mesh_hand_axe_a",
+        assetId = 70394272147624,
+        targetLongestDimension = 3,
+        maxTriangles = 3500,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
         id = "mesh_blacksmith_hammer_a",
         assetId = 80321423425082,
         targetLongestDimension = 3,

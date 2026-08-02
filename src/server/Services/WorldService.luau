@@ -38,6 +38,7 @@ export type WorldService = typeof(setmetatable(
         _lobby: Folder?,
         _lobbySpawn: SpawnLocation?,
         _departurePlatform: BasePart?,
+        _clickHandler: ((Player, string) -> ())?,
         _lantern: BasePart?,
         _lanternVisualHealth: number,
         _beacon: BasePart?,
@@ -1770,6 +1771,7 @@ function WorldService.new(
         _lobby = nil,
         _lobbySpawn = nil,
         _departurePlatform = nil,
+        _clickHandler = nil,
         _lantern = nil,
         _lanternVisualHealth = 100,
         _beacon = nil,
@@ -1827,6 +1829,28 @@ function WorldService._registerInteraction(
         prompt:SetAttribute("Payload", payload)
     end
     prompt.Parent = target
+
+    --[[
+        Click or tap the object itself.
+
+        The prompt still works, but requiring the player to walk into range and
+        then find the right HUD button made every interaction a two-step
+        exercise in button-hunting. A ClickDetector on the same anchor lets the
+        object be the control: tap the stump to chop it. The server still
+        validates range, stage, and everything else through the same path the
+        prompt uses, so this adds a way to ask, not a way to bypass.
+    ]]
+    local click = Instance.new("ClickDetector")
+    click.Name = "InteractClick"
+    click.MaxActivationDistance = prompt.MaxActivationDistance
+    click.CursorIcon = ""
+    click.Parent = target
+    click.MouseClick:Connect(function(clicker: Player)
+        local handler = self._clickHandler
+        if handler ~= nil then
+            handler(clicker, interactionId)
+        end
+    end)
     CollectionService:AddTag(prompt, self._runtimeIds.InteractionTag)
     self._interactions[interactionId] = prompt
 end
@@ -4274,7 +4298,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             tool = "axe",
             position = TOOL_YARD_CENTER + Vector3.new(0, 0, 8),
             color = Color3.fromRGB(102, 154, 102),
-            assetId = "mesh_creator_hand_axe_a",
+            assetId = "mesh_hand_axe_a",
             seed = 9895,
         },
         {
@@ -5971,6 +5995,78 @@ end
 
 -- Lift the fallen trunk off Mara. Called once, when she is actually freed, so
 -- the rescue has a visible physical consequence instead of only a toast.
+--[[
+    Swing the player's tool for a timed action.
+
+    Rotates the right shoulder joint through a chopping arc, once per swing,
+    over the action's own duration. Driven from the server so every player in
+    the world sees the same motion, and guarded throughout because a character
+    can despawn mid-swing.
+
+    Deliberately joint-driven rather than an animation asset: it needs no
+    upload, cannot fail to load, and works on whatever rig a player brings.
+]]
+function WorldService.playToolAction(
+    _self: WorldService,
+    player: Player,
+    _actionId: string,
+    duration: number,
+    swings: number
+)
+    local character = player.Character
+    if character == nil or type(duration) ~= "number" or duration ~= duration or duration <= 0 then
+        return
+    end
+    local arm = character:FindFirstChild("RightUpperArm") or character:FindFirstChild("Right Arm")
+    if arm == nil then
+        return
+    end
+    local joint = arm:FindFirstChild("RightShoulder")
+    if joint == nil or not joint:IsA("Motor6D") then
+        return
+    end
+
+    local motor = joint :: Motor6D
+    local rest = motor.C0
+    local count = math.clamp(math.floor(swings), 1, 6)
+    task.spawn(function()
+        local perSwing = duration / count
+        for _ = 1, count do
+            if character.Parent == nil or motor.Parent == nil then
+                break
+            end
+            local raise = TweenService:Create(
+                motor,
+                TweenInfo.new(perSwing * 0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                { C0 = rest * CFrame.Angles(math.rad(-115), 0, 0) }
+            )
+            raise:Play()
+            task.wait(perSwing * 0.35)
+            if character.Parent == nil or motor.Parent == nil then
+                break
+            end
+            local strike = TweenService:Create(
+                motor,
+                TweenInfo.new(perSwing * 0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In),
+                { C0 = rest * CFrame.Angles(math.rad(25), 0, 0) }
+            )
+            strike:Play()
+            task.wait(perSwing * 0.65)
+        end
+        if motor.Parent ~= nil then
+            TweenService:Create(
+                motor,
+                TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                { C0 = rest }
+            ):Play()
+        end
+    end)
+end
+
+function WorldService.setClickHandler(self: WorldService, handler: (Player, string) -> ())
+    self._clickHandler = handler
+end
+
 function WorldService.freeMara(self: WorldService)
     local trap = self._maraTrap
     if trap == nil then

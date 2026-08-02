@@ -190,6 +190,9 @@ end
 export type HUDController = typeof(setmetatable(
     {} :: {
         _gui: ScreenGui,
+        _actionFrame: Frame,
+        _actionLabel: TextLabel,
+        _actionFill: Frame,
         _canvas: Frame,
         _scale: UIScale,
         _phaseFrame: Frame,
@@ -1078,7 +1081,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     lobbyFrame.Name = "LobbyPanel"
     lobbyFrame.AnchorPoint = Vector2.new(0.5, 1)
     lobbyFrame.Position = UDim2.new(0.5, 0, 1, -104)
-    lobbyFrame.Size = UDim2.fromOffset(360, 108)
+    lobbyFrame.Size = UDim2.fromOffset(420, 132)
     lobbyFrame.BackgroundColor3 = Color3.fromRGB(16, 22, 26)
     lobbyFrame.BackgroundTransparency = 0.12
     lobbyFrame.BorderSizePixel = 0
@@ -1102,7 +1105,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     lobbyTitle.Font = Enum.Font.GothamBold
     lobbyTitle.Text = "DEPARTURE"
     lobbyTitle.TextColor3 = Color3.fromRGB(255, 181, 76)
-    lobbyTitle.TextSize = 13
+    lobbyTitle.TextSize = 20
     lobbyTitle.TextXAlignment = Enum.TextXAlignment.Left
     lobbyTitle.ZIndex = 41
     lobbyTitle.Parent = lobbyFrame
@@ -1110,12 +1113,12 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     local lobbyDetail = Instance.new("TextLabel")
     lobbyDetail.Name = "LobbyDetail"
     lobbyDetail.BackgroundTransparency = 1
-    lobbyDetail.Position = UDim2.fromOffset(14, 26)
+    lobbyDetail.Position = UDim2.fromOffset(14, 34)
     lobbyDetail.Size = UDim2.new(1, -28, 0, 18)
     lobbyDetail.Font = Enum.Font.Gotham
     lobbyDetail.Text = "STAND ON THE PLATFORM TO DEPART"
     lobbyDetail.TextColor3 = Color3.fromRGB(178, 194, 183)
-    lobbyDetail.TextSize = 12
+    lobbyDetail.TextSize = 16
     lobbyDetail.TextXAlignment = Enum.TextXAlignment.Left
     lobbyDetail.ZIndex = 41
     lobbyDetail.Parent = lobbyFrame
@@ -1123,7 +1126,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     local lobbySizes = Instance.new("Frame")
     lobbySizes.Name = "LobbySizes"
     lobbySizes.BackgroundTransparency = 1
-    lobbySizes.Position = UDim2.fromOffset(14, 52)
+    lobbySizes.Position = UDim2.fromOffset(14, 66)
     lobbySizes.Size = UDim2.new(1, -28, 0, 44)
     lobbySizes.ZIndex = 41
     lobbySizes.Parent = lobbyFrame
@@ -1138,13 +1141,13 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         local sizeButton = Instance.new("TextButton")
         sizeButton.Name = "PartySize_" .. size
         sizeButton.LayoutOrder = size
-        sizeButton.Size = UDim2.new(0, 36, 1, 0)
+        sizeButton.Size = UDim2.new(0, 44, 1, 0)
         sizeButton.BackgroundColor3 = Color3.fromRGB(31, 40, 44)
         sizeButton.AutoButtonColor = true
         sizeButton.Font = Enum.Font.GothamBold
         sizeButton.Text = tostring(size)
         sizeButton.TextColor3 = Color3.fromRGB(244, 230, 197)
-        sizeButton.TextSize = 15
+        sizeButton.TextSize = 19
         sizeButton.Selectable = true
         sizeButton.ZIndex = 42
         sizeButton.Parent = lobbySizes
@@ -1154,8 +1157,63 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         table.insert(lobbySizeButtons, sizeButton)
     end
 
+    -- Action progress: what a timed gather or build looks like while it runs.
+    local actionFrame = Instance.new("Frame")
+    actionFrame.Name = "ActionProgress"
+    actionFrame.AnchorPoint = Vector2.new(0.5, 1)
+    actionFrame.Position = UDim2.new(0.5, 0, 1, -170)
+    actionFrame.Size = UDim2.fromOffset(300, 58)
+    actionFrame.BackgroundColor3 = COLORS.panel
+    actionFrame.BackgroundTransparency = 0.1
+    actionFrame.BorderSizePixel = 0
+    actionFrame.Visible = false
+    actionFrame.ZIndex = 44
+    actionFrame.Parent = gui
+    local actionCorner = Instance.new("UICorner")
+    actionCorner.CornerRadius = UDim.new(0, 12)
+    actionCorner.Parent = actionFrame
+
+    local actionLabel = Instance.new("TextLabel")
+    actionLabel.Name = "ActionLabel"
+    actionLabel.BackgroundTransparency = 1
+    actionLabel.Position = UDim2.fromOffset(16, 8)
+    actionLabel.Size = UDim2.new(1, -32, 0, 22)
+    actionLabel.Font = Enum.Font.GothamBold
+    actionLabel.Text = "GATHERING..."
+    actionLabel.TextColor3 = COLORS.amber
+    actionLabel.TextSize = 17
+    actionLabel.TextXAlignment = Enum.TextXAlignment.Left
+    actionLabel.ZIndex = 45
+    actionLabel.Parent = actionFrame
+
+    local actionTrack = Instance.new("Frame")
+    actionTrack.Name = "ActionTrack"
+    actionTrack.Position = UDim2.fromOffset(16, 36)
+    actionTrack.Size = UDim2.new(1, -32, 0, 10)
+    actionTrack.BackgroundColor3 = Color3.fromRGB(23, 30, 34)
+    actionTrack.BorderSizePixel = 0
+    actionTrack.ZIndex = 45
+    actionTrack.Parent = actionFrame
+    local actionTrackCorner = Instance.new("UICorner")
+    actionTrackCorner.CornerRadius = UDim.new(0, 5)
+    actionTrackCorner.Parent = actionTrack
+
+    local actionFill = Instance.new("Frame")
+    actionFill.Name = "ActionFill"
+    actionFill.Size = UDim2.fromScale(0, 1)
+    actionFill.BackgroundColor3 = COLORS.amber
+    actionFill.BorderSizePixel = 0
+    actionFill.ZIndex = 46
+    actionFill.Parent = actionTrack
+    local actionFillCorner = Instance.new("UICorner")
+    actionFillCorner.CornerRadius = UDim.new(0, 5)
+    actionFillCorner.Parent = actionFill
+
     local self = setmetatable({
         _gui = gui,
+        _actionFrame = actionFrame,
+        _actionLabel = actionLabel,
+        _actionFill = actionFill,
         _lobbyFrame = lobbyFrame,
         _lobbyTitle = lobbyTitle,
         _lobbyDetail = lobbyDetail,
@@ -2139,6 +2197,14 @@ function HUDController.update(self: HUDController, state: any)
     end
     self._currentState = state
     self:_updateLobby(state)
+    local action = state.action
+    if type(action) == "table" and action.active == true then
+        self._actionFrame.Visible = true
+        self._actionLabel.Text = tostring(action.label) .. "..."
+        self._actionFill.Size = UDim2.fromScale(math.clamp(tonumber(action.alpha) or 0, 0, 1), 1)
+    else
+        self._actionFrame.Visible = false
+    end
     -- Sprint is a toggle, not a hold, so the button has to show which it is.
     local combat = state.combat
     local running = type(combat) == "table" and combat.sprinting == true

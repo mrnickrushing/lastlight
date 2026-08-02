@@ -926,6 +926,7 @@ local creatorAssetCounts: { [string]: number } = {
     mesh_first_lantern_a = 0,
     mesh_heartwood_stump_a = 0,
     mesh_blacksmith_hammer_a = 0,
+    mesh_hand_axe_a = 0,
 }
 local stretchedRoadAssets = 0
 for _, descendant in world:GetDescendants() do
@@ -1051,6 +1052,7 @@ assert(
     creatorAssetCounts.mesh_heartwood_stump_a == 1,
     "the Heartwood gather node must use its own authored stump, not the scenery stump"
 )
+assert(creatorAssetCounts.mesh_hand_axe_a == 1, "the starter axe display must use the authored axe")
 assert(
     creatorAssetCounts.mesh_blacksmith_hammer_a == 1,
     "the starter hammer display must use the authored hammer"
