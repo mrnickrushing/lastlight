@@ -1008,6 +1008,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         nightNumber = phase.nightNumber,
         blackoutDue = phase.blackoutDue,
         expeditionActive = expedition.active,
+        regionId = if expedition.active then "region_bramblewake" else "region_emberhollow",
         expeditionSeed = expedition.seed,
         expeditionManifestHash = expedition.manifestHash,
         expeditionModuleId = expedition.moduleId,

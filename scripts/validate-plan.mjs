@@ -17,6 +17,7 @@ const requiredFiles = [
   "docs/UX_MOBILE_ACCESSIBILITY.md",
   "docs/UI_DESIGN_DIRECTION.md",
   "docs/ART_AUDIO_DIRECTION.md",
+  "docs/MILESTONE_3_ADAPTIVE_REGION_MUSIC.md",
   "docs/MONETIZATION_LIVEOPS_ANALYTICS.md",
   "docs/PRODUCTION_ROADMAP.md",
   "docs/QA_RELEASE_PLAN.md",
@@ -37,6 +38,7 @@ const requiredFiles = [
   "docs/DECISIONS.md",
   "src/shared/Environment.luau",
   "src/shared/AmbientMotion.luau",
+  "src/shared/MusicCatalog.luau",
   "src/shared/EnemyMotion.luau",
   "src/shared/WeatherProfile.luau",
   "src/shared/Content/ContentId.luau",
@@ -85,10 +87,12 @@ const requiredFiles = [
   "src/client/Controllers/WeatherController.luau",
   "src/client/Controllers/InputController.luau",
   "src/client/Controllers/InteractionController.luau",
+  "src/client/Controllers/MusicController.luau",
   "src/first/LoadingController.client.luau",
   "tests/run.luau",
   "tests/specs/ReviveFlow.spec.luau",
   "tests/specs/AmbientMotion.spec.luau",
+  "tests/specs/MusicCatalog.spec.luau",
   "tests/specs/EnemyMotion.spec.luau",
   "tests/specs/ExtractionPayoff.spec.luau",
   "tests/specs/WeatherProfile.spec.luau",
@@ -96,6 +100,8 @@ const requiredFiles = [
   "tests/specs/ProfessionState.spec.luau",
   "tests/studio/FoundationIntegration.server.luau",
   "scripts/verify-build.luau",
+  "scripts/validate_audio_assets.py",
+  "assets/audio/manifest.json",
   "types/standard.d.luau"
 ];
 

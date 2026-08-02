@@ -8,6 +8,7 @@ assert(root ~= nil, "Last Light shared root did not replicate before client boot
 
 local Config = require(root.Config)
 local AmbientMotion = require(root.AmbientMotion)
+local MusicCatalog = require(root.MusicCatalog)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local RuntimeIds = require(root.RuntimeIds)
 local WeatherProfile = require(root.WeatherProfile)
@@ -15,6 +16,7 @@ local AmbientController = require(script.Controllers.AmbientController)
 local HUDController = require(script.Controllers.HUDController)
 local InputController = require(script.Controllers.InputController)
 local InteractionController = require(script.Controllers.InteractionController)
+local MusicController = require(script.Controllers.MusicController)
 local WorldMotionController = require(script.Controllers.WorldMotionController)
 local WeatherController = require(script.Controllers.WeatherController)
 
@@ -45,6 +47,7 @@ local worldMotion = WorldMotionController.new(
 )
 local weather = WeatherController.new(WeatherProfile)
 local interaction = InteractionController.new(RuntimeIds.InteractionTag, hud)
+local music = MusicController.new(MusicCatalog)
 
 local function send(kind: string, fields: { [string]: any }?)
     local payload = fields or {}
@@ -91,6 +94,7 @@ stateChanged.OnClientEvent:Connect(function(snapshot: any)
     ambient:setPhase(tostring(snapshot.phase or "day"))
     worldMotion:setPhase(tostring(snapshot.phase or "day"))
     weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
+    music:setSnapshot(snapshot)
 end)
 
 task.spawn(function()
@@ -102,6 +106,7 @@ task.spawn(function()
         ambient:setPhase(tostring(snapshot.phase or "day"))
         worldMotion:setPhase(tostring(snapshot.phase or "day"))
         weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
+        music:setSnapshot(snapshot)
     end
 end)
 

@@ -11,6 +11,7 @@ local serverRoot = ServerScriptService:WaitForChild("LastLightServer", 8)
 assert(serverRoot ~= nil, "server root unavailable in Studio integration test")
 
 local Config = require(root.Config)
+local MusicCatalog = require(root.MusicCatalog)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
 local BramblewakeEnemies = require(root.BramblewakeEnemies)
 local CombatState = require(root.CombatState)
@@ -41,9 +42,16 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 11, "unexpected save schema version")
-assert(Config.BuildVersion == "0.44.0", "unexpected build version")
+assert(Config.BuildVersion == "0.45.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
+assert(#MusicCatalog.regionIds() == 8, "every playable world needs an adaptive score")
+assert(#MusicCatalog.tracks() == 25, "adaptive score must include 24 regional tracks and Blackout")
+assert(
+    MusicCatalog.resolve("region_bramblewake", "night", false).intensity
+        > MusicCatalog.resolve("region_bramblewake", "day", false).intensity,
+    "Bramblewake night music must be scarier than its day music"
+)
 assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
 local studioBrace = EngineerBrace.deploy(EngineerBrace.default(), 10, 12, 14, 42)
 local studioBraceAfterHit, studioBraceHit = EngineerBrace.absorb(studioBrace, 9, 11)
@@ -337,7 +345,7 @@ assert(
 )
 assert(world:GetAttribute("Ready") == true, "world model is not marked ready")
 assert(
-    world:GetAttribute("WorldVersion") == "emberhollow-full-assets-v26",
+    world:GetAttribute("WorldVersion") == "emberhollow-adaptive-music-v27",
     "world model version does not match the current build"
 )
 assert(world:FindFirstChild("ArrivalSpawn", true) ~= nil, "arrival spawn is missing")
