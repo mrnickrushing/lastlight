@@ -44,7 +44,13 @@ TARGET_LONGEST_DIMENSIONS = {
 # The root arch is a separately normalized, UV-authored PBR asset. Rebuilding
 # it from the procedural fallback destroys its matching texture set and exceeds
 # its one-slot manifest budget, so the general kit generator must preserve it.
-PRESERVED_ASSET_IDS = {"mesh_root_arch_a"}
+PRESERVED_ASSET_IDS = {
+    "mesh_root_arch_a",
+    "mesh_creator_kerosene_lantern_a",
+    "mesh_creator_first_lantern_a",
+    "mesh_creator_street_lantern_a",
+    "mesh_creator_campfire_a",
+}
 
 
 PALETTE = {

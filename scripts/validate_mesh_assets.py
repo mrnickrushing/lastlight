@@ -32,27 +32,48 @@ def main() -> None:
         measured = measurements[stable_id]
         path = MESH_ROOT / asset["file"]
         if not path.is_file():
-            fail(f"{stable_id}: missing GLB {path}")
+            fail(f"{stable_id}: missing source model {path}")
         data = path.read_bytes()
-        if len(data) < 12 or data[:4] != b"glTF" or struct.unpack_from("<I", data, 4)[0] != 2:
-            fail(f"{stable_id}: file is not a glTF 2 binary")
-        if struct.unpack_from("<I", data, 8)[0] != len(data):
-            fail(f"{stable_id}: GLB header length does not match file size")
-        json_length, json_type = struct.unpack_from("<II", data, 12)
-        if json_type != 0x4E4F534A:
-            fail(f"{stable_id}: first GLB chunk is not JSON")
-        gltf = json.loads(data[20 : 20 + json_length].decode("utf-8").rstrip(" \x00"))
-        mesh_names = [str(mesh.get("name", "")) for mesh in gltf.get("meshes", [])]
-        expected_prefix = f"{stable_id}__"
-        if not asset.get("pbrMaps") and (
-            not mesh_names or any(not name.startswith(expected_prefix) for name in mesh_names)
-        ):
-            fail(
-                f"{stable_id}: exported mesh datablock names must preserve the authored material group"
-            )
+        creator_store_model = asset.get("source") == "roblox_creator_store_model"
+        if creator_store_model:
+            if len(data) < 16 or not data.startswith(b"<roblox!"):
+                fail(f"{stable_id}: downloaded Creator Store source is not a Roblox binary model")
+            if measured.get("scripts") != 0:
+                fail(f"{stable_id}: Creator Store source must be script-free")
+            if not asset.get("preserveSourceMaterials"):
+                fail(f"{stable_id}: Creator Store source materials must be explicitly preserved")
+            if not str(asset.get("sourceUrl", "")).startswith(
+                "https://create.roblox.com/store/asset/"
+            ):
+                fail(f"{stable_id}: Creator Store source URL is missing")
+        else:
+            if (
+                len(data) < 12
+                or data[:4] != b"glTF"
+                or struct.unpack_from("<I", data, 4)[0] != 2
+            ):
+                fail(f"{stable_id}: file is not a glTF 2 binary")
+            if struct.unpack_from("<I", data, 8)[0] != len(data):
+                fail(f"{stable_id}: GLB header length does not match file size")
+            json_length, json_type = struct.unpack_from("<II", data, 12)
+            if json_type != 0x4E4F534A:
+                fail(f"{stable_id}: first GLB chunk is not JSON")
+            gltf = json.loads(data[20 : 20 + json_length].decode("utf-8").rstrip(" \x00"))
+            mesh_names = [str(mesh.get("name", "")) for mesh in gltf.get("meshes", [])]
+            expected_prefix = f"{stable_id}__"
+            if not asset.get("pbrMaps") and (
+                not mesh_names or any(not name.startswith(expected_prefix) for name in mesh_names)
+            ):
+                fail(
+                    f"{stable_id}: exported mesh datablock names must preserve the authored material group"
+                )
         if measured["bytes"] != len(data):
             fail(f"{stable_id}: measured byte count is stale")
-        if abs(measured["longestDimension"] - asset["targetLongestDimension"]) > 0.001:
+        if measured["longestDimension"] <= 0:
+            fail(f"{stable_id}: measured longest dimension must be positive")
+        if not creator_store_model and abs(
+            measured["longestDimension"] - asset["targetLongestDimension"]
+        ) > 0.001:
             fail(f"{stable_id}: authored size does not match target")
         if measured["triangles"] > asset["maxTriangles"]:
             fail(f"{stable_id}: triangle budget exceeded")
@@ -76,6 +97,18 @@ def main() -> None:
         expected_pbr = "pbr = true" if asset.get("pbrMaps") else "pbr = false"
         if expected_pbr not in registry_block:
             fail(f"{stable_id}: runtime PBR classification differs from manifest")
+        expected_preserve = (
+            "preserveSourceMaterials = true"
+            if asset.get("preserveSourceMaterials") or asset.get("pbrMaps")
+            else "preserveSourceMaterials = false"
+        )
+        if expected_preserve not in registry_block:
+            fail(f"{stable_id}: runtime source-material policy differs from manifest")
+        expected_creator_store = (
+            "creatorStore = true" if creator_store_model else "creatorStore = false"
+        )
+        if expected_creator_store not in registry_block:
+            fail(f"{stable_id}: runtime Creator Store loading policy differs from manifest")
         source_file = asset.get("sourceFile")
         if source_file and not (MESH_ROOT / source_file).is_file():
             fail(f"{stable_id}: missing original generation source")
@@ -86,7 +119,7 @@ def main() -> None:
 
     if len(roblox_ids) != len(set(roblox_ids)):
         fail("mesh manifest reuses a Roblox asset ID")
-    print(f"Validated {len(assets)} measured GLBs and Roblox asset mappings.")
+    print(f"Validated {len(assets)} measured source models and Roblox asset mappings.")
 
 
 if __name__ == "__main__":

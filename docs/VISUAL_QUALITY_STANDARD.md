@@ -56,6 +56,13 @@ physical geometry.
    access path, clearance, sightline, then decoration. Reversing this order is
    not an acceptable visual workflow.
 
+An emergency fallback is not finished art. When a vetted authored asset loads,
+every visible fallback part and effect for that object must be hidden. A visible
+production prop may not be approved merely because its block, orb, wedge, or
+debug assembly is recognizable enough to keep gameplay running. Structural
+shells, collision, terrain, and roads may remain purpose-built Roblox geometry;
+inspectable props and practical-light vessels must use reviewed art assets.
+
 ## Environment standard
 
 ### Site planning and circulation

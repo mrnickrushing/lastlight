@@ -1,6 +1,54 @@
 {
   "schemaVersion": 1,
   "assets": {
+    "mesh_creator_kerosene_lantern_a": {
+      "boundsMin": [250.5543, 0.0, 351.2274],
+      "boundsMax": [251.4673, 1.9893, 352.1405],
+      "dimensions": [0.9131, 1.9893, 0.9131],
+      "longestDimension": 1.9893,
+      "triangles": 3600,
+      "meshObjects": 3,
+      "materials": ["creator_source_preserved"],
+      "baseParts": 3,
+      "scripts": 0,
+      "bytes": 48550
+    },
+    "mesh_creator_first_lantern_a": {
+      "boundsMin": [-167.2, 11.2, -154.4],
+      "boundsMax": [-166.2, 13.4, -153.4],
+      "dimensions": [1.0, 2.2, 1.0],
+      "longestDimension": 2.2,
+      "triangles": 3302,
+      "meshObjects": 13,
+      "materials": ["creator_source_preserved"],
+      "baseParts": 13,
+      "scripts": 0,
+      "bytes": 6996
+    },
+    "mesh_creator_street_lantern_a": {
+      "boundsMin": [-86.7364, -191.6874, -101.1669],
+      "boundsMax": [-77.1084, -169.3448, -91.0632],
+      "dimensions": [9.6281, 22.3427, 10.1036],
+      "longestDimension": 22.3427,
+      "triangles": 700,
+      "meshObjects": 8,
+      "materials": ["creator_source_preserved"],
+      "baseParts": 8,
+      "scripts": 0,
+      "bytes": 25530
+    },
+    "mesh_creator_campfire_a": {
+      "boundsMin": [38.5493, -0.8905, 2.3538],
+      "boundsMax": [43.5433, 1.2596, 7.123],
+      "dimensions": [4.994, 2.1501, 4.7692],
+      "longestDimension": 4.994,
+      "triangles": 2982,
+      "meshObjects": 24,
+      "materials": ["creator_source_preserved"],
+      "baseParts": 26,
+      "scripts": 0,
+      "bytes": 142649
+    },
     "mesh_root_arch_a": {
       "boundsMin": [
         -5.5953,

@@ -3,6 +3,11 @@
   "servePort": 34872,
   "tree": {
     "$className": "DataModel",
+    "AssetService": {
+      "$properties": {
+        "AllowInsertFreeAssets": true
+      }
+    },
     "ReplicatedFirst": {
       "$path": "src/first"
     },

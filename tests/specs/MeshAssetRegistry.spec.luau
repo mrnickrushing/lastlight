@@ -10,7 +10,7 @@ return {
             name = "keeps stable and unique uploaded asset mappings",
             run = function()
                 local entries = MeshAssetRegistry.all()
-                TestRunner.equal(#entries, 12)
+                TestRunner.equal(#entries, 16)
                 local stableIds = {}
                 local robloxIds = {}
                 for _, entry in entries do
@@ -21,6 +21,31 @@ return {
                     TestRunner.truthy(not robloxIds[entry.assetId], "duplicate Roblox asset ID")
                     stableIds[entry.id] = true
                     robloxIds[entry.assetId] = true
+                end
+            end,
+        },
+        {
+            name = "keeps inspected Creator Store props curated and source-preserved",
+            run = function()
+                for _, stableId in
+                    {
+                        "mesh_creator_kerosene_lantern_a",
+                        "mesh_creator_first_lantern_a",
+                        "mesh_creator_street_lantern_a",
+                        "mesh_creator_campfire_a",
+                    }
+                do
+                    local entry = MeshAssetRegistry.get(stableId)
+                    TestRunner.truthy(entry ~= nil, "missing Creator Store prop " .. stableId)
+                    TestRunner.equal(
+                        (entry :: MeshAssetRegistry.Entry).placementBand,
+                        "curated_core"
+                    )
+                    TestRunner.equal(
+                        (entry :: MeshAssetRegistry.Entry).preserveSourceMaterials,
+                        true
+                    )
+                    TestRunner.equal((entry :: MeshAssetRegistry.Entry).creatorStore, true)
                 end
             end,
         },
