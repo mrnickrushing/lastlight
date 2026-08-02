@@ -1840,6 +1840,21 @@ function WorldService._registerInteraction(
         validates range, stage, and everything else through the same path the
         prompt uses, so this adds a way to ask, not a way to bypass.
     ]]
+    --[[
+        A ClickDetector only receives clicks if its part answers raycasts, and
+        most of these anchors deliberately do not: tool pedestals are invisible
+        non-colliding boxes, and part() clears CanQuery whenever a part is
+        non-colliding. So the axe, hammer and torch displays, the lantern, and
+        the reliquary all had click detectors that nothing could ever hit,
+        which is why gathering worked -- a solid stump -- and choosing a tool,
+        building, lighting, and the orb did not.
+
+        Making the anchor queryable cannot bypass anything: _interact still
+        checks the prompt is enabled and the player is in range, exactly as it
+        does for the keyboard path.
+    ]]
+    target.CanQuery = true
+
     local click = Instance.new("ClickDetector")
     click.Name = "InteractClick"
     click.MaxActivationDistance = prompt.MaxActivationDistance
