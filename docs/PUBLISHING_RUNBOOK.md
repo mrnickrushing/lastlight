@@ -66,6 +66,29 @@ release notes.
 Publish from Studio to the private target, then restart a fresh private server.
 Do not treat a local Play session as published verification.
 
+### Publishing from the command line
+
+The universe and start place now exist and are recorded in
+`Config.ProductionPlaceIds`:
+
+| Universe | Start place |
+|---|---|
+| 10611704810 | 115897110071287 |
+
+```bash
+npm test          # regenerates build/ from the commit under test
+npm run publish   # releases build/LastLight.rbxlx to players
+```
+
+`npm run publish --saved` uploads a version without releasing it, which is the
+safer choice when you want to inspect a build in Studio before players get it.
+The Open Cloud key is read from `ROBLOX_API_KEY` and needs the
+`universe-places:write` scope for that universe.
+
+Publish only from a commit whose `npm test` run produced the `build/` artifacts
+being uploaded; the script uploads whatever is on disk and cannot tell a stale
+place file from a fresh one.
+
 ## Published verification
 
 For the current foundation milestone:
