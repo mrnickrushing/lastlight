@@ -131,6 +131,12 @@ function TutorialFlow.progress(stage: Stage): (number, number)
     return TutorialFlow.definition(stage).index, #ORDER
 end
 
+-- The stage a fresh run begins at. Named rather than indexed at call sites so
+-- reordering the flow cannot silently change where new sessions start.
+function TutorialFlow.firstStage(): Stage
+    return TutorialFlow.order()[1]
+end
+
 function TutorialFlow.order(): { Stage }
     return table.clone(ORDER)
 end

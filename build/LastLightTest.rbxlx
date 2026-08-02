@@ -1717,11 +1717,19 @@ function CombatState.create(now: number): State
     }
 end
 
+--[[
+    `moving` defaults to true so existing callers keep their behaviour, but the
+    service passes the player's real movement. Standing still with run toggled
+    on used to drain the bar to nothing while the character had not gone
+    anywhere, which reads as a bug and punishes a player for pausing to look
+    around. Sprint now only costs while actually sprinting somewhere.
+]]
 function CombatState.advance(
     state: State,
     now: number,
     canAct: boolean,
-    staminaRegenMultiplier: number?
+    staminaRegenMultiplier: number?,
+    moving: boolean?
 ): State
     assert(finiteNumber(now), "combat state time is invalid")
     local nextState = copyAt(state, now)
@@ -1733,7 +1741,8 @@ function CombatState.advance(
         changed = true
     end
 
-    if nextState.sprinting and canAct then
+    local spending = nextState.sprinting and canAct and moving ~= false
+    if spending then
         local stamina = math.max(0, state.stamina - SPRINT_DRAIN_PER_SECOND * delta)
         if stamina ~= state.stamina then
             nextState.stamina = stamina
@@ -2006,7 +2015,11 @@ return table.freeze({
         combat_mobility_enabled = true,
         profession_kits_enabled = true,
         player_survival_enabled = true,
-        tutorial_persistence = true,
+        -- Off: a session starts a fresh run at the lodge. Rejoining to find
+        -- yourself halfway through a night you already left reads as the
+        -- game having lost track, not as progress. The stage is still
+        -- written to the profile, so turning this on resumes as before.
+        tutorial_persistence = false,
         content_registry = true,
         bramblewake_events_enabled = true,
         old_growth_elite_enabled = true,
@@ -9781,6 +9794,12 @@ function TutorialFlow.progress(stage: Stage): (number, number)
     return TutorialFlow.definition(stage).index, #ORDER
 end
 
+-- The stage a fresh run begins at. Named rather than indexed at call sites so
+-- reordering the flow cannot silently change where new sessions start.
+function TutorialFlow.firstStage(): Stage
+    return TutorialFlow.order()[1]
+end
+
 function TutorialFlow.order(): { Stage }
     return table.clone(ORDER)
 end
@@ -10514,6 +10533,7 @@ local tutorialService = TutorialService.new(
     RuntimeIds,
     TutorialFlow,
     RateLimiter,
+    featureFlags,
     networkService,
     profileService,
     worldService,
@@ -10568,6 +10588,9 @@ lobbyService:setChangedHandler(function(toast: string?)
 end)
 worldService:setClickHandler(function(clicker: Player, interactionId: string)
     tutorialService:interactFromClick(clicker, interactionId)
+end)
+enemyService:setStrikeHandler(function(clicker: Player)
+    tutorialService:strikeFromClick(clicker)
 end)
 services:register(tutorialService)
 services:initialize()
@@ -12098,6 +12121,7 @@ export type EnemyService = typeof(setmetatable(
         _queue: { string },
         _nextSpawnAt: number,
         _nightActive: boolean,
+        _strikeHandler: ((Player) -> ())?,
         _lanternHealth: number,
         _breachMultiplier: number,
         _nightModifiers: any,
@@ -12149,6 +12173,7 @@ function EnemyService.new(
         _queue = {},
         _nextSpawnAt = 0,
         _nightActive = false,
+        _strikeHandler = nil,
         _lanternHealth = 100,
         _breachMultiplier = 1,
         _nightModifiers = {
@@ -12511,6 +12536,7 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
             self._worldService:placeEnemyVisual(model, definition.modelKey)
         end
     end)
+    self:bindStrikeClicks(model)
     local spawnedAt = workspace:GetServerTimeNow()
     local basePosition = model:GetPivot().Position
     local themedHealth =
@@ -13195,6 +13221,30 @@ function EnemyService.spendLanternStrength(self: EnemyService, amount: number, s
         reason = if spent > 0 then "spent" else "minimum_health",
         spent = spent,
     }
+end
+
+-- Wire every spawned enemy's ClickDetector to the strike handler. The click
+-- only says which creature the player meant; damageNearest still resolves
+-- range, night state, and damage on the server exactly as the button did.
+function EnemyService.bindStrikeClicks(self: EnemyService, model: Model)
+    local core = model.PrimaryPart
+    if core == nil then
+        return
+    end
+    local click = core:FindFirstChild("StrikeClick")
+    if click == nil or not click:IsA("ClickDetector") then
+        return
+    end
+    click.MouseClick:Connect(function(clicker: Player)
+        local handler = self._strikeHandler
+        if handler ~= nil then
+            handler(clicker)
+        end
+    end)
+end
+
+function EnemyService.setStrikeHandler(self: EnemyService, handler: (Player) -> ())
+    self._strikeHandler = handler
 end
 
 function EnemyService.damageNearest(self: EnemyService, player: Player): (boolean, string)
@@ -16020,11 +16070,16 @@ end
 function PlayerCombatService._step(self: PlayerCombatService, now: number)
     local enabled = self._featureFlags:isEnabled("combat_mobility_enabled")
     for player, state in self._states do
+        -- Read real movement from the humanoid so a player standing still with
+        -- run toggled on is not charged for going nowhere.
+        local activeHumanoid = humanoid(player)
+        local moving = activeHumanoid ~= nil and activeHumanoid.MoveDirection.Magnitude > 0.05
         local nextState = self._combatState.advance(
             state,
             now,
             enabled and self._survivalService:canAct(player),
-            self:_staminaRegenMultiplier(player)
+            self:_staminaRegenMultiplier(player),
+            moving
         )
         self._states[player] = nextState
 
@@ -19496,6 +19551,7 @@ export type TutorialService = typeof(setmetatable(
         _runtimeIds: any,
         _tutorialFlow: any,
         _rateLimiter: any,
+        _featureFlags: any,
         _networkService: any,
         _profileService: any,
         _worldService: any,
@@ -19531,6 +19587,7 @@ function TutorialService.new(
     runtimeIds: any,
     tutorialFlow: any,
     rateLimiter: any,
+    featureFlags: any,
     networkService: any,
     profileService: any,
     worldService: any,
@@ -19558,6 +19615,7 @@ function TutorialService.new(
         _runtimeIds = runtimeIds,
         _tutorialFlow = tutorialFlow,
         _rateLimiter = rateLimiter,
+        _featureFlags = featureFlags,
         _networkService = networkService,
         _profileService = profileService,
         _worldService = worldService,
@@ -19772,7 +19830,19 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
         return
     end
 
-    local stage = profile.tutorial.stage
+    --[[
+        Every session starts a fresh run.
+
+        The tutorial stage is still written to the profile, and the flag below
+        can restore it, but with tutorial_persistence off a player who leaves
+        and comes back begins at the lodge again rather than resuming mid-way
+        through a run they have already left. Rejoining to find yourself
+        halfway through the first night, holding an axe you do not remember
+        picking, reads as the game having lost track rather than as progress.
+    ]]
+    local stage = if self._featureFlags:isEnabled("tutorial_persistence")
+        then profile.tutorial.stage
+        else self._tutorialFlow.firstStage()
     player:SetAttribute("LastLightTutorialSurvivalReady", isCombatEligibleStage(stage))
     local session: Session = {
         stage = stage,
@@ -19926,6 +19996,28 @@ end
 -- Entry point for tapping a world object. Goes through the same rate limiter
 -- and the same validated interaction path as the HUD button, so clicking is
 -- another way to ask, not a way around any check.
+-- Shared by the tool action and by tapping a creature. Every guard stays on
+-- the server: a click only says which enemy the player meant.
+function TutorialService.strike(self: TutorialService, player: Player)
+    local session = self._sessions[player]
+    if
+        session ~= nil
+        and self._survivalService:canAct(player)
+        and (session.stage == "survive" or player:GetAttribute("LastLightInExpedition") == true)
+    then
+        local _, message = self._enemyService:damageNearest(player)
+        self:_setToast(player, message)
+        self:_publishAll()
+    end
+end
+
+function TutorialService.strikeFromClick(self: TutorialService, player: Player)
+    if not self._limiter:allow(tostring(player.UserId), os.clock(), 2) then
+        return
+    end
+    self:strike(player)
+end
+
 function TutorialService.interactFromClick(
     self: TutorialService,
     player: Player,
@@ -20356,16 +20448,7 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             self:_interact(player, interactionId)
         end
     elseif kind == self._runtimeIds.Actions.UseTool then
-        local session = self._sessions[player]
-        if
-            session ~= nil
-            and self._survivalService:canAct(player)
-            and (session.stage == "survive" or player:GetAttribute("LastLightInExpedition") == true)
-        then
-            local _, message = self._enemyService:damageNearest(player)
-            self:_setToast(player, message)
-            self:_publishAll()
-        end
+        self:strike(player)
     elseif kind == self._runtimeIds.Actions.Sprint and type(payload.enabled) == "boolean" then
         self._combatService:setSprint(player, payload.enabled)
     elseif kind == self._runtimeIds.Actions.Dodge then
@@ -24668,6 +24751,27 @@ function WorldService._buildLobby(self: WorldService, world: Model)
         Vector3.new(14, wallHeight - 11, 1.2),
         Vector3.new(0, wallHeight - (wallHeight - 11) / 2, -halfDepth)
     )
+    --[[
+        The doorway is a view, not an exit.
+
+        The lodge is a staging room: the platform is how you leave, and a
+        player who simply ran out through the door skipped the entire
+        departure and arrived in the world alone. An invisible pane across
+        the opening keeps the doorway readable as a way out -- you can see the
+        road you are about to be sent to -- while making the platform the only
+        thing that actually gets you there.
+    ]]
+    local doorSeal = part(
+        lobby,
+        "LodgeDoorSeal",
+        Vector3.new(14, 11, 1),
+        CFrame.new(LOBBY_CENTER + Vector3.new(0, 5.5, -halfDepth)),
+        Color3.fromRGB(255, 181, 76),
+        Enum.Material.Neon
+    )
+    doorSeal.Transparency = 0.94
+    doorSeal.CastShadow = false
+    doorSeal.CanQuery = false
 
     -- Log courses and corner posts so the walls read as built timber.
     for courseIndex = 1, 5 do
@@ -34799,6 +34903,21 @@ function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target:
     highlight.DepthMode = Enum.HighlightDepthMode.Occluded
     highlight.Parent = model
 
+    --[[
+        Tap the creature to hit it.
+
+        Combat used to require finding a STRIKE button while a telegraph was
+        winding up. Putting the control on the enemy itself makes attacking
+        the same gesture as everything else in the game, and it aims: the
+        server still resolves range and damage, so this only decides which
+        creature the player meant.
+    ]]
+    local click = Instance.new("ClickDetector")
+    click.Name = "StrikeClick"
+    click.MaxActivationDistance = 26
+    click.CursorIcon = ""
+    click.Parent = core
+
     local flatTarget = Vector3.new(target.X, core.Position.Y, target.Z)
     if (flatTarget - core.Position).Magnitude > 0.01 then
         model:PivotTo(CFrame.lookAt(core.Position, flatTarget))
@@ -39912,8 +40031,8 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         "Objective",
         "FREE MARA",
         UDim2.new(1, -28, 0, 34),
-        UDim2.fromOffset(14, 32),
-        20,
+        UDim2.fromOffset(14, 30),
+        26,
         COLORS.cream
     )
     objective.Font = Enum.Font.GothamBold
@@ -39921,9 +40040,9 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         objectiveFrame,
         "Detail",
         "Follow the lantern path.",
-        UDim2.new(1, -28, 0, 48),
-        UDim2.fromOffset(14, 70),
-        14,
+        UDim2.new(1, -28, 0, 42),
+        UDim2.fromOffset(14, 66),
+        18,
         COLORS.muted
     )
     detail.TextYAlignment = Enum.TextYAlignment.Top
@@ -41383,7 +41502,7 @@ function HUDController._layout(self: HUDController)
 
     if narrow then
         self._objectiveFrame.Position = UDim2.fromOffset(18, 70)
-        self._objectiveFrame.Size = UDim2.new(1, -36, 0, if self._compactEnabled then 76 else 132)
+        self._objectiveFrame.Size = UDim2.fromOffset(470, if self._compactEnabled then 78 else 112)
         self._resource.Position = UDim2.fromOffset(18, if self._compactEnabled then 158 else 218)
         self._compact.Size = UDim2.fromOffset(44, 38)
         self._compact.Text = if self._compactEnabled then "+" else "−"
@@ -41813,7 +41932,13 @@ function HUDController.update(self: HUDController, state: any)
     self._resource.Visible = not nightActive
         and not blackoutActive
         and ((tonumber(state.resources) or 0) > 0 or state.selectedTool ~= nil)
-    self._tool.Visible = (nightActive or eliteActive or bossActive or blackoutActive)
+    -- FIND and STRIKE now live on the world objects: tap the stump, tap the
+    -- creature. Dead buttons cost the thing a phone screen has least of, so
+    -- they stay hidden. Run, dodge, and ability remain because they have no
+    -- target to tap.
+    self._primary.Visible = false
+    self._tool.Visible = false
+        and (nightActive or eliteActive or bossActive or blackoutActive)
         and not self._playerDowned
     self._sprint.Visible = self._inputMode == "touch" and not self._playerDowned
     self._dodge.Visible = not self._playerDowned

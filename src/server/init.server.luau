@@ -264,6 +264,7 @@ local tutorialService = TutorialService.new(
     RuntimeIds,
     TutorialFlow,
     RateLimiter,
+    featureFlags,
     networkService,
     profileService,
     worldService,
@@ -318,6 +319,9 @@ lobbyService:setChangedHandler(function(toast: string?)
 end)
 worldService:setClickHandler(function(clicker: Player, interactionId: string)
     tutorialService:interactFromClick(clicker, interactionId)
+end)
+enemyService:setStrikeHandler(function(clicker: Player)
+    tutorialService:strikeFromClick(clicker)
 end)
 services:register(tutorialService)
 services:initialize()

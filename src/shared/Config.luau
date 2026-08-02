@@ -63,7 +63,11 @@ return table.freeze({
         combat_mobility_enabled = true,
         profession_kits_enabled = true,
         player_survival_enabled = true,
-        tutorial_persistence = true,
+        -- Off: a session starts a fresh run at the lodge. Rejoining to find
+        -- yourself halfway through a night you already left reads as the
+        -- game having lost track, not as progress. The stage is still
+        -- written to the profile, so turning this on resumes as before.
+        tutorial_persistence = false,
         content_registry = true,
         bramblewake_events_enabled = true,
         old_growth_elite_enabled = true,

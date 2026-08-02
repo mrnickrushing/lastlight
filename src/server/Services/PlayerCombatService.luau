@@ -229,11 +229,16 @@ end
 function PlayerCombatService._step(self: PlayerCombatService, now: number)
     local enabled = self._featureFlags:isEnabled("combat_mobility_enabled")
     for player, state in self._states do
+        -- Read real movement from the humanoid so a player standing still with
+        -- run toggled on is not charged for going nowhere.
+        local activeHumanoid = humanoid(player)
+        local moving = activeHumanoid ~= nil and activeHumanoid.MoveDirection.Magnitude > 0.05
         local nextState = self._combatState.advance(
             state,
             now,
             enabled and self._survivalService:canAct(player),
-            self:_staminaRegenMultiplier(player)
+            self:_staminaRegenMultiplier(player),
+            moving
         )
         self._states[player] = nextState
 
