@@ -768,8 +768,9 @@ for _, sample in { { 0, 0 }, { 0, -112 }, { 0, -204 }, { 92, -126 }, { -92, -184
         )
     )
 end
-local mainStreet = world:FindFirstChild("TownMainStreet", true)
-assert(mainStreet ~= nil and mainStreet:IsA("BasePart"), "the town needs a visible main street")
+-- Reuses the mainStreet resolved and nil-checked with the rest of the street
+-- geometry above; existence is already asserted there, so this only has to
+-- prove the street clears the floor rather than sitting inside it.
 assert(
     mainStreet.Position.Y + mainStreet.Size.Y * 0.5 > TerrainBuilder.valleyFloorTop(),
     "the main street must sit above the terrain, not buried under it"
