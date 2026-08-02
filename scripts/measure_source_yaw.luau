@@ -61,6 +61,12 @@ for _, path in paths do
     assert(fs.isFile(path), "missing Creator Store model " .. path)
     local parts: { BasePart } = {}
     for _, root in roblox.deserializeModel(fs.readFile(path)) do
+        -- The root itself counts. A single-MeshPart asset has no descendants,
+        -- so walking only descendants reports it as empty and the script dies
+        -- on the assert below rather than measuring it.
+        if root:IsA("BasePart") then
+            table.insert(parts, root)
+        end
         for _, descendant in root:GetDescendants() do
             if descendant:IsA("BasePart") then
                 table.insert(parts, descendant)
@@ -75,7 +81,14 @@ for _, path in paths do
     local modal, modalCount = 0, 0
     for _, part in parts do
         local _, yaw = part.CFrame:ToOrientation()
-        local rounded = math.floor(math.deg(yaw) * 100 + 0.5) / 100
+        -- Round half away from zero. math.floor(x + 0.5) biases toward positive
+        -- infinity, so -32.845 would bucket to -32.84 while +32.845 buckets to
+        -- +32.85 -- and this number feeds straight into the loader's
+        -- inverse-rotation, where stored yaws are as often negative as not.
+        local scaled = math.deg(yaw) * 100
+        local rounded = (
+            if scaled >= 0 then math.floor(scaled + 0.5) else math.ceil(scaled - 0.5)
+        ) / 100
         counts[rounded] = (counts[rounded] or 0) + 1
         if counts[rounded] > modalCount then
             modalCount, modal = counts[rounded], rounded

@@ -33980,7 +33980,12 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
     -- the asset is used, instead of every caller carrying the same offset.
     local sourceYaw = entry.sourceYawDegrees
     if sourceYaw ~= nil and sourceYaw ~= 0 then
-        loaded:PivotTo(CFrame.Angles(0, -math.rad(sourceYaw), 0) * loaded:GetPivot())
+        -- Post-multiply so the yaw is cancelled about the model's own pivot.
+        -- Pre-multiplying rotates about the world origin instead, which also
+        -- drags the model's position -- harmless while the pivot rotation is
+        -- identity, but wrong the moment a source model ships with a
+        -- PrimaryPart carrying its own rotation, which Creator Store models do.
+        loaded:PivotTo(loaded:GetPivot() * CFrame.Angles(0, -math.rad(sourceYaw), 0))
     end
     local _, nativeSize = loaded:GetBoundingBox()
     local nativeLongest = longestDimension(nativeSize)
