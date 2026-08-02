@@ -308,6 +308,12 @@ services:register(blackoutService)
 services:register(phaseService)
 services:register(lobbyService)
 services:register(townNightService)
+-- Without this the departure countdown never reached a client: LobbyService
+-- published every whole second into a handler nobody had set, so the panel
+-- froze at "DEPARTING IN 10" while the server counted down and launched.
+lobbyService:setChangedHandler(function(toast: string?)
+    tutorialService:broadcastLobby(toast)
+end)
 services:register(tutorialService)
 services:initialize()
 services:start()
