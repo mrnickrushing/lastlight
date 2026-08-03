@@ -37,6 +37,10 @@ local RuntimeIds = {
         ActionRequest = "ActionRequest",
         StateChanged = "StateChanged",
         GetState = "GetState",
+        -- Deliberately not an action kind. Perf samples are telemetry that
+        -- grants nothing, and keeping them off the action remote means the
+        -- gameplay payload contract stays one field per kind.
+        PerformanceReport = "PerformanceReport",
     }),
     Actions = table.freeze({
         Rescue = "rescue",

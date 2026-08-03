@@ -17,6 +17,7 @@ local HUDController = require(script.Controllers.HUDController)
 local InputController = require(script.Controllers.InputController)
 local InteractionController = require(script.Controllers.InteractionController)
 local MusicController = require(script.Controllers.MusicController)
+local PerformanceController = require(script.Controllers.PerformanceController)
 local WorldMotionController = require(script.Controllers.WorldMotionController)
 local WeatherController = require(script.Controllers.WeatherController)
 
@@ -29,9 +30,15 @@ local actionRequest =
 local stateChanged =
     runtime:WaitForChild(RuntimeIds.Remotes.StateChanged, Config.BootstrapTimeoutSeconds)
 local getState = runtime:WaitForChild(RuntimeIds.Remotes.GetState, Config.BootstrapTimeoutSeconds)
+local performanceReport =
+    runtime:WaitForChild(RuntimeIds.Remotes.PerformanceReport, Config.BootstrapTimeoutSeconds)
 assert(actionRequest ~= nil and actionRequest:IsA("RemoteEvent"), "missing ActionRequest")
 assert(stateChanged ~= nil and stateChanged:IsA("RemoteEvent"), "missing StateChanged")
 assert(getState ~= nil and getState:IsA("RemoteFunction"), "missing GetState")
+assert(
+    performanceReport ~= nil and performanceReport:IsA("RemoteEvent"),
+    "missing PerformanceReport"
+)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui", Config.BootstrapTimeoutSeconds)
@@ -48,6 +55,7 @@ local worldMotion = WorldMotionController.new(
 local weather = WeatherController.new(WeatherProfile)
 local interaction = InteractionController.new(RuntimeIds.InteractionTag, hud)
 local music = MusicController.new(MusicCatalog)
+PerformanceController.new(performanceReport :: RemoteEvent, Config.PerformanceReportIntervalSeconds)
 
 local function send(kind: string, fields: { [string]: any }?)
     local payload = fields or {}

@@ -20,7 +20,10 @@ export type NetworkService = typeof(setmetatable(
         _actionRequest: RemoteEvent?,
         _stateChanged: RemoteEvent?,
         _getState: RemoteFunction?,
+        _performanceReport: RemoteEvent?,
         _actionHandler: ((Player, any) -> ())?,
+        _actionObserver: ((Player) -> ())?,
+        _performanceHandler: ((Player, any) -> ())?,
         _snapshotProvider: ((Player) -> any)?,
         _snapshotCache: { [Player]: { at: number, value: any } },
         _lastActionAt: { [Player]: number },
@@ -38,7 +41,10 @@ function NetworkService.new(logger: Logger): NetworkService
         _actionRequest = nil,
         _stateChanged = nil,
         _getState = nil,
+        _performanceReport = nil,
         _actionHandler = nil,
+        _actionObserver = nil,
+        _performanceHandler = nil,
         _snapshotProvider = nil,
         _snapshotCache = {},
         _lastActionAt = {},
@@ -75,12 +81,26 @@ function NetworkService.Init(self: NetworkService, context: any)
         makeRemote("RemoteEvent", runtimeIds.Remotes.StateChanged, folder) :: RemoteEvent
     self._getState =
         makeRemote("RemoteFunction", runtimeIds.Remotes.GetState, folder) :: RemoteFunction
+    self._performanceReport =
+        makeRemote("RemoteEvent", runtimeIds.Remotes.PerformanceReport, folder) :: RemoteEvent
 end
 
 function NetworkService.Start(self: NetworkService)
     local actionRequest = assert(self._actionRequest, "action remote unavailable")
     local getState = assert(self._getState, "state function unavailable")
     local contract = assert(self._actionPayloadContract, "action payload contract unavailable")
+    local performanceReport = assert(self._performanceReport, "performance remote unavailable")
+
+    -- Telemetry, kept off the action path on purpose. The handler bounds and
+    -- rate limits the payload itself; nothing here can grant a player
+    -- anything, so the worst a lying client achieves is a wrong row in its own
+    -- performance report.
+    performanceReport.OnServerEvent:Connect(function(player: Player, payload: any)
+        local handler = self._performanceHandler
+        if handler ~= nil then
+            handler(player, payload)
+        end
+    end)
 
     actionRequest.OnServerEvent:Connect(function(player: Player, payload: any)
         if not contract.isValidTransport(payload) then
@@ -92,6 +112,10 @@ function NetworkService.Start(self: NetworkService)
             return
         end
         self._lastActionAt[player] = now
+        local observer = self._actionObserver
+        if observer ~= nil then
+            observer(player)
+        end
         local handler = self._actionHandler
         if handler ~= nil then
             handler(player, payload)
@@ -135,6 +159,17 @@ end
 
 function NetworkService.setActionHandler(self: NetworkService, handler: (Player, any) -> ())
     self._actionHandler = handler
+end
+
+-- Counts accepted actions for the remote-traffic budget. Set after the fact
+-- because the observer belongs to a service built later, and kept separate
+-- from the handler so measuring can never change what a payload does.
+function NetworkService.setActionObserver(self: NetworkService, observer: (Player) -> ())
+    self._actionObserver = observer
+end
+
+function NetworkService.setPerformanceHandler(self: NetworkService, handler: (Player, any) -> ())
+    self._performanceHandler = handler
 end
 
 function NetworkService.setSnapshotProvider(self: NetworkService, provider: (Player) -> any)

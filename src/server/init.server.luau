@@ -45,6 +45,7 @@ local TownGuardLastStand = require(root.TownGuardLastStand)
 local LobbyDeparture = require(root.LobbyDeparture)
 local ActionProgress = require(root.ActionProgress)
 local ActionPayloadContract = require(root.ActionPayloadContract)
+local PerformanceBudget = require(root.PerformanceBudget)
 local RunHandoff = require(root.RunHandoff)
 local AdminRoster = require(root.AdminRoster)
 local TownProgression = require(root.TownProgression)
@@ -59,6 +60,7 @@ local Logger = require(script.Services.Logger)
 local FeatureFlagService = require(script.Services.FeatureFlagService)
 local GearVisualService = require(script.Services.GearVisualService)
 local NetworkService = require(script.Services.NetworkService)
+local PerformanceService = require(script.Services.PerformanceService)
 local OldGrowthService = require(script.Services.OldGrowthService)
 local WardenStagService = require(script.Services.WardenStagService)
 local BramblewakeBlackoutService = require(script.Services.BramblewakeBlackoutService)
@@ -239,6 +241,7 @@ local lobbyService = LobbyService.new(
     worldService,
     analyticsService
 )
+local performanceService = PerformanceService.new(logger, Config, PerformanceBudget)
 local adminService = AdminService.new(
     logger,
     AdminRoster,
@@ -247,7 +250,8 @@ local adminService = AdminService.new(
     survivalService,
     combatService,
     worldService,
-    expeditionService
+    expeditionService,
+    performanceService
 )
 local townNightService = TownNightService.new(
     logger,
@@ -317,6 +321,7 @@ local services = ServiceRegistry.new({
     actionPayloadContract = ActionPayloadContract,
 })
 services:register(featureFlags)
+services:register(performanceService)
 services:register(networkService)
 services:register(profileService)
 services:register(gearVisualService)
@@ -344,6 +349,18 @@ worldService:setClickHandler(function(clicker: Player, interactionId: string)
 end)
 enemyService:setStrikeHandler(function(clicker: Player)
     tutorialService:strikeFromClick(clicker)
+end)
+-- The three sample sources the server owns. Join time is measured to the
+-- moment a profile is loaded, which is the first moment a player can actually
+-- do anything, rather than to the moment their character appeared.
+networkService:setPerformanceHandler(function(player: Player, payload: any)
+    performanceService:acceptClientReport(player, payload)
+end)
+profileService:onLoaded(function(player: Player, _profile: any)
+    performanceService:markInteractive(player)
+end)
+networkService:setActionObserver(function(player: Player)
+    performanceService:noteAction(player)
 end)
 adminService:setTutorialService(tutorialService)
 services:register(adminService)
