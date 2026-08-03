@@ -18,28 +18,43 @@ LOG="$OUT/generation.log"
 
 mkdir -p "$OUT"
 
-STYLE="Polished stylized low-poly dark-fantasy woodland building, hand-shaped \
-faceted forms, softened bevels, asymmetrical silhouette, visible craft details. \
-Rain-dark umber timber, deep moss green accents, slate blue-gray stone \
-foundation, muted meadow gold trim, charcoal-indigo shadow. Matte rough tactile \
-materials, no gloss. Strong readable gameplay-scale silhouette, sparse surface \
-noise, readable negative space, consistent three-quarter proportions. Single \
-freestanding structure on a small stone base, no ground plane, no terrain, no \
-surrounding scenery, no characters."
+# Isolation is the hard part, not the style.
+#
+# The first pass asked for a building and got a diorama: the sawmill arrived
+# with a pine tree, a stone path and grass tufts, the celebration stage with
+# scattered boulders and dead trees. Two phrasings caused it. "On a small stone
+# base" reads as an invitation to model the ground, and a trailing "no terrain,
+# no scenery" is too weak and too late to overcome it.
+#
+# What works is leading with the isolation instead of appending it: name the
+# thing as an isolated model on a plain background before describing it, ask
+# for a clean flat underside rather than a base, and list the exclusions
+# explicitly and in capitals. These buildings sit on authored town terrain
+# beside the plaza, so anything that brings its own ground fights the roads and
+# the foliage system.
+# Meshy caps a text-to-3d prompt at 600 characters and answers 400 for anything
+# longer, so the style block has to earn its room. The exclusions are kept in
+# full and the descriptive language is what got compressed: losing an adjective
+# costs a little polish, while losing a NO brings back the pine tree.
+STYLE="Stylized low-poly dark-fantasy architecture, faceted forms, soft bevels, \
+visible craft detail, rain-dark umber timber, slate blue-grey stone, meadow gold \
+trim, matte rough materials, strong readable silhouette. Clean flat underside. \
+NO ground, NO terrain, NO rocks, NO trees, NO plants, NO grass, NO path, NO \
+fence, NO scenery, NO diorama base, NO environment, NO characters."
 
 # id|prompt subject
 BUILDINGS=(
-"mesh_celebration_stage_a|An open timber celebration stage with a low plank platform, four carved corner posts, a draped banner canopy, and hanging lantern hooks"
-"mesh_sawmill_a|A working sawmill with a timber frame, a large vertical waterwheel on one side, stacked cut logs, and an open cutting floor under a shingled roof"
-"mesh_union_forge_a|A blacksmith forge building with a stone chimney stack, an open-fronted work bay, a visible anvil and quench barrel, and iron tool racks on the wall"
-"mesh_engineer_yard_a|An engineer workshop yard with a half-open timber shed, a raised testing platform, coiled rope and pulley rigging, and mechanical trap parts on trestles"
-"mesh_common_kitchen_a|A communal outdoor kitchen with a long covered cooking hearth, a stone oven dome, hanging herb bundles, and a serving counter along the open side"
-"mesh_hearthmarket_stalls_a|A cluster of three joined market stalls under patched awnings, with open display counters, crates of goods, and a hanging sign bracket"
-"mesh_trade_post_a|A small trade post cabin with a wide shuttered exchange window, a covered porch, a strongbox bench, and a ledger desk visible through the opening"
-"mesh_guardhouse_a|A stout guardhouse with thick timber walls, a narrow reinforced door, weapon racks under the eaves, and a small shuttered watch window"
-"mesh_watchtower_a|A tall narrow watchtower with a stone base, a timber ladder shaft, an enclosed railed lookout platform, and a signal brazier on top"
-"mesh_trapworks_a|A trapworks shed with an open workbench front, racked spring traps and stakes, a spool of wire, and a low sandbag testing berm along one side"
-"mesh_waterworks_a|A waterworks structure with a raised stone cistern, a hand pump wheel, wooden trough channels running from its base, and bucket hooks on the frame"
+"mesh_celebration_stage_a|an open timber celebration stage, low plank platform, four carved corner posts, draped banner canopy, hanging lantern hooks"
+"mesh_sawmill_a|a sawmill building, timber frame, large vertical waterwheel on one side, stacked cut logs, open cutting floor, shingled roof"
+"mesh_union_forge_a|a blacksmith forge building, stone chimney stack, open-fronted work bay, anvil and quench barrel, iron tool racks"
+"mesh_engineer_yard_a|an engineer workshop building, half-open timber shed, raised testing deck, coiled rope and pulley rigging, trap parts on trestles"
+"mesh_common_kitchen_a|a communal kitchen building, long covered cooking hearth, stone oven dome, hanging herb bundles, open serving counter"
+"mesh_hearthmarket_stalls_a|three joined market stalls, patched awnings, open display counters, crates of goods, hanging sign bracket"
+"mesh_trade_post_a|a small trade post cabin, wide shuttered exchange window, covered porch, strongbox bench, ledger desk inside"
+"mesh_guardhouse_a|a stout guardhouse, thick timber walls, narrow reinforced door, weapon racks under the eaves, shuttered watch window"
+"mesh_watchtower_a|a tall narrow watchtower, stone footing, timber ladder shaft, enclosed railed lookout platform, signal brazier on top"
+"mesh_trapworks_a|a trapworks shed, open workbench front, racked spring traps and stakes, spool of wire, low sandbag berm along one side"
+"mesh_waterworks_a|a waterworks building, raised stone cistern, hand pump wheel, wooden trough channels, bucket hooks on the frame"
 )
 
 echo "=== Town building generation started $(date -Is) ===" | tee -a "$LOG"
@@ -47,13 +62,29 @@ echo "=== Town building generation started $(date -Is) ===" | tee -a "$LOG"
 for entry in "${BUILDINGS[@]}"; do
     id="${entry%%|*}"
     subject="${entry#*|}"
-    prompt="$subject. $STYLE"
+    prompt="Isolated 3D model of $subject, floating on plain white background, nothing else in frame. $STYLE"
 
     echo "" | tee -a "$LOG"
     echo "--- $id ---" | tee -a "$LOG"
 
     dir="$OUT/$id"
     mkdir -p "$dir"
+
+    # Already finished. Skipping is what makes this script safe to rerun after
+    # a partial batch, which is the only reason the earlier failures cost 20
+    # credits instead of 300.
+    if [ -f "$dir/$id.glb" ]; then
+        echo "OK $id (already generated)" | tee -a "$LOG"
+        continue
+    fi
+
+    # Meshy rejects a prompt over 600 characters with a bare 400. Checking here
+    # turns that into a message naming the building, before any credit is spent.
+    length=${#prompt}
+    if [ "$length" -gt 600 ]; then
+        echo "FAILED $id: prompt is $length characters, over the 600 cap" | tee -a "$LOG"
+        continue
+    fi
 
     # Reuse a preview that already succeeded. Previews cost 20 credits each, so
     # a rerun after a partial batch must not pay for them twice.
