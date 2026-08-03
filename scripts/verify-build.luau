@@ -164,6 +164,45 @@ assert(
 local integrationScript =
     testPlace:GetService("ServerScriptService"):FindFirstChild("FoundationIntegration", true)
 assert(integrationScript ~= nil, "test build is missing FoundationIntegration")
+
+-- The Studio integration place only runs when a human presses Play, so a
+-- version bump that forgets the literals in FoundationIntegration fails in the
+-- owner's hands instead of in CI. Compare the asserted literals against Config
+-- here, where every npm test runs.
+local configSource = fs.readFile("src/shared/Config.luau")
+local integrationSource = fs.readFile("tests/studio/FoundationIntegration.server.luau")
+local configBuildVersion = assert(
+    string.match(configSource, 'BuildVersion%s*=%s*"([^"]+)"'),
+    "Config.luau no longer declares BuildVersion"
+)
+local configSchemaVersion = assert(
+    string.match(configSource, "SaveSchemaVersion%s*=%s*(%d+)"),
+    "Config.luau no longer declares SaveSchemaVersion"
+)
+local assertedBuildVersion = assert(
+    string.match(integrationSource, 'Config%.BuildVersion%s*==%s*"([^"]+)"'),
+    "FoundationIntegration no longer asserts Config.BuildVersion"
+)
+local assertedSchemaVersion = assert(
+    string.match(integrationSource, "Config%.SaveSchemaVersion%s*==%s*(%d+)"),
+    "FoundationIntegration no longer asserts Config.SaveSchemaVersion"
+)
+assert(
+    assertedBuildVersion == configBuildVersion,
+    string.format(
+        "FoundationIntegration asserts build %s but Config declares %s -- update the Studio test",
+        assertedBuildVersion,
+        configBuildVersion
+    )
+)
+assert(
+    assertedSchemaVersion == configSchemaVersion,
+    string.format(
+        "FoundationIntegration asserts save schema %s but Config declares %s -- update the Studio test",
+        assertedSchemaVersion,
+        configSchemaVersion
+    )
+)
 assert(
     testPlace:GetService("ReplicatedFirst"):FindFirstChild("LoadingController") ~= nil,
     "test build is missing the bounded loading controller"
