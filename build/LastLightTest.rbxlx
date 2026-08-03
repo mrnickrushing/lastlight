@@ -25393,12 +25393,15 @@ function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKe
             yaw = math.rad(180),
             profile = Vector3.new(0.94, 1.08, 0.9),
         },
+        -- The stag was generated without antlers on purpose. The fight breaks
+        -- them one at a time, so they stay authored parts standing above the
+        -- crown rather than geometry baked into the mesh.
         warden_stag = {
-            assetId = "mesh_creator_wood_ibex_a",
+            assetId = "mesh_warden_stag_a",
             groundOffset = 10,
             yaw = math.rad(180),
-            profile = Vector3.new(1.08, 1.14, 0.94),
-            scale = 3,
+            profile = Vector3.new(1, 1, 1),
+            scale = 1.2,
         },
     }
     local profile = visualProfiles[modelKey]
@@ -33757,17 +33760,31 @@ local function buildModuleVisual(
         end
         dress(extra, "mesh_deadfall_a", parent, center + Vector3.new(6, 0, -20), 1, 0.7, 2429)
     elseif visual == "foxglove" then
+        -- The orbs stay: they are the light this stretch of road is read by,
+        -- and a textured flower cannot emit. The authored plant goes around
+        -- each one so the glow reads as coming from inside the blooms rather
+        -- than from a bare sphere floating in the dark.
         for index = 1, 8 do
             local side = if index % 2 == 0 then 1 else -1
+            local at = center + Vector3.new(side * (12 + index), 1.2, -26 + index * 6)
             local glow = orb(
                 parent,
                 "Foxglove",
-                center + Vector3.new(side * (12 + index), 1.2, -26 + index * 6),
+                at,
                 1.4,
                 if index % 3 == 0 then AMBER else FOXFIRE,
                 Enum.Material.Neon
             )
             glow.CanQuery = false
+            dress(
+                extra,
+                "mesh_foxglove_cluster_a",
+                parent,
+                at - Vector3.new(0, 1.2, 0),
+                0.95 + (index % 3) * 0.12,
+                math.rad(index * 47 + side * 20),
+                7300 + index
+            )
         end
     elseif visual == "farm" then
         local shell = buildFarm(parent, center)
@@ -37102,6 +37119,28 @@ local ENTRIES: { Entry } = {
         assetId = 100249823997866,
         targetLongestDimension = 18,
         maxTriangles = 6000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_expedition",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_warden_stag_a",
+        assetId = 97419722389385,
+        targetLongestDimension = 19,
+        maxTriangles = 9000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_expedition",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_foxglove_cluster_a",
+        assetId = 137511250030382,
+        targetLongestDimension = 4.5,
+        maxTriangles = 5500,
         maxMaterialSlots = 1,
         placementBand = "curated_expedition",
         pbr = true,
