@@ -1983,9 +1983,12 @@ function WorldService._configureLighting(_self: WorldService)
 
     local bloom = Instance.new("BloomEffect")
     bloom.Name = "LastLightBloom"
-    bloom.Intensity = 0.34
-    bloom.Size = 46
-    bloom.Threshold = 0.82
+    -- Raised off 0.82 because Future lighting pushed every Neon part over it.
+    -- Lantern flames and harvest glows were blooming into flat discs that hid
+    -- the object underneath, which is the opposite of what marking it is for.
+    bloom.Intensity = 0.22
+    bloom.Size = 38
+    bloom.Threshold = 1.08
     bloom.Parent = Lighting
 
     local rays = Instance.new("SunRaysEffect")
