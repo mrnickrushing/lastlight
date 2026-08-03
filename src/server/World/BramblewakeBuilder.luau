@@ -1157,18 +1157,72 @@ local function buildStoryLandmark(
     return count
 end
 
+--[[
+    Authored dressing for a module.
+
+    Several of these assets already existed and simply were not being used out
+    here -- the root arch, the boulder cluster, the conifers, the shrine --
+    which is most of why Bramblewake read as grey slabs while Emberhollow read
+    as a place. `extra` collects any number of placements so a module can carry
+    a proper set rather than the single one the return value allows.
+]]
+local function dress(
+    extra: { any },
+    assetId: string,
+    parent: Instance,
+    position: Vector3,
+    scale: number,
+    yaw: number,
+    seed: number
+)
+    table.insert(extra, {
+        assetId = assetId,
+        fallbackKind = "asset_dressing",
+        position = position,
+        scale = scale,
+        yaw = yaw,
+        seed = seed,
+        swayTag = nil,
+        parent = parent,
+        fallbackInstance = nil,
+    })
+end
+
 local function buildModuleVisual(
     parent: Instance,
     visual: string,
     center: Vector3,
-    runtimeIds: any
+    runtimeIds: any,
+    extra: { any }
 ): any?
     if visual == "lantern_gate" then
         rootArch(parent, center, 1)
         lantern(parent, center + Vector3.new(-14, 0, 13), 1, runtimeIds.AmbientLightTag)
         lantern(parent, center + Vector3.new(14, 0, 13), 1, runtimeIds.AmbientLightTag)
+        dress(extra, "mesh_root_arch_a", parent, center, 1, 0, 2401)
+        dress(
+            extra,
+            "mesh_creator_street_lantern_a",
+            parent,
+            center + Vector3.new(-14, 0, 13),
+            1,
+            0,
+            2402
+        )
+        dress(
+            extra,
+            "mesh_creator_street_lantern_a",
+            parent,
+            center + Vector3.new(14, 0, 13),
+            1,
+            0,
+            2403
+        )
     elseif visual == "root_arch" then
         rootArch(parent, center + Vector3.new(0, 0, -7), 0.9)
+        dress(extra, "mesh_root_arch_a", parent, center + Vector3.new(0, 0, -7), 0.9, 0, 2411)
+        dress(extra, "mesh_fern_cluster_a", parent, center + Vector3.new(-11, 0, 6), 1.2, 0.4, 2412)
+        dress(extra, "mesh_fern_cluster_a", parent, center + Vector3.new(12, 0, 4), 1.1, 2.2, 2413)
         for offset = -1, 1, 2 do
             orb(
                 parent,
@@ -1183,8 +1237,18 @@ local function buildModuleVisual(
         for x = -1, 1 do
             for z = -1, 1 do
                 tree(parent, center + Vector3.new(x * 17, 0, z * 17), 0.68)
+                dress(
+                    extra,
+                    if (x + z) % 2 == 0 then "mesh_broadleaf_hero_a" else "mesh_conifer_hero_b",
+                    parent,
+                    center + Vector3.new(x * 17, 0, z * 17),
+                    0.85,
+                    (x + 2) * 1.3 + z,
+                    2420 + (x + 1) * 3 + (z + 1)
+                )
             end
         end
+        dress(extra, "mesh_deadfall_a", parent, center + Vector3.new(6, 0, -20), 1, 0.7, 2429)
     elseif visual == "foxglove" then
         for index = 1, 8 do
             local side = if index % 2 == 0 then 1 else -1
@@ -1212,6 +1276,30 @@ local function buildModuleVisual(
             fallbackInstance = shell,
         }
     elseif visual == "briar_ring" then
+        for index = 1, 10 do
+            local angle = (index / 10) * math.pi * 2 + math.pi / 10
+            dress(
+                extra,
+                "mesh_briar_wall_a",
+                parent,
+                center + Vector3.new(math.cos(angle) * 25, 0, math.sin(angle) * 25),
+                1.1,
+                -angle + math.pi / 2,
+                2480 + index
+            )
+        end
+        for index = 1, 6 do
+            local angle = (index / 6) * math.pi * 2
+            dress(
+                extra,
+                "mesh_deadfall_a",
+                parent,
+                center + Vector3.new(math.cos(angle) * 25, 0, math.sin(angle) * 25),
+                1.1,
+                -angle,
+                2440 + index
+            )
+        end
         for index = 1, 8 do
             local angle = (index / 8) * math.pi * 2 + math.pi / 8
             part(
@@ -1225,6 +1313,17 @@ local function buildModuleVisual(
             )
         end
     elseif visual == "sapfall" then
+        for index = -2, 2 do
+            dress(
+                extra,
+                "mesh_boulder_cluster_a",
+                parent,
+                center + Vector3.new(index * 8, 0, 17 + math.abs(index) * 2),
+                0.9,
+                index * 0.8,
+                2450 + index
+            )
+        end
         for index = -2, 2 do
             local stone = orb(
                 parent,
@@ -1260,6 +1359,7 @@ local function buildModuleVisual(
             fallbackInstance = shell,
         }
     elseif visual == "bridge" then
+        dress(extra, "mesh_tangle_bridge_a", parent, center + Vector3.new(19, 0.4, 0), 1, 0, 2470)
         for index = -4, 4 do
             part(
                 parent,
@@ -1271,6 +1371,18 @@ local function buildModuleVisual(
             )
         end
     elseif visual == "moth_meadow" then
+        for index = 1, 5 do
+            local angle = index * 1.26
+            dress(
+                extra,
+                if index % 2 == 0 then "mesh_conifer_hero_a" else "mesh_broadleaf_hero_a",
+                parent,
+                center + Vector3.new(math.cos(angle) * 26, 0, math.sin(angle) * 26),
+                0.9,
+                angle,
+                2460 + index
+            )
+        end
         part(
             parent,
             "MeadowGold",
@@ -2634,9 +2746,14 @@ function BramblewakeBuilder.build(
             resourceNodes,
             meshPlacements
         )
-        local meshPlacement = buildModuleVisual(module, definition.visual, center, runtimeIds)
+        local moduleDressingExtra = {}
+        local meshPlacement =
+            buildModuleVisual(module, definition.visual, center, runtimeIds, moduleDressingExtra)
         if meshPlacement ~= nil then
             table.insert(meshPlacements, meshPlacement)
+        end
+        for _, placementExtra in moduleDressingExtra do
+            table.insert(meshPlacements, placementExtra)
         end
         if
             type(definition.storyLandmark) == "string"

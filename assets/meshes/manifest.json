@@ -826,6 +826,46 @@
         "normal"
       ],
       "robloxAssetId": 112488289637746
+    },
+    {
+      "id": "mesh_tangle_bridge_a",
+      "displayName": "Tangle Bridge",
+      "role": "expedition_module_landmark",
+      "placementBand": "curated_expedition",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc562-4e51-7f29-80b0-749418f6649a then multi-image-to-3d task 019fc565-8bfb-7f8f-ae80-918daa09ce4b, textures downscaled to 1024. The Tangle Bridge module's crossing, which was previously nine plain planks.",
+      "file": "generated/mesh_tangle_bridge_a.glb",
+      "previewFile": "previews/mesh-tangle-bridge.png",
+      "targetLongestDimension": 18,
+      "maxTriangles": 6000,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 100249823997866
+    },
+    {
+      "id": "mesh_briar_wall_a",
+      "displayName": "Briar Wall",
+      "role": "expedition_module_landmark",
+      "placementBand": "curated_expedition",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc562-5064-7790-9f85-2d3ae2ed7a29 then multi-image-to-3d task 019fc565-9391-7519-b78c-6767c57f3cd0, textures downscaled to 1024. The Briar Ring module's thorn barrier, which was previously eight tilted boxes.",
+      "file": "generated/mesh_briar_wall_a.glb",
+      "previewFile": "previews/mesh-briar-wall.png",
+      "targetLongestDimension": 9,
+      "maxTriangles": 5500,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 125598340587515
     }
   ]
 }
