@@ -22,6 +22,7 @@
 ]]
 
 local Players = game:GetService("Players")
+local TextChatService = game:GetService("TextChatService")
 
 local AdminService = {}
 AdminService.__index = AdminService
@@ -205,7 +206,49 @@ function AdminService._onChatted(self: AdminService, player: Player, message: st
     end
 end
 
+--[[
+    Register one TextChatCommand per admin command.
+
+    Player.Chatted is a legacy-chat event and does not fire when an
+    experience uses TextChatService, which is the default for anything made
+    recently. Every admin command in this game was therefore dead on arrival:
+    the message went out as ordinary chat, nothing listened, and the only
+    symptom was that typing it did nothing at all.
+
+    AutocompleteVisible is false on every one of them. A registered command
+    otherwise appears in the chat autocomplete for every player in the
+    server, which would advertise the roster to exactly the people the silent
+    refusals elsewhere in this file exist to keep it from.
+]]
+function AdminService._registerChatCommands(self: AdminService)
+    for _, name in self._adminRoster.commandNames() do
+        local command = Instance.new("TextChatCommand")
+        command.Name = "LastLightAdmin_" .. name
+        command.PrimaryAlias = "/" .. name
+        command.AutocompleteVisible = false
+        command.Triggered:Connect(function(textSource: TextSource, text: string)
+            local player = Players:GetPlayerByUserId(textSource.UserId)
+            if player ~= nil then
+                self:_onChatted(player, text)
+            end
+        end)
+        command.Parent = TextChatService
+    end
+end
+
 function AdminService.Start(self: AdminService)
+    -- Both paths are wired because only one of them can fire. Under
+    -- TextChatService the commands above carry every message and Chatted
+    -- stays silent; under legacy chat there are no TextChatCommands and
+    -- Chatted is the only route. Neither knows about the other, and running
+    -- both costs nothing.
+    local registered, err = pcall(function()
+        self:_registerChatCommands()
+    end)
+    if not registered then
+        self._logger:warn("admin_chat_commands_unavailable", { error = tostring(err) })
+    end
+
     local function bind(player: Player)
         player.Chatted:Connect(function(message: string)
             self:_onChatted(player, message)
@@ -219,6 +262,7 @@ function AdminService.Start(self: AdminService)
     self._logger:info("admin_service_started", {
         admins = #self._adminRoster.adminUserIds(),
         enabled = self._featureFlags:isEnabled("admin_commands_enabled"),
+        chatCommands = registered,
     })
 end
 
