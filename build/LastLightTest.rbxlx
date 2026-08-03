@@ -27440,7 +27440,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     fallbackFlame.Shape = Enum.PartType.Wedge
     fallbackFlame.CanQuery = false
     table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_memory_reliquary_a",
+        assetId = "mesh_memory_reliquary_a",
         fallbackKind = "asset_replacement",
         position = Vector3.new(0, 0.25, -148),
         scale = 1,
@@ -35876,7 +35876,7 @@ function BramblewakeBuilder.build(
     queueItemAsset(
         meshPlacements,
         bossArena.seal,
-        "mesh_creator_memory_reliquary_a",
+        "mesh_memory_reliquary_a",
         1.12,
         7101,
         math.rad(180),
@@ -37323,6 +37323,17 @@ local ENTRIES: { Entry } = {
         assetId = 100249823997866,
         targetLongestDimension = 18,
         maxTriangles = 6000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_expedition",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_memory_reliquary_a",
+        assetId = 95277599944074,
+        targetLongestDimension = 5.4,
+        maxTriangles = 5500,
         maxMaterialSlots = 1,
         placementBand = "curated_expedition",
         pbr = true,

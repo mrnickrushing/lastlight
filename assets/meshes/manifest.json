@@ -1066,6 +1066,26 @@
         "normal"
       ],
       "robloxAssetId": 82812210501095
+    },
+    {
+      "id": "mesh_memory_reliquary_a",
+      "displayName": "Memory Reliquary",
+      "role": "story_landmark",
+      "placementBand": "curated_expedition",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc5c4-5fa6-7172-8db4-caf2fbfefc8c then multi-image-to-3d task 019fc5c5-9868-7457-b334-a4a8c57e8857, textures downscaled to 1024. The game's central memory motif -- Emberhollow's beacon and Bramblewake's boss arena seal -- which previously borrowed a Creator Store model. Prompted with an empty, unlit glass vessel on purpose, because both placements supply their own light and the vessel has to read as holding it.",
+      "file": "generated/mesh_memory_reliquary_a.glb",
+      "previewFile": "previews/mesh-memory-reliquary.png",
+      "targetLongestDimension": 5.4,
+      "maxTriangles": 5500,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 95277599944074
     }
   ]
 }
