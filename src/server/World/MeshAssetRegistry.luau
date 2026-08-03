@@ -161,6 +161,17 @@ local ENTRIES: { Entry } = {
         creatorStore = false,
     },
     {
+        id = "mesh_amber_sap_node_a",
+        assetId = 112488289637746,
+        targetLongestDimension = 6,
+        maxTriangles = 5500,
+        maxMaterialSlots = 1,
+        placementBand = "curated_expedition",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
         id = "mesh_heartwood_stump_a",
         assetId = 140476842967550,
         targetLongestDimension = 7,

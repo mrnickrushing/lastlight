@@ -1870,8 +1870,12 @@ function HUDController._layout(self: HUDController)
         self._compact.Size = UDim2.fromOffset(44, 38)
         self._compact.Text = if self._compactEnabled then "+" else "−"
         self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 212)
-        self._blackoutFrame.Position = UDim2.new(0.5, 0, 0, 212)
-        self._blackoutFrame.Size = UDim2.new(1, -36, 0, 64)
+        -- Tucked under the objective panel on the left rather than spanning
+        -- the screen at eye level. At full width it sat straight across the
+        -- middle of the view for the whole nine minutes of a Blackout.
+        self._blackoutFrame.Position = UDim2.fromOffset(18, 196)
+        self._blackoutFrame.Size = UDim2.fromOffset(470, 70)
+        self._blackoutFrame.AnchorPoint = Vector2.new(0, 0)
         self._eliteFrame.Position =
             UDim2.new(0.5, 0, 0, if self._blackoutFrame.Visible then 284 else 212)
         self._eliteFrame.Size = UDim2.new(1, -36, 0, 70)

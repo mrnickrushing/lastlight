@@ -62,6 +62,7 @@ local RuntimeIds = {
         UseGear = "use_gear",
         EquipGear = "equip_gear",
         LobbyDepart = "lobby_depart",
+        GatherResource = "gather_resource",
         OpenFieldBook = "open_field_book",
         TalkResident = "talk_resident",
         RepairTown = "repair_town",

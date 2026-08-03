@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_amber_sap_node_a",
+  "source": "assets/meshes/candidates/mesh_sap_meshy.glb",
+  "output": "assets/meshes/generated/mesh_amber_sap_node_a.glb",
+  "targetLongestDimension": 6.0,
+  "boundsMin": [
+    -2.3977,
+    -2.3515,
+    0.0
+  ],
+  "boundsMax": [
+    2.3977,
+    2.3515,
+    6.0
+  ],
+  "dimensions": [
+    4.7954,
+    4.7029,
+    6.0
+  ],
+  "longestDimension": 6.0,
+  "trianglesBefore": 4586,
+  "trianglesAfter": 4586,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    }
+  ],
+  "bytes": 3962980
+}

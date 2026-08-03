@@ -567,6 +567,48 @@ function TutorialService._interact(
         return
     end
 
+    if actionId == self._runtimeIds.Actions.GatherResource then
+        --[[
+            Harvesting a Bramblewake node.
+
+            Handled before the tutorial-stage machinery below, because these
+            nodes belong to the expedition rather than to the First Light
+            sequence and must not advance or be gated by it. Uses the same
+            timed gather as the town stump -- swing, bar, then the grant --
+            and the same idempotent expedition grant path as events and
+            encounters, keyed on the node's own ID, so a node pays out exactly
+            once per run however many times it is clicked.
+        ]]
+        local node = self._worldService:resourceNode(interactionId)
+        if node == nil then
+            self:_setToast(player, "ALREADY HARVESTED")
+            self:_publish(player)
+            return
+        end
+        if player:GetAttribute("LastLightInExpedition") ~= true then
+            self:_setToast(player, "ONLY OUT IN BRAMBLEWAKE")
+            self:_publish(player)
+            return
+        end
+        if
+            not skipTimer
+            and self:_beginTimedAction(player, self._runtimeIds.Actions.Gather, interactionId)
+        then
+            return
+        end
+        local granted = self._expeditionService:grantNodeReward(
+            player.UserId,
+            interactionId,
+            { [node.materialId] = 1 }
+        )
+        if granted then
+            self._worldService:markResourceNodeHarvested(interactionId)
+            self:_setToast(player, "+1 " .. string.upper(node.objectText))
+        end
+        self:_publish(player)
+        return
+    end
+
     local session = self._sessions[player]
     if session == nil then
         return

@@ -2461,6 +2461,84 @@ local function buildBlackoutLayer(
     }
 end
 
+--[[
+    Harvestable resource nodes along the route.
+
+    Bramblewake previously had no gather nodes of any kind: Heartwood and
+    Amber Sap existed as materials, as crafting inputs, and as elite and boss
+    rewards, but there was nothing in the world to harvest. A player walking
+    the route had no way to find either, because neither was there.
+
+    Two per module from the second module onward, alternating material and
+    offset to either side of the road, so the route always has something
+    visible to walk toward and the reason to travel is on the path rather than
+    only at the far end. Each carries a lantern-amber or foxfire glow so it
+    reads at distance in Blackout lighting, and a billboard naming what it is.
+]]
+local function buildResourceNodes(
+    module: Instance,
+    center: Vector3,
+    moduleIndex: number,
+    runtimeIds: any,
+    nodes: { any },
+    meshPlacements: { any }
+)
+    if moduleIndex < 2 then
+        return
+    end
+    for slot = 1, 2 do
+        local isSap = (moduleIndex + slot) % 2 == 0
+        local side = if slot == 1 then -1 else 1
+        local at = center + Vector3.new(side * (15 + (moduleIndex % 3) * 2), 0, (slot - 1.5) * 18)
+        local nodeId = string.format("node_bw_%d_%d", moduleIndex, slot)
+
+        local anchor = part(
+            module,
+            if isSap then "AmberSapNode" else "HeartwoodNode",
+            Vector3.new(5, 7, 5),
+            CFrame.new(at + Vector3.new(0, 3.5, 0)),
+            if isSap then Color3.fromRGB(196, 142, 58) else Color3.fromRGB(96, 68, 46),
+            Enum.Material.Wood
+        )
+        anchor.Transparency = 1
+        anchor.CanCollide = false
+
+        local glow = part(
+            module,
+            "ResourceGlow",
+            Vector3.new(2.2, 2.2, 2.2),
+            CFrame.new(at + Vector3.new(0, 3.2, 0)),
+            if isSap then Color3.fromRGB(255, 186, 84) else Color3.fromRGB(120, 214, 178),
+            Enum.Material.Neon,
+            false
+        )
+        glow.Shape = Enum.PartType.Ball
+        glow.Transparency = 0.4
+        glow.CastShadow = false
+        light(glow, glow.Color, 1.4, 24)
+        CollectionService:AddTag(glow, runtimeIds.AmbientLightTag)
+
+        table.insert(meshPlacements, {
+            assetId = if isSap then "mesh_amber_sap_node_a" else "mesh_heartwood_stump_a",
+            fallbackKind = "asset_replacement",
+            position = at,
+            scale = 1,
+            yaw = math.rad((moduleIndex * 37 + slot * 61) % 360),
+            seed = 11200 + moduleIndex * 10 + slot,
+            swayTag = nil,
+            parent = module,
+            fallbackInstance = nil,
+        })
+
+        table.insert(nodes, {
+            target = anchor,
+            interactionId = nodeId,
+            materialId = if isSap then "material_amber_sap" else "material_heartwood",
+            objectText = if isSap then "Amber Sap" else "Heartwood",
+        })
+    end
+end
+
 function BramblewakeBuilder.build(
     parent: Instance,
     manifest: any,
@@ -2491,6 +2569,7 @@ function BramblewakeBuilder.build(
     local oldGrowthCenter: Vector3? = nil
     local extractionTarget: BasePart? = nil
     local meshPlacements = {}
+    local resourceNodes = {}
     for _, placement in manifest.modules do
         centers[placement.index] = ORIGIN
             + Vector3.new(placement.cellX * catalog.CellSize, 0, placement.cellZ * catalog.CellSize)
@@ -2547,6 +2626,14 @@ function BramblewakeBuilder.build(
             local z = if cornerIndex <= 2 then -27 else 27
             tree(module, center + Vector3.new(x, 0, z), 0.62 + (cornerIndex % 2) * 0.08)
         end
+        buildResourceNodes(
+            module,
+            center,
+            placement.index,
+            runtimeIds,
+            resourceNodes,
+            meshPlacements
+        )
         local meshPlacement = buildModuleVisual(module, definition.visual, center, runtimeIds)
         if meshPlacement ~= nil then
             table.insert(meshPlacements, meshPlacement)
@@ -2817,6 +2904,7 @@ function BramblewakeBuilder.build(
         entryCFrame = CFrame.new(centers[1] + Vector3.new(0, 5, 0)),
         extractionTarget = assert(extractionTarget, "Bramblewake extraction target is missing"),
         eventInteractions = eventInteractions,
+        resourceNodes = resourceNodes,
         eventSockets = eventSockets,
         eliteArena = assert(eliteArena, "Old Growth elite arena is missing"),
         bossArena = bossArena,
