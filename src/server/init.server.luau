@@ -44,6 +44,7 @@ local TownCondition = require(root.TownCondition)
 local TownGuardLastStand = require(root.TownGuardLastStand)
 local LobbyDeparture = require(root.LobbyDeparture)
 local ActionProgress = require(root.ActionProgress)
+local ActionPayloadContract = require(root.ActionPayloadContract)
 local RunHandoff = require(root.RunHandoff)
 local AdminRoster = require(root.AdminRoster)
 local TownProgression = require(root.TownProgression)
@@ -313,6 +314,7 @@ local services = ServiceRegistry.new({
     content = content,
     runtimeIds = RuntimeIds,
     saveSchema = SaveSchema,
+    actionPayloadContract = ActionPayloadContract,
 })
 services:register(featureFlags)
 services:register(networkService)

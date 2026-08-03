@@ -25,6 +25,10 @@ function ExpeditionRewardLedger.grant(
             and type(reward.materialId) == "string"
             and string.sub(reward.materialId, 1, 9) == "material_"
             and type(reward.amount) == "number"
+            -- Infinity satisfies both of the checks below on its own: it is
+            -- greater than one, and math.floor of it is itself. Without this
+            -- line an infinite amount was a valid reward.
+            and reward.amount < math.huge
             and reward.amount >= 1
             and reward.amount == math.floor(reward.amount),
         "reward contract is invalid"

@@ -39,6 +39,7 @@ export type TutorialService = typeof(setmetatable(
         _runtimeIds: any,
         _tutorialFlow: any,
         _rateLimiter: any,
+        _actionPayloadContract: any,
         _featureFlags: any,
         _networkService: any,
         _profileService: any,
@@ -103,6 +104,7 @@ function TutorialService.new(
         _runtimeIds = runtimeIds,
         _tutorialFlow = tutorialFlow,
         _rateLimiter = rateLimiter,
+        _actionPayloadContract = nil,
         _featureFlags = featureFlags,
         _networkService = networkService,
         _profileService = profileService,
@@ -132,7 +134,10 @@ function TutorialService.new(
     }, TutorialService)
 end
 
-function TutorialService.Init(self: TutorialService, _context: any)
+function TutorialService.Init(self: TutorialService, context: any)
+    self._actionPayloadContract =
+        assert(context.actionPayloadContract, "action payload contract unavailable")
+
     self._profileService:onLoaded(function(player: Player, profile: any)
         self:_profileLoaded(player, profile)
     end)
@@ -933,48 +938,16 @@ function TutorialService._useGear(self: TutorialService, player: Player, itemId:
 end
 
 function TutorialService._handleAction(self: TutorialService, player: Player, payload: any)
-    if type(payload) ~= "table" or payload.schemaVersion ~= 1 then
+    local contract = self._actionPayloadContract
+    if not contract.isValidForKind(self._runtimeIds, payload) then
         return
     end
     local kind = payload.kind
-    if type(kind) ~= "string" or #kind > 32 then
-        return
-    end
-
-    local allowedFields: { [string]: boolean } = {
-        schemaVersion = true,
-        kind = true,
-    }
-    if kind == self._runtimeIds.Actions.Interact then
-        allowedFields.interactionId = true
-    elseif kind == self._runtimeIds.Actions.SelectProfession then
-        allowedFields.professionId = true
-    elseif
-        kind == self._runtimeIds.Actions.UseGear
-        or kind == self._runtimeIds.Actions.EquipGear
-    then
-        allowedFields.itemId = true
-    elseif
-        kind == self._runtimeIds.Actions.Sprint
-        or kind == self._runtimeIds.Actions.CompactHud
-    then
-        allowedFields.enabled = true
-    elseif kind == self._runtimeIds.Actions.LobbyDepart then
-        allowedFields.partySize = true
-    end
-    for key in payload do
-        if type(key) ~= "string" or allowedFields[key] ~= true then
-            return
-        end
-    end
     if
         not self._limiter:allow(
             tostring(player.UserId),
             os.clock(),
-            if kind == self._runtimeIds.Actions.UseTool
-                    or kind == self._runtimeIds.Actions.ProfessionAbility
-                then 2
-                else 1
+            contract.cost(self._runtimeIds, kind)
         )
     then
         return
