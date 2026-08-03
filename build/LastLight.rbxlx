@@ -23682,7 +23682,8 @@ function WorldService._registerInteraction(
     actionText: string,
     objectText: string,
     payload: string?,
-    holdDuration: number?
+    holdDuration: number?,
+    clickVolume: Vector3?
 )
     local prompt = Instance.new("ProximityPrompt")
     prompt.Name = interactionId
@@ -23712,31 +23713,63 @@ function WorldService._registerInteraction(
         prompt uses, so this adds a way to ask, not a way to bypass.
     ]]
     --[[
-        A ClickDetector only receives clicks if its part answers raycasts, and
-        most of these anchors deliberately do not: tool pedestals are invisible
-        non-colliding boxes, and part() clears CanQuery whenever a part is
-        non-colliding. So the axe, hammer and torch displays, the lantern, and
-        the reliquary all had click detectors that nothing could ever hit,
-        which is why gathering worked -- a solid stump -- and choosing a tool,
-        building, lighting, and the orb did not.
+        Click the whole object, not the anchor.
 
-        Making the anchor queryable cannot bypass anything: _interact still
-        checks the prompt is enabled and the player is in range, exactly as it
-        does for the keyboard path.
+        A ClickDetector only receives clicks if its part answers raycasts, and
+        these anchors are the wrong thing to aim at even when they do. They are
+        invisible bookkeeping volumes: a tool pedestal is a flat box under a
+        display whose axe sits well above it, and the construction plot is an
+        18 x 0.5 pancake that a player has almost no chance of hitting. The
+        authored meshes cannot take the clicks themselves, because the loader
+        makes every mesh part non-queryable so meshes never block the camera.
+
+        So each interaction gets a generous invisible volume covering the space
+        the object actually occupies, sized from the anchor and extended upward
+        to reach whatever stands on it. Call sites can override it for anything
+        unusually shaped.
+
+        None of this grants anything: _interact still checks the prompt is
+        enabled and the player is in range, the same guards the keyboard path
+        uses. A bigger target only makes the ask easier to make.
     ]]
     target.CanQuery = true
 
-    local click = Instance.new("ClickDetector")
-    click.Name = "InteractClick"
-    click.MaxActivationDistance = prompt.MaxActivationDistance
-    click.CursorIcon = ""
-    click.Parent = target
-    click.MouseClick:Connect(function(clicker: Player)
-        local handler = self._clickHandler
-        if handler ~= nil then
-            handler(clicker, interactionId)
-        end
-    end)
+    local function bindClick(surface: BasePart)
+        local click = Instance.new("ClickDetector")
+        click.Name = "InteractClick"
+        click.MaxActivationDistance = prompt.MaxActivationDistance
+        click.CursorIcon = ""
+        click.Parent = surface
+        click.MouseClick:Connect(function(clicker: Player)
+            local handler = self._clickHandler
+            if handler ~= nil then
+                handler(clicker, interactionId)
+            end
+        end)
+    end
+    bindClick(target)
+
+    local anchorSize = target.Size
+    local volume = clickVolume
+        or Vector3.new(
+            math.max(anchorSize.X * 1.35, 10),
+            math.max(anchorSize.Y, 11),
+            math.max(anchorSize.Z * 1.35, 10)
+        )
+    local clickPart = Instance.new("Part")
+    clickPart.Name = interactionId .. "_ClickVolume"
+    clickPart.Size = volume
+    -- Sit the volume on the anchor and grow upward, which is where the visible
+    -- object is: displays stand on pedestals, meshes stand on their anchors.
+    clickPart.CFrame = target.CFrame * CFrame.new(0, volume.Y / 2 - anchorSize.Y / 2, 0)
+    clickPart.Anchored = true
+    clickPart.CanCollide = false
+    clickPart.CanTouch = false
+    clickPart.CanQuery = true
+    clickPart.CastShadow = false
+    clickPart.Transparency = 1
+    clickPart.Parent = target
+    bindClick(clickPart)
     CollectionService:AddTag(prompt, self._runtimeIds.InteractionTag)
     self._interactions[interactionId] = prompt
 end
@@ -25969,7 +26002,9 @@ function WorldService._buildMara(self: WorldService, world: Model)
         self._runtimeIds.Actions.Rescue,
         "FREE",
         "Mara",
-        nil
+        nil,
+        nil,
+        Vector3.new(7, 8, 7)
     )
 end
 
@@ -26130,7 +26165,9 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         self._runtimeIds.Actions.Gather,
         "GATHER",
         "Heartwood",
-        nil
+        nil,
+        nil,
+        Vector3.new(12, 12, 12)
     )
 
     local toolYard = Instance.new("Model")
@@ -26419,7 +26456,12 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             self._runtimeIds.Actions.ChooseTool,
             "CHOOSE",
             definition.tool,
-            definition.tool
+            definition.tool,
+            nil,
+            -- The axe, hammer, or torch stands above its crate, so the volume
+            -- has to cover the whole display: clicking the tool itself is the
+            -- obvious gesture and was previously missing the pedestal below.
+            Vector3.new(7, 9, 7)
         )
     end
     -- toolDisplayFallback is not scratch geometry for this workbench prop --
@@ -26523,7 +26565,12 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         self._runtimeIds.Actions.Build,
         "BUILD",
         "Barricade",
-        nil
+        nil,
+        nil,
+        -- The plot is an 18 x 0.5 slab: almost impossible to hit, and the one
+        -- interaction players reported as simply not working. The volume
+        -- covers the whole worksite, posts and braces included.
+        Vector3.new(20, 12, 12)
     )
 
     local firstLanternFallback = Instance.new("Model")
@@ -26694,7 +26741,9 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         self._runtimeIds.Actions.Prepare,
         "LIGHT",
         "First Lantern",
-        nil
+        nil,
+        nil,
+        Vector3.new(12, 16, 12)
     )
 
     -- The gate reads as a threshold you walk through on the way in, not a
@@ -26878,7 +26927,9 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         self._runtimeIds.Actions.Reveal,
         "REMEMBER",
         "Bramblewake",
-        nil
+        nil,
+        nil,
+        Vector3.new(11, 14, 11)
     )
     local beaconPrompt = self._interactions[self._runtimeIds.InteractionIds.Beacon]
     beaconPrompt.Enabled = false
@@ -30133,7 +30184,12 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
                 self._runtimeIds.Actions.TalkResident,
                 "TALK",
                 resident.displayName,
-                residentId
+                residentId,
+                nil,
+                -- People get a person-sized volume, like Mara. The default is
+                -- shaped for buildings and props, and at that size neighbouring
+                -- residents would overlap into each other's reach.
+                Vector3.new(7, 8, 7)
             )
         end
     end
