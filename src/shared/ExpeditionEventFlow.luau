@@ -81,6 +81,19 @@ function ExpeditionEventFlow.validateDefinition(definition: any): (boolean, { st
     if type(definition.killSwitchFlag) ~= "string" or definition.killSwitchFlag == "" then
         issue("event must declare a kill-switch flag")
     end
+    -- Both variants are required. An event that reads clearly alone can be
+    -- opaque in a group and the reverse, and an unauthored variant is
+    -- indistinguishable at runtime from one that was never surfaced.
+    for _, variant in { "soloVariant", "groupVariant" } do
+        local authored = (definition :: any)[variant]
+        if
+            type(authored) ~= "table"
+            or type(authored.guidance) ~= "string"
+            or authored.guidance == ""
+        then
+            issue("event must declare " .. variant .. " guidance")
+        end
+    end
 
     local steps = definition.steps
     if type(steps) ~= "table" or #steps < 2 or #steps > 6 then
@@ -273,12 +286,34 @@ function ExpeditionEventFlow.contribute(
     }
 end
 
+--[[
+    Which guidance a party should be reading.
+
+    Group advice is chosen the moment a second player is working the event,
+    because that is exactly when advice like "split up and turn separate
+    latches" becomes possible to act on -- telling a lone player to split up
+    is worse than telling them nothing. Before anyone has engaged, the solo
+    line is the safe default: it describes the event rather than the party.
+]]
+function ExpeditionEventFlow.guidanceFor(definition: any, participantCount: any): string?
+    local isGroup = type(participantCount) == "number"
+        and participantCount == participantCount
+        and participantCount >= 2
+        and participantCount == math.floor(participantCount)
+    local variant = if isGroup then definition.groupVariant else definition.soloVariant
+    if type(variant) ~= "table" or type(variant.guidance) ~= "string" or variant.guidance == "" then
+        return nil
+    end
+    return variant.guidance
+end
+
 function ExpeditionEventFlow.snapshot(state: any, definition: any, now: number): any
     local timeRemaining = nil
     if state.status == "active" and type(state.expiresAt) == "number" then
         timeRemaining = math.max(0, math.ceil(state.expiresAt - now))
     end
 
+    local participants = participantList(state.participants)
     return {
         eventId = state.eventId,
         displayName = definition.displayName,
@@ -294,7 +329,8 @@ function ExpeditionEventFlow.snapshot(state: any, definition: any, now: number):
         timeRemaining = timeRemaining,
         reward = definition.reward,
         rewardTransactionId = state.rewardTransactionId,
-        participants = participantList(state.participants),
+        participants = participants,
+        guidance = ExpeditionEventFlow.guidanceFor(definition, #participants),
     }
 end
 
