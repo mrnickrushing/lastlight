@@ -263,7 +263,7 @@ local function billboard(target: BasePart, text: string, color: Color3)
     gui.Adornee = target
     gui.AlwaysOnTop = false
     gui.LightInfluence = 0.35
-    gui.MaxDistance = 55
+    gui.MaxDistance = 26
     gui.Size = UDim2.fromOffset(190, 40)
     gui.StudsOffsetWorldSpace = Vector3.new(0, 3.8, 0)
     gui.Parent = target
@@ -565,14 +565,18 @@ local function tree(parent: Instance, position: Vector3, scale: number)
     trunk.CanQuery = false
 end
 
-local function rootArch(parent: Instance, center: Vector3, scale: number)
+local function rootArch(parent: Instance, center: Vector3, scale: number, facing: number?)
+    local turn = CFrame.Angles(0, facing or 0, 0)
+    local function placed(offset: Vector3): Vector3
+        return center + (turn * offset)
+    end
     for side = -1, 1, 2 do
         part(
             parent,
             "LivingRoot",
             Vector3.new(2.4 * scale, 18 * scale, 2.4 * scale),
-            CFrame.new(center + Vector3.new(side * 10 * scale, 8 * scale, side * 10 * scale))
-                * CFrame.Angles(0, 0, math.rad(-side * 18)),
+            CFrame.new(placed(Vector3.new(side * 10 * scale, 8 * scale, side * 10 * scale)))
+                * CFrame.Angles(0, facing or 0, math.rad(-side * 18)),
             BARK,
             Enum.Material.Wood
         )
@@ -1407,18 +1411,27 @@ end
     a proper set rather than the single one the return value allows.
 ]]
 
+--[[
+    `facing` is the yaw of the road as it arrives at this module.
+
+    Route modules sit on a winding grid, so anything a player walks through
+    rather than past -- the three gates -- has to be turned to meet them.
+    Every one of them was placed at yaw 0 regardless of which way the road
+    ran, which is why the arches read as standing sideways across the path.
+]]
 local function buildModuleVisual(
     parent: Instance,
     visual: string,
     center: Vector3,
     runtimeIds: any,
-    extra: { any }
+    extra: { any },
+    facing: number
 ): any?
     if visual == "lantern_gate" then
-        rootArch(parent, center, 1)
+        rootArch(parent, center, 1, facing)
         lantern(parent, center + Vector3.new(-14, 0, 13), 1, runtimeIds.AmbientLightTag)
         lantern(parent, center + Vector3.new(14, 0, 13), 1, runtimeIds.AmbientLightTag)
-        dress(extra, "mesh_root_arch_a", parent, center, 1, 0, 2401)
+        dress(extra, "mesh_root_arch_a", parent, center, 1, facing, 2401)
         dress(
             extra,
             "mesh_creator_street_lantern_a",
@@ -1439,7 +1452,7 @@ local function buildModuleVisual(
         )
     elseif visual == "root_arch" then
         rootArch(parent, center + Vector3.new(0, 0, -7), 0.9)
-        dress(extra, "mesh_root_arch_a", parent, center + Vector3.new(0, 0, -7), 0.9, 0, 2411)
+        dress(extra, "mesh_root_arch_a", parent, center + Vector3.new(0, 0, -7), 0.9, facing, 2411)
         dress(extra, "mesh_fern_cluster_a", parent, center + Vector3.new(-11, 0, 6), 1.2, 0.4, 2412)
         dress(extra, "mesh_fern_cluster_a", parent, center + Vector3.new(12, 0, 4), 1.1, 2.2, 2413)
         for offset = -1, 1, 2 do
@@ -1683,8 +1696,8 @@ local function buildModuleVisual(
             )
         end
     elseif visual == "wayhome_gate" then
-        rootArch(parent, center, 1.15)
-        dress(extra, "mesh_wayhome_gate_a", parent, center, 1.25, 0, 2495)
+        rootArch(parent, center, 1.15, facing)
+        dress(extra, "mesh_wayhome_gate_a", parent, center, 1.25, facing, 2495)
         dress(
             extra,
             "mesh_creator_street_lantern_a",
@@ -3101,16 +3114,16 @@ local function buildResourceNodes(
         local glow = part(
             module,
             "ResourceGlow",
-            Vector3.new(2.2, 2.2, 2.2),
+            Vector3.new(1.15, 1.15, 1.15),
             CFrame.new(at + Vector3.new(0, 3.2, 0)),
             if isSap then Color3.fromRGB(255, 186, 84) else Color3.fromRGB(120, 214, 178),
             Enum.Material.Neon,
             false
         )
         glow.Shape = Enum.PartType.Ball
-        glow.Transparency = 0.4
+        glow.Transparency = 0.62
         glow.CastShadow = false
-        light(glow, glow.Color, 1.4, 24)
+        light(glow, glow.Color, 0.75, 17)
         CollectionService:AddTag(glow, runtimeIds.AmbientLightTag)
 
         table.insert(meshPlacements, {
@@ -3230,8 +3243,25 @@ function BramblewakeBuilder.build(
             meshPlacements
         )
         local moduleDressingExtra = {}
-        local meshPlacement =
-            buildModuleVisual(module, definition.visual, center, runtimeIds, moduleDressingExtra)
+        -- The yaw of the road as it reaches this module, taken from the
+        -- module before it. The first module has nothing behind it, so it
+        -- borrows the direction of the one ahead. Gates are built to this so
+        -- a player walks through them rather than past their edge.
+        local previous = centers[placement.index - 1]
+        local ahead = centers[placement.index + 1]
+        local along = if previous ~= nil
+            then center - previous
+            elseif ahead ~= nil then ahead - center
+            else Vector3.new(0, 0, 1)
+        local facing = if along.Magnitude > 0.01 then math.atan2(along.X, along.Z) else 0
+        local meshPlacement = buildModuleVisual(
+            module,
+            definition.visual,
+            center,
+            runtimeIds,
+            moduleDressingExtra,
+            facing
+        )
         if meshPlacement ~= nil then
             table.insert(meshPlacements, meshPlacement)
         end

@@ -365,6 +365,16 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         COLORS.cream
     )
     objective.Font = Enum.Font.GothamBold
+    -- Long objectives were being clipped rather than fitted: the card gives
+    -- this line 34 pixels, which holds exactly one line at 26, so anything
+    -- longer lost its tail mid-word. Scaling within a floor keeps short
+    -- objectives at full size and lets a long one wrap to two smaller lines
+    -- instead of disappearing.
+    objective.TextScaled = true
+    local objectiveFit = Instance.new("UITextSizeConstraint")
+    objectiveFit.MaxTextSize = 26
+    objectiveFit.MinTextSize = 16
+    objectiveFit.Parent = objective
     local detail = textLabel(
         objectiveFrame,
         "Detail",
