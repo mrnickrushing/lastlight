@@ -715,3 +715,38 @@ exists.
 
 **Roster:** the owner (1213625298) and zacksigma472 (8772161919).
 
+
+## Named creatures use original assets, not the Creator Store
+
+**Decision:** Bramblewake's boss (Warden Stag) and elite (Old Growth) are
+generated Last Light assets. Both previously borrowed Creator Store models —
+a wood ibex stretched to `(1.08, 1.14, 0.94)` at three times scale, and an
+old-growth model stretched to `(0.94, 1.08, 0.9)`. Neither needs a stretch
+profile now, because each was generated to the silhouette the fight already
+assumed.
+
+**Reason:** a third-party model was moderated mid-project earlier in
+development and silently fell back to placeholder geometry. A prop failing
+that way costs a crate. A named creature failing that way costs the encounter
+its identity at the moment the encounter is the point. Props may stay borrowed;
+anything the game names should not be.
+
+**The rule this produced:** a creature's mesh must be generated around the
+parts the fight is read from, never over them.
+
+  * The stag was generated deliberately *without* antlers — only broken stubs
+    at the crown — because the fight breaks its antlers one at a time and they
+    have to remain authored parts standing above the mesh.
+  * The elite was generated with a hollow chest cavity, because the amber
+    heart is the weak point and is relit on every state change; it needs
+    somewhere to sit inside the creature rather than on top of it.
+
+Getting this wrong is invisible in Studio and total in play: the mesh looks
+correct standing still and the fight becomes unreadable the moment it starts.
+
+**Facing is measured, not guessed.** A mesh's forward axis is found by
+comparing the two halves of its long axis in Blender, then mapped through the
+glTF convention — Blender `-Y` becomes Roblox `+Z`. Both builders put the
+creature's front at `-Z`, because `CFrame.lookAt` aims `-Z` at the target, so
+both profiles carry `yaw = math.rad(180)`. A backwards boss is a plausible
+mistake that only a player standing in the arena would ever catch.
