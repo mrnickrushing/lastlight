@@ -612,6 +612,10 @@ function ExpeditionService.snapshot(self: ExpeditionService, player: Player): an
         else self._generator.eventDefinition(snapshot.eventId)
     snapshot.moduleName = moduleDefinition.displayName
     snapshot.pointOfInterestName = if poiDefinition == nil then nil else poiDefinition.displayName
+    -- Carried so the point of interest can say something specific to itself.
+    -- Without it every landmark on the route shares one generic line, which
+    -- is indistinguishable from having no landmark there at all.
+    snapshot.pointOfInterestDetail = if poiDefinition == nil then nil else poiDefinition.detail
     snapshot.eventName = if eventDefinition == nil then nil else eventDefinition.displayName
     if eventDefinition ~= nil then
         local state = self._eventStates[snapshot.eventId]

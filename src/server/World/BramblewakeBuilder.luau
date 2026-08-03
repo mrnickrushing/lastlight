@@ -2035,6 +2035,40 @@ local function buildPointOfInterest(
             2541
         )
         dress(extra, "mesh_fern_cluster_a", parent, origin2 + Vector3.new(-6, 0, 3), 1.1, 1.7, 2542)
+
+        -- The chapel is the one point of interest whose structure was still
+        -- primitive: pillars, a crown and benches standing in for a nave. The
+        -- authored chapel replaces that shape rather than sitting beside it,
+        -- so the pillars move into a shell the placement hides once the asset
+        -- resolves. The altar and its candles stay outside the shell, because
+        -- they are what the landmark is read by and they must survive an
+        -- asset that never loads.
+        local shell = Instance.new("Model")
+        shell.Name = "RootChapelShell"
+        shell.Parent = landmark
+        for _, existing in landmark:GetChildren() do
+            if
+                existing:IsA("BasePart")
+                and (
+                    existing.Name == "RootChapelPillar"
+                    or existing.Name == "RootChapelCrown"
+                    or existing.Name == "RootChapelBench"
+                )
+            then
+                existing.Parent = shell
+            end
+        end
+        table.insert(extra, {
+            assetId = "mesh_root_chapel_a",
+            fallbackKind = "placeholder",
+            position = origin,
+            scale = 1,
+            yaw = math.rad(6),
+            seed = 2543,
+            swayTag = nil,
+            parent = parent,
+            fallbackInstance = shell,
+        })
     end
 
     local memory = orb(

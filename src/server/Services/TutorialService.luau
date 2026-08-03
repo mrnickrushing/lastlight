@@ -1081,7 +1081,10 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         detail = if discovery == nil
             then expedition.moduleName
             else string.format("%s · %s", expedition.moduleName, discovery)
-        mara = "The roots remember every traveler. Keep to the amber path."
+        -- A landmark gets to speak for itself; the generic line is only for
+        -- the stretches of road between them.
+        mara = expedition.pointOfInterestDetail
+            or "The roots remember every traveler. Keep to the amber path."
         local event = expedition.event
         if event ~= nil then
             if event.status == "dormant" then

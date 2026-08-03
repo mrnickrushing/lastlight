@@ -212,24 +212,32 @@ local pointsOfInterest = {
         displayName = "Reedstead Ruin",
         visual = "ruined_homestead",
         tags = { "story", "resident" },
+        detail = "A family lived here until the roots came through the floor. "
+            .. "The door is still barred from the inside.",
     }),
     frozenDefinition({
         id = "poi_bw_mothwell",
         displayName = "Mothwell",
         visual = "moth_well",
         tags = { "puzzle", "mystery" },
+        detail = "Moths gather here in numbers no season explains. "
+            .. "Something below the water is still warm.",
     }),
     frozenDefinition({
         id = "poi_bw_sapglass_grove",
         displayName = "Sapglass Grove",
         visual = "sap_grove",
         tags = { "resource", "risk" },
+        detail = "Amber runs freely here because the trees were tapped and "
+            .. "never sealed. Whatever feeds on the sap has not left.",
     }),
     frozenDefinition({
         id = "poi_bw_root_chapel",
         displayName = "Root Chapel",
         visual = "root_chapel",
         tags = { "story", "sanctuary" },
+        detail = "Nobody built this. The roots grew into a nave and Emberhollow "
+            .. "took it as a sign, and sheltered here on the way out.",
     }),
 }
 

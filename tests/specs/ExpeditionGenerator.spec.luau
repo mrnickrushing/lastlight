@@ -1,11 +1,31 @@
 --!strict
 
+local Catalog = require("../../src/shared/Content/Definitions/BramblewakeExpedition")
 local ExpeditionGenerator = require("../../src/shared/ExpeditionGenerator")
 local TestRunner = require("../TestRunner")
 
 return {
     name = "ExpeditionGenerator",
     cases = {
+        {
+            -- Every point of interest is tagged story, mystery or sanctuary and
+            -- all four shipped with nothing to say, so each shared one generic
+            -- line. A landmark that says the same thing as the road it stands
+            -- on is indistinguishable from no landmark at all.
+            name = "every point of interest says something specific to itself",
+            run = function()
+                local seen: { [string]: boolean } = {}
+                for _, poi in Catalog.PointsOfInterest do
+                    TestRunner.truthy(
+                        type(poi.detail) == "string" and #poi.detail > 24,
+                        "point of interest has nothing to say: " .. tostring(poi.id)
+                    )
+                    TestRunner.truthy(not seen[poi.detail], "duplicate line: " .. poi.id)
+                    seen[poi.detail] = true
+                end
+                TestRunner.equal(#Catalog.PointsOfInterest, Catalog.PointOfInterestCount)
+            end,
+        },
         {
             name = "passes 1,000 deterministic Bramblewake seeds",
             run = function()

@@ -2513,24 +2513,32 @@ local pointsOfInterest = {
         displayName = "Reedstead Ruin",
         visual = "ruined_homestead",
         tags = { "story", "resident" },
+        detail = "A family lived here until the roots came through the floor. "
+            .. "The door is still barred from the inside.",
     }),
     frozenDefinition({
         id = "poi_bw_mothwell",
         displayName = "Mothwell",
         visual = "moth_well",
         tags = { "puzzle", "mystery" },
+        detail = "Moths gather here in numbers no season explains. "
+            .. "Something below the water is still warm.",
     }),
     frozenDefinition({
         id = "poi_bw_sapglass_grove",
         displayName = "Sapglass Grove",
         visual = "sap_grove",
         tags = { "resource", "risk" },
+        detail = "Amber runs freely here because the trees were tapped and "
+            .. "never sealed. Whatever feeds on the sap has not left.",
     }),
     frozenDefinition({
         id = "poi_bw_root_chapel",
         displayName = "Root Chapel",
         visual = "root_chapel",
         tags = { "story", "sanctuary" },
+        detail = "Nobody built this. The roots grew into a nave and Emberhollow "
+            .. "took it as a sign, and sheltered here on the way out.",
     }),
 }
 
@@ -14585,6 +14593,10 @@ function ExpeditionService.snapshot(self: ExpeditionService, player: Player): an
         else self._generator.eventDefinition(snapshot.eventId)
     snapshot.moduleName = moduleDefinition.displayName
     snapshot.pointOfInterestName = if poiDefinition == nil then nil else poiDefinition.displayName
+    -- Carried so the point of interest can say something specific to itself.
+    -- Without it every landmark on the route shares one generic line, which
+    -- is indistinguishable from having no landmark there at all.
+    snapshot.pointOfInterestDetail = if poiDefinition == nil then nil else poiDefinition.detail
     snapshot.eventName = if eventDefinition == nil then nil else eventDefinition.displayName
     if eventDefinition ~= nil then
         local state = self._eventStates[snapshot.eventId]
@@ -21366,7 +21378,10 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         detail = if discovery == nil
             then expedition.moduleName
             else string.format("%s · %s", expedition.moduleName, discovery)
-        mara = "The roots remember every traveler. Keep to the amber path."
+        -- A landmark gets to speak for itself; the generic line is only for
+        -- the stretches of road between them.
+        mara = expedition.pointOfInterestDetail
+            or "The roots remember every traveler. Keep to the amber path."
         local event = expedition.event
         if event ~= nil then
             if event.status == "dormant" then
@@ -34589,6 +34604,40 @@ local function buildPointOfInterest(
             2541
         )
         dress(extra, "mesh_fern_cluster_a", parent, origin2 + Vector3.new(-6, 0, 3), 1.1, 1.7, 2542)
+
+        -- The chapel is the one point of interest whose structure was still
+        -- primitive: pillars, a crown and benches standing in for a nave. The
+        -- authored chapel replaces that shape rather than sitting beside it,
+        -- so the pillars move into a shell the placement hides once the asset
+        -- resolves. The altar and its candles stay outside the shell, because
+        -- they are what the landmark is read by and they must survive an
+        -- asset that never loads.
+        local shell = Instance.new("Model")
+        shell.Name = "RootChapelShell"
+        shell.Parent = landmark
+        for _, existing in landmark:GetChildren() do
+            if
+                existing:IsA("BasePart")
+                and (
+                    existing.Name == "RootChapelPillar"
+                    or existing.Name == "RootChapelCrown"
+                    or existing.Name == "RootChapelBench"
+                )
+            then
+                existing.Parent = shell
+            end
+        end
+        table.insert(extra, {
+            assetId = "mesh_root_chapel_a",
+            fallbackKind = "placeholder",
+            position = origin,
+            scale = 1,
+            yaw = math.rad(6),
+            seed = 2543,
+            swayTag = nil,
+            parent = parent,
+            fallbackInstance = shell,
+        })
     end
 
     local memory = orb(
@@ -37365,6 +37414,17 @@ local ENTRIES: { Entry } = {
         maxTriangles = 6000,
         maxMaterialSlots = 1,
         placementBand = "curated_expedition",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_root_chapel_a",
+        assetId = 93798103786347,
+        targetLongestDimension = 14,
+        maxTriangles = 7000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_hero",
         pbr = true,
         preserveSourceMaterials = true,
         creatorStore = false,
