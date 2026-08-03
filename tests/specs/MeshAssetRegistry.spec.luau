@@ -10,7 +10,7 @@ return {
             name = "keeps stable and unique uploaded asset mappings",
             run = function()
                 local entries = MeshAssetRegistry.all()
-                TestRunner.equal(#entries, 59)
+                TestRunner.equal(#entries, 64)
                 local stableIds = {}
                 local robloxIds = {}
                 for _, entry in entries do

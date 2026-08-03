@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_snapvine_a",
+  "source": "assets/meshes/raw/mesh_snapvine_a.glb",
+  "output": "assets/meshes/generated/mesh_snapvine_a.glb",
+  "targetLongestDimension": 4.8,
+  "boundsMin": [
+    -2.4,
+    -1.9119,
+    0.0
+  ],
+  "boundsMax": [
+    2.4,
+    1.9119,
+    4.7427
+  ],
+  "dimensions": [
+    4.8,
+    3.8237,
+    4.7427
+  ],
+  "longestDimension": 4.8,
+  "trianglesBefore": 13747,
+  "trianglesAfter": 5500,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    }
+  ],
+  "bytes": 11261548
+}

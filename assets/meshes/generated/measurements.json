@@ -1882,6 +1882,256 @@
         }
       ],
       "bytes": 13187184
+    },
+    "mesh_rootling_a": {
+      "boundsMin": [
+        -1.8632,
+        -1.6728,
+        0.0
+      ],
+      "boundsMax": [
+        1.8632,
+        1.6728,
+        5.8
+      ],
+      "dimensions": [
+        3.7263,
+        3.3456,
+        5.8
+      ],
+      "longestDimension": 5.8,
+      "triangles": 5500,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "normal",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        }
+      ],
+      "bytes": 12138692
+    },
+    "mesh_briarback_a": {
+      "boundsMin": [
+        -2.001,
+        -3.4,
+        0.0
+      ],
+      "boundsMax": [
+        2.001,
+        3.4,
+        5.075
+      ],
+      "dimensions": [
+        4.002,
+        6.8,
+        5.075
+      ],
+      "longestDimension": 6.8,
+      "triangles": 5500,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "normal",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        }
+      ],
+      "bytes": 13004848
+    },
+    "mesh_hollow_crow_a": {
+      "boundsMin": [
+        -0.9187,
+        -0.9928,
+        0.0
+      ],
+      "boundsMax": [
+        0.9187,
+        0.9928,
+        3.8
+      ],
+      "dimensions": [
+        1.8374,
+        1.9856,
+        3.8
+      ],
+      "longestDimension": 3.8,
+      "triangles": 5499,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "normal",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        }
+      ],
+      "bytes": 11226724
+    },
+    "mesh_snapvine_a": {
+      "boundsMin": [
+        -2.4,
+        -1.9119,
+        0.0
+      ],
+      "boundsMax": [
+        2.4,
+        1.9119,
+        4.7427
+      ],
+      "dimensions": [
+        4.8,
+        3.8237,
+        4.7427
+      ],
+      "longestDimension": 4.8,
+      "triangles": 5500,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "normal",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        }
+      ],
+      "bytes": 11261548
+    },
+    "mesh_bark_ram_a": {
+      "boundsMin": [
+        -2.3352,
+        -3.1,
+        0.0
+      ],
+      "boundsMax": [
+        2.3352,
+        3.1,
+        5.7828
+      ],
+      "dimensions": [
+        4.6704,
+        6.2,
+        5.7828
+      ],
+      "longestDimension": 6.2,
+      "triangles": 5500,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "normal",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        }
+      ],
+      "bytes": 11114096
     }
   }
 }
