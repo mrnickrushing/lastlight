@@ -1097,7 +1097,11 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
                     event.total,
                     event.timeRemaining or 0
                 )
-                mara = event.detail
+                -- Once the event is running, Mara's line stops describing the
+                -- scene and starts saying how to finish it. The flavour still
+                -- plays while the event is dormant, which is when a player is
+                -- deciding whether to start it rather than trying to solve it.
+                mara = event.guidance or event.detail
             elseif event.status == "completed" then
                 objective = "EVENT COMPLETE — FOLLOW THE FOXFIRE TRAIL"
                 detail = event.completionMessage

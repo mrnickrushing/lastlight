@@ -50,6 +50,72 @@ return {
             end,
         },
         {
+            name = "every event tells a stuck player what to do, alone and in a group",
+            run = function()
+                -- These strings were authored for all eight events and read by
+                -- nothing, which is most of why the level was reported as
+                -- leaving players with no idea what to do.
+                for _, event in Catalog.Events do
+                    local solo = ExpeditionEventFlow.guidanceFor(event, 1)
+                    local group = ExpeditionEventFlow.guidanceFor(event, 3)
+                    TestRunner.truthy(solo ~= nil and #(solo :: string) > 0, event.id)
+                    TestRunner.truthy(group ~= nil and #(group :: string) > 0, event.id)
+                    TestRunner.equal(solo, event.soloVariant.guidance)
+                    TestRunner.equal(group, event.groupVariant.guidance)
+                end
+            end,
+        },
+        {
+            name = "falls back to the solo line until a second player is actually there",
+            run = function()
+                -- Telling one player to split up is worse than telling them
+                -- nothing, so the group line waits for a second participant.
+                local event = definition("event_bw_moving_hedge")
+                for _, count in { 0, 1, "3", -2, 1.5, 0 / 0 } do
+                    TestRunner.equal(
+                        ExpeditionEventFlow.guidanceFor(event, count),
+                        event.soloVariant.guidance
+                    )
+                end
+                TestRunner.equal(
+                    ExpeditionEventFlow.guidanceFor(event, nil),
+                    event.soloVariant.guidance
+                )
+                TestRunner.equal(
+                    ExpeditionEventFlow.guidanceFor(event, 2),
+                    event.groupVariant.guidance
+                )
+            end,
+        },
+        {
+            name = "refuses an event that ships without guidance",
+            run = function()
+                local base = definition("event_bw_lost_wagon")
+                for _, missing in { "soloVariant", "groupVariant" } do
+                    local broken = table.clone(base)
+                    broken[missing] = nil
+                    local valid, issues = ExpeditionEventFlow.validateDefinition(broken)
+                    TestRunner.equal(valid, false)
+                    TestRunner.truthy(
+                        string.find(table.concat(issues, "; "), missing) ~= nil,
+                        table.concat(issues, "; ")
+                    )
+                end
+                local blank = table.clone(base)
+                blank.soloVariant = { guidance = "" }
+                TestRunner.equal(ExpeditionEventFlow.validateDefinition(blank), false)
+            end,
+        },
+        {
+            name = "carries guidance into the snapshot the player actually sees",
+            run = function()
+                local event = definition("event_bw_moving_hedge")
+                local state = ExpeditionEventFlow.create(event, "run-guidance", "hash-guidance")
+                local alone = ExpeditionEventFlow.snapshot(state, event, 1)
+                TestRunner.equal(alone.guidance, event.soloVariant.guidance)
+            end,
+        },
+        {
             name = "completes a shared event with a deterministic reward transaction",
             run = function()
                 local event = definition("event_bw_lost_wagon")
