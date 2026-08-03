@@ -609,13 +609,23 @@ function EnemyService._createAttackVisual(
     marker.Parent = workspace
 
     local billboard = Instance.new("BillboardGui")
+    --[[
+        A small marker over the telegraph, not a caption across the screen.
+
+        This card was 250 x 66 with TextScaled, so on a phone the attack name
+        and its instruction were rendered enormous, overlapping themselves and
+        the identical text already shown in the HUD threat banner. The banner
+        is where a player reads what to do; this only has to say where the
+        attack is landing, so it names the attack and leaves the instruction
+        to the HUD.
+    ]]
     billboard.Name = "AttackLabel"
     billboard.Adornee = marker
     billboard.AlwaysOnTop = true
     billboard.LightInfluence = 0
-    billboard.MaxDistance = 110
-    billboard.Size = UDim2.fromOffset(250, 66)
-    billboard.StudsOffsetWorldSpace = Vector3.new(0, 3.2, 0)
+    billboard.MaxDistance = 80
+    billboard.Size = UDim2.fromOffset(132, 26)
+    billboard.StudsOffsetWorldSpace = Vector3.new(0, 4.2, 0)
     billboard.Parent = marker
 
     local label = Instance.new("TextLabel")
@@ -625,9 +635,10 @@ function EnemyService._createAttackVisual(
     label.BorderSizePixel = 0
     label.Font = Enum.Font.GothamBold
     label.Size = UDim2.fromScale(1, 1)
-    label.Text = definition.attackName .. "\n" .. definition.instruction
+    label.Text = definition.attackName
     label.TextColor3 = Color3.fromRGB(255, 236, 205)
-    label.TextScaled = true
+    label.TextScaled = false
+    label.TextSize = 13
     label.TextStrokeTransparency = 0.72
     label.TextWrapped = true
     label.Parent = billboard

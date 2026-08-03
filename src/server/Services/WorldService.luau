@@ -7906,8 +7906,37 @@ local function buildTownProgressionBuildings(
         },
     }
 
+    --[[
+        A resident is a person, built the way Mara is.
+
+        These were ~15 hand-stacked primitives: a coat slab, a cube head, a
+        sphere of hair. At gameplay distance that read as a blocky mess rather
+        than a villager, which is exactly what the character standard exists to
+        prevent. They now use the same real R15 rig Mara does -- jointed limbs,
+        real hands and feet, a rounded head -- tinted to each resident's own
+        palette, with layered clothing, a readable face, and their role prop.
+
+        Anchored throughout, for the same reason Mara is: the rig arrives
+        unanchored and every part is non-colliding, so an unanchored resident
+        falls through the valley floor and never stops.
+    ]]
     local function buildResident(residentId: string, definition: any)
-        local model = Instance.new("Model")
+        local description = Instance.new("HumanoidDescription")
+        description.HeadColor = definition.skin
+        description.LeftArmColor = definition.coat
+        description.RightArmColor = definition.coat
+        description.TorsoColor = definition.coat
+        description.LeftLegColor = definition.coat:Lerp(Color3.new(0, 0, 0), 0.35)
+        description.RightLegColor = definition.coat:Lerp(Color3.new(0, 0, 0), 0.35)
+        description.HeightScale = 0.98
+        description.WidthScale = 0.9
+        description.DepthScale = 0.92
+        description.HeadScale = 1.02
+        description.BodyTypeScale = 0.25
+        description.ProportionScale = 0.6
+
+        local model =
+            Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
         model.Name = definition.displayName
         model:SetAttribute("ResidentId", residentId)
         model:SetAttribute("ResidentRole", definition.role)
@@ -7917,339 +7946,187 @@ local function buildTownProgressionBuildings(
         model:SetAttribute("DayDuty", definition.dayDuty)
         model:SetAttribute("MotionKind", "resident")
         model:SetAttribute("MotionSpeed", 0.58 + (#residentId % 5) * 0.06)
-        model.Parent = parent
+        model:PivotTo(definition.day)
 
-        local root = part(
-            model,
-            "HumanoidRootPart",
-            Vector3.new(2, 2, 1),
-            CFrame.new(0, 0, 0),
-            definition.coat,
-            Enum.Material.SmoothPlastic,
-            false
-        )
+        local residentHumanoid = model:WaitForChild("Humanoid") :: Humanoid
+        residentHumanoid.DisplayName = definition.displayName
+        residentHumanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
+        residentHumanoid.BreakJointsOnDeath = false
+        residentHumanoid.RequiresNeck = false
+
+        local root = model:WaitForChild("HumanoidRootPart") :: BasePart
         root.Transparency = 1
-        part(
-            model,
-            "WorkCoat",
-            Vector3.new(2.5, 3.2, 1.35),
-            CFrame.new(0, 0.4, 0),
-            definition.coat,
-            Enum.Material.Fabric,
-            false
-        )
-        local head = part(
-            model,
-            "Head",
-            Vector3.new(2, 2, 2),
-            CFrame.new(0, 3, 0),
-            definition.skin,
-            Enum.Material.SmoothPlastic,
-            false
-        )
-        head.Shape = Enum.PartType.Ball
-        local hair = part(
+        local torso = model:WaitForChild("UpperTorso") :: BasePart
+        local head = model:WaitForChild("Head") :: BasePart
+        for _, descendant in model:GetDescendants() do
+            if descendant:IsA("BasePart") then
+                descendant.Anchored = true
+                descendant.CanCollide = false
+                descendant.CanTouch = false
+                descendant.CanQuery = false
+            end
+        end
+
+        local function attach(piece: BasePart, to: BasePart)
+            local weld = Instance.new("WeldConstraint")
+            weld.Part0 = to
+            weld.Part1 = piece
+            weld.Parent = piece
+        end
+
+        -- Hair in layers rather than one sphere.
+        local crown = part(
             model,
             "Hair",
-            Vector3.new(2.15, 1.15, 2.15),
-            CFrame.new(0, 3.65, 0.1),
+            Vector3.new(head.Size.X * 1.12, head.Size.Y * 0.6, head.Size.Z * 1.12),
+            head.CFrame * CFrame.new(0, head.Size.Y * 0.36, 0),
             definition.hair,
             Enum.Material.SmoothPlastic,
             false
         )
-        hair.Shape = Enum.PartType.Ball
-        local apron = part(
+        crown.Shape = Enum.PartType.Ball
+        attach(crown, head)
+        local back = part(
             model,
-            "ProfessionLayer",
-            Vector3.new(1.85, 2.2, 0.18),
-            CFrame.new(0, 0.2, -0.78),
-            definition.accent,
-            Enum.Material.Fabric,
+            "HairBack",
+            Vector3.new(head.Size.X * 0.98, head.Size.Y * 1.0, head.Size.Z * 0.6),
+            head.CFrame * CFrame.new(0, -head.Size.Y * 0.24, head.Size.Z * 0.5),
+            definition.hair,
+            Enum.Material.SmoothPlastic,
             false
         )
-        apron.Transparency = 0.04
-        for side = -1, 1, 2 do
-            local shoulder = part(
-                model,
-                "CoatShoulder",
-                Vector3.new(1.02, 1.02, 1.18),
-                CFrame.new(side * 1.3, 1.15, 0),
-                definition.coat:Lerp(definition.accent, 0.1),
-                Enum.Material.Fabric,
-                false
-            )
-            shoulder.Shape = Enum.PartType.Ball
-            part(
-                model,
-                "CoatCuff",
-                Vector3.new(0.84, 0.42, 0.84),
-                CFrame.new(side * 1.67, -0.83, 0),
-                definition.accent,
-                Enum.Material.Fabric,
-                false
-            )
-            part(
-                model,
-                "HairSide",
-                Vector3.new(0.42, 1.45, 0.5),
-                CFrame.new(side * 0.88, 2.85, 0.08) * CFrame.Angles(0, 0, math.rad(side * 7)),
-                definition.hair,
-                Enum.Material.SmoothPlastic,
-                false
-            )
-        end
-        part(
-            model,
-            "WorkBelt",
-            Vector3.new(2.65, 0.32, 1.45),
-            CFrame.new(0, -0.55, 0),
-            Color3.fromRGB(77, 55, 40),
-            Enum.Material.Leather,
-            false
-        )
-        part(
-            model,
-            "WorkBeltBuckle",
-            Vector3.new(0.5, 0.46, 0.18),
-            CFrame.new(0, -0.55, -0.8),
-            definition.accent,
-            Enum.Material.Metal,
-            false
-        )
-        for lapelSide = -1, 1, 2 do
-            part(
-                model,
-                "CoatLapel",
-                Vector3.new(0.58, 1.7, 0.16),
-                CFrame.new(lapelSide * 0.48, 0.72, -0.78)
-                    * CFrame.Angles(0, 0, math.rad(lapelSide * 18)),
-                definition.accent:Lerp(definition.coat, 0.35),
-                Enum.Material.Fabric,
-                false
-            )
-        end
-        for side = -1, 1, 2 do
-            part(
-                model,
-                "Arm",
-                Vector3.new(0.7, 3, 0.7),
-                CFrame.new(side * 1.55, 0.35, 0) * CFrame.Angles(0, 0, math.rad(side * 7)),
-                definition.coat,
-                Enum.Material.Fabric,
-                false
-            )
-            local hand = part(
-                model,
-                "Hand",
-                Vector3.new(0.72, 0.72, 0.72),
-                CFrame.new(side * 1.72, -1.2, 0),
-                definition.skin,
-                Enum.Material.SmoothPlastic,
-                false
-            )
-            hand.Shape = Enum.PartType.Ball
-            part(
-                model,
-                "Leg",
-                Vector3.new(0.82, 2.2, 0.9),
-                CFrame.new(side * 0.62, -2.25, 0),
-                Color3.fromRGB(45, 49, 47),
-                Enum.Material.Fabric,
-                false
-            )
-            part(
-                model,
-                "Boot",
-                Vector3.new(1, 0.7, 1.45),
-                CFrame.new(side * 0.62, -3.15, -0.22),
-                Color3.fromRGB(52, 39, 31),
-                Enum.Material.Leather,
-                false
-            )
+        attach(back, head)
+
+        -- A readable face: eyes, nose, mouth. Roblox heads face -Z.
+        for eyeSide = -1, 1, 2 do
             local eye = part(
                 model,
                 "Eye",
-                Vector3.new(0.25, 0.25, 0.14),
-                CFrame.new(side * 0.47, 3.2, -0.93),
-                Color3.fromRGB(43, 34, 30),
+                Vector3.new(head.Size.X * 0.14, head.Size.Y * 0.14, head.Size.Z * 0.1),
+                head.CFrame
+                    * CFrame.new(
+                        eyeSide * head.Size.X * 0.22,
+                        head.Size.Y * 0.08,
+                        -head.Size.Z * 0.48
+                    ),
+                Color3.fromRGB(38, 44, 42),
                 Enum.Material.SmoothPlastic,
                 false
             )
             eye.Shape = Enum.PartType.Ball
+            attach(eye, head)
         end
-        part(
+        local nose = part(
             model,
             "Nose",
-            Vector3.new(0.28, 0.4, 0.32),
-            CFrame.new(0, 3, -1.02),
-            definition.skin:Lerp(Color3.fromRGB(119, 72, 57), 0.12),
+            Vector3.new(head.Size.X * 0.12, head.Size.Y * 0.15, head.Size.Z * 0.15),
+            head.CFrame * CFrame.new(0, -head.Size.Y * 0.04, -head.Size.Z * 0.52),
+            definition.skin:Lerp(Color3.new(0, 0, 0), 0.12),
             Enum.Material.SmoothPlastic,
             false
-        ).Shape =
-            Enum.PartType.Ball
-        part(
+        )
+        attach(nose, head)
+        local mouth = part(
             model,
             "Mouth",
-            Vector3.new(0.48, 0.11, 0.1),
-            CFrame.new(0, 2.62, -1.02),
-            Color3.fromRGB(91, 52, 47),
+            Vector3.new(head.Size.X * 0.22, head.Size.Y * 0.05, head.Size.Z * 0.08),
+            head.CFrame * CFrame.new(0, -head.Size.Y * 0.26, -head.Size.Z * 0.48),
+            Color3.fromRGB(142, 84, 74),
             Enum.Material.SmoothPlastic,
             false
         )
+        attach(mouth, head)
 
-        if definition.prop == "cookpot" then
-            part(
+        -- Layered working clothes, tinted per resident so the cast reads apart
+        -- at a glance without relying on the nameplate.
+        for shoulderSide = -1, 1, 2 do
+            local shoulder = part(
                 model,
-                "QuartermasterCap",
-                Vector3.new(2.45, 0.48, 2.35),
-                CFrame.new(0, 4.18, 0.02) * CFrame.Angles(0, 0, math.rad(-4)),
-                Color3.fromRGB(83, 55, 40),
+                "CoatShoulder",
+                Vector3.new(torso.Size.X * 0.44, torso.Size.Y * 0.28, torso.Size.Z * 1.2),
+                torso.CFrame
+                    * CFrame.new(shoulderSide * torso.Size.X * 0.36, torso.Size.Y * 0.26, 0)
+                    * CFrame.Angles(0, 0, math.rad(shoulderSide * 6)),
+                definition.coat:Lerp(Color3.new(0, 0, 0), 0.3),
                 Enum.Material.Fabric,
                 false
             )
-            local pot = part(
-                model,
-                "QuartermasterCookpot",
-                -- Cylinder axis is local X: (height, diameter, diameter).
-                Vector3.new(1.5, 2.4, 2.4),
-                CFrame.new(2.5, -0.8, -0.2) * CFrame.Angles(0, 0, math.rad(90)),
-                Color3.fromRGB(87, 91, 88),
-                Enum.Material.Metal,
-                false
-            )
-            pot.Shape = Enum.PartType.Cylinder
-            part(
-                model,
-                "QuartermasterLadle",
-                Vector3.new(0.22, 3.2, 0.22),
-                CFrame.new(2.2, 0.55, -0.3) * CFrame.Angles(0, 0, math.rad(-20)),
-                Color3.fromRGB(131, 137, 136),
-                Enum.Material.Metal,
-                false
-            )
-        elseif definition.prop == "route_map" then
-            part(
-                model,
-                "CourierScarf",
-                Vector3.new(2.55, 0.46, 1.46),
-                CFrame.new(0, 1.9, 0),
-                definition.accent,
-                Enum.Material.Fabric,
-                false
-            )
-            part(
-                model,
-                "CourierScarfTail",
-                Vector3.new(0.62, 2.05, 0.28),
-                CFrame.new(0.82, 1.08, 0.75) * CFrame.Angles(math.rad(-12), 0, math.rad(-8)),
-                definition.accent,
-                Enum.Material.Fabric,
-                false
-            )
-            part(
-                model,
-                "CourierSatchel",
-                Vector3.new(1.65, 1.8, 0.75),
-                CFrame.new(-1.45, -0.25, 0.35),
-                Color3.fromRGB(105, 74, 46),
-                Enum.Material.Leather,
-                false
-            )
-            local map = part(
-                model,
-                "CourierRouteMap",
-                Vector3.new(2.6, 1.7, 0.12),
-                CFrame.new(2, -0.05, -0.8) * CFrame.Angles(0, math.rad(-18), math.rad(5)),
-                Color3.fromRGB(220, 204, 164),
-                Enum.Material.SmoothPlastic,
-                false
-            )
-            map.CastShadow = false
-        else
-            part(
-                model,
-                "SeedkeeperShawl",
-                Vector3.new(3, 0.48, 1.65),
-                CFrame.new(0, 1.72, 0),
-                Color3.fromRGB(106, 126, 72),
-                Enum.Material.Fabric,
-                false
-            )
-            local basket = part(
-                model,
-                "SeedBasket",
-                Vector3.new(2.4, 1.45, 2),
-                CFrame.new(2.25, -0.85, 0),
-                Color3.fromRGB(118, 83, 48),
-                Enum.Material.WoodPlanks,
-                false
-            )
-            for seedIndex = -1, 1 do
-                local seed = part(
+            attach(shoulder, torso)
+            local lowerArm =
+                model:FindFirstChild(if shoulderSide < 0 then "LeftLowerArm" else "RightLowerArm")
+            if lowerArm ~= nil and lowerArm:IsA("BasePart") then
+                local cuff = part(
                     model,
-                    "SeedBundle",
-                    Vector3.new(0.55, 0.7, 0.55),
-                    basket.CFrame + Vector3.new(seedIndex * 0.65, 0.8, 0),
-                    if seedIndex == 0 then AMBER else FOXFIRE,
-                    Enum.Material.Grass,
+                    "CoatCuff",
+                    Vector3.new(
+                        lowerArm.Size.X * 1.22,
+                        lowerArm.Size.Y * 0.28,
+                        lowerArm.Size.Z * 1.22
+                    ),
+                    lowerArm.CFrame * CFrame.new(0, -lowerArm.Size.Y * 0.34, 0),
+                    definition.accent,
+                    Enum.Material.Fabric,
                     false
                 )
-                seed.Shape = Enum.PartType.Ball
+                attach(cuff, lowerArm)
             end
-            part(
-                model,
-                "SeedkeeperHat",
-                Vector3.new(3.3, 0.3, 3.3),
-                CFrame.new(0, 4.15, 0),
-                Color3.fromRGB(135, 112, 66),
-                Enum.Material.Fabric,
-                false
-            )
-            part(
-                model,
-                "SeedkeeperHatCrown",
-                Vector3.new(1.75, 1.25, 1.75),
-                CFrame.new(0, 4.72, 0.08),
-                Color3.fromRGB(122, 101, 61),
-                Enum.Material.Fabric,
-                false
-            )
         end
-
-        local nightLantern = part(
+        local apron = part(
             model,
-            "NightWatchLantern",
-            Vector3.new(0.85, 1.15, 0.85),
-            CFrame.new(-2.15, -1.35, -0.1),
-            AMBER,
-            Enum.Material.Glass,
+            "ProfessionLayer",
+            Vector3.new(torso.Size.X * 0.92, torso.Size.Y * 0.95, torso.Size.Z * 0.28),
+            torso.CFrame * CFrame.new(0, -torso.Size.Y * 0.12, -torso.Size.Z * 0.56),
+            definition.accent,
+            Enum.Material.Fabric,
             false
         )
-        nightLantern.Shape = Enum.PartType.Ball
-        nightLantern.Transparency = 1
-        nightLantern:SetAttribute("NightOnly", true)
-        local lanternLight = Instance.new("PointLight")
-        lanternLight.Color = AMBER
-        lanternLight.Brightness = 1.4
-        lanternLight.Range = 19
-        lanternLight.Shadows = false
-        lanternLight.Enabled = false
-        lanternLight.Parent = nightLantern
+        attach(apron, torso)
+        local belt = part(
+            model,
+            "CoatBelt",
+            Vector3.new(torso.Size.X * 1.04, 0.28, torso.Size.Z * 1.1),
+            torso.CFrame * CFrame.new(0, -torso.Size.Y * 0.44, 0),
+            Color3.fromRGB(84, 58, 40),
+            Enum.Material.Leather,
+            false
+        )
+        attach(belt, torso)
+
+        -- The prop that says what they do.
+        local lowerArm = model:FindFirstChild("RightLowerArm")
+        if lowerArm ~= nil and lowerArm:IsA("BasePart") then
+            local propColor = if definition.prop == "cookpot"
+                then Color3.fromRGB(58, 62, 60)
+                elseif definition.prop == "route_map" then Color3.fromRGB(216, 200, 160)
+                else Color3.fromRGB(96, 128, 74)
+            local prop = part(
+                model,
+                "RolePropCarried",
+                if definition.prop == "route_map"
+                    then Vector3.new(1.5, 0.12, 1.1)
+                    else Vector3.new(1, 0.9, 1),
+                lowerArm.CFrame * CFrame.new(0, -lowerArm.Size.Y * 0.7, -0.3),
+                propColor,
+                if definition.prop == "route_map"
+                    then Enum.Material.SmoothPlastic
+                    else Enum.Material.Metal,
+                false
+            )
+            attach(prop, lowerArm)
+        end
 
         model.PrimaryPart = root
-        model:PivotTo(definition.day)
-        local dayPosition = definition.day.Position
+        model.Parent = parent
         table.insert(meshPlacements, {
             assetId = "mesh_creator_kerosene_lantern_a",
             fallbackKind = "asset_dressing",
-            position = dayPosition + Vector3.new(-2.15, -2.35, -0.1),
-            scale = 0.72,
-            yaw = math.rad(8 + (#residentId % 3) * 7),
+            position = (definition.day * CFrame.new(1.6, -1.4, 0)).Position,
+            scale = 0.9,
+            yaw = math.rad(12),
             seed = 10150 + #residentId,
             swayTag = nil,
             parent = model,
             fallbackInstance = nil,
-            profileScale = Vector3.new(0.92, 1.08, 0.92),
         })
         addBillboard(head, definition.displayName .. " · " .. definition.role, definition.accent)
         CollectionService:AddTag(model, runtimeIds.AmbientMotionTag)
