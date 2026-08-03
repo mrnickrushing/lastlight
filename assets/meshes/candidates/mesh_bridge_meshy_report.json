@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_tangle_bridge_a",
+  "source": "assets/meshes/candidates/mesh_bridge_meshy.glb",
+  "output": "assets/meshes/generated/mesh_tangle_bridge_a.glb",
+  "targetLongestDimension": 18.0,
+  "boundsMin": [
+    -9.0,
+    -3.0618,
+    0.0
+  ],
+  "boundsMax": [
+    9.0,
+    3.0618,
+    6.5741
+  ],
+  "dimensions": [
+    18.0,
+    6.1236,
+    6.5741
+  ],
+  "longestDimension": 18.0,
+  "trianglesBefore": 5016,
+  "trianglesAfter": 5016,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    }
+  ],
+  "bytes": 4143324
+}

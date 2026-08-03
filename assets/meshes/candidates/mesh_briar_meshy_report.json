@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_briar_wall_a",
+  "source": "assets/meshes/candidates/mesh_briar_meshy.glb",
+  "output": "assets/meshes/generated/mesh_briar_wall_a.glb",
+  "targetLongestDimension": 9.0,
+  "boundsMin": [
+    -3.9968,
+    -2.7996,
+    0.0
+  ],
+  "boundsMax": [
+    3.9968,
+    2.7996,
+    9.0
+  ],
+  "dimensions": [
+    7.9936,
+    5.5991,
+    9.0
+  ],
+  "longestDimension": 9.0,
+  "trianglesBefore": 4561,
+  "trianglesAfter": 4561,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    }
+  ],
+  "bytes": 4891084
+}
