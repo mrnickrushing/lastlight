@@ -138,6 +138,30 @@ return {
             end,
         },
         {
+            name = "unlock takes a username or a raw user ID as text",
+            run = function()
+                for _, message in { "/unlock UncleNickRush", "/unlock 8772161919" } do
+                    local result = AdminRoster.authorize(OWNER, message, true)
+                    TestRunner.equal(result.allowed, true)
+                    TestRunner.equal(result.command, "unlock")
+                    TestRunner.truthy(result.text ~= nil and #result.text > 0)
+                end
+            end,
+        },
+        {
+            name = "unlock refuses a missing or oversized target",
+            run = function()
+                for _, message in { "/unlock", "/unlock " .. string.rep("a", 33) } do
+                    local result = AdminRoster.authorize(OWNER, message, true)
+                    TestRunner.equal(result.allowed, false)
+                    TestRunner.equal(result.reason, "invalid_unlock_target")
+                end
+                local atBound =
+                    AdminRoster.authorize(OWNER, "/unlock " .. string.rep("a", 32), true)
+                TestRunner.equal(atBound.allowed, true)
+            end,
+        },
+        {
             name = "lists both admins",
             run = function()
                 local ids = AdminRoster.adminUserIds()

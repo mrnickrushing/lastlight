@@ -1082,4 +1082,71 @@ function ProfileService.inspect(self: ProfileService, userId: number): any
     return self._adminInspectionReport.build(result, now, staleAfter)
 end
 
+--[[
+    Clears a lock, but only one that is already dead.
+
+    This is the one write an offline profile is allowed to receive from an
+    admin, and it is deliberately the narrowest write that could exist: it
+    can remove a stale sessionLock field and nothing else. It cannot touch
+    night number, materials, equipment, or anything a player earned, which is
+    what keeps it out of the "repair tool becomes a duplication vector"
+    problem inspect's own doc comment warns about.
+
+    Safety is UpdateAsync re-deciding from scratch on the value it is actually
+    about to commit over, using the exact same ProfilePersistence.acquireLock
+    a real server uses to decide whether it may start playing a profile --
+    not a snapshot read beforehand, which could be stale by the time the
+    write lands. A throwaway job ID is passed in because this is not claiming
+    the lock for a session; a decision of "already_held" would only mean the
+    stored jobId happens to collide with that throwaway string, which cannot
+    happen. Every other acquireLock outcome -- unlocked, malformed, stale, a
+    heartbeat from a broken clock -- means the same thing here: no live
+    server is holding this, so the field may go.
+]]
+function ProfileService.forceUnlock(self: ProfileService, userId: number): any
+    assert(type(userId) == "number" and userId > 0, "unlock target must be a valid user ID")
+
+    if not self._persistent or self._store == nil then
+        return { applied = false, reason = "not_persistent" }
+    end
+
+    local outcome: any = { applied = false, reason = "update_did_not_run" }
+    local ok, err = pcall(function()
+        (self._store :: GlobalDataStore):UpdateAsync(
+            string.format("player_%d", userId),
+            function(current: any)
+                if current == nil then
+                    outcome = { applied = false, reason = "no_save_on_record" }
+                    return nil
+                end
+                local existingLock = if type(current) == "table" then current.sessionLock else nil
+                if existingLock == nil then
+                    outcome = { applied = false, reason = "already_unlocked" }
+                    return nil
+                end
+                local decision = self._profilePersistence.acquireLock(
+                    existingLock,
+                    "admin-unlock-check",
+                    os.time(),
+                    self._config.ProfileLockStaleAfterSeconds
+                )
+                if not decision.acquired then
+                    outcome = { applied = false, reason = "lock_is_active" }
+                    return nil
+                end
+                local updated = table.clone(current)
+                updated.sessionLock = nil
+                outcome = { applied = true, reason = decision.reason }
+                return updated
+            end
+        )
+    end)
+    if not ok then
+        self._logger:warn("profile_unlock_failed", { userId = userId, reason = tostring(err) })
+        error("could not update that profile right now")
+    end
+
+    return outcome
+end
+
 return table.freeze(ProfileService)

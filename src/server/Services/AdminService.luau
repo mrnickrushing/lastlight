@@ -165,6 +165,8 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
         -- AdminRoster.authorize's inspect case -- so the cast documents an
         -- invariant this file does not itself enforce, rather than skips one.
         self:_inspect(player, decision.text :: string)
+    elseif command == "unlock" then
+        self:_unlock(player, decision.text :: string)
     end
 
     self._logger:info("admin_command", {
@@ -173,6 +175,28 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
         value = decision.value,
         text = decision.text,
     })
+end
+
+--[[
+    A username or a raw user ID, resolved to a user ID -- or nil, with the
+    refusal already sent, so both /inspect and /unlock can share one lookup
+    instead of two copies drifting apart.
+]]
+function AdminService._resolveTarget(self: AdminService, admin: Player, argument: string): number?
+    local resolvedId: number? = tonumber(argument)
+    if resolvedId == nil then
+        local ok, byName = pcall(function()
+            return Players:GetUserIdFromNameAsync(argument)
+        end)
+        if ok and type(byName) == "number" then
+            resolvedId = byName
+        end
+    end
+    if resolvedId == nil or resolvedId <= 0 then
+        self:_reply(admin, "NO PLAYER NAMED " .. string.upper(argument))
+        return nil
+    end
+    return math.floor(resolvedId)
 end
 
 --[[
@@ -187,20 +211,10 @@ end
     seeing without leaving the game.
 ]]
 function AdminService._inspect(self: AdminService, admin: Player, argument: string)
-    local resolvedId: number? = tonumber(argument)
-    if resolvedId == nil then
-        local ok, byName = pcall(function()
-            return Players:GetUserIdFromNameAsync(argument)
-        end)
-        if ok and type(byName) == "number" then
-            resolvedId = byName
-        end
-    end
-    if resolvedId == nil or resolvedId <= 0 then
-        self:_reply(admin, "NO PLAYER NAMED " .. string.upper(argument))
+    local userId = self:_resolveTarget(admin, argument)
+    if userId == nil then
         return
     end
-    local userId = math.floor(resolvedId)
 
     local report = self._profileService:inspect(userId)
     if not report.found then
@@ -241,6 +255,49 @@ function AdminService._inspect(self: AdminService, admin: Player, argument: stri
             if report.lock.held and report.lock.stale ~= true then " · LOCKED" else ""
         )
     )
+end
+
+--[[
+    Clears a lock, but only the ProfileService method backing this will ever
+    clear a lock that is already dead. Every refusal reason it can return
+    means the same thing to a player waiting to get back in: try rejoining
+    now, because the lock either never existed, was already gone, or was
+    just cleared. The one reason that does not is lock_is_active, and that
+    one is not a bug to route around -- it means a server is still genuinely
+    holding this save, and forcing it open from here is the exact race this
+    whole system exists to prevent.
+]]
+function AdminService._unlock(self: AdminService, admin: Player, argument: string)
+    local userId = self:_resolveTarget(admin, argument)
+    if userId == nil then
+        return
+    end
+
+    local result = self._profileService:forceUnlock(userId)
+    self._logger:info("admin_unlock", {
+        admin = admin.UserId,
+        target = userId,
+        applied = result.applied,
+        reason = result.reason,
+    })
+
+    if result.applied then
+        self:_reply(admin, string.format("%d — LOCK CLEARED (%s)", userId, result.reason))
+        return
+    end
+
+    local reply = if result.reason == "no_save_on_record"
+        then string.format("NO SAVE ON RECORD FOR %d", userId)
+        elseif result.reason == "already_unlocked" then string.format(
+            "%d — NOT LOCKED",
+            userId
+        )
+        elseif result.reason == "lock_is_active" then string.format(
+            "%d — A SERVER IS STILL HOLDING THIS SAVE",
+            userId
+        )
+        else string.format("%d — UNLOCK UNAVAILABLE RIGHT NOW", userId)
+    self:_reply(admin, reply)
 end
 
 function AdminService._onChatted(self: AdminService, player: Player, message: string)
@@ -289,6 +346,8 @@ function AdminService._onChatted(self: AdminService, player: Player, message: st
         self:_reply(player, "PHASE TAKES DAY, DUSK, OR NIGHT")
     elseif decision.reason == "invalid_inspection_target" then
         self:_reply(player, "INSPECT TAKES A USERNAME OR USER ID")
+    elseif decision.reason == "invalid_unlock_target" then
+        self:_reply(player, "UNLOCK TAKES A USERNAME OR USER ID")
     elseif decision.reason == "admin_disabled" then
         self:_reply(player, "ADMIN COMMANDS ARE OFF")
     end
