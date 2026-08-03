@@ -58,14 +58,19 @@ local REGIONS: { [string]: RegionScore } = {
             0.18,
             0.52
         ),
+        -- Night in Emberhollow is a defence, not a lullaby: this is the
+        -- phase creatures come for the lantern. "The Night's Serenade" was
+        -- pretty and completely at odds with what is happening on screen.
+        -- Slightly louder than the day and dusk cues, because it should
+        -- arrive as a change you notice.
         night = track(
             "music_emberhollow_night",
-            111317209034361,
-            "The Night's Serenade",
+            124064284287798,
+            "Hollowtide",
             "Epic Fantasy Music",
-            218,
-            0.18,
-            0.76
+            146,
+            0.2,
+            0.82
         ),
     }),
     region_bramblewake = table.freeze({
