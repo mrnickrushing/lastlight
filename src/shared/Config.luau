@@ -75,6 +75,11 @@ return table.freeze({
         bramblewake_blackout_enabled = true,
         town_night_cycle_enabled = true,
         lobby_departure_enabled = true,
+        -- Each departing party gets its own reserved server. Off falls back
+        -- to moving the party within the current server, which is also what
+        -- happens in Studio and on an unpublished place, where reserving is
+        -- impossible.
+        reserved_run_servers_enabled = true,
         region_bramblewake_enabled = true,
         region_ironroot_enabled = false,
         region_mireglass_enabled = false,

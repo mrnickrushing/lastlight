@@ -51,4 +51,5 @@ TestRunner.run({
     require("./specs/TownGuardLastStand.spec"),
     require("./specs/LobbyDeparture.spec"),
     require("./specs/ActionProgress.spec"),
+    require("./specs/RunHandoff.spec"),
 })
