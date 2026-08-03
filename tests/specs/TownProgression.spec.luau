@@ -77,6 +77,87 @@ return {
             end,
         },
         {
+            name = "the town has sixteen buildings and every one of them stages",
+            run = function()
+                -- Milestone 4 asks for sixteen initial buildings through their
+                -- first functional tiers. The count is asserted here so adding
+                -- an asset without wiring its progression, or wiring one
+                -- without adding it to the shared list, fails rather than
+                -- quietly producing a town with a hole in it.
+                local ids = TownProgression.buildingIds()
+                TestRunner.equal(#ids, 16)
+
+                local seen: { [string]: boolean } = {}
+                for _, buildingId in ids do
+                    TestRunner.truthy(not seen[buildingId], "duplicate building " .. buildingId)
+                    seen[buildingId] = true
+                end
+
+                for tier = 0, 3 do
+                    local consequence = TownProgression.resolve({
+                        town = { nightNumber = tier * 3 + 1 },
+                    })
+                    for _, buildingId in ids do
+                        local stage = consequence.buildingStages[buildingId]
+                        TestRunner.truthy(
+                            type(stage) == "number" and stage >= 0 and stage <= 3,
+                            string.format("%s has no readable stage at tier %d", buildingId, tier)
+                        )
+                    end
+                end
+            end,
+        },
+        {
+            name = "a building never un-builds itself as the town grows",
+            run = function()
+                -- Whatever the staging curve, no building may go backwards
+                -- between one tier and the next. A town that survives more
+                -- nights cannot show less than it did before.
+                local previous: { [string]: number } = {}
+                for nights = 1, 16 do
+                    local consequence = TownProgression.resolve({ town = { nightNumber = nights } })
+                    for buildingId, stage in consequence.buildingStages do
+                        local before = previous[buildingId]
+                        if before ~= nil then
+                            TestRunner.truthy(
+                                stage >= before,
+                                string.format(
+                                    "%s fell from %d to %d at night %d",
+                                    buildingId,
+                                    before,
+                                    stage,
+                                    nights
+                                )
+                            )
+                        end
+                        previous[buildingId] = stage
+                    end
+                end
+            end,
+        },
+        {
+            name = "every building is reconciled between players, not just the first five",
+            run = function()
+                -- The merge used to read a hardcoded list of five. A building
+                -- missing from it stops reconciling, which reads in game as
+                -- the building flickering as people join.
+                local mature = TownProgression.resolve({ town = { nightNumber = 12 } })
+                local fresh = TownProgression.resolve({ town = { nightNumber = 1 } })
+
+                local merged = TownProgression.merge(mature, fresh)
+                for _, buildingId in TownProgression.buildingIds() do
+                    TestRunner.truthy(
+                        merged.buildingStages[buildingId] ~= nil,
+                        buildingId .. " was dropped by the merge"
+                    )
+                    TestRunner.truthy(
+                        merged.buildingStages[buildingId] >= mature.buildingStages[buildingId],
+                        buildingId .. " regressed when a fresh player joined"
+                    )
+                end
+            end,
+        },
+        {
             name = "caps mature building stages at tier three",
             run = function()
                 local consequence = TownProgression.resolve({

@@ -10716,18 +10716,69 @@ export type Consequence = {
     residentIds: { string },
 }
 
+--[[
+    The tier at which each later building first breaks ground.
+
+    The five original buildings keep their own hand-written curves below: they
+    are the survival core and their exact staging is pinned by tests. Everything
+    added for the sixteen-building town is declared here instead, because eleven
+    more bespoke expressions would be eleven more things to get subtly wrong.
+
+    A town fills in the order it would actually need things. Defence and food
+    come first, because those are what a settlement that survives its nights
+    wants next. Production follows once there is something to protect. The
+    fourth-tier group is the long tail a town only reaches after ten nights, so
+    the last thing a player unlocks is the stage they celebrate on.
+]]
+local BUILDING_FIRST_TIER: { [string]: number } = {
+    building_guardhouse = 1,
+    building_kitchen = 1,
+
+    building_sawmill = 2,
+    building_forge = 2,
+    building_watchtower = 2,
+    building_market = 2,
+
+    building_celebration_stage = 3,
+    building_engineer_yard = 3,
+    building_trade_post = 3,
+    building_trapworks = 3,
+    building_waterworks = 3,
+}
+
 local function buildingStages(tier: number): { [string]: number }
     -- Stage zero is a readable construction site, while stages one through
     -- three are increasingly complete buildings. Core services arrive first;
     -- the inn opens only after the town has survived enough nights to support
     -- visitors instead of appearing fully formed on a fresh save.
-    return {
+    local stages = {
         building_first_lantern = math.max(1, tier),
         building_archive = tier,
         building_town_board = math.max(1, tier),
         building_workbench = math.max(1, tier),
         building_inn = math.max(0, tier - 1),
     }
+
+    for buildingId, firstTier in BUILDING_FIRST_TIER do
+        stages[buildingId] = math.clamp(tier - firstTier + 1, 0, 3)
+    end
+
+    return stages
+end
+
+function TownProgression.buildingIds(): { string }
+    local ids = {
+        "building_first_lantern",
+        "building_archive",
+        "building_town_board",
+        "building_workbench",
+        "building_inn",
+    }
+    for buildingId in BUILDING_FIRST_TIER do
+        table.insert(ids, buildingId)
+    end
+    table.sort(ids)
+    return ids
 end
 
 local function residentIds(tier: number): { string }
@@ -10816,15 +10867,10 @@ function TownProgression.merge(current: any, incoming: Consequence): Consequence
     )
 
     local mergedStages = {}
-    for _, buildingId in
-        {
-            "building_first_lantern",
-            "building_archive",
-            "building_town_board",
-            "building_workbench",
-            "building_inn",
-        }
-    do
+    -- Read from the shared list rather than a copy of it: a building added to
+    -- the town but forgotten here would silently stop reconciling between
+    -- players, which looks like the building flickering as people join.
+    for _, buildingId in TownProgression.buildingIds() do
         local currentStages = if type(current.buildingStages) == "table"
             then current.buildingStages
             else {}
