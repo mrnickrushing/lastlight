@@ -742,8 +742,23 @@ local function fence(parent: Instance, start: Vector3, count: number, spacing: n
     end
 end
 
-local function moduleDressing(parent: Instance, center: Vector3, seed: number, runtimeIds: any)
+--[[
+    `isArrival` halves the scatter for the one module a player is guaranteed
+    to stand in with no context yet. The arrival module already authors a
+    small partBudget of its own for exactly this reason, but that budget only
+    ever bounded its own visual -- this generic scatter ran at full density on
+    top of it regardless, on every module including that one. First
+    impressions do not get to be the busiest ones.
+]]
+local function moduleDressing(
+    parent: Instance,
+    center: Vector3,
+    seed: number,
+    runtimeIds: any,
+    isArrival: boolean?
+)
     local random = Random.new(seed)
+    local scale = if isArrival then 0.5 else 1
     groundPatch(
         parent,
         center,
@@ -759,7 +774,7 @@ local function moduleDressing(parent: Instance, center: Vector3, seed: number, r
         Enum.Material.Mud
     )
     lowMist(parent, center, Vector3.new(56, 1.4, 56), 0.84)
-    for index = 1, 13 do
+    for index = 1, math.floor(13 * scale) do
         local angle = random:NextNumber(0, math.pi * 2)
         local radius = random:NextNumber(12, 31)
         local position = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
@@ -782,35 +797,77 @@ local function moduleDressing(parent: Instance, center: Vector3, seed: number, r
             )
         end
     end
-    for index = 1, 10 do
+    for index = 1, math.floor(10 * scale) do
         local angle = random:NextNumber(0, math.pi * 2)
         local radius = random:NextNumber(7, 28)
         local position = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
         if index % 2 == 0 then
             fernCluster(parent, position, random:NextNumber(0.7, 1.25), runtimeIds.AmbientSwayTag)
         else
+            -- Deliberately not Neon and deliberately not the amber/foxfire
+            -- pair that every functional light in this level uses -- a
+            -- harvest node, the blackout fire, a relay core. A decorative
+            -- mote that borrows the same colour and the same blown-out
+            -- material as something a player is meant to walk toward is a
+            -- decorative mote a player cannot tell apart from one.
             local tuft = orb(
                 parent,
                 "MossLight",
                 position + Vector3.new(0, 0.6, 0),
-                0.42,
-                if index % 3 == 0 then FOXFIRE else AMBER,
-                Enum.Material.Neon
+                0.3,
+                Color3.fromRGB(150, 176, 138),
+                Enum.Material.ForceField
             )
-            tuft.Transparency = 0.2
+            tuft.Transparency = 0.55
             tuft.CanQuery = false
-            CollectionService:AddTag(tuft, runtimeIds.AmbientLightTag)
+            tuft.CastShadow = false
         end
     end
-    fireflyCluster(
-        parent,
-        center + Vector3.new(0, 0, 5),
-        FOXFIRE,
-        5,
-        24,
-        seed + 1301,
-        runtimeIds.AmbientMoteTag
-    )
+    if not isArrival then
+        fireflyCluster(
+            parent,
+            center + Vector3.new(0, 0, 5),
+            FOXFIRE,
+            5,
+            24,
+            seed + 1301,
+            runtimeIds.AmbientMoteTag
+        )
+    end
+end
+
+--[[
+    Lantern posts marking the way to the next module.
+
+    Emberhollow's own tutorial line is "follow the lantern path" -- this
+    reuses that exact primitive rather than inventing a new symbol for
+    Bramblewake. The arrival module's own gate already lights its two posts
+    with `lantern()`; running the same shape rhythmically down every
+    connection is what turns "a lit post" into "the lit post means forward,"
+    the same way it already does at the gate.
+
+    Two posts per forward connection, offset to the side so they mark the way
+    without standing in it, placed for every module transition rather than
+    some of them, because a trail with gaps reads as decoration and a trail
+    without them reads as a trail.
+]]
+local function wayfindingTrail(
+    parent: Instance,
+    center: Vector3,
+    neighbor: Vector3,
+    ambientLightTag: string?
+)
+    local delta = neighbor - center
+    if delta.Magnitude < 1 then
+        return
+    end
+    local direction = delta.Unit
+    local side = Vector3.new(-direction.Z, 0, direction.X)
+    for index, fraction in { 0.32, 0.68 } do
+        local offset = if index == 1 then 7 else -7
+        local at = center + direction * (fraction * delta.Magnitude) + side * offset
+        lantern(parent, at, 0.68, ambientLightTag)
+    end
 end
 
 local function buildFarm(parent: Instance, center: Vector3): Model
@@ -2648,6 +2705,13 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
     -- One floor under everything. Sized well past the outermost module so the
     -- route never reaches its edge, and low enough that the per-module ground
     -- patches still read as the path over it.
+    --
+    -- This is a safety net, not scenery: it is the only thing standing
+    -- between a player who steps past a module's own collision footprint and
+    -- FallenPartsDestroyHeight. It must collide. The `false` this originally
+    -- shipped with was meant for CanQuery two lines down and landed on the
+    -- wrong parameter instead, so the one floor built to stop Bramblewake
+    -- from having a bottomless edge did not have one.
     local floorSpan = (reach + 420) * 2
     local groundFloor = part(
         folder,
@@ -2655,8 +2719,7 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
         Vector3.new(floorSpan, 4, floorSpan),
         CFrame.new(middle - Vector3.new(0, 2.1, 0)),
         Color3.fromRGB(31, 38, 30),
-        Enum.Material.Ground,
-        false
+        Enum.Material.Ground
     )
     groundFloor.CanQuery = false
 
@@ -3327,12 +3390,24 @@ function BramblewakeBuilder.build(
         end
         if placement.index < #manifest.modules then
             pathArm(module, center, centers[placement.index + 1])
+            wayfindingTrail(
+                module,
+                center,
+                centers[placement.index + 1],
+                runtimeIds.AmbientLightTag
+            )
             if placement.index % 2 == 1 then
                 evacuationRoadMarker(module, center, centers[placement.index + 1], placement.index)
             end
         end
 
-        moduleDressing(module, center, manifest.seed + placement.index * 97, runtimeIds)
+        moduleDressing(
+            module,
+            center,
+            manifest.seed + placement.index * 97,
+            runtimeIds,
+            definition.role == "arrival"
+        )
 
         for cornerIndex = 1, 4 do
             local x = if cornerIndex == 1 or cornerIndex == 4 then -27 else 27

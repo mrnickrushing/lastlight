@@ -4579,6 +4579,18 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         toolFallback.Name = "ToolFallback"
         toolFallback.Parent = display
         local toolAnchor = displayFrame * CFrame.new(0, 5.4, 0)
+        -- Only the torch lit itself. Under a shadow-casting technology the
+        -- open-rafter tool yard roof above this display is enough shade that
+        -- the axe and hammer -- which have no light of their own -- read as
+        -- close to black. Every tool now gets the same small fixed light the
+        -- torch was already getting from its own flame, so which one is lit
+        -- stops depending on which tool a player happens to be looking at.
+        local displayLight = Instance.new("PointLight")
+        displayLight.Color = Color3.fromRGB(255, 238, 214)
+        displayLight.Brightness = 2.4
+        displayLight.Range = 14
+        displayLight.Shadows = false
+        displayLight.Parent = pedestal
         part(
             toolFallback,
             "ToolHandle",
