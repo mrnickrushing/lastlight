@@ -14,6 +14,10 @@ playable game exists.
 
 ## Current status
 
+**The living session handoff is [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)**
+-- read it first to pick up exactly where the last working session left off.
+The summary below is the long-form milestone recap.
+
 **Milestone 2 source implemented; Milestone 3 Bramblewake expedition foundation,
 eight active events, durable extraction settlement, player rescue, combat
 mobility, six-enemy first-night roster, four basic profession kits, Old Growth,
@@ -34,7 +38,11 @@ abilities now produce distinct physical world feedback, and Emergency Patch
 deploys a temporary server-owned Rootline Brace that absorbs lantern pressure;
 the Night Watch now answers one fully downed town party per normal night by
 spending First Lantern strength for a bounded, server-owned Last Stand recovery;
-Studio and device exit gates remain pending.**
+Studio and device exit gates remain pending. Milestone 4's persistent town
+platform is now in flight: versioned profiles with session locking, sixteen
+staged town buildings, resource-charged construction orders, host/visitor
+permissions, and audited admin save inspection have landed --
+[docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) tracks the live edge.**
 
 The repository currently contains:
 
