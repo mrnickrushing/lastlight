@@ -38,7 +38,14 @@ Do not push implementation commits directly to `main`.
 
 ## Planning source of truth
 
-Start with [README.md](README.md), then follow the linked design documents. If
+**Start every session by reading
+[docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md), and update it before the
+session ends.** It is the living handoff between sessions: what just landed,
+what is in flight, what is blocked on the owner, and the environment gotchas
+that cost previous sessions real time. This project is worked on across many
+short sessions -- anything not written there is invisible to the next one.
+
+Then read [README.md](README.md) and follow the linked design documents. If
 code and plans disagree, record a decision in [docs/DECISIONS.md](docs/DECISIONS.md)
 before changing scope.
 
