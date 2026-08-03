@@ -1442,6 +1442,23 @@ end
 -- glance, short enough that it never becomes furniture.
 local MARA_LINE_SECONDS = 7
 
+--[[
+    Dodge has no button on touch.
+
+    Visibility was being decided in three separate places -- the input-mode
+    handler, the combat-state branch, and the main update -- and each one
+    re-enabled it, so removing it from any single site never stuck. They all
+    ask here now. Dodge itself is untouched and still LeftAlt or gamepad B;
+    only the on-screen button is gone, because on a phone it was one more
+    thing to find mid-telegraph.
+]]
+function HUDController._dodgeButtonVisible(self: HUDController): boolean
+    if self._inputMode == "touch" then
+        return false
+    end
+    return not self._playerDowned and self._combatContext == true
+end
+
 function HUDController._maraLineIsFresh(self: HUDController): boolean
     return self._maraShownAt > 0 and (os.clock() - self._maraShownAt) < MARA_LINE_SECONDS
 end
@@ -1511,7 +1528,7 @@ end
 function HUDController.setInputMode(self: HUDController, mode: string)
     self._inputMode = mode
     self._sprint.Visible = mode == "touch" and not self._playerDowned
-    self._dodge.Visible = not self._playerDowned and (mode == "touch" or self._combatContext)
+    self._dodge.Visible = self:_dodgeButtonVisible()
     self:setInteraction(self._interactionLabel, self._interactionAvailable)
     self._tool.Text = if mode == "keyboard"
         then "CLICK\nSTRIKE"
@@ -1529,7 +1546,7 @@ function HUDController._updateCombatClock(self: HUDController)
     local combat = state.combat
     if type(combat) ~= "table" then
         self._staminaFrame.Visible = false
-        self._dodge.Visible = false
+        self._dodge.Visible = self:_dodgeButtonVisible()
         return
     end
 
@@ -1911,11 +1928,15 @@ function HUDController._layout(self: HUDController)
         -- thumb already is. Ability keeps the next slot along. Dodge is gone
         -- on touch: it is still LeftAlt on a keyboard, but as a button it was
         -- one more thing to find mid-telegraph on a small screen.
-        self._sprint.Position = UDim2.new(1, -170, 1, -34)
-        self._ability.Position = UDim2.new(1, -280, 1, -34)
-        self._primary.Position = UDim2.new(1, -390, 1, -34)
-        self._tool.Position = UDim2.new(1, -500, 1, -34)
-        self._dodge.Position = UDim2.new(1, -610, 1, -34)
+        -- Clear of Roblox's jump button, which owns roughly the rightmost 200
+        -- points. The canvas is scaled by 0.78, so these offsets shrink by
+        -- that much on screen -- -170 looked clear here and landed on top of
+        -- jump on the device.
+        self._sprint.Position = UDim2.new(1, -300, 1, -34)
+        self._ability.Position = UDim2.new(1, -410, 1, -34)
+        self._primary.Position = UDim2.new(1, -520, 1, -34)
+        self._tool.Position = UDim2.new(1, -630, 1, -34)
+        self._dodge.Position = UDim2.new(1, -740, 1, -34)
     else
         self._objectiveFrame.Position = UDim2.fromOffset(18, 18)
         self._objectiveFrame.Size = if self._compactEnabled
@@ -2306,8 +2327,7 @@ function HUDController.update(self: HUDController, state: any)
         and (nightActive or eliteActive or bossActive or blackoutActive)
         and not self._playerDowned
     self._sprint.Visible = self._inputMode == "touch" and not self._playerDowned
-    self._dodge.Visible = not self._playerDowned
-        and (self._inputMode == "touch" or self._combatContext)
+    self._dodge.Visible = self:_dodgeButtonVisible()
     self:_updateProfessionClock()
     self:_updateGear()
     self:_updateProgress()
