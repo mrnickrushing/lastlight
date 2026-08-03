@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_briarback_a",
+  "source": "assets/meshes/raw/mesh_briarback_a.glb",
+  "output": "assets/meshes/generated/mesh_briarback_a.glb",
+  "targetLongestDimension": 6.8,
+  "boundsMin": [
+    -2.001,
+    -3.4,
+    0.0
+  ],
+  "boundsMax": [
+    2.001,
+    3.4,
+    5.075
+  ],
+  "dimensions": [
+    4.002,
+    6.8,
+    5.075
+  ],
+  "longestDimension": 6.8,
+  "trianglesBefore": 13779,
+  "trianglesAfter": 5500,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    }
+  ],
+  "bytes": 13004848
+}

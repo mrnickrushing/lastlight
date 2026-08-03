@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_hollow_crow_a",
+  "source": "assets/meshes/raw/mesh_hollow_crow_a.glb",
+  "output": "assets/meshes/generated/mesh_hollow_crow_a.glb",
+  "targetLongestDimension": 3.8,
+  "boundsMin": [
+    -0.9187,
+    -0.9928,
+    0.0
+  ],
+  "boundsMax": [
+    0.9187,
+    0.9928,
+    3.8
+  ],
+  "dimensions": [
+    1.8374,
+    1.9856,
+    3.8
+  ],
+  "longestDimension": 3.8,
+  "trianglesBefore": 14092,
+  "trianglesAfter": 5499,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    }
+  ],
+  "bytes": 11226724
+}

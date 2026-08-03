@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_bark_ram_a",
+  "source": "assets/meshes/raw/mesh_bark_ram_a.glb",
+  "output": "assets/meshes/generated/mesh_bark_ram_a.glb",
+  "targetLongestDimension": 6.2,
+  "boundsMin": [
+    -2.3352,
+    -3.1,
+    0.0
+  ],
+  "boundsMax": [
+    2.3352,
+    3.1,
+    5.7828
+  ],
+  "dimensions": [
+    4.6704,
+    6.2,
+    5.7828
+  ],
+  "longestDimension": 6.2,
+  "trianglesBefore": 14599,
+  "trianglesAfter": 5500,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    }
+  ],
+  "bytes": 11114096
+}

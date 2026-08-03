@@ -966,6 +966,106 @@
         "normal"
       ],
       "robloxAssetId": 132155545012921
+    },
+    {
+      "id": "mesh_rootling_a",
+      "displayName": "Rootling",
+      "role": "expedition_enemy",
+      "placementBand": "curated_expedition",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc5ad-9828-7ed0-be79-bc6f804bd6ad then multi-image-to-3d task 019fc5ae-5a1c-7ac0-b4a7-8aa159ae5e25, textures downscaled to 1024. A small humanoid woven from pale twisted roots with a knot of tangle where a head should be. Bramblewake's most common enemy. Previously borrowed from the Creator Store.",
+      "file": "generated/mesh_rootling_a.glb",
+      "previewFile": "previews/mesh-rootling.png",
+      "targetLongestDimension": 5.8,
+      "maxTriangles": 5500,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 123682099011902
+    },
+    {
+      "id": "mesh_briarback_a",
+      "displayName": "Briarback",
+      "role": "expedition_enemy",
+      "placementBand": "curated_expedition",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc5ad-9a1f-7ed1-b308-33b7a9d8e987 then multi-image-to-3d task 019fc5ae-5e87-7ab8-9197-a18ef32b9132, textures downscaled to 1024. A four-legged beast with its back armoured in dense thorn and bramble. Previously borrowed from the Creator Store.",
+      "file": "generated/mesh_briarback_a.glb",
+      "previewFile": "previews/mesh-briarback.png",
+      "targetLongestDimension": 6.8,
+      "maxTriangles": 5500,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 123899097134679
+    },
+    {
+      "id": "mesh_hollow_crow_a",
+      "displayName": "Hollow Crow",
+      "role": "expedition_enemy",
+      "placementBand": "curated_expedition",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc5ad-9c5f-7124-be74-fd74854b20c1 then multi-image-to-3d task 019fc5ae-62a8-7efc-a69b-fc8ec8867570, textures downscaled to 1024. A ragged crow with a hollow ribcage visible through oil-black feathers. Previously borrowed from the Creator Store.",
+      "file": "generated/mesh_hollow_crow_a.glb",
+      "previewFile": "previews/mesh-hollow-crow.png",
+      "targetLongestDimension": 3.8,
+      "maxTriangles": 5500,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 133077954762802
+    },
+    {
+      "id": "mesh_snapvine_a",
+      "displayName": "Snapvine",
+      "role": "expedition_enemy",
+      "placementBand": "curated_expedition",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc5ad-9e97-7ed1-bd13-5b6e16eb8f09 then multi-image-to-3d task 019fc5ae-665a-7ab9-8fde-7093d942f689, textures downscaled to 1024. A carnivorous vine ending in a hinged jaw of pale thorn teeth. Previously borrowed from the Creator Store.",
+      "file": "generated/mesh_snapvine_a.glb",
+      "previewFile": "previews/mesh-snapvine.png",
+      "targetLongestDimension": 4.8,
+      "maxTriangles": 5500,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 100337926258029
+    },
+    {
+      "id": "mesh_bark_ram_a",
+      "displayName": "Bark Ram",
+      "role": "expedition_enemy",
+      "placementBand": "curated_expedition",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc5ad-a097-7aab-9fd5-11ea03ca0251 then multi-image-to-3d task 019fc5ae-689e-713e-aeb0-201d3e63a1a7, textures downscaled to 1024. A charging ram slabbed in grey bark with heavy curled horns of knotted wood. Previously borrowed from the Creator Store.",
+      "file": "generated/mesh_bark_ram_a.glb",
+      "previewFile": "previews/mesh-bark-ram.png",
+      "targetLongestDimension": 6.2,
+      "maxTriangles": 5500,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 82812210501095
     }
   ]
 }
