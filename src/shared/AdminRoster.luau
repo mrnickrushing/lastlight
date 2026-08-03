@@ -70,7 +70,7 @@ function AdminRoster.adminUserIds(): { number }
 end
 
 function AdminRoster.commandNames(): { string }
-    return { "night", "give", "heal", "phase", "where", "go", "perf" }
+    return { "night", "give", "heal", "phase", "where", "go", "perf", "inspect" }
 end
 
 --[[
@@ -157,6 +157,17 @@ function AdminRoster.authorize(userId: any, message: any, enabled: boolean): any
     if command.name == "phase" then
         if command.text == nil or PHASES[command.text] ~= true then
             return { allowed = false, reason = "unknown_phase", command = command.name }
+        end
+        return { allowed = true, command = command.name, text = command.text }
+    end
+
+    if command.name == "inspect" then
+        -- The target is a username or a raw user ID, so it is carried as text
+        -- rather than validated against a fixed set the way go/phase are.
+        -- Whether it resolves to a real player is ProfileService's problem,
+        -- not the roster's -- this only rejects what could never be one.
+        if command.text == nil or #command.text == 0 or #command.text > 32 then
+            return { allowed = false, reason = "invalid_inspection_target", command = command.name }
         end
         return { allowed = true, command = command.name, text = command.text }
     end

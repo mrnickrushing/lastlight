@@ -45,6 +45,7 @@ local TownGuardLastStand = require(root.TownGuardLastStand)
 local LobbyDeparture = require(root.LobbyDeparture)
 local ActionProgress = require(root.ActionProgress)
 local ActionPayloadContract = require(root.ActionPayloadContract)
+local AdminInspectionReport = require(root.AdminInspectionReport)
 local PerformanceBudget = require(root.PerformanceBudget)
 local ProfilePersistence = require(root.ProfilePersistence)
 local TownPermissions = require(root.TownPermissions)
@@ -322,6 +323,7 @@ local services = ServiceRegistry.new({
     runtimeIds = RuntimeIds,
     saveSchema = SaveSchema,
     actionPayloadContract = ActionPayloadContract,
+    adminInspectionReport = AdminInspectionReport,
     profilePersistence = ProfilePersistence,
     config = Config,
 })
