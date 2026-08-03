@@ -33467,12 +33467,43 @@ local function buildWindmill(parent: Instance, center: Vector3, ambientMotionTag
     return shell
 end
 
+local function dress(
+    extra: { any },
+    assetId: string,
+    parent: Instance,
+    position: Vector3,
+    scale: number,
+    yaw: number,
+    seed: number
+)
+    table.insert(extra, {
+        assetId = assetId,
+        fallbackKind = "asset_dressing",
+        position = position,
+        scale = scale,
+        yaw = yaw,
+        seed = seed,
+        swayTag = nil,
+        parent = parent,
+        fallbackInstance = nil,
+    })
+end
+
+--[[
+    A story landmark is a scene the route walks past rather than an encounter
+    it stops at, so it has to say what happened without a prompt to read. The
+    primitives below are the specific evidence -- a sickle dropped mid-row, a
+    cart still loaded, a satchel at a crossing nobody finished. `extra` is
+    what puts the world back around them, because a table and three baskets
+    alone read as crates in a field.
+]]
 local function buildStoryLandmark(
     parent: Instance,
     center: Vector3,
     kind: string,
     title: string,
-    offset: any
+    offset: any,
+    extra: { any }
 ): number
     assert(
         type(offset) == "table" and type(offset.x) == "number" and type(offset.z) == "number",
@@ -33538,6 +33569,56 @@ local function buildStoryLandmark(
             Color3.fromRGB(127, 139, 140),
             Enum.Material.Metal
         )
+        -- The crop is what makes the dropped sickle mean anything: rows still
+        -- standing on one side, cut and stacked on the other, stopping where
+        -- whoever was working simply left.
+        for row = 0, 3 do
+            dress(
+                extra,
+                "mesh_creator_wheat_cluster_a",
+                parent,
+                origin + Vector3.new(-9.5 + row * 1.6, 0, -7.5 - row * 2.2),
+                1.05 + (row % 2) * 0.14,
+                math.rad(row * 37),
+                8100 + row
+            )
+            dress(
+                extra,
+                "mesh_creator_wheat_cluster_a",
+                parent,
+                origin + Vector3.new(9 - row * 1.3, 0, -6 - row * 2.6),
+                0.92 + (row % 3) * 0.1,
+                math.rad(180 + row * 29),
+                8110 + row
+            )
+        end
+        dress(
+            extra,
+            "mesh_creator_crate_a",
+            parent,
+            origin + Vector3.new(-6.2, 0, 3.4),
+            1,
+            math.rad(21),
+            8120
+        )
+        dress(
+            extra,
+            "mesh_creator_barrel_a",
+            parent,
+            origin + Vector3.new(-7.4, 0, 5.6),
+            1,
+            math.rad(-14),
+            8121
+        )
+        dress(
+            extra,
+            "mesh_creator_rustic_fence_a",
+            parent,
+            origin + Vector3.new(0, 0, 9.5),
+            1.1,
+            0,
+            8122
+        )
     elseif kind == "evacuation_cart" then
         anchor = storyPart(
             "EvacuationHandcart",
@@ -33572,6 +33653,53 @@ local function buildStoryLandmark(
                 Enum.Material.WoodPlanks
             )
         end
+        dress(
+            extra,
+            "mesh_creator_crate_a",
+            parent,
+            origin + Vector3.new(-7.8, 0, 2.9),
+            1.05,
+            math.rad(-24),
+            8200
+        )
+        dress(
+            extra,
+            "mesh_creator_crate_a",
+            parent,
+            origin + Vector3.new(-6.1, 0, -3.6),
+            0.9,
+            math.rad(11),
+            8201
+        )
+        dress(
+            extra,
+            "mesh_creator_barrel_a",
+            parent,
+            origin + Vector3.new(7.2, 0, 3.1),
+            1,
+            math.rad(38),
+            8202
+        )
+        -- Spilled on the verge, because a cart left loaded was a cart nobody
+        -- came back for.
+        dress(
+            extra,
+            "mesh_creator_road_stones_a",
+            parent,
+            origin + Vector3.new(2.4, 0, 7.8),
+            1.15,
+            math.rad(-9),
+            8203
+        )
+        dress(
+            extra,
+            "mesh_deadfall_a",
+            parent,
+            origin + Vector3.new(-10.5, 0, -7.2),
+            1,
+            math.rad(64),
+            8204
+        )
         for trackIndex = 1, 4 do
             local track = storyPart(
                 "DepartureTrack",
@@ -33609,6 +33737,51 @@ local function buildStoryLandmark(
             CFrame.new(origin + Vector3.new(6, 1.05, 4)),
             Color3.fromRGB(90, 61, 41),
             Enum.Material.WoodPlanks
+        )
+        dress(
+            extra,
+            "mesh_creator_crate_a",
+            parent,
+            origin + Vector3.new(4.9, 0, -4.2),
+            0.95,
+            math.rad(17),
+            8300
+        )
+        dress(
+            extra,
+            "mesh_creator_barrel_a",
+            parent,
+            origin + Vector3.new(6.3, 0, -1.8),
+            1,
+            math.rad(-31),
+            8301
+        )
+        dress(
+            extra,
+            "mesh_boulder_cluster_a",
+            parent,
+            origin + Vector3.new(-8.6, 0, 4.4),
+            1.2,
+            math.rad(53),
+            8302
+        )
+        dress(
+            extra,
+            "mesh_deadfall_a",
+            parent,
+            origin + Vector3.new(-5.2, 0, -8.1),
+            1.05,
+            math.rad(-72),
+            8303
+        )
+        dress(
+            extra,
+            "mesh_fern_cluster_a",
+            parent,
+            origin + Vector3.new(8.1, 0, 5.9),
+            1,
+            math.rad(26),
+            8304
         )
         for toolIndex = -1, 1 do
             storyPart(
@@ -33652,6 +33825,53 @@ local function buildStoryLandmark(
                 Enum.Material.Wood
             )
         end
+        -- The bank is dressed, not the gap. The missing span is the point,
+        -- so nothing is placed across it.
+        dress(
+            extra,
+            "mesh_boulder_cluster_a",
+            parent,
+            origin + Vector3.new(-7.9, 0, 3.2),
+            1.25,
+            math.rad(41),
+            8400
+        )
+        dress(
+            extra,
+            "mesh_boulder_cluster_a",
+            parent,
+            origin + Vector3.new(6.8, 0, -4.6),
+            1,
+            math.rad(-18),
+            8401
+        )
+        dress(
+            extra,
+            "mesh_deadfall_a",
+            parent,
+            origin + Vector3.new(-4.1, 0, -7.4),
+            1.1,
+            math.rad(88),
+            8402
+        )
+        dress(
+            extra,
+            "mesh_lantern_post_a",
+            parent,
+            origin + Vector3.new(5.4, 0, 6.2),
+            1,
+            math.rad(-7),
+            8403
+        )
+        dress(
+            extra,
+            "mesh_fern_cluster_a",
+            parent,
+            origin + Vector3.new(-6.3, 0, -2.1),
+            0.95,
+            math.rad(133),
+            8404
+        )
         local lostLantern = storyPart(
             "ColdTrailLantern",
             Vector3.new(1.6, 2.1, 1.6),
@@ -33680,27 +33900,6 @@ end
     as a place. `extra` collects any number of placements so a module can carry
     a proper set rather than the single one the return value allows.
 ]]
-local function dress(
-    extra: { any },
-    assetId: string,
-    parent: Instance,
-    position: Vector3,
-    scale: number,
-    yaw: number,
-    seed: number
-)
-    table.insert(extra, {
-        assetId = assetId,
-        fallbackKind = "asset_dressing",
-        position = position,
-        scale = scale,
-        yaw = yaw,
-        seed = seed,
-        swayTag = nil,
-        parent = parent,
-        fallbackInstance = nil,
-    })
-end
 
 local function buildModuleVisual(
     parent: Instance,
@@ -35508,7 +35707,8 @@ function BramblewakeBuilder.build(
                 center,
                 definition.storyLandmark,
                 definition.storyTitle,
-                definition.storyOffset
+                definition.storyOffset,
+                meshPlacements
             )
             assert(
                 landmarkParts == definition.storyPartCount,
@@ -35567,7 +35767,7 @@ function BramblewakeBuilder.build(
             queueItemAsset(
                 meshPlacements,
                 rootHeart,
-                "mesh_creator_predatory_flower_a",
+                "mesh_snapvine_a",
                 1.05,
                 5300 + placement.index,
                 math.rad(-16),
@@ -35686,7 +35886,7 @@ function BramblewakeBuilder.build(
         queueItemAsset(
             meshPlacements,
             node,
-            "mesh_creator_hollow_rootling_a",
+            "mesh_rootling_a",
             0.78,
             7200 + string.len(nodeIndex),
             math.rad(string.len(nodeIndex) * 7),
@@ -35708,7 +35908,7 @@ function BramblewakeBuilder.build(
         queueItemAsset(
             meshPlacements,
             node,
-            "mesh_creator_hollow_rootling_a",
+            "mesh_rootling_a",
             0.86,
             7310 + relaySeed,
             math.rad((relaySeed - 2) * 13),
@@ -35717,7 +35917,7 @@ function BramblewakeBuilder.build(
     end
     local decisionAssets = {
         restore_farmland = "mesh_creator_wheat_cluster_a",
-        wild_regrowth = "mesh_creator_predatory_flower_a",
+        wild_regrowth = "mesh_snapvine_a",
         shared_agroforest = "mesh_creator_stump_a",
     }
     local decisionSeed = 0
