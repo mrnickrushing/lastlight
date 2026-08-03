@@ -10,7 +10,7 @@ return {
             name = "keeps stable and unique uploaded asset mappings",
             run = function()
                 local entries = MeshAssetRegistry.all()
-                TestRunner.equal(#entries, 65)
+                TestRunner.equal(#entries, 57)
                 local stableIds = {}
                 local robloxIds = {}
                 for _, entry in entries do
@@ -46,17 +46,22 @@ return {
             end,
         },
         {
-            name = "keeps reviewed enemy shells cosmetic and source-preserved",
+            -- Every creature the game names is an original asset. The list is
+            -- exhaustive on purpose: it is what stops a named creature being
+            -- quietly swapped back to a borrowed model, which is the failure
+            -- that already cost this project a moderated boss.
+            name = "keeps every named creature original, cosmetic and source-preserved",
             run = function()
                 for _, stableId in
                     {
-                        "mesh_creator_hollow_rootling_a",
-                        "mesh_creator_earth_golem_a",
+                        "mesh_rootling_a",
+                        "mesh_briarback_a",
                         "mesh_zombie_a",
-                        "mesh_creator_raven_a",
-                        "mesh_creator_predatory_flower_a",
-                        "mesh_creator_wood_ibex_a",
-                        "mesh_creator_bark_ram_a",
+                        "mesh_hollow_crow_a",
+                        "mesh_snapvine_a",
+                        "mesh_bark_ram_a",
+                        "mesh_old_growth_a",
+                        "mesh_warden_stag_a",
                     }
                 do
                     local entry = MeshAssetRegistry.get(stableId)
@@ -69,8 +74,9 @@ return {
                         (entry :: MeshAssetRegistry.Entry).preserveSourceMaterials,
                         true
                     )
+                    TestRunner.equal((entry :: MeshAssetRegistry.Entry).creatorStore, false)
                 end
-                local reliquary = MeshAssetRegistry.get("mesh_creator_memory_reliquary_a")
+                local reliquary = MeshAssetRegistry.get("mesh_memory_reliquary_a")
                 TestRunner.truthy(reliquary ~= nil)
                 TestRunner.equal(
                     (reliquary :: MeshAssetRegistry.Entry).placementBand,
