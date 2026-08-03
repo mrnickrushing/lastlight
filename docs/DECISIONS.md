@@ -689,3 +689,29 @@ tested without a live game, and the service falls back rather than failing when
 reserving is impossible. The teleport itself can only be verified in the
 published game with real clients.
 
+## 2026-08-02 — Admin commands exist for testing, by user ID, behind a flag
+
+**Decision:** A small chat command set — `/night`, `/give`, `/heal`, `/phase`,
+`/where` — available to an explicit roster of Roblox user IDs, behind
+`admin_commands_enabled`. Membership is by numeric user ID, never by username,
+because a display name can change and a numeric ID cannot be chosen by the
+player holding it. Every argument is bounded in `AdminRoster` rather than at
+the handler, so a command cannot set night nine thousand.
+
+**Reason:** Testing the town needs states the game only reaches after several
+sessions. Residents, for example, arrive at town tier 1, which is four nights
+in — so seeing them at all previously meant either playing four nights or
+changing the authored gate. `/night 4` reaches the same state the game reaches
+on its own, without touching the design.
+
+**Bounds on what this may become:** these commands only call the same service
+methods the game already calls itself, so an admin cannot put the world into a
+state the world cannot otherwise be in. Nothing here grants currency, unlocks
+purchases, or edits another player's profile. Every accepted command is logged
+with the admin's user ID and the value applied, which is the audit trail
+Milestone 4 requires before admin tooling counts as done. Refusals are silent
+to everyone not on the roster, so ordinary chat never reveals that the roster
+exists.
+
+**Roster:** the owner (1213625298) and zacksigma472 (8772161919).
+

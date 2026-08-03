@@ -45,6 +45,7 @@ local TownGuardLastStand = require(root.TownGuardLastStand)
 local LobbyDeparture = require(root.LobbyDeparture)
 local ActionProgress = require(root.ActionProgress)
 local RunHandoff = require(root.RunHandoff)
+local AdminRoster = require(root.AdminRoster)
 local TownProgression = require(root.TownProgression)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
@@ -64,6 +65,7 @@ local PhaseService = require(script.Services.PhaseService)
 local ProfileService = require(script.Services.ProfileService)
 local TownNightService = require(script.Services.TownNightService)
 local LobbyService = require(script.Services.LobbyService)
+local AdminService = require(script.Services.AdminService)
 local PlayerSurvivalService = require(script.Services.PlayerSurvivalService)
 local PlayerCombatService = require(script.Services.PlayerCombatService)
 local ProfessionService = require(script.Services.ProfessionService)
@@ -236,6 +238,15 @@ local lobbyService = LobbyService.new(
     worldService,
     analyticsService
 )
+local adminService = AdminService.new(
+    logger,
+    AdminRoster,
+    featureFlags,
+    profileService,
+    survivalService,
+    combatService,
+    worldService
+)
 local townNightService = TownNightService.new(
     logger,
     Config,
@@ -331,6 +342,8 @@ end)
 enemyService:setStrikeHandler(function(clicker: Player)
     tutorialService:strikeFromClick(clicker)
 end)
+adminService:setTutorialService(tutorialService)
+services:register(adminService)
 services:register(tutorialService)
 services:initialize()
 services:start()

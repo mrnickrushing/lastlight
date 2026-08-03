@@ -87,6 +87,7 @@ for _, serviceName in
         "EnemyService",
         "ExpeditionService",
         "FeatureFlagService",
+        "AdminService",
         "LobbyService",
         "Logger",
         "NetworkService",

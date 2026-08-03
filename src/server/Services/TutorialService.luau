@@ -486,6 +486,22 @@ end
 -- another way to ask, not a way around any check.
 -- Shared by the tool action and by tapping a creature. Every guard stays on
 -- the server: a click only says which enemy the player meant.
+-- Admin surface. Kept here because the toast and the session belong to this
+-- service; AdminService decides nothing on its own.
+function TutorialService.adminToast(self: TutorialService, player: Player, message: string)
+    self:_setToast(player, message)
+    self:_publish(player)
+end
+
+function TutorialService.adminGrantResources(self: TutorialService, player: Player, amount: number)
+    local session = self._sessions[player]
+    if session == nil then
+        return
+    end
+    session.resources = amount
+    self:_publish(player)
+end
+
 function TutorialService.strike(self: TutorialService, player: Player)
     local session = self._sessions[player]
     if
