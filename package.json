@@ -6,7 +6,7 @@
   "scripts": {
     "bootstrap": "node scripts/bootstrap.mjs",
     "build": "node scripts/build.mjs",
-    "check": "node scripts/validate-plan.mjs && python3 scripts/validate_mesh_assets.py && python3 scripts/validate_image_assets.py && python3 scripts/validate_audio_assets.py",
+    "check": "node scripts/validate-plan.mjs && python3 scripts/validate_call_arity.py && python3 scripts/validate_mesh_assets.py && python3 scripts/validate_image_assets.py && python3 scripts/validate_audio_assets.py",
     "format": "stylua src tests scripts/verify-build.luau",
     "format:check": "stylua --check src tests scripts/verify-build.luau",
     "lint": "selene src tests scripts/verify-build.luau",
