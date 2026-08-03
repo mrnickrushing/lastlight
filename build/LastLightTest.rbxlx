@@ -40303,6 +40303,8 @@ export type HUDController = typeof(setmetatable(
         _interactionLabel: string?,
         _interactionAvailable: boolean,
         _inputMode: string,
+        _maraText: string,
+        _maraShownAt: number,
         _compactEnabled: boolean,
         _playerDowned: boolean,
         _combatContext: boolean,
@@ -41206,8 +41208,8 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     local actionFrame = Instance.new("Frame")
     actionFrame.Name = "ActionProgress"
     actionFrame.AnchorPoint = Vector2.new(0.5, 1)
-    actionFrame.Position = UDim2.new(0.5, 0, 1, -170)
-    actionFrame.Size = UDim2.fromOffset(300, 58)
+    actionFrame.Position = UDim2.new(0.5, 0, 1, -210)
+    actionFrame.Size = UDim2.fromOffset(320, 76)
     actionFrame.BackgroundColor3 = COLORS.panel
     actionFrame.BackgroundTransparency = 0.1
     actionFrame.BorderSizePixel = 0
@@ -41221,8 +41223,8 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     local actionLabel = Instance.new("TextLabel")
     actionLabel.Name = "ActionLabel"
     actionLabel.BackgroundTransparency = 1
-    actionLabel.Position = UDim2.fromOffset(16, 8)
-    actionLabel.Size = UDim2.new(1, -32, 0, 22)
+    actionLabel.Position = UDim2.fromOffset(16, 10)
+    actionLabel.Size = UDim2.new(1, -32, 0, 26)
     actionLabel.Font = Enum.Font.GothamBold
     actionLabel.Text = "GATHERING..."
     actionLabel.TextColor3 = COLORS.amber
@@ -41233,8 +41235,8 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
 
     local actionTrack = Instance.new("Frame")
     actionTrack.Name = "ActionTrack"
-    actionTrack.Position = UDim2.fromOffset(16, 36)
-    actionTrack.Size = UDim2.new(1, -32, 0, 10)
+    actionTrack.Position = UDim2.fromOffset(16, 48)
+    actionTrack.Size = UDim2.new(1, -32, 0, 14)
     actionTrack.BackgroundColor3 = Color3.fromRGB(23, 30, 34)
     actionTrack.BorderSizePixel = 0
     actionTrack.ZIndex = 45
@@ -41324,6 +41326,8 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _interactionLabel = nil,
         _interactionAvailable = false,
         _inputMode = "keyboard",
+        _maraText = "",
+        _maraShownAt = 0,
         _compactEnabled = false,
         _playerDowned = false,
         _combatContext = false,
@@ -41403,6 +41407,11 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         end
         clockAccumulator = 0
         self:_updateClock()
+        -- Mara's line expires on a timer rather than on the next state push,
+        -- which may not arrive for minutes.
+        if self._mara.Visible and not self:_maraLineIsFresh() then
+            self._mara.Visible = false
+        end
     end)
 
     return self
@@ -41472,6 +41481,14 @@ function HUDController.setLobbyDepartHandler(self: HUDController, callback: (num
             end
         end)
     end
+end
+
+-- Mara's last line stays up for a few seconds. Long enough to read at a
+-- glance, short enough that it never becomes furniture.
+local MARA_LINE_SECONDS = 7
+
+function HUDController._maraLineIsFresh(self: HUDController): boolean
+    return self._maraShownAt > 0 and (os.clock() - self._maraShownAt) < MARA_LINE_SECONDS
 end
 
 function HUDController._updateLobby(self: HUDController, state: any)
@@ -41848,7 +41865,9 @@ end
 
 function HUDController._applyCompact(self: HUDController)
     self._detail.Visible = not self._compactEnabled
-    self._mara.Visible = not self._compactEnabled and not self._playerDowned
+    self._mara.Visible = self:_maraLineIsFresh()
+        and not self._compactEnabled
+        and not self._playerDowned
     self._objective.Position = if self._compactEnabled
         then UDim2.fromOffset(14, 31)
         else UDim2.fromOffset(14, 32)
@@ -41933,11 +41952,15 @@ function HUDController._layout(self: HUDController)
             the thumbstick, so every control is thumb-reachable without
             fighting a Roblox one, and none of them sit over the character.
         ]]
-        self._primary.Position = UDim2.new(1, -220, 1, -30)
-        self._tool.Position = UDim2.new(1, -330, 1, -30)
-        self._dodge.Position = UDim2.new(1, -440, 1, -30)
-        self._ability.Position = UDim2.new(1, -550, 1, -30)
-        self._sprint.Position = UDim2.new(1, -660, 1, -30)
+        -- Run sits immediately left of Roblox's jump button, where a right
+        -- thumb already is. Ability keeps the next slot along. Dodge is gone
+        -- on touch: it is still LeftAlt on a keyboard, but as a button it was
+        -- one more thing to find mid-telegraph on a small screen.
+        self._sprint.Position = UDim2.new(1, -170, 1, -34)
+        self._ability.Position = UDim2.new(1, -280, 1, -34)
+        self._primary.Position = UDim2.new(1, -390, 1, -34)
+        self._tool.Position = UDim2.new(1, -500, 1, -34)
+        self._dodge.Position = UDim2.new(1, -610, 1, -34)
     else
         self._objectiveFrame.Position = UDim2.fromOffset(18, 18)
         self._objectiveFrame.Size = if self._compactEnabled
@@ -42283,7 +42306,22 @@ function HUDController.update(self: HUDController, state: any)
         tonumber(state.progress) or 0,
         tonumber(state.progressTotal) or 8
     )
-    self._mara.Text = "Mara: " .. tostring(state.mara or "")
+    --[[
+        Mara speaks and then stops.
+
+        Her line used to sit on screen permanently, which turned a character
+        remark into a permanent HUD element and left it contradicting whatever
+        the player was doing minutes later. It now appears when she has
+        something new to say and fades a few seconds afterwards; walking back
+        to her produces a fresh line, which shows it again.
+    ]]
+    local maraLine = "Mara: " .. tostring(state.mara or "")
+    if maraLine ~= self._maraText then
+        self._maraText = maraLine
+        self._maraShownAt = os.clock()
+        self._mara.Text = maraLine
+        self._mara.TextTransparency = 0
+    end
     self._resource.Text = string.format(
         "HEARTWOOD · %d%s",
         tonumber(state.resources) or 0,
@@ -42338,7 +42376,9 @@ function HUDController.update(self: HUDController, state: any)
         self._compactEnabled = state.compactHud == true
         self:_applyCompact()
     end
-    self._mara.Visible = not self._compactEnabled and not self._playerDowned
+    self._mara.Visible = self:_maraLineIsFresh()
+        and not self._compactEnabled
+        and not self._playerDowned
     self:setInteraction(self._interactionLabel, self._interactionAvailable)
     self:_layout()
     self:_updateCombatClock()
