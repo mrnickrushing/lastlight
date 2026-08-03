@@ -16,6 +16,7 @@ export type NetworkService = typeof(setmetatable(
         Name: string,
         _logger: Logger,
         _folder: Folder?,
+        _actionPayloadContract: any,
         _actionRequest: RemoteEvent?,
         _stateChanged: RemoteEvent?,
         _getState: RemoteFunction?,
@@ -33,6 +34,7 @@ function NetworkService.new(logger: Logger): NetworkService
         Name = NetworkService.Name,
         _logger = logger,
         _folder = nil,
+        _actionPayloadContract = nil,
         _actionRequest = nil,
         _stateChanged = nil,
         _getState = nil,
@@ -44,38 +46,6 @@ function NetworkService.new(logger: Logger): NetworkService
     }, NetworkService)
 end
 
-local function isValidActionPayload(payload: any): boolean
-    if type(payload) ~= "table" or payload.schemaVersion ~= 1 then
-        return false
-    end
-
-    local kind = payload.kind
-    if type(kind) ~= "string" or #kind == 0 or #kind > 32 then
-        return false
-    end
-
-    local fieldCount = 0
-    for key, value in payload do
-        fieldCount += 1
-        if fieldCount > 6 or type(key) ~= "string" then
-            return false
-        end
-        local valueType = type(value)
-        if valueType == "string" then
-            if #value > 128 then
-                return false
-            end
-        elseif valueType == "number" then
-            if value ~= value or value == math.huge or value == -math.huge then
-                return false
-            end
-        elseif valueType ~= "boolean" and valueType ~= "number" then
-            return false
-        end
-    end
-    return true
-end
-
 local function makeRemote(className: string, name: string, parent: Instance): Instance
     local remote = Instance.new(className)
     remote.Name = name
@@ -85,6 +55,8 @@ end
 
 function NetworkService.Init(self: NetworkService, context: any)
     local runtimeIds = context.runtimeIds
+    self._actionPayloadContract =
+        assert(context.actionPayloadContract, "action payload contract unavailable")
     local existing = ReplicatedStorage:FindFirstChild(runtimeIds.FolderName)
     if existing ~= nil then
         existing:Destroy()
@@ -108,12 +80,10 @@ end
 function NetworkService.Start(self: NetworkService)
     local actionRequest = assert(self._actionRequest, "action remote unavailable")
     local getState = assert(self._getState, "state function unavailable")
+    local contract = assert(self._actionPayloadContract, "action payload contract unavailable")
 
     actionRequest.OnServerEvent:Connect(function(player: Player, payload: any)
-        if type(payload) ~= "table" then
-            return
-        end
-        if not isValidActionPayload(payload) then
+        if not contract.isValidTransport(payload) then
             return
         end
         local now = os.clock()
