@@ -3010,12 +3010,15 @@ function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKe
             yaw = math.rad(180),
             profile = Vector3.new(0.94, 1.08, 0.9),
         },
+        -- The stag was generated without antlers on purpose. The fight breaks
+        -- them one at a time, so they stay authored parts standing above the
+        -- crown rather than geometry baked into the mesh.
         warden_stag = {
-            assetId = "mesh_creator_wood_ibex_a",
+            assetId = "mesh_warden_stag_a",
             groundOffset = 10,
             yaw = math.rad(180),
-            profile = Vector3.new(1.08, 1.14, 0.94),
-            scale = 3,
+            profile = Vector3.new(1, 1, 1),
+            scale = 1.2,
         },
     }
     local profile = visualProfiles[modelKey]

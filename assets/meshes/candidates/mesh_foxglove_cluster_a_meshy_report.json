@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_foxglove_cluster_a",
+  "source": "assets/meshes/raw/mesh_foxglove_cluster_a.glb",
+  "output": "assets/meshes/generated/mesh_foxglove_cluster_a.glb",
+  "targetLongestDimension": 4.5,
+  "boundsMin": [
+    -1.5407,
+    -1.1126,
+    0.0
+  ],
+  "boundsMax": [
+    1.5407,
+    1.1126,
+    4.5
+  ],
+  "dimensions": [
+    3.0814,
+    2.2253,
+    4.5
+  ],
+  "longestDimension": 4.5,
+  "trianglesBefore": 18350,
+  "trianglesAfter": 5500,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    }
+  ],
+  "bytes": 14004320
+}

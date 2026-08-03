@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_warden_stag_a",
+  "source": "assets/meshes/raw/mesh_warden_stag_a.glb",
+  "output": "assets/meshes/generated/mesh_warden_stag_a.glb",
+  "targetLongestDimension": 19.0,
+  "boundsMin": [
+    -3.632,
+    -9.5,
+    0.0
+  ],
+  "boundsMax": [
+    3.632,
+    9.5,
+    14.903
+  ],
+  "dimensions": [
+    7.2641,
+    19.0,
+    14.903
+  ],
+  "longestDimension": 19.0,
+  "trianglesBefore": 18563,
+  "trianglesAfter": 9000,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    }
+  ],
+  "bytes": 12482652
+}

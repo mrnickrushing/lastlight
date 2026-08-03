@@ -1250,17 +1250,31 @@ local function buildModuleVisual(
         end
         dress(extra, "mesh_deadfall_a", parent, center + Vector3.new(6, 0, -20), 1, 0.7, 2429)
     elseif visual == "foxglove" then
+        -- The orbs stay: they are the light this stretch of road is read by,
+        -- and a textured flower cannot emit. The authored plant goes around
+        -- each one so the glow reads as coming from inside the blooms rather
+        -- than from a bare sphere floating in the dark.
         for index = 1, 8 do
             local side = if index % 2 == 0 then 1 else -1
+            local at = center + Vector3.new(side * (12 + index), 1.2, -26 + index * 6)
             local glow = orb(
                 parent,
                 "Foxglove",
-                center + Vector3.new(side * (12 + index), 1.2, -26 + index * 6),
+                at,
                 1.4,
                 if index % 3 == 0 then AMBER else FOXFIRE,
                 Enum.Material.Neon
             )
             glow.CanQuery = false
+            dress(
+                extra,
+                "mesh_foxglove_cluster_a",
+                parent,
+                at - Vector3.new(0, 1.2, 0),
+                0.95 + (index % 3) * 0.12,
+                math.rad(index * 47 + side * 20),
+                7300 + index
+            )
         end
     elseif visual == "farm" then
         local shell = buildFarm(parent, center)

@@ -906,6 +906,46 @@
         "normal"
       ],
       "robloxAssetId": 126541616322157
+    },
+    {
+      "id": "mesh_warden_stag_a",
+      "displayName": "Warden Stag",
+      "role": "expedition_boss",
+      "placementBand": "curated_expedition",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc597-7775-7703-9ba9-eaf7c7def9a8 then multi-image-to-3d task 019fc599-0152-7733-b310-032ef1b97663, textures downscaled to 1024. Bramblewake's boss, which previously borrowed a Creator Store wood ibex. Generated deliberately without antlers -- only broken stubs at the crown -- because the fight's antlers are authored parts that break one at a time.",
+      "file": "generated/mesh_warden_stag_a.glb",
+      "previewFile": "previews/mesh-warden-stag.png",
+      "targetLongestDimension": 19,
+      "maxTriangles": 9000,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 97419722389385
+    },
+    {
+      "id": "mesh_foxglove_cluster_a",
+      "displayName": "Foxglove Cluster",
+      "role": "expedition_module_landmark",
+      "placementBand": "curated_expedition",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc592-a46d-7be7-8beb-b400e2dde842 then multi-image-to-3d task 019fc598-fe75-78a3-86c0-8640a67020cc, textures downscaled to 1024. The Foxglove Run module's namesake flowers, which were previously bare glowing orbs.",
+      "file": "generated/mesh_foxglove_cluster_a.glb",
+      "previewFile": "previews/mesh-foxglove-cluster.png",
+      "targetLongestDimension": 4.5,
+      "maxTriangles": 5500,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 137511250030382
     }
   ]
 }
