@@ -3349,7 +3349,8 @@ function BramblewakeBuilder.build(
                 module,
                 center,
                 generator.eventDefinition(placement.eventId),
-                runtimeIds
+                runtimeIds,
+                meshPlacements
             )
             eventSockets[placement.eventId] = eventResult.socket
             for interactionIndex, interaction in eventResult.interactions do
