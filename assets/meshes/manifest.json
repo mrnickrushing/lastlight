@@ -958,6 +958,26 @@
         "normal"
       ],
       "robloxAssetId": 95277599944074
+    },
+    {
+      "id": "mesh_root_chapel_a",
+      "displayName": "Root Chapel",
+      "role": "expedition_poi_landmark",
+      "placementBand": "curated_hero",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc5f9-c156-7932-9f6a-cedab39f7d58 then multi-image-to-3d task 019fc5fb-8fff-75d0-a115-cf0c021ba27f, textures downscaled to 1024. The Root Chapel was the one Bramblewake point of interest whose structure was still primitive -- pillars, a crown and benches standing in for a nave.",
+      "file": "generated/mesh_root_chapel_a.glb",
+      "previewFile": "previews/mesh-root-chapel.png",
+      "targetLongestDimension": 14,
+      "maxTriangles": 7000,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 93798103786347
     }
   ]
 }

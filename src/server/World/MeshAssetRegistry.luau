@@ -194,6 +194,17 @@ local ENTRIES: { Entry } = {
         creatorStore = false,
     },
     {
+        id = "mesh_root_chapel_a",
+        assetId = 93798103786347,
+        targetLongestDimension = 14,
+        maxTriangles = 7000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_hero",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
         id = "mesh_memory_reliquary_a",
         assetId = 95277599944074,
         targetLongestDimension = 5.4,

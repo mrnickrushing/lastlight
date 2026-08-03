@@ -1974,6 +1974,56 @@
         }
       ],
       "bytes": 12304520
+    },
+    "mesh_root_chapel_a": {
+      "boundsMin": [
+        -6.222,
+        -7.0,
+        0.0
+      ],
+      "boundsMax": [
+        6.222,
+        7.0,
+        13.1157
+      ],
+      "dimensions": [
+        12.4439,
+        14.0,
+        13.1157
+      ],
+      "longestDimension": 14.0,
+      "triangles": 7000,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "normal",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        }
+      ],
+      "bytes": 12775780
     }
   }
 }

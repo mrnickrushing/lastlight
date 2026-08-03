@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_root_chapel_a",
+  "source": "assets/meshes/raw/mesh_root_chapel_a.glb",
+  "output": "assets/meshes/generated/mesh_root_chapel_a.glb",
+  "targetLongestDimension": 14.0,
+  "boundsMin": [
+    -6.222,
+    -7.0,
+    0.0
+  ],
+  "boundsMax": [
+    6.222,
+    7.0,
+    13.1157
+  ],
+  "dimensions": [
+    12.4439,
+    14.0,
+    13.1157
+  ],
+  "longestDimension": 14.0,
+  "trianglesBefore": 18451,
+  "trianglesAfter": 7000,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    }
+  ],
+  "bytes": 12775780
+}
