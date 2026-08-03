@@ -32636,12 +32636,32 @@ local function orb(
     return instance
 end
 
-local function light(target: BasePart, color: Color3, brightness: number, range: number)
+--[[
+    Shadows are off unless a light is asked to cast them.
+
+    Under Future lighting every shadow-casting light is paid for each frame,
+    and this route runs about seventy small ones: a glow on all twenty-five
+    event steps, two on every harvest node, and a foxfire post the length of
+    the road. Those exist to make the path readable in the dark, and none of
+    them is anywhere a player looks for a shadow.
+
+    The handful that are -- the Wayhome beacon, the blackout flame, the
+    lantern at each point of interest -- ask for it. That is the same
+    discipline the town already uses, where the hearth casts and the windows
+    do not.
+]]
+local function light(
+    target: BasePart,
+    color: Color3,
+    brightness: number,
+    range: number,
+    shadows: boolean?
+)
     local pointLight = Instance.new("PointLight")
     pointLight.Color = color
     pointLight.Brightness = brightness
     pointLight.Range = range
-    pointLight.Shadows = true
+    pointLight.Shadows = shadows == true
     pointLight.Parent = target
 end
 
@@ -34254,7 +34274,7 @@ local function buildModuleVisual(
         )
         local beacon =
             orb(parent, "WayhomeLight", center + Vector3.new(0, 8, 0), 6, AMBER, Enum.Material.Neon)
-        light(beacon, AMBER, 3, 36)
+        light(beacon, AMBER, 3, 36, true)
         billboard(beacon, "WAYHOME GATE", CREAM)
         objectIcon(beacon, "wayhome", AMBER)
     end
@@ -34650,7 +34670,7 @@ local function buildPointOfInterest(
     )
     physicalParts += 1
     memory.Transparency = 0.1
-    light(memory, FOXFIRE, 0.85, 13)
+    light(memory, FOXFIRE, 0.85, 13, true)
     billboard(memory, string.upper(definition.displayName), FOXFIRE)
     objectIcon(memory, "memory", FOXFIRE)
     landmark:SetAttribute("PhysicalPartCount", physicalParts)
@@ -35463,7 +35483,7 @@ local function buildBlackoutLayer(
         Enum.Material.Neon
     )
     cagedLanternShell(layer, sourceFlame.Position, 0.78, "BlackoutLantern")
-    light(sourceFlame, AMBER, 1.8, 16)
+    light(sourceFlame, AMBER, 1.8, 16, true)
     fireSource:SetAttribute("BlackoutInteraction", "take_fire")
     CollectionService:AddTag(fireSource, runtimeIds.ExpeditionBlackoutTag)
     billboard(fireSource, "BLACKOUT FIRE · CARRY TO LIVING ROOTS", CREAM)

@@ -21,6 +21,11 @@
         "$path": "src/server"
       }
     },
+    "Lighting": {
+      "$properties": {
+        "Technology": "Future"
+      }
+    },
     "StarterPlayer": {
       "StarterPlayerScripts": {
         "LastLightClient": {
