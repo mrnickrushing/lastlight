@@ -2024,6 +2024,556 @@
         }
       ],
       "bytes": 12775780
+    },
+    "mesh_celebration_stage_a": {
+      "boundsMin": [
+        -11.0,
+        -8.4401,
+        0.0
+      ],
+      "boundsMax": [
+        11.0,
+        8.4401,
+        15.4464
+      ],
+      "dimensions": [
+        22.0,
+        16.8802,
+        15.4464
+      ],
+      "longestDimension": 22.0,
+      "triangles": 8000,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_2",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        }
+      ],
+      "bytes": 4429848
+    },
+    "mesh_sawmill_a": {
+      "boundsMin": [
+        -12.0,
+        -11.1143,
+        0.0
+      ],
+      "boundsMax": [
+        12.0,
+        11.1143,
+        21.9279
+      ],
+      "dimensions": [
+        24.0,
+        22.2287,
+        21.9279
+      ],
+      "longestDimension": 24.0,
+      "triangles": 8000,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_2",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        }
+      ],
+      "bytes": 4473428
+    },
+    "mesh_union_forge_a": {
+      "boundsMin": [
+        -10.0,
+        -6.6703,
+        0.0
+      ],
+      "boundsMax": [
+        10.0,
+        6.6703,
+        15.5767
+      ],
+      "dimensions": [
+        20.0,
+        13.3407,
+        15.5767
+      ],
+      "longestDimension": 20.0,
+      "triangles": 8000,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_2",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        }
+      ],
+      "bytes": 4606332
+    },
+    "mesh_engineer_yard_a": {
+      "boundsMin": [
+        -8.3812,
+        -10.0,
+        0.0
+      ],
+      "boundsMax": [
+        8.3812,
+        10.0,
+        11.7903
+      ],
+      "dimensions": [
+        16.7625,
+        20.0,
+        11.7903
+      ],
+      "longestDimension": 20.0,
+      "triangles": 8000,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_2",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        }
+      ],
+      "bytes": 4491836
+    },
+    "mesh_common_kitchen_a": {
+      "boundsMin": [
+        -10.0,
+        -9.9934,
+        0.0
+      ],
+      "boundsMax": [
+        10.0,
+        9.9934,
+        11.5609
+      ],
+      "dimensions": [
+        20.0,
+        19.9868,
+        11.5609
+      ],
+      "longestDimension": 20.0,
+      "triangles": 8000,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_2",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        }
+      ],
+      "bytes": 5049252
+    },
+    "mesh_hearthmarket_stalls_a": {
+      "boundsMin": [
+        -12.0,
+        -5.8453,
+        0.0
+      ],
+      "boundsMax": [
+        12.0,
+        5.8453,
+        16.0803
+      ],
+      "dimensions": [
+        24.0,
+        11.6905,
+        16.0803
+      ],
+      "longestDimension": 24.0,
+      "triangles": 7998,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_2",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        }
+      ],
+      "bytes": 4633524
+    },
+    "mesh_trade_post_a": {
+      "boundsMin": [
+        -8.0,
+        -5.1286,
+        0.0
+      ],
+      "boundsMax": [
+        8.0,
+        5.1286,
+        15.0047
+      ],
+      "dimensions": [
+        16.0,
+        10.2572,
+        15.0047
+      ],
+      "longestDimension": 16.0,
+      "triangles": 8000,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_2",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        }
+      ],
+      "bytes": 4297624
+    },
+    "mesh_guardhouse_a": {
+      "boundsMin": [
+        -8.0,
+        -6.8817,
+        0.0
+      ],
+      "boundsMax": [
+        8.0,
+        6.8817,
+        15.4651
+      ],
+      "dimensions": [
+        16.0,
+        13.7635,
+        15.4651
+      ],
+      "longestDimension": 16.0,
+      "triangles": 8000,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_2",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        }
+      ],
+      "bytes": 4573488
+    },
+    "mesh_watchtower_a": {
+      "boundsMin": [
+        -3.3793,
+        -3.2703,
+        0.0
+      ],
+      "boundsMax": [
+        3.3793,
+        3.2703,
+        26.0
+      ],
+      "dimensions": [
+        6.7586,
+        6.5407,
+        26.0
+      ],
+      "longestDimension": 26.0,
+      "triangles": 8000,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_2",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        }
+      ],
+      "bytes": 4103956
+    },
+    "mesh_trapworks_a": {
+      "boundsMin": [
+        -8.0,
+        -6.9878,
+        0.0
+      ],
+      "boundsMax": [
+        8.0,
+        6.9878,
+        10.6192
+      ],
+      "dimensions": [
+        16.0,
+        13.9756,
+        10.6192
+      ],
+      "longestDimension": 16.0,
+      "triangles": 7999,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_2",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        }
+      ],
+      "bytes": 4540184
+    },
+    "mesh_waterworks_a": {
+      "boundsMin": [
+        -9.0,
+        -7.3941,
+        0.0
+      ],
+      "boundsMax": [
+        9.0,
+        7.3941,
+        13.5799
+      ],
+      "dimensions": [
+        18.0,
+        14.7882,
+        13.5799
+      ],
+      "longestDimension": 18.0,
+      "triangles": 7998,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_2",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 1024,
+          "height": 1024,
+          "packed": true
+        }
+      ],
+      "bytes": 4329576
     }
   }
 }
