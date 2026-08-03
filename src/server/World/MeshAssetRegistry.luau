@@ -194,6 +194,17 @@ local ENTRIES: { Entry } = {
         creatorStore = false,
     },
     {
+        id = "mesh_old_growth_a",
+        assetId = 132155545012921,
+        targetLongestDimension = 22.5,
+        maxTriangles = 9000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_expedition",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
         id = "mesh_warden_stag_a",
         assetId = 97419722389385,
         targetLongestDimension = 19,

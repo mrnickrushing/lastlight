@@ -946,6 +946,26 @@
         "normal"
       ],
       "robloxAssetId": 137511250030382
+    },
+    {
+      "id": "mesh_old_growth_a",
+      "displayName": "Old Growth",
+      "role": "expedition_elite",
+      "placementBand": "curated_expedition",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc5a3-db47-7da4-a9bb-38766f12b397 then multi-image-to-3d task 019fc5a4-e71e-79a1-a982-7bd4a9b6e5a7, textures downscaled to 1024. Bramblewake's elite, which previously borrowed a Creator Store model. Prompted with a hollow chest cavity so the authored amber heart weak point sits inside the creature rather than on top of it.",
+      "file": "generated/mesh_old_growth_a.glb",
+      "previewFile": "previews/mesh-old-growth.png",
+      "targetLongestDimension": 22.5,
+      "maxTriangles": 9000,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 132155545012921
     }
   ]
 }
