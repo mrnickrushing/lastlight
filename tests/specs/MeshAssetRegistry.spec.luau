@@ -10,7 +10,9 @@ return {
             name = "keeps stable and unique uploaded asset mappings",
             run = function()
                 local entries = MeshAssetRegistry.all()
-                TestRunner.equal(#entries, 58)
+                -- 58 before the Milestone 4 town, plus the eleven buildings
+                -- that take Emberhollow from five to sixteen.
+                TestRunner.equal(#entries, 69)
                 local stableIds = {}
                 local robloxIds = {}
                 for _, entry in entries do

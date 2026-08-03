@@ -10716,18 +10716,69 @@ export type Consequence = {
     residentIds: { string },
 }
 
+--[[
+    The tier at which each later building first breaks ground.
+
+    The five original buildings keep their own hand-written curves below: they
+    are the survival core and their exact staging is pinned by tests. Everything
+    added for the sixteen-building town is declared here instead, because eleven
+    more bespoke expressions would be eleven more things to get subtly wrong.
+
+    A town fills in the order it would actually need things. Defence and food
+    come first, because those are what a settlement that survives its nights
+    wants next. Production follows once there is something to protect. The
+    fourth-tier group is the long tail a town only reaches after ten nights, so
+    the last thing a player unlocks is the stage they celebrate on.
+]]
+local BUILDING_FIRST_TIER: { [string]: number } = {
+    building_guardhouse = 1,
+    building_kitchen = 1,
+
+    building_sawmill = 2,
+    building_forge = 2,
+    building_watchtower = 2,
+    building_market = 2,
+
+    building_celebration_stage = 3,
+    building_engineer_yard = 3,
+    building_trade_post = 3,
+    building_trapworks = 3,
+    building_waterworks = 3,
+}
+
 local function buildingStages(tier: number): { [string]: number }
     -- Stage zero is a readable construction site, while stages one through
     -- three are increasingly complete buildings. Core services arrive first;
     -- the inn opens only after the town has survived enough nights to support
     -- visitors instead of appearing fully formed on a fresh save.
-    return {
+    local stages = {
         building_first_lantern = math.max(1, tier),
         building_archive = tier,
         building_town_board = math.max(1, tier),
         building_workbench = math.max(1, tier),
         building_inn = math.max(0, tier - 1),
     }
+
+    for buildingId, firstTier in BUILDING_FIRST_TIER do
+        stages[buildingId] = math.clamp(tier - firstTier + 1, 0, 3)
+    end
+
+    return stages
+end
+
+function TownProgression.buildingIds(): { string }
+    local ids = {
+        "building_first_lantern",
+        "building_archive",
+        "building_town_board",
+        "building_workbench",
+        "building_inn",
+    }
+    for buildingId in BUILDING_FIRST_TIER do
+        table.insert(ids, buildingId)
+    end
+    table.sort(ids)
+    return ids
 end
 
 local function residentIds(tier: number): { string }
@@ -10816,15 +10867,10 @@ function TownProgression.merge(current: any, incoming: Consequence): Consequence
     )
 
     local mergedStages = {}
-    for _, buildingId in
-        {
-            "building_first_lantern",
-            "building_archive",
-            "building_town_board",
-            "building_workbench",
-            "building_inn",
-        }
-    do
+    -- Read from the shared list rather than a copy of it: a building added to
+    -- the town but forgotten here would silently stop reconciling between
+    -- players, which looks like the building flickering as people join.
+    for _, buildingId in TownProgression.buildingIds() do
         local currentStages = if type(current.buildingStages) == "table"
             then current.buildingStages
             else {}
@@ -25815,6 +25861,21 @@ local FOLIAGE_KEEP_OUT = table.freeze({
     table.freeze({ x = 0, z = -143, radius = 26 }), -- night watch posts
     table.freeze({ x = 78, z = -42, radius = 22 }), -- authored root arch landmark
     table.freeze({ x = -78, z = -44, radius = 24 }), -- hollow lantern shrine landmark
+
+    -- The eleven Milestone 4 buildings. Radii are each building's footprint
+    -- half-width plus clearance, matching the margin the layout was computed
+    -- against rather than a round number.
+    table.freeze({ x = 0, z = -226, radius = 20 }), -- celebration stage
+    table.freeze({ x = 150, z = -100, radius = 21 }), -- sawmill
+    table.freeze({ x = 150, z = -140, radius = 17 }), -- union forge
+    table.freeze({ x = 150, z = -180, radius = 18 }), -- engineer yard
+    table.freeze({ x = -150, z = -158, radius = 18 }), -- common kitchen
+    table.freeze({ x = -150, z = -196, radius = 20 }), -- hearthmarket stalls
+    table.freeze({ x = -150, z = -232, radius = 14 }), -- trade post
+    table.freeze({ x = 110, z = -212, radius = 16 }), -- waterworks
+    table.freeze({ x = -70, z = -262, radius = 14 }), -- guardhouse
+    table.freeze({ x = 70, z = -262, radius = 10 }), -- watchtower
+    table.freeze({ x = 0, z = -270, radius = 14 }), -- trapworks
 })
 
 local TOWN_SIDE_ROAD_BOUNDS = table.freeze({
@@ -31618,6 +31679,191 @@ local function buildTownProgressionBuildings(
             })
         end
     end
+
+    --[[
+        The eleven Milestone 4 buildings that complete the sixteen-building
+        town: Builder's Row, Hearthmarket, the Watch Ring, the celebration
+        stage, and Waterworks. Each is an authored Meshy model rather than the
+        five hand-built procedural shells above.
+
+        The procedural shell is not retired for these -- it becomes the
+        fallback. buildingShell(..., stage, ...) already produces a readable,
+        stage-appropriate building out of primitives, so it is reused wholesale
+        as what the town shows if the authored mesh ever fails to load
+        (moderation, deletion, a private asset). Milestone 3's asset pipeline
+        exists precisely because that happens; three of the game's meshes have
+        already needed this exact kind of fallback in production.
+
+        What these do NOT get, and the original five do: a bespoke escalating
+        look across stages one through three. There is one authored model per
+        building, not three, so stage 0 is the shared constructionSite and
+        stages 1-3 all show the same finished mesh. The fallback shell still
+        escalates (its own stage-based awning and planters), which is a
+        harmless bonus on a path that only renders when the primary path has
+        already failed.
+
+        Positions were chosen to clear every existing keep-out zone and every
+        other new building by at least six studs, computed once rather than by
+        eye; none of this has been seen in Studio, so treat placement as a
+        first pass to confirm there, not a final one.
+    ]]
+    local function authoredBuilding(
+        id: string,
+        displayName: string,
+        meshAssetId: string,
+        center: Vector3,
+        footprint: Vector3,
+        accent: Color3,
+        facingYaw: number,
+        seed: number
+    ): Model
+        local stage = stageFor(id)
+        if stage == 0 then
+            return constructionSite(id, displayName, center, footprint, facingYaw)
+        end
+
+        local fallback = buildingShell(id, displayName, center, footprint, stage, accent, facingYaw)
+        table.insert(meshPlacements, {
+            assetId = meshAssetId,
+            fallbackKind = "asset_replacement",
+            position = center,
+            scale = 1,
+            yaw = facingYaw,
+            seed = seed,
+            swayTag = nil,
+            parent = assetParent,
+            fallbackInstance = fallback,
+        })
+        return fallback
+    end
+
+    local PLAZA = Vector3.new(0, 0, -112)
+    -- The Watch Ring faces outward, away from the plaza, the way a defensive
+    -- post looks toward what it is watching rather than toward the town it
+    -- guards.
+    local function facingAwayFromTown(center: Vector3): number
+        return yawToward(center, center + Vector3.new(0, 0, -40))
+    end
+
+    authoredBuilding(
+        "building_celebration_stage",
+        "CELEBRATION STAGE",
+        "mesh_celebration_stage_a",
+        Vector3.new(0, 0, -226),
+        Vector3.new(22, 0, 17),
+        AMBER,
+        yawToward(Vector3.new(0, 0, -226), PLAZA),
+        10200
+    )
+
+    -- Builder's Row: a line running south along the town's eastern edge, past
+    -- the existing workbench.
+    authoredBuilding(
+        "building_sawmill",
+        "SAWMILL",
+        "mesh_sawmill_a",
+        Vector3.new(150, 0, -100),
+        Vector3.new(24, 0, 22),
+        Color3.fromRGB(158, 122, 74),
+        yawToward(Vector3.new(150, 0, -100), PLAZA),
+        10201
+    )
+    authoredBuilding(
+        "building_forge",
+        "UNION FORGE",
+        "mesh_union_forge_a",
+        Vector3.new(150, 0, -140),
+        Vector3.new(20, 0, 13),
+        Color3.fromRGB(178, 92, 58),
+        yawToward(Vector3.new(150, 0, -140), PLAZA),
+        10202
+    )
+    authoredBuilding(
+        "building_engineer_yard",
+        "ENGINEER YARD",
+        "mesh_engineer_yard_a",
+        Vector3.new(150, 0, -180),
+        Vector3.new(17, 0, 20),
+        Color3.fromRGB(120, 128, 118),
+        yawToward(Vector3.new(150, 0, -180), PLAZA),
+        10203
+    )
+
+    -- Hearthmarket: the mirrored line on the western edge, past the inn.
+    authoredBuilding(
+        "building_kitchen",
+        "COMMON KITCHEN",
+        "mesh_common_kitchen_a",
+        Vector3.new(-150, 0, -158),
+        Vector3.new(20, 0, 20),
+        Color3.fromRGB(196, 140, 79),
+        yawToward(Vector3.new(-150, 0, -158), PLAZA),
+        10204
+    )
+    authoredBuilding(
+        "building_market",
+        "HEARTHMARKET STALLS",
+        "mesh_hearthmarket_stalls_a",
+        Vector3.new(-150, 0, -196),
+        Vector3.new(24, 0, 12),
+        Color3.fromRGB(112, 118, 132),
+        yawToward(Vector3.new(-150, 0, -196), PLAZA),
+        10205
+    )
+    authoredBuilding(
+        "building_trade_post",
+        "TRADE POST",
+        "mesh_trade_post_a",
+        Vector3.new(-150, 0, -232),
+        Vector3.new(16, 0, 10),
+        Color3.fromRGB(184, 158, 96),
+        yawToward(Vector3.new(-150, 0, -232), PLAZA),
+        10206
+    )
+
+    -- Waterworks, tucked south of the existing Greenward garden.
+    authoredBuilding(
+        "building_waterworks",
+        "WATERWORKS",
+        "mesh_waterworks_a",
+        Vector3.new(110, 0, -212),
+        Vector3.new(18, 0, 15),
+        Color3.fromRGB(96, 110, 118),
+        yawToward(Vector3.new(110, 0, -212), PLAZA),
+        10207
+    )
+
+    -- The Watch Ring: the town's southern perimeter, facing outward.
+    authoredBuilding(
+        "building_guardhouse",
+        "GUARDHOUSE",
+        "mesh_guardhouse_a",
+        Vector3.new(-70, 0, -262),
+        Vector3.new(16, 0, 14),
+        Color3.fromRGB(88, 84, 80),
+        facingAwayFromTown(Vector3.new(-70, 0, -262)),
+        10208
+    )
+    authoredBuilding(
+        "building_watchtower",
+        "WATCHTOWER",
+        "mesh_watchtower_a",
+        Vector3.new(70, 0, -262),
+        Vector3.new(7, 0, 7),
+        Color3.fromRGB(80, 78, 76),
+        facingAwayFromTown(Vector3.new(70, 0, -262)),
+        10209
+    )
+    authoredBuilding(
+        "building_trapworks",
+        "TRAPWORKS",
+        "mesh_trapworks_a",
+        Vector3.new(0, 0, -270),
+        Vector3.new(16, 0, 14),
+        Color3.fromRGB(94, 92, 74),
+        facingAwayFromTown(Vector3.new(0, 0, -270)),
+        10210
+    )
 
     local residentDefinitions = {
         npc_tomas_reed = {
@@ -39368,6 +39614,127 @@ local ENTRIES: { Entry } = {
         pbr = false,
         preserveSourceMaterials = true,
         creatorStore = true,
+    },
+    {
+        id = "mesh_celebration_stage_a",
+        assetId = 90438134844070,
+        targetLongestDimension = 22,
+        maxTriangles = 8000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_sawmill_a",
+        assetId = 118785895109979,
+        targetLongestDimension = 24,
+        maxTriangles = 8000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_union_forge_a",
+        assetId = 112706424048213,
+        targetLongestDimension = 20,
+        maxTriangles = 8000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_engineer_yard_a",
+        assetId = 124846526369833,
+        targetLongestDimension = 20,
+        maxTriangles = 8000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_common_kitchen_a",
+        assetId = 131499149518940,
+        targetLongestDimension = 20,
+        maxTriangles = 8000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_hearthmarket_stalls_a",
+        assetId = 98478070451212,
+        targetLongestDimension = 24,
+        maxTriangles = 7998,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_trade_post_a",
+        assetId = 106875264595961,
+        targetLongestDimension = 16,
+        maxTriangles = 8000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_guardhouse_a",
+        assetId = 122763719647460,
+        targetLongestDimension = 16,
+        maxTriangles = 8000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_watchtower_a",
+        assetId = 129659016957808,
+        targetLongestDimension = 26,
+        maxTriangles = 8000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_trapworks_a",
+        assetId = 77879043908704,
+        targetLongestDimension = 16,
+        maxTriangles = 7999,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_waterworks_a",
+        assetId = 82559982340510,
+        targetLongestDimension = 18,
+        maxTriangles = 7998,
+        maxMaterialSlots = 1,
+        placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
     },
 }
 

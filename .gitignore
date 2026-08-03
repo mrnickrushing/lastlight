@@ -57,3 +57,7 @@ assets/meshes/candidates/mesh_bridge_meshy.glb
 assets/meshes/candidates/mesh_briar_meshy.glb
 assets/meshes/candidates/mesh_way_meshy.glb
 assets/meshes/candidates/mesh_og_meshy.glb
+
+# Meshy working directory: generated GLBs, thumbnails, and task metadata.
+# Prepared assets land in assets/meshes/ instead.
+meshy_output/
