@@ -21,6 +21,7 @@ TestRunner.run({
     require("./specs/ExpeditionEventFlow.spec"),
     require("./specs/ExpeditionGenerator.spec"),
     require("./specs/ExpeditionInventory.spec"),
+    require("./specs/ExploitSurface.spec"),
     require("./specs/ExpeditionRewardLedger.spec"),
     require("./specs/ExtractionPayoff.spec"),
     require("./specs/FeatureFlagService.spec"),
