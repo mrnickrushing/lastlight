@@ -2027,6 +2027,11 @@ return table.freeze({
         bramblewake_blackout_enabled = true,
         town_night_cycle_enabled = true,
         lobby_departure_enabled = true,
+        -- Each departing party gets its own reserved server. Off falls back
+        -- to moving the party within the current server, which is also what
+        -- happens in Studio and on an unpublished place, where reserving is
+        -- impossible.
+        reserved_run_servers_enabled = true,
         region_bramblewake_enabled = true,
         region_ironroot_enabled = false,
         region_mireglass_enabled = false,
@@ -7763,6 +7768,135 @@ return table.freeze(ReviveFlow)
       </Item>
       <Item class="ModuleScript" referent="45">
         <Properties>
+          <string name="Name">RunHandoff</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    The contract for handing a departing party to its own run server.
+
+    Pure logic: no TeleportService, no players. It decides what a departure
+    payload must contain, whether an arriving server should trust one, and
+    what a server should do when a teleport fails. Keeping that here means the
+    rules can be tested without a live game, which matters more than usual
+    because reserved-server teleports cannot be exercised in Studio at all.
+
+    The rules:
+
+      * A run server is told what it is by its teleport payload. A server that
+        receives no payload, or one it cannot verify, behaves as a lobby --
+        the safe default, because a wrong guess in that direction strands a
+        player in an empty world rather than merely showing them the lodge.
+      * Payloads are validated field by field on arrival. Teleport data is
+        reachable by exploiters on some paths, so nothing in it is trusted as
+        authority: it may say "this is a run", never "give me rewards".
+      * A failed teleport returns the party to the lobby with the departure
+        cancelled and nothing consumed. A half-sent party that lost its
+        staging state is worse than a party that never left.
+      * The party size that was chosen travels with the payload so the run
+        server can bound its own population without asking the lobby.
+]]
+
+local RunHandoff = {}
+
+export type Payload = {
+    schemaVersion: number,
+    kind: string,
+    partySize: number,
+    departedAt: number,
+}
+
+local SCHEMA_VERSION = 1
+local RUN_KIND = "last_light_run"
+local MAX_PARTY_SIZE = 8
+
+local function finite(value: any): boolean
+    return type(value) == "number" and value == value and value > -math.huge and value < math.huge
+end
+
+local function wholeBetween(value: any, low: number, high: number): boolean
+    return finite(value) and value >= low and value <= high and value == math.floor(value)
+end
+
+function RunHandoff.schemaVersion(): number
+    return SCHEMA_VERSION
+end
+
+function RunHandoff.runKind(): string
+    return RUN_KIND
+end
+
+--[[
+    Build the payload a departing party carries to its run server.
+
+    `partySize` is the size the lobby actually launched, not the size that was
+    requested, so a party that shrank on the platform arrives described
+    correctly.
+]]
+function RunHandoff.buildPayload(partySize: any, now: any): (Payload?, any)
+    if not wholeBetween(partySize, 1, MAX_PARTY_SIZE) then
+        return nil, { accepted = false, reason = "invalid_party_size" }
+    end
+    if not finite(now) or now < 0 then
+        return nil, { accepted = false, reason = "invalid_time" }
+    end
+    return {
+        schemaVersion = SCHEMA_VERSION,
+        kind = RUN_KIND,
+        partySize = partySize,
+        departedAt = now,
+    }, { accepted = true }
+end
+
+--[[
+    Decide what an arriving server is.
+
+    Anything unrecognised resolves to a lobby. A server that wrongly believes
+    it is a run skips the lodge and drops a player into the world with no way
+    to start one; a server that wrongly believes it is a lobby merely shows a
+    staging room the player can depart from again.
+]]
+function RunHandoff.readPayload(value: any): any
+    if type(value) ~= "table" then
+        return { isRun = false, reason = "no_payload" }
+    end
+    if value.schemaVersion ~= SCHEMA_VERSION then
+        return { isRun = false, reason = "schema_mismatch" }
+    end
+    if value.kind ~= RUN_KIND then
+        return { isRun = false, reason = "unknown_kind" }
+    end
+    if not wholeBetween(value.partySize, 1, MAX_PARTY_SIZE) then
+        return { isRun = false, reason = "invalid_party_size" }
+    end
+    if not finite(value.departedAt) or value.departedAt < 0 then
+        return { isRun = false, reason = "invalid_time" }
+    end
+    return { isRun = true, partySize = value.partySize, departedAt = value.departedAt }
+end
+
+--[[
+    What to do when a teleport attempt fails.
+
+    Always returns the party to the lobby and always cancels the departure.
+    Reserving and teleporting are separate calls that can each fail, and the
+    only safe response to either is to put everyone back where they were
+    standing with nothing spent.
+]]
+function RunHandoff.failureRecovery(reason: any): any
+    return {
+        returnToLobby = true,
+        cancelDeparture = true,
+        reason = if type(reason) == "string" and #reason > 0 then reason else "unknown",
+        message = "THE ROAD DID NOT OPEN - EVERYONE IS STILL HERE",
+    }
+end
+
+return table.freeze(RunHandoff)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="46">
+        <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -7886,7 +8020,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -8492,7 +8626,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -8611,7 +8745,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -8868,7 +9002,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -9029,7 +9163,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -9121,7 +9255,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -9333,7 +9467,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -9486,7 +9620,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -9663,7 +9797,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -9813,7 +9947,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -9849,7 +9983,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -10231,7 +10365,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -10264,11 +10398,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="58">
+  <Item class="ServerScriptService" referent="59">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="59">
+    <Item class="Script" referent="60">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -10318,6 +10452,7 @@ local TownCondition = require(root.TownCondition)
 local TownGuardLastStand = require(root.TownGuardLastStand)
 local LobbyDeparture = require(root.LobbyDeparture)
 local ActionProgress = require(root.ActionProgress)
+local RunHandoff = require(root.RunHandoff)
 local TownProgression = require(root.TownProgression)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
@@ -10500,8 +10635,15 @@ local phaseService = PhaseService.new(
     Config.FirstNightDuskSeconds,
     Config.FirstNightSeconds
 )
-local lobbyService =
-    LobbyService.new(logger, Config, LobbyDeparture, featureFlags, worldService, analyticsService)
+local lobbyService = LobbyService.new(
+    logger,
+    Config,
+    LobbyDeparture,
+    RunHandoff,
+    featureFlags,
+    worldService,
+    analyticsService
+)
 local townNightService = TownNightService.new(
     logger,
     Config,
@@ -10609,7 +10751,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -10707,11 +10849,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="61">
+      <Item class="Folder" referent="62">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="62">
+        <Item class="ModuleScript" referent="63">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11564,7 +11706,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="63">
+        <Item class="ModuleScript" referent="64">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12062,7 +12204,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="64">
+        <Item class="ModuleScript" referent="65">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13356,7 +13498,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="65">
+        <Item class="ModuleScript" referent="66">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13968,7 +14110,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14072,7 +14214,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14261,7 +14403,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="68">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14281,6 +14423,7 @@ return GearVisualService
 ]]
 
 local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
 
 local LobbyService = {}
@@ -14298,6 +14441,8 @@ export type LobbyService = typeof(setmetatable(
         _logger: Logger,
         _config: any,
         _lobbyDeparture: any,
+        _runHandoff: any,
+        _isRunServer: boolean,
         _featureFlags: any,
         _worldService: any,
         _analyticsService: any,
@@ -14316,6 +14461,7 @@ function LobbyService.new(
     logger: Logger,
     config: any,
     lobbyDeparture: any,
+    runHandoff: any,
     featureFlags: any,
     worldService: any,
     analyticsService: any
@@ -14325,6 +14471,8 @@ function LobbyService.new(
         _logger = logger,
         _config = config,
         _lobbyDeparture = lobbyDeparture,
+        _runHandoff = runHandoff,
+        _isRunServer = false,
         _featureFlags = featureFlags,
         _worldService = worldService,
         _analyticsService = analyticsService,
@@ -14445,7 +14593,125 @@ end
     another, and marked departed so a respawn keeps them in the game rather
     than dropping them back into the lobby.
 ]]
+--[[
+    Is this server a run, or the lobby?
+
+    Resolved once from the teleport payload this server was started with.
+    Anything unrecognised resolves to a lobby, which is the safe direction:
+    a server that wrongly thinks it is a run drops players into the world
+    with no way to start one, while a server that wrongly thinks it is a
+    lobby only shows a staging room they can depart from again.
+]]
+function LobbyService.isRunServer(self: LobbyService): boolean
+    return self._isRunServer
+end
+
+--[[
+    Read the teleport payload a joining player arrived with.
+
+    The payload travels per player, so the first arrival carrying a valid run
+    payload settles what this server is, and later joins cannot change it. The
+    payload is inert by design -- it can say "this is a run" and nothing about
+    rewards or progression -- so trusting it decides only which room the
+    player wakes up in.
+]]
+function LobbyService._adoptArrival(self: LobbyService, player: Player)
+    local data: any = nil
+    pcall(function()
+        data = player:GetJoinData().TeleportData
+    end)
+    local read = self._runHandoff.readPayload(data)
+    if not read.isRun then
+        return
+    end
+    if not self._isRunServer then
+        self._isRunServer = true
+        self._logger:info("run_server_adopted", { partySize = read.partySize })
+    end
+    -- Departed players skip the lodge: the existing respawn path puts them at
+    -- the arrival clearing and keeps them there.
+    self._departed[player] = true
+end
+
+--[[
+    Send a boarded party to its own reserved server.
+
+    Reserving and teleporting are separate calls and either can fail. Both are
+    wrapped, and any failure runs the same recovery: the party stays in the
+    lodge, the departure is cancelled, and nothing is consumed. A half-sent
+    party that lost its staging state is worse than one that never left.
+]]
+function LobbyService._teleportParty(self: LobbyService, boarding: { Player }): boolean
+    if not self._featureFlags:isEnabled("reserved_run_servers_enabled") then
+        return false
+    end
+    local placeId = game.PlaceId
+    if placeId == 0 then
+        -- Studio and unpublished builds cannot reserve a server. Fall back to
+        -- moving the party in place so the lodge still works while testing.
+        self._logger:info("run_teleport_skipped", { reason = "unpublished_place" })
+        return false
+    end
+
+    local payload, built = self._runHandoff.buildPayload(#boarding, workspace:GetServerTimeNow())
+    if payload == nil then
+        self._logger:warn("run_teleport_payload_invalid", { reason = built.reason })
+        return false
+    end
+
+    local reserved, accessCode = pcall(function()
+        return TeleportService:ReserveServer(placeId)
+    end)
+    if not reserved or type(accessCode) ~= "string" then
+        self:_recoverFromTeleportFailure(boarding, "reserve_failed")
+        return true
+    end
+
+    local options = Instance.new("TeleportOptions")
+    options.ReservedServerAccessCode = accessCode
+    options:SetTeleportData(payload)
+
+    local sent = pcall(function()
+        TeleportService:TeleportAsync(placeId, boarding, options)
+    end)
+    if not sent then
+        self:_recoverFromTeleportFailure(boarding, "teleport_failed")
+        return true
+    end
+
+    self._logger:info("run_teleport_started", { boarded = #boarding })
+    self._analyticsService:lobbyDeparture(nil, "teleport", true, nil, #boarding)
+    return true
+end
+
+function LobbyService._recoverFromTeleportFailure(
+    self: LobbyService,
+    boarding: { Player },
+    reason: string
+)
+    local recovery = self._runHandoff.failureRecovery(reason)
+    for _, player in boarding do
+        self._departed[player] = nil
+    end
+    if recovery.cancelDeparture then
+        self._state = self._lobbyDeparture.cancel(self._state)
+    end
+    self._logger:warn("run_teleport_failed", { reason = recovery.reason, party = #boarding })
+    self._analyticsService:lobbyDeparture(nil, "teleport", false, recovery.reason, #boarding)
+    self:_notify(recovery.message)
+end
+
 function LobbyService._launch(self: LobbyService, boarding: { Player })
+    -- Each party gets its own world when reserved servers are on. Only when
+    -- that is unavailable -- Studio, an unpublished place, or the flag off --
+    -- does the party move within this server instead.
+    if self:_teleportParty(boarding) then
+        for _, player in boarding do
+            self._departed[player] = true
+        end
+        return
+    end
+
     local destination = self._worldService:arrivalSpawnPosition()
     for index, player in boarding do
         local character = player.Character
@@ -14465,7 +14731,11 @@ function LobbyService.Start(self: LobbyService)
     Players.PlayerRemoving:Connect(function(player: Player)
         self._departed[player] = nil
     end)
+    for _, player in Players:GetPlayers() do
+        self:_adoptArrival(player)
+    end
     Players.PlayerAdded:Connect(function(player: Player)
+        self:_adoptArrival(player)
         player.CharacterAdded:Connect(function(character: Model)
             -- A player who already left keeps playing the game after a death
             -- instead of being returned to the staging yard.
@@ -14526,7 +14796,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -14620,7 +14890,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14833,7 +15103,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15662,7 +15932,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="72">
+        <Item class="ModuleScript" referent="73">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15841,7 +16111,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16412,7 +16682,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="74">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17511,7 +17781,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="75">
+        <Item class="ModuleScript" referent="76">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18036,7 +18306,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="76">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19012,7 +19282,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="77">
+        <Item class="ModuleScript" referent="78">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19512,7 +19782,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="78">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20749,7 +21019,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="80">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21588,7 +21858,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="80">
+        <Item class="ModuleScript" referent="81">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24766,40 +25036,58 @@ function WorldService._buildLobby(self: WorldService, world: Model)
             Vector3.new(wallSide * halfWidth, wallHeight / 2, 0)
         )
     end
-    -- Front wall with a wide doorway looking out toward Emberhollow.
-    for frontSide = -1, 1, 2 do
-        wall(
-            "LodgeWallFront",
-            Vector3.new(halfWidth - 7, wallHeight, 1.2),
-            Vector3.new(frontSide * (halfWidth + 7) / 2, wallHeight / 2, -halfDepth)
-        )
-    end
-    wall(
-        "LodgeDoorHeader",
-        Vector3.new(14, wallHeight - 11, 1.2),
-        Vector3.new(0, wallHeight - (wallHeight - 11) / 2, -halfDepth)
-    )
     --[[
-        The doorway is a view, not an exit.
+        The front wall is solid. There is no door.
 
-        The lodge is a staging room: the platform is how you leave, and a
-        player who simply ran out through the door skipped the entire
-        departure and arrived in the world alone. An invisible pane across
-        the opening keeps the doorway readable as a way out -- you can see the
-        road you are about to be sent to -- while making the platform the only
-        thing that actually gets you there.
+        A doorway invited players to walk out and skip the departure entirely,
+        arriving in the world alone; sealing it with an invisible pane stopped
+        that but left an opening the player could see through and not use,
+        which is its own kind of broken. A lodge with no exit but the platform
+        states the rule in geometry instead of enforcing it with a trick.
+        Windows keep the room from feeling like a box and still show the road
+        the player is about to be sent to.
     ]]
-    local doorSeal = part(
-        lobby,
-        "LodgeDoorSeal",
-        Vector3.new(14, 11, 1),
-        CFrame.new(LOBBY_CENTER + Vector3.new(0, 5.5, -halfDepth)),
-        Color3.fromRGB(255, 181, 76),
-        Enum.Material.Neon
+    wall(
+        "LodgeWallFront",
+        Vector3.new(halfWidth * 2, wallHeight, 1.2),
+        Vector3.new(0, wallHeight / 2, -halfDepth)
     )
-    doorSeal.Transparency = 0.94
-    doorSeal.CastShadow = false
-    doorSeal.CanQuery = false
+    for windowSide = -1, 1, 2 do
+        local windowAt = LOBBY_CENTER + Vector3.new(windowSide * 13, wallHeight * 0.58, -halfDepth)
+        local pane = part(
+            lobby,
+            "LodgeWindow",
+            Vector3.new(9, 5.5, 0.4),
+            CFrame.new(windowAt),
+            Color3.fromRGB(126, 168, 178),
+            Enum.Material.Glass,
+            false
+        )
+        pane.Transparency = 0.62
+        pane.CanQuery = false
+        for barIndex = -1, 1 do
+            local bar = part(
+                lobby,
+                "LodgeWindowBar",
+                Vector3.new(0.35, 5.7, 0.6),
+                CFrame.new(windowAt + Vector3.new(barIndex * 3, 0, 0)),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+            bar.CanQuery = false
+        end
+        local sill = part(
+            lobby,
+            "LodgeWindowSill",
+            Vector3.new(10, 0.6, 1.4),
+            CFrame.new(windowAt - Vector3.new(0, 3.1, 0)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+        sill.CanQuery = false
+    end
 
     -- Log courses and corner posts so the walls read as built timber.
     for courseIndex = 1, 5 do
@@ -31666,11 +31954,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="81">
+      <Item class="Folder" referent="82">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -34506,7 +34794,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -34957,7 +35245,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -35652,7 +35940,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="85">
+        <Item class="ModuleScript" referent="86">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -36286,7 +36574,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="86">
+        <Item class="ModuleScript" referent="87">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -36372,7 +36660,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="87">
+        <Item class="ModuleScript" referent="88">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -36644,7 +36932,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="88">
+        <Item class="ModuleScript" referent="89">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -36819,7 +37107,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="89">
+        <Item class="ModuleScript" referent="90">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -37364,7 +37652,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="90">
+        <Item class="ModuleScript" referent="91">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -37597,7 +37885,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="91">
+        <Item class="ModuleScript" referent="92">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -37686,7 +37974,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="92">
+        <Item class="ModuleScript" referent="93">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -38010,11 +38298,11 @@ return table.freeze(WorldSignBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="93">
+    <Item class="Folder" referent="94">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="94">
+      <Item class="Script" referent="95">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -39431,15 +39719,15 @@ print("[Last Light] PASS FoundationIntegration")
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="95">
+  <Item class="StarterPlayer" referent="96">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="96">
+    <Item class="StarterPlayerScripts" referent="97">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="97">
+      <Item class="LocalScript" referent="98">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -39561,11 +39849,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="98">
+        <Item class="Folder" referent="99">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="99">
+          <Item class="ModuleScript" referent="100">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -39696,7 +39984,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="100">
+          <Item class="ModuleScript" referent="101">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -42019,7 +42307,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="101">
+          <Item class="ModuleScript" referent="102">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -42318,7 +42606,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="102">
+          <Item class="ModuleScript" referent="103">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -42426,7 +42714,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="103">
+          <Item class="ModuleScript" referent="104">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -42545,7 +42833,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="104">
+          <Item class="ModuleScript" referent="105">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -42677,7 +42965,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="105">
+          <Item class="ModuleScript" referent="106">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -42965,7 +43253,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="106">
+  <Item class="Workspace" referent="107">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

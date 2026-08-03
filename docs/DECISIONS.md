@@ -584,3 +584,108 @@ altars, and no cosmetic purchases exist yet. Selling professions outright, which
 has been discussed, would contradict the paid-power rule in AGENTS.md and needs
 its own decision before any implementation.
 
+## 2026-08-02 — Tapping the world is the interaction model
+
+**Decision:** Objects are their own controls. Tapping a gather node, a tool
+display, the construction plot, the First Lantern, the memory reliquary, or a
+creature performs that action. The FIND and STRIKE buttons are gone; run,
+dodge, and ability keep buttons because they have no target to tap. Every
+click routes through the same rate limiter and the same server validation the
+keyboard path uses, so a click only says *which* object the player meant.
+
+**Reason:** Walking into range and then hunting the right HUD button made every
+interaction two steps, and on a phone those buttons were consuming the screen
+space the game has least of. Tapping is also self-teaching in a way a button
+labelled FIND is not.
+
+**Consequence to watch:** a ClickDetector only receives clicks if its part
+answers raycasts. Several interaction anchors are deliberately invisible and
+non-colliding, and `part()` clears `CanQuery` for anything non-colliding, so
+they were unclickable until `_registerInteraction` began forcing it back on.
+Any new interaction anchor must stay queryable or it will silently do nothing.
+
+## 2026-08-02 — Gathering and building take time and show it
+
+**Decision:** Gather and build are timed server-owned actions rather than
+instant grants. The character swings its tool, a progress bar runs, and the
+reward lands when `ActionProgress` says the clock is up. One action at a time
+per player, completion checked server-side, cancellation grants nothing, and
+the state is consumed on completion.
+
+**Reason:** An instant grant on button-press gave the player nothing to feel and
+made the tool choice decorative. The timer is deliberately short — this is
+confirmation that something happened, not a tax on the player's time.
+
+**Note:** the timed gate sits after the resource and stage guards but before
+`_advance`, which mutates. `TutorialFlow.advance` is pure, so validity is
+checked without committing; otherwise an invalid interaction would make the
+player swing an axe and only then be told it was the wrong objective.
+
+## 2026-08-02 — A session starts a fresh run
+
+**Decision:** `tutorial_persistence` is off. A player who leaves and rejoins
+begins at the lodge rather than resuming mid-run. The stage is still written to
+the profile, so turning the flag on restores resuming.
+
+**Reason:** Rejoining to find yourself halfway through a night you had already
+left, holding a tool you did not remember picking, reads as the game having
+lost track rather than as progress. Durable progress — banked materials,
+professions, town condition, chapter outcome — is separate from tutorial stage
+and is unaffected.
+
+## 2026-08-02 — Two placement mistakes worth recognising on sight
+
+**Decision:** Record these because each has now caused multiple bugs that all
+presented as "the thing does not appear".
+
+1. **Procedural content wired as a mesh's `fallbackInstance`.**
+   `hideProceduralPlaceholder` blanks *every* descendant of that instance —
+   transparency to 1 and every `Light` disabled — the moment the authored mesh
+   loads. This hid the Dawn Gate steps, wiped the tool yard displays, and
+   turned the First Lantern off when lit. A fallback must contain only the
+   geometry the mesh replaces, never real content that shares the model.
+
+2. **Ground-level geometry under a road.** Roads are thin and sit around
+   y 0.24–0.60. Anything authored at ground level in the same footprint is
+   drawn over and becomes both invisible and unclickable. This buried the
+   arrival roads once and the barricade construction plot once.
+
+**Reason:** Both failure modes are silent — no error, no log line, and the
+automated checks pass. Knowing the shape of them turns a long hunt into a
+first guess.
+
+## 2026-08-02 — Each departing party gets its own reserved server
+
+**Decision:** Reverses the "in-world staging, no teleport" decision taken
+earlier the same day. A party leaving the departure platform is now teleported
+to a reserved server for the *same* place, carrying a `RunHandoff` payload that
+tells the arriving server it is a run rather than a lobby. Behind
+`reserved_run_servers_enabled`; when the flag is off, when the place is
+unpublished, or in Studio, the party moves within the current server exactly as
+before.
+
+**Reason:** The earlier decision was right about cost and wrong about
+consequence. One shared world meant a party of three and a party of five who
+both departed landed in the same Emberhollow together, which makes the lodge a
+lie: it presents a choice of party size and then ignores it. Reserving a server
+for the same place avoids the thing that made the multi-place option expensive
+— there is no second place to publish, version, or keep in sync — while giving
+each run the isolation the staging platform implies.
+
+**Authority and failure:** The payload is deliberately inert. It can say "this
+is a run" and carries the party size; it cannot say anything about rewards,
+stage, or progression, so a forged one changes only which room a player wakes
+up in. Anything unrecognised resolves to a lobby, which is the safe direction:
+a server wrongly believing it is a run strands players in a world with no way
+to start one, while the reverse merely shows a staging room they can leave
+again. Reserving and teleporting are separate calls and either can fail; both
+are wrapped, and either failure returns the whole party to the lodge with the
+departure cancelled and nothing consumed.
+
+**Testing limit worth recording:** reserved-server teleports cannot be
+exercised in Studio at all, and `game.PlaceId` is 0 on an unpublished place.
+The rules therefore live in the pure `RunHandoff` module where they can be
+tested without a live game, and the service falls back rather than failing when
+reserving is impossible. The teleport itself can only be verified in the
+published game with real clients.
+

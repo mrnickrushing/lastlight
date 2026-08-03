@@ -3173,40 +3173,58 @@ function WorldService._buildLobby(self: WorldService, world: Model)
             Vector3.new(wallSide * halfWidth, wallHeight / 2, 0)
         )
     end
-    -- Front wall with a wide doorway looking out toward Emberhollow.
-    for frontSide = -1, 1, 2 do
-        wall(
-            "LodgeWallFront",
-            Vector3.new(halfWidth - 7, wallHeight, 1.2),
-            Vector3.new(frontSide * (halfWidth + 7) / 2, wallHeight / 2, -halfDepth)
-        )
-    end
-    wall(
-        "LodgeDoorHeader",
-        Vector3.new(14, wallHeight - 11, 1.2),
-        Vector3.new(0, wallHeight - (wallHeight - 11) / 2, -halfDepth)
-    )
     --[[
-        The doorway is a view, not an exit.
+        The front wall is solid. There is no door.
 
-        The lodge is a staging room: the platform is how you leave, and a
-        player who simply ran out through the door skipped the entire
-        departure and arrived in the world alone. An invisible pane across
-        the opening keeps the doorway readable as a way out -- you can see the
-        road you are about to be sent to -- while making the platform the only
-        thing that actually gets you there.
+        A doorway invited players to walk out and skip the departure entirely,
+        arriving in the world alone; sealing it with an invisible pane stopped
+        that but left an opening the player could see through and not use,
+        which is its own kind of broken. A lodge with no exit but the platform
+        states the rule in geometry instead of enforcing it with a trick.
+        Windows keep the room from feeling like a box and still show the road
+        the player is about to be sent to.
     ]]
-    local doorSeal = part(
-        lobby,
-        "LodgeDoorSeal",
-        Vector3.new(14, 11, 1),
-        CFrame.new(LOBBY_CENTER + Vector3.new(0, 5.5, -halfDepth)),
-        Color3.fromRGB(255, 181, 76),
-        Enum.Material.Neon
+    wall(
+        "LodgeWallFront",
+        Vector3.new(halfWidth * 2, wallHeight, 1.2),
+        Vector3.new(0, wallHeight / 2, -halfDepth)
     )
-    doorSeal.Transparency = 0.94
-    doorSeal.CastShadow = false
-    doorSeal.CanQuery = false
+    for windowSide = -1, 1, 2 do
+        local windowAt = LOBBY_CENTER + Vector3.new(windowSide * 13, wallHeight * 0.58, -halfDepth)
+        local pane = part(
+            lobby,
+            "LodgeWindow",
+            Vector3.new(9, 5.5, 0.4),
+            CFrame.new(windowAt),
+            Color3.fromRGB(126, 168, 178),
+            Enum.Material.Glass,
+            false
+        )
+        pane.Transparency = 0.62
+        pane.CanQuery = false
+        for barIndex = -1, 1 do
+            local bar = part(
+                lobby,
+                "LodgeWindowBar",
+                Vector3.new(0.35, 5.7, 0.6),
+                CFrame.new(windowAt + Vector3.new(barIndex * 3, 0, 0)),
+                WET_BARK,
+                Enum.Material.Wood,
+                false
+            )
+            bar.CanQuery = false
+        end
+        local sill = part(
+            lobby,
+            "LodgeWindowSill",
+            Vector3.new(10, 0.6, 1.4),
+            CFrame.new(windowAt - Vector3.new(0, 3.1, 0)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+        sill.CanQuery = false
+    end
 
     -- Log courses and corner posts so the walls read as built timber.
     for courseIndex = 1, 5 do

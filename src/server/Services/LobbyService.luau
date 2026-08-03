@@ -15,6 +15,7 @@
 ]]
 
 local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
 
 local LobbyService = {}
@@ -32,6 +33,8 @@ export type LobbyService = typeof(setmetatable(
         _logger: Logger,
         _config: any,
         _lobbyDeparture: any,
+        _runHandoff: any,
+        _isRunServer: boolean,
         _featureFlags: any,
         _worldService: any,
         _analyticsService: any,
@@ -50,6 +53,7 @@ function LobbyService.new(
     logger: Logger,
     config: any,
     lobbyDeparture: any,
+    runHandoff: any,
     featureFlags: any,
     worldService: any,
     analyticsService: any
@@ -59,6 +63,8 @@ function LobbyService.new(
         _logger = logger,
         _config = config,
         _lobbyDeparture = lobbyDeparture,
+        _runHandoff = runHandoff,
+        _isRunServer = false,
         _featureFlags = featureFlags,
         _worldService = worldService,
         _analyticsService = analyticsService,
@@ -179,7 +185,125 @@ end
     another, and marked departed so a respawn keeps them in the game rather
     than dropping them back into the lobby.
 ]]
+--[[
+    Is this server a run, or the lobby?
+
+    Resolved once from the teleport payload this server was started with.
+    Anything unrecognised resolves to a lobby, which is the safe direction:
+    a server that wrongly thinks it is a run drops players into the world
+    with no way to start one, while a server that wrongly thinks it is a
+    lobby only shows a staging room they can depart from again.
+]]
+function LobbyService.isRunServer(self: LobbyService): boolean
+    return self._isRunServer
+end
+
+--[[
+    Read the teleport payload a joining player arrived with.
+
+    The payload travels per player, so the first arrival carrying a valid run
+    payload settles what this server is, and later joins cannot change it. The
+    payload is inert by design -- it can say "this is a run" and nothing about
+    rewards or progression -- so trusting it decides only which room the
+    player wakes up in.
+]]
+function LobbyService._adoptArrival(self: LobbyService, player: Player)
+    local data: any = nil
+    pcall(function()
+        data = player:GetJoinData().TeleportData
+    end)
+    local read = self._runHandoff.readPayload(data)
+    if not read.isRun then
+        return
+    end
+    if not self._isRunServer then
+        self._isRunServer = true
+        self._logger:info("run_server_adopted", { partySize = read.partySize })
+    end
+    -- Departed players skip the lodge: the existing respawn path puts them at
+    -- the arrival clearing and keeps them there.
+    self._departed[player] = true
+end
+
+--[[
+    Send a boarded party to its own reserved server.
+
+    Reserving and teleporting are separate calls and either can fail. Both are
+    wrapped, and any failure runs the same recovery: the party stays in the
+    lodge, the departure is cancelled, and nothing is consumed. A half-sent
+    party that lost its staging state is worse than one that never left.
+]]
+function LobbyService._teleportParty(self: LobbyService, boarding: { Player }): boolean
+    if not self._featureFlags:isEnabled("reserved_run_servers_enabled") then
+        return false
+    end
+    local placeId = game.PlaceId
+    if placeId == 0 then
+        -- Studio and unpublished builds cannot reserve a server. Fall back to
+        -- moving the party in place so the lodge still works while testing.
+        self._logger:info("run_teleport_skipped", { reason = "unpublished_place" })
+        return false
+    end
+
+    local payload, built = self._runHandoff.buildPayload(#boarding, workspace:GetServerTimeNow())
+    if payload == nil then
+        self._logger:warn("run_teleport_payload_invalid", { reason = built.reason })
+        return false
+    end
+
+    local reserved, accessCode = pcall(function()
+        return TeleportService:ReserveServer(placeId)
+    end)
+    if not reserved or type(accessCode) ~= "string" then
+        self:_recoverFromTeleportFailure(boarding, "reserve_failed")
+        return true
+    end
+
+    local options = Instance.new("TeleportOptions")
+    options.ReservedServerAccessCode = accessCode
+    options:SetTeleportData(payload)
+
+    local sent = pcall(function()
+        TeleportService:TeleportAsync(placeId, boarding, options)
+    end)
+    if not sent then
+        self:_recoverFromTeleportFailure(boarding, "teleport_failed")
+        return true
+    end
+
+    self._logger:info("run_teleport_started", { boarded = #boarding })
+    self._analyticsService:lobbyDeparture(nil, "teleport", true, nil, #boarding)
+    return true
+end
+
+function LobbyService._recoverFromTeleportFailure(
+    self: LobbyService,
+    boarding: { Player },
+    reason: string
+)
+    local recovery = self._runHandoff.failureRecovery(reason)
+    for _, player in boarding do
+        self._departed[player] = nil
+    end
+    if recovery.cancelDeparture then
+        self._state = self._lobbyDeparture.cancel(self._state)
+    end
+    self._logger:warn("run_teleport_failed", { reason = recovery.reason, party = #boarding })
+    self._analyticsService:lobbyDeparture(nil, "teleport", false, recovery.reason, #boarding)
+    self:_notify(recovery.message)
+end
+
 function LobbyService._launch(self: LobbyService, boarding: { Player })
+    -- Each party gets its own world when reserved servers are on. Only when
+    -- that is unavailable -- Studio, an unpublished place, or the flag off --
+    -- does the party move within this server instead.
+    if self:_teleportParty(boarding) then
+        for _, player in boarding do
+            self._departed[player] = true
+        end
+        return
+    end
+
     local destination = self._worldService:arrivalSpawnPosition()
     for index, player in boarding do
         local character = player.Character
@@ -199,7 +323,11 @@ function LobbyService.Start(self: LobbyService)
     Players.PlayerRemoving:Connect(function(player: Player)
         self._departed[player] = nil
     end)
+    for _, player in Players:GetPlayers() do
+        self:_adoptArrival(player)
+    end
     Players.PlayerAdded:Connect(function(player: Player)
+        self:_adoptArrival(player)
         player.CharacterAdded:Connect(function(character: Model)
             -- A player who already left keeps playing the game after a death
             -- instead of being returned to the staging yard.

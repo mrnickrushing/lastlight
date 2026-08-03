@@ -44,6 +44,7 @@ local TownCondition = require(root.TownCondition)
 local TownGuardLastStand = require(root.TownGuardLastStand)
 local LobbyDeparture = require(root.LobbyDeparture)
 local ActionProgress = require(root.ActionProgress)
+local RunHandoff = require(root.RunHandoff)
 local TownProgression = require(root.TownProgression)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
@@ -226,8 +227,15 @@ local phaseService = PhaseService.new(
     Config.FirstNightDuskSeconds,
     Config.FirstNightSeconds
 )
-local lobbyService =
-    LobbyService.new(logger, Config, LobbyDeparture, featureFlags, worldService, analyticsService)
+local lobbyService = LobbyService.new(
+    logger,
+    Config,
+    LobbyDeparture,
+    RunHandoff,
+    featureFlags,
+    worldService,
+    analyticsService
+)
 local townNightService = TownNightService.new(
     logger,
     Config,
