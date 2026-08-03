@@ -1,0 +1,298 @@
+--!strict
+
+--[[
+    Milestone 4 exit gate: "migration fixtures cover every released schema."
+
+    SaveSchema.spec already tests what each migration does. This file exists to
+    answer a different question -- whether any released version has been left
+    without a fixture at all -- and to make the answer fail loudly rather than
+    quietly. The coverage case below reads the current version from Config, so
+    bumping the schema without adding an era profile breaks the suite instead of
+    shipping an untested upgrade path.
+
+    An era profile is a representative save as it actually looked at that
+    version: only the fields that existed then. That matters, because a fixture
+    built from a modern profile with an old version number stamped on it does
+    not exercise migration at all -- every field it needs is already present.
+]]
+
+local Config = require("../../src/shared/Config")
+local SaveSchema = require("../../src/shared/SaveSchema")
+local TestRunner = require("../TestRunner")
+
+local NOW = 4000
+
+-- One representative profile per released schema version. Shapes are taken
+-- from the migrations already covered in SaveSchema.spec rather than invented.
+local ERA_PROFILES: { [number]: any } = {
+    [1] = {
+        schemaVersion = 1,
+        createdAt = 10,
+        updatedAt = 20,
+        revision = 7,
+        tutorial = { stage = "complete", complete = true },
+    },
+    [2] = {
+        schemaVersion = 2,
+        createdAt = 10,
+        updatedAt = 20,
+        revision = 3,
+        tutorial = { stage = "gather", complete = false },
+        profession = { selectedId = "profession_medic" },
+    },
+    [3] = {
+        schemaVersion = 3,
+        createdAt = 10,
+        updatedAt = 20,
+        revision = 4,
+        tutorial = { stage = "complete", complete = true },
+        profession = { selectedId = "profession_scout" },
+        story = { chapterOne = { status = "unresolved" } },
+    },
+    [4] = {
+        schemaVersion = 4,
+        createdAt = 10,
+        updatedAt = 20,
+        revision = 5,
+        tutorial = { stage = "complete", complete = true },
+        story = { chapterOne = { status = "unresolved" } },
+    },
+    [5] = {
+        schemaVersion = 5,
+        createdAt = 10,
+        updatedAt = 20,
+        revision = 6,
+        tutorial = { stage = "complete", complete = true },
+        town = { nightNumber = 4 },
+    },
+    [6] = {
+        schemaVersion = 6,
+        createdAt = 10,
+        updatedAt = 20,
+        revision = 8,
+        tutorial = { stage = "complete", complete = true },
+        town = { nightNumber = 6 },
+        gear = {},
+    },
+    [7] = {
+        schemaVersion = 7,
+        createdAt = 10,
+        updatedAt = 20,
+        revision = 9,
+        tutorial = { stage = "complete", complete = true },
+        town = { nightNumber = 7 },
+        gear = {},
+        quests = { claimed = {} },
+    },
+    [8] = {
+        schemaVersion = 8,
+        createdAt = 10,
+        updatedAt = 20,
+        revision = 11,
+        tutorial = { stage = "complete", complete = true },
+        town = { nightNumber = 9 },
+        quests = { claimed = {} },
+    },
+    [9] = {
+        schemaVersion = 9,
+        createdAt = 10,
+        updatedAt = 20,
+        revision = 12,
+        tutorial = { stage = "complete", complete = true },
+        town = { nightNumber = 10, condition = {} },
+    },
+    [10] = {
+        schemaVersion = 10,
+        createdAt = 10,
+        updatedAt = 20,
+        revision = 14,
+        tutorial = { stage = "complete", complete = true },
+        town = { nightNumber = 12, condition = {} },
+        profession = { selectedId = "profession_engineer" },
+    },
+}
+
+-- Every field SaveSchema.default produces. A migrated profile that is missing
+-- one of these is a profile some later system will index into and fault on.
+local REQUIRED_FIELDS: { string } = {
+    "schemaVersion",
+    "createdAt",
+    "updatedAt",
+    "revision",
+    "tutorial",
+    "inventory",
+    "profession",
+    "story",
+    "town",
+    "gear",
+    "equipped",
+    "quests",
+}
+
+local function assertCurrentShape(profile: any, label: string)
+    for _, field in REQUIRED_FIELDS do
+        TestRunner.truthy(
+            profile[field] ~= nil,
+            string.format("%s: migrated profile is missing %s", label, field)
+        )
+    end
+    TestRunner.equal(profile.schemaVersion, Config.SaveSchemaVersion)
+    TestRunner.truthy(type(profile.revision) == "number", label .. ": revision is not a number")
+    TestRunner.truthy(profile.revision >= 0, label .. ": revision went negative")
+    TestRunner.truthy(
+        type(profile.tutorial.stage) == "string",
+        label .. ": tutorial lost its stage"
+    )
+    TestRunner.truthy(
+        type(profile.town.nightNumber) == "number" and profile.town.nightNumber >= 1,
+        label .. ": night number is not a real night"
+    )
+    TestRunner.truthy(
+        type(profile.story.chapterOne.status) == "string",
+        label .. ": chapter one lost its status"
+    )
+end
+
+return {
+    name = "SaveMigration",
+    cases = {
+        {
+            name = "every released schema version has a migration fixture",
+            run = function()
+                -- The current version is not in the table by design: it is what
+                -- everything migrates *to*, and SaveSchema.default covers it.
+                for version = 1, Config.SaveSchemaVersion - 1 do
+                    TestRunner.truthy(
+                        ERA_PROFILES[version] ~= nil,
+                        string.format(
+                            "schema %d was released with no migration fixture -- add an era "
+                                .. "profile to SaveMigration.spec before shipping the bump",
+                            version
+                        )
+                    )
+                end
+            end,
+        },
+        {
+            name = "no fixture claims a version that was never released",
+            run = function()
+                for version in ERA_PROFILES do
+                    TestRunner.truthy(
+                        version >= 1 and version < Config.SaveSchemaVersion,
+                        string.format("fixture for unreleased schema version %d", version)
+                    )
+                end
+            end,
+        },
+        {
+            name = "every released schema normalizes into a complete current profile",
+            run = function()
+                for version = 1, Config.SaveSchemaVersion - 1 do
+                    local profile = SaveSchema.normalize(ERA_PROFILES[version], NOW)
+                    assertCurrentShape(profile, string.format("schema %d", version))
+                end
+            end,
+        },
+        {
+            name = "migration preserves what the old save actually earned",
+            run = function()
+                -- A migration that quietly resets progress passes a shape check
+                -- and still loses the player's game.
+                local one = SaveSchema.normalize(ERA_PROFILES[1], NOW)
+                TestRunner.equal(one.revision, 7)
+                TestRunner.equal(one.tutorial.complete, true)
+
+                local five = SaveSchema.normalize(ERA_PROFILES[5], NOW)
+                TestRunner.equal(five.town.nightNumber, 4)
+
+                local ten = SaveSchema.normalize(ERA_PROFILES[10], NOW)
+                TestRunner.equal(ten.town.nightNumber, 12)
+                TestRunner.equal(ten.profession.selectedId, "profession_engineer")
+            end,
+        },
+        {
+            name = "migrating twice changes nothing the second time",
+            run = function()
+                -- Every save is normalized on load and again on write, so a
+                -- migration that is not idempotent drifts a little on every
+                -- session until something downstream breaks.
+                for version = 1, Config.SaveSchemaVersion - 1 do
+                    local once = SaveSchema.normalize(ERA_PROFILES[version], NOW)
+                    local twice = SaveSchema.normalize(once, NOW + 100)
+
+                    local label = string.format("schema %d", version)
+                    TestRunner.equal(twice.schemaVersion, once.schemaVersion)
+                    TestRunner.equal(twice.revision, once.revision)
+                    TestRunner.equal(twice.tutorial.stage, once.tutorial.stage)
+                    TestRunner.equal(twice.tutorial.complete, once.tutorial.complete)
+                    TestRunner.equal(twice.town.nightNumber, once.town.nightNumber)
+                    TestRunner.equal(twice.profession.selectedId, once.profession.selectedId)
+                    TestRunner.equal(twice.story.chapterOne.status, once.story.chapterOne.status)
+                    assertCurrentShape(twice, label .. " (second pass)")
+                end
+            end,
+        },
+        {
+            name = "a migrated profile still accepts every current wrapper",
+            run = function()
+                -- Shape alone is not enough: the migrated profile has to work
+                -- with the code that will touch it next.
+                for version = 1, Config.SaveSchemaVersion - 1 do
+                    local profile = SaveSchema.normalize(ERA_PROFILES[version], NOW)
+                    local label = string.format("schema %d", version)
+
+                    local advanced = SaveSchema.withNightNumber(profile, 40, NOW)
+                    TestRunner.equal(advanced.town.nightNumber, 40)
+                    TestRunner.equal(advanced.revision, profile.revision + 1)
+
+                    local rewarded = SaveSchema.withUnbankedExpeditionReward(
+                        advanced,
+                        "txn_" .. version,
+                        "manifest_migration",
+                        { materialId = "material_heartwood", amount = 2 },
+                        NOW
+                    )
+                    TestRunner.truthy(
+                        SaveSchema.hasExpeditionReward(rewarded, "txn_" .. version),
+                        label .. ": a migrated profile could not take a reward"
+                    )
+                end
+            end,
+        },
+        {
+            name = "a hostile save from any era is refused rather than carried forward",
+            run = function()
+                -- The oldest saves are the likeliest to have been edited by
+                -- hand, so every era gets the same forged payload treatment.
+                for version = 1, Config.SaveSchemaVersion - 1 do
+                    local forged = table.clone(ERA_PROFILES[version])
+                    forged.revision = -500
+                    forged.schemaVersion = version
+                    forged.tutorial = { stage = "own_the_server", complete = "yes" }
+                    forged.profession = { selectedId = "profession_admin" }
+                    forged.story = {
+                        chapterOne = {
+                            status = "complete",
+                            decision = "grant_everything",
+                            wardenOutcome = "cheated",
+                            transactionId = "",
+                        },
+                    }
+                    forged.town = { nightNumber = -9000 }
+
+                    local profile = SaveSchema.normalize(forged, NOW)
+                    local label = string.format("schema %d", version)
+
+                    assertCurrentShape(profile, label .. " (forged)")
+                    TestRunner.equal(profile.profession.selectedId, nil)
+                    TestRunner.equal(profile.story.chapterOne.status, "unresolved")
+                    TestRunner.equal(profile.story.chapterOne.decision, nil)
+                    TestRunner.truthy(
+                        profile.tutorial.stage ~= "own_the_server",
+                        label .. ": an invented tutorial stage survived migration"
+                    )
+                end
+            end,
+        },
+    },
+}

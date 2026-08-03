@@ -39,6 +39,7 @@ TestRunner.run({
     require("./specs/ReviveFlow.spec"),
     require("./specs/ResidentDialogue.spec"),
     require("./specs/SaveSchema.spec"),
+    require("./specs/SaveMigration.spec"),
     require("./specs/ServiceRegistry.spec"),
     require("./specs/SurvivalState.spec"),
     require("./specs/StatusEffectState.spec"),

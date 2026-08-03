@@ -23566,10 +23566,40 @@ local function buildEmberhollowSanctuary(
     meshPlacements: { MeshPlacement }
 ): { Instance }
     local courtyard = Vector3.new(0, 0, -112)
+
+    --[[
+        How much room the town square gives a fight.
+
+        The square shipped at 35 studs across, which combat had outgrown
+        without anyone doing the arithmetic. At the sprint speed of 24 you
+        crossed the whole plaza in 1.46 seconds, and a dodge covers about 18
+        studs, so two dodges took you from one edge to the other. There was no
+        room to retreat, circle, or pull an enemy off someone -- only room to
+        hit the far wall.
+
+        72 is not a round number picked for headroom. It is twice
+        LanternSafeRadius, so the First Lantern's safe light now reaches almost
+        exactly to the plaza edge and leaves the corners outside it. The
+        boundary a player has been standing inside all along becomes something
+        they can see: the middle is lit and safe, the corners are neither. At
+        that width a dodge is an evasive move rather than a traversal, sprinting
+        the full span takes three seconds, and four of the longest enemy attack
+        lanes fit across it.
+
+        The cabins moved out to match. They sat at x +/-36 with a 17.3-stud
+        footprint, putting their inner walls at 27.4 -- inside the new plaza.
+        Everything else here is positioned off PLAZA_HALF so the next person to
+        retune this changes one number.
+    ]]
+    local PLAZA_HALF = 36
+    local COURTYARD_HALF_X = PLAZA_HALF + 22
+    local COURTYARD_HALF_Z = PLAZA_HALF + 12
+    local CABIN_X = 52
+
     local courtyardPatch = part(
         parent,
         "EmberhollowCourtyard",
-        Vector3.new(92, 0.3, 62),
+        Vector3.new(COURTYARD_HALF_X * 2, 0.3, COURTYARD_HALF_Z * 2),
         CFrame.new(courtyard + Vector3.new(0, 0.18, 1)),
         Color3.fromRGB(53, 59, 45),
         Enum.Material.Ground,
@@ -24312,8 +24342,8 @@ local function buildEmberhollowSanctuary(
     end
 
     local shells = {
-        cabin(Vector3.new(-36, 0, -112), math.rad(-90), "WAYFARER CABIN", AMBER),
-        cabin(Vector3.new(36, 0, -112), math.rad(90), "MARA'S SHELTER", FOXFIRE),
+        cabin(Vector3.new(-CABIN_X, 0, -112), math.rad(-90), "WAYFARER CABIN", AMBER),
+        cabin(Vector3.new(CABIN_X, 0, -112), math.rad(90), "MARA'S SHELTER", FOXFIRE),
     }
 
     local commons = Instance.new("Model")
@@ -24474,15 +24504,18 @@ local function buildEmberhollowSanctuary(
             9700 + #meshPlacements
         )
     end
-    townSideRoad(Vector3.new(0, 0.45, -144), Vector3.new(-80, 0.45, -144))
-    townSideRoad(Vector3.new(0, 0.45, -126), Vector3.new(80, 0.45, -126))
+    -- These two run east and west at depths the plaza now covers. They start at
+    -- its edge rather than at x = 0, so a road meets the square instead of
+    -- appearing to begin in the middle of it.
+    townSideRoad(Vector3.new(-PLAZA_HALF, 0.45, -144), Vector3.new(-80, 0.45, -144))
+    townSideRoad(Vector3.new(PLAZA_HALF, 0.45, -126), Vector3.new(80, 0.45, -126))
     townSideRoad(Vector3.new(0, 0.45, -184), Vector3.new(-80, 0.45, -184))
     townSideRoad(Vector3.new(0, 0.45, -164), Vector3.new(80, 0.45, -164))
     townSideRoad(Vector3.new(0, 0.45, -198), Vector3.new(50, 0.45, -198))
     local square = part(
         parent,
         "FirstLanternTownSquare",
-        Vector3.new(35, 0.56, 35),
+        Vector3.new(PLAZA_HALF * 2, 0.56, PLAZA_HALF * 2),
         CFrame.new(courtyard + Vector3.new(0, 0.52, 0)),
         Color3.fromRGB(83, 64, 44),
         Enum.Material.Ground,
@@ -24491,8 +24524,17 @@ local function buildEmberhollowSanctuary(
     square.CanQuery = false
     for _, pathSpec in
         {
-            { Vector3.new(-10, 0.84, -113), Vector3.new(-27.5, 0.84, -116.5) },
-            { Vector3.new(10, 0.84, -111), Vector3.new(27.5, 0.84, -107.5) },
+            -- From the plaza edge out to each cabin door, rather than from
+            -- near the lantern: the paths used to start inside what is now
+            -- fighting space.
+            {
+                Vector3.new(-(PLAZA_HALF - 2), 0.84, -113),
+                Vector3.new(-(CABIN_X - 9), 0.84, -116.5),
+            },
+            {
+                Vector3.new(PLAZA_HALF - 2, 0.84, -111),
+                Vector3.new(CABIN_X - 9, 0.84, -107.5),
+            },
         }
     do
         local start = pathSpec[1]
@@ -24523,8 +24565,14 @@ local function buildEmberhollowSanctuary(
                 parent,
                 "TownSquareEdgeStone",
                 Vector3.new(2.4, 0.75, 1.6),
-                CFrame.new(courtyard + Vector3.new(xDirection * 16.3, 0.86, zDirection * 16.3))
-                    * CFrame.Angles(0.08, angle, 0.12),
+                CFrame.new(
+                    courtyard
+                        + Vector3.new(
+                            xDirection * (PLAZA_HALF - 2.5),
+                            0.86,
+                            zDirection * (PLAZA_HALF - 2.5)
+                        )
+                ) * CFrame.Angles(0.08, angle, 0.12),
                 Color3.fromRGB(78, 82, 74),
                 Enum.Material.Slate,
                 false
@@ -24532,13 +24580,17 @@ local function buildEmberhollowSanctuary(
             stone.Shape = Enum.PartType.Ball
         end
     end
+    -- Benches line the plaza edge instead of standing in the middle of it.
+    -- Seating a player could be knocked into during a night fight is furniture
+    -- in an arena; seating at the rim is somewhere to watch from.
+    local benchX = PLAZA_HALF - 6
     for side = -1, 1, 2 do
-        local benchZ = if side < 0 then -100 else -124
+        local benchZ = -112 + side * (PLAZA_HALF - 8)
         local bench = part(
             parent,
             "LanternBench",
             Vector3.new(7, 0.7, 1.6),
-            CFrame.new(side * 19.5, 1.2, benchZ) * CFrame.Angles(0, math.rad(90), 0),
+            CFrame.new(side * benchX, 1.2, benchZ) * CFrame.Angles(0, math.rad(90), 0),
             Color3.fromRGB(91, 65, 45),
             Enum.Material.WoodPlanks
         )
@@ -24548,7 +24600,7 @@ local function buildEmberhollowSanctuary(
                 parent,
                 "LanternBenchLeg",
                 Vector3.new(0.45, 1.2, 1.1),
-                CFrame.new(side * 19.5, 0.6, benchZ + leg * 2.1),
+                CFrame.new(side * benchX, 0.6, benchZ + leg * 2.1),
                 WET_BARK,
                 Enum.Material.Wood,
                 false
@@ -24556,15 +24608,16 @@ local function buildEmberhollowSanctuary(
             support.CanQuery = false
         end
     end
+    local signZ = -112 + COURTYARD_HALF_Z - 4
     local campSign = labelSign(
         parent,
-        CFrame.new(0, 3.2, -95) * CFrame.Angles(0, math.pi, 0),
+        CFrame.new(0, 3.2, signZ) * CFrame.Angles(0, math.pi, 0),
         "EMBERHOLLOW · SAFE CAMP"
     )
     table.insert(meshPlacements, {
         assetId = "mesh_creator_forest_sign_a",
         fallbackKind = "asset_replacement",
-        position = Vector3.new(0, 0, -95),
+        position = Vector3.new(0, 0, signZ),
         scale = 1.2,
         yaw = math.pi,
         seed = 9840,
@@ -41366,11 +41419,17 @@ assert(
     heartwoodStump ~= nil and heartwoodStump:IsA("BasePart") and heartwoodStump.Position.X >= 34,
     "Heartwood must sit beside the road rather than on it"
 )
+-- This used to require the worksite 38 studs off the route, back when it sat
+-- in an empty field at x = -44. It was deliberately moved across the arrival
+-- road just past the spawn so that building it visibly defends the way in --
+-- and this assertion was left behind asserting the opposite, which no run
+-- could satisfy. Standing on the route is now the requirement, not the fault.
 assert(
     constructionPlot ~= nil
         and constructionPlot:IsA("BasePart")
-        and constructionPlot.Position.X <= -38,
-    "barricade worksite must sit beside the road rather than on it"
+        and math.abs(constructionPlot.Position.X) <= 10
+        and constructionPlot.Position.Z > -40,
+    "barricade worksite must straddle the arrival road just past the spawn"
 )
 local builderMaterialSets = 0
 local completedBuildingFrames = 0
