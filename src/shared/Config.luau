@@ -80,6 +80,10 @@ return table.freeze({
         -- happens in Studio and on an unpublished place, where reserving is
         -- impossible.
         reserved_run_servers_enabled = true,
+        -- Chat commands for the AdminRoster user IDs. Checked on every
+        -- message rather than cached, so turning this off stops them
+        -- mid-session for everyone, roster included.
+        admin_commands_enabled = true,
         region_bramblewake_enabled = true,
         region_ironroot_enabled = false,
         region_mireglass_enabled = false,

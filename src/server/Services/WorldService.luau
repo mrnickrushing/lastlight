@@ -10010,6 +10010,32 @@ function WorldService._applyDuskLighting(_self: WorldService)
     end
 end
 
+--[[
+    Force the world's lighting phase for a tester.
+
+    Goes through the same setDusk/setNight the phase clock uses, so an admin
+    can only put the world into a state it reaches on its own. It does not
+    touch the schedule: the next real phase change overwrites this, which is
+    the intended behaviour -- this is for looking at something, not for
+    running the game from chat.
+]]
+function WorldService.adminSetPhase(self: WorldService, phase: string): boolean
+    if phase == "day" then
+        self:setNight(false)
+        self:setDusk(false)
+        return true
+    elseif phase == "dusk" then
+        self:setNight(false)
+        self:setDusk(true)
+        return true
+    elseif phase == "night" then
+        self:setDusk(false)
+        self:setNight(true)
+        return true
+    end
+    return false
+end
+
 function WorldService.setDusk(self: WorldService, enabled: boolean)
     self._dusk = enabled
     self:_setDuskSignals(enabled)
