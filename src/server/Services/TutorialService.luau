@@ -353,6 +353,14 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     }
     self._sessions[player] = session
     self._worldService:setTownConsequence(self._profileService:townConsequence(player))
+    -- Seeds the server's live construction accumulator from this player's
+    -- own profile the same moment their tier ceiling is seeded. Without
+    -- this, a fresh server session starts every building back at the
+    -- accumulator's empty default until someone happens to fund a stage,
+    -- which is exactly the "town collapses back to construction sites"
+    -- regression this whole feature exists to avoid on the buildings a
+    -- returning player already paid for (or was grandfathered into).
+    self._worldService:setTownConstruction(self._profileService:townConstructionState(player))
 
     if stage == "prepare" or stage == "survive" or stage == "reveal" or stage == "complete" then
         self._worldService:buildBarricade(false)
@@ -680,6 +688,43 @@ function TutorialService._interact(
             toast = "NOT ENOUGH MATERIALS"
         else
             toast = "CRAFTING UNAVAILABLE"
+        end
+        self:_setToast(player, toast)
+        self:_publish(player)
+        return
+    end
+    if actionId == self._runtimeIds.Actions.ContributeConstruction then
+        local buildingId = prompt:GetAttribute("Payload")
+        if type(buildingId) ~= "string" then
+            return
+        end
+        local result = self._profileService:contributeToConstruction(player, buildingId)
+        if result.accepted then
+            self:_setToast(
+                player,
+                string.format("%s BUILT TO STAGE %d", prompt.ObjectText, result.stage)
+            )
+            -- Construction is shared town state, the same reasoning
+            -- RepairTown's own _publishAll() call already uses: the stage a
+            -- player just funded is visible to everyone in the world, not
+            -- only to the player who paid for it.
+            self._worldService:setTownConstruction(
+                self._profileService:townConstructionState(player)
+            )
+            self:_publishAll()
+            return
+        end
+        local toast: string
+        if result.reason == "tier_not_ready" then
+            toast = "SURVIVE MORE NIGHTS BEFORE BUILDING FURTHER"
+        elseif result.reason == "already_maxed" then
+            toast = "ALREADY FULLY BUILT"
+        elseif result.reason == "insufficient_materials" then
+            toast = "NOT ENOUGH MATERIALS TO BUILD"
+        elseif result.reason == "unknown_building" then
+            toast = "THAT BUILDING DOES NOT EXIST"
+        else
+            toast = "CONSTRUCTION UNAVAILABLE"
         end
         self:_setToast(player, toast)
         self:_publish(player)

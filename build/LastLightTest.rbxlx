@@ -2410,14 +2410,14 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.46.1",
+    BuildVersion = "0.47.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 11,
+    SaveSchemaVersion = 12,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -8994,6 +8994,7 @@ return table.freeze(RunHandoff)
 
 local ExpeditionEventFlow = require("./ExpeditionEventFlow")
 local ProfessionMastery = require("./ProfessionMastery")
+local TownProgression = require("./TownProgression")
 
 local professionSpecializationInteractionIds = {}
 local professionSpecializationInteractionIdBySpecialization = {}
@@ -9005,6 +9006,16 @@ for _, specializationId in ProfessionMastery.specializationIds() do
     )
     table.insert(professionSpecializationInteractionIds, interactionId)
     professionSpecializationInteractionIdBySpecialization[specializationId] = interactionId
+end
+
+-- One construction interaction per building, generated from the shared
+-- sixteen-building list rather than written out by hand, the same reasoning
+-- TownProgression.luau itself gives for driving the later eleven buildings
+-- off one table: a building added to the town gets an interaction ID for
+-- free instead of needing someone to remember to add one.
+local constructionInteractionIds = {}
+for _, buildingId in TownProgression.buildingIds() do
+    constructionInteractionIds[buildingId] = "construction_" .. buildingId
 end
 
 local RuntimeIds = {
@@ -9065,6 +9076,7 @@ local RuntimeIds = {
         ResolveTownIncident = "resolve_town_incident",
         RecoverExpeditionCache = "recover_expedition_cache",
         SelectProfessionSpecialization = "select_profession_specialization",
+        ContributeConstruction = "contribute_construction",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -9102,6 +9114,7 @@ local RuntimeIds = {
         npc_pip_wren = "resident_pip_wren",
         npc_ena_moss = "resident_ena_moss",
     }),
+    ConstructionInteractionIds = table.freeze(constructionInteractionIds),
     TownRepairInteractionIds = table.freeze({
         "town_repair_archive",
         "town_repair_workshop",
@@ -9131,6 +9144,7 @@ local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
 local TownProgression = require("./TownProgression")
 local TownCondition = require("./TownCondition")
+local TownConstruction = require("./TownConstruction")
 
 local SaveSchema = {}
 
@@ -9164,6 +9178,7 @@ export type Profile = {
     town: {
         nightNumber: number,
         condition: TownCondition.State,
+        construction: { [string]: number },
     },
     gear: { [string]: number },
     equipped: Equipment.Equipped,
@@ -9187,7 +9202,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 11,
+        schemaVersion = 12,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -9214,6 +9229,7 @@ function SaveSchema.default(now: number): Profile
         town = {
             nightNumber = 1,
             condition = TownCondition.default(),
+            construction = TownConstruction.default(),
         },
         gear = Crafting.default(),
         equipped = Equipment.default(),
@@ -9308,13 +9324,41 @@ function SaveSchema.normalize(value: any, now: number): Profile
     end
     profile.town.condition =
         TownCondition.normalize(if type(town) == "table" then town.condition else nil)
+
+    --[[
+        Construction orders (schema 12) must grandfather every save that
+        predates them. A save from before this field existed carries no
+        `town.construction` table at all -- that absence, not any particular
+        value inside it, is what marks a pre-migration profile, because a
+        genuinely fresh schema-12 save also starts with an empty table (no
+        building funded yet) and must not be treated as needing a rescue.
+
+        Grandfathering happens by re-deriving the exact ceiling nights and
+        chapter one already granted, using TownProgression.resolve against
+        the `profile` this function has already built above -- its
+        town.nightNumber and story.chapterOne are already the trustworthy,
+        normalized values for this save, not the raw (and possibly forged)
+        input. Seeding the ledger to that ceiling means every building a
+        player already had looks exactly as built as it did a moment ago;
+        only growth beyond what nights had already unlocked requires payment
+        from here on. Getting this wrong either lets a hostile save claim
+        stages nights never granted, or -- far worse -- rolls every existing
+        town back to bare construction sites the instant this ships.
+    ]]
+    if type(town) == "table" and type(town.construction) == "table" then
+        profile.town.construction = TownConstruction.normalize(town.construction)
+    else
+        profile.town.construction =
+            TownConstruction.normalize(TownProgression.resolve(profile).buildingStages)
+    end
+
     profile.gear = Crafting.normalizeGear(value.gear)
     profile.equipped = Equipment.normalize(value.equipped)
     local quests = value.quests
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 11
+    profile.schemaVersion = 12
     return profile
 end
 
@@ -9623,6 +9667,42 @@ end
 
 function SaveSchema.gearSnapshot(profile: Profile): { [string]: number }
     return table.clone(profile.gear)
+end
+
+-- Spends materials to advance one building's construction by exactly one
+-- stage. `ceilingStage` is the caller's own tier-derived ceiling for this
+-- building (see TownProgression.resolve), not trusted from anywhere the
+-- profile itself stores, since nights and chapter one already govern it
+-- independently of what a player has paid for.
+function SaveSchema.withConstructionContribution(
+    profile: Profile,
+    buildingId: string,
+    ceilingStage: number,
+    now: number
+): (Profile, any)
+    local nextMaterials, nextConstruction, result = TownConstruction.contribute(
+        profile.inventory.materials,
+        profile.town.construction,
+        buildingId,
+        ceilingStage,
+        now
+    )
+    if not result.applied then
+        return profile, result
+    end
+
+    local nextProfile = table.clone(profile)
+    nextProfile.inventory = table.clone(profile.inventory)
+    nextProfile.inventory.materials = nextMaterials
+    nextProfile.town = table.clone(profile.town)
+    nextProfile.town.construction = nextConstruction
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.constructionSnapshot(profile: Profile): { [string]: number }
+    return table.clone(profile.town.construction)
 end
 
 function SaveSchema.masterySnapshot(profile: Profile): ProfessionMastery.State
@@ -10262,6 +10342,251 @@ return table.freeze(TownCondition)
       </Item>
       <Item class="ModuleScript" referent="56">
         <Properties>
+          <string name="Name">TownConstruction</string>
+          <string name="Source"><![CDATA[--!strict
+
+local TownProgression = require("./TownProgression")
+local TownConstructionCatalog = require("./TownConstructionCatalog")
+
+-- The player-funded half of a building's stage. TownProgression still owns
+-- the ceiling nights and chapter-one grant a building -- how far it is
+-- *allowed* to go -- while this module owns how far it has actually been
+-- *built*, paid for out of the same material wallet Crafting spends. A
+-- building's rendered stage is always the lesser of the two: nights alone
+-- no longer finish a building by themselves, but they never let payment
+-- outrun what the story has earned either.
+local TownConstruction = {}
+
+local MAX_STAGE = TownConstructionCatalog.maxStage()
+
+local function isValidBuildingId(buildingId: any): boolean
+    if type(buildingId) ~= "string" then
+        return false
+    end
+    for _, id in TownProgression.buildingIds() do
+        if id == buildingId then
+            return true
+        end
+    end
+    return false
+end
+
+local function clampStage(value: any): number
+    return math.clamp(math.floor(tonumber(value) or 0), 0, MAX_STAGE)
+end
+
+function TownConstruction.default(): { [string]: number }
+    return {}
+end
+
+function TownConstruction.normalize(value: any): { [string]: number }
+    local normalized: { [string]: number } = {}
+    if type(value) ~= "table" then
+        return normalized
+    end
+    for buildingId, stage in value do
+        if isValidBuildingId(buildingId) and type(stage) == "number" then
+            normalized[buildingId] = clampStage(stage)
+        end
+    end
+    return normalized
+end
+
+function TownConstruction.stageFor(construction: any, buildingId: any): number
+    if type(construction) ~= "table" or not isValidBuildingId(buildingId) then
+        return 0
+    end
+    return clampStage(construction[buildingId])
+end
+
+-- The cost to advance from `currentStage` to `currentStage + 1`, or nil if
+-- `currentStage` is already maxed (or not a real stage at all).
+function TownConstruction.costFor(currentStage: number): { [string]: number }?
+    if type(currentStage) ~= "number" then
+        return nil
+    end
+    local floored = math.floor(currentStage)
+    if floored ~= currentStage or floored < 0 or floored >= MAX_STAGE then
+        return nil
+    end
+    return TownConstructionCatalog.costToReach(floored + 1)
+end
+
+-- Spends materials to advance one building exactly one stage, or leaves
+-- every input untouched and reports why. Refusal order matters: a building
+-- already at stage three is "already_maxed" even when the tier ceiling also
+-- reads three, because there being nothing left to build is the more
+-- accurate reason than the tier not being the blocker. Mirrors
+-- Crafting.craft's shape and its own "insufficient_materials" reason string
+-- exactly, since both spend the same wallet.
+--
+-- `_now` is accepted rather than dropped so a caller can pass the same
+-- timestamp it already carries for revision bookkeeping without a special
+-- case; nothing here is timestamped today, so it goes unused.
+function TownConstruction.contribute(
+    materials: { [string]: number },
+    construction: { [string]: number },
+    buildingId: any,
+    ceilingStage: number,
+    _now: number
+): ({ [string]: number }, { [string]: number }, any)
+    if not isValidBuildingId(buildingId) then
+        return materials,
+            construction,
+            {
+                applied = false,
+                reason = "unknown_building",
+            }
+    end
+
+    local currentStage = TownConstruction.stageFor(construction, buildingId)
+    if currentStage >= MAX_STAGE then
+        return materials,
+            construction,
+            {
+                applied = false,
+                buildingId = buildingId,
+                reason = "already_maxed",
+            }
+    end
+
+    local ceiling = clampStage(ceilingStage)
+    if currentStage >= ceiling then
+        return materials,
+            construction,
+            {
+                applied = false,
+                buildingId = buildingId,
+                reason = "tier_not_ready",
+            }
+    end
+
+    local cost = TownConstruction.costFor(currentStage)
+    if cost == nil then
+        return materials,
+            construction,
+            {
+                applied = false,
+                buildingId = buildingId,
+                reason = "already_maxed",
+            }
+    end
+
+    for materialId, amount in cost do
+        if (materials[materialId] or 0) < amount then
+            return materials,
+                construction,
+                {
+                    applied = false,
+                    buildingId = buildingId,
+                    reason = "insufficient_materials",
+                }
+        end
+    end
+
+    local nextMaterials = table.clone(materials)
+    for materialId, amount in cost do
+        nextMaterials[materialId] = nextMaterials[materialId] - amount
+    end
+
+    local nextConstruction = table.clone(construction)
+    local nextStage = currentStage + 1
+    nextConstruction[buildingId] = nextStage
+
+    return nextMaterials,
+        nextConstruction,
+        {
+            applied = true,
+            buildingId = buildingId,
+            stage = nextStage,
+        }
+end
+
+-- Reconciles two accumulators for the same shared town, the same
+-- never-regress rule TownProgression.merge uses for the tier ceiling: every
+-- building keeps the higher of the two stages, and unknown or malformed
+-- input on either side normalizes down to nothing rather than erroring.
+function TownConstruction.merge(current: any, incoming: any): { [string]: number }
+    local normalizedCurrent = TownConstruction.normalize(current)
+    local normalizedIncoming = TownConstruction.normalize(incoming)
+    local merged: { [string]: number } = {}
+    for _, buildingId in TownProgression.buildingIds() do
+        merged[buildingId] =
+            math.max(normalizedCurrent[buildingId] or 0, normalizedIncoming[buildingId] or 0)
+    end
+    return merged
+end
+
+return table.freeze(TownConstruction)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="57">
+        <Properties>
+          <string name="Name">TownConstructionCatalog</string>
+          <string name="Source"><![CDATA[--!strict
+
+-- Cost to advance a building one construction stage, table-driven by the
+-- stage being reached rather than sixteen bespoke curves. TownProgression's
+-- own doc comment already made this call for the eleven later buildings --
+-- "eleven more bespoke expressions would be eleven more things to get
+-- subtly wrong" -- and a per-building cost curve would multiply that same
+-- risk by sixteen for no gameplay benefit anyone asked for: every building
+-- becoming buildable at the same rate is the point, not a limitation.
+--
+-- Costs escalate with the stage reached, not the building, and lean on the
+-- same four materials Crafting already spends (CraftingCatalog recipes run
+-- 2-5 units per material). A construction stage is a town-wide, permanent
+-- upgrade rather than one personal accessory, so it is priced well above a
+-- single recipe: stage one is roughly double the heaviest existing recipe,
+-- and stage three introduces brightcap only at the top so the last stretch
+-- of any building still wants a supply run across all three gathered
+-- materials rather than a single stockpile.
+local TownConstructionCatalog = {}
+
+export type StageCost = { [string]: number }
+
+local MAX_STAGE = 3
+
+local COSTS: { [number]: StageCost } = {
+    [1] = table.freeze({
+        material_heartwood = 8,
+    }),
+    [2] = table.freeze({
+        material_heartwood = 8,
+        material_amber_sap = 6,
+    }),
+    [3] = table.freeze({
+        material_heartwood = 12,
+        material_amber_sap = 10,
+        material_brightcap = 4,
+    }),
+}
+
+-- The material cost to reach `stage` (1-3) from `stage - 1`. Nil for stage
+-- zero (nothing to reach; a construction site is the starting state, not a
+-- purchase) and for anything past three (already fully built).
+function TownConstructionCatalog.costToReach(stage: number): StageCost?
+    if type(stage) ~= "number" then
+        return nil
+    end
+    local floored = math.floor(stage)
+    if floored ~= stage or floored < 1 or floored > MAX_STAGE then
+        return nil
+    end
+    return COSTS[floored]
+end
+
+function TownConstructionCatalog.maxStage(): number
+    return MAX_STAGE
+end
+
+return table.freeze(TownConstructionCatalog)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="58">
+        <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -10352,7 +10677,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -10564,7 +10889,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -10717,7 +11042,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -10855,7 +11180,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -11078,7 +11403,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -11228,7 +11553,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -11264,7 +11589,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -11646,7 +11971,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -11679,11 +12004,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="65">
+  <Item class="ServerScriptService" referent="67">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="66">
+    <Item class="Script" referent="68">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -11741,6 +12066,7 @@ local TownPermissions = require(root.TownPermissions)
 local RunHandoff = require(root.RunHandoff)
 local AdminRoster = require(root.AdminRoster)
 local TownProgression = require(root.TownProgression)
+local TownConstruction = require(root.TownConstruction)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
@@ -11788,8 +12114,13 @@ local networkService = NetworkService.new(logger)
 local profileService = ProfileService.new(logger, environmentConfig.UsePersistentData)
 local gearVisualService = GearVisualService.new(logger, profileService, GearVisualPlan)
 local analyticsService = AnalyticsService.new(logger)
-local worldService =
-    WorldService.new(logger, ExtractionPayoff, TownProgression, ProfessionAbilityVisuals)
+local worldService = WorldService.new(
+    logger,
+    ExtractionPayoff,
+    TownProgression,
+    ProfessionAbilityVisuals,
+    TownConstruction
+)
 local expeditionService = ExpeditionService.new(
     logger,
     worldService,
@@ -12072,7 +12403,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -12170,11 +12501,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="68">
+      <Item class="Folder" referent="70">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12596,7 +12927,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13449,7 +13780,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="73">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13947,7 +14278,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="72">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15252,7 +15583,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15896,7 +16227,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="74">
+        <Item class="ModuleScript" referent="76">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16000,7 +16331,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="75">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16189,7 +16520,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="76">
+        <Item class="ModuleScript" referent="78">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16582,7 +16913,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="77">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -16676,7 +17007,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="78">
+        <Item class="ModuleScript" referent="80">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16894,7 +17225,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="81">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17723,7 +18054,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="80">
+        <Item class="ModuleScript" referent="82">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17967,7 +18298,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="81">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18146,7 +18477,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18717,7 +19048,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19816,7 +20147,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="86">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20341,7 +20672,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="85">
+        <Item class="ModuleScript" referent="87">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20877,6 +21208,54 @@ function ProfileService.townConsequence(self: ProfileService, player: Player): a
         return { tier = 0, title = "EMBERHOLLOW AWAKENS", detail = "" }
     end
     return self._saveSchema.townConsequence(profile)
+end
+
+function ProfileService.townConstructionState(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {}
+    end
+    return self._saveSchema.constructionSnapshot(profile)
+end
+
+function ProfileService.contributeToConstruction(
+    self: ProfileService,
+    player: Player,
+    buildingId: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {
+            accepted = false,
+            reason = "profile_loading",
+        }
+    end
+    if not self:isWritable(player) then
+        return {
+            accepted = false,
+            reason = "profile_read_only",
+        }
+    end
+
+    local ceilingStage = self._saveSchema.townConsequence(profile).buildingStages[buildingId] or 0
+    local nextProfile, result =
+        self._saveSchema.withConstructionContribution(profile, buildingId, ceilingStage, os.time())
+    if not result.applied then
+        return {
+            accepted = false,
+            reason = result.reason,
+        }
+    end
+
+    self._profiles[player] = nextProfile
+    if self._persistent and self._writable[player] == true then
+        self._dirty[player] = true
+    end
+    return {
+        accepted = true,
+        buildingId = result.buildingId,
+        stage = result.stage,
+    }
 end
 
 -- Safe to call after any action, whether or not it moved a quest signal:
@@ -21499,7 +21878,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="86">
+        <Item class="ModuleScript" referent="88">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22021,7 +22400,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="87">
+        <Item class="ModuleScript" referent="89">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22379,6 +22758,14 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     }
     self._sessions[player] = session
     self._worldService:setTownConsequence(self._profileService:townConsequence(player))
+    -- Seeds the server's live construction accumulator from this player's
+    -- own profile the same moment their tier ceiling is seeded. Without
+    -- this, a fresh server session starts every building back at the
+    -- accumulator's empty default until someone happens to fund a stage,
+    -- which is exactly the "town collapses back to construction sites"
+    -- regression this whole feature exists to avoid on the buildings a
+    -- returning player already paid for (or was grandfathered into).
+    self._worldService:setTownConstruction(self._profileService:townConstructionState(player))
 
     if stage == "prepare" or stage == "survive" or stage == "reveal" or stage == "complete" then
         self._worldService:buildBarricade(false)
@@ -22706,6 +23093,43 @@ function TutorialService._interact(
             toast = "NOT ENOUGH MATERIALS"
         else
             toast = "CRAFTING UNAVAILABLE"
+        end
+        self:_setToast(player, toast)
+        self:_publish(player)
+        return
+    end
+    if actionId == self._runtimeIds.Actions.ContributeConstruction then
+        local buildingId = prompt:GetAttribute("Payload")
+        if type(buildingId) ~= "string" then
+            return
+        end
+        local result = self._profileService:contributeToConstruction(player, buildingId)
+        if result.accepted then
+            self:_setToast(
+                player,
+                string.format("%s BUILT TO STAGE %d", prompt.ObjectText, result.stage)
+            )
+            -- Construction is shared town state, the same reasoning
+            -- RepairTown's own _publishAll() call already uses: the stage a
+            -- player just funded is visible to everyone in the world, not
+            -- only to the player who paid for it.
+            self._worldService:setTownConstruction(
+                self._profileService:townConstructionState(player)
+            )
+            self:_publishAll()
+            return
+        end
+        local toast: string
+        if result.reason == "tier_not_ready" then
+            toast = "SURVIVE MORE NIGHTS BEFORE BUILDING FURTHER"
+        elseif result.reason == "already_maxed" then
+            toast = "ALREADY FULLY BUILT"
+        elseif result.reason == "insufficient_materials" then
+            toast = "NOT ENOUGH MATERIALS TO BUILD"
+        elseif result.reason == "unknown_building" then
+            toast = "THAT BUILDING DOES NOT EXIST"
+        else
+            toast = "CONSTRUCTION UNAVAILABLE"
         end
         self:_setToast(player, toast)
         self:_publish(player)
@@ -23298,7 +23722,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="88">
+        <Item class="ModuleScript" referent="90">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24137,7 +24561,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="89">
+        <Item class="ModuleScript" referent="91">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24204,6 +24628,8 @@ export type WorldService = typeof(setmetatable(
         _blackoutArena: any,
         _characterRoots: { [Player]: BasePart? },
         _townConsequence: any,
+        _townConstruction: any,
+        _townConstructionRules: any,
         _townCondition: any,
         _townResidents: { [string]: any },
         _townIncidentModel: Model?,
@@ -25957,7 +26383,8 @@ function WorldService.new(
     logger: Logger,
     extractionPayoff: any,
     townProgression: any,
-    professionAbilityVisuals: any
+    professionAbilityVisuals: any,
+    townConstruction: any
 ): WorldService
     return setmetatable({
         Name = WorldService.Name,
@@ -25999,6 +26426,8 @@ function WorldService.new(
         _blackoutArena = nil,
         _characterRoots = {},
         _townConsequence = nil,
+        _townConstruction = townConstruction.default(),
+        _townConstructionRules = townConstruction,
         _townCondition = { integrity = 100, damageLevel = 0, repairsRemaining = 0 },
         _townResidents = {},
         _townIncidentModel = nil,
@@ -31545,15 +31974,56 @@ local function buildTownProgressionBuildings(
     consequence: any,
     runtimeIds: any,
     assetParent: Instance,
-    meshPlacements: { MeshPlacement }
-): { [string]: any }
+    meshPlacements: { MeshPlacement },
+    construction: any,
+    townConstructionRules: any
+): ({ [string]: any }, { [string]: any })
     local stages = if type(consequence.buildingStages) == "table"
         then consequence.buildingStages
         else {}
     local residents: { [string]: any } = {}
+    -- Buildings currently short of their tier ceiling, keyed by ID, with the
+    -- anchor part a ContributeConstruction prompt belongs on and the name to
+    -- show for it. A building already at its ceiling gets no entry, so
+    -- nothing prompts a player to fund a stage nights have not unlocked yet.
+    local constructionTargets: { [string]: { target: BasePart, displayName: string } } = {}
 
-    local function stageFor(id: string): number
+    -- The tier a building is *allowed* to reach right now, purely from nights
+    -- and chapter one -- unchanged from before construction orders existed.
+    local function ceilingStageFor(id: string): number
         return math.clamp(math.floor(tonumber(stages[id]) or 0), 0, 3)
+    end
+
+    -- What a building actually renders as: never ahead of what a player has
+    -- paid to build, and never ahead of what the story has earned either.
+    local function stageFor(id: string): number
+        return math.min(ceilingStageFor(id), townConstructionRules.stageFor(construction, id))
+    end
+
+    -- The sign each buildingShell/constructionSite anchors a readable name
+    -- to, whichever of the two produced this particular model. Neither name
+    -- is guaranteed (a bespoke model like the town board has neither), so
+    -- callers with their own anchor part skip this and pass it directly.
+    local function signAnchor(model: Model): BasePart?
+        local sign = model:FindFirstChild("BuildingSign")
+            or model:FindFirstChild("ConstructionSign")
+        if sign ~= nil and sign:IsA("BasePart") then
+            return sign
+        end
+        return nil
+    end
+
+    local function noteConstructionTarget(id: string, displayName: string, anchor: BasePart?)
+        if anchor == nil then
+            return
+        end
+        local built = townConstructionRules.stageFor(construction, id)
+        if built < ceilingStageFor(id) then
+            constructionTargets[id] = {
+                target = anchor,
+                displayName = displayName,
+            }
+        end
     end
 
     -- Yaw that turns a building's entrance toward `to`. A part's Front face is
@@ -31918,6 +32388,7 @@ local function buildTownProgressionBuildings(
         FOXFIRE,
         yawToward(Vector3.new(-92, 0, -144), Vector3.new(0, 0, -144))
     )
+    noteConstructionTarget("building_archive", "MEMORY ARCHIVE", signAnchor(archive))
     if archiveStage > 0 then
         local archivePropsFallback = Instance.new("Model")
         archivePropsFallback.Name = "ArchivePropsFallback"
@@ -31977,6 +32448,7 @@ local function buildTownProgressionBuildings(
         AMBER,
         yawToward(Vector3.new(92, 0, -126), Vector3.new(0, 0, -126))
     )
+    noteConstructionTarget("building_workbench", "LANTERN WORKBENCH", signAnchor(workshop))
     if workbenchStage > 0 then
         local workbenchFallback = Instance.new("Model")
         workbenchFallback.Name = "TownWorkbenchFallback"
@@ -32046,6 +32518,7 @@ local function buildTownProgressionBuildings(
         CREAM,
         { "community_watch", "lantern_maintenance", "supply_inventory" }
     )
+    noteConstructionTarget("building_town_board", "TOWN BOARD", board)
     table.insert(meshPlacements, {
         assetId = "mesh_creator_notice_board_a",
         fallbackKind = "asset_replacement",
@@ -32068,6 +32541,7 @@ local function buildTownProgressionBuildings(
         Color3.fromRGB(219, 151, 77),
         yawToward(Vector3.new(-92, 0, -184), Vector3.new(0, 0, -184))
     )
+    noteConstructionTarget("building_inn", "WAYFARER INN", signAnchor(inn))
     if innStage > 0 then
         local innFurnitureFallback = Instance.new("Model")
         innFurnitureFallback.Name = "InnFurnitureFallback"
@@ -32161,7 +32635,7 @@ local function buildTownProgressionBuildings(
         return yawToward(center, center + Vector3.new(0, 0, -40))
     end
 
-    authoredBuilding(
+    local celebrationStage = authoredBuilding(
         "building_celebration_stage",
         "CELEBRATION STAGE",
         "mesh_celebration_stage_a",
@@ -32171,10 +32645,15 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(0, 0, -226), PLAZA),
         10200
     )
+    noteConstructionTarget(
+        "building_celebration_stage",
+        "CELEBRATION STAGE",
+        signAnchor(celebrationStage)
+    )
 
     -- Builder's Row: a line running south along the town's eastern edge, past
     -- the existing workbench.
-    authoredBuilding(
+    local sawmill = authoredBuilding(
         "building_sawmill",
         "SAWMILL",
         "mesh_sawmill_a",
@@ -32184,7 +32663,8 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(150, 0, -100), PLAZA),
         10201
     )
-    authoredBuilding(
+    noteConstructionTarget("building_sawmill", "SAWMILL", signAnchor(sawmill))
+    local forge = authoredBuilding(
         "building_forge",
         "UNION FORGE",
         "mesh_union_forge_a",
@@ -32194,7 +32674,8 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(150, 0, -140), PLAZA),
         10202
     )
-    authoredBuilding(
+    noteConstructionTarget("building_forge", "UNION FORGE", signAnchor(forge))
+    local engineerYard = authoredBuilding(
         "building_engineer_yard",
         "ENGINEER YARD",
         "mesh_engineer_yard_a",
@@ -32204,9 +32685,10 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(150, 0, -180), PLAZA),
         10203
     )
+    noteConstructionTarget("building_engineer_yard", "ENGINEER YARD", signAnchor(engineerYard))
 
     -- Hearthmarket: the mirrored line on the western edge, past the inn.
-    authoredBuilding(
+    local kitchen = authoredBuilding(
         "building_kitchen",
         "COMMON KITCHEN",
         "mesh_common_kitchen_a",
@@ -32216,7 +32698,8 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(-150, 0, -158), PLAZA),
         10204
     )
-    authoredBuilding(
+    noteConstructionTarget("building_kitchen", "COMMON KITCHEN", signAnchor(kitchen))
+    local market = authoredBuilding(
         "building_market",
         "HEARTHMARKET STALLS",
         "mesh_hearthmarket_stalls_a",
@@ -32226,7 +32709,8 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(-150, 0, -196), PLAZA),
         10205
     )
-    authoredBuilding(
+    noteConstructionTarget("building_market", "HEARTHMARKET STALLS", signAnchor(market))
+    local tradePost = authoredBuilding(
         "building_trade_post",
         "TRADE POST",
         "mesh_trade_post_a",
@@ -32236,9 +32720,10 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(-150, 0, -232), PLAZA),
         10206
     )
+    noteConstructionTarget("building_trade_post", "TRADE POST", signAnchor(tradePost))
 
     -- Waterworks, tucked south of the existing Greenward garden.
-    authoredBuilding(
+    local waterworks = authoredBuilding(
         "building_waterworks",
         "WATERWORKS",
         "mesh_waterworks_a",
@@ -32248,9 +32733,10 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(110, 0, -212), PLAZA),
         10207
     )
+    noteConstructionTarget("building_waterworks", "WATERWORKS", signAnchor(waterworks))
 
     -- The Watch Ring: the town's southern perimeter, facing outward.
-    authoredBuilding(
+    local guardhouse = authoredBuilding(
         "building_guardhouse",
         "GUARDHOUSE",
         "mesh_guardhouse_a",
@@ -32260,7 +32746,8 @@ local function buildTownProgressionBuildings(
         facingAwayFromTown(Vector3.new(-70, 0, -262)),
         10208
     )
-    authoredBuilding(
+    noteConstructionTarget("building_guardhouse", "GUARDHOUSE", signAnchor(guardhouse))
+    local watchtower = authoredBuilding(
         "building_watchtower",
         "WATCHTOWER",
         "mesh_watchtower_a",
@@ -32270,7 +32757,8 @@ local function buildTownProgressionBuildings(
         facingAwayFromTown(Vector3.new(70, 0, -262)),
         10209
     )
-    authoredBuilding(
+    noteConstructionTarget("building_watchtower", "WATCHTOWER", signAnchor(watchtower))
+    local trapworks = authoredBuilding(
         "building_trapworks",
         "TRAPWORKS",
         "mesh_trapworks_a",
@@ -32280,6 +32768,7 @@ local function buildTownProgressionBuildings(
         facingAwayFromTown(Vector3.new(0, 0, -270)),
         10210
     )
+    noteConstructionTarget("building_trapworks", "TRAPWORKS", signAnchor(trapworks))
 
     local residentDefinitions = {
         npc_tomas_reed = {
@@ -32570,7 +33059,7 @@ local function buildTownProgressionBuildings(
     parent:SetAttribute("ArchiveStage", archiveStage)
     parent:SetAttribute("WorkbenchStage", workbenchStage)
     parent:SetAttribute("InnStage", innStage)
-    return residents
+    return residents, constructionTargets
 end
 
 function WorldService._setTownResidentRoutine(self: WorldService, phase: string)
@@ -32603,13 +33092,17 @@ function WorldService._setTownResidentRoutine(self: WorldService, phase: string)
     end
 end
 
-function WorldService.setTownConsequence(self: WorldService, consequence: any)
+-- Tears down and rebuilds the whole GreenwardConsequence/TownProgressionBuildings
+-- tree from self._townConsequence and self._townConstruction. Both setters
+-- below update their own piece of merged state and then call this, so
+-- neither the tier ceiling nor the construction ledger can drive a rebuild
+-- that reflects only half of what the town actually knows.
+function WorldService._rebuildTownProgression(self: WorldService)
     local world = self._world
-    if world == nil or type(consequence) ~= "table" then
+    local resolved = self._townConsequence
+    if world == nil or type(resolved) ~= "table" then
         return
     end
-    local resolved = self._townProgression.merge(self._townConsequence, consequence)
-    self._townConsequence = resolved
     local existing = world:FindFirstChild("GreenwardConsequence")
     if existing ~= nil then
         existing:Destroy()
@@ -32619,6 +33112,13 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
         local residentPrompt = self._interactions[interactionId]
         if residentPrompt ~= nil then
             residentPrompt:Destroy()
+            self._interactions[interactionId] = nil
+        end
+    end
+    for _, interactionId in self._runtimeIds.ConstructionInteractionIds do
+        local constructionPrompt = self._interactions[interactionId]
+        if constructionPrompt ~= nil then
+            constructionPrompt:Destroy()
             self._interactions[interactionId] = nil
         end
     end
@@ -32633,13 +33133,16 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
     local buildings = Instance.new("Model")
     buildings.Name = "TownProgressionBuildings"
     buildings.Parent = world
-    self._townResidents = buildTownProgressionBuildings(
+    local residents, constructionTargets = buildTownProgressionBuildings(
         buildings,
         resolved,
         self._runtimeIds,
         world,
-        townMeshPlacements
+        townMeshPlacements,
+        self._townConstruction,
+        self._townConstructionRules
     )
+    self._townResidents = residents
     self:_placeAuthoredMeshes(townMeshPlacements, world, buildings, "town_mesh_dressing_ready")
     for residentId, resident in self._townResidents do
         local interactionId = self._runtimeIds.ResidentInteractionIds[residentId]
@@ -32659,6 +33162,19 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
             )
         end
     end
+    for buildingId, buildingTarget in constructionTargets do
+        local interactionId = self._runtimeIds.ConstructionInteractionIds[buildingId]
+        if interactionId ~= nil then
+            self:_registerInteraction(
+                buildingTarget.target,
+                interactionId,
+                self._runtimeIds.Actions.ContributeConstruction,
+                "BUILD",
+                buildingTarget.displayName,
+                buildingId
+            )
+        end
+    end
     self:_setTownResidentRoutine(
         if self._night then "night" elseif self._dusk then "dusk" else "day"
     )
@@ -32672,6 +33188,27 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
     world:SetAttribute("TownTier", resolved.tier)
     world:SetAttribute("TownDecision", tostring(resolved.decision or "unresolved"))
     world:SetAttribute("WardenOutcome", tostring(resolved.wardenOutcome or "unresolved"))
+end
+
+function WorldService.setTownConsequence(self: WorldService, consequence: any)
+    if self._world == nil or type(consequence) ~= "table" then
+        return
+    end
+    self._townConsequence = self._townProgression.merge(self._townConsequence, consequence)
+    self:_rebuildTownProgression()
+end
+
+-- Construction orders are shared town state exactly like the tier
+-- consequence above: whichever player funds a stage, everyone sees it, so
+-- this merges into the same server-wide accumulator rather than per-player
+-- state, and never regresses one player's contribution because another
+-- player's snapshot has not caught up yet.
+function WorldService.setTownConstruction(self: WorldService, construction: any)
+    if self._world == nil or type(construction) ~= "table" then
+        return
+    end
+    self._townConstruction = self._townConstructionRules.merge(self._townConstruction, construction)
+    self:_rebuildTownProgression()
 end
 
 function WorldService.setTownCondition(self: WorldService, condition: any)
@@ -34532,11 +35069,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="90">
+      <Item class="Folder" referent="92">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="91">
+        <Item class="ModuleScript" referent="93">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -38273,7 +38810,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="92">
+        <Item class="ModuleScript" referent="94">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -38728,7 +39265,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="93">
+        <Item class="ModuleScript" referent="95">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -39423,7 +39960,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="94">
+        <Item class="ModuleScript" referent="96">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -40255,7 +40792,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="95">
+        <Item class="ModuleScript" referent="97">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -40341,7 +40878,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="96">
+        <Item class="ModuleScript" referent="98">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -40613,7 +41150,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="97">
+        <Item class="ModuleScript" referent="99">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -40788,7 +41325,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="98">
+        <Item class="ModuleScript" referent="100">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -41333,7 +41870,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="99">
+        <Item class="ModuleScript" referent="101">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -41566,7 +42103,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="100">
+        <Item class="ModuleScript" referent="102">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -41655,7 +42192,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="101">
+        <Item class="ModuleScript" referent="103">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -41979,11 +42516,11 @@ return table.freeze(WorldSignBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="102">
+    <Item class="Folder" referent="104">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="103">
+      <Item class="Script" referent="105">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -43406,15 +43943,15 @@ print("[Last Light] PASS FoundationIntegration")
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="104">
+  <Item class="StarterPlayer" referent="106">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="105">
+    <Item class="StarterPlayerScripts" referent="107">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="106">
+      <Item class="LocalScript" referent="108">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -43544,11 +44081,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="107">
+        <Item class="Folder" referent="109">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="108">
+          <Item class="ModuleScript" referent="110">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -43679,7 +44216,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="109">
+          <Item class="ModuleScript" referent="111">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -46076,7 +46613,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="110">
+          <Item class="ModuleScript" referent="112">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -46375,7 +46912,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="111">
+          <Item class="ModuleScript" referent="113">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -46483,7 +47020,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="112">
+          <Item class="ModuleScript" referent="114">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -46602,7 +47139,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="113">
+          <Item class="ModuleScript" referent="115">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -46702,7 +47239,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="114">
+          <Item class="ModuleScript" referent="116">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -46834,7 +47371,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="115">
+          <Item class="ModuleScript" referent="117">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -47122,7 +47659,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="116">
+  <Item class="Workspace" referent="118">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

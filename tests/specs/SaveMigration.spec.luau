@@ -18,6 +18,7 @@
 
 local Config = require("../../src/shared/Config")
 local SaveSchema = require("../../src/shared/SaveSchema")
+local TownProgression = require("../../src/shared/TownProgression")
 local TestRunner = require("../TestRunner")
 
 local NOW = 4000
@@ -110,6 +111,28 @@ local ERA_PROFILES: { [number]: any } = {
         town = { nightNumber = 12, condition = {} },
         profession = { selectedId = "profession_engineer" },
     },
+    -- No town.construction field: construction orders (schema 12) did not
+    -- exist yet, so this is exactly what a real player's save looked like
+    -- the moment before this feature shipped -- nights and a resolved
+    -- chapter one, nothing about paying for a stage.
+    [11] = {
+        schemaVersion = 11,
+        createdAt = 10,
+        updatedAt = 20,
+        revision = 15,
+        tutorial = { stage = "complete", complete = true },
+        town = { nightNumber = 7, condition = {} },
+        story = {
+            chapterOne = {
+                status = "complete",
+                decision = "restore_farmland",
+                wardenOutcome = "preserved",
+                transactionId = "chapter_1:era11:hash:1",
+                completedAt = 12,
+            },
+        },
+        profession = { selectedId = "profession_engineer" },
+    },
 }
 
 -- Every field SaveSchema.default produces. A migrated profile that is missing
@@ -150,6 +173,10 @@ local function assertCurrentShape(profile: any, label: string)
     TestRunner.truthy(
         type(profile.story.chapterOne.status) == "string",
         label .. ": chapter one lost its status"
+    )
+    TestRunner.truthy(
+        type(profile.town.construction) == "table",
+        label .. ": construction ledger is missing"
     )
 end
 
@@ -228,6 +255,13 @@ return {
                     TestRunner.equal(twice.town.nightNumber, once.town.nightNumber)
                     TestRunner.equal(twice.profession.selectedId, once.profession.selectedId)
                     TestRunner.equal(twice.story.chapterOne.status, once.story.chapterOne.status)
+                    for _, buildingId in TownProgression.buildingIds() do
+                        TestRunner.equal(
+                            twice.town.construction[buildingId],
+                            once.town.construction[buildingId],
+                            label .. ": construction drifted on re-migration for " .. buildingId
+                        )
+                    end
                     assertCurrentShape(twice, label .. " (second pass)")
                 end
             end,
@@ -290,6 +324,54 @@ return {
                     TestRunner.truthy(
                         profile.tutorial.stage ~= "own_the_server",
                         label .. ": an invented tutorial stage survived migration"
+                    )
+                end
+            end,
+        },
+        {
+            -- The construction-orders migration is the one this suite's own
+            -- header warns about: a fixture that merely has the right shape
+            -- can still quietly reset a player's town. ERA_PROFILES[11] has
+            -- no town.construction field at all, exactly like a real save
+            -- written before this feature existed, so migrating it has to
+            -- grandfather the ledger to precisely what nights and chapter
+            -- one had already granted -- not zero, and not anything higher.
+            name = "grandfathers construction to exactly what nights already unlocked",
+            run = function()
+                local profile = SaveSchema.normalize(ERA_PROFILES[11], NOW)
+                local expected = TownProgression.resolve(profile).buildingStages
+
+                local sawAnyBuiltStage = false
+                for _, buildingId in TownProgression.buildingIds() do
+                    TestRunner.equal(
+                        profile.town.construction[buildingId],
+                        expected[buildingId],
+                        string.format("%s was not grandfathered to its tier ceiling", buildingId)
+                    )
+                    if expected[buildingId] > 0 then
+                        sawAnyBuiltStage = true
+                    end
+                end
+                -- A fixture where every building happens to be at stage zero
+                -- would let this pass even if grandfathering were entirely
+                -- broken. ERA_PROFILES[11] plays seven nights with a
+                -- resolved chapter one specifically so at least one building
+                -- is already built, and the comparison above has to catch a
+                -- real discrepancy.
+                TestRunner.truthy(
+                    sawAnyBuiltStage,
+                    "fixture is too thin to exercise grandfathering: nothing was built"
+                )
+
+                -- Re-migrating the already-current profile must not add
+                -- anything further: grandfathering only ever fires once, on
+                -- the save that never had the field.
+                local twice = SaveSchema.normalize(profile, NOW + 10)
+                for _, buildingId in TownProgression.buildingIds() do
+                    TestRunner.equal(
+                        twice.town.construction[buildingId],
+                        profile.town.construction[buildingId],
+                        buildingId .. " changed on a second migration pass"
                     )
                 end
             end,

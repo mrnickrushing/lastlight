@@ -62,6 +62,8 @@ export type WorldService = typeof(setmetatable(
         _blackoutArena: any,
         _characterRoots: { [Player]: BasePart? },
         _townConsequence: any,
+        _townConstruction: any,
+        _townConstructionRules: any,
         _townCondition: any,
         _townResidents: { [string]: any },
         _townIncidentModel: Model?,
@@ -1815,7 +1817,8 @@ function WorldService.new(
     logger: Logger,
     extractionPayoff: any,
     townProgression: any,
-    professionAbilityVisuals: any
+    professionAbilityVisuals: any,
+    townConstruction: any
 ): WorldService
     return setmetatable({
         Name = WorldService.Name,
@@ -1857,6 +1860,8 @@ function WorldService.new(
         _blackoutArena = nil,
         _characterRoots = {},
         _townConsequence = nil,
+        _townConstruction = townConstruction.default(),
+        _townConstructionRules = townConstruction,
         _townCondition = { integrity = 100, damageLevel = 0, repairsRemaining = 0 },
         _townResidents = {},
         _townIncidentModel = nil,
@@ -7403,15 +7408,56 @@ local function buildTownProgressionBuildings(
     consequence: any,
     runtimeIds: any,
     assetParent: Instance,
-    meshPlacements: { MeshPlacement }
-): { [string]: any }
+    meshPlacements: { MeshPlacement },
+    construction: any,
+    townConstructionRules: any
+): ({ [string]: any }, { [string]: any })
     local stages = if type(consequence.buildingStages) == "table"
         then consequence.buildingStages
         else {}
     local residents: { [string]: any } = {}
+    -- Buildings currently short of their tier ceiling, keyed by ID, with the
+    -- anchor part a ContributeConstruction prompt belongs on and the name to
+    -- show for it. A building already at its ceiling gets no entry, so
+    -- nothing prompts a player to fund a stage nights have not unlocked yet.
+    local constructionTargets: { [string]: { target: BasePart, displayName: string } } = {}
 
-    local function stageFor(id: string): number
+    -- The tier a building is *allowed* to reach right now, purely from nights
+    -- and chapter one -- unchanged from before construction orders existed.
+    local function ceilingStageFor(id: string): number
         return math.clamp(math.floor(tonumber(stages[id]) or 0), 0, 3)
+    end
+
+    -- What a building actually renders as: never ahead of what a player has
+    -- paid to build, and never ahead of what the story has earned either.
+    local function stageFor(id: string): number
+        return math.min(ceilingStageFor(id), townConstructionRules.stageFor(construction, id))
+    end
+
+    -- The sign each buildingShell/constructionSite anchors a readable name
+    -- to, whichever of the two produced this particular model. Neither name
+    -- is guaranteed (a bespoke model like the town board has neither), so
+    -- callers with their own anchor part skip this and pass it directly.
+    local function signAnchor(model: Model): BasePart?
+        local sign = model:FindFirstChild("BuildingSign")
+            or model:FindFirstChild("ConstructionSign")
+        if sign ~= nil and sign:IsA("BasePart") then
+            return sign
+        end
+        return nil
+    end
+
+    local function noteConstructionTarget(id: string, displayName: string, anchor: BasePart?)
+        if anchor == nil then
+            return
+        end
+        local built = townConstructionRules.stageFor(construction, id)
+        if built < ceilingStageFor(id) then
+            constructionTargets[id] = {
+                target = anchor,
+                displayName = displayName,
+            }
+        end
     end
 
     -- Yaw that turns a building's entrance toward `to`. A part's Front face is
@@ -7776,6 +7822,7 @@ local function buildTownProgressionBuildings(
         FOXFIRE,
         yawToward(Vector3.new(-92, 0, -144), Vector3.new(0, 0, -144))
     )
+    noteConstructionTarget("building_archive", "MEMORY ARCHIVE", signAnchor(archive))
     if archiveStage > 0 then
         local archivePropsFallback = Instance.new("Model")
         archivePropsFallback.Name = "ArchivePropsFallback"
@@ -7835,6 +7882,7 @@ local function buildTownProgressionBuildings(
         AMBER,
         yawToward(Vector3.new(92, 0, -126), Vector3.new(0, 0, -126))
     )
+    noteConstructionTarget("building_workbench", "LANTERN WORKBENCH", signAnchor(workshop))
     if workbenchStage > 0 then
         local workbenchFallback = Instance.new("Model")
         workbenchFallback.Name = "TownWorkbenchFallback"
@@ -7904,6 +7952,7 @@ local function buildTownProgressionBuildings(
         CREAM,
         { "community_watch", "lantern_maintenance", "supply_inventory" }
     )
+    noteConstructionTarget("building_town_board", "TOWN BOARD", board)
     table.insert(meshPlacements, {
         assetId = "mesh_creator_notice_board_a",
         fallbackKind = "asset_replacement",
@@ -7926,6 +7975,7 @@ local function buildTownProgressionBuildings(
         Color3.fromRGB(219, 151, 77),
         yawToward(Vector3.new(-92, 0, -184), Vector3.new(0, 0, -184))
     )
+    noteConstructionTarget("building_inn", "WAYFARER INN", signAnchor(inn))
     if innStage > 0 then
         local innFurnitureFallback = Instance.new("Model")
         innFurnitureFallback.Name = "InnFurnitureFallback"
@@ -8019,7 +8069,7 @@ local function buildTownProgressionBuildings(
         return yawToward(center, center + Vector3.new(0, 0, -40))
     end
 
-    authoredBuilding(
+    local celebrationStage = authoredBuilding(
         "building_celebration_stage",
         "CELEBRATION STAGE",
         "mesh_celebration_stage_a",
@@ -8029,10 +8079,15 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(0, 0, -226), PLAZA),
         10200
     )
+    noteConstructionTarget(
+        "building_celebration_stage",
+        "CELEBRATION STAGE",
+        signAnchor(celebrationStage)
+    )
 
     -- Builder's Row: a line running south along the town's eastern edge, past
     -- the existing workbench.
-    authoredBuilding(
+    local sawmill = authoredBuilding(
         "building_sawmill",
         "SAWMILL",
         "mesh_sawmill_a",
@@ -8042,7 +8097,8 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(150, 0, -100), PLAZA),
         10201
     )
-    authoredBuilding(
+    noteConstructionTarget("building_sawmill", "SAWMILL", signAnchor(sawmill))
+    local forge = authoredBuilding(
         "building_forge",
         "UNION FORGE",
         "mesh_union_forge_a",
@@ -8052,7 +8108,8 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(150, 0, -140), PLAZA),
         10202
     )
-    authoredBuilding(
+    noteConstructionTarget("building_forge", "UNION FORGE", signAnchor(forge))
+    local engineerYard = authoredBuilding(
         "building_engineer_yard",
         "ENGINEER YARD",
         "mesh_engineer_yard_a",
@@ -8062,9 +8119,10 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(150, 0, -180), PLAZA),
         10203
     )
+    noteConstructionTarget("building_engineer_yard", "ENGINEER YARD", signAnchor(engineerYard))
 
     -- Hearthmarket: the mirrored line on the western edge, past the inn.
-    authoredBuilding(
+    local kitchen = authoredBuilding(
         "building_kitchen",
         "COMMON KITCHEN",
         "mesh_common_kitchen_a",
@@ -8074,7 +8132,8 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(-150, 0, -158), PLAZA),
         10204
     )
-    authoredBuilding(
+    noteConstructionTarget("building_kitchen", "COMMON KITCHEN", signAnchor(kitchen))
+    local market = authoredBuilding(
         "building_market",
         "HEARTHMARKET STALLS",
         "mesh_hearthmarket_stalls_a",
@@ -8084,7 +8143,8 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(-150, 0, -196), PLAZA),
         10205
     )
-    authoredBuilding(
+    noteConstructionTarget("building_market", "HEARTHMARKET STALLS", signAnchor(market))
+    local tradePost = authoredBuilding(
         "building_trade_post",
         "TRADE POST",
         "mesh_trade_post_a",
@@ -8094,9 +8154,10 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(-150, 0, -232), PLAZA),
         10206
     )
+    noteConstructionTarget("building_trade_post", "TRADE POST", signAnchor(tradePost))
 
     -- Waterworks, tucked south of the existing Greenward garden.
-    authoredBuilding(
+    local waterworks = authoredBuilding(
         "building_waterworks",
         "WATERWORKS",
         "mesh_waterworks_a",
@@ -8106,9 +8167,10 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(110, 0, -212), PLAZA),
         10207
     )
+    noteConstructionTarget("building_waterworks", "WATERWORKS", signAnchor(waterworks))
 
     -- The Watch Ring: the town's southern perimeter, facing outward.
-    authoredBuilding(
+    local guardhouse = authoredBuilding(
         "building_guardhouse",
         "GUARDHOUSE",
         "mesh_guardhouse_a",
@@ -8118,7 +8180,8 @@ local function buildTownProgressionBuildings(
         facingAwayFromTown(Vector3.new(-70, 0, -262)),
         10208
     )
-    authoredBuilding(
+    noteConstructionTarget("building_guardhouse", "GUARDHOUSE", signAnchor(guardhouse))
+    local watchtower = authoredBuilding(
         "building_watchtower",
         "WATCHTOWER",
         "mesh_watchtower_a",
@@ -8128,7 +8191,8 @@ local function buildTownProgressionBuildings(
         facingAwayFromTown(Vector3.new(70, 0, -262)),
         10209
     )
-    authoredBuilding(
+    noteConstructionTarget("building_watchtower", "WATCHTOWER", signAnchor(watchtower))
+    local trapworks = authoredBuilding(
         "building_trapworks",
         "TRAPWORKS",
         "mesh_trapworks_a",
@@ -8138,6 +8202,7 @@ local function buildTownProgressionBuildings(
         facingAwayFromTown(Vector3.new(0, 0, -270)),
         10210
     )
+    noteConstructionTarget("building_trapworks", "TRAPWORKS", signAnchor(trapworks))
 
     local residentDefinitions = {
         npc_tomas_reed = {
@@ -8428,7 +8493,7 @@ local function buildTownProgressionBuildings(
     parent:SetAttribute("ArchiveStage", archiveStage)
     parent:SetAttribute("WorkbenchStage", workbenchStage)
     parent:SetAttribute("InnStage", innStage)
-    return residents
+    return residents, constructionTargets
 end
 
 function WorldService._setTownResidentRoutine(self: WorldService, phase: string)
@@ -8461,13 +8526,17 @@ function WorldService._setTownResidentRoutine(self: WorldService, phase: string)
     end
 end
 
-function WorldService.setTownConsequence(self: WorldService, consequence: any)
+-- Tears down and rebuilds the whole GreenwardConsequence/TownProgressionBuildings
+-- tree from self._townConsequence and self._townConstruction. Both setters
+-- below update their own piece of merged state and then call this, so
+-- neither the tier ceiling nor the construction ledger can drive a rebuild
+-- that reflects only half of what the town actually knows.
+function WorldService._rebuildTownProgression(self: WorldService)
     local world = self._world
-    if world == nil or type(consequence) ~= "table" then
+    local resolved = self._townConsequence
+    if world == nil or type(resolved) ~= "table" then
         return
     end
-    local resolved = self._townProgression.merge(self._townConsequence, consequence)
-    self._townConsequence = resolved
     local existing = world:FindFirstChild("GreenwardConsequence")
     if existing ~= nil then
         existing:Destroy()
@@ -8477,6 +8546,13 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
         local residentPrompt = self._interactions[interactionId]
         if residentPrompt ~= nil then
             residentPrompt:Destroy()
+            self._interactions[interactionId] = nil
+        end
+    end
+    for _, interactionId in self._runtimeIds.ConstructionInteractionIds do
+        local constructionPrompt = self._interactions[interactionId]
+        if constructionPrompt ~= nil then
+            constructionPrompt:Destroy()
             self._interactions[interactionId] = nil
         end
     end
@@ -8491,13 +8567,16 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
     local buildings = Instance.new("Model")
     buildings.Name = "TownProgressionBuildings"
     buildings.Parent = world
-    self._townResidents = buildTownProgressionBuildings(
+    local residents, constructionTargets = buildTownProgressionBuildings(
         buildings,
         resolved,
         self._runtimeIds,
         world,
-        townMeshPlacements
+        townMeshPlacements,
+        self._townConstruction,
+        self._townConstructionRules
     )
+    self._townResidents = residents
     self:_placeAuthoredMeshes(townMeshPlacements, world, buildings, "town_mesh_dressing_ready")
     for residentId, resident in self._townResidents do
         local interactionId = self._runtimeIds.ResidentInteractionIds[residentId]
@@ -8517,6 +8596,19 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
             )
         end
     end
+    for buildingId, buildingTarget in constructionTargets do
+        local interactionId = self._runtimeIds.ConstructionInteractionIds[buildingId]
+        if interactionId ~= nil then
+            self:_registerInteraction(
+                buildingTarget.target,
+                interactionId,
+                self._runtimeIds.Actions.ContributeConstruction,
+                "BUILD",
+                buildingTarget.displayName,
+                buildingId
+            )
+        end
+    end
     self:_setTownResidentRoutine(
         if self._night then "night" elseif self._dusk then "dusk" else "day"
     )
@@ -8530,6 +8622,27 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
     world:SetAttribute("TownTier", resolved.tier)
     world:SetAttribute("TownDecision", tostring(resolved.decision or "unresolved"))
     world:SetAttribute("WardenOutcome", tostring(resolved.wardenOutcome or "unresolved"))
+end
+
+function WorldService.setTownConsequence(self: WorldService, consequence: any)
+    if self._world == nil or type(consequence) ~= "table" then
+        return
+    end
+    self._townConsequence = self._townProgression.merge(self._townConsequence, consequence)
+    self:_rebuildTownProgression()
+end
+
+-- Construction orders are shared town state exactly like the tier
+-- consequence above: whichever player funds a stage, everyone sees it, so
+-- this merges into the same server-wide accumulator rather than per-player
+-- state, and never regresses one player's contribution because another
+-- player's snapshot has not caught up yet.
+function WorldService.setTownConstruction(self: WorldService, construction: any)
+    if self._world == nil or type(construction) ~= "table" then
+        return
+    end
+    self._townConstruction = self._townConstructionRules.merge(self._townConstruction, construction)
+    self:_rebuildTownProgression()
 end
 
 function WorldService.setTownCondition(self: WorldService, condition: any)

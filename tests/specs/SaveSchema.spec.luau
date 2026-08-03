@@ -10,7 +10,7 @@ return {
             name = "creates a safe first-session profile",
             run = function()
                 local profile = SaveSchema.default(100)
-                TestRunner.equal(profile.schemaVersion, 11)
+                TestRunner.equal(profile.schemaVersion, 12)
                 TestRunner.equal(profile.tutorial.stage, "arrive")
                 TestRunner.equal(profile.tutorial.complete, false)
                 TestRunner.equal(profile.revision, 0)
@@ -52,7 +52,7 @@ return {
                 TestRunner.equal(profile.tutorial.stage, "build")
                 TestRunner.equal(profile.tutorial.selectedTool, "hammer")
                 TestRunner.equal(profile.revision, 4)
-                TestRunner.equal(profile.schemaVersion, 11)
+                TestRunner.equal(profile.schemaVersion, 12)
             end,
         },
         {
@@ -68,7 +68,7 @@ return {
                         complete = true,
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 11)
+                TestRunner.equal(profile.schemaVersion, 12)
                 TestRunner.equal(profile.revision, 7)
                 TestRunner.equal(profile.tutorial.complete, true)
                 TestRunner.equal(SaveSchema.expeditionPending(profile).count, 0)
@@ -154,7 +154,7 @@ return {
                         selectedId = "profession_hacker",
                     },
                 }, 300)
-                TestRunner.equal(migrated.schemaVersion, 11)
+                TestRunner.equal(migrated.schemaVersion, 12)
                 TestRunner.equal(migrated.profession.selectedId, nil)
 
                 local selected = SaveSchema.withProfession(migrated, "profession_medic", 320)
@@ -176,7 +176,7 @@ return {
                         },
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 11)
+                TestRunner.equal(profile.schemaVersion, 12)
                 TestRunner.equal(profile.story.chapterOne.status, "unresolved")
                 TestRunner.equal(profile.story.chapterOne.decision, nil)
             end,
@@ -224,7 +224,7 @@ return {
                     revision = 3,
                     tutorial = { stage = "reveal", complete = false },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 11)
+                TestRunner.equal(profile.schemaVersion, 12)
                 TestRunner.equal(profile.town.nightNumber, 1)
             end,
         },
@@ -285,7 +285,7 @@ return {
                     town = { nightNumber = 7 },
                 }, 300)
                 local condition = SaveSchema.townCondition(profile)
-                TestRunner.equal(profile.schemaVersion, 11)
+                TestRunner.equal(profile.schemaVersion, 12)
                 TestRunner.equal(condition.integrity, 100)
                 TestRunner.equal(condition.damageLevel, 0)
                 TestRunner.equal(condition.lastNightNumber, 0)
@@ -316,7 +316,7 @@ return {
                     schemaVersion = 5,
                     town = { nightNumber = 3 },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 11)
+                TestRunner.equal(profile.schemaVersion, 12)
                 TestRunner.equal(next(profile.gear), nil)
             end,
         },
@@ -397,7 +397,7 @@ return {
                     schemaVersion = 6,
                     gear = { gear_meadow_satchel = 1 },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 11)
+                TestRunner.equal(profile.schemaVersion, 12)
                 TestRunner.equal(next(profile.quests.claimed), nil)
             end,
         },
@@ -456,7 +456,7 @@ return {
             name = "migrates schema nine profiles into empty recovery state",
             run = function()
                 local profile = SaveSchema.normalize({ schemaVersion = 9 }, 100)
-                TestRunner.equal(profile.schemaVersion, 11)
+                TestRunner.equal(profile.schemaVersion, 12)
                 TestRunner.equal(SaveSchema.expeditionRecovery(profile), nil)
                 TestRunner.equal(#profile.inventory.recoveryOrder, 0)
             end,
@@ -510,13 +510,122 @@ return {
                     "specialization_pathfinder",
                     110
                 )
-                TestRunner.equal(profile.schemaVersion, 11)
+                TestRunner.equal(profile.schemaVersion, 12)
                 TestRunner.equal(result.applied, true)
                 TestRunner.equal(
                     SaveSchema.masterySnapshot(specialized).profession_scout.specializationId,
                     "specialization_pathfinder"
                 )
                 TestRunner.equal(specialized.revision, profile.revision + 1)
+            end,
+        },
+        {
+            name = "grandfathers construction to the tier ceiling when the field never existed",
+            run = function()
+                -- No town.construction at all -- the pre-schema-12 shape.
+                -- Seven nights alone should already read as tier two, and
+                -- the grandfathered ledger has to match that ceiling exactly
+                -- rather than starting from zero.
+                local profile = SaveSchema.normalize({
+                    town = { nightNumber = 7 },
+                }, 100)
+                TestRunner.equal(profile.town.construction.building_archive, 2)
+                TestRunner.equal(profile.town.construction.building_inn, 1)
+            end,
+        },
+        {
+            name = "an explicit empty construction table is trusted, not grandfathered",
+            run = function()
+                -- The field is present -- this is a real schema-12 save with
+                -- nothing built yet, not a migration. Grandfathering here
+                -- would hand a brand new player free stages just because
+                -- their town also happens to have survived some nights.
+                local profile = SaveSchema.normalize({
+                    town = { nightNumber = 7, construction = {} },
+                }, 100)
+                TestRunner.equal(next(profile.town.construction), nil)
+            end,
+        },
+        {
+            name = "withConstructionContribution deducts the exact stage cost and advances by one",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    town = { construction = {} },
+                    inventory = {
+                        materials = { material_heartwood = 8 },
+                    },
+                }, 100)
+                local built, result =
+                    SaveSchema.withConstructionContribution(profile, "building_archive", 3, 200)
+                TestRunner.equal(result.applied, true)
+                TestRunner.equal(result.stage, 1)
+                TestRunner.equal(built.town.construction.building_archive, 1)
+                TestRunner.equal(built.inventory.materials.material_heartwood, 0)
+                TestRunner.equal(built.revision, profile.revision + 1)
+                TestRunner.equal(profile.town.construction.building_archive, nil)
+            end,
+        },
+        {
+            name = "withConstructionContribution refuses a stage nights have not unlocked yet",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    town = { construction = { building_archive = 1 } },
+                    inventory = {
+                        materials = { material_heartwood = 999, material_amber_sap = 999 },
+                    },
+                }, 100)
+                local rejected, result =
+                    SaveSchema.withConstructionContribution(profile, "building_archive", 1, 200)
+                TestRunner.equal(result.applied, false)
+                TestRunner.equal(result.reason, "tier_not_ready")
+                TestRunner.equal(rejected, profile)
+            end,
+        },
+        {
+            name = "withConstructionContribution refuses insufficient materials without mutating the profile",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    town = { construction = {} },
+                    inventory = {
+                        materials = { material_heartwood = 3 },
+                    },
+                }, 100)
+                local rejected, result =
+                    SaveSchema.withConstructionContribution(profile, "building_archive", 3, 200)
+                TestRunner.equal(result.applied, false)
+                TestRunner.equal(result.reason, "insufficient_materials")
+                TestRunner.equal(rejected, profile)
+            end,
+        },
+        {
+            name = "withConstructionContribution refuses a building already at stage three",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    town = { construction = { building_archive = 3 } },
+                    inventory = {
+                        materials = { material_heartwood = 999, material_amber_sap = 999 },
+                    },
+                }, 100)
+                local rejected, result =
+                    SaveSchema.withConstructionContribution(profile, "building_archive", 3, 200)
+                TestRunner.equal(result.applied, false)
+                TestRunner.equal(result.reason, "already_maxed")
+                TestRunner.equal(rejected, profile)
+            end,
+        },
+        {
+            name = "constructionSnapshot reads the current persisted value",
+            run = function()
+                local profile = SaveSchema.normalize({
+                    town = { construction = {} },
+                    inventory = {
+                        materials = { material_heartwood = 8 },
+                    },
+                }, 100)
+                local built =
+                    SaveSchema.withConstructionContribution(profile, "building_archive", 3, 200)
+                TestRunner.equal(SaveSchema.constructionSnapshot(built).building_archive, 1)
+                TestRunner.equal(next(SaveSchema.constructionSnapshot(profile)), nil)
             end,
         },
     },

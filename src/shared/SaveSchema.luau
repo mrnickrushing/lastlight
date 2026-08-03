@@ -9,6 +9,7 @@ local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
 local TownProgression = require("./TownProgression")
 local TownCondition = require("./TownCondition")
+local TownConstruction = require("./TownConstruction")
 
 local SaveSchema = {}
 
@@ -42,6 +43,7 @@ export type Profile = {
     town: {
         nightNumber: number,
         condition: TownCondition.State,
+        construction: { [string]: number },
     },
     gear: { [string]: number },
     equipped: Equipment.Equipped,
@@ -65,7 +67,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 11,
+        schemaVersion = 12,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -92,6 +94,7 @@ function SaveSchema.default(now: number): Profile
         town = {
             nightNumber = 1,
             condition = TownCondition.default(),
+            construction = TownConstruction.default(),
         },
         gear = Crafting.default(),
         equipped = Equipment.default(),
@@ -186,13 +189,41 @@ function SaveSchema.normalize(value: any, now: number): Profile
     end
     profile.town.condition =
         TownCondition.normalize(if type(town) == "table" then town.condition else nil)
+
+    --[[
+        Construction orders (schema 12) must grandfather every save that
+        predates them. A save from before this field existed carries no
+        `town.construction` table at all -- that absence, not any particular
+        value inside it, is what marks a pre-migration profile, because a
+        genuinely fresh schema-12 save also starts with an empty table (no
+        building funded yet) and must not be treated as needing a rescue.
+
+        Grandfathering happens by re-deriving the exact ceiling nights and
+        chapter one already granted, using TownProgression.resolve against
+        the `profile` this function has already built above -- its
+        town.nightNumber and story.chapterOne are already the trustworthy,
+        normalized values for this save, not the raw (and possibly forged)
+        input. Seeding the ledger to that ceiling means every building a
+        player already had looks exactly as built as it did a moment ago;
+        only growth beyond what nights had already unlocked requires payment
+        from here on. Getting this wrong either lets a hostile save claim
+        stages nights never granted, or -- far worse -- rolls every existing
+        town back to bare construction sites the instant this ships.
+    ]]
+    if type(town) == "table" and type(town.construction) == "table" then
+        profile.town.construction = TownConstruction.normalize(town.construction)
+    else
+        profile.town.construction =
+            TownConstruction.normalize(TownProgression.resolve(profile).buildingStages)
+    end
+
     profile.gear = Crafting.normalizeGear(value.gear)
     profile.equipped = Equipment.normalize(value.equipped)
     local quests = value.quests
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 11
+    profile.schemaVersion = 12
     return profile
 end
 
@@ -501,6 +532,42 @@ end
 
 function SaveSchema.gearSnapshot(profile: Profile): { [string]: number }
     return table.clone(profile.gear)
+end
+
+-- Spends materials to advance one building's construction by exactly one
+-- stage. `ceilingStage` is the caller's own tier-derived ceiling for this
+-- building (see TownProgression.resolve), not trusted from anywhere the
+-- profile itself stores, since nights and chapter one already govern it
+-- independently of what a player has paid for.
+function SaveSchema.withConstructionContribution(
+    profile: Profile,
+    buildingId: string,
+    ceilingStage: number,
+    now: number
+): (Profile, any)
+    local nextMaterials, nextConstruction, result = TownConstruction.contribute(
+        profile.inventory.materials,
+        profile.town.construction,
+        buildingId,
+        ceilingStage,
+        now
+    )
+    if not result.applied then
+        return profile, result
+    end
+
+    local nextProfile = table.clone(profile)
+    nextProfile.inventory = table.clone(profile.inventory)
+    nextProfile.inventory.materials = nextMaterials
+    nextProfile.town = table.clone(profile.town)
+    nextProfile.town.construction = nextConstruction
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.constructionSnapshot(profile: Profile): { [string]: number }
+    return table.clone(profile.town.construction)
 end
 
 function SaveSchema.masterySnapshot(profile: Profile): ProfessionMastery.State
