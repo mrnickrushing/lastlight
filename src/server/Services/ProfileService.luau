@@ -533,6 +533,54 @@ function ProfileService.townConsequence(self: ProfileService, player: Player): a
     return self._saveSchema.townConsequence(profile)
 end
 
+function ProfileService.townConstructionState(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {}
+    end
+    return self._saveSchema.constructionSnapshot(profile)
+end
+
+function ProfileService.contributeToConstruction(
+    self: ProfileService,
+    player: Player,
+    buildingId: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {
+            accepted = false,
+            reason = "profile_loading",
+        }
+    end
+    if not self:isWritable(player) then
+        return {
+            accepted = false,
+            reason = "profile_read_only",
+        }
+    end
+
+    local ceilingStage = self._saveSchema.townConsequence(profile).buildingStages[buildingId] or 0
+    local nextProfile, result =
+        self._saveSchema.withConstructionContribution(profile, buildingId, ceilingStage, os.time())
+    if not result.applied then
+        return {
+            accepted = false,
+            reason = result.reason,
+        }
+    end
+
+    self._profiles[player] = nextProfile
+    if self._persistent and self._writable[player] == true then
+        self._dirty[player] = true
+    end
+    return {
+        accepted = true,
+        buildingId = result.buildingId,
+        stage = result.stage,
+    }
+end
+
 -- Safe to call after any action, whether or not it moved a quest signal:
 -- returns an empty list and touches nothing when there's nothing newly
 -- claimable.

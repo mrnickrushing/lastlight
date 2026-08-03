@@ -52,6 +52,7 @@ local TownPermissions = require(root.TownPermissions)
 local RunHandoff = require(root.RunHandoff)
 local AdminRoster = require(root.AdminRoster)
 local TownProgression = require(root.TownProgression)
+local TownConstruction = require(root.TownConstruction)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
@@ -99,8 +100,13 @@ local networkService = NetworkService.new(logger)
 local profileService = ProfileService.new(logger, environmentConfig.UsePersistentData)
 local gearVisualService = GearVisualService.new(logger, profileService, GearVisualPlan)
 local analyticsService = AnalyticsService.new(logger)
-local worldService =
-    WorldService.new(logger, ExtractionPayoff, TownProgression, ProfessionAbilityVisuals)
+local worldService = WorldService.new(
+    logger,
+    ExtractionPayoff,
+    TownProgression,
+    ProfessionAbilityVisuals,
+    TownConstruction
+)
 local expeditionService = ExpeditionService.new(
     logger,
     worldService,

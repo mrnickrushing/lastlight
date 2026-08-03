@@ -2,6 +2,7 @@
 
 local ExpeditionEventFlow = require("./ExpeditionEventFlow")
 local ProfessionMastery = require("./ProfessionMastery")
+local TownProgression = require("./TownProgression")
 
 local professionSpecializationInteractionIds = {}
 local professionSpecializationInteractionIdBySpecialization = {}
@@ -13,6 +14,16 @@ for _, specializationId in ProfessionMastery.specializationIds() do
     )
     table.insert(professionSpecializationInteractionIds, interactionId)
     professionSpecializationInteractionIdBySpecialization[specializationId] = interactionId
+end
+
+-- One construction interaction per building, generated from the shared
+-- sixteen-building list rather than written out by hand, the same reasoning
+-- TownProgression.luau itself gives for driving the later eleven buildings
+-- off one table: a building added to the town gets an interaction ID for
+-- free instead of needing someone to remember to add one.
+local constructionInteractionIds = {}
+for _, buildingId in TownProgression.buildingIds() do
+    constructionInteractionIds[buildingId] = "construction_" .. buildingId
 end
 
 local RuntimeIds = {
@@ -73,6 +84,7 @@ local RuntimeIds = {
         ResolveTownIncident = "resolve_town_incident",
         RecoverExpeditionCache = "recover_expedition_cache",
         SelectProfessionSpecialization = "select_profession_specialization",
+        ContributeConstruction = "contribute_construction",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -110,6 +122,7 @@ local RuntimeIds = {
         npc_pip_wren = "resident_pip_wren",
         npc_ena_moss = "resident_ena_moss",
     }),
+    ConstructionInteractionIds = table.freeze(constructionInteractionIds),
     TownRepairInteractionIds = table.freeze({
         "town_repair_archive",
         "town_repair_workshop",
