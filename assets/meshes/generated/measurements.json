@@ -2292,7 +2292,7 @@
         16.0803
       ],
       "longestDimension": 24.0,
-      "triangles": 7998,
+      "triangles": 7999,
       "meshObjects": 1,
       "materials": [
         "embedded_pbr"
@@ -2323,7 +2323,7 @@
           "packed": true
         }
       ],
-      "bytes": 4633524
+      "bytes": 5276916
     },
     "mesh_trade_post_a": {
       "boundsMin": [
@@ -2542,7 +2542,7 @@
         13.5799
       ],
       "longestDimension": 18.0,
-      "triangles": 7998,
+      "triangles": 7999,
       "meshObjects": 1,
       "materials": [
         "embedded_pbr"
@@ -2573,7 +2573,7 @@
           "packed": true
         }
       ],
-      "bytes": 4329576
+      "bytes": 4581196
     }
   }
 }
