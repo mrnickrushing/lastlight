@@ -10560,6 +10560,144 @@ return table.freeze(TownNightSchedule)
       </Item>
       <Item class="ModuleScript" referent="58">
         <Properties>
+          <string name="Name">TownPermissions</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    Who may change a shared town, and in which direction.
+
+    Milestone 4's exit gate asks that "visitors cannot modify or steal without
+    permission." Most of that is already true by construction: every profile
+    write is keyed to the player it belongs to, so a visitor has no path to a
+    host's save, and TownProgression.merge is monotonic -- tier, growth stage,
+    and building stages only ever take the maximum, so arriving with a fresh
+    profile can never tear down what a host has built.
+
+    Town condition was the exception. Its merge resolves on night number first,
+    so a visitor arriving from night fifty with a wrecked town replaced a host's
+    intact one outright: a stranger walks in and the walls are suddenly broken.
+    Nobody stole anything, but the host's town changed because someone else
+    visited, which is the thing the gate is asking about.
+
+    The rule here restores the same shape the rest of the town already has:
+
+      * a **host** may move their own town in either direction, because their
+        own nights are what damage it and their own repairs are what fix it;
+      * a **visitor** may only ever contribute upward. Their higher night count
+        and their completed repairs carry, their damage does not.
+
+    Stated as an invariant: no arrival by another player may lower integrity,
+    reduce a building stage, or remove a resident. A town gets better when
+    people visit, or it stays the same.
+]]
+
+local TownPermissions = {}
+
+export type Role = "host" | "visitor"
+
+export type Decision = {
+    allowed: boolean,
+    reason: string,
+}
+
+local function finite(value: any): boolean
+    return type(value) == "number" and value == value and value > -math.huge and value < math.huge
+end
+
+local function integrityOf(value: any): number
+    if type(value) ~= "table" or not finite(value.integrity) then
+        return 0
+    end
+    return math.clamp(value.integrity, 0, 100)
+end
+
+--[[
+    Which role a player holds in the town they are standing in.
+
+    Ownership is by user ID and nothing else. A display name can be changed to
+    match someone else's; the numeric ID a player joins with cannot.
+]]
+function TownPermissions.roleFor(actorUserId: any, hostUserId: any): Role
+    if
+        finite(actorUserId)
+        and finite(hostUserId)
+        and actorUserId > 0
+        and actorUserId == hostUserId
+    then
+        return "host"
+    end
+    return "visitor"
+end
+
+function TownPermissions.isHost(actorUserId: any, hostUserId: any): boolean
+    return TownPermissions.roleFor(actorUserId, hostUserId) == "host"
+end
+
+--[[
+    Whether this actor may apply a change that lowers shared town state.
+
+    Only the host may. Everything else is refused with a reason rather than
+    silently dropped, so a caller can tell a player why nothing happened.
+]]
+function TownPermissions.canDegrade(actorUserId: any, hostUserId: any): Decision
+    if TownPermissions.isHost(actorUserId, hostUserId) then
+        return { allowed = true, reason = "host" }
+    end
+    return { allowed = false, reason = "visitors_cannot_damage_a_town" }
+end
+
+--[[
+    Resolve an incoming town condition against the current one.
+
+    `merge` is the existing TownCondition.merge, passed in rather than required
+    so this module stays free of a dependency it would only use once and so the
+    host path provably keeps its old behaviour.
+
+    The visitor path never returns anything with lower integrity than what is
+    already standing, whatever night number rides along with it.
+]]
+function TownPermissions.resolveCondition(
+    current: any,
+    incoming: any,
+    role: Role,
+    merge: (any, any) -> any
+): any
+    local merged = merge(current, incoming)
+    if role == "host" then
+        return merged
+    end
+
+    -- A visitor's contribution is accepted only where it does not cost the host
+    -- anything. If the merge would lower integrity, the town keeps what it had.
+    if integrityOf(merged) < integrityOf(current) then
+        return current
+    end
+    return merged
+end
+
+--[[
+    Whether an actor may take a specific owned object.
+
+    The recovery satchels and delivery crates already carry an OwnerUserId, and
+    this is the same question asked in one place: an unowned object is free to
+    anyone, an owned one belongs to its owner.
+]]
+function TownPermissions.canTake(actorUserId: any, ownerUserId: any): Decision
+    if not finite(ownerUserId) or ownerUserId <= 0 then
+        return { allowed = true, reason = "unowned" }
+    end
+    if finite(actorUserId) and actorUserId == ownerUserId then
+        return { allowed = true, reason = "owner" }
+    end
+    return { allowed = false, reason = "belongs_to_another_traveler" }
+end
+
+return table.freeze(TownPermissions)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="59">
+        <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -10735,7 +10873,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -10885,7 +11023,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -10921,7 +11059,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -11303,7 +11441,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -11336,11 +11474,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="63">
+  <Item class="ServerScriptService" referent="64">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="64">
+    <Item class="Script" referent="65">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -11393,6 +11531,7 @@ local ActionProgress = require(root.ActionProgress)
 local ActionPayloadContract = require(root.ActionPayloadContract)
 local PerformanceBudget = require(root.PerformanceBudget)
 local ProfilePersistence = require(root.ProfilePersistence)
+local TownPermissions = require(root.TownPermissions)
 local RunHandoff = require(root.RunHandoff)
 local AdminRoster = require(root.AdminRoster)
 local TownProgression = require(root.TownProgression)
@@ -11608,6 +11747,7 @@ local townNightService = TownNightService.new(
     TownNightSchedule,
     TownNightIncident,
     TownCondition,
+    TownPermissions,
     TownGuardLastStand,
     analyticsService,
     featureFlags
@@ -11725,7 +11865,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -11823,11 +11963,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="66">
+      <Item class="Folder" referent="67">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12114,7 +12254,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="68">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12967,7 +13107,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13465,7 +13605,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14770,7 +14910,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15414,7 +15554,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="72">
+        <Item class="ModuleScript" referent="73">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15518,7 +15658,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15707,7 +15847,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="74">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16100,7 +16240,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="75">
+        <Item class="ModuleScript" referent="76">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -16194,7 +16334,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="76">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16412,7 +16552,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="77">
+        <Item class="ModuleScript" referent="78">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17241,7 +17381,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="78">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17485,7 +17625,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="80">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17664,7 +17804,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="80">
+        <Item class="ModuleScript" referent="81">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18235,7 +18375,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="81">
+        <Item class="ModuleScript" referent="82">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19334,7 +19474,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19859,7 +19999,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20909,7 +21049,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20931,6 +21071,8 @@ export type TownNightService = typeof(setmetatable(
         _townNightSchedule: any,
         _townNightIncident: any,
         _townCondition: any,
+        _townPermissions: any,
+        _hostUserId: number?,
         _townGuardLastStand: any,
         _analyticsService: any,
         _condition: any,
@@ -20960,6 +21102,7 @@ function TownNightService.new(
     townNightSchedule: any,
     townNightIncident: any,
     townCondition: any,
+    townPermissions: any,
     townGuardLastStand: any,
     analyticsService: any,
     featureFlags: any
@@ -20972,6 +21115,8 @@ function TownNightService.new(
         _townNightSchedule = townNightSchedule,
         _townNightIncident = townNightIncident,
         _townCondition = townCondition,
+        _townPermissions = townPermissions,
+        _hostUserId = nil,
         _townGuardLastStand = townGuardLastStand,
         _analyticsService = analyticsService,
         _condition = townCondition.default(),
@@ -21159,11 +21304,28 @@ end
 function TownNightService.ensureStarted(
     self: TownNightService,
     nightNumber: number,
-    condition: any?
+    condition: any?,
+    actorUserId: number?
 )
     self._nightNumber = math.max(self._nightNumber, math.floor(nightNumber))
+
+    -- The first player to establish this server's town owns it. Everyone after
+    -- them is visiting, and a visit may improve the town or leave it alone --
+    -- never break it. Without this a player arriving from a later, wrecked town
+    -- replaced an intact one outright, because condition resolves on night
+    -- number before it looks at integrity.
+    if self._hostUserId == nil and actorUserId ~= nil then
+        self._hostUserId = actorUserId
+    end
+
     if condition ~= nil then
-        self._condition = self._townCondition.merge(self._condition, condition)
+        local role = self._townPermissions.roleFor(actorUserId, self._hostUserId)
+        self._condition = self._townPermissions.resolveCondition(
+            self._condition,
+            condition,
+            role,
+            self._townCondition.merge
+        )
         self._worldService:setTownCondition(self:conditionSnapshot())
     end
     if not self._enabled or self._started then
@@ -21409,7 +21571,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="85">
+        <Item class="ModuleScript" referent="86">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21781,7 +21943,8 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
         self._worldService:setBeaconVisible(true)
         self._townNightService:ensureStarted(
             profile.town.nightNumber,
-            self._profileService:townCondition(player)
+            self._profileService:townCondition(player),
+            player.UserId
         )
     end
 
@@ -22288,7 +22451,8 @@ function TutorialService._nightComplete(self: TutorialService)
         self:_advanceSurvivorToReveal(player, session)
         self._townNightService:ensureStarted(
             self._profileService:nightNumber(player),
-            self._profileService:townCondition(player)
+            self._profileService:townCondition(player),
+            player.UserId
         )
     end
     self:_publishAll()
@@ -22684,7 +22848,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="86">
+        <Item class="ModuleScript" referent="87">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23523,7 +23687,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="87">
+        <Item class="ModuleScript" referent="88">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -33706,11 +33870,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="88">
+      <Item class="Folder" referent="89">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="89">
+        <Item class="ModuleScript" referent="90">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -37372,7 +37536,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="90">
+        <Item class="ModuleScript" referent="91">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -37827,7 +37991,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="91">
+        <Item class="ModuleScript" referent="92">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -38522,7 +38686,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="92">
+        <Item class="ModuleScript" referent="93">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -39233,7 +39397,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="93">
+        <Item class="ModuleScript" referent="94">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -39319,7 +39483,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="94">
+        <Item class="ModuleScript" referent="95">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -39591,7 +39755,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="95">
+        <Item class="ModuleScript" referent="96">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -39766,7 +39930,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="96">
+        <Item class="ModuleScript" referent="97">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -40311,7 +40475,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="97">
+        <Item class="ModuleScript" referent="98">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -40544,7 +40708,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="98">
+        <Item class="ModuleScript" referent="99">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -40633,7 +40797,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="99">
+        <Item class="ModuleScript" referent="100">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -40957,11 +41121,11 @@ return table.freeze(WorldSignBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="100">
+    <Item class="Folder" referent="101">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="101">
+      <Item class="Script" referent="102">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -42384,15 +42548,15 @@ print("[Last Light] PASS FoundationIntegration")
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="102">
+  <Item class="StarterPlayer" referent="103">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="103">
+    <Item class="StarterPlayerScripts" referent="104">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="104">
+      <Item class="LocalScript" referent="105">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -42522,11 +42686,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="105">
+        <Item class="Folder" referent="106">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="106">
+          <Item class="ModuleScript" referent="107">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -42657,7 +42821,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="107">
+          <Item class="ModuleScript" referent="108">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -45054,7 +45218,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="108">
+          <Item class="ModuleScript" referent="109">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -45353,7 +45517,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="109">
+          <Item class="ModuleScript" referent="110">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -45461,7 +45625,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="110">
+          <Item class="ModuleScript" referent="111">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -45580,7 +45744,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="111">
+          <Item class="ModuleScript" referent="112">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -45680,7 +45844,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="112">
+          <Item class="ModuleScript" referent="113">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -45812,7 +45976,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="113">
+          <Item class="ModuleScript" referent="114">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -46100,7 +46264,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="114">
+  <Item class="Workspace" referent="115">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>
