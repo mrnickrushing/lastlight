@@ -70,7 +70,7 @@ function AdminRoster.adminUserIds(): { number }
 end
 
 function AdminRoster.commandNames(): { string }
-    return { "night", "give", "heal", "phase", "where", "go", "perf", "inspect" }
+    return { "night", "give", "heal", "phase", "where", "go", "perf", "inspect", "unlock" }
 end
 
 --[[
@@ -168,6 +168,15 @@ function AdminRoster.authorize(userId: any, message: any, enabled: boolean): any
         -- not the roster's -- this only rejects what could never be one.
         if command.text == nil or #command.text == 0 or #command.text > 32 then
             return { allowed = false, reason = "invalid_inspection_target", command = command.name }
+        end
+        return { allowed = true, command = command.name, text = command.text }
+    end
+
+    if command.name == "unlock" then
+        -- Same target shape as inspect. Whether the lock it names is safe to
+        -- clear is decided at the point of the write, not here.
+        if command.text == nil or #command.text == 0 or #command.text > 32 then
+            return { allowed = false, reason = "invalid_unlock_target", command = command.name }
         end
         return { allowed = true, command = command.name, text = command.text }
     end

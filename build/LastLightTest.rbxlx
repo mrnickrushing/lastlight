@@ -1203,7 +1203,7 @@ function AdminRoster.adminUserIds(): { number }
 end
 
 function AdminRoster.commandNames(): { string }
-    return { "night", "give", "heal", "phase", "where", "go", "perf", "inspect" }
+    return { "night", "give", "heal", "phase", "where", "go", "perf", "inspect", "unlock" }
 end
 
 --[[
@@ -1301,6 +1301,15 @@ function AdminRoster.authorize(userId: any, message: any, enabled: boolean): any
         -- not the roster's -- this only rejects what could never be one.
         if command.text == nil or #command.text == 0 or #command.text > 32 then
             return { allowed = false, reason = "invalid_inspection_target", command = command.name }
+        end
+        return { allowed = true, command = command.name, text = command.text }
+    end
+
+    if command.name == "unlock" then
+        -- Same target shape as inspect. Whether the lock it names is safe to
+        -- clear is decided at the point of the write, not here.
+        if command.text == nil or #command.text == 0 or #command.text > 32 then
+            return { allowed = false, reason = "invalid_unlock_target", command = command.name }
         end
         return { allowed = true, command = command.name, text = command.text }
     end
@@ -12335,6 +12344,8 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
         -- AdminRoster.authorize's inspect case -- so the cast documents an
         -- invariant this file does not itself enforce, rather than skips one.
         self:_inspect(player, decision.text :: string)
+    elseif command == "unlock" then
+        self:_unlock(player, decision.text :: string)
     end
 
     self._logger:info("admin_command", {
@@ -12343,6 +12354,28 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
         value = decision.value,
         text = decision.text,
     })
+end
+
+--[[
+    A username or a raw user ID, resolved to a user ID -- or nil, with the
+    refusal already sent, so both /inspect and /unlock can share one lookup
+    instead of two copies drifting apart.
+]]
+function AdminService._resolveTarget(self: AdminService, admin: Player, argument: string): number?
+    local resolvedId: number? = tonumber(argument)
+    if resolvedId == nil then
+        local ok, byName = pcall(function()
+            return Players:GetUserIdFromNameAsync(argument)
+        end)
+        if ok and type(byName) == "number" then
+            resolvedId = byName
+        end
+    end
+    if resolvedId == nil or resolvedId <= 0 then
+        self:_reply(admin, "NO PLAYER NAMED " .. string.upper(argument))
+        return nil
+    end
+    return math.floor(resolvedId)
 end
 
 --[[
@@ -12357,20 +12390,10 @@ end
     seeing without leaving the game.
 ]]
 function AdminService._inspect(self: AdminService, admin: Player, argument: string)
-    local resolvedId: number? = tonumber(argument)
-    if resolvedId == nil then
-        local ok, byName = pcall(function()
-            return Players:GetUserIdFromNameAsync(argument)
-        end)
-        if ok and type(byName) == "number" then
-            resolvedId = byName
-        end
-    end
-    if resolvedId == nil or resolvedId <= 0 then
-        self:_reply(admin, "NO PLAYER NAMED " .. string.upper(argument))
+    local userId = self:_resolveTarget(admin, argument)
+    if userId == nil then
         return
     end
-    local userId = math.floor(resolvedId)
 
     local report = self._profileService:inspect(userId)
     if not report.found then
@@ -12411,6 +12434,49 @@ function AdminService._inspect(self: AdminService, admin: Player, argument: stri
             if report.lock.held and report.lock.stale ~= true then " · LOCKED" else ""
         )
     )
+end
+
+--[[
+    Clears a lock, but only the ProfileService method backing this will ever
+    clear a lock that is already dead. Every refusal reason it can return
+    means the same thing to a player waiting to get back in: try rejoining
+    now, because the lock either never existed, was already gone, or was
+    just cleared. The one reason that does not is lock_is_active, and that
+    one is not a bug to route around -- it means a server is still genuinely
+    holding this save, and forcing it open from here is the exact race this
+    whole system exists to prevent.
+]]
+function AdminService._unlock(self: AdminService, admin: Player, argument: string)
+    local userId = self:_resolveTarget(admin, argument)
+    if userId == nil then
+        return
+    end
+
+    local result = self._profileService:forceUnlock(userId)
+    self._logger:info("admin_unlock", {
+        admin = admin.UserId,
+        target = userId,
+        applied = result.applied,
+        reason = result.reason,
+    })
+
+    if result.applied then
+        self:_reply(admin, string.format("%d — LOCK CLEARED (%s)", userId, result.reason))
+        return
+    end
+
+    local reply = if result.reason == "no_save_on_record"
+        then string.format("NO SAVE ON RECORD FOR %d", userId)
+        elseif result.reason == "already_unlocked" then string.format(
+            "%d — NOT LOCKED",
+            userId
+        )
+        elseif result.reason == "lock_is_active" then string.format(
+            "%d — A SERVER IS STILL HOLDING THIS SAVE",
+            userId
+        )
+        else string.format("%d — UNLOCK UNAVAILABLE RIGHT NOW", userId)
+    self:_reply(admin, reply)
 end
 
 function AdminService._onChatted(self: AdminService, player: Player, message: string)
@@ -12459,6 +12525,8 @@ function AdminService._onChatted(self: AdminService, player: Player, message: st
         self:_reply(player, "PHASE TAKES DAY, DUSK, OR NIGHT")
     elseif decision.reason == "invalid_inspection_target" then
         self:_reply(player, "INSPECT TAKES A USERNAME OR USER ID")
+    elseif decision.reason == "invalid_unlock_target" then
+        self:_reply(player, "UNLOCK TAKES A USERNAME OR USER ID")
     elseif decision.reason == "admin_disabled" then
         self:_reply(player, "ADMIN COMMANDS ARE OFF")
     end
@@ -21358,6 +21426,73 @@ function ProfileService.inspect(self: ProfileService, userId: number): any
     end
 
     return self._adminInspectionReport.build(result, now, staleAfter)
+end
+
+--[[
+    Clears a lock, but only one that is already dead.
+
+    This is the one write an offline profile is allowed to receive from an
+    admin, and it is deliberately the narrowest write that could exist: it
+    can remove a stale sessionLock field and nothing else. It cannot touch
+    night number, materials, equipment, or anything a player earned, which is
+    what keeps it out of the "repair tool becomes a duplication vector"
+    problem inspect's own doc comment warns about.
+
+    Safety is UpdateAsync re-deciding from scratch on the value it is actually
+    about to commit over, using the exact same ProfilePersistence.acquireLock
+    a real server uses to decide whether it may start playing a profile --
+    not a snapshot read beforehand, which could be stale by the time the
+    write lands. A throwaway job ID is passed in because this is not claiming
+    the lock for a session; a decision of "already_held" would only mean the
+    stored jobId happens to collide with that throwaway string, which cannot
+    happen. Every other acquireLock outcome -- unlocked, malformed, stale, a
+    heartbeat from a broken clock -- means the same thing here: no live
+    server is holding this, so the field may go.
+]]
+function ProfileService.forceUnlock(self: ProfileService, userId: number): any
+    assert(type(userId) == "number" and userId > 0, "unlock target must be a valid user ID")
+
+    if not self._persistent or self._store == nil then
+        return { applied = false, reason = "not_persistent" }
+    end
+
+    local outcome: any = { applied = false, reason = "update_did_not_run" }
+    local ok, err = pcall(function()
+        (self._store :: GlobalDataStore):UpdateAsync(
+            string.format("player_%d", userId),
+            function(current: any)
+                if current == nil then
+                    outcome = { applied = false, reason = "no_save_on_record" }
+                    return nil
+                end
+                local existingLock = if type(current) == "table" then current.sessionLock else nil
+                if existingLock == nil then
+                    outcome = { applied = false, reason = "already_unlocked" }
+                    return nil
+                end
+                local decision = self._profilePersistence.acquireLock(
+                    existingLock,
+                    "admin-unlock-check",
+                    os.time(),
+                    self._config.ProfileLockStaleAfterSeconds
+                )
+                if not decision.acquired then
+                    outcome = { applied = false, reason = "lock_is_active" }
+                    return nil
+                end
+                local updated = table.clone(current)
+                updated.sessionLock = nil
+                outcome = { applied = true, reason = decision.reason }
+                return updated
+            end
+        )
+    end)
+    if not ok then
+        self._logger:warn("profile_unlock_failed", { userId = userId, reason = tostring(err) })
+        error("could not update that profile right now")
+    end
+
+    return outcome
 end
 
 return table.freeze(ProfileService)

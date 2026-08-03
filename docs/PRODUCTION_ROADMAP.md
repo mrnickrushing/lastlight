@@ -216,7 +216,9 @@ technically healthy, and shows credible D1 intent in closed testing.
 - migration fixtures cover every released schema;
 - forced crashes, lock contention, write failure, stale revision, and shutdown pass;
 - visitors cannot modify or steal without permission;
-- town remains navigable under every allowed building state;
+- town remains navigable under every allowed building state -- `scripts/validate_town_layout.py`
+  guards building-to-building footprint clearance from source alone; it cannot verify
+  pathfinding, so a live Studio pass is still required for the gate itself;
 - no functional progress requires premium cosmetics.
 
 ## Milestone 5 — Expedition platform
