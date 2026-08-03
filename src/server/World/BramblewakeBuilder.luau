@@ -1409,6 +1409,25 @@ local function buildModuleVisual(
             CollectionService:AddTag(moth, runtimeIds.AmbientMoteTag)
         end
     elseif visual == "old_growth" then
+        dress(
+            extra,
+            "mesh_old_growth_stump_a",
+            parent,
+            center + Vector3.new(22, 0, 22),
+            1.4,
+            0.5,
+            2490
+        )
+        dress(extra, "mesh_deadfall_a", parent, center + Vector3.new(6, 0, 14), 1.2, 1.9, 2491)
+        dress(
+            extra,
+            "mesh_boulder_cluster_a",
+            parent,
+            center + Vector3.new(-14, 0, 18),
+            1,
+            0.3,
+            2492
+        )
         part(
             parent,
             "OldGrowthTrunk",
@@ -1432,6 +1451,25 @@ local function buildModuleVisual(
         end
     elseif visual == "wayhome_gate" then
         rootArch(parent, center, 1.15)
+        dress(extra, "mesh_wayhome_gate_a", parent, center, 1.25, 0, 2495)
+        dress(
+            extra,
+            "mesh_creator_street_lantern_a",
+            parent,
+            center + Vector3.new(-11, 0, 8),
+            1,
+            0,
+            2496
+        )
+        dress(
+            extra,
+            "mesh_creator_street_lantern_a",
+            parent,
+            center + Vector3.new(11, 0, 8),
+            1,
+            0,
+            2497
+        )
         local beacon =
             orb(parent, "WayhomeLight", center + Vector3.new(0, 8, 0), 6, AMBER, Enum.Material.Neon)
         light(beacon, AMBER, 3, 36)

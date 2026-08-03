@@ -98,6 +98,21 @@ return {
             end,
         },
         {
+            name = "go accepts only the two levels",
+            run = function()
+                for _, place in { "town", "bramblewake" } do
+                    local result = AdminRoster.authorize(OWNER, "/go " .. place, true)
+                    TestRunner.equal(result.allowed, true)
+                    TestRunner.equal(result.text, place)
+                end
+                for _, message in { "/go", "/go emberhollow", "/go 2" } do
+                    local result = AdminRoster.authorize(OWNER, message, true)
+                    TestRunner.equal(result.allowed, false)
+                    TestRunner.equal(result.reason, "unknown_destination")
+                end
+            end,
+        },
+        {
             name = "lists both admins",
             run = function()
                 local ids = AdminRoster.adminUserIds()
