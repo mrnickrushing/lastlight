@@ -8321,7 +8321,12 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
                 self._runtimeIds.Actions.TalkResident,
                 "TALK",
                 resident.displayName,
-                residentId
+                residentId,
+                nil,
+                -- People get a person-sized volume, like Mara. The default is
+                -- shaped for buildings and props, and at that size neighbouring
+                -- residents would overlap into each other's reach.
+                Vector3.new(7, 8, 7)
             )
         end
     end
