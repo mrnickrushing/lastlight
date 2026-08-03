@@ -5057,7 +5057,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     fallbackFlame.Shape = Enum.PartType.Wedge
     fallbackFlame.CanQuery = false
     table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_memory_reliquary_a",
+        assetId = "mesh_memory_reliquary_a",
         fallbackKind = "asset_replacement",
         position = Vector3.new(0, 0.25, -148),
         scale = 1,

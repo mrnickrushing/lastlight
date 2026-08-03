@@ -3362,7 +3362,7 @@ function BramblewakeBuilder.build(
     queueItemAsset(
         meshPlacements,
         bossArena.seal,
-        "mesh_creator_memory_reliquary_a",
+        "mesh_memory_reliquary_a",
         1.12,
         7101,
         math.rad(180),

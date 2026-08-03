@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_memory_reliquary_a",
+  "source": "assets/meshes/raw/mesh_memory_reliquary_a.glb",
+  "output": "assets/meshes/generated/mesh_memory_reliquary_a.glb",
+  "targetLongestDimension": 5.4,
+  "boundsMin": [
+    -1.2667,
+    -0.9453,
+    0.0
+  ],
+  "boundsMax": [
+    1.2667,
+    0.9453,
+    5.4
+  ],
+  "dimensions": [
+    2.5333,
+    1.8905,
+    5.4
+  ],
+  "longestDimension": 5.4,
+  "trianglesBefore": 14374,
+  "trianglesAfter": 5500,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    }
+  ],
+  "bytes": 12304520
+}

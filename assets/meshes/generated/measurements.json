@@ -2132,6 +2132,56 @@
         }
       ],
       "bytes": 11114096
+    },
+    "mesh_memory_reliquary_a": {
+      "boundsMin": [
+        -1.2667,
+        -0.9453,
+        0.0
+      ],
+      "boundsMax": [
+        1.2667,
+        0.9453,
+        5.4
+      ],
+      "dimensions": [
+        2.5333,
+        1.8905,
+        5.4
+      ],
+      "longestDimension": 5.4,
+      "triangles": 5500,
+      "meshObjects": 1,
+      "materials": [
+        "embedded_pbr"
+      ],
+      "textures": [
+        {
+          "name": "Image_0",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_1",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "Image_3",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        },
+        {
+          "name": "normal",
+          "width": 2048,
+          "height": 2048,
+          "packed": true
+        }
+      ],
+      "bytes": 12304520
     }
   }
 }
