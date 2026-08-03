@@ -1841,11 +1841,18 @@ local function buildPointOfInterest(
     return memory
 end
 
+--[[
+    Event scenes are the encounters a player stops for, and they were the last
+    part of the route still assembled entirely from boxes. Each now carries the
+    authored props that say what it is before the prompt is read, which is the
+    order the visual standard asks for.
+]]
 local function buildEventSocket(
     parent: Instance,
     center: Vector3,
     definition: any,
-    runtimeIds: any
+    runtimeIds: any,
+    extra: { any }
 ): any
     local anchor = part(
         parent,
@@ -1874,7 +1881,13 @@ local function buildEventSocket(
     scene:SetAttribute("VisualKind", definition.visual)
     scene.Parent = parent
 
+    local sceneAt = center + Vector3.new(22, 0, -19)
     if definition.visual == "wagon" then
+        -- A wagon that did not make it, and the load it was carrying.
+        dress(extra, "mesh_creator_crate_a", parent, sceneAt + Vector3.new(3, 0, 2), 1, 0.6, 2560)
+        dress(extra, "mesh_creator_crate_a", parent, sceneAt + Vector3.new(-2, 0, 4), 1, 2.2, 2561)
+        dress(extra, "mesh_creator_barrel_a", parent, sceneAt + Vector3.new(4, 0, -3), 1, 1.1, 2562)
+        dress(extra, "mesh_deadfall_a", parent, sceneAt + Vector3.new(-6, 0, -2), 1, 1.6, 2563)
         part(
             scene,
             "LostWagon",
@@ -1930,6 +1943,17 @@ local function buildEventSocket(
             )
         end
     elseif definition.visual == "hedge" then
+        for hedgeIndex = -2, 2 do
+            dress(
+                extra,
+                "mesh_briar_wall_a",
+                parent,
+                sceneAt + Vector3.new(hedgeIndex * 7, 0, 0),
+                1,
+                math.pi / 2,
+                2610 + hedgeIndex
+            )
+        end
         part(
             scene,
             "MovingHedge",
@@ -1960,8 +1984,28 @@ local function buildEventSocket(
             leaf.CanQuery = false
         end
     elseif definition.visual == "root_bridge" then
+        dress(extra, "mesh_tangle_bridge_a", parent, sceneAt, 0.9, 1.57, 2570)
+        dress(
+            extra,
+            "mesh_boulder_cluster_a",
+            parent,
+            sceneAt + Vector3.new(-8, 0, 5),
+            0.9,
+            0.4,
+            2571
+        )
         rootArch(scene, anchor.Position, 0.52)
     elseif definition.visual == "pollen_storm" then
+        dress(
+            extra,
+            "mesh_broadleaf_hero_a",
+            parent,
+            sceneAt + Vector3.new(-8, 0, -5),
+            0.85,
+            0.9,
+            2620
+        )
+        dress(extra, "mesh_fern_cluster_a", parent, sceneAt + Vector3.new(5, 0, 4), 1.3, 2.1, 2621)
         for moteIndex = 1, 7 do
             local angle = (moteIndex / 7) * math.pi * 2
             local mote = orb(
@@ -1977,6 +2021,25 @@ local function buildEventSocket(
             mote.CanQuery = false
         end
     elseif definition.visual == "hungry_homestead" then
+        dress(
+            extra,
+            "mesh_crooked_farmhouse_a",
+            parent,
+            sceneAt + Vector3.new(0, 0, -5),
+            0.9,
+            0.8,
+            2580
+        )
+        dress(extra, "mesh_creator_barrel_a", parent, sceneAt + Vector3.new(5, 0, 2), 1, 0.3, 2581)
+        dress(
+            extra,
+            "mesh_creator_rustic_fence_a",
+            parent,
+            sceneAt + Vector3.new(-7, 0, 3),
+            1,
+            0,
+            2582
+        )
         part(
             scene,
             "HomesteadPorch",
@@ -2039,6 +2102,17 @@ local function buildEventSocket(
             Enum.Material.WoodPlanks
         )
     elseif definition.visual == "stag_tracks" then
+        dress(extra, "mesh_deadfall_a", parent, sceneAt + Vector3.new(6, 0, -4), 1.1, 2.9, 2590)
+        dress(
+            extra,
+            "mesh_conifer_hero_b",
+            parent,
+            sceneAt + Vector3.new(-9, 0, -6),
+            0.8,
+            1.2,
+            2591
+        )
+        dress(extra, "mesh_fern_cluster_a", parent, sceneAt + Vector3.new(2, 0, 5), 1.2, 0.5, 2592)
         for side = -1, 1, 2 do
             part(
                 scene,
@@ -2068,6 +2142,17 @@ local function buildEventSocket(
             track.Shape = Enum.PartType.Ball
         end
     elseif definition.visual == "wildfire_choice" then
+        dress(extra, "mesh_creator_campfire_a", parent, sceneAt, 1.4, 0, 2600)
+        dress(extra, "mesh_deadfall_a", parent, sceneAt + Vector3.new(-7, 0, 4), 1.2, 1.1, 2601)
+        dress(
+            extra,
+            "mesh_boulder_cluster_a",
+            parent,
+            sceneAt + Vector3.new(7, 0, 3),
+            0.9,
+            2.4,
+            2602
+        )
         for side = -1, 1, 2 do
             local flame = orb(
                 scene,
