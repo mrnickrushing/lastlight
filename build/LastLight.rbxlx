@@ -8124,6 +8124,7 @@ local RuntimeIds = {
         UseGear = "use_gear",
         EquipGear = "equip_gear",
         LobbyDepart = "lobby_depart",
+        GatherResource = "gather_resource",
         OpenFieldBook = "open_field_book",
         TalkResident = "talk_resident",
         RepairTown = "repair_town",
@@ -14193,6 +14194,34 @@ function ExpeditionService._grantReward(
         "event",
         definition.id
     )
+end
+
+--[[
+    Grant a harvested resource node.
+
+    Nodes are the reason to walk the route at all, so they go through the same
+    idempotent grant path as events and encounters: one transaction per node
+    per run, recorded against the run's manifest, so a node cannot be farmed by
+    re-clicking it or by a duplicated remote.
+]]
+function ExpeditionService.grantNodeReward(
+    self: ExpeditionService,
+    userId: number,
+    nodeId: string,
+    reward: any
+): boolean
+    if type(nodeId) ~= "string" or string.sub(nodeId, 1, 5) ~= "node_" then
+        self._logger:warn("expedition_node_reward_rejected", {
+            node = nodeId,
+            reason = "invalid_node_id",
+            userId = userId,
+        })
+        return false
+    end
+    local manifest = assert(self._manifest, "expedition manifest was not initialized")
+    -- The node's own ID is the transaction, so harvesting is exactly-once for
+    -- the life of the run regardless of how many times it is asked for.
+    return self:_grant(userId, nodeId, manifest.hash, reward, "node", nodeId)
 end
 
 function ExpeditionService.grantEncounterReward(
@@ -20731,6 +20760,48 @@ function TutorialService._interact(
         return
     end
 
+    if actionId == self._runtimeIds.Actions.GatherResource then
+        --[[
+            Harvesting a Bramblewake node.
+
+            Handled before the tutorial-stage machinery below, because these
+            nodes belong to the expedition rather than to the First Light
+            sequence and must not advance or be gated by it. Uses the same
+            timed gather as the town stump -- swing, bar, then the grant --
+            and the same idempotent expedition grant path as events and
+            encounters, keyed on the node's own ID, so a node pays out exactly
+            once per run however many times it is clicked.
+        ]]
+        local node = self._worldService:resourceNode(interactionId)
+        if node == nil then
+            self:_setToast(player, "ALREADY HARVESTED")
+            self:_publish(player)
+            return
+        end
+        if player:GetAttribute("LastLightInExpedition") ~= true then
+            self:_setToast(player, "ONLY OUT IN BRAMBLEWAKE")
+            self:_publish(player)
+            return
+        end
+        if
+            not skipTimer
+            and self:_beginTimedAction(player, self._runtimeIds.Actions.Gather, interactionId)
+        then
+            return
+        end
+        local granted = self._expeditionService:grantNodeReward(
+            player.UserId,
+            interactionId,
+            { [node.materialId] = 1 }
+        )
+        if granted then
+            self._worldService:markResourceNodeHarvested(interactionId)
+            self:_setToast(player, "+1 " .. string.upper(node.objectText))
+        end
+        self:_publish(player)
+        return
+    end
+
     local session = self._sessions[player]
     if session == nil then
         return
@@ -22295,6 +22366,7 @@ export type WorldService = typeof(setmetatable(
         _lobbySpawn: SpawnLocation?,
         _departurePlatform: BasePart?,
         _clickHandler: ((Player, string) -> ())?,
+        _resourceNodes: { [string]: any },
         _lantern: BasePart?,
         _lanternVisualHealth: number,
         _beacon: BasePart?,
@@ -24036,6 +24108,7 @@ function WorldService.new(
         _lobbySpawn = nil,
         _departurePlatform = nil,
         _clickHandler = nil,
+        _resourceNodes = {},
         _lantern = nil,
         _lanternVisualHealth = 100,
         _beacon = nil,
@@ -28432,6 +28505,39 @@ function WorldService.playToolAction(
     end)
 end
 
+function WorldService.resourceNode(self: WorldService, interactionId: string): any
+    return self._resourceNodes[interactionId]
+end
+
+-- Harvested nodes stay in the world but stop glowing and stop offering the
+-- prompt, so a player can see what they have already taken.
+function WorldService.markResourceNodeHarvested(self: WorldService, interactionId: string)
+    local node = self._resourceNodes[interactionId]
+    if node == nil then
+        return
+    end
+    self._resourceNodes[interactionId] = nil
+    local prompt = self._interactions[interactionId]
+    if prompt ~= nil then
+        prompt.Enabled = false
+    end
+    local module = node.target.Parent
+    if module ~= nil then
+        for _, descendant in module:GetChildren() do
+            if descendant:IsA("BasePart") and descendant.Name == "ResourceGlow" then
+                if (descendant.Position - node.target.Position).Magnitude < 8 then
+                    descendant.Transparency = 1
+                    for _, child in descendant:GetChildren() do
+                        if child:IsA("Light") then
+                            child.Enabled = false
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 function WorldService.setClickHandler(self: WorldService, handler: (Player, string) -> ())
     self._clickHandler = handler
 end
@@ -30985,6 +31091,25 @@ function WorldService.buildBramblewake(
         nil,
         nil
     )
+    -- Harvest nodes: the reason to walk the route. Registered with the same
+    -- generous click volume everything else uses, and remembered here so the
+    -- tutorial service can look up what a given node grants.
+    self._resourceNodes = {}
+    for _, node in result.resourceNodes or {} do
+        self:_registerInteraction(
+            node.target,
+            node.interactionId,
+            self._runtimeIds.Actions.GatherResource,
+            "HARVEST",
+            node.objectText,
+            nil,
+            nil,
+            Vector3.new(10, 12, 10)
+        )
+        self._resourceNodes[node.interactionId] = node
+        addBillboard(node.target, string.upper(node.objectText), AMBER, 90)
+    end
+
     for _, descriptor in result.eventInteractions do
         self:_registerInteraction(
             descriptor.target,
@@ -31292,18 +31417,29 @@ function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
         end
         return
     end
-    Lighting.Brightness = 1.8
-    Lighting.Ambient = Color3.fromRGB(48, 62, 72)
-    Lighting.OutdoorAmbient = Color3.fromRGB(38, 52, 68)
-    Lighting.ExposureCompensation = -0.05
+    --[[
+        A Blackout should read as dangerous, not as a colour filter.
+
+        The old values washed the whole world to one flat teal: a heavy
+        saturated tint over raised brightness and flattened contrast, which
+        left every surface the same value and made the place genuinely
+        unreadable -- you could not tell a wall from a road from a creature.
+        Now the tint is nearly neutral with only a cool cast, contrast is up
+        so silhouettes separate, and brightness is down so the lantern-fire
+        the Blackout is about is the brightest thing in frame.
+    ]]
+    Lighting.Brightness = 1.15
+    Lighting.Ambient = Color3.fromRGB(58, 66, 74)
+    Lighting.OutdoorAmbient = Color3.fromRGB(46, 54, 64)
+    Lighting.ExposureCompensation = -0.1
     local color = if effect ~= nil and effect:IsA("ColorCorrectionEffect")
         then effect
         else Instance.new("ColorCorrectionEffect")
     color.Name = "LastLightBlackoutColor"
-    color.Brightness = 0.04
-    color.Contrast = 0.04
-    color.Saturation = -0.05
-    color.TintColor = Color3.fromRGB(164, 205, 186)
+    color.Brightness = -0.02
+    color.Contrast = 0.16
+    color.Saturation = 0.04
+    color.TintColor = Color3.fromRGB(214, 228, 224)
     color.Parent = Lighting
 end
 
@@ -34899,6 +35035,84 @@ local function buildBlackoutLayer(
     }
 end
 
+--[[
+    Harvestable resource nodes along the route.
+
+    Bramblewake previously had no gather nodes of any kind: Heartwood and
+    Amber Sap existed as materials, as crafting inputs, and as elite and boss
+    rewards, but there was nothing in the world to harvest. A player walking
+    the route had no way to find either, because neither was there.
+
+    Two per module from the second module onward, alternating material and
+    offset to either side of the road, so the route always has something
+    visible to walk toward and the reason to travel is on the path rather than
+    only at the far end. Each carries a lantern-amber or foxfire glow so it
+    reads at distance in Blackout lighting, and a billboard naming what it is.
+]]
+local function buildResourceNodes(
+    module: Instance,
+    center: Vector3,
+    moduleIndex: number,
+    runtimeIds: any,
+    nodes: { any },
+    meshPlacements: { any }
+)
+    if moduleIndex < 2 then
+        return
+    end
+    for slot = 1, 2 do
+        local isSap = (moduleIndex + slot) % 2 == 0
+        local side = if slot == 1 then -1 else 1
+        local at = center + Vector3.new(side * (15 + (moduleIndex % 3) * 2), 0, (slot - 1.5) * 18)
+        local nodeId = string.format("node_bw_%d_%d", moduleIndex, slot)
+
+        local anchor = part(
+            module,
+            if isSap then "AmberSapNode" else "HeartwoodNode",
+            Vector3.new(5, 7, 5),
+            CFrame.new(at + Vector3.new(0, 3.5, 0)),
+            if isSap then Color3.fromRGB(196, 142, 58) else Color3.fromRGB(96, 68, 46),
+            Enum.Material.Wood
+        )
+        anchor.Transparency = 1
+        anchor.CanCollide = false
+
+        local glow = part(
+            module,
+            "ResourceGlow",
+            Vector3.new(2.2, 2.2, 2.2),
+            CFrame.new(at + Vector3.new(0, 3.2, 0)),
+            if isSap then Color3.fromRGB(255, 186, 84) else Color3.fromRGB(120, 214, 178),
+            Enum.Material.Neon,
+            false
+        )
+        glow.Shape = Enum.PartType.Ball
+        glow.Transparency = 0.4
+        glow.CastShadow = false
+        light(glow, glow.Color, 1.4, 24)
+        CollectionService:AddTag(glow, runtimeIds.AmbientLightTag)
+
+        table.insert(meshPlacements, {
+            assetId = if isSap then "mesh_amber_sap_node_a" else "mesh_heartwood_stump_a",
+            fallbackKind = "asset_replacement",
+            position = at,
+            scale = 1,
+            yaw = math.rad((moduleIndex * 37 + slot * 61) % 360),
+            seed = 11200 + moduleIndex * 10 + slot,
+            swayTag = nil,
+            parent = module,
+            fallbackInstance = nil,
+        })
+
+        table.insert(nodes, {
+            target = anchor,
+            interactionId = nodeId,
+            materialId = if isSap then "material_amber_sap" else "material_heartwood",
+            objectText = if isSap then "Amber Sap" else "Heartwood",
+        })
+    end
+end
+
 function BramblewakeBuilder.build(
     parent: Instance,
     manifest: any,
@@ -34929,6 +35143,7 @@ function BramblewakeBuilder.build(
     local oldGrowthCenter: Vector3? = nil
     local extractionTarget: BasePart? = nil
     local meshPlacements = {}
+    local resourceNodes = {}
     for _, placement in manifest.modules do
         centers[placement.index] = ORIGIN
             + Vector3.new(placement.cellX * catalog.CellSize, 0, placement.cellZ * catalog.CellSize)
@@ -34985,6 +35200,14 @@ function BramblewakeBuilder.build(
             local z = if cornerIndex <= 2 then -27 else 27
             tree(module, center + Vector3.new(x, 0, z), 0.62 + (cornerIndex % 2) * 0.08)
         end
+        buildResourceNodes(
+            module,
+            center,
+            placement.index,
+            runtimeIds,
+            resourceNodes,
+            meshPlacements
+        )
         local meshPlacement = buildModuleVisual(module, definition.visual, center, runtimeIds)
         if meshPlacement ~= nil then
             table.insert(meshPlacements, meshPlacement)
@@ -35255,6 +35478,7 @@ function BramblewakeBuilder.build(
         entryCFrame = CFrame.new(centers[1] + Vector3.new(0, 5, 0)),
         extractionTarget = assert(extractionTarget, "Bramblewake extraction target is missing"),
         eventInteractions = eventInteractions,
+        resourceNodes = resourceNodes,
         eventSockets = eventSockets,
         eliteArena = assert(eliteArena, "Old Growth elite arena is missing"),
         bossArena = bossArena,
@@ -36576,6 +36800,17 @@ local ENTRIES: { Entry } = {
         maxTriangles = 3500,
         maxMaterialSlots = 1,
         placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_amber_sap_node_a",
+        assetId = 112488289637746,
+        targetLongestDimension = 6,
+        maxTriangles = 5500,
+        maxMaterialSlots = 1,
+        placementBand = "curated_expedition",
         pbr = true,
         preserveSourceMaterials = true,
         creatorStore = false,
@@ -40914,8 +41149,12 @@ function HUDController._layout(self: HUDController)
         self._compact.Size = UDim2.fromOffset(44, 38)
         self._compact.Text = if self._compactEnabled then "+" else "−"
         self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 212)
-        self._blackoutFrame.Position = UDim2.new(0.5, 0, 0, 212)
-        self._blackoutFrame.Size = UDim2.new(1, -36, 0, 64)
+        -- Tucked under the objective panel on the left rather than spanning
+        -- the screen at eye level. At full width it sat straight across the
+        -- middle of the view for the whole nine minutes of a Blackout.
+        self._blackoutFrame.Position = UDim2.fromOffset(18, 196)
+        self._blackoutFrame.Size = UDim2.fromOffset(470, 70)
+        self._blackoutFrame.AnchorPoint = Vector2.new(0, 0)
         self._eliteFrame.Position =
             UDim2.new(0.5, 0, 0, if self._blackoutFrame.Visible then 284 else 212)
         self._eliteFrame.Size = UDim2.new(1, -36, 0, 70)

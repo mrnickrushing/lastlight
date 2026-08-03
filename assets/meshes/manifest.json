@@ -806,6 +806,26 @@
         "normal"
       ],
       "robloxAssetId": 70394272147624
+    },
+    {
+      "id": "mesh_amber_sap_node_a",
+      "displayName": "Amber Sap Bole",
+      "role": "expedition_gather_node",
+      "placementBand": "curated_expedition",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc54c-deb6-7c70-999b-27dc668e0833 then multi-image-to-3d task 019fc552-c0ba-7577-9752-c0a76e665970, textures downscaled to 1024. The harvestable Amber Sap node for Bramblewake, which previously had no gather nodes of any kind.",
+      "file": "generated/mesh_amber_sap_node_a.glb",
+      "previewFile": "previews/mesh-amber-sap-node.png",
+      "targetLongestDimension": 6,
+      "maxTriangles": 5500,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 112488289637746
     }
   ]
 }

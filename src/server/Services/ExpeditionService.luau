@@ -315,6 +315,34 @@ function ExpeditionService._grantReward(
     )
 end
 
+--[[
+    Grant a harvested resource node.
+
+    Nodes are the reason to walk the route at all, so they go through the same
+    idempotent grant path as events and encounters: one transaction per node
+    per run, recorded against the run's manifest, so a node cannot be farmed by
+    re-clicking it or by a duplicated remote.
+]]
+function ExpeditionService.grantNodeReward(
+    self: ExpeditionService,
+    userId: number,
+    nodeId: string,
+    reward: any
+): boolean
+    if type(nodeId) ~= "string" or string.sub(nodeId, 1, 5) ~= "node_" then
+        self._logger:warn("expedition_node_reward_rejected", {
+            node = nodeId,
+            reason = "invalid_node_id",
+            userId = userId,
+        })
+        return false
+    end
+    local manifest = assert(self._manifest, "expedition manifest was not initialized")
+    -- The node's own ID is the transaction, so harvesting is exactly-once for
+    -- the life of the run regardless of how many times it is asked for.
+    return self:_grant(userId, nodeId, manifest.hash, reward, "node", nodeId)
+end
+
 function ExpeditionService.grantEncounterReward(
     self: ExpeditionService,
     userId: number,

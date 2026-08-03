@@ -39,6 +39,7 @@ export type WorldService = typeof(setmetatable(
         _lobbySpawn: SpawnLocation?,
         _departurePlatform: BasePart?,
         _clickHandler: ((Player, string) -> ())?,
+        _resourceNodes: { [string]: any },
         _lantern: BasePart?,
         _lanternVisualHealth: number,
         _beacon: BasePart?,
@@ -1780,6 +1781,7 @@ function WorldService.new(
         _lobbySpawn = nil,
         _departurePlatform = nil,
         _clickHandler = nil,
+        _resourceNodes = {},
         _lantern = nil,
         _lanternVisualHealth = 100,
         _beacon = nil,
@@ -6176,6 +6178,39 @@ function WorldService.playToolAction(
     end)
 end
 
+function WorldService.resourceNode(self: WorldService, interactionId: string): any
+    return self._resourceNodes[interactionId]
+end
+
+-- Harvested nodes stay in the world but stop glowing and stop offering the
+-- prompt, so a player can see what they have already taken.
+function WorldService.markResourceNodeHarvested(self: WorldService, interactionId: string)
+    local node = self._resourceNodes[interactionId]
+    if node == nil then
+        return
+    end
+    self._resourceNodes[interactionId] = nil
+    local prompt = self._interactions[interactionId]
+    if prompt ~= nil then
+        prompt.Enabled = false
+    end
+    local module = node.target.Parent
+    if module ~= nil then
+        for _, descendant in module:GetChildren() do
+            if descendant:IsA("BasePart") and descendant.Name == "ResourceGlow" then
+                if (descendant.Position - node.target.Position).Magnitude < 8 then
+                    descendant.Transparency = 1
+                    for _, child in descendant:GetChildren() do
+                        if child:IsA("Light") then
+                            child.Enabled = false
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 function WorldService.setClickHandler(self: WorldService, handler: (Player, string) -> ())
     self._clickHandler = handler
 end
@@ -8729,6 +8764,25 @@ function WorldService.buildBramblewake(
         nil,
         nil
     )
+    -- Harvest nodes: the reason to walk the route. Registered with the same
+    -- generous click volume everything else uses, and remembered here so the
+    -- tutorial service can look up what a given node grants.
+    self._resourceNodes = {}
+    for _, node in result.resourceNodes or {} do
+        self:_registerInteraction(
+            node.target,
+            node.interactionId,
+            self._runtimeIds.Actions.GatherResource,
+            "HARVEST",
+            node.objectText,
+            nil,
+            nil,
+            Vector3.new(10, 12, 10)
+        )
+        self._resourceNodes[node.interactionId] = node
+        addBillboard(node.target, string.upper(node.objectText), AMBER, 90)
+    end
+
     for _, descriptor in result.eventInteractions do
         self:_registerInteraction(
             descriptor.target,
@@ -9036,18 +9090,29 @@ function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
         end
         return
     end
-    Lighting.Brightness = 1.8
-    Lighting.Ambient = Color3.fromRGB(48, 62, 72)
-    Lighting.OutdoorAmbient = Color3.fromRGB(38, 52, 68)
-    Lighting.ExposureCompensation = -0.05
+    --[[
+        A Blackout should read as dangerous, not as a colour filter.
+
+        The old values washed the whole world to one flat teal: a heavy
+        saturated tint over raised brightness and flattened contrast, which
+        left every surface the same value and made the place genuinely
+        unreadable -- you could not tell a wall from a road from a creature.
+        Now the tint is nearly neutral with only a cool cast, contrast is up
+        so silhouettes separate, and brightness is down so the lantern-fire
+        the Blackout is about is the brightest thing in frame.
+    ]]
+    Lighting.Brightness = 1.15
+    Lighting.Ambient = Color3.fromRGB(58, 66, 74)
+    Lighting.OutdoorAmbient = Color3.fromRGB(46, 54, 64)
+    Lighting.ExposureCompensation = -0.1
     local color = if effect ~= nil and effect:IsA("ColorCorrectionEffect")
         then effect
         else Instance.new("ColorCorrectionEffect")
     color.Name = "LastLightBlackoutColor"
-    color.Brightness = 0.04
-    color.Contrast = 0.04
-    color.Saturation = -0.05
-    color.TintColor = Color3.fromRGB(164, 205, 186)
+    color.Brightness = -0.02
+    color.Contrast = 0.16
+    color.Saturation = 0.04
+    color.TintColor = Color3.fromRGB(214, 228, 224)
     color.Parent = Lighting
 end
 
