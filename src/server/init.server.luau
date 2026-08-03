@@ -46,6 +46,7 @@ local LobbyDeparture = require(root.LobbyDeparture)
 local ActionProgress = require(root.ActionProgress)
 local ActionPayloadContract = require(root.ActionPayloadContract)
 local PerformanceBudget = require(root.PerformanceBudget)
+local ProfilePersistence = require(root.ProfilePersistence)
 local RunHandoff = require(root.RunHandoff)
 local AdminRoster = require(root.AdminRoster)
 local TownProgression = require(root.TownProgression)
@@ -319,6 +320,8 @@ local services = ServiceRegistry.new({
     runtimeIds = RuntimeIds,
     saveSchema = SaveSchema,
     actionPayloadContract = ActionPayloadContract,
+    profilePersistence = ProfilePersistence,
+    config = Config,
 })
 services:register(featureFlags)
 services:register(performanceService)

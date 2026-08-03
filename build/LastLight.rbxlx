@@ -2314,6 +2314,16 @@ return table.freeze({
     -- finalized on the baseline device during the vertical slice, and this is
     -- one of the numbers that pass exists to replace.
     BaselinePhoneMemoryCeilingMb = 700,
+    -- Session locking. A server refreshes its lock on the same ten-second beat
+    -- as the autosave, and a lock is reclaimable once it has been silent for
+    -- ninety -- nine missed beats. The gap is deliberately wide: reclaiming a
+    -- lock that is merely slow means two servers writing one profile, which
+    -- costs a player progress, while waiting too long only costs them a wait.
+    -- The number that matters after a crash is this one, because a server that
+    -- dies never releases its lock and this is the only way the player plays
+    -- again.
+    ProfileLockHeartbeatSeconds = 10,
+    ProfileLockStaleAfterSeconds = 90,
     -- How often a client reports its own frame and memory samples, and the
     -- floor the server enforces on that remote. Telemetry only: nothing a
     -- client reports here grants it anything.
@@ -8044,6 +8054,180 @@ return table.freeze(ProfessionState)
       </Item>
       <Item class="ModuleScript" referent="44">
         <Properties>
+          <string name="Name">ProfilePersistence</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    The decisions ProfileService makes about a save, separated from the calls
+    it makes to reach one.
+
+    Milestone 4's exit gate asks that forced crashes, lock contention, write
+    failure, stale revision, and shutdown all pass. Every one of those is a
+    decision about state -- should this load be trusted, may this server claim
+    this profile, whose copy wins -- and none of them needs a DataStore to
+    answer. They live here so the gate can be tested rather than argued about,
+    and so the one place that decides whether a save may be overwritten is a
+    place you can read in one sitting.
+
+    The property everything else protects: **a save is never overwritten by a
+    profile that failed to load.** A DataStore read that errors or times out
+    produces a playable session with a default profile and no write permission,
+    because the alternative -- treating "I could not read your save" as "you
+    have no save" -- deletes a player's game during a Roblox outage. That is
+    the single worst thing this system could do, and it is why loadOutcome
+    returns writable = false on every unhappy path.
+]]
+
+local ProfilePersistence = {}
+
+export type Lock = {
+    jobId: string,
+    heartbeat: number,
+}
+
+export type LoadOutcome = {
+    source: string,
+    writable: boolean,
+    useStored: boolean,
+}
+
+export type LockDecision = {
+    acquired: boolean,
+    reason: string,
+}
+
+export type WriteDecision = {
+    action: string,
+    reason: string,
+}
+
+local function finite(value: any): boolean
+    return type(value) == "number" and value == value and value > -math.huge and value < math.huge
+end
+
+--[[
+    What a load attempt produced.
+
+    `finished` is whether the request came back at all before the deadline, and
+    `ok` whether it came back without erroring. Only the path where both hold
+    and the store answered may write.
+]]
+function ProfilePersistence.loadOutcome(finished: boolean, ok: boolean, stored: any): LoadOutcome
+    if not finished then
+        -- The request never returned. Somebody else's copy may still be live;
+        -- writing over it from here would be guessing.
+        return { source = "read_only", writable = false, useStored = false }
+    end
+    if not ok then
+        return { source = "read_only", writable = false, useStored = false }
+    end
+    if stored == nil then
+        return { source = "new", writable = true, useStored = false }
+    end
+    return { source = "datastore", writable = true, useStored = true }
+end
+
+--[[
+    Whether this server may claim a profile.
+
+    A lock is a job ID and a heartbeat. The heartbeat is what makes a crash
+    survivable: a server that dies never releases its lock, so the only way the
+    player ever plays again is for a later session to reclaim a lock that has
+    stopped beating. `staleAfter` therefore has to exceed the heartbeat interval
+    by enough that a slow save is not mistaken for a dead server.
+
+    Two shapes of bad data are treated as unlocked rather than as locked, on the
+    principle that corrupt bookkeeping must never cost a player their save
+    permanently: a lock that is not a well-formed record, and a lock whose
+    heartbeat is far enough in the future that it cannot be a real clock.
+]]
+function ProfilePersistence.acquireLock(
+    existing: any,
+    jobId: string,
+    now: number,
+    staleAfter: number
+): LockDecision
+    assert(type(jobId) == "string" and jobId ~= "", "a lock needs a job ID")
+    assert(finite(now), "lock time must be finite")
+    assert(finite(staleAfter) and staleAfter > 0, "stale threshold must be positive")
+
+    if existing == nil then
+        return { acquired = true, reason = "unlocked" }
+    end
+    if
+        type(existing) ~= "table"
+        or type(existing.jobId) ~= "string"
+        or existing.jobId == ""
+        or not finite(existing.heartbeat)
+    then
+        return { acquired = true, reason = "malformed_lock" }
+    end
+    if existing.jobId == jobId then
+        return { acquired = true, reason = "already_held" }
+    end
+
+    local age = now - existing.heartbeat
+    if age >= staleAfter then
+        return { acquired = true, reason = "reclaimed_stale" }
+    end
+    if age < -staleAfter then
+        -- A heartbeat from the future by more than the whole stale window is a
+        -- broken clock, not a live server holding the profile.
+        return { acquired = true, reason = "reclaimed_future" }
+    end
+    return { acquired = false, reason = "held_by_another_server" }
+end
+
+function ProfilePersistence.lock(jobId: string, now: number): Lock
+    return { jobId = jobId, heartbeat = now }
+end
+
+--[[
+    Whose copy of a profile wins.
+
+    Two servers can hold the same profile briefly -- a reclaimed lock, a
+    teleport, a rejoin before the old session flushed. Revision is the tie
+    break, and the rule is that the higher revision is never overwritten by a
+    lower one. Losing here is not a failure: it means the copy in memory is
+    behind, and the caller adopts the stored one instead of pushing stale
+    progress over fresh progress.
+]]
+function ProfilePersistence.resolveWrite(stored: any, pending: any): WriteDecision
+    assert(type(pending) == "table" and finite(pending.revision), "a write needs a revision")
+
+    if stored == nil then
+        return { action = "write", reason = "no_stored_profile" }
+    end
+    if type(stored) ~= "table" or not finite(stored.revision) then
+        -- Unreadable stored data is replaced rather than deferred to: deferring
+        -- would strand the player on a profile nothing can parse.
+        return { action = "write", reason = "stored_profile_unreadable" }
+    end
+    if stored.revision > pending.revision then
+        return { action = "retain_stored", reason = "stored_revision_is_newer" }
+    end
+    return { action = "write", reason = "pending_revision_is_current" }
+end
+
+-- Whether a heartbeat is due. Kept here so the interval that refreshes a lock
+-- and the threshold that reclaims one stay visibly related.
+function ProfilePersistence.shouldRefreshLock(
+    lastHeartbeat: any,
+    now: number,
+    interval: number
+): boolean
+    if not finite(lastHeartbeat) then
+        return true
+    end
+    return now - lastHeartbeat >= interval
+end
+
+return table.freeze(ProfilePersistence)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="45">
+        <Properties>
           <string name="Name">QuestCatalog</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -8113,7 +8297,7 @@ return table.freeze(QuestCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">Quests</string>
           <string name="Source"><![CDATA[--!strict
@@ -8230,7 +8414,7 @@ return table.freeze(Quests)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
@@ -8289,7 +8473,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
@@ -8406,7 +8590,7 @@ return table.freeze(ResidentDialogue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -8521,7 +8705,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -8650,7 +8834,7 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -8780,7 +8964,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -9386,7 +9570,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -9505,7 +9689,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -9762,7 +9946,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -9923,7 +10107,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -10015,7 +10199,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -10227,7 +10411,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -10380,7 +10564,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -10557,7 +10741,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -10707,7 +10891,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -10743,7 +10927,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -11125,7 +11309,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -11158,11 +11342,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="63">
+  <Item class="ServerScriptService" referent="64">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="64">
+    <Item class="Script" referent="65">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -11214,6 +11398,7 @@ local LobbyDeparture = require(root.LobbyDeparture)
 local ActionProgress = require(root.ActionProgress)
 local ActionPayloadContract = require(root.ActionPayloadContract)
 local PerformanceBudget = require(root.PerformanceBudget)
+local ProfilePersistence = require(root.ProfilePersistence)
 local RunHandoff = require(root.RunHandoff)
 local AdminRoster = require(root.AdminRoster)
 local TownProgression = require(root.TownProgression)
@@ -11487,6 +11672,8 @@ local services = ServiceRegistry.new({
     runtimeIds = RuntimeIds,
     saveSchema = SaveSchema,
     actionPayloadContract = ActionPayloadContract,
+    profilePersistence = ProfilePersistence,
+    config = Config,
 })
 services:register(featureFlags)
 services:register(performanceService)
@@ -11544,7 +11731,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -11642,11 +11829,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="66">
+      <Item class="Folder" referent="67">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11933,7 +12120,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="68">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12786,7 +12973,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13284,7 +13471,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14589,7 +14776,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15233,7 +15420,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="72">
+        <Item class="ModuleScript" referent="73">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15337,7 +15524,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15526,7 +15713,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="74">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15919,7 +16106,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="75">
+        <Item class="ModuleScript" referent="76">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -16013,7 +16200,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="76">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16231,7 +16418,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="77">
+        <Item class="ModuleScript" referent="78">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17060,7 +17247,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="78">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17304,7 +17491,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="80">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17483,7 +17670,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="80">
+        <Item class="ModuleScript" referent="81">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18054,7 +18241,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="81">
+        <Item class="ModuleScript" referent="82">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19153,7 +19340,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19678,7 +19865,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19705,9 +19892,13 @@ export type ProfileService = typeof(setmetatable(
         _dirty: { [Player]: boolean },
         _saving: { [Player]: boolean },
         _loading: { [Player]: boolean },
+        _lockHeartbeat: { [Player]: number },
         _loadedEvent: BindableEvent,
         _equipmentChangedEvent: BindableEvent,
         _saveSchema: any,
+        _profilePersistence: any,
+        _config: any,
+        _jobId: string,
         _store: GlobalDataStore?,
     },
     ProfileService
@@ -19723,15 +19914,27 @@ function ProfileService.new(logger: Logger, persistent: boolean): ProfileService
         _dirty = {},
         _saving = {},
         _loading = {},
+        _lockHeartbeat = {},
         _loadedEvent = Instance.new("BindableEvent"),
         _equipmentChangedEvent = Instance.new("BindableEvent"),
         _saveSchema = nil,
+        _profilePersistence = nil,
+        _config = nil,
+        _jobId = "",
         _store = nil,
     }, ProfileService)
 end
 
 function ProfileService.Init(self: ProfileService, context: any)
     self._saveSchema = context.saveSchema
+    self._profilePersistence =
+        assert(context.profilePersistence, "profile persistence rules unavailable")
+    self._config = assert(context.config, "config unavailable")
+    -- Studio has no JobId. A stable stand-in keeps the lock logic identical
+    -- there instead of leaving every Studio session sharing an empty ID.
+    self._jobId = if game.JobId ~= nil and game.JobId ~= ""
+        then game.JobId
+        else "studio-" .. tostring(os.time())
     if self._persistent then
         self._store = DataStoreService:GetDataStore("LastLightProfile_v1")
     end
@@ -19767,19 +19970,43 @@ function ProfileService._load(self: ProfileService, player: Player)
             task.wait(0.1)
         end
 
-        if finished and ok then
-            profile = self._saveSchema.normalize(result, now)
-            source = result == nil and "new" or "datastore"
-            writable = true
+        local outcome = self._profilePersistence.loadOutcome(finished, ok, result)
+        source = outcome.source
+        writable = outcome.writable
+        if outcome.useStored or outcome.source == "new" then
+            profile = self._saveSchema.normalize(if outcome.useStored then result else nil, now)
         elseif finished then
-            source = "read_only"
             self._logger:warn("profile_load_failed", {
                 player = player.UserId,
                 reason = tostring(result),
             })
         else
-            source = "read_only"
             self._logger:warn("profile_load_timed_out", { player = player.UserId })
+        end
+
+        -- A profile another live server still holds is played read-only rather
+        -- than refused: the player gets a session, and nothing they do in it
+        -- can overwrite the copy the other server is still writing.
+        if writable then
+            local lockDecision = self._profilePersistence.acquireLock(
+                if type(result) == "table" then result.sessionLock else nil,
+                self._jobId,
+                now,
+                self._config.ProfileLockStaleAfterSeconds
+            )
+            if not lockDecision.acquired then
+                writable = false
+                source = "locked_read_only"
+                self._logger:warn("profile_locked_by_another_server", {
+                    player = player.UserId,
+                    reason = lockDecision.reason,
+                })
+            elseif lockDecision.reason ~= "unlocked" then
+                self._logger:info("profile_lock_acquired", {
+                    player = player.UserId,
+                    reason = lockDecision.reason,
+                })
+            end
         end
     else
         source = "session"
@@ -19815,6 +20042,7 @@ function ProfileService.Start(self: ProfileService)
         self._dirty[player] = nil
         self._saving[player] = nil
         self._loading[player] = nil
+        self._lockHeartbeat[player] = nil
     end)
 
     for _, player in Players:GetPlayers() do
@@ -19826,11 +20054,34 @@ function ProfileService.Start(self: ProfileService)
     if self._persistent then
         task.spawn(function()
             while true do
-                task.wait(10)
+                task.wait(self._config.ProfileLockHeartbeatSeconds)
                 for player in self._dirty do
                     if player.Parent ~= nil then
                         task.spawn(function()
                             self:save(player)
+                        end)
+                    end
+                end
+
+                -- A player who is simply standing still writes nothing, and a
+                -- lock only refreshes on write. Without this pass their own
+                -- lock goes stale underneath them and another server becomes
+                -- free to reclaim a profile that is still being played.
+                local now = os.time()
+                for player in self._profiles do
+                    if
+                        player.Parent ~= nil
+                        and self._writable[player] == true
+                        and self._dirty[player] == nil
+                        and self._profilePersistence.shouldRefreshLock(
+                            self._lockHeartbeat[player],
+                            now,
+                            self._config.ProfileLockHeartbeatSeconds
+                        )
+                    then
+                        local target = player
+                        task.spawn(function()
+                            self:save(target)
                         end)
                     end
                 end
@@ -20602,15 +20853,21 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
         (self._store :: GlobalDataStore):UpdateAsync(
             string.format("player_%d", player.UserId),
             function(current: any)
-                if current ~= nil then
-                    local normalized = self._saveSchema.normalize(current, os.time())
-                    if normalized.revision > profile.revision then
-                        retainedNewer = true
-                        newerProfile = normalized
-                        return current
-                    end
+                local normalized = if current == nil
+                    then nil
+                    else self._saveSchema.normalize(current, os.time())
+                local decision = self._profilePersistence.resolveWrite(normalized, profile)
+                if decision.action == "retain_stored" then
+                    retainedNewer = true
+                    newerProfile = normalized
+                    return current
                 end
-                return profile
+                -- The lock rides along with the profile so a crash leaves
+                -- behind a heartbeat that stops, which is the only thing a
+                -- later session can use to tell dead from merely slow.
+                local written = table.clone(profile)
+                written.sessionLock = self._profilePersistence.lock(self._jobId, os.time())
+                return written
             end
         )
     end)
@@ -20638,6 +20895,10 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
         return true
     end
 
+    -- The write carried a fresh lock, so the heartbeat is only recorded on the
+    -- path that actually reached the store.
+    self._lockHeartbeat[player] = os.time()
+
     local activeProfile = self._profiles[player]
     if activeProfile ~= nil and activeProfile.revision == profile.revision then
         self._dirty[player] = nil
@@ -20654,7 +20915,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21154,7 +21415,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="85">
+        <Item class="ModuleScript" referent="86">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22429,7 +22690,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="86">
+        <Item class="ModuleScript" referent="87">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23268,7 +23529,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="87">
+        <Item class="ModuleScript" referent="88">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -33451,11 +33712,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="88">
+      <Item class="Folder" referent="89">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="89">
+        <Item class="ModuleScript" referent="90">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -37117,7 +37378,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="90">
+        <Item class="ModuleScript" referent="91">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -37572,7 +37833,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="91">
+        <Item class="ModuleScript" referent="92">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -38267,7 +38528,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="92">
+        <Item class="ModuleScript" referent="93">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -38978,7 +39239,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="93">
+        <Item class="ModuleScript" referent="94">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -39064,7 +39325,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="94">
+        <Item class="ModuleScript" referent="95">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -39336,7 +39597,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="95">
+        <Item class="ModuleScript" referent="96">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -39511,7 +39772,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="96">
+        <Item class="ModuleScript" referent="97">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -40056,7 +40317,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="97">
+        <Item class="ModuleScript" referent="98">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -40289,7 +40550,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="98">
+        <Item class="ModuleScript" referent="99">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -40378,7 +40639,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="99">
+        <Item class="ModuleScript" referent="100">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -40703,15 +40964,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="100">
+  <Item class="StarterPlayer" referent="101">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="101">
+    <Item class="StarterPlayerScripts" referent="102">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="102">
+      <Item class="LocalScript" referent="103">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -40841,11 +41102,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="103">
+        <Item class="Folder" referent="104">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="104">
+          <Item class="ModuleScript" referent="105">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -40976,7 +41237,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="105">
+          <Item class="ModuleScript" referent="106">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -43373,7 +43634,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="106">
+          <Item class="ModuleScript" referent="107">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -43672,7 +43933,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="107">
+          <Item class="ModuleScript" referent="108">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -43780,7 +44041,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="108">
+          <Item class="ModuleScript" referent="109">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -43899,7 +44160,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="109">
+          <Item class="ModuleScript" referent="110">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -43999,7 +44260,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="110">
+          <Item class="ModuleScript" referent="111">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -44131,7 +44392,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="111">
+          <Item class="ModuleScript" referent="112">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -44419,7 +44680,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="112">
+  <Item class="Workspace" referent="113">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

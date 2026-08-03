@@ -22,9 +22,13 @@ export type ProfileService = typeof(setmetatable(
         _dirty: { [Player]: boolean },
         _saving: { [Player]: boolean },
         _loading: { [Player]: boolean },
+        _lockHeartbeat: { [Player]: number },
         _loadedEvent: BindableEvent,
         _equipmentChangedEvent: BindableEvent,
         _saveSchema: any,
+        _profilePersistence: any,
+        _config: any,
+        _jobId: string,
         _store: GlobalDataStore?,
     },
     ProfileService
@@ -40,15 +44,27 @@ function ProfileService.new(logger: Logger, persistent: boolean): ProfileService
         _dirty = {},
         _saving = {},
         _loading = {},
+        _lockHeartbeat = {},
         _loadedEvent = Instance.new("BindableEvent"),
         _equipmentChangedEvent = Instance.new("BindableEvent"),
         _saveSchema = nil,
+        _profilePersistence = nil,
+        _config = nil,
+        _jobId = "",
         _store = nil,
     }, ProfileService)
 end
 
 function ProfileService.Init(self: ProfileService, context: any)
     self._saveSchema = context.saveSchema
+    self._profilePersistence =
+        assert(context.profilePersistence, "profile persistence rules unavailable")
+    self._config = assert(context.config, "config unavailable")
+    -- Studio has no JobId. A stable stand-in keeps the lock logic identical
+    -- there instead of leaving every Studio session sharing an empty ID.
+    self._jobId = if game.JobId ~= nil and game.JobId ~= ""
+        then game.JobId
+        else "studio-" .. tostring(os.time())
     if self._persistent then
         self._store = DataStoreService:GetDataStore("LastLightProfile_v1")
     end
@@ -84,19 +100,43 @@ function ProfileService._load(self: ProfileService, player: Player)
             task.wait(0.1)
         end
 
-        if finished and ok then
-            profile = self._saveSchema.normalize(result, now)
-            source = result == nil and "new" or "datastore"
-            writable = true
+        local outcome = self._profilePersistence.loadOutcome(finished, ok, result)
+        source = outcome.source
+        writable = outcome.writable
+        if outcome.useStored or outcome.source == "new" then
+            profile = self._saveSchema.normalize(if outcome.useStored then result else nil, now)
         elseif finished then
-            source = "read_only"
             self._logger:warn("profile_load_failed", {
                 player = player.UserId,
                 reason = tostring(result),
             })
         else
-            source = "read_only"
             self._logger:warn("profile_load_timed_out", { player = player.UserId })
+        end
+
+        -- A profile another live server still holds is played read-only rather
+        -- than refused: the player gets a session, and nothing they do in it
+        -- can overwrite the copy the other server is still writing.
+        if writable then
+            local lockDecision = self._profilePersistence.acquireLock(
+                if type(result) == "table" then result.sessionLock else nil,
+                self._jobId,
+                now,
+                self._config.ProfileLockStaleAfterSeconds
+            )
+            if not lockDecision.acquired then
+                writable = false
+                source = "locked_read_only"
+                self._logger:warn("profile_locked_by_another_server", {
+                    player = player.UserId,
+                    reason = lockDecision.reason,
+                })
+            elseif lockDecision.reason ~= "unlocked" then
+                self._logger:info("profile_lock_acquired", {
+                    player = player.UserId,
+                    reason = lockDecision.reason,
+                })
+            end
         end
     else
         source = "session"
@@ -132,6 +172,7 @@ function ProfileService.Start(self: ProfileService)
         self._dirty[player] = nil
         self._saving[player] = nil
         self._loading[player] = nil
+        self._lockHeartbeat[player] = nil
     end)
 
     for _, player in Players:GetPlayers() do
@@ -143,11 +184,34 @@ function ProfileService.Start(self: ProfileService)
     if self._persistent then
         task.spawn(function()
             while true do
-                task.wait(10)
+                task.wait(self._config.ProfileLockHeartbeatSeconds)
                 for player in self._dirty do
                     if player.Parent ~= nil then
                         task.spawn(function()
                             self:save(player)
+                        end)
+                    end
+                end
+
+                -- A player who is simply standing still writes nothing, and a
+                -- lock only refreshes on write. Without this pass their own
+                -- lock goes stale underneath them and another server becomes
+                -- free to reclaim a profile that is still being played.
+                local now = os.time()
+                for player in self._profiles do
+                    if
+                        player.Parent ~= nil
+                        and self._writable[player] == true
+                        and self._dirty[player] == nil
+                        and self._profilePersistence.shouldRefreshLock(
+                            self._lockHeartbeat[player],
+                            now,
+                            self._config.ProfileLockHeartbeatSeconds
+                        )
+                    then
+                        local target = player
+                        task.spawn(function()
+                            self:save(target)
                         end)
                     end
                 end
@@ -919,15 +983,21 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
         (self._store :: GlobalDataStore):UpdateAsync(
             string.format("player_%d", player.UserId),
             function(current: any)
-                if current ~= nil then
-                    local normalized = self._saveSchema.normalize(current, os.time())
-                    if normalized.revision > profile.revision then
-                        retainedNewer = true
-                        newerProfile = normalized
-                        return current
-                    end
+                local normalized = if current == nil
+                    then nil
+                    else self._saveSchema.normalize(current, os.time())
+                local decision = self._profilePersistence.resolveWrite(normalized, profile)
+                if decision.action == "retain_stored" then
+                    retainedNewer = true
+                    newerProfile = normalized
+                    return current
                 end
-                return profile
+                -- The lock rides along with the profile so a crash leaves
+                -- behind a heartbeat that stops, which is the only thing a
+                -- later session can use to tell dead from merely slow.
+                local written = table.clone(profile)
+                written.sessionLock = self._profilePersistence.lock(self._jobId, os.time())
+                return written
             end
         )
     end)
@@ -954,6 +1024,10 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
         })
         return true
     end
+
+    -- The write carried a fresh lock, so the heartbeat is only recorded on the
+    -- path that actually reached the store.
+    self._lockHeartbeat[player] = os.time()
 
     local activeProfile = self._profiles[player]
     if activeProfile ~= nil and activeProfile.revision == profile.revision then
