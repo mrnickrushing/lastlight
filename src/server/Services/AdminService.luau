@@ -43,6 +43,7 @@ export type AdminService = typeof(setmetatable(
         _combatService: any,
         _tutorialService: any,
         _worldService: any,
+        _expeditionService: any,
     },
     AdminService
 ))
@@ -54,7 +55,8 @@ function AdminService.new(
     profileService: any,
     survivalService: any,
     combatService: any,
-    worldService: any
+    worldService: any,
+    expeditionService: any
 ): AdminService
     return setmetatable({
         Name = AdminService.Name,
@@ -66,6 +68,7 @@ function AdminService.new(
         _combatService = combatService,
         _tutorialService = nil,
         _worldService = worldService,
+        _expeditionService = expeditionService,
     }, AdminService)
 end
 
@@ -111,6 +114,30 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
                 then string.upper(decision.text) .. " APPLIED"
                 else "PHASE UNAVAILABLE RIGHT NOW"
         )
+    elseif command == "go" then
+        -- Uses the same enter and exit the game uses, so an admin cannot
+        -- arrive somewhere the transition would not normally put them.
+        if command == nil then
+            return
+        end
+        if decision.text == "bramblewake" then
+            if player:GetAttribute("LastLightInExpedition") == true then
+                self:_reply(player, "ALREADY IN BRAMBLEWAKE")
+            else
+                local entered = self._expeditionService:enter(player)
+                self:_reply(player, if entered then "ENTERING BRAMBLEWAKE" else "ENTRY UNAVAILABLE")
+            end
+        else
+            if player:GetAttribute("LastLightInExpedition") ~= true then
+                self:_reply(player, "ALREADY IN TOWN")
+            else
+                local left = self._worldService:exitBramblewake(player)
+                self:_reply(
+                    player,
+                    if left then "RETURNING TO EMBERHOLLOW" else "RETURN UNAVAILABLE"
+                )
+            end
+        end
     elseif command == "where" then
         local root = if player.Character ~= nil
             then player.Character:FindFirstChild("HumanoidRootPart")
@@ -169,6 +196,8 @@ function AdminService._onChatted(self: AdminService, player: Player, message: st
                 decision.high
             )
         )
+    elseif decision.reason == "unknown_destination" then
+        self:_reply(player, "GO TAKES TOWN OR BRAMBLEWAKE")
     elseif decision.reason == "unknown_phase" then
         self:_reply(player, "PHASE TAKES DAY, DUSK, OR NIGHT")
     elseif decision.reason == "admin_disabled" then

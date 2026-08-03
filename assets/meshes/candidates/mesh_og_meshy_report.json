@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_old_growth_stump_a",
+  "source": "assets/meshes/candidates/mesh_og_meshy.glb",
+  "output": "assets/meshes/generated/mesh_old_growth_stump_a.glb",
+  "targetLongestDimension": 22.0,
+  "boundsMin": [
+    -11.0,
+    -8.7505,
+    0.0
+  ],
+  "boundsMax": [
+    11.0,
+    8.7505,
+    21.1331
+  ],
+  "dimensions": [
+    22.0,
+    17.5011,
+    21.1331
+  ],
+  "longestDimension": 22.0,
+  "trianglesBefore": 6127,
+  "trianglesAfter": 6127,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    }
+  ],
+  "bytes": 3619064
+}

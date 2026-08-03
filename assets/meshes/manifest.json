@@ -866,6 +866,46 @@
         "normal"
       ],
       "robloxAssetId": 125598340587515
+    },
+    {
+      "id": "mesh_wayhome_gate_a",
+      "displayName": "Wayhome Gate",
+      "role": "expedition_module_landmark",
+      "placementBand": "curated_expedition",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc57e-cc95-73bc-8dcb-f6c75e8dbacc then multi-image-to-3d task 019fc580-7ccb-7902-94e8-b12aee3d9c78, textures downscaled to 1024. The extraction gate that ends a Bramblewake run, which was previously plain posts.",
+      "file": "generated/mesh_wayhome_gate_a.glb",
+      "previewFile": "previews/mesh-wayhome-gate.png",
+      "targetLongestDimension": 14,
+      "maxTriangles": 6000,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 106584116139977
+    },
+    {
+      "id": "mesh_old_growth_stump_a",
+      "displayName": "Old Growth Hollow",
+      "role": "expedition_module_landmark",
+      "placementBand": "curated_expedition",
+      "source": "original_meshy_generation_then_blender_normalized",
+      "provenance": "Original Last Light asset prompted from the docs/VISUAL_QUALITY_STANDARD.md style formula via the meshy-3d-generation skill: text-to-image task 019fc57e-ce83-78d1-9adf-48b3b65a5245 then multi-image-to-3d task 019fc580-8423-7af6-9bc5-3d2e97410ec9, textures downscaled to 1024. The Old Growth approach landmark, which was previously an untextured slab.",
+      "file": "generated/mesh_old_growth_stump_a.glb",
+      "previewFile": "previews/mesh-old-growth-stump.png",
+      "targetLongestDimension": 22,
+      "maxTriangles": 7000,
+      "maxMaterialSlots": 1,
+      "pbrMaps": [
+        "Image_0",
+        "Image_1",
+        "Image_3",
+        "normal"
+      ],
+      "robloxAssetId": 126541616322157
     }
   ]
 }

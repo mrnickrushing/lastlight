@@ -245,7 +245,8 @@ local adminService = AdminService.new(
     profileService,
     survivalService,
     combatService,
-    worldService
+    worldService,
+    expeditionService
 )
 local townNightService = TownNightService.new(
     logger,

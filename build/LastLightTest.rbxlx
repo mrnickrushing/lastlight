@@ -907,6 +907,14 @@ local ADMIN_USER_IDS = table.freeze({
 
 local PHASES = table.freeze({ day = true, dusk = true, night = true })
 
+-- Where /go can send an admin. Both directions exist so a tester can reach
+-- the expedition without playing to the reveal, and get back out without
+-- having to reach the Wayhome gate.
+local DESTINATIONS = table.freeze({
+    town = true,
+    bramblewake = true,
+})
+
 -- Every numeric command carries its own bounds so a handler cannot be handed
 -- a value the game was never designed to hold.
 local NUMERIC_LIMITS: { [string]: { low: number, high: number } } = {
@@ -932,7 +940,7 @@ function AdminRoster.adminUserIds(): { number }
 end
 
 function AdminRoster.commandNames(): { string }
-    return { "night", "give", "heal", "phase", "where" }
+    return { "night", "give", "heal", "phase", "where", "go" }
 end
 
 --[[
@@ -1007,6 +1015,13 @@ function AdminRoster.authorize(userId: any, message: any, enabled: boolean): any
             }
         end
         return { allowed = true, command = command.name, value = value }
+    end
+
+    if command.name == "go" then
+        if command.text == nil or DESTINATIONS[command.text] ~= true then
+            return { allowed = false, reason = "unknown_destination", command = command.name }
+        end
+        return { allowed = true, command = command.name, text = command.text }
     end
 
     if command.name == "phase" then
@@ -10816,7 +10831,8 @@ local adminService = AdminService.new(
     profileService,
     survivalService,
     combatService,
-    worldService
+    worldService,
+    expeditionService
 )
 local townNightService = TownNightService.new(
     logger,
@@ -11077,6 +11093,7 @@ export type AdminService = typeof(setmetatable(
         _combatService: any,
         _tutorialService: any,
         _worldService: any,
+        _expeditionService: any,
     },
     AdminService
 ))
@@ -11088,7 +11105,8 @@ function AdminService.new(
     profileService: any,
     survivalService: any,
     combatService: any,
-    worldService: any
+    worldService: any,
+    expeditionService: any
 ): AdminService
     return setmetatable({
         Name = AdminService.Name,
@@ -11100,6 +11118,7 @@ function AdminService.new(
         _combatService = combatService,
         _tutorialService = nil,
         _worldService = worldService,
+        _expeditionService = expeditionService,
     }, AdminService)
 end
 
@@ -11145,6 +11164,30 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
                 then string.upper(decision.text) .. " APPLIED"
                 else "PHASE UNAVAILABLE RIGHT NOW"
         )
+    elseif command == "go" then
+        -- Uses the same enter and exit the game uses, so an admin cannot
+        -- arrive somewhere the transition would not normally put them.
+        if command == nil then
+            return
+        end
+        if decision.text == "bramblewake" then
+            if player:GetAttribute("LastLightInExpedition") == true then
+                self:_reply(player, "ALREADY IN BRAMBLEWAKE")
+            else
+                local entered = self._expeditionService:enter(player)
+                self:_reply(player, if entered then "ENTERING BRAMBLEWAKE" else "ENTRY UNAVAILABLE")
+            end
+        else
+            if player:GetAttribute("LastLightInExpedition") ~= true then
+                self:_reply(player, "ALREADY IN TOWN")
+            else
+                local left = self._worldService:exitBramblewake(player)
+                self:_reply(
+                    player,
+                    if left then "RETURNING TO EMBERHOLLOW" else "RETURN UNAVAILABLE"
+                )
+            end
+        end
     elseif command == "where" then
         local root = if player.Character ~= nil
             then player.Character:FindFirstChild("HumanoidRootPart")
@@ -11203,6 +11246,8 @@ function AdminService._onChatted(self: AdminService, player: Player, message: st
                 decision.high
             )
         )
+    elseif decision.reason == "unknown_destination" then
+        self:_reply(player, "GO TAKES TOWN OR BRAMBLEWAKE")
     elseif decision.reason == "unknown_phase" then
         self:_reply(player, "PHASE TAKES DAY, DUSK, OR NIGHT")
     elseif decision.reason == "admin_disabled" then
@@ -33871,6 +33916,25 @@ local function buildModuleVisual(
             CollectionService:AddTag(moth, runtimeIds.AmbientMoteTag)
         end
     elseif visual == "old_growth" then
+        dress(
+            extra,
+            "mesh_old_growth_stump_a",
+            parent,
+            center + Vector3.new(22, 0, 22),
+            1.4,
+            0.5,
+            2490
+        )
+        dress(extra, "mesh_deadfall_a", parent, center + Vector3.new(6, 0, 14), 1.2, 1.9, 2491)
+        dress(
+            extra,
+            "mesh_boulder_cluster_a",
+            parent,
+            center + Vector3.new(-14, 0, 18),
+            1,
+            0.3,
+            2492
+        )
         part(
             parent,
             "OldGrowthTrunk",
@@ -33894,6 +33958,25 @@ local function buildModuleVisual(
         end
     elseif visual == "wayhome_gate" then
         rootArch(parent, center, 1.15)
+        dress(extra, "mesh_wayhome_gate_a", parent, center, 1.25, 0, 2495)
+        dress(
+            extra,
+            "mesh_creator_street_lantern_a",
+            parent,
+            center + Vector3.new(-11, 0, 8),
+            1,
+            0,
+            2496
+        )
+        dress(
+            extra,
+            "mesh_creator_street_lantern_a",
+            parent,
+            center + Vector3.new(11, 0, 8),
+            1,
+            0,
+            2497
+        )
         local beacon =
             orb(parent, "WayhomeLight", center + Vector3.new(0, 8, 0), 6, AMBER, Enum.Material.Neon)
         light(beacon, AMBER, 3, 36)
@@ -36809,6 +36892,28 @@ local ENTRIES: { Entry } = {
         maxTriangles = 3500,
         maxMaterialSlots = 1,
         placementBand = "curated_core",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_wayhome_gate_a",
+        assetId = 106584116139977,
+        targetLongestDimension = 14,
+        maxTriangles = 6000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_expedition",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_old_growth_stump_a",
+        assetId = 126541616322157,
+        targetLongestDimension = 22,
+        maxTriangles = 7000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_expedition",
         pbr = true,
         preserveSourceMaterials = true,
         creatorStore = false,

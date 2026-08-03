@@ -37,6 +37,14 @@ local ADMIN_USER_IDS = table.freeze({
 
 local PHASES = table.freeze({ day = true, dusk = true, night = true })
 
+-- Where /go can send an admin. Both directions exist so a tester can reach
+-- the expedition without playing to the reveal, and get back out without
+-- having to reach the Wayhome gate.
+local DESTINATIONS = table.freeze({
+    town = true,
+    bramblewake = true,
+})
+
 -- Every numeric command carries its own bounds so a handler cannot be handed
 -- a value the game was never designed to hold.
 local NUMERIC_LIMITS: { [string]: { low: number, high: number } } = {
@@ -62,7 +70,7 @@ function AdminRoster.adminUserIds(): { number }
 end
 
 function AdminRoster.commandNames(): { string }
-    return { "night", "give", "heal", "phase", "where" }
+    return { "night", "give", "heal", "phase", "where", "go" }
 end
 
 --[[
@@ -137,6 +145,13 @@ function AdminRoster.authorize(userId: any, message: any, enabled: boolean): any
             }
         end
         return { allowed = true, command = command.name, value = value }
+    end
+
+    if command.name == "go" then
+        if command.text == nil or DESTINATIONS[command.text] ~= true then
+            return { allowed = false, reason = "unknown_destination", command = command.name }
+        end
+        return { allowed = true, command = command.name, text = command.text }
     end
 
     if command.name == "phase" then

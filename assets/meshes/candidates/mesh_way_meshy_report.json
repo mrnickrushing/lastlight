@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_wayhome_gate_a",
+  "source": "assets/meshes/candidates/mesh_way_meshy.glb",
+  "output": "assets/meshes/generated/mesh_wayhome_gate_a.glb",
+  "targetLongestDimension": 14.0,
+  "boundsMin": [
+    -7.0,
+    -2.3423,
+    0.0
+  ],
+  "boundsMax": [
+    7.0,
+    2.3423,
+    13.5982
+  ],
+  "dimensions": [
+    14.0,
+    4.6846,
+    13.5982
+  ],
+  "longestDimension": 14.0,
+  "trianglesBefore": 5129,
+  "trianglesAfter": 5129,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 1024,
+      "height": 1024,
+      "packed": true
+    }
+  ],
+  "bytes": 4322336
+}
