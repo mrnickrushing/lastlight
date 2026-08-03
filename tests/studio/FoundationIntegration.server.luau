@@ -713,11 +713,17 @@ assert(
     heartwoodStump ~= nil and heartwoodStump:IsA("BasePart") and heartwoodStump.Position.X >= 34,
     "Heartwood must sit beside the road rather than on it"
 )
+-- This used to require the worksite 38 studs off the route, back when it sat
+-- in an empty field at x = -44. It was deliberately moved across the arrival
+-- road just past the spawn so that building it visibly defends the way in --
+-- and this assertion was left behind asserting the opposite, which no run
+-- could satisfy. Standing on the route is now the requirement, not the fault.
 assert(
     constructionPlot ~= nil
         and constructionPlot:IsA("BasePart")
-        and constructionPlot.Position.X <= -38,
-    "barricade worksite must sit beside the road rather than on it"
+        and math.abs(constructionPlot.Position.X) <= 10
+        and constructionPlot.Position.Z > -40,
+    "barricade worksite must straddle the arrival road just past the spawn"
 )
 local builderMaterialSets = 0
 local completedBuildingFrames = 0

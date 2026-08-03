@@ -27,14 +27,23 @@ return {
             end,
         },
         {
-            name = "passes 1,000 deterministic Bramblewake seeds",
+            -- Milestone 5's exit gate asks for 10,000 headless graph manifests
+            -- passing invariants. That is this case: validate() is the invariant
+            -- set, and it is a real one -- consecutive modules must sit one cell
+            -- apart, no cell may be reused, the path must start at an arrival
+            -- and end at an extraction, and no module may need a profession to
+            -- traverse. The 1,000 Studio assemblies the same gate asks for are
+            -- a separate pass that only Studio can run.
+            name = "passes 10,000 deterministic Bramblewake seeds",
             run = function()
                 local hashes: { [string]: boolean } = {}
-                for seed = 1, 1000 do
+                for seed = 1, 10000 do
                     local manifest = ExpeditionGenerator.generate(seed)
                     local valid, issues = ExpeditionGenerator.validate(manifest)
-                    TestRunner.truthy(valid, table.concat(issues, "; "))
-                    TestRunner.equal(manifest.hash, ExpeditionGenerator.generate(seed).hash)
+                    TestRunner.truthy(
+                        valid,
+                        string.format("seed %d: %s", seed, table.concat(issues, "; "))
+                    )
                     TestRunner.equal(#manifest.modules, 12)
                     hashes[manifest.hash] = true
                 end
@@ -43,7 +52,34 @@ return {
                 for _ in hashes do
                     uniqueHashes += 1
                 end
-                TestRunner.truthy(uniqueHashes >= 100, "seeded assembly lacks route variety")
+                -- Repetition control is the point of the count, not the count
+                -- itself: ten thousand seeds that produced two hundred routes
+                -- would pass the invariants and still be a game that repeats.
+                TestRunner.truthy(
+                    uniqueHashes >= 1000,
+                    string.format("seeded assembly lacks route variety: %d unique", uniqueHashes)
+                )
+            end,
+        },
+        {
+            -- Determinism is checked on its own rather than inside the sweep so
+            -- the sweep does not pay for a second generation of every seed. A
+            -- spread of seeds across the range catches a generator that is
+            -- stable early and drifts later.
+            name = "replays the same manifest for the same seed",
+            run = function()
+                for seed = 1, 10000, 37 do
+                    local first = ExpeditionGenerator.generate(seed)
+                    local second = ExpeditionGenerator.generate(seed)
+                    TestRunner.equal(first.hash, second.hash)
+                    TestRunner.equal(#first.modules, #second.modules)
+                    for index, placement in first.modules do
+                        local replayed = second.modules[index]
+                        TestRunner.equal(placement.moduleId, replayed.moduleId)
+                        TestRunner.equal(placement.cellX, replayed.cellX)
+                        TestRunner.equal(placement.cellZ, replayed.cellZ)
+                    end
+                end
             end,
         },
         {

@@ -17,6 +17,8 @@ export type TownNightService = typeof(setmetatable(
         _townNightSchedule: any,
         _townNightIncident: any,
         _townCondition: any,
+        _townPermissions: any,
+        _hostUserId: number?,
         _townGuardLastStand: any,
         _analyticsService: any,
         _condition: any,
@@ -46,6 +48,7 @@ function TownNightService.new(
     townNightSchedule: any,
     townNightIncident: any,
     townCondition: any,
+    townPermissions: any,
     townGuardLastStand: any,
     analyticsService: any,
     featureFlags: any
@@ -58,6 +61,8 @@ function TownNightService.new(
         _townNightSchedule = townNightSchedule,
         _townNightIncident = townNightIncident,
         _townCondition = townCondition,
+        _townPermissions = townPermissions,
+        _hostUserId = nil,
         _townGuardLastStand = townGuardLastStand,
         _analyticsService = analyticsService,
         _condition = townCondition.default(),
@@ -245,11 +250,28 @@ end
 function TownNightService.ensureStarted(
     self: TownNightService,
     nightNumber: number,
-    condition: any?
+    condition: any?,
+    actorUserId: number?
 )
     self._nightNumber = math.max(self._nightNumber, math.floor(nightNumber))
+
+    -- The first player to establish this server's town owns it. Everyone after
+    -- them is visiting, and a visit may improve the town or leave it alone --
+    -- never break it. Without this a player arriving from a later, wrecked town
+    -- replaced an intact one outright, because condition resolves on night
+    -- number before it looks at integrity.
+    if self._hostUserId == nil and actorUserId ~= nil then
+        self._hostUserId = actorUserId
+    end
+
     if condition ~= nil then
-        self._condition = self._townCondition.merge(self._condition, condition)
+        local role = self._townPermissions.roleFor(actorUserId, self._hostUserId)
+        self._condition = self._townPermissions.resolveCondition(
+            self._condition,
+            condition,
+            role,
+            self._townCondition.merge
+        )
         self._worldService:setTownCondition(self:conditionSnapshot())
     end
     if not self._enabled or self._started then

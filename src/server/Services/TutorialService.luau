@@ -367,7 +367,8 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
         self._worldService:setBeaconVisible(true)
         self._townNightService:ensureStarted(
             profile.town.nightNumber,
-            self._profileService:townCondition(player)
+            self._profileService:townCondition(player),
+            player.UserId
         )
     end
 
@@ -874,7 +875,8 @@ function TutorialService._nightComplete(self: TutorialService)
         self:_advanceSurvivorToReveal(player, session)
         self._townNightService:ensureStarted(
             self._profileService:nightNumber(player),
-            self._profileService:townCondition(player)
+            self._profileService:townCondition(player),
+            player.UserId
         )
     end
     self:_publishAll()

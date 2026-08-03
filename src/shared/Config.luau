@@ -59,6 +59,16 @@ return table.freeze({
     -- finalized on the baseline device during the vertical slice, and this is
     -- one of the numbers that pass exists to replace.
     BaselinePhoneMemoryCeilingMb = 700,
+    -- Session locking. A server refreshes its lock on the same ten-second beat
+    -- as the autosave, and a lock is reclaimable once it has been silent for
+    -- ninety -- nine missed beats. The gap is deliberately wide: reclaiming a
+    -- lock that is merely slow means two servers writing one profile, which
+    -- costs a player progress, while waiting too long only costs them a wait.
+    -- The number that matters after a crash is this one, because a server that
+    -- dies never releases its lock and this is the only way the player plays
+    -- again.
+    ProfileLockHeartbeatSeconds = 10,
+    ProfileLockStaleAfterSeconds = 90,
     -- How often a client reports its own frame and memory samples, and the
     -- floor the server enforces on that remote. Telemetry only: nothing a
     -- client reports here grants it anything.
