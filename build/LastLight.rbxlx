@@ -1070,7 +1070,7 @@ function AdminRoster.adminUserIds(): { number }
 end
 
 function AdminRoster.commandNames(): { string }
-    return { "night", "give", "heal", "phase", "where", "go" }
+    return { "night", "give", "heal", "phase", "where", "go", "perf" }
 end
 
 --[[
@@ -2307,6 +2307,17 @@ return table.freeze({
     EngineerBraceSeconds = 12,
     EngineerBraceCapacity = 14,
     ActionRatePerSecond = 8,
+    -- What a baseline phone is assumed to have for this experience before
+    -- Roblox starts reclaiming. Client memory headroom is measured against it,
+    -- so it decides whether that budget reads as healthy or as one asset load
+    -- from a reload. Provisional: TECHNICAL_ARCHITECTURE.md says budgets are
+    -- finalized on the baseline device during the vertical slice, and this is
+    -- one of the numbers that pass exists to replace.
+    BaselinePhoneMemoryCeilingMb = 700,
+    -- How often a client reports its own frame and memory samples, and the
+    -- floor the server enforces on that remote. Telemetry only: nothing a
+    -- client reports here grants it anything.
+    PerformanceReportIntervalSeconds = 5,
     -- The Last Light universe (10611704810) and its start place. Registered
     -- per the publishing runbook so environment checks can tell a real
     -- production place from an unregistered one.
@@ -6837,6 +6848,395 @@ return table.freeze(OldGrowthEncounter)
       </Item>
       <Item class="ModuleScript" referent="38">
         <Properties>
+          <string name="Name">PerformanceBudget</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    The performance budgets from docs/TECHNICAL_ARCHITECTURE.md, as data.
+
+    Milestone 3's exit gate asks that "target device meets frame, memory, join,
+    and network budgets for a 30-minute run." That sentence is only checkable
+    if the budgets are numbers and the run produces samples, so both live here:
+    the thresholds the architecture doc already fixed, and the arithmetic that
+    turns a pile of samples into a verdict.
+
+    Three things this module deliberately does:
+
+      * It judges a tail, not an average. A 30-minute run that averages 50 FPS
+        while stuttering through every night is a run that failed, and a mean
+        hides exactly that. Each metric names the percentile that decides it --
+        the low tail when higher is better, the high tail when lower is worse.
+      * A metric with no samples is never "ok". An unmeasured budget reports
+        `incomplete`, because the failure this gate exists to catch is claiming
+        a pass for something nobody looked at.
+      * It is pure. No Roblox services, no players, no clock. Whatever samples
+        it, from the server or from a client, hands it numbers.
+
+    The numbers are the architecture doc's, not new ones. Where that doc gave a
+    qualitative hard threshold rather than a figure, the reading taken here is
+    marked so it can be argued with instead of being quietly invented.
+]]
+
+local Config = require("./Config")
+
+local PerformanceBudget = {}
+
+export type Direction = "higher_is_better" | "lower_is_better"
+export type Verdict = "ok" | "watch" | "breach" | "incomplete"
+
+export type Definition = {
+    id: string,
+    label: string,
+    unit: string,
+    direction: Direction,
+    target: number,
+    hard: number,
+    -- The percentile that decides this metric's verdict: the tail where the
+    -- bad samples live.
+    percentile: number,
+    source: string,
+}
+
+export type Summary = {
+    id: string,
+    count: number,
+    discarded: number,
+    min: number,
+    max: number,
+    mean: number,
+    p50: number,
+    value: number,
+    verdict: Verdict,
+}
+
+export type Report = {
+    verdict: Verdict,
+    metrics: { Summary },
+    missing: { string },
+}
+
+local ORDER: { string } = {
+    "join_seconds",
+    "client_fps",
+    "frame_spike_ms",
+    "server_heartbeat_hz",
+    "client_memory_headroom",
+    "remote_actions_per_second",
+}
+
+local DEFINITIONS: { [string]: Definition } = {
+    join_seconds = {
+        id = "join_seconds",
+        label = "Interactive join, warm network",
+        unit = "s",
+        direction = "lower_is_better",
+        target = 5,
+        hard = 8,
+        percentile = 95,
+        source = "TECHNICAL_ARCHITECTURE.md performance budgets",
+    },
+    client_fps = {
+        id = "client_fps",
+        label = "Client frame rate, normal play",
+        unit = "FPS",
+        direction = "higher_is_better",
+        target = 45,
+        hard = 30,
+        -- "Sustained < 30 FPS" is the doc's failure case. The 5th percentile
+        -- is the reading of "sustained": a fifth of a second in twenty spent
+        -- below the line is a stutter, a twentieth of the whole run below it
+        -- is the run being slow.
+        percentile = 5,
+        source = "TECHNICAL_ARCHITECTURE.md performance budgets",
+    },
+    frame_spike_ms = {
+        id = "frame_spike_ms",
+        label = "Client frame time spikes",
+        unit = "ms",
+        direction = "lower_is_better",
+        target = 50,
+        hard = 100,
+        percentile = 95,
+        source = "TECHNICAL_ARCHITECTURE.md performance budgets",
+    },
+    server_heartbeat_hz = {
+        id = "server_heartbeat_hz",
+        label = "Server heartbeat",
+        unit = "Hz",
+        direction = "higher_is_better",
+        target = 30,
+        hard = 20,
+        percentile = 5,
+        source = "TECHNICAL_ARCHITECTURE.md performance budgets",
+    },
+    client_memory_headroom = {
+        id = "client_memory_headroom",
+        label = "Client memory headroom",
+        unit = "ratio",
+        direction = "higher_is_better",
+        target = 0.2,
+        -- The doc's hard threshold here is "OOM/reload risk", which is a
+        -- consequence rather than a number. Half the target is the reading
+        -- taken: below a tenth of the device's memory free, a Roblox client
+        -- is one asset load from being killed. Argue with this figure before
+        -- the slice closes -- it is the one budget here nobody measured yet.
+        hard = 0.1,
+        percentile = 5,
+        source = "TECHNICAL_ARCHITECTURE.md, numeric reading of OOM risk",
+    },
+    remote_actions_per_second = {
+        id = "remote_actions_per_second",
+        label = "Remote traffic, actions per client",
+        unit = "/s",
+        direction = "lower_is_better",
+        -- The action limiter already owns this budget, so the budget is the
+        -- limiter's own configuration rather than a second opinion: sustained
+        -- traffic at the rate, never above the burst ceiling.
+        target = Config.ActionRatePerSecond,
+        hard = Config.ActionRatePerSecond * 2,
+        percentile = 95,
+        source = "Config.ActionRatePerSecond",
+    },
+}
+
+local SEVERITY: { [string]: number } = {
+    ok = 0,
+    watch = 1,
+    incomplete = 2,
+    breach = 3,
+}
+
+local function finite(value: any): boolean
+    return type(value) == "number" and value == value and value > -math.huge and value < math.huge
+end
+
+function PerformanceBudget.order(): { string }
+    return table.clone(ORDER)
+end
+
+function PerformanceBudget.definition(metricId: string): Definition
+    local definition = DEFINITIONS[metricId]
+    assert(definition ~= nil, string.format("unknown performance metric %q", tostring(metricId)))
+    return definition
+end
+
+function PerformanceBudget.isValidMetric(value: any): boolean
+    return type(value) == "string" and DEFINITIONS[value] ~= nil
+end
+
+-- Where a single sample falls against its budget. Used for live warnings while
+-- a run is in progress; the verdict that closes the gate comes from summarize.
+function PerformanceBudget.classify(metricId: string, value: number): Verdict
+    local definition = PerformanceBudget.definition(metricId)
+    if not finite(value) then
+        return "incomplete"
+    end
+    if definition.direction == "higher_is_better" then
+        if value >= definition.target then
+            return "ok"
+        elseif value >= definition.hard then
+            return "watch"
+        end
+        return "breach"
+    end
+    if value <= definition.target then
+        return "ok"
+    elseif value <= definition.hard then
+        return "watch"
+    end
+    return "breach"
+end
+
+function PerformanceBudget.percentile(sorted: { number }, percentile: number): number
+    local count = #sorted
+    assert(count > 0, "percentile needs at least one sample")
+    if count == 1 then
+        return sorted[1]
+    end
+    local rank = (percentile / 100) * (count - 1) + 1
+    local low = math.floor(rank)
+    local high = math.ceil(rank)
+    if low == high then
+        return sorted[low]
+    end
+    return sorted[low] + (sorted[high] - sorted[low]) * (rank - low)
+end
+
+function PerformanceBudget.summarize(metricId: string, samples: { number }): Summary?
+    local definition = PerformanceBudget.definition(metricId)
+
+    -- A NaN would sort unpredictably and an infinity would swallow the tail,
+    -- so garbage is counted and dropped rather than allowed to decide a gate.
+    local clean = {}
+    local discarded = 0
+    for _, sample in samples do
+        if finite(sample) then
+            table.insert(clean, sample)
+        else
+            discarded += 1
+        end
+    end
+    if #clean == 0 then
+        return nil
+    end
+    table.sort(clean)
+
+    local total = 0
+    for _, sample in clean do
+        total += sample
+    end
+    local value = PerformanceBudget.percentile(clean, definition.percentile)
+
+    return {
+        id = metricId,
+        count = #clean,
+        discarded = discarded,
+        min = clean[1],
+        max = clean[#clean],
+        mean = total / #clean,
+        p50 = PerformanceBudget.percentile(clean, 50),
+        value = value,
+        verdict = PerformanceBudget.classify(metricId, value),
+    }
+end
+
+--[[
+    Roll every metric into one verdict.
+
+    A metric with no samples lands in `missing` and forces the report to
+    `incomplete`, which outranks `watch` deliberately: a budget nobody measured
+    is a worse position to close a milestone from than one measured and found
+    merely close to the line.
+]]
+function PerformanceBudget.report(samplesByMetric: { [string]: { number } }): Report
+    local metrics: { Summary } = {}
+    local missing: { string } = {}
+    local worst = "ok"
+
+    for _, metricId in ORDER do
+        local samples = samplesByMetric[metricId]
+        local summary = if samples == nil
+            then nil
+            else PerformanceBudget.summarize(metricId, samples)
+        if summary == nil then
+            table.insert(missing, metricId)
+        else
+            table.insert(metrics, summary)
+            if SEVERITY[summary.verdict] > SEVERITY[worst] then
+                worst = summary.verdict
+            end
+        end
+    end
+
+    if #missing > 0 and SEVERITY.incomplete > SEVERITY[worst] then
+        worst = "incomplete"
+    end
+
+    return {
+        verdict = worst :: Verdict,
+        metrics = metrics,
+        missing = missing,
+    }
+end
+
+-- One line per metric, in the order the architecture doc lists them, for the
+-- admin readout at the end of a run.
+function PerformanceBudget.format(report: Report): { string }
+    local lines = {}
+    for _, summary in report.metrics do
+        local definition = PerformanceBudget.definition(summary.id)
+        table.insert(
+            lines,
+            string.format(
+                "%s %s: p%d %.1f%s (target %.1f, hard %.1f, n=%d)",
+                string.upper(summary.verdict),
+                definition.label,
+                definition.percentile,
+                summary.value,
+                definition.unit,
+                definition.target,
+                definition.hard,
+                summary.count
+            )
+        )
+    end
+    for _, metricId in report.missing do
+        table.insert(
+            lines,
+            string.format("INCOMPLETE %s: no samples", PerformanceBudget.definition(metricId).label)
+        )
+    end
+    return lines
+end
+
+--[[
+    Validate a client's self-reported frame and memory sample.
+
+    Client-reported numbers are diagnostic and never authoritative: nothing
+    here grants a player anything, so a lying client only corrupts its own row
+    in the report. That is still worth refusing rather than clamping -- a
+    rejected sample is visible in the discard count, while a clamped one turns
+    into a plausible-looking data point that quietly moves a percentile.
+
+    Returns nil for anything malformed or outside the range a real device can
+    physically produce.
+]]
+function PerformanceBudget.sanitizeClientReport(payload: any): any
+    if type(payload) ~= "table" or payload.schemaVersion ~= 1 then
+        return nil
+    end
+
+    local fps = payload.fps
+    local spikeMs = payload.spikeMs
+    local memoryMb = payload.memoryMb
+    if not finite(fps) or not finite(spikeMs) or not finite(memoryMb) then
+        return nil
+    end
+
+    -- No device renders a thousand frames a second, stalls for a minute and
+    -- keeps running, or addresses 32 GB from a Roblox client.
+    if fps <= 0 or fps > 1000 then
+        return nil
+    end
+    if spikeMs < 0 or spikeMs > 60000 then
+        return nil
+    end
+    if memoryMb <= 0 or memoryMb > 32768 then
+        return nil
+    end
+
+    local fieldCount = 0
+    for key in payload do
+        fieldCount += 1
+        if fieldCount > 4 or type(key) ~= "string" then
+            return nil
+        end
+    end
+
+    return {
+        fps = fps,
+        spikeMs = spikeMs,
+        memoryMb = memoryMb,
+    }
+end
+
+-- Memory headroom as a fraction of the baseline device's ceiling. Clamped to
+-- zero rather than going negative: a client over the ceiling is at zero
+-- headroom, and how far over tells the gate nothing it does not already know.
+function PerformanceBudget.memoryHeadroom(memoryMb: number, ceilingMb: number): number
+    assert(finite(ceilingMb) and ceilingMb > 0, "memory ceiling must be positive")
+    if not finite(memoryMb) or memoryMb < 0 then
+        return 0 / 0
+    end
+    return math.max(0, 1 - memoryMb / ceilingMb)
+end
+
+return table.freeze(PerformanceBudget)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="39">
+        <Properties>
           <string name="Name">ProfessionAbilityVisuals</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -6905,7 +7305,7 @@ return table.freeze(ProfessionAbilityVisuals)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">ProfessionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -7015,7 +7415,7 @@ return table.freeze(ProfessionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">ProfessionMastery</string>
           <string name="Source"><![CDATA[--!strict
@@ -7396,7 +7796,7 @@ return table.freeze(ProfessionMastery)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">ProfessionRescue</string>
           <string name="Source"><![CDATA[--!strict
@@ -7475,7 +7875,7 @@ return table.freeze(ProfessionRescue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">ProfessionState</string>
           <string name="Source"><![CDATA[--!strict
@@ -7642,7 +8042,7 @@ return table.freeze(ProfessionState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">QuestCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -7713,7 +8113,7 @@ return table.freeze(QuestCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">Quests</string>
           <string name="Source"><![CDATA[--!strict
@@ -7830,7 +8230,7 @@ return table.freeze(Quests)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
@@ -7889,7 +8289,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
@@ -8006,7 +8406,7 @@ return table.freeze(ResidentDialogue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -8121,7 +8521,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -8250,7 +8650,7 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -8292,6 +8692,10 @@ local RuntimeIds = {
         ActionRequest = "ActionRequest",
         StateChanged = "StateChanged",
         GetState = "GetState",
+        -- Deliberately not an action kind. Perf samples are telemetry that
+        -- grants nothing, and keeping them off the action remote means the
+        -- gameplay payload contract stays one field per kind.
+        PerformanceReport = "PerformanceReport",
     }),
     Actions = table.freeze({
         Rescue = "rescue",
@@ -8376,7 +8780,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -8982,7 +9386,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -9101,7 +9505,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -9358,7 +9762,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -9519,7 +9923,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -9611,7 +10015,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -9823,7 +10227,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -9976,7 +10380,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -10153,7 +10557,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -10303,7 +10707,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -10339,7 +10743,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -10721,7 +11125,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -10754,11 +11158,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="62">
+  <Item class="ServerScriptService" referent="63">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="63">
+    <Item class="Script" referent="64">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -10809,6 +11213,7 @@ local TownGuardLastStand = require(root.TownGuardLastStand)
 local LobbyDeparture = require(root.LobbyDeparture)
 local ActionProgress = require(root.ActionProgress)
 local ActionPayloadContract = require(root.ActionPayloadContract)
+local PerformanceBudget = require(root.PerformanceBudget)
 local RunHandoff = require(root.RunHandoff)
 local AdminRoster = require(root.AdminRoster)
 local TownProgression = require(root.TownProgression)
@@ -10823,6 +11228,7 @@ local Logger = require(script.Services.Logger)
 local FeatureFlagService = require(script.Services.FeatureFlagService)
 local GearVisualService = require(script.Services.GearVisualService)
 local NetworkService = require(script.Services.NetworkService)
+local PerformanceService = require(script.Services.PerformanceService)
 local OldGrowthService = require(script.Services.OldGrowthService)
 local WardenStagService = require(script.Services.WardenStagService)
 local BramblewakeBlackoutService = require(script.Services.BramblewakeBlackoutService)
@@ -11003,6 +11409,7 @@ local lobbyService = LobbyService.new(
     worldService,
     analyticsService
 )
+local performanceService = PerformanceService.new(logger, Config, PerformanceBudget)
 local adminService = AdminService.new(
     logger,
     AdminRoster,
@@ -11011,7 +11418,8 @@ local adminService = AdminService.new(
     survivalService,
     combatService,
     worldService,
-    expeditionService
+    expeditionService,
+    performanceService
 )
 local townNightService = TownNightService.new(
     logger,
@@ -11081,6 +11489,7 @@ local services = ServiceRegistry.new({
     actionPayloadContract = ActionPayloadContract,
 })
 services:register(featureFlags)
+services:register(performanceService)
 services:register(networkService)
 services:register(profileService)
 services:register(gearVisualService)
@@ -11109,6 +11518,18 @@ end)
 enemyService:setStrikeHandler(function(clicker: Player)
     tutorialService:strikeFromClick(clicker)
 end)
+-- The three sample sources the server owns. Join time is measured to the
+-- moment a profile is loaded, which is the first moment a player can actually
+-- do anything, rather than to the moment their character appeared.
+networkService:setPerformanceHandler(function(player: Player, payload: any)
+    performanceService:acceptClientReport(player, payload)
+end)
+profileService:onLoaded(function(player: Player, _profile: any)
+    performanceService:markInteractive(player)
+end)
+networkService:setActionObserver(function(player: Player)
+    performanceService:noteAction(player)
+end)
 adminService:setTutorialService(tutorialService)
 services:register(adminService)
 services:register(tutorialService)
@@ -11123,7 +11544,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -11221,11 +11642,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="65">
+      <Item class="Folder" referent="66">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="66">
+        <Item class="ModuleScript" referent="67">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -11275,6 +11696,7 @@ export type AdminService = typeof(setmetatable(
         _tutorialService: any,
         _worldService: any,
         _expeditionService: any,
+        _performanceService: any,
     },
     AdminService
 ))
@@ -11287,7 +11709,8 @@ function AdminService.new(
     survivalService: any,
     combatService: any,
     worldService: any,
-    expeditionService: any
+    expeditionService: any,
+    performanceService: any
 ): AdminService
     return setmetatable({
         Name = AdminService.Name,
@@ -11300,6 +11723,7 @@ function AdminService.new(
         _tutorialService = nil,
         _worldService = worldService,
         _expeditionService = expeditionService,
+        _performanceService = performanceService,
     }, AdminService)
 end
 
@@ -11333,6 +11757,15 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
     elseif command == "give" then
         self._tutorialService:adminGrantResources(player, decision.value)
         self:_reply(player, string.format("HEARTWOOD SET TO %d", decision.value))
+    elseif command == "perf" then
+        -- The headline goes to the toast because a tester on a phone cannot
+        -- read a table, and every line goes to the log because whoever closes
+        -- the exit gate needs the numbers rather than the verdict.
+        local lines = self._performanceService:formattedReport()
+        self:_reply(player, lines[1])
+        for _, line in lines do
+            self._logger:info("performance_report", { line = line })
+        end
     elseif command == "heal" then
         self._survivalService:healInRadius(player, 500)
         self._combatService:restoreStamina(player, 100)
@@ -11500,7 +11933,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="67">
+        <Item class="ModuleScript" referent="68">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12353,7 +12786,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="68">
+        <Item class="ModuleScript" referent="69">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -12851,7 +13284,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="69">
+        <Item class="ModuleScript" referent="70">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14156,7 +14589,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="70">
+        <Item class="ModuleScript" referent="71">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14800,7 +15233,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="71">
+        <Item class="ModuleScript" referent="72">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14904,7 +15337,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="72">
+        <Item class="ModuleScript" referent="73">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15093,7 +15526,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15486,7 +15919,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="74">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -15580,7 +16013,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="75">
+        <Item class="ModuleScript" referent="76">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15605,7 +16038,10 @@ export type NetworkService = typeof(setmetatable(
         _actionRequest: RemoteEvent?,
         _stateChanged: RemoteEvent?,
         _getState: RemoteFunction?,
+        _performanceReport: RemoteEvent?,
         _actionHandler: ((Player, any) -> ())?,
+        _actionObserver: ((Player) -> ())?,
+        _performanceHandler: ((Player, any) -> ())?,
         _snapshotProvider: ((Player) -> any)?,
         _snapshotCache: { [Player]: { at: number, value: any } },
         _lastActionAt: { [Player]: number },
@@ -15623,7 +16059,10 @@ function NetworkService.new(logger: Logger): NetworkService
         _actionRequest = nil,
         _stateChanged = nil,
         _getState = nil,
+        _performanceReport = nil,
         _actionHandler = nil,
+        _actionObserver = nil,
+        _performanceHandler = nil,
         _snapshotProvider = nil,
         _snapshotCache = {},
         _lastActionAt = {},
@@ -15660,12 +16099,26 @@ function NetworkService.Init(self: NetworkService, context: any)
         makeRemote("RemoteEvent", runtimeIds.Remotes.StateChanged, folder) :: RemoteEvent
     self._getState =
         makeRemote("RemoteFunction", runtimeIds.Remotes.GetState, folder) :: RemoteFunction
+    self._performanceReport =
+        makeRemote("RemoteEvent", runtimeIds.Remotes.PerformanceReport, folder) :: RemoteEvent
 end
 
 function NetworkService.Start(self: NetworkService)
     local actionRequest = assert(self._actionRequest, "action remote unavailable")
     local getState = assert(self._getState, "state function unavailable")
     local contract = assert(self._actionPayloadContract, "action payload contract unavailable")
+    local performanceReport = assert(self._performanceReport, "performance remote unavailable")
+
+    -- Telemetry, kept off the action path on purpose. The handler bounds and
+    -- rate limits the payload itself; nothing here can grant a player
+    -- anything, so the worst a lying client achieves is a wrong row in its own
+    -- performance report.
+    performanceReport.OnServerEvent:Connect(function(player: Player, payload: any)
+        local handler = self._performanceHandler
+        if handler ~= nil then
+            handler(player, payload)
+        end
+    end)
 
     actionRequest.OnServerEvent:Connect(function(player: Player, payload: any)
         if not contract.isValidTransport(payload) then
@@ -15677,6 +16130,10 @@ function NetworkService.Start(self: NetworkService)
             return
         end
         self._lastActionAt[player] = now
+        local observer = self._actionObserver
+        if observer ~= nil then
+            observer(player)
+        end
         local handler = self._actionHandler
         if handler ~= nil then
             handler(player, payload)
@@ -15722,6 +16179,17 @@ function NetworkService.setActionHandler(self: NetworkService, handler: (Player,
     self._actionHandler = handler
 end
 
+-- Counts accepted actions for the remote-traffic budget. Set after the fact
+-- because the observer belongs to a service built later, and kept separate
+-- from the handler so measuring can never change what a payload does.
+function NetworkService.setActionObserver(self: NetworkService, observer: (Player) -> ())
+    self._actionObserver = observer
+end
+
+function NetworkService.setPerformanceHandler(self: NetworkService, handler: (Player, any) -> ())
+    self._performanceHandler = handler
+end
+
 function NetworkService.setSnapshotProvider(self: NetworkService, provider: (Player) -> any)
     self._snapshotProvider = provider
 end
@@ -15763,7 +16231,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="76">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16592,7 +17060,251 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="77">
+        <Item class="ModuleScript" referent="78">
+          <Properties>
+            <string name="Name">PerformanceService</string>
+            <string name="Source"><![CDATA[--!strict
+
+--[[
+    Samples a live session against the performance budgets.
+
+    Milestone 3's exit gate wants a 30-minute run on a target device to meet
+    frame, memory, join, and network budgets. This is the thing that makes that
+    sentence produce numbers: it collects samples while people play and hands
+    them to PerformanceBudget, which decides whether the run passed.
+
+    Split of responsibility, because it decides what is trustworthy:
+
+      * The server measures what it owns -- its own heartbeat, how long each
+        player waited to become interactive, and how much remote traffic each
+        client actually sent. None of it can be influenced by a client.
+      * The client reports what only it can see -- its frame rate, its worst
+        stall, its memory. That arrives over a separate telemetry remote,
+        bounded and rate limited, and grants nothing.
+
+    Samples are capped so a server left running overnight cannot grow this into
+    a leak. The cap drops the oldest, which keeps the recent run intact -- the
+    30 minutes anyone is actually reporting on.
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local PerformanceService = {}
+PerformanceService.__index = PerformanceService
+PerformanceService.Name = "PerformanceService"
+
+local MAX_SAMPLES = 5000
+
+export type Logger = {
+    info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+    warn: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+}
+
+export type PerformanceService = typeof(setmetatable(
+    {} :: {
+        Name: string,
+        _logger: Logger,
+        _config: any,
+        _performanceBudget: any,
+        _samples: { [string]: { number } },
+        _joinedAt: { [Player]: number },
+        _interactive: { [Player]: boolean },
+        _actionCounts: { [Player]: number },
+        _lastReportAt: { [Player]: number },
+        _frames: number,
+        _windowStartedAt: number,
+        _heartbeat: RBXScriptConnection?,
+        _startedAt: number,
+    },
+    PerformanceService
+))
+
+function PerformanceService.new(
+    logger: Logger,
+    config: any,
+    performanceBudget: any
+): PerformanceService
+    return setmetatable({
+        Name = PerformanceService.Name,
+        _logger = logger,
+        _config = config,
+        _performanceBudget = performanceBudget,
+        _samples = {},
+        _joinedAt = {},
+        _interactive = {},
+        _actionCounts = {},
+        _lastReportAt = {},
+        _frames = 0,
+        _windowStartedAt = 0,
+        _heartbeat = nil,
+        _startedAt = 0,
+    }, PerformanceService)
+end
+
+function PerformanceService._record(self: PerformanceService, metricId: string, value: number)
+    if not self._performanceBudget.isValidMetric(metricId) then
+        return
+    end
+    local samples = self._samples[metricId]
+    if samples == nil then
+        samples = {}
+        self._samples[metricId] = samples
+    end
+    table.insert(samples, value)
+    if #samples > MAX_SAMPLES then
+        table.remove(samples, 1)
+    end
+
+    -- A breach is worth saying out loud while the run is still happening, so
+    -- whoever is holding the phone knows which minute to look at later.
+    if self._performanceBudget.classify(metricId, value) == "breach" then
+        self._logger:warn("performance_budget_breach", {
+            metric = metricId,
+            value = value,
+        })
+    end
+end
+
+function PerformanceService.Init(self: PerformanceService, _context: any)
+    Players.PlayerAdded:Connect(function(player: Player)
+        self._joinedAt[player] = os.clock()
+        self._actionCounts[player] = 0
+    end)
+    Players.PlayerRemoving:Connect(function(player: Player)
+        self._joinedAt[player] = nil
+        self._interactive[player] = nil
+        self._actionCounts[player] = nil
+        self._lastReportAt[player] = nil
+    end)
+end
+
+function PerformanceService.Start(self: PerformanceService)
+    self._startedAt = os.clock()
+    self._windowStartedAt = os.clock()
+
+    -- Heartbeat rate is counted over a one-second window rather than taken
+    -- from a single delta. One long frame is a spike, which the client already
+    -- reports; what the budget asks about the server is the sustained rate.
+    self._heartbeat = RunService.Heartbeat:Connect(function()
+        self._frames += 1
+        local now = os.clock()
+        local elapsed = now - self._windowStartedAt
+        if elapsed < 1 then
+            return
+        end
+
+        self:_record("server_heartbeat_hz", self._frames / elapsed)
+
+        for player, count in self._actionCounts do
+            if count > 0 then
+                self:_record("remote_actions_per_second", count / elapsed)
+                self._actionCounts[player] = 0
+            end
+        end
+
+        self._frames = 0
+        self._windowStartedAt = now
+    end)
+
+    self._logger:info("performance_service_started", {
+        memoryCeilingMb = self._config.BaselinePhoneMemoryCeilingMb,
+    })
+end
+
+-- Called when a player reaches interactive play. Only the first call counts:
+-- the budget is join-to-interactive, not every later state load.
+function PerformanceService.markInteractive(self: PerformanceService, player: Player)
+    if self._interactive[player] then
+        return
+    end
+    local joinedAt = self._joinedAt[player]
+    if joinedAt == nil then
+        return
+    end
+    self._interactive[player] = true
+    self:_record("join_seconds", os.clock() - joinedAt)
+end
+
+function PerformanceService.noteAction(self: PerformanceService, player: Player)
+    local count = self._actionCounts[player]
+    if count ~= nil then
+        self._actionCounts[player] = count + 1
+    end
+end
+
+--[[
+    Take a client's frame and memory sample.
+
+    Rate limited on the server's clock rather than trusting the client to keep
+    to the interval, and every field is bounded before it reaches the report.
+    A refused report is counted in the log, not silently dropped, because a
+    client that cannot report is itself a symptom worth seeing.
+]]
+function PerformanceService.acceptClientReport(
+    self: PerformanceService,
+    player: Player,
+    payload: any
+): boolean
+    local now = os.clock()
+    local lastAt = self._lastReportAt[player]
+    local interval = self._config.PerformanceReportIntervalSeconds
+    if lastAt ~= nil and now - lastAt < interval * 0.5 then
+        return false
+    end
+
+    local sample = self._performanceBudget.sanitizeClientReport(payload)
+    if sample == nil then
+        self._logger:warn("performance_report_rejected", { player = player.UserId })
+        return false
+    end
+    self._lastReportAt[player] = now
+
+    self:_record("client_fps", sample.fps)
+    self:_record("frame_spike_ms", sample.spikeMs)
+    self:_record(
+        "client_memory_headroom",
+        self._performanceBudget.memoryHeadroom(
+            sample.memoryMb,
+            self._config.BaselinePhoneMemoryCeilingMb
+        )
+    )
+    return true
+end
+
+function PerformanceService.report(self: PerformanceService): any
+    return self._performanceBudget.report(self._samples)
+end
+
+function PerformanceService.formattedReport(self: PerformanceService): { string }
+    local report = self:report()
+    local lines = self._performanceBudget.format(report)
+    table.insert(
+        lines,
+        1,
+        string.format(
+            "%s after %.0f min, %d players",
+            string.upper(report.verdict),
+            (os.clock() - self._startedAt) / 60,
+            #Players:GetPlayers()
+        )
+    )
+    return lines
+end
+
+function PerformanceService.Stop(self: PerformanceService)
+    local heartbeat = self._heartbeat
+    if heartbeat ~= nil then
+        heartbeat:Disconnect()
+        self._heartbeat = nil
+    end
+end
+
+return table.freeze(PerformanceService)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16771,7 +17483,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="78">
+        <Item class="ModuleScript" referent="80">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17342,7 +18054,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="81">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18441,7 +19153,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="80">
+        <Item class="ModuleScript" referent="82">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18966,7 +19678,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="81">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19942,7 +20654,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20442,7 +21154,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21717,7 +22429,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="86">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22556,7 +23268,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="85">
+        <Item class="ModuleScript" referent="87">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -32686,11 +33398,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="86">
+      <Item class="Folder" referent="88">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="87">
+        <Item class="ModuleScript" referent="89">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -36352,7 +37064,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="88">
+        <Item class="ModuleScript" referent="90">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -36807,7 +37519,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="89">
+        <Item class="ModuleScript" referent="91">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -37502,7 +38214,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="90">
+        <Item class="ModuleScript" referent="92">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -38213,7 +38925,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="91">
+        <Item class="ModuleScript" referent="93">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -38299,7 +39011,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="92">
+        <Item class="ModuleScript" referent="94">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -38571,7 +39283,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="93">
+        <Item class="ModuleScript" referent="95">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -38746,7 +39458,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="94">
+        <Item class="ModuleScript" referent="96">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -39291,7 +40003,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="95">
+        <Item class="ModuleScript" referent="97">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -39524,7 +40236,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="96">
+        <Item class="ModuleScript" referent="98">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -39613,7 +40325,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="97">
+        <Item class="ModuleScript" referent="99">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -39938,15 +40650,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="98">
+  <Item class="StarterPlayer" referent="100">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="99">
+    <Item class="StarterPlayerScripts" referent="101">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="100">
+      <Item class="LocalScript" referent="102">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -39968,6 +40680,7 @@ local HUDController = require(script.Controllers.HUDController)
 local InputController = require(script.Controllers.InputController)
 local InteractionController = require(script.Controllers.InteractionController)
 local MusicController = require(script.Controllers.MusicController)
+local PerformanceController = require(script.Controllers.PerformanceController)
 local WorldMotionController = require(script.Controllers.WorldMotionController)
 local WeatherController = require(script.Controllers.WeatherController)
 
@@ -39980,9 +40693,15 @@ local actionRequest =
 local stateChanged =
     runtime:WaitForChild(RuntimeIds.Remotes.StateChanged, Config.BootstrapTimeoutSeconds)
 local getState = runtime:WaitForChild(RuntimeIds.Remotes.GetState, Config.BootstrapTimeoutSeconds)
+local performanceReport =
+    runtime:WaitForChild(RuntimeIds.Remotes.PerformanceReport, Config.BootstrapTimeoutSeconds)
 assert(actionRequest ~= nil and actionRequest:IsA("RemoteEvent"), "missing ActionRequest")
 assert(stateChanged ~= nil and stateChanged:IsA("RemoteEvent"), "missing StateChanged")
 assert(getState ~= nil and getState:IsA("RemoteFunction"), "missing GetState")
+assert(
+    performanceReport ~= nil and performanceReport:IsA("RemoteEvent"),
+    "missing PerformanceReport"
+)
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui", Config.BootstrapTimeoutSeconds)
@@ -39999,6 +40718,7 @@ local worldMotion = WorldMotionController.new(
 local weather = WeatherController.new(WeatherProfile)
 local interaction = InteractionController.new(RuntimeIds.InteractionTag, hud)
 local music = MusicController.new(MusicCatalog)
+PerformanceController.new(performanceReport :: RemoteEvent, Config.PerformanceReportIntervalSeconds)
 
 local function send(kind: string, fields: { [string]: any }?)
     local payload = fields or {}
@@ -40068,11 +40788,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="101">
+        <Item class="Folder" referent="103">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="102">
+          <Item class="ModuleScript" referent="104">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -40203,7 +40923,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="103">
+          <Item class="ModuleScript" referent="105">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -42600,7 +43320,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="104">
+          <Item class="ModuleScript" referent="106">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -42899,7 +43619,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="105">
+          <Item class="ModuleScript" referent="107">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -43007,7 +43727,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="106">
+          <Item class="ModuleScript" referent="108">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -43126,7 +43846,107 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="107">
+          <Item class="ModuleScript" referent="109">
+            <Properties>
+              <string name="Name">PerformanceController</string>
+              <string name="Source"><![CDATA[--!strict
+
+--[[
+    Reports this client's own frame and memory numbers to the server.
+
+    Frame rate, stalls, and memory are the three budgets in
+    docs/TECHNICAL_ARCHITECTURE.md that only the client can see, and they are
+    the ones the exit gate cares most about, since "target device meets frame,
+    memory, join, and network budgets" is a statement about the phone in
+    someone's hand rather than about the server.
+
+    What it sends, once per interval:
+
+      * the mean frame rate over the interval, not the instantaneous one, so a
+        single lucky frame cannot flatter the sample;
+      * the worst single frame in the interval, in milliseconds, which is the
+        stutter a player actually felt;
+      * total client memory, which the server turns into headroom against the
+        baseline device ceiling.
+
+    The interval matters: sampling every frame and sending it would itself be
+    the network problem this is supposed to measure.
+]]
+
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
+
+local PerformanceController = {}
+PerformanceController.__index = PerformanceController
+
+export type PerformanceController = typeof(setmetatable(
+    {} :: {
+        _remote: RemoteEvent,
+        _interval: number,
+        _frames: number,
+        _elapsed: number,
+        _worstFrameMs: number,
+        _connection: RBXScriptConnection?,
+    },
+    PerformanceController
+))
+
+function PerformanceController.new(remote: RemoteEvent, interval: number): PerformanceController
+    local self = setmetatable({
+        _remote = remote,
+        _interval = math.max(1, interval),
+        _frames = 0,
+        _elapsed = 0,
+        _worstFrameMs = 0,
+        _connection = nil,
+    }, PerformanceController)
+
+    self._connection = RunService.RenderStepped:Connect(function(deltaTime: number)
+        self:_step(deltaTime)
+    end)
+    return self
+end
+
+function PerformanceController._step(self: PerformanceController, deltaTime: number)
+    self._frames += 1
+    self._elapsed += deltaTime
+    self._worstFrameMs = math.max(self._worstFrameMs, deltaTime * 1000)
+
+    if self._elapsed < self._interval then
+        return
+    end
+
+    local fps = self._frames / self._elapsed
+    local worstFrameMs = self._worstFrameMs
+    self._frames = 0
+    self._elapsed = 0
+    self._worstFrameMs = 0
+
+    -- A pcall because a failed telemetry send must never be the thing that
+    -- breaks someone's session.
+    pcall(function()
+        self._remote:FireServer({
+            schemaVersion = 1,
+            fps = fps,
+            spikeMs = worstFrameMs,
+            memoryMb = Stats:GetTotalMemoryUsageMb(),
+        })
+    end)
+end
+
+function PerformanceController.destroy(self: PerformanceController)
+    local connection = self._connection
+    if connection ~= nil then
+        connection:Disconnect()
+        self._connection = nil
+    end
+end
+
+return table.freeze(PerformanceController)
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="110">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -43258,7 +44078,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="108">
+          <Item class="ModuleScript" referent="111">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -43546,7 +44366,7 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="Workspace" referent="109">
+  <Item class="Workspace" referent="112">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

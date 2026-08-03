@@ -26,6 +26,7 @@ TestRunner.run({
     require("./specs/ExtractionPayoff.spec"),
     require("./specs/FeatureFlagService.spec"),
     require("./specs/NightSchedule.spec"),
+    require("./specs/PerformanceBudget.spec"),
     require("./specs/OldGrowthEncounter.spec"),
     require("./specs/ProfessionState.spec"),
     require("./specs/ProfessionMastery.spec"),

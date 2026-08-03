@@ -175,15 +175,25 @@ See [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md)
 
 ### Exit gate
 
-- a fresh save plays start to chapter-one resolution;
-- solo, 2-player, 4-player, and 8-player passes complete;
-- 1,000 automated seeds pass connectivity and content invariants;
+- a fresh save plays start to chapter-one resolution — run it against
+  [`MILESTONE_3_PLAYTEST.md`](MILESTONE_3_PLAYTEST.md);
+- solo, 2-player, 4-player, and 8-player passes complete — same document;
+- 1,000 automated seeds pass connectivity and content invariants — covered by
+  `tests/specs/ExpeditionGenerator.spec.luau`, which sweeps seeds 1–1000 through
+  `validate`, asserts the manifest hash replays, and requires route variety;
 - duplicate reward, remote spam, damage spoof, and invalid build tests fail
-  safely — covered by `tests/specs/ExploitSurface.spec.luau`, one section per
+  safely — covered by `tests/specs/ExploitGate.spec.luau`, one section per
   gate item, asserting each boundary holds under abuse rather than that the
   feature works;
-- no critical placeholder UI/audio/art remains in the slice;
-- target device meets frame, memory, join, and network budgets for a 30-minute run.
+- no critical placeholder UI/audio/art remains in the slice — static coverage
+  is tracked in [`ASSET_COVERAGE_AUDIT.md`](ASSET_COVERAGE_AUDIT.md); whether a
+  placed asset *looks* right still needs the Studio pass in the playtest
+  document;
+- target device meets frame, memory, join, and network budgets for a 30-minute
+  run — budgets live in
+  [`TECHNICAL_ARCHITECTURE.md`](TECHNICAL_ARCHITECTURE.md) and are measured by
+  `PerformanceService`; `/perf` prints the verdict at the end of a run. A metric
+  nobody sampled reports `incomplete` rather than passing.
 
 **Decision gate:** approve full production only if the slice is fun, readable,
 technically healthy, and shows credible D1 intent in closed testing.

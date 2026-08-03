@@ -10,19 +10,23 @@ snapshot, not a live view.
 
 ## Where things stand
 
+Re-derived 2026-08-03. The previous snapshot read 410 / 44 / 42; the manifest
+has gained fourteen assets since, and one of the two entries it listed as
+unplaced has since been placed.
+
 | | Count |
 | --- | ---: |
-| Distinct primitive object kinds | 410 |
-| Reviewed assets in the manifest | 44 |
-| Assets referenced by placement code | 42 |
+| Distinct primitive object kinds | 414 |
+| Reviewed assets in the manifest | 58 |
+| Assets referenced by placement code | 54 |
 | Dynamic character asset shells | 8 |
-| Retired or superseded assets intentionally unplaced | 2 |
+| Superseded or retired assets intentionally unplaced | 4 |
 
-42 of 44: both `mesh_lantern_post_a` and `mesh_wayfarer_cabin_a` are
-absent from the world, and the two unplaced entries below are the whole of the
-difference.
+54 of 58: the four entries in the unplaced table below are the whole of the
+difference. Three of them are superseded originals whose replacements are
+placed, and the fourth is the retired cabin.
 
-The 410 primitive names are no longer a count of visible placeholders: they now
+The 414 primitive names are no longer a count of visible placeholders: they now
 include terrain, roads, floors, walls, roofs, collision shells, invisible
 interaction anchors, and asset-load fallbacks. Those are *supposed* to remain
 purpose-built geometry under `VISUAL_QUALITY_STANDARD.md`. Inspectable item and
@@ -32,12 +36,16 @@ character shells use the reviewed asset path.
 
 | Builder | Kinds |
 | --- | ---: |
-| `WorldService.luau` | 285 |
-| `BramblewakeBuilder.luau` | 76 |
-| `BramblewakeEnemyBuilder.luau` | 25 |
+| `WorldService.luau` | 294 |
+| `BramblewakeBuilder.luau` | 67 |
+| `BramblewakeEnemyBuilder.luau` | 29 |
 | `WorldSignBuilder.luau` | 11 |
 | `OldGrowthBuilder.luau` | 7 |
 | `WardenStagBuilder.luau` | 6 |
+
+These sum to exactly 414 because no part name is shared between two builders —
+checked, not assumed. If a future pass finds the union below the sum, a name
+has been duplicated across builders and the duplicate is worth looking at.
 
 ## Enemy and encounter shell pass — resolved 2026-08-01
 
@@ -73,13 +81,23 @@ that sightline.
 
 | Stable ID | Band | Status |
 | --- | --- | --- |
-| `mesh_lantern_post_a` | `curated_core` | Superseded by `mesh_creator_street_lantern_a`; referenced only in a comparison in `WorldService.luau`, never placed. Either retire it explicitly or place it. |
+| `mesh_creator_hand_axe_a` | `curated_core` | Superseded by `mesh_hand_axe_a`, which is placed at `WorldService.luau:4412`. The manifest says why: the original measured 199.5 studs and was squeezed 66x down to 3, which is what made it render wrong on mobile. Still banded `curated_core`; re-band it to a retired band so this row stops reappearing. |
+| `mesh_creator_blacksmith_hammer_a` | `curated_core` | Superseded by `mesh_blacksmith_hammer_a`, placed at `WorldService.luau:4420`. The manifest records the reason as the Creator Store source reading poorly at display scale. Same re-banding needed. |
+| `mesh_creator_first_lantern_a` | `curated_core` | Not placed anywhere. The town's visible first lantern is `mesh_first_lantern_a` (`WorldService.luau:4877`), a different asset in the `curated_hero` band. Unlike the two above, no manifest entry claims to replace this one, so it is genuinely undecided: retire it explicitly or place it. |
 | `mesh_wayfarer_cabin_a` | `retired_visual_failure` | Correct. Retired on Studio evidence; must never be placed. |
+
+`mesh_lantern_post_a` was on this table as unplaced. It no longer belongs here:
+`BramblewakeBuilder.luau` places it at lines 1369 and 1869. The `==` comparison
+in `WorldService.luau:177` that made it look unplaced is still there, which is
+exactly the trap in the next section — the comparison was never the whole story,
+and the asset acquired a real placement afterwards.
 
 ## Reading the placement code correctly
 
-Two traps, both of which produced a wrong answer on the first pass of this
-audit:
+Three traps, each of which produced a wrong answer on some pass of this audit.
+A plain `grep` falls into all three, so the counts above come from parsing the
+argument list of every `part(...)` call and intersecting literal asset IDs
+against the manifest, rather than from pattern-matching lines:
 
 1. **`assetId` is not always a string literal.** The conifers are assigned
    through a conditional:
@@ -94,9 +112,14 @@ audit:
    They are placed — on roughly a third of band-1 trees, by design, to stay
    inside the mesh budget.
 
-2. **A mention is not a placement.** `mesh_lantern_post_a` appears in
-   `WorldService.luau` only inside `placement.assetId == "mesh_lantern_post_a"`,
-   a comparison that tunes jitter. Counting mentions makes it look placed.
+2. **A mention is not a placement.** `WorldService.luau:177` contains
+   `placement.assetId == "mesh_lantern_post_a"`, a comparison that tunes jitter.
+   Counting mentions makes an asset look placed on the strength of a line that
+   only tests for it. The reverse also bites: when this audit was first written
+   that comparison was the asset's *only* appearance, so it was recorded as
+   unplaced — and it has since gained real placements in
+   `BramblewakeBuilder.luau` while the note here went on saying otherwise. Check
+   both directions on every pass.
 
 3. **Not every quoted snake_case string is an asset ID.** A regex that scrapes
    quoted identifiers out of the neighbourhood of `assetId` also collects

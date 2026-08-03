@@ -52,6 +52,17 @@ return table.freeze({
     EngineerBraceSeconds = 12,
     EngineerBraceCapacity = 14,
     ActionRatePerSecond = 8,
+    -- What a baseline phone is assumed to have for this experience before
+    -- Roblox starts reclaiming. Client memory headroom is measured against it,
+    -- so it decides whether that budget reads as healthy or as one asset load
+    -- from a reload. Provisional: TECHNICAL_ARCHITECTURE.md says budgets are
+    -- finalized on the baseline device during the vertical slice, and this is
+    -- one of the numbers that pass exists to replace.
+    BaselinePhoneMemoryCeilingMb = 700,
+    -- How often a client reports its own frame and memory samples, and the
+    -- floor the server enforces on that remote. Telemetry only: nothing a
+    -- client reports here grants it anything.
+    PerformanceReportIntervalSeconds = 5,
     -- The Last Light universe (10611704810) and its start place. Registered
     -- per the publishing runbook so environment checks can tell a real
     -- production place from an unregistered one.

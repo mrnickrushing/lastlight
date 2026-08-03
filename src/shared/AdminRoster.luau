@@ -70,7 +70,7 @@ function AdminRoster.adminUserIds(): { number }
 end
 
 function AdminRoster.commandNames(): { string }
-    return { "night", "give", "heal", "phase", "where", "go" }
+    return { "night", "give", "heal", "phase", "where", "go", "perf" }
 end
 
 --[[

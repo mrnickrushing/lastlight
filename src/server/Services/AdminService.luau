@@ -45,6 +45,7 @@ export type AdminService = typeof(setmetatable(
         _tutorialService: any,
         _worldService: any,
         _expeditionService: any,
+        _performanceService: any,
     },
     AdminService
 ))
@@ -57,7 +58,8 @@ function AdminService.new(
     survivalService: any,
     combatService: any,
     worldService: any,
-    expeditionService: any
+    expeditionService: any,
+    performanceService: any
 ): AdminService
     return setmetatable({
         Name = AdminService.Name,
@@ -70,6 +72,7 @@ function AdminService.new(
         _tutorialService = nil,
         _worldService = worldService,
         _expeditionService = expeditionService,
+        _performanceService = performanceService,
     }, AdminService)
 end
 
@@ -103,6 +106,15 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
     elseif command == "give" then
         self._tutorialService:adminGrantResources(player, decision.value)
         self:_reply(player, string.format("HEARTWOOD SET TO %d", decision.value))
+    elseif command == "perf" then
+        -- The headline goes to the toast because a tester on a phone cannot
+        -- read a table, and every line goes to the log because whoever closes
+        -- the exit gate needs the numbers rather than the verdict.
+        local lines = self._performanceService:formattedReport()
+        self:_reply(player, lines[1])
+        for _, line in lines do
+            self._logger:info("performance_report", { line = line })
+        end
     elseif command == "heal" then
         self._survivalService:healInRadius(player, 500)
         self._combatService:restoreStamina(player, 100)
