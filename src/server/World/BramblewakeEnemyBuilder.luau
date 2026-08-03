@@ -413,10 +413,14 @@ function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target:
     -- lighting the world or showing enemies through terrain -- Occluded is
     -- kept deliberately so nothing is visible through geometry.
     highlight.Name = "ThreatOutline"
-    highlight.FillColor = Color3.fromRGB(96, 34, 34)
-    highlight.FillTransparency = 0.6
-    highlight.OutlineColor = Color3.fromRGB(255, 168, 120)
-    highlight.OutlineTransparency = 0
+    -- Enough to find them in the dark, not so much that they become
+    -- featureless cut-outs. A fully opaque rim over a heavy fill turned every
+    -- creature into a black silhouette with a white edge, which lost the
+    -- shapes the enemy roster relies on for readability.
+    highlight.FillColor = Color3.fromRGB(104, 42, 38)
+    highlight.FillTransparency = 0.82
+    highlight.OutlineColor = Color3.fromRGB(255, 178, 132)
+    highlight.OutlineTransparency = 0.3
     highlight.DepthMode = Enum.HighlightDepthMode.Occluded
     highlight.Parent = model
 
