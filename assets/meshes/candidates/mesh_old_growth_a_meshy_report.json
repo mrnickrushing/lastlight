@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "assetId": "mesh_old_growth_a",
+  "source": "assets/meshes/raw/mesh_old_growth_a.glb",
+  "output": "assets/meshes/generated/mesh_old_growth_a.glb",
+  "targetLongestDimension": 22.5,
+  "boundsMin": [
+    -7.7806,
+    -4.4389,
+    0.0
+  ],
+  "boundsMax": [
+    7.7806,
+    4.4389,
+    22.5
+  ],
+  "dimensions": [
+    15.5613,
+    8.8777,
+    22.5
+  ],
+  "longestDimension": 22.5,
+  "trianglesBefore": 18575,
+  "trianglesAfter": 9000,
+  "meshObjects": 1,
+  "materialSlots": 1,
+  "textures": [
+    {
+      "name": "Image_0",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_1",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "Image_3",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    },
+    {
+      "name": "normal",
+      "width": 2048,
+      "height": 2048,
+      "packed": true
+    }
+  ],
+  "bytes": 13187184
+}

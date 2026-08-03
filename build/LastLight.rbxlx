@@ -25387,11 +25387,15 @@ function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKe
             profile = Vector3.new(1.12, 0.88, 1.05),
             scale = 1.35,
         },
+        -- Generated with a hollow chest so the amber heart weak point sits
+        -- inside the creature. The heart is a neon part the elite restores on
+        -- every state change, so it stays lit in that cavity rather than
+        -- being buried by the mesh.
         old_growth = {
-            assetId = "mesh_creator_old_growth_a",
+            assetId = "mesh_old_growth_a",
             groundOffset = 9,
             yaw = math.rad(180),
-            profile = Vector3.new(0.94, 1.08, 0.9),
+            profile = Vector3.new(1, 1, 1),
         },
         -- The stag was generated without antlers on purpose. The fight breaks
         -- them one at a time, so they stay authored parts standing above the
@@ -37119,6 +37123,17 @@ local ENTRIES: { Entry } = {
         assetId = 100249823997866,
         targetLongestDimension = 18,
         maxTriangles = 6000,
+        maxMaterialSlots = 1,
+        placementBand = "curated_expedition",
+        pbr = true,
+        preserveSourceMaterials = true,
+        creatorStore = false,
+    },
+    {
+        id = "mesh_old_growth_a",
+        assetId = 132155545012921,
+        targetLongestDimension = 22.5,
+        maxTriangles = 9000,
         maxMaterialSlots = 1,
         placementBand = "curated_expedition",
         pbr = true,
