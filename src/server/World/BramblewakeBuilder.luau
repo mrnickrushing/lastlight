@@ -2608,52 +2608,157 @@ local function buildEventSocket(
     }
 end
 
-local function buildBackdrop(parent: Instance, centers: { Vector3 })
+--[[
+    The forest Bramblewake stands in.
+
+    This used to be a mist plane and thirty-six pillars on a fixed radius
+    around the average module position, and it had two problems that together
+    made the region read as platforms in a void.
+
+    The pillars were rotated by `CFrame.Angles(lean, 0, -angle)`, which spends
+    the ring angle on roll instead of yaw. A pillar a quarter of the way round
+    the ring lay flat; one halfway round stood upside down. What should have
+    been a treeline was a spray of slabs across the sky.
+
+    And nothing held the ground. Each module carried its own patch, so beyond
+    the route there was no floor at all -- the edge of the last patch was the
+    edge of the world, with sky underneath it.
+
+    So the floor now spans the whole route with a wide margin, and the trees
+    are placed by distance from the route's own bounds rather than from a
+    guessed centre, thickening as they go out until the far rank closes the
+    horizon. Nothing here is interactive or collidable: it exists to be the
+    reason you cannot see the edge.
+]]
+local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { any })
     local folder = Instance.new("Folder")
     folder.Name = "RegionalBackdrop"
     folder.Parent = parent
 
-    local average = Vector3.zero
+    local low = centers[1]
+    local high = centers[1]
     for _, center in centers do
-        average += center
+        low = Vector3.new(math.min(low.X, center.X), 0, math.min(low.Z, center.Z))
+        high = Vector3.new(math.max(high.X, center.X), 0, math.max(high.Z, center.Z))
     end
-    average /= #centers
+    local middle = (low + high) / 2
+    local span = high - low
+    local reach = math.max(span.X, span.Z) / 2 + 120
 
-    lowMist(folder, average + Vector3.new(0, 0, 0), Vector3.new(680, 2.2, 680), 0.88)
-    for ring = 1, 2 do
-        for index = 1, 18 do
-            local angle = (index / 18) * math.pi * 2 + ring * 0.09
-            local radius = 230 + ring * 70 + (index % 4) * 18
-            local height = 52 + (index % 5) * 16 + ring * 8
-            local spire = part(
-                folder,
-                "DistantRootSpire",
-                Vector3.new(10 + ring * 4, height, 10 + ring * 4),
-                CFrame.new(
-                    average
-                        + Vector3.new(
-                            math.cos(angle) * radius,
-                            height / 2 - 3,
-                            math.sin(angle) * radius
-                        )
-                ) * CFrame.Angles(math.rad(8 + ring * 2), 0, -angle),
-                if ring == 1 then Color3.fromRGB(32, 45, 39) else Color3.fromRGB(24, 35, 34),
-                Enum.Material.Wood
+    -- One floor under everything. Sized well past the outermost module so the
+    -- route never reaches its edge, and low enough that the per-module ground
+    -- patches still read as the path over it.
+    local floorSpan = (reach + 420) * 2
+    local groundFloor = part(
+        folder,
+        "BramblewakeForestFloor",
+        Vector3.new(floorSpan, 4, floorSpan),
+        CFrame.new(middle - Vector3.new(0, 2.1, 0)),
+        Color3.fromRGB(31, 38, 30),
+        Enum.Material.Ground,
+        false
+    )
+    groundFloor.CanQuery = false
+
+    lowMist(folder, middle, Vector3.new(floorSpan * 0.92, 2.2, floorSpan * 0.92), 0.9)
+
+    local function backdropTree(
+        at: Vector3,
+        height: number,
+        width: number,
+        shade: number,
+        seed: number
+    )
+        local lean = math.rad(((seed % 7) - 3) * 1.6)
+        local trunk = part(
+            folder,
+            "BackdropTrunk",
+            Vector3.new(width, height, width),
+            CFrame.new(at + Vector3.new(0, height / 2, 0))
+                * CFrame.Angles(lean, (seed % 360) * 0.0175, lean * 0.6),
+            Color3.fromRGB(math.floor(34 * shade), math.floor(30 * shade), math.floor(26 * shade)),
+            Enum.Material.Wood,
+            false
+        )
+        trunk.CanQuery = false
+        local canopy = part(
+            folder,
+            "BackdropCanopy",
+            Vector3.new(width * 4.4, height * 0.72, width * 4.4),
+            CFrame.new(at + Vector3.new(0, height * 0.86, 0))
+                * CFrame.Angles(lean, (seed % 211) * 0.021, 0),
+            Color3.fromRGB(math.floor(38 * shade), math.floor(58 * shade), math.floor(41 * shade)),
+            Enum.Material.Grass,
+            false
+        )
+        canopy.CanQuery = false
+        canopy.Shape = Enum.PartType.Ball
+    end
+
+    -- Four ranks. The near one is sparse enough to walk toward and see
+    -- through; each one out is denser, darker and taller, so the horizon
+    -- closes gradually rather than ending at a wall.
+    local ranks = {
+        { radius = reach + 40, count = 34, height = 46, width = 4.2, shade = 1.0 },
+        { radius = reach + 130, count = 46, height = 62, width = 5.0, shade = 0.86 },
+        { radius = reach + 240, count = 58, height = 84, width = 6.0, shade = 0.7 },
+        { radius = reach + 360, count = 66, height = 108, width = 7.2, shade = 0.56 },
+    }
+    for rankIndex, rank in ranks do
+        for index = 1, rank.count do
+            local angle = (index / rank.count) * math.pi * 2 + rankIndex * 0.21
+            local jitter = ((index * 37 + rankIndex * 11) % 23) - 11
+            local radius = rank.radius + jitter * 2.4
+            local at = middle + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+            backdropTree(
+                at,
+                rank.height + ((index % 5) - 2) * 6,
+                rank.width,
+                rank.shade,
+                index * 13 + rankIndex * 7
             )
-            spire.Transparency = if ring == 1 then 0.08 else 0.18
-            if index % 6 == 0 then
-                local glow = orb(
-                    folder,
-                    "DistantSapGlow",
-                    spire.Position + Vector3.new(0, height * 0.28, 0),
-                    1.3,
-                    FOXFIRE,
-                    Enum.Material.Neon
-                )
-                glow.Transparency = 0.38
-                glow.CanQuery = false
-            end
         end
+    end
+
+    -- Authored trees only where a player can actually get close enough to
+    -- read one. Past the first rank the silhouette is all that survives, and
+    -- a mesh costs the same there as it does underfoot.
+    local heroes = { "mesh_conifer_hero_a", "mesh_conifer_hero_b", "mesh_broadleaf_hero_a" }
+    for index = 1, 22 do
+        local angle = (index / 22) * math.pi * 2 + 0.4
+        local radius = reach + 6 + ((index * 29) % 34)
+        dress(
+            extra,
+            heroes[(index % #heroes) + 1],
+            folder,
+            middle + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius),
+            1 + ((index % 4) * 0.12),
+            angle + math.rad((index % 9) * 7),
+            9600 + index
+        )
+    end
+
+    -- A few sap lights deep in the trees, so the dark past the route reads as
+    -- somewhere rather than as nothing.
+    for index = 1, 7 do
+        local angle = (index / 7) * math.pi * 2 + 1.1
+        local radius = reach + 150 + (index % 3) * 60
+        local glow = orb(
+            folder,
+            "DistantSapGlow",
+            middle
+                + Vector3.new(
+                    math.cos(angle) * radius,
+                    16 + (index % 4) * 7,
+                    math.sin(angle) * radius
+                ),
+            2.6,
+            FOXFIRE,
+            Enum.Material.Neon
+        )
+        glow.Transparency = 0.52
+        glow.CanQuery = false
+        glow.CastShadow = false
     end
 end
 
@@ -3504,7 +3609,7 @@ function BramblewakeBuilder.build(
             target.Position.Y - 2.2
         )
     end
-    buildBackdrop(expedition, centers)
+    buildBackdrop(expedition, centers, meshPlacements)
 
     local generatedParts = 0
     for _, descendant in expedition:GetDescendants() do
