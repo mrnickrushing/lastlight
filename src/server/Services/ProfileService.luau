@@ -27,6 +27,7 @@ export type ProfileService = typeof(setmetatable(
         _equipmentChangedEvent: BindableEvent,
         _saveSchema: any,
         _profilePersistence: any,
+        _adminInspectionReport: any,
         _config: any,
         _jobId: string,
         _store: GlobalDataStore?,
@@ -49,6 +50,7 @@ function ProfileService.new(logger: Logger, persistent: boolean): ProfileService
         _equipmentChangedEvent = Instance.new("BindableEvent"),
         _saveSchema = nil,
         _profilePersistence = nil,
+        _adminInspectionReport = nil,
         _config = nil,
         _jobId = "",
         _store = nil,
@@ -59,6 +61,8 @@ function ProfileService.Init(self: ProfileService, context: any)
     self._saveSchema = context.saveSchema
     self._profilePersistence =
         assert(context.profilePersistence, "profile persistence rules unavailable")
+    self._adminInspectionReport =
+        assert(context.adminInspectionReport, "admin inspection report unavailable")
     self._config = assert(context.config, "config unavailable")
     -- Studio has no JobId. A stable stand-in keeps the lock logic identical
     -- there instead of leaving every Studio session sharing an empty ID.
@@ -1039,6 +1043,43 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
         stage = profile.tutorial.stage,
     })
     return true
+end
+
+--[[
+    Read-only inspection of any player's save, online or not.
+
+    Reads the DataStore key directly rather than going through a live
+    session, which is the entire point: an admin needs to look at a save
+    whether or not that player is on this server, or on any server at all.
+    It never touches self._profiles, never claims the lock, and cannot be
+    reached by anything but AdminService, which is itself gated to the
+    roster.
+
+    In non-persistent mode (Studio without ProfileLockStaleAfterSeconds
+    wired to a real store) there is nothing durable to read, so this reports
+    "not found" rather than reaching for a store that was never opened.
+]]
+function ProfileService.inspect(self: ProfileService, userId: number): any
+    assert(type(userId) == "number" and userId > 0, "inspection target must be a valid user ID")
+    local now = os.time()
+    local staleAfter = self._config.ProfileLockStaleAfterSeconds
+
+    if not self._persistent or self._store == nil then
+        return self._adminInspectionReport.build(nil, now, staleAfter)
+    end
+
+    local ok, result = pcall(function()
+        return (self._store :: GlobalDataStore):GetAsync(string.format("player_%d", userId))
+    end)
+    if not ok then
+        self._logger:warn("profile_inspection_failed", {
+            userId = userId,
+            reason = tostring(result),
+        })
+        error("could not read that profile right now")
+    end
+
+    return self._adminInspectionReport.build(result, now, staleAfter)
 end
 
 return table.freeze(ProfileService)

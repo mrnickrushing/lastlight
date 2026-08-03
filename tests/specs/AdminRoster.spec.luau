@@ -113,6 +113,31 @@ return {
             end,
         },
         {
+            name = "inspect takes a username or a raw user ID as text",
+            run = function()
+                for _, message in { "/inspect UncleNickRush", "/inspect 8772161919" } do
+                    local result = AdminRoster.authorize(OWNER, message, true)
+                    TestRunner.equal(result.allowed, true)
+                    TestRunner.equal(result.command, "inspect")
+                    TestRunner.truthy(result.text ~= nil and #result.text > 0)
+                end
+            end,
+        },
+        {
+            name = "inspect refuses a missing or oversized target",
+            run = function()
+                for _, message in { "/inspect", "/inspect " .. string.rep("a", 33) } do
+                    local result = AdminRoster.authorize(OWNER, message, true)
+                    TestRunner.equal(result.allowed, false)
+                    TestRunner.equal(result.reason, "invalid_inspection_target")
+                end
+                -- Exactly at the bound is allowed; one character over is not.
+                local atBound =
+                    AdminRoster.authorize(OWNER, "/inspect " .. string.rep("a", 32), true)
+                TestRunner.equal(atBound.allowed, true)
+            end,
+        },
+        {
             name = "lists both admins",
             run = function()
                 local ids = AdminRoster.adminUserIds()

@@ -57,5 +57,6 @@ TestRunner.run({
     require("./specs/LobbyDeparture.spec"),
     require("./specs/ActionProgress.spec"),
     require("./specs/RunHandoff.spec"),
+    require("./specs/AdminInspectionReport.spec"),
     require("./specs/AdminRoster.spec"),
 })

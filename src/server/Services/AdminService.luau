@@ -159,6 +159,12 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
             local at = root.Position
             self:_reply(player, string.format("%.0f, %.0f, %.0f", at.X, at.Y, at.Z))
         end
+    elseif command == "inspect" then
+        -- The roster only reaches this branch with allowed = true once
+        -- decision.text is a non-empty string of bounded length -- see
+        -- AdminRoster.authorize's inspect case -- so the cast documents an
+        -- invariant this file does not itself enforce, rather than skips one.
+        self:_inspect(player, decision.text :: string)
     end
 
     self._logger:info("admin_command", {
@@ -167,6 +173,74 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
         value = decision.value,
         text = decision.text,
     })
+end
+
+--[[
+    Reads a save without needing the target online, and writes the full
+    result to the log rather than the toast.
+
+    A toast is a HUD element sized for one line -- "HEALED", "NIGHT SET TO
+    4". The report this produces has a dozen fields and is the actual audit
+    record an operator wants, so it goes to Output next to profile_loaded and
+    profile_saved, where the rest of a save's history already lives. The
+    toast only confirms the command ran and gives the one number worth
+    seeing without leaving the game.
+]]
+function AdminService._inspect(self: AdminService, admin: Player, argument: string)
+    local resolvedId: number? = tonumber(argument)
+    if resolvedId == nil then
+        local ok, byName = pcall(function()
+            return Players:GetUserIdFromNameAsync(argument)
+        end)
+        if ok and type(byName) == "number" then
+            resolvedId = byName
+        end
+    end
+    if resolvedId == nil or resolvedId <= 0 then
+        self:_reply(admin, "NO PLAYER NAMED " .. string.upper(argument))
+        return
+    end
+    local userId = math.floor(resolvedId)
+
+    local report = self._profileService:inspect(userId)
+    if not report.found then
+        self._logger:info("admin_inspection", {
+            admin = admin.UserId,
+            target = userId,
+            found = false,
+        })
+        self:_reply(admin, string.format("NO SAVE ON RECORD FOR %d", userId))
+        return
+    end
+
+    self._logger:info("admin_inspection", {
+        admin = admin.UserId,
+        target = userId,
+        found = true,
+        schemaVersion = report.schemaVersion,
+        nightNumber = report.nightNumber,
+        tutorialStage = report.tutorialStage,
+        tutorialComplete = report.tutorialComplete,
+        chapterOneStatus = report.chapterOneStatus,
+        chapterOneDecision = report.chapterOneDecision,
+        professionId = report.professionId,
+        professionsWithMastery = report.professionsWithMastery,
+        equippedCount = report.equippedCount,
+        gearStacks = report.gearStacks,
+        lockHeld = report.lock.held,
+        lockHolder = report.lock.holder,
+        lockStale = report.lock.stale,
+    })
+    self:_reply(
+        admin,
+        string.format(
+            "%d — NIGHT %s · %s%s — SEE OUTPUT FOR FULL REPORT",
+            userId,
+            tostring(report.nightNumber),
+            string.upper(tostring(report.tutorialStage)),
+            if report.lock.held and report.lock.stale ~= true then " · LOCKED" else ""
+        )
+    )
 end
 
 function AdminService._onChatted(self: AdminService, player: Player, message: string)
@@ -213,6 +287,8 @@ function AdminService._onChatted(self: AdminService, player: Player, message: st
         self:_reply(player, "GO TAKES TOWN OR BRAMBLEWAKE")
     elseif decision.reason == "unknown_phase" then
         self:_reply(player, "PHASE TAKES DAY, DUSK, OR NIGHT")
+    elseif decision.reason == "invalid_inspection_target" then
+        self:_reply(player, "INSPECT TAKES A USERNAME OR USER ID")
     elseif decision.reason == "admin_disabled" then
         self:_reply(player, "ADMIN COMMANDS ARE OFF")
     end
