@@ -67,6 +67,7 @@ export type WorldService = typeof(setmetatable(
         _townConstructionRules: any,
         _townCondition: any,
         _townResidents: { [string]: any },
+        _buildingPlacements: { [string]: any },
         _townIncidentModel: Model?,
         _engineerBraceModel: Model?,
         _meshTemplateLoader: MeshTemplateLoader.MeshTemplateLoader,
@@ -1872,6 +1873,7 @@ function WorldService.new(
         _townConstructionRules = townConstruction,
         _townCondition = { integrity = 100, damageLevel = 0, repairsRemaining = 0 },
         _townResidents = {},
+        _buildingPlacements = {},
         _townIncidentModel = nil,
         _engineerBraceModel = nil,
         _meshTemplateLoader = MeshTemplateLoader.new(logger),
@@ -7469,7 +7471,11 @@ local function buildTownProgressionBuildings(
     meshPlacements: { MeshPlacement },
     construction: any,
     townConstructionRules: any
-): ({ [string]: any }, { [string]: any })
+): (
+    { [string]: any },
+    { [string]: any },
+    { [string]: any }
+)
     local stages = if type(consequence.buildingStages) == "table"
         then consequence.buildingStages
         else {}
@@ -7479,6 +7485,16 @@ local function buildTownProgressionBuildings(
     -- show for it. A building already at its ceiling gets no entry, so
     -- nothing prompts a player to fund a stage nights have not unlocked yet.
     local constructionTargets: { [string]: { target: BasePart, displayName: string } } = {}
+
+    -- Where each building actually stands, recorded as it is placed rather than
+    -- duplicated into a second table of coordinates. Per-building storm damage
+    -- has to put its repair site at the building it damaged, and a hand-copied
+    -- position list would drift away from these call sites the first time a lot
+    -- moved -- the exact failure validate_town_layout.py exists to catch.
+    -- `damageable` is false for a construction site: a building nobody has
+    -- built yet cannot be storm-damaged, and asking a player to repair one
+    -- would be asking them to fix something that was never there.
+    local buildingPlacements: { [string]: { center: Vector3, damageable: boolean } } = {}
 
     -- The tier a building is *allowed* to reach right now, purely from nights
     -- and chapter one -- unchanged from before construction orders existed.
@@ -7542,6 +7558,7 @@ local function buildTownProgressionBuildings(
         local function at(offset: Vector3): CFrame
             return base * CFrame.new(offset)
         end
+        buildingPlacements[id] = { center = center, damageable = false }
         local model = Instance.new("Model")
         model.Name = id
         model:SetAttribute("BuildingId", id)
@@ -7679,6 +7696,7 @@ local function buildTownProgressionBuildings(
         if stage == 0 then
             return constructionSite(id, displayName, center, size, facingYaw)
         end
+        buildingPlacements[id] = { center = center, damageable = true }
         local model = Instance.new("Model")
         model.Name = id
         model:SetAttribute("BuildingId", id)
@@ -8551,7 +8569,7 @@ local function buildTownProgressionBuildings(
     parent:SetAttribute("ArchiveStage", archiveStage)
     parent:SetAttribute("WorkbenchStage", workbenchStage)
     parent:SetAttribute("InnStage", innStage)
-    return residents, constructionTargets
+    return residents, constructionTargets, buildingPlacements
 end
 
 function WorldService._setTownResidentRoutine(self: WorldService, phase: string)
@@ -8625,7 +8643,7 @@ function WorldService._rebuildTownProgression(self: WorldService)
     local buildings = Instance.new("Model")
     buildings.Name = "TownProgressionBuildings"
     buildings.Parent = world
-    local residents, constructionTargets = buildTownProgressionBuildings(
+    local residents, constructionTargets, buildingPlacements = buildTownProgressionBuildings(
         buildings,
         resolved,
         self._runtimeIds,
@@ -8635,6 +8653,7 @@ function WorldService._rebuildTownProgression(self: WorldService)
         self._townConstructionRules
     )
     self._townResidents = residents
+    self._buildingPlacements = buildingPlacements
     self:_placeAuthoredMeshes(townMeshPlacements, world, buildings, "town_mesh_dressing_ready")
     for residentId, resident in self._townResidents do
         local interactionId = self._runtimeIds.ResidentInteractionIds[residentId]
@@ -8703,23 +8722,36 @@ function WorldService.setTownConstruction(self: WorldService, construction: any)
     self:_rebuildTownProgression()
 end
 
+--[[
+    Rebuild the town's visible storm damage from a per-building condition
+    snapshot.
+
+    A repair site now stands beside the building it belongs to, at the centre
+    that building recorded when it was placed, and its prompt carries that
+    building's ID as its baked Payload -- so repairing the inn repairs the inn.
+    Under the single-integrity model this could not be true: every repair moved
+    one shared number, and which of three fixed piles appeared was a function of
+    that number, so fixing the inn could make the archive's damage vanish.
+]]
 function WorldService.setTownCondition(self: WorldService, condition: any)
     local world = self._world
     if world == nil or type(condition) ~= "table" then
         return
     end
     local integrity = math.clamp(math.floor(tonumber(condition.integrity) or 100), 25, 100)
-    local damageLevel = math.clamp(math.floor(tonumber(condition.damageLevel) or 0), 0, 3)
+    local damaged = if type(condition.damagedBuildings) == "table"
+        then condition.damagedBuildings
+        else {}
     self._townCondition = {
         integrity = integrity,
-        damageLevel = damageLevel,
+        damageLevel = #damaged,
         lastNightNumber = math.max(0, math.floor(tonumber(condition.lastNightNumber) or 0)),
         lastDamage = math.max(0, math.floor(tonumber(condition.lastDamage) or 0)),
         repairsCompleted = math.max(0, math.floor(tonumber(condition.repairsCompleted) or 0)),
         repairsRemaining = math.max(0, math.floor(tonumber(condition.repairsRemaining) or 0)),
     }
 
-    for _, interactionId in self._runtimeIds.TownRepairInteractionIds do
+    for _, interactionId in self._runtimeIds.TownRepairInteractionIdByBuilding do
         local prompt = self._interactions[interactionId]
         if prompt ~= nil then
             prompt:Destroy()
@@ -8731,47 +8763,52 @@ function WorldService.setTownCondition(self: WorldService, condition: any)
         existing:Destroy()
     end
     world:SetAttribute("TownIntegrity", integrity)
-    world:SetAttribute("TownDamageLevel", damageLevel)
-    if damageLevel == 0 then
+    world:SetAttribute("TownDamageLevel", #damaged)
+    if #damaged == 0 then
         return
     end
 
-    local damage = Instance.new("Model")
-    damage.Name = "TownDamageConsequences"
-    damage:SetAttribute("Integrity", integrity)
-    damage:SetAttribute("DamageLevel", damageLevel)
-    damage.Parent = world
-    local sites = {
-        {
-            id = self._runtimeIds.TownRepairInteractionIds[1],
-            name = "Archive Roof Brace",
-            position = Vector3.new(-40, 2.4, -96),
-        },
-        {
-            id = self._runtimeIds.TownRepairInteractionIds[2],
-            name = "Workbench Shutters",
-            position = Vector3.new(39, 2.4, -95),
-        },
-        {
-            id = self._runtimeIds.TownRepairInteractionIds[3],
-            name = "Inn Storm Frame",
-            position = Vector3.new(-40, 2.4, -140),
-        },
-    }
-    for siteIndex = 1, damageLevel do
-        local site = sites[siteIndex]
+    local damageModel = Instance.new("Model")
+    damageModel.Name = "TownDamageConsequences"
+    damageModel:SetAttribute("Integrity", integrity)
+    damageModel:SetAttribute("DamageLevel", #damaged)
+    damageModel.Parent = world
+
+    local placed = 0
+    for _, entry in damaged do
+        local buildingId = if type(entry) == "table" then entry.buildingId else nil
+        local placement = if type(buildingId) == "string"
+            then self._buildingPlacements[buildingId]
+            else nil
+        local interactionId = if type(buildingId) == "string"
+            then self._runtimeIds.TownRepairInteractionIdByBuilding[buildingId]
+            else nil
+        -- A building with no recorded placement is one this town has not built
+        -- -- a stale profile can carry damage for it. Skipping is the safe
+        -- direction: no prompt appears for a building that is not there.
+        if placement == nil or interactionId == nil then
+            continue
+        end
+
+        placed += 1
+        local buildingIntegrity = math.clamp(math.floor(tonumber(entry.integrity) or 100), 25, 100)
+        -- Offset toward the street so the work sits in front of the building
+        -- rather than inside its walls, and never on the building's own anchor.
+        local site = placement.center + Vector3.new(0, 2.4, 9.5)
         local target = part(
-            damage,
-            "RepairPile_" .. tostring(siteIndex),
+            damageModel,
+            "RepairPile_" .. buildingId,
             Vector3.new(5.5, 1.2, 2.8),
-            CFrame.new(site.position) * CFrame.Angles(0, math.rad(siteIndex * 8 - 16), 0),
+            CFrame.new(site) * CFrame.Angles(0, math.rad(placed * 8 - 16), 0),
             Color3.fromRGB(93, 65, 43),
             Enum.Material.WoodPlanks,
             false
         )
+        target:SetAttribute("BuildingId", buildingId)
+        target:SetAttribute("BuildingIntegrity", buildingIntegrity)
         for braceIndex = -1, 1 do
             part(
-                damage,
+                damageModel,
                 "StormBrokenBrace",
                 Vector3.new(0.55, 5.5, 0.55),
                 target.CFrame
@@ -8783,11 +8820,11 @@ function WorldService.setTownCondition(self: WorldService, condition: any)
             )
         end
         local canvas = part(
-            damage,
+            damageModel,
             "StormTarp",
             Vector3.new(5.8, 0.2, 4.4),
-            CFrame.new(site.position + Vector3.new(0, 4.2, 0))
-                * CFrame.Angles(0, 0, math.rad(siteIndex % 2 == 0 and -7 or 7)),
+            CFrame.new(site + Vector3.new(0, 4.2, 0))
+                * CFrame.Angles(0, 0, math.rad(placed % 2 == 0 and -7 or 7)),
             Color3.fromRGB(75, 87, 77),
             Enum.Material.Fabric,
             false
@@ -8795,19 +8832,50 @@ function WorldService.setTownCondition(self: WorldService, condition: any)
         canvas.Transparency = 0.06
         self:_registerInteraction(
             target,
-            site.id,
+            interactionId,
             self._runtimeIds.Actions.RepairTown,
             "REPAIR",
-            site.name,
-            nil,
+            string.format("%s · %d%%", self:_buildingDisplayName(buildingId), buildingIntegrity),
+            -- The building this prompt repairs, baked in at build time. The
+            -- client only ever sends the interaction ID, exactly as it does for
+            -- a crafting bench, so nothing a client says can name a building.
+            buildingId,
             1.1
         )
     end
     self:setTownRepairEnabled(not self._night and not self._dusk)
 end
 
+-- A readable name for a building ID, for a prompt that has to say which
+-- building it repairs. Falls back to the ID's own words rather than going
+-- blank on a building added without a display name.
+function WorldService._buildingDisplayName(self: WorldService, buildingId: string): string
+    local model = if self._world ~= nil then self._world:FindFirstChild(buildingId, true) else nil
+    if model ~= nil then
+        local sign = model:FindFirstChild("BuildingSign")
+        if sign ~= nil and sign:GetAttribute("DisplayName") ~= nil then
+            return tostring(sign:GetAttribute("DisplayName"))
+        end
+    end
+    local words = string.gsub(string.gsub(buildingId, "^building_", ""), "_", " ")
+    return string.upper(words)
+end
+
+-- Which buildings physically stand and can therefore be storm damaged. A
+-- construction site is excluded: nobody has built it yet.
+function WorldService.damageableBuildingIds(self: WorldService): { string }
+    local ids = {}
+    for buildingId, placement in self._buildingPlacements do
+        if type(placement) == "table" and placement.damageable == true then
+            table.insert(ids, buildingId)
+        end
+    end
+    table.sort(ids)
+    return ids
+end
+
 function WorldService.setTownRepairEnabled(self: WorldService, enabled: boolean)
-    for _, interactionId in self._runtimeIds.TownRepairInteractionIds do
+    for _, interactionId in self._runtimeIds.TownRepairInteractionIdByBuilding do
         local prompt = self._interactions[interactionId]
         if prompt ~= nil then
             prompt.Enabled = enabled and self._townCondition.damageLevel > 0

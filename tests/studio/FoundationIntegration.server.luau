@@ -35,6 +35,7 @@ local TownNightIncident = require(root.TownNightIncident)
 local TownGuardLastStand = require(root.TownGuardLastStand)
 local SaveSchema = require(root.SaveSchema)
 local ProfileBackup = require(root.ProfileBackup)
+local TownCondition = require(root.TownCondition)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
 local ServiceRegistry = require(serverRoot.ServiceRegistry)
@@ -43,8 +44,8 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 local TerrainBuilder = require(serverRoot.World.TerrainBuilder)
 
 local content = Registry.new(Regions)
-assert(Config.SaveSchemaVersion == 12, "unexpected save schema version")
-assert(Config.BuildVersion == "0.48.0", "unexpected build version")
+assert(Config.SaveSchemaVersion == 13, "unexpected save schema version")
+assert(Config.BuildVersion == "0.49.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#MusicCatalog.regionIds() == 8, "every playable world needs an adaptive score")
@@ -86,6 +87,18 @@ local studioRestored = ProfileBackup.restoredProfile(ProfileBackup.newest(studio
 assert(
     studioRestored.revision == 10 and studioRestored.sessionLock == nil,
     "profile backup restore contract is missing"
+)
+-- Damage belongs to a building, and repairing one must not touch another. The
+-- single-integrity model this replaced could not express that: every repair
+-- moved one shared number, so fixing the inn could un-damage the archive.
+local studioRoster = { "building_archive", "building_inn" }
+local studioDamaged = TownCondition.afterNight(TownCondition.default(), 10, 1, studioRoster)
+local studioRepaired = TownCondition.repair(studioDamaged, "building_inn")
+assert(
+    TownCondition.integrityFor(studioRepaired, "building_inn") == 85
+        and TownCondition.integrityFor(studioRepaired, "building_archive")
+            == TownCondition.integrityFor(studioDamaged, "building_archive"),
+    "per-building town repair contract is missing"
 )
 
 local calls = 0
