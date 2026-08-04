@@ -100,6 +100,49 @@ worse than one that verifies nothing.
 - **Whether the game is fun.** The Milestone 3 decision gate asks whether the
   slice is fun, readable, and shows credible D1 intent. Nothing automates that.
 
+## Driving gameplay from a session
+
+Clicking through UI via synthesized input is slow and brittle. The reliable
+way to drive real gameplay state — fast-forward a tutorial, defeat an enemy,
+select a profession — is firing the same `RemoteEvent` the client fires, with
+the same payload shape, from `execute_luau` on the `Client` datamodel:
+
+```lua
+local RuntimeIds = require(ReplicatedStorage.LastLight.RuntimeIds)
+local remotes = ReplicatedStorage[RuntimeIds.FolderName][RuntimeIds.Remotes.ActionRequest]
+remotes:FireServer({ schemaVersion = 1, kind = RuntimeIds.Actions.UseTool })
+```
+
+Find the exact payload shape each action expects in `src/client/init.client.luau`'s
+`send()` calls (e.g. `Interact` needs `interactionId`, `SelectProfession` needs
+`professionId`) — do not guess it. This is how the night-combat audit drove
+several real day/dusk/night cycles end to end, defeated enemies across all six
+species to drain the wave queue, and reached a Town Guard Last Stand, all
+without waiting on wall-clock time or a mouse.
+
+Two things about Studio Play mode that read as bugs the first time but are not:
+
+- **A local Play-mode profile is session-only.** It lives in memory and is not
+  persisted across Play stop/start, so any progress used to reach a test
+  scenario — tutorial completion, a chosen profession, unlocked content — has
+  to be re-driven after every restart. This is Studio's local-testing
+  behaviour, not a save-system bug.
+- **`EnemyService` queues; it does not force-clear.** A new enemy queues
+  behind whichever one is already active; nothing skips or times out an
+  undefeated enemy except defeating it or the night ending. A passive test
+  that never fights back will see the wave schedule stall behind the first
+  enemy — correct behaviour, not evidence the spawn system is broken.
+
+And two tool-shape gotchas in the MCP server itself, each worth a wasted call
+to rediscover:
+
+- `multi_edit` takes `datamodel_type: "Edit"` — the only value it accepts, and
+  a different thing from the `Server`/`Client` datamodels `execute_luau` uses.
+  It edits the Edit-mode DataModel directly and works whether or not Play mode
+  is running; `Server`/`Client` datamodels for `execute_luau` only exist while
+  a Play session is live.
+- `start_stop_play` takes a boolean `is_start`, not a string `action`.
+
 ## Recording evidence
 
 A connected session must write what it saw into the runbook it was closing, the
