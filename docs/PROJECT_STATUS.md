@@ -28,9 +28,10 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
-- **(in flight, this branch: `agent/bramblewake-audit`)** Level-2 playability
-  and visual audit, driven live through a connected Studio session. The
-  headline: **chapter one had become uncompletable, and is fixed.** The
+- **(in flight, this branch: `agent/chapter-one-strikes`; the town-surface
+  half below already merged as #183)** Level-2 playability and visual audit,
+  driven live through a connected Studio session. The headline: **chapter
+  one had become uncompletable, and is fixed.** The
   `part()` tap-to-interact change (#173) left the Old Growth AmberHeart and
   Warden Stag MemoryHeart non-queryable once the enemy-visual pass hid them,
   and both services' line-of-sight checks required the strike ray to hit the
