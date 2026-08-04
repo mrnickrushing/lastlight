@@ -23,7 +23,19 @@ export type MeshTemplateLoader = typeof(setmetatable(
     MeshTemplateLoader
 ))
 
-local function sanitize(model: Model, stripDecals: boolean): (number, number)
+type RestyleRule = { match: { number }, color: { number }?, material: string? }
+
+local function matchesRestyleColor(color: Color3, match: { number }): boolean
+    return math.abs(color.R * 255 - match[1]) <= 4
+        and math.abs(color.G * 255 - match[2]) <= 4
+        and math.abs(color.B * 255 - match[3]) <= 4
+end
+
+local function sanitize(
+    model: Model,
+    stripDecals: boolean,
+    restyleParts: { RestyleRule }?
+): (number, number)
     local meshParts = 0
     local baseParts = 0
     for _, descendant in model:GetDescendants() do
@@ -35,6 +47,23 @@ local function sanitize(model: Model, stripDecals: boolean): (number, number)
             descendant.CanQuery = false
             descendant.CastShadow = true
             descendant.Massless = true
+            if restyleParts ~= nil then
+                for _, rule in restyleParts do
+                    if matchesRestyleColor(descendant.Color, rule.match) then
+                        if rule.color ~= nil and descendant:IsA("UnionOperation") then
+                            descendant.UsePartColor = true
+                        end
+                        if rule.color ~= nil then
+                            descendant.Color =
+                                Color3.fromRGB(rule.color[1], rule.color[2], rule.color[3])
+                        end
+                        if rule.material ~= nil then
+                            descendant.Material = (Enum.Material :: any)[rule.material]
+                        end
+                        break
+                    end
+                end
+            end
             if descendant:IsA("MeshPart") then
                 meshParts += 1
             end
@@ -220,7 +249,8 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
     end
 
     loaded.Name = "Template_" .. stableId
-    local meshPartCount, basePartCount = sanitize(loaded, entry.stripDecals == true)
+    local meshPartCount, basePartCount =
+        sanitize(loaded, entry.stripDecals == true, entry.restyleParts)
     local styledParts, unstyledParts =
         applyBuiltInMaterials(loaded, entry.pbr, entry.preserveSourceMaterials)
     -- Cancel the source model's stored rotation BEFORE measuring anything. A

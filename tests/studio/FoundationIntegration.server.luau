@@ -565,7 +565,9 @@ for _, descendant in world:GetDescendants() do
             "arrival road needs a textured cobblestone surface that survives atmospheric tint"
         )
         assert(
-            descendant:IsA("BasePart") and descendant.Position.Y >= 2,
+            descendant:IsA("BasePart")
+                and descendant.Position.Y + descendant.Size.Y * 0.5
+                    > TerrainBuilder.valleyFloorTop() + 0.2,
             "arrival road visual skin must sit above the voxel-rendered valley surface"
         )
     elseif descendant.Name == "EmberhollowRoadFoundation" then
@@ -1443,19 +1445,21 @@ assert(oldGrowthHeartRoots == 3, "Old Growth heart needs a rooted physical shell
 assert(wardenLivingRoots == 12, "Warden nodes need three living roots each")
 
 --[[
-    44 fixed prompts, measured rather than remembered.
+    53 fixed prompts, measured rather than remembered.
 
     Composition in Studio at this revision:
       15  first world -- Mara, First Lantern, memory beacon, Heartwood node,
-          barricade plot, Greenward archive, Town Board, workbench sign,
-          three starter tool displays, four crafting benches
-      29  expedition fixtures -- per-module amber sap and heartwood nodes,
-          Old Growth fire source and root heart, Wayhome light, four Warden
+          barricade plot, Greenward archive, two construction orders (Town
+          Board, Workbench), three starter tool displays, four crafting
+          benches
+      38  expedition fixtures -- 22 per-module amber sap and heartwood nodes
+          (two per module from module 2 on, see buildResourceNodes), Old
+          Growth fire source and root heart, Wayhome light, four Warden
           living-root nodes, two memory antlers, Blackout lantern fire, three
           Blackout relays, three Greenward chapter choices
 
-    The literal was 26 and had drifted by 18, almost all of it the per-module
-    resource nodes the expedition grew after this line last ran. The two
+    The literal was 44 and had drifted by 9: the per-module resource nodes
+    reached their full two-per-module count after this line last ran. The two
     derived terms beside it stay derived: event interactions come from the
     catalog and specializations from RuntimeIds, so only genuinely new fixtures
     move this number, and moving it should be a deliberate edit.
@@ -1463,13 +1467,13 @@ assert(wardenLivingRoots == 12, "Warden nodes need three living roots each")
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
     #tagged
-        == 44
+        == 53
             + BramblewakeExpedition.EventInteractionCount
             + #RuntimeIds.ProfessionSpecializationInteractionIds,
     string.format(
         "expected tutorial, event, elite, boss, extraction, crafting, and mastery prompts (found %d, expected %d)",
         #tagged,
-        44
+        53
             + BramblewakeExpedition.EventInteractionCount
             + #RuntimeIds.ProfessionSpecializationInteractionIds
     )

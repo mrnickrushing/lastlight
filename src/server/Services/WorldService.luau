@@ -1182,11 +1182,21 @@ local function buildEmberhollowSanctuary(
         fallbackInstance = commons,
     })
 
+    -- The town surface stack, referenced to the walk plane (terrain renders at
+    -- the authored y = 0 -- see VOXEL_SURFACE_RISE in TerrainBuilder). Players
+    -- and NPCs both stand on terrain, so every skin here must stay thin enough
+    -- to read as paving underfoot: courtyard top 0.33, square pad top 0.38,
+    -- street foundation top 0.44, street top 0.56, wear top 0.64. The street
+    -- tops the courtyard by > 0.2 and the wear strip tops the square pad, so
+    -- the critical road stays readable through both -- FoundationIntegration
+    -- asserts exactly that. Before this pass the foundation was fully buried
+    -- (top -0.02) and the street was coplanar with the courtyard (both 0.33),
+    -- which z-fought where they overlapped and erased the road.
     local streetFoundation = part(
         parent,
         "TownMainStreetFoundation",
         Vector3.new(18, 0.34, 206),
-        CFrame.new(0, -0.19, -102),
+        CFrame.new(0, 0.27, -102),
         Color3.fromRGB(38, 41, 39),
         Enum.Material.Slate,
         false
@@ -1196,7 +1206,7 @@ local function buildEmberhollowSanctuary(
         parent,
         "TownMainStreet",
         Vector3.new(15.5, 0.32, 204),
-        CFrame.new(0, 0.17, -102),
+        CFrame.new(0, 0.40, -102),
         Color3.fromRGB(183, 143, 91),
         Enum.Material.Cobblestone,
         false
@@ -1206,7 +1216,7 @@ local function buildEmberhollowSanctuary(
         parent,
         "TownMainStreetWear",
         Vector3.new(3.8, 0.12, 202),
-        CFrame.new(0, 0.42, -102),
+        CFrame.new(0, 0.58, -102),
         Color3.fromRGB(88, 58, 37),
         Enum.Material.Mud,
         false
@@ -1217,7 +1227,7 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownStreetRut",
             Vector3.new(0.68, 0.08, 200),
-            CFrame.new(rutSide * 2.4, 0.5, -102),
+            CFrame.new(rutSide * 2.4, 0.56, -102),
             Color3.fromRGB(61, 43, 30),
             Enum.Material.Mud,
             false
@@ -1240,7 +1250,7 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownDistrictRoadFoundation",
             Vector3.new(8.6, 0.26, delta.Magnitude + 1.2),
-            frame * CFrame.new(0, -0.5, 0),
+            frame * CFrame.new(0, -0.14, 0),
             Color3.fromRGB(38, 41, 39),
             Enum.Material.Slate,
             false
@@ -1250,7 +1260,7 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownDistrictRoad",
             Vector3.new(7.2, 0.24, delta.Magnitude + 0.8),
-            frame * CFrame.new(0, -0.19, 0),
+            frame * CFrame.new(0, -0.01, 0),
             Color3.fromRGB(176, 137, 87),
             Enum.Material.Cobblestone,
             false
@@ -1260,7 +1270,7 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownDistrictRoadWear",
             Vector3.new(2.1, 0.08, delta.Magnitude + 0.5),
-            frame * CFrame.new(0, 0.01, 0),
+            frame * CFrame.new(0, 0.14, 0),
             Color3.fromRGB(79, 52, 34),
             Enum.Material.Mud,
             false
@@ -1286,7 +1296,11 @@ local function buildEmberhollowSanctuary(
         parent,
         "FirstLanternTownSquare",
         Vector3.new(PLAZA_HALF * 2, 0.56, PLAZA_HALF * 2),
-        CFrame.new(courtyard + Vector3.new(0, 0.52, 0)),
+        -- Top face 0.38: a thin paving skin over the walk plane, not a raised
+        -- deck. The pad is non-colliding, so characters stand on the terrain
+        -- through it -- at the old 0.52 offset (top 0.80) every player and
+        -- resident crossing the civic centre sank shin-deep into the paving.
+        CFrame.new(courtyard + Vector3.new(0, 0.10, 0)),
         Color3.fromRGB(83, 64, 44),
         Enum.Material.Ground,
         false
@@ -1298,12 +1312,12 @@ local function buildEmberhollowSanctuary(
             -- near the lantern: the paths used to start inside what is now
             -- fighting space.
             {
-                Vector3.new(-(PLAZA_HALF - 2), 0.84, TOWN_CENTER.Z - 1),
-                Vector3.new(-(CABIN_X - 9), 0.84, TOWN_CENTER.Z - 4.5),
+                Vector3.new(-(PLAZA_HALF - 2), 0.44, TOWN_CENTER.Z - 1),
+                Vector3.new(-(CABIN_X - 9), 0.44, TOWN_CENTER.Z - 4.5),
             },
             {
-                Vector3.new(PLAZA_HALF - 2, 0.84, TOWN_CENTER.Z + 1),
-                Vector3.new(CABIN_X - 9, 0.84, TOWN_CENTER.Z + 4.5),
+                Vector3.new(PLAZA_HALF - 2, 0.44, TOWN_CENTER.Z + 1),
+                Vector3.new(CABIN_X - 9, 0.44, TOWN_CENTER.Z + 4.5),
             },
         }
     do
@@ -1339,7 +1353,7 @@ local function buildEmberhollowSanctuary(
                     courtyard
                         + Vector3.new(
                             xDirection * (PLAZA_HALF - 2.5),
-                            0.86,
+                            0.44,
                             zDirection * (PLAZA_HALF - 2.5)
                         )
                 ) * CFrame.Angles(0.08, angle, 0.12),
@@ -2433,7 +2447,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             geometry,
             "EmberhollowRoadFoundation",
             Vector3.new(17.2, 0.28, distance + 4),
-            roadFrame * CFrame.new(0, -0.58, 0),
+            roadFrame * CFrame.new(0, -0.31, 0),
             Color3.fromRGB(38, 41, 39),
             Enum.Material.Slate,
             false
@@ -2580,9 +2594,9 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         )
         spur.CanQuery = false
     end
-    tutorialSpur(Vector3.new(28, 0.76, -48), Vector3.new(34, 0.76, -48))
-    tutorialSpur(Vector3.new(-8, 0.76, -68), Vector3.new(-38, 0.76, -68))
-    tutorialSpur(Vector3.new(-27, 0.76, -89), Vector3.new(-39, 0.76, -92))
+    tutorialSpur(Vector3.new(28, 0.42, -48), Vector3.new(34, 0.42, -48))
+    tutorialSpur(Vector3.new(-8, 0.42, -68), Vector3.new(-38, 0.42, -68))
+    tutorialSpur(Vector3.new(-27, 0.42, -89), Vector3.new(-39, 0.42, -92))
 
     -- The forest. Previously 92 identical conifers packed into a 54-154 stud
     -- ring, which is why the valley read as a yard with a hedge around it: the
@@ -4959,7 +4973,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             firstLanternFallback,
             "FirstLanternPlinth",
             Vector3.new(10.5 - stepIndex * 1.45, 0.52, 10.5 - stepIndex * 1.45),
-            CFrame.new(0, 0.25 + stepIndex * 0.42, TOWN_CENTER.Z),
+            CFrame.new(0, -0.16 + stepIndex * 0.42, TOWN_CENTER.Z),
             if stepIndex % 2 == 0 then Color3.fromRGB(76, 79, 73) else Color3.fromRGB(61, 66, 62),
             Enum.Material.Slate
         )
@@ -5091,7 +5105,10 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     table.insert(self._meshPlacements, {
         assetId = "mesh_first_lantern_a",
         fallbackKind = "placeholder",
-        position = Vector3.new(0, 0, TOWN_CENTER.Z),
+        -- Base slightly set into the 0.38-top square pad. At y = 0 the
+        -- lantern's own authored plinth was swallowed by the pad and the
+        -- town's centrepiece read almost a stud shorter than authored.
+        position = Vector3.new(0, 0.32, TOWN_CENTER.Z),
         scale = 0.95,
         yaw = math.rad(8),
         seed = 9314,

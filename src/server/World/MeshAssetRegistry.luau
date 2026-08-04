@@ -33,6 +33,18 @@ export type Entry = {
     -- modern typeface -- that this world never agreed to. Set this when the
     -- geometry is worth keeping and the printing on it is not.
     stripDecals: boolean?,
+    -- Recolor and re-material matching source parts at template load. A part
+    -- matches a rule when its authored color is within 4 per channel of
+    -- `match` (0-255 channels). A rule without `color` keeps the part's color
+    -- and changes only the material.
+    --
+    -- Creator Store props arrive palette-locked to whatever game they were
+    -- built for -- a fairground-red canopy on otherwise sound market-stall
+    -- geometry, for example. When the shape is worth keeping and only the
+    -- finish is off-standard, restyling here is cheaper and safer than
+    -- re-sourcing the asset, and it happens once per template rather than
+    -- once per placement.
+    restyleParts: { { match: { number }, color: { number }?, material: string? } }?,
 }
 
 local ENTRIES: { Entry } = {
@@ -529,6 +541,12 @@ local ENTRIES: { Entry } = {
         pbr = false,
         preserveSourceMaterials = true,
         creatorStore = true,
+        restyleParts = {
+            { match = { 117, 0, 0 }, color = { 64, 78, 56 }, material = "Fabric" },
+            { match = { 213, 115, 61 }, color = { 89, 63, 43 }, material = "Wood" },
+            { match = { 170, 85, 0 }, color = { 89, 63, 43 }, material = "Wood" },
+            { match = { 105, 64, 40 }, material = "WoodPlanks" },
+        },
     },
     {
         id = "mesh_creator_wheat_cluster_a",
