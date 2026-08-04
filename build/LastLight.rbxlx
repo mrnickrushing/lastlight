@@ -28716,16 +28716,42 @@ end
 -- authoritative combat volume. Only the visible shell is replaced, so a
 -- cosmetic Creator Store model can never change reach, navigation, or hits.
 function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKey: string): boolean
+    --[[
+        groundOffset is how far below each species' hitbox core its authored
+        mesh's feet sit -- see BramblewakeEnemyBuilder for the matching
+        fallback-core lift each of these numbers has to track.
+
+        Four of these -- rootling, briarback, snapvine, bark_ram -- used to
+        carry exactly their fallback core's lift plus 2.0 more than that lift,
+        every one of them, which is too consistent to be separate tuning
+        mistakes. It sank each of those four authored meshes about two studs
+        into the ground, for the entire lifetime of this feature: measured
+        directly against terrain in Studio, a rootling and a snapvine both
+        landed almost exactly 2 studs under. This did not come from the
+        terrain-datum fix elsewhere in this file -- the sink is `lift -
+        groundOffset`, and the spawn origin has always equaled the rendered
+        terrain height (both before that fix, when both were the old wrong
+        higher value, and after, when both are the corrected one), so the gap
+        between them cancels out and was never affected by it.
+
+        Corrected to equal each species' own fallback lift, so a
+        ground-walking creature's authored mesh meets the ground exactly where
+        its fallback silhouette already does. hollow_crow is untouched: it
+        hovers by design (see BramblewakeEnemyBuilder's hoverOrigin), so
+        "meets the ground" is not the right target for it. zombie is untouched
+        too -- its own lift/offset pair was already close (a 0.2-stud
+        difference, imperceptible).
+    ]]
     local visualProfiles = {
         rootling = {
             assetId = "mesh_rootling_a",
-            groundOffset = 2,
+            groundOffset = 0,
             yaw = math.rad(180),
             profile = Vector3.new(1, 1, 1),
         },
         briarback = {
             assetId = "mesh_briarback_a",
-            groundOffset = 2.4,
+            groundOffset = 0.4,
             yaw = math.rad(180),
             profile = Vector3.new(1, 1, 1),
         },
@@ -28745,14 +28771,14 @@ function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKe
         },
         snapvine = {
             assetId = "mesh_snapvine_a",
-            groundOffset = 2,
+            groundOffset = 0,
             yaw = math.rad(180),
             profile = Vector3.new(1, 1, 1),
             scale = 1,
         },
         bark_ram = {
             assetId = "mesh_bark_ram_a",
-            groundOffset = 2.5,
+            groundOffset = 0.5,
             yaw = math.rad(180),
             profile = Vector3.new(1, 1, 1),
             scale = 1,
@@ -36356,8 +36382,25 @@ function WorldService.lanternPosition(self: WorldService): Vector3
     return assert(self._lantern, "First Lantern has not initialized").Position
 end
 
+--[[
+    Where a night-defense enemy is born.
+
+    The Y used to be a bare literal, 2. That was never GROUND_Y (0) -- it was
+    tuned by hand to sit on the terrain surface as Roblox rendered it *before*
+    the datum fix in TerrainBuilder, when a voxel fill's top face rendered two
+    studs above where it was authored. Once that was corrected so the surface
+    renders where it is authored, this literal stopped meaning anything: every
+    enemy in every night defense has been spawning, walking, and fighting
+    2+ studs above the ground for its entire encounter, because EnemyService
+    holds an enemy's Y fixed at its spawn value for its whole lifetime (see
+    `_step`'s `flatTarget` computation, which only moves X/Z).
+
+    Reading the real surface here, the same way foliage placement already
+    does, means this can never drift out of sync with the terrain again --
+    including if the datum ever moves a second time.
+]]
 function WorldService.enemySpawnPosition(_self: WorldService): Vector3
-    return Vector3.new(0, 2, -153)
+    return Vector3.new(0, TerrainBuilder.surfaceHeight(0, -153), -153)
 end
 
 return table.freeze(WorldService)
