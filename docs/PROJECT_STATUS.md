@@ -7,7 +7,7 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-04, at `main` = `f18a136` (PR #181), build `0.49.1`,
+Last updated: 2026-08-04, at `main` = `bcb0fb4` (PR #182), build `0.49.1`,
 save schema 13, 20 services.
 
 ---
@@ -28,6 +28,34 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
+- **(in flight, this branch: `agent/bramblewake-audit`)** First fruits of the
+  level-2 playability/visual audit, found by actually running the committed
+  Studio test to its first failures — it had not executed past its road
+  assertion since #180 merged:
+  - **The town's main street was invisible.** Its top face (0.33) was exactly
+    coplanar with the courtyard's, z-fighting where they overlapped, its
+    18-stud foundation was fully buried (top −0.02), and its worn center
+    line disappeared under the 0.80-tall plaza pad. Every player and NPC also
+    sank shin-deep in that pad, because it is a non-colliding skin and
+    characters walk on the terrain through it. The whole town surface stack
+    was re-layered as thin skins over the walk plane (street 0.56, wear 0.64,
+    foundation 0.44, square pad 0.38), documented in `WorldService.luau` at
+    the street builder. Cabin entry paths (floating 0.4), three tutorial spur
+    paths (floating 0.35), the square edge stones, district-road foundations
+    (buried), and the arrival road's foundations (buried) were re-seated in
+    the same pass; the First Lantern mesh — whose authored plinth was
+    swallowed by the old pad, reading almost a stud shorter — now stands its
+    full height.
+  - **Two stale Studio-test assertions** fixed: the arrival-road height check
+    still asserted the pre-#180 `Y >= 2` compensation (now measured against
+    `TerrainBuilder.valleyFloorTop()`), and the interaction census expected
+    81 prompts against the world's real 90 — the per-module resource nodes
+    reached their full two-per-module count (22) after that line last ran.
+  - **New `restyleParts` registry mechanism** (same declarative pattern as
+    `stripDecals`): recolors/re-materials matching source parts at template
+    load. First use: the two 23-stud Creator Store market stalls whose
+    fairground-red plastic canopies flanked the town gate now wear moss-green
+    canvas and rain-dark timber.
 - **#181** Full audit of the night-defense combat system: every combat source
   file read end to end, then live-tested by firing the real gameplay remotes
   (spawn, strike, profession, incident) through a connected Studio session,
