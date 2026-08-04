@@ -40,6 +40,11 @@
         "PlayerScriptsUseInputActionSystem": "Enabled",
         "FallenPartsDestroyHeight": -80
       }
+    },
+    "TextChatService": {
+      "$properties": {
+        "ChatVersion": "TextChatService"
+      }
     }
   }
 }

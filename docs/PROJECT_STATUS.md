@@ -28,10 +28,57 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
-- **(in flight, this branch: `agent/bramblewake-audit`)** First fruits of the
-  level-2 playability/visual audit, found by actually running the committed
-  Studio test to its first failures — it had not executed past its road
-  assertion since #180 merged:
+- **(in flight, this branch: `agent/chapter-one-strikes`; the town-surface
+  half below already merged as #183)** Level-2 playability and visual audit,
+  driven live through a connected Studio session. The headline: **chapter
+  one had become uncompletable, and is fixed.** The
+  `part()` tap-to-interact change (#173) left the Old Growth AmberHeart and
+  Warden Stag MemoryHeart non-queryable once the enemy-visual pass hid them,
+  and both services' line-of-sight checks required the strike ray to hit the
+  heart part first — so every strike on either encounter failed "behind the
+  trunk", forever. Nobody had fought either live since the mesh pass. Fixed
+  three ways (hearts marked `KeepVisibleOnReplacement`, the enemy-visual hide
+  pass now honours that flag, both LOS checks exclude the creature's own body
+  and test only world cover), then **proven by playing chapter one end to end
+  in-session**: tutorial → night (3 defeats) → entry → relay 3/3 → Old Growth
+  (3 phases, 2 fire breaks, +3 sap) → Warden Stag (3 phases, 9 roots, 0
+  antlers, preserved) → solo vote → immutable `chapter_1` transaction →
+  Wayhome banking; then all 8 events run to completion in one pass (25 steps
+  accepted, 8 rewards persisted, second settlement banked exactly the award
+  table's 23 materials).
+
+  Also fixed in the same branch: the elite/boss rails no longer leak a
+  full-health "PHASE 1/3 · 360/360" for dormant encounters (the Blackout
+  relay's farm root sits beside the arena, so every carrier saw it one stage
+  early — both runbooks forbid it); the DEPARTURE lobby panel is
+  proximity-gated to its platform (it used to follow any player who left the
+  yard without departing, through the tutorial, the night, and the whole
+  expedition); the objective card holds two wrapped lines ("TAKE ROOTFIRE
+  FROM THE BLACKOUT LANTERN" rendered as "TAKE ROOTFIRE FROM THE"); the
+  chapter-resolution copy no longer leaks raw snake_case IDs
+  ("SHARED_AGROFOREST"); the committed places now set
+  `TextChatService.ChatVersion = TextChatService` — it defaulted to Legacy
+  in rojo-built places, which left every `/command` the playtest runbooks
+  depend on silently dead; and the Studio test's final assertion no longer
+  reads the engine-removed `PlayerScriptsUseInputActionSystem` rollout gate
+  raw (that error killed the test one statement before its PASS line).
+  `[Last Light] PASS FoundationIntegration` was then seen to print with zero
+  errors — the first time since #180.
+
+  Flagged for the owner, deliberately not acted on:
+  - **Bramblewake reads very dark at dawn/day mid-route** in the test place;
+    the test place does not set `Lighting.Technology = Future` (the game
+    place does), so judge lighting there before tuning anything.
+  - **A solo Blackout leaves the town lantern undefended** through however
+    many normal nights elapse — it hit the 18-health floor during this run,
+    which means three damaged buildings at dawn. Design tension, not a bug.
+  - The Blackout `RootedWall` barriers read as flat translucent green panes;
+    the market-stall canopies (restyled from fairground red to deep moss
+    Fabric) read near-black in shade; the archive/board notice-board mesh is
+    placed roughly half-buried (its visible height is right, the method is
+    odd). All three are taste calls needing the Future-lighting pass.
+
+  The first fruits of the same audit, from before the live playthrough:
   - **The town's main street was invisible.** Its top face (0.33) was exactly
     coplanar with the courtyard's, z-fighting where they overlapped, its
     18-stud foundation was fully buried (top −0.02), and its worn center

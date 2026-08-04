@@ -654,9 +654,13 @@ function WardenStagService._lineOfSight(
     end
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = { character }
+    -- Exclude the boss itself for the same reason OldGrowthService does: its
+    -- invisible hitbox parts are not cover against its own exposed heart, and
+    -- the old first-hit-must-be-the-heart check could never pass once the
+    -- visual pass cleared the heart's CanQuery. Only world geometry blocks.
+    params.FilterDescendantsInstances = { character, model }
     local result = workspace:Raycast(root.Position, heart.Position - root.Position, params)
-    return result ~= nil and result.Instance == heart
+    return result == nil
 end
 
 function WardenStagService.damageNearest(self: WardenStagService, player: Player): (boolean, string)
@@ -806,6 +810,13 @@ end
 
 function WardenStagService.snapshot(self: WardenStagService, player: Player): any
     if player:GetAttribute("LastLightInExpedition") ~= true then
+        return nil
+    end
+    -- Same contract as the Old Growth rail: no boss rail before the fight
+    -- exists. "locked" is the sealed annex and "dormant" the unlocked but
+    -- not-yet-entered arena; the physical seal already explains both states
+    -- in the world.
+    if self._state.status == "locked" or self._state.status == "dormant" then
         return nil
     end
     if not self:_inArena(player, ENCOUNTER_RADIUS + 20) then

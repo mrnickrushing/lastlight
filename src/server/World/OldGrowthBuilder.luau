@@ -114,6 +114,11 @@ function OldGrowthBuilder.build(origin: Vector3, target: Vector3, maxHealth: num
         Enum.PartType.Ball
     )
     heart:SetAttribute("WeakPoint", true)
+    -- The heart is the strike target and sits in the authored mesh's hollow
+    -- chest by design. Without this flag the enemy-visual pass blanks it and
+    -- clears its CanQuery when the mesh loads, which makes the encounter
+    -- uncompletable: the line-of-sight ray can never hit a query-off part.
+    heart:SetAttribute("KeepVisibleOnReplacement", true)
 
     local highlight = Instance.new("Highlight")
     highlight.Name = "EliteOutline"

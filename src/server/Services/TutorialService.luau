@@ -1166,9 +1166,11 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
                 blackout.status == "resolution"
             then "STAGE 4/4 · FARMLAND, WILD REGROWTH, OR SHARED AGROFOREST"
             elseif blackout.status == "complete" then string.format(
+                -- Decision IDs are snake_case; a raw one leaked into
+                -- player-facing copy as "SHARED_AGROFOREST · PRESERVED".
                 "%s · %s",
-                string.upper(tostring(blackout.decision)),
-                string.upper(tostring(blackout.wardenOutcome))
+                string.upper(tostring(blackout.decision):gsub("_", " ")),
+                string.upper(tostring(blackout.wardenOutcome):gsub("_", " "))
             )
             else "THE BLACKOUT HAS NOT BEGUN"
         mara = if blackout.status == "relay"

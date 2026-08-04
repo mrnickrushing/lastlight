@@ -122,6 +122,10 @@ function WardenStagBuilder.build(origin: Vector3, target: Vector3, maxHealth: nu
         Enum.PartType.Ball
     )
     heart:SetAttribute("WeakPoint", true)
+    -- Same contract as the Old Growth heart: the weak point lives inside the
+    -- authored mesh's cavity and must survive the enemy-visual blanking pass,
+    -- or the boss cannot be struck at all.
+    heart:SetAttribute("KeepVisibleOnReplacement", true)
 
     local highlight = Instance.new("Highlight")
     highlight.Name = "BossOutline"

@@ -359,17 +359,18 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         objectiveFrame,
         "Objective",
         "FREE MARA",
-        UDim2.new(1, -28, 0, 34),
-        UDim2.fromOffset(14, 30),
+        UDim2.new(1, -28, 0, 44),
+        UDim2.fromOffset(14, 28),
         26,
         COLORS.cream
     )
     objective.Font = Enum.Font.GothamBold
-    -- Long objectives were being clipped rather than fitted: the card gives
-    -- this line 34 pixels, which holds exactly one line at 26, so anything
-    -- longer lost its tail mid-word. Scaling within a floor keeps short
-    -- objectives at full size and lets a long one wrap to two smaller lines
-    -- instead of disappearing.
+    -- Long objectives were being clipped rather than fitted: the card gave
+    -- this line 34 pixels, which holds exactly one line even at the 16-pixel
+    -- floor (two 16-pixel lines need ~38 with line spacing), so "TAKE
+    -- ROOTFIRE FROM THE BLACKOUT LANTERN" rendered as "TAKE ROOTFIRE FROM
+    -- THE". 44 pixels holds two floor-size lines, keeping short objectives at
+    -- full size and letting a long one wrap instead of disappearing.
     objective.TextScaled = true
     local objectiveFit = Instance.new("UITextSizeConstraint")
     objectiveFit.MaxTextSize = 26
@@ -380,7 +381,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         "Detail",
         "Follow the lantern path.",
         UDim2.new(1, -28, 0, 42),
-        UDim2.fromOffset(14, 66),
+        UDim2.fromOffset(14, 76),
         18,
         COLORS.muted
     )
@@ -1236,6 +1237,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _lobbyDetail = lobbyDetail,
         _lobbySizes = lobbySizes,
         _lobbySizeButtons = lobbySizeButtons,
+        _departurePlatformPart = nil,
         _onLobbyDepart = nil,
         _canvas = canvas,
         _scale = scale,
@@ -1483,6 +1485,25 @@ function HUDController._updateLobby(self: HUDController, state: any)
     if type(lobby) ~= "table" or state.departed == true then
         self._lobbyFrame.Visible = false
         return
+    end
+    -- The departure panel is a control for the platform in front of you, not
+    -- a HUD fixture. `departed` only flips for players who leave through the
+    -- platform, so anyone who walks out of the yard another way carried this
+    -- panel through the tutorial, the night defense, and the entire
+    -- expedition. Show it only within sight of the platform it operates.
+    local platform = self._departurePlatformPart
+    if platform == nil or platform.Parent == nil then
+        platform = workspace:FindFirstChild("DeparturePlatform", true)
+        self._departurePlatformPart = platform
+    end
+    local character = game:GetService("Players").LocalPlayer.Character
+    local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+    if platform ~= nil and root ~= nil and root:IsA("BasePart") and platform:IsA("BasePart") then
+        local offset = root.Position - platform.Position
+        if Vector3.new(offset.X, 0, offset.Z).Magnitude > 46 then
+            self._lobbyFrame.Visible = false
+            return
+        end
     end
     self._lobbyFrame.Visible = true
     if lobby.counting then

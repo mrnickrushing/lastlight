@@ -1692,8 +1692,20 @@ assert(
     extractionPrompt:GetAttribute("ActionId") == RuntimeIds.Actions.Extract,
     "Wayhome prompt does not route to server extraction"
 )
+--[[
+    PlayerScriptsUseInputActionSystem was a rollout gate, and Roblox removes
+    rollout properties once the feature fully ships. Reading it raw errored on
+    the first Studio build without it, which killed this script one statement
+    before its PASS line. Where the gate still exists (an older Studio) it
+    must read Enabled; where it is gone, the rollout is complete and there is
+    nothing left to assert.
+]]
+local inputActionRollout: Enum.RolloutState? = nil
+local inputActionRolloutExists = pcall(function()
+    inputActionRollout = (workspace :: any).PlayerScriptsUseInputActionSystem
+end)
 assert(
-    workspace.PlayerScriptsUseInputActionSystem == Enum.RolloutState.Enabled,
+    not inputActionRolloutExists or inputActionRollout == Enum.RolloutState.Enabled,
     "Input Action System must be enabled"
 )
 
