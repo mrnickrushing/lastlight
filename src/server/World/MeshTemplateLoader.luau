@@ -62,6 +62,8 @@ local function sanitize(model: Model, stripDecals: boolean): (number, number)
     return meshParts, baseParts
 end
 
+local MAX_LOAD_ATTEMPTS = 3
+
 local function longestDimension(size: Vector3): number
     return math.max(size.X, size.Y, size.Z)
 end
@@ -159,20 +161,59 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
         return nil
     end
 
+    --[[
+        Retry a failed fetch before condemning the asset for the session.
+
+        One blip used to cost the whole run. A failure here sets
+        self._failed[stableId], which is checked before every later placement
+        of the same asset -- so a single transient error does not lose one
+        prop, it silently drops every instance of that asset in the world and
+        leaves procedural fallbacks in their place. Observed repeatedly under
+        Wine: the same IDs that fail one boot load cleanly the next, reporting
+        "User is not authorized to access Asset" for an asset the account
+        plainly can access. That is throttling or CDN flakiness, not a
+        permission fact.
+
+        Three attempts with a widening pause. Bounded on purpose: a genuinely
+        unavailable asset still gets condemned quickly rather than being
+        retried once per placement, and the cost is paid once per asset at
+        template load, not per instance.
+    ]]
     local ok, loaded
-    if entry.creatorStore then
-        ok, loaded = pcall(AssetService.LoadAssetAsync, AssetService, entry.assetId)
-    else
-        ok, loaded = pcall(InsertService.LoadAsset, InsertService, entry.assetId)
-    end
-    if not ok or not loaded:IsA("Model") then
-        if ok then
+    local attempts = 0
+    repeat
+        attempts += 1
+        if entry.creatorStore then
+            ok, loaded = pcall(AssetService.LoadAssetAsync, AssetService, entry.assetId)
+        else
+            ok, loaded = pcall(InsertService.LoadAsset, InsertService, entry.assetId)
+        end
+        local usable = ok and typeof(loaded) == "Instance" and loaded:IsA("Model")
+        if usable then
+            break
+        end
+        if ok and typeof(loaded) == "Instance" then
+            loaded:Destroy()
+        end
+        self._logger:info("mesh_asset_load_retry", {
+            assetId = stableId,
+            robloxAssetId = entry.assetId,
+            attempt = attempts,
+            error = if ok then "LoadAsset returned a non-Model" else tostring(loaded),
+        })
+        if attempts < MAX_LOAD_ATTEMPTS then
+            task.wait(attempts * 0.75)
+        end
+    until attempts >= MAX_LOAD_ATTEMPTS
+    if not ok or typeof(loaded) ~= "Instance" or not loaded:IsA("Model") then
+        if ok and typeof(loaded) == "Instance" then
             loaded:Destroy()
         end
         self._failed[stableId] = true
         self._logger:info("mesh_asset_load_failed", {
             assetId = stableId,
             robloxAssetId = entry.assetId,
+            attempts = attempts,
             error = if ok then "LoadAsset returned a non-Model" else tostring(loaded),
         })
         return nil

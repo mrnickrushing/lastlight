@@ -7,9 +7,9 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-04, at `main` = `fffa122` (PR #178), build `0.49.1`,
-save schema 13, 20 services. A first connected-Studio visual sweep is in
-flight on `agent/visual-sweep-fixes`.
+Last updated: 2026-08-04, at `main` = `7590abe` (PR #179), build `0.49.1`,
+save schema 13, 20 services. A layout and datum pass covering both levels is in
+flight on `agent/first-world-layout`.
 
 ---
 
@@ -241,24 +241,64 @@ None of these can be completed from a session.
 
 ## Known open threads
 
-- **Bramblewake is 3.3x over its generated part budget, and this is now the one
-  thing stopping `PASS FoundationIntegration` from printing.** The preview
-  generates **2330** parts against a catalogued budget of **700**
-  (`PartBudget` 640 + `BossArenaPartBudget` 40 + `BlackoutPartBudget` 20 in
-  `BramblewakeExpedition.luau`). That budget has not moved since `fe31b24`
-  (2026-08-01), and everything added to the expedition since — the module
-  dressing pass, boss arena, blackout layer, story landmarks, backdrop — landed
-  on top of it without the number being revisited. Nothing caught it because
-  the test aborted 700 lines earlier.
+- **The world's vertical datum was wrong by two studs, and is now fixed --
+  re-read anything that reasons about height.** Roblox renders a terrain
+  surface half a voxel (2 studs) above the top face of the fill that made it.
+  `TerrainBuilder` reported the valley floor at `GROUND_Y = 0` while the engine
+  put it at 2, so every authored `Vector3` written against y = 0 was two studs
+  underground. Consequences that had been live for a long time: the town square
+  (top face 0.80) was **buried and had never once rendered** at either 72 or
+  112 studs across, and Mara and all three residents stood shin-deep with their
+  legs swallowed. The road network looked correct only because it had been
+  nudged to 2.2-2.5 one layer at a time -- `WorldService` still carried a
+  comment diagnosing this as a road problem and adding a "+1.77 visual skin".
 
-  **This needs an owner decision, not a session's guess.** The M3 exit gate in
-  [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md)
-  reads "generated part count stays within catalog budget and target-device
-  frame/memory captures are attached", so the number is a product gate, and
-  raising it to match whatever the world happens to contain would delete the
-  gate rather than pass it. Either re-derive the budget from a real
-  baseline-phone capture and record why, or cut expedition density back toward
-  the existing one. A session can do either once told which.
+  Fixed at the source: fills are now placed at `FILL_Y = GROUND_Y -
+  VOXEL_SURFACE_RISE`, so the rendered surface lands on the authored plane
+  (measured 0.02 across the valley, was 2.00). Every compensation was then
+  removed -- arrival road stack, town main street, district roads, road edge
+  stones, cobblestone layer, `ROAD_SURFACE_Y` 2.45 -> 0.53. **If you find
+  height arithmetic anywhere that looks like it is dodging the ground, it is
+  probably another one of these; check it against the datum rather than nudging
+  it.**
+- **Bramblewake was being viewed through glass.** Thirteen `BlueGroundMist`
+  Glass slabs, one per module plus the Blackout arena, covering about 1.8
+  million square studs at knee height. Glass renders a refractive pane whatever
+  Transparency says, so the whole expedition came out flat blue-grey and from
+  any raised angle the slab edges read as the edge of a void. Removed, same as
+  `LowMorningMist` over Emberhollow. Both regions already have tuned
+  `Atmosphere` doing this properly.
+
+
+- **The town square moved and grew; three things now stand on it.** `TOWN_CENTER`
+  is (0, 0, -80) and `PLAZA_HALF` is 56, so the square spans z -24..-136 and
+  reaches Mara's clearing. Mara and the starter tool yard were authored to stand
+  on grass at y 0 and are now lifted onto the pad by `PLAZA_SURFACE_Y`; the
+  Heartwood gather node and the First Lantern's own plinth still embed ~0.8
+  studs in the paving, which reads as set-in rather than sunk but has not been
+  owner-reviewed. If the Heartwood stump on a paved plaza looks wrong, reseat it.
+- **`RouteGuideMarker` is a taste call nobody has made.** 26 Neon foxfire
+  waypoint inlays run the length of the critical route. Their rationale is
+  documented and deliberate -- they are the only thing that says "this way" in
+  the dark -- but in daylight they read as saturated cyan rectangles lying on
+  the paving. Left untouched. Decide whether daylight should dim them.
+
+
+- **Bramblewake's part budget was never breached; the test was measuring the
+  wrong thing.** Recorded here previously as "3.3x over budget" -- that was
+  wrong, and the correction matters because it nearly cost the generator its
+  one working constraint. `PartBudget` (640) bounds the *manifest*: the sum of
+  the chosen modules' planning allowances, checked by
+  `ExpeditionGenerator.validate`. The preview seed totals **427** against it and
+  always has. `GeneratedPartCount` (**2330**) counts *built* BaseParts, which is
+  a different quantity entirely -- a module with a planning allowance of 44
+  legitimately builds several hundred real parts. The Studio test compared the
+  two, and summed in the boss-arena and Blackout allowances on top, though both
+  are built after that count is taken. Split into `PartBudget` (unchanged) and
+  a new `BuiltPartBudget` (2600 = measured 2330 + ~12%), derivation recorded in
+  `BramblewakeExpedition.luau`. **Still owed:** `BuiltPartBudget` is a
+  regression guard, not evidence 2330 parts is affordable on a phone. The
+  Milestone 3 device capture has still never been taken.
 - **Two selected Creator Store assets were never actually adopted.**
   `mesh_creator_hollow_rootling_a` and `mesh_creator_predatory_flower_a` are
   listed in `assets/meshes/candidates/creator-store-full-pass/selection.json`

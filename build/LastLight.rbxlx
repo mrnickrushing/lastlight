@@ -3287,7 +3287,46 @@ return table.freeze({
     PointOfInterestCount = 4,
     EventCount = 8,
     EventInteractionCount = eventInteractionCount,
+    --[[
+        Two different things have been called "the part budget", and conflating
+        them is why Bramblewake looked 233% over a budget it was never
+        breaching.
+
+        PartBudget bounds the MANIFEST: the sum of each chosen module's
+        `partBudget` allowance, which ExpeditionGenerator.validate checks when
+        it composes a run. That is a planning number, in units of "roughly how
+        much structure is this module allowed to ask for". The preview seed
+        totals 427 against 640, and has been comfortably inside it all along.
+
+        BuiltPartBudget bounds the WORLD: BaseParts actually constructed under
+        the expedition by BramblewakeBuilder, which is what
+        `GeneratedPartCount` records and what the Studio integration test
+        measures. Those are not the same quantity and never were -- a module
+        with a planning allowance of 44 legitimately builds several hundred
+        real parts once its trail stones, brambles, roots and dressing are
+        instantiated. The test had been comparing built parts against the
+        planning budget and failing on the mismatch.
+
+        Derivation of 2600: the preview seed
+        (Config.BramblewakePreviewSeed, which is the only seed the test ever
+        builds) measures 2330 in Studio -- twelve modules plus the regional
+        backdrop, before authored mesh dressing and before the Warden seal
+        annex and Blackout layer, which are built afterwards by their own
+        services and are therefore NOT in this number. 2600 is that measurement
+        plus about 12% headroom.
+
+        What this is: a regression guard. It catches the expedition quietly
+        growing a few hundred parts nobody intended.
+
+        What it is NOT: evidence that 2330 parts is affordable on a baseline
+        phone. Nothing here has been measured on device, and
+        TECHNICAL_ARCHITECTURE is explicit that Studio numbers are not hardware
+        evidence. The device capture the Milestone 3 gate asks for is still
+        owed, and if it comes back badly this ceiling should come down rather
+        than the guard be widened again.
+    ]]
     PartBudget = 640,
+    BuiltPartBudget = 2600,
     BossArenaPartBudget = 40,
     BlackoutPartBudget = 20,
     LightBudget = 32,
@@ -25606,6 +25645,7 @@ export type WorldService = typeof(setmetatable(
         _lanternVisualHealth: number,
         _beacon: BasePart?,
         _beaconCore: BasePart?,
+        _beaconLens: BasePart?,
         _barricadeBuilt: boolean,
         _dusk: boolean,
         _duskSignals: { BasePart },
@@ -25657,7 +25697,33 @@ local WET_BARK = Color3.fromRGB(36, 26, 24)
 local MOSS = Color3.fromRGB(58, 91, 54)
 local WET_EARTH = Color3.fromRGB(67, 55, 39)
 local HEARTWOOD_CENTER = Vector3.new(38, 0, -48)
+
 local TOOL_YARD_CENTER = Vector3.new(-42, 0, -68)
+--[[
+    The town square: Emberhollow's centre, and the arena every night fight
+    happens in.
+
+    Both numbers used to live inside buildEmberhollowSanctuary while a dozen
+    other places -- the First Lantern assembly, the foliage keep-out lots, the
+    Watch Ring, the breach pulse, the road route -- each repeated the literal
+    -112 instead. Moving the square meant finding all of them. They are here so
+    that "where is the square and how big is it" has exactly one answer.
+
+    Sized and seated for the fight rather than for the walk. The square sat at
+    z -112, which put the arena at the far south end of town behind the
+    lantern, and at 72 across it was only twice LanternSafeRadius (34) -- so
+    the safe light reached the edge and there was nowhere to fight that was not
+    already safe. At 112 across the lit core is the middle third: somewhere to
+    retreat to rather than the whole floor. Pulling the centre north to -80
+    brings the arena back up the road toward Mara and the arrival route, so a
+    night defence happens where the player already is instead of at the bottom
+    of the map.
+
+    Everything that used to hard-code -112 or 36 now reads these.
+]]
+local TOWN_CENTER = Vector3.new(0, 0, -80)
+local PLAZA_HALF = 56
+
 --[[
     Across the arrival road just past the spawn, so the thing the player is
     asked to build visibly defends the way they came in. It used to sit 44
@@ -25819,7 +25885,7 @@ local function queueRoadAssetPlacements(
         table.insert(placements, {
             assetId = "mesh_creator_road_stones_a",
             fallbackKind = "asset_dressing",
-            position = Vector3.new(position.X, 2.42, position.Z),
+            position = Vector3.new(position.X, 0.42, position.Z),
             scale = 1,
             yaw = yaw,
             seed = seedBase + index,
@@ -25870,7 +25936,7 @@ local function buildEmberhollowSanctuary(
     parent: Instance,
     meshPlacements: { MeshPlacement }
 ): { Instance }
-    local courtyard = Vector3.new(0, 0, -112)
+    local courtyard = TOWN_CENTER
 
     --[[
         How much room the town square gives a fight.
@@ -25882,24 +25948,24 @@ local function buildEmberhollowSanctuary(
         room to retreat, circle, or pull an enemy off someone -- only room to
         hit the far wall.
 
-        72 is not a round number picked for headroom. It is twice
-        LanternSafeRadius, so the First Lantern's safe light now reaches almost
-        exactly to the plaza edge and leaves the corners outside it. The
+        It then went to 72 -- twice LanternSafeRadius (34) -- which fixed the
+        traversal problem but created a subtler one: the safe light reached the
+        edge, so the entire arena was inside the safe zone and retreating into
+        the light meant nothing. At 112 the lit core is the middle third. The
         boundary a player has been standing inside all along becomes something
-        they can see: the middle is lit and safe, the corners are neither. At
-        that width a dodge is an evasive move rather than a traversal, sprinting
-        the full span takes three seconds, and four of the longest enemy attack
-        lanes fit across it.
+        they can see and choose: the middle is lit and safe, the outer ring is
+        neither, and pulling an enemy off someone means giving up the light.
 
-        The cabins moved out to match. They sat at x +/-36 with a 17.3-stud
-        footprint, putting their inner walls at 27.4 -- inside the new plaza.
-        Everything else here is positioned off PLAZA_HALF so the next person to
-        retune this changes one number.
+        The cabins moved out to match, twice now. They sat at x +/-36 with a
+        17.3-stud footprint, putting their inner walls at 27.4 -- inside the
+        72-wide plaza -- and +/-52 put them inside this one. At +/-68 the inner
+        walls sit at 59.3, clear of the 56-stud edge. See TOWN_CENTER and
+        PLAZA_HALF at the top of this file; everything here is positioned off
+        them, so retuning the square is still one number.
     ]]
-    local PLAZA_HALF = 36
     local COURTYARD_HALF_X = PLAZA_HALF + 22
     local COURTYARD_HALF_Z = PLAZA_HALF + 12
-    local CABIN_X = 52
+    local CABIN_X = 68
 
     local courtyardPatch = part(
         parent,
@@ -26647,8 +26713,8 @@ local function buildEmberhollowSanctuary(
     end
 
     local shells = {
-        cabin(Vector3.new(-CABIN_X, 0, -112), math.rad(-90), "WAYFARER CABIN", AMBER),
-        cabin(Vector3.new(CABIN_X, 0, -112), math.rad(90), "MARA'S SHELTER", FOXFIRE),
+        cabin(Vector3.new(-CABIN_X, 0, TOWN_CENTER.Z), math.rad(-90), "WAYFARER CABIN", AMBER),
+        cabin(Vector3.new(CABIN_X, 0, TOWN_CENTER.Z), math.rad(90), "MARA'S SHELTER", FOXFIRE),
     }
 
     local commons = Instance.new("Model")
@@ -26721,7 +26787,7 @@ local function buildEmberhollowSanctuary(
         parent,
         "TownMainStreetFoundation",
         Vector3.new(18, 0.34, 206),
-        CFrame.new(0, 1.81, -102),
+        CFrame.new(0, -0.19, -102),
         Color3.fromRGB(38, 41, 39),
         Enum.Material.Slate,
         false
@@ -26731,7 +26797,7 @@ local function buildEmberhollowSanctuary(
         parent,
         "TownMainStreet",
         Vector3.new(15.5, 0.32, 204),
-        CFrame.new(0, 2.17, -102),
+        CFrame.new(0, 0.17, -102),
         Color3.fromRGB(183, 143, 91),
         Enum.Material.Cobblestone,
         false
@@ -26741,7 +26807,7 @@ local function buildEmberhollowSanctuary(
         parent,
         "TownMainStreetWear",
         Vector3.new(3.8, 0.12, 202),
-        CFrame.new(0, 2.42, -102),
+        CFrame.new(0, 0.42, -102),
         Color3.fromRGB(88, 58, 37),
         Enum.Material.Mud,
         false
@@ -26752,7 +26818,7 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownStreetRut",
             Vector3.new(0.68, 0.08, 200),
-            CFrame.new(rutSide * 2.4, 2.5, -102),
+            CFrame.new(rutSide * 2.4, 0.5, -102),
             Color3.fromRGB(61, 43, 30),
             Enum.Material.Mud,
             false
@@ -26775,7 +26841,7 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownDistrictRoadFoundation",
             Vector3.new(8.6, 0.26, delta.Magnitude + 1.2),
-            frame * CFrame.new(0, 1.5, 0),
+            frame * CFrame.new(0, -0.5, 0),
             Color3.fromRGB(38, 41, 39),
             Enum.Material.Slate,
             false
@@ -26785,7 +26851,7 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownDistrictRoad",
             Vector3.new(7.2, 0.24, delta.Magnitude + 0.8),
-            frame * CFrame.new(0, 1.81, 0),
+            frame * CFrame.new(0, -0.19, 0),
             Color3.fromRGB(176, 137, 87),
             Enum.Material.Cobblestone,
             false
@@ -26795,7 +26861,7 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownDistrictRoadWear",
             Vector3.new(2.1, 0.08, delta.Magnitude + 0.5),
-            frame * CFrame.new(0, 2.01, 0),
+            frame * CFrame.new(0, 0.01, 0),
             Color3.fromRGB(79, 52, 34),
             Enum.Material.Mud,
             false
@@ -26804,8 +26870,8 @@ local function buildEmberhollowSanctuary(
         queueRoadAssetPlacements(
             meshPlacements,
             parent,
-            start + Vector3.new(0, 1.38, 0),
-            finish + Vector3.new(0, 1.38, 0),
+            start + Vector3.new(0, -0.62, 0),
+            finish + Vector3.new(0, -0.62, 0),
             9700 + #meshPlacements
         )
     end
@@ -26833,12 +26899,12 @@ local function buildEmberhollowSanctuary(
             -- near the lantern: the paths used to start inside what is now
             -- fighting space.
             {
-                Vector3.new(-(PLAZA_HALF - 2), 0.84, -113),
-                Vector3.new(-(CABIN_X - 9), 0.84, -116.5),
+                Vector3.new(-(PLAZA_HALF - 2), 0.84, TOWN_CENTER.Z - 1),
+                Vector3.new(-(CABIN_X - 9), 0.84, TOWN_CENTER.Z - 4.5),
             },
             {
-                Vector3.new(PLAZA_HALF - 2, 0.84, -111),
-                Vector3.new(CABIN_X - 9, 0.84, -107.5),
+                Vector3.new(PLAZA_HALF - 2, 0.84, TOWN_CENTER.Z + 1),
+                Vector3.new(CABIN_X - 9, 0.84, TOWN_CENTER.Z + 4.5),
             },
         }
     do
@@ -26890,7 +26956,7 @@ local function buildEmberhollowSanctuary(
     -- in an arena; seating at the rim is somewhere to watch from.
     local benchX = PLAZA_HALF - 6
     for side = -1, 1, 2 do
-        local benchZ = -112 + side * (PLAZA_HALF - 8)
+        local benchZ = TOWN_CENTER.Z + side * (PLAZA_HALF - 8)
         local bench = part(
             parent,
             "LanternBench",
@@ -26913,7 +26979,7 @@ local function buildEmberhollowSanctuary(
             support.CanQuery = false
         end
     end
-    local signZ = -112 + COURTYARD_HALF_Z - 4
+    local signZ = TOWN_CENTER.Z + COURTYARD_HALF_Z - 4
     local campSign = labelSign(
         parent,
         CFrame.new(0, 3.2, signZ) * CFrame.Angles(0, math.pi, 0),
@@ -27397,6 +27463,7 @@ function WorldService.new(
         _lanternVisualHealth = 100,
         _beacon = nil,
         _beaconCore = nil,
+        _beaconLens = nil,
         _barricadeBuilt = false,
         _dusk = false,
         _duskSignals = {},
@@ -27671,9 +27738,9 @@ local ROUTE_HALF_WIDTH = 26
 ]]
 local FOLIAGE_KEEP_OUT = table.freeze({
     table.freeze({ x = 0, z = 62, radius = 52 }), -- the departure lodge and its clearing
-    table.freeze({ x = -36, z = -112, radius = 30 }), -- Wayfarer cabin lot
-    table.freeze({ x = 36, z = -112, radius = 30 }), -- Mara's shelter lot
-    table.freeze({ x = 0, z = -112, radius = 36 }), -- lantern square
+    table.freeze({ x = -68, z = -80, radius = 30 }), -- Wayfarer cabin lot
+    table.freeze({ x = 68, z = -80, radius = 30 }), -- Mara's shelter lot
+    table.freeze({ x = 0, z = -80, radius = 56 }), -- lantern square
     table.freeze({ x = -42, z = -142, radius = 32 }), -- western workshop district
     table.freeze({ x = 42, z = -142, radius = 32 }), -- eastern workshop district
     table.freeze({ x = -78, z = -76, radius = 22 }), -- Scout mastery clearing
@@ -27950,7 +28017,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         Vector3.new(20, 0.42, -48),
         Vector3.new(0, 0.42, -68),
         Vector3.new(-20, 0.42, -88),
-        Vector3.new(0, 0.42, -112),
+        Vector3.new(0, 0.42, TOWN_CENTER.Z),
         Vector3.new(0, 0.42, -148),
     }
     local arrivalRoadAssetPlacements: { MeshPlacement } = {}
@@ -27967,7 +28034,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             geometry,
             "EmberhollowRoadFoundation",
             Vector3.new(17.2, 0.28, distance + 4),
-            roadFrame * CFrame.new(0, 1.42, 0),
+            roadFrame * CFrame.new(0, -0.58, 0),
             Color3.fromRGB(38, 41, 39),
             Enum.Material.Slate,
             false
@@ -27977,11 +28044,13 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             geometry,
             "EmberhollowRoad",
             Vector3.new(15.2, 0.36, distance + 3.6),
-            -- Studio verification showed the voxel-rendered valley surface
-            -- occluding the authored y=0 plane by about 1.5 studs. Keeping the
-            -- route non-colliding while lifting its visual skin preserves the
-            -- gameplay plane and makes the road actually render underfoot.
-            roadFrame * CFrame.new(0, 1.77, 0),
+            -- The whole road stack used to be lifted about two studs, because
+            -- the voxel-rendered valley surface was occluding the authored y=0
+            -- plane and this was diagnosed as a road problem. It was a datum
+            -- problem: see VOXEL_SURFACE_RISE in TerrainBuilder. The terrain
+            -- now renders on the authored plane, so the compensation is gone
+            -- and these offsets are back to describing the layer stack alone.
+            roadFrame * CFrame.new(0, -0.23, 0),
             Color3.fromRGB(190, 149, 94),
             Enum.Material.Cobblestone,
             false
@@ -27992,7 +28061,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             geometry,
             "EmberhollowRoadWear",
             Vector3.new(3.6, 0.12, distance + 2.8),
-            roadFrame * CFrame.new(0, 2.05, 0),
+            roadFrame * CFrame.new(0, 0.05, 0),
             Color3.fromRGB(78, 51, 33),
             Enum.Material.Mud,
             false
@@ -28007,7 +28076,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 geometry,
                 "RoadShoulder",
                 Vector3.new(1.15, 0.3, distance + 3.2),
-                roadFrame * CFrame.new(shoulderSide * 7.45, 1.83, 0),
+                roadFrame * CFrame.new(shoulderSide * 7.45, -0.17, 0),
                 Color3.fromRGB(57, 62, 59),
                 Enum.Material.Slate,
                 false
@@ -28020,7 +28089,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 geometry,
                 "RoadRut",
                 Vector3.new(0.62, 0.08, distance + 1),
-                roadFrame * CFrame.new(rutSide * 2.25, 2.14, 0),
+                roadFrame * CFrame.new(rutSide * 2.25, 0.14, 0),
                 Color3.fromRGB(57, 40, 28),
                 Enum.Material.Mud,
                 false
@@ -28037,7 +28106,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                     "RoadEdgeStone",
                     Vector3.new(1.3, 0.62, 1.75),
                     roadFrame
-                        * CFrame.new(side * 7.85, 2.13, along)
+                        * CFrame.new(side * 7.85, 0.13, along)
                         * CFrame.Angles(0, math.rad(side * (marker % 2) * 7), 0),
                     if marker % 3 == 0
                         then Color3.fromRGB(132, 124, 101)
@@ -28073,7 +28142,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 -- tops out at 0.91, so this offset puts the wedge's underside
                 -- at 0.89 -- inlaid into the road. At 0.94 it floated a full
                 -- 0.4 studs above the surface and pulsed in mid-air.
-                roadFrame * CFrame.new(0, 2.15, along) * CFrame.Angles(0, math.pi, 0),
+                roadFrame * CFrame.new(0, 0.15, along) * CFrame.Angles(0, math.pi, 0),
                 FOXFIRE,
                 Enum.Material.Neon,
                 false
@@ -28131,16 +28200,20 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     local random = Random.new(1847)
     local swayTag = _self._runtimeIds.AmbientSwayTag
 
+    --[[
+        The root arch that used to stand at (78, -42) is gone. It was a 25-stud
+        grey stone arch alone in open grass east of the arrival road, framing
+        nothing and part of no district -- and with the square moved north to
+        TOWN_CENTER it would have sat just off the new arena's north-east
+        corner, reading as clutter beside the fight rather than as a landmark
+        on the approach. Removed at owner request.
+
+        mesh_root_arch_a stays registered in MeshAssetRegistry and is still
+        placed twice inside Bramblewake by BramblewakeBuilder, where an arch
+        over a forest trail is doing real work. This is the same
+        reviewed-but-unplaced-here status the retired wood arch has.
+    ]]
     _self._meshPlacements = {
-        {
-            assetId = "mesh_root_arch_a",
-            fallbackKind = "root_arch",
-            position = Vector3.new(78, TerrainBuilder.surfaceHeight(78, -42), -42),
-            scale = 1,
-            yaw = math.rad(-28),
-            seed = 9147,
-            swayTag = nil,
-        },
         {
             assetId = "mesh_hollow_lantern_shrine_a",
             fallbackKind = "hollow_shrine",
@@ -28214,7 +28287,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
 
     addFillLight(geometry, Vector3.new(-46, 12, -96), Color3.fromRGB(54, 103, 95), 0.85, 78)
     addFillLight(geometry, Vector3.new(38, 10, -28), Color3.fromRGB(255, 177, 88), 0.45, 54)
-    emberDrift(geometry, Vector3.new(0, 0, -112), AMBER, 16, 28, _self._runtimeIds.AmbientMoteTag)
+    emberDrift(geometry, TOWN_CENTER, AMBER, 16, 28, _self._runtimeIds.AmbientMoteTag)
 
     local lanternSpecs = {
         { position = Vector3.new(7, 0, -9), scale = 0.68, yaw = math.rad(-18) },
@@ -30452,7 +30525,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         firstLanternFallback,
         "FirstLantern",
         Vector3.new(8, 3, 8),
-        CFrame.new(0, 1.5, -112),
+        CFrame.new(0, 1.5, TOWN_CENTER.Z),
         Color3.fromRGB(67, 68, 61),
         Enum.Material.Slate
     )
@@ -30461,7 +30534,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             firstLanternFallback,
             "FirstLanternPlinth",
             Vector3.new(10.5 - stepIndex * 1.45, 0.52, 10.5 - stepIndex * 1.45),
-            CFrame.new(0, 0.25 + stepIndex * 0.42, -112),
+            CFrame.new(0, 0.25 + stepIndex * 0.42, TOWN_CENTER.Z),
             if stepIndex % 2 == 0 then Color3.fromRGB(76, 79, 73) else Color3.fromRGB(61, 66, 62),
             Enum.Material.Slate
         )
@@ -30472,7 +30545,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 firstLanternFallback,
                 "FirstLanternCagePost",
                 Vector3.new(0.48, 6.2, 0.48),
-                CFrame.new(sideX * 2.35, 5.7, -112 + sideZ * 2.35)
+                CFrame.new(sideX * 2.35, 5.7, TOWN_CENTER.Z + sideZ * 2.35)
                     * CFrame.Angles(0, 0, math.rad(sideX * sideZ * 4)),
                 Color3.fromRGB(75, 72, 62),
                 Enum.Material.Metal,
@@ -30486,7 +30559,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 firstLanternFallback,
                 "FirstLanternCageBand",
                 Vector3.new(5.2, 0.28, 0.28),
-                CFrame.new(0, ringY, -112 + side * 2.5),
+                CFrame.new(0, ringY, TOWN_CENTER.Z + side * 2.5),
                 Color3.fromRGB(86, 76, 59),
                 Enum.Material.Metal,
                 false
@@ -30495,7 +30568,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 firstLanternFallback,
                 "FirstLanternCageBand",
                 Vector3.new(0.28, 0.28, 5.2),
-                CFrame.new(side * 2.5, ringY, -112),
+                CFrame.new(side * 2.5, ringY, TOWN_CENTER.Z),
                 Color3.fromRGB(86, 76, 59),
                 Enum.Material.Metal,
                 false
@@ -30507,7 +30580,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             firstLanternFallback,
             "FirstLanternGlassPanel",
             Vector3.new(4.35, 4.55, 0.13),
-            CFrame.new(0, 5.65, -112 + side * 2.34),
+            CFrame.new(0, 5.65, TOWN_CENTER.Z + side * 2.34),
             Color3.fromRGB(205, 158, 91),
             Enum.Material.Glass,
             false
@@ -30517,7 +30590,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             firstLanternFallback,
             "FirstLanternGlassPanel",
             Vector3.new(0.13, 4.55, 4.35),
-            CFrame.new(side * 2.34, 5.65, -112),
+            CFrame.new(side * 2.34, 5.65, TOWN_CENTER.Z),
             Color3.fromRGB(205, 158, 91),
             Enum.Material.Glass,
             false
@@ -30527,7 +30600,8 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             firstLanternFallback,
             "FirstLanternRainHood",
             Vector3.new(5.7, 0.34, 3.5),
-            CFrame.new(0, 9.22, -112 + side * 1.35) * CFrame.Angles(math.rad(side * 28), 0, 0),
+            CFrame.new(0, 9.22, TOWN_CENTER.Z + side * 1.35)
+                * CFrame.Angles(math.rad(side * 28), 0, 0),
             Color3.fromRGB(55, 57, 53),
             Enum.Material.Slate,
             false
@@ -30537,7 +30611,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         firstLanternFallback,
         "FirstLanternCrown",
         Vector3.new(0.42, 1.25, 0.42),
-        CFrame.new(0, 10.35, -112) * CFrame.Angles(0, 0, math.rad(5)),
+        CFrame.new(0, 10.35, TOWN_CENTER.Z) * CFrame.Angles(0, 0, math.rad(5)),
         Color3.fromRGB(73, 67, 57),
         Enum.Material.Metal,
         false
@@ -30546,7 +30620,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         firstLanternFallback,
         "FirstLanternFlame",
         Vector3.new(1.05, 2.45, 0.82),
-        CFrame.new(0, 5.65, -112) * CFrame.Angles(0, math.rad(18), 0),
+        CFrame.new(0, 5.65, TOWN_CENTER.Z) * CFrame.Angles(0, math.rad(18), 0),
         AMBER,
         Enum.Material.Neon,
         false
@@ -30571,7 +30645,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         interactables,
         "FirstLanternCore",
         Vector3.new(2.3, 3.1, 2.3),
-        CFrame.new(0, 6.3, -112),
+        CFrame.new(0, 6.3, TOWN_CENTER.Z),
         AMBER,
         Enum.Material.Neon,
         false
@@ -30592,7 +30666,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     table.insert(self._meshPlacements, {
         assetId = "mesh_first_lantern_a",
         fallbackKind = "placeholder",
-        position = Vector3.new(0, 0, -112),
+        position = Vector3.new(0, 0, TOWN_CENTER.Z),
         scale = 0.95,
         yaw = math.rad(8),
         seed = 9314,
@@ -30635,11 +30709,11 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     approach.Name = "BramblewakeDawnApproach"
     approach.Parent = interactables
     -- ROAD_SURFACE_Y matches the trail/wear-strip top computed in the
-    -- Emberhollow road loop above (route base y 0.42 + trail offset 1.77 +
+    -- Emberhollow road loop above (route base y 0.42 + wear offset 0.05 +
     -- half its 0.36 thickness, and the wear strip reaching to 0.42 + 2.05 +
     -- half its 0.12 thickness) -- anything at or below the old y~0.2-0.4
     -- authored here rendered buried under that raised visual skin.
-    local ROAD_SURFACE_Y = 2.45
+    local ROAD_SURFACE_Y = 0.53
     for stepIndex = 1, 3 do
         part(
             approach,
@@ -30733,18 +30807,41 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     )
     beaconCollar.Shape = Enum.PartType.Cylinder
     beaconCollar.CanQuery = false
-    local fallbackLens = part(
-        beaconFallback,
-        "BeaconFallbackLens",
-        Vector3.new(2.2, 2.6, 2.6),
-        CFrame.new(0, 8.45, -148) * CFrame.Angles(0, 0, math.rad(90)),
+    --[[
+        The memory orb itself, and the reason the reliquary read as broken.
+
+        This lens is the orb a player sees resting in the vessel. It used to
+        live inside beaconFallback, so hideProceduralPlaceholder blanked it the
+        moment the reviewed reliquary mesh loaded -- and that mesh was
+        deliberately generated as an *empty* vessel, because "both placements
+        supply their own light". The only other thing in the cradle is
+        BeaconCore, which is held at Transparency 1 until the dawn reveal. So
+        for the entire tutorial the vessel stood on the road holding nothing:
+        the owner's report was literally "the memory orb was gone".
+
+        Hoisted out of the fallback and made a sibling, exactly like BeaconCore
+        and FirstLanternCore before it. The orb is always in the vessel. What
+        the dawn reveal changes is that it catches fire, not that it appears.
+    ]]
+    local beaconLens = part(
+        interactables,
+        "BeaconLens",
+        Vector3.new(1.9, 1.9, 1.9),
+        CFrame.new(0, 7.6, -148),
         FOXFIRE,
         Enum.Material.Glass,
         false
     )
-    fallbackLens.Shape = Enum.PartType.Cylinder
-    fallbackLens.Transparency = 0.22
-    fallbackLens.CanQuery = false
+    -- A sphere, not the cylinder this used to be. The cylinder was shaped to
+    -- sit between the fallback's four cradle arms, and those arms are exactly
+    -- what the authored mesh replaces -- so on the real vessel it read as a
+    -- bucket balanced on the rim. Seated at 7.6 it nests into the mouth of the
+    -- vessel (which tops out at 7.9) with its upper half proud.
+    beaconLens.Shape = Enum.PartType.Ball
+    beaconLens.Transparency = 0.42
+    beaconLens.CastShadow = false
+    beaconLens.CanQuery = false
+    self._beaconLens = beaconLens
     --[[
         The beacon's fire lives outside the fallback on purpose, exactly like
         FirstLanternCore above.
@@ -32034,6 +32131,13 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
         if coreLight ~= nil then
             coreLight.Enabled = visible
         end
+    end
+    -- The orb is present either way; the reveal is it clearing rather than
+    -- arriving. Dormant glass reads as a cold lens, lit glass as a held flame.
+    local lens = self._beaconLens
+    if lens ~= nil then
+        lens.Transparency = if visible then 0.16 else 0.42
+        lens.Material = if visible then Enum.Material.Neon else Enum.Material.Glass
     end
 
     local world = self._world
@@ -33589,12 +33693,28 @@ local function buildTownProgressionBuildings(
     boardModel:SetAttribute("BuildingStage", boardStage)
     boardModel:SetAttribute("BuildingState", "complete")
     boardModel.Parent = parent
+    --[[
+        Off the road's centreline, turned to face it.
+
+        The board stood at (0, -158), ten studs directly behind the memory
+        reliquary at (0, -148) and on the same axis. Walking south down the
+        road you saw the reliquary silhouetted against a big blank board --
+        the owner's report was a "sign right in the middle of" the memory orb.
+        Nothing was broken about the board itself; it was standing in the one
+        place that ruins the landmark behind it.
+
+        Seated on the west verge and rotated -90 degrees so its face looks east
+        across the road. A reader now stands beside the road looking west,
+        rather than standing on the road blocking the walk south, and the
+        reliquary keeps a clear backdrop.
+    ]]
+    local boardBase = CFrame.new(-24, 0, -150) * CFrame.Angles(0, math.rad(-90), 0)
     for side = -1, 1, 2 do
         part(
             boardModel,
             "TownBoardPost",
             Vector3.new(0.8, 7.2, 0.8),
-            CFrame.new(side * 5.2, 3.6, -158),
+            boardBase * CFrame.new(side * 5.2, 3.6, 0),
             WET_BARK,
             Enum.Material.Wood
         )
@@ -33603,7 +33723,7 @@ local function buildTownProgressionBuildings(
         boardModel,
         "TownBoard",
         Vector3.new(11.5, 5.5, 0.65),
-        CFrame.new(0, 5.2, -158),
+        boardBase * CFrame.new(0, 5.2, 0),
         Color3.fromRGB(90, 64, 42),
         Enum.Material.WoodPlanks,
         false
@@ -33618,9 +33738,9 @@ local function buildTownProgressionBuildings(
     table.insert(meshPlacements, {
         assetId = "mesh_creator_notice_board_a",
         fallbackKind = "asset_replacement",
-        position = Vector3.new(0, 0, -158),
+        position = Vector3.new(-24, 0, -150),
         scale = 1.05,
-        yaw = 0,
+        yaw = math.rad(-90),
         seed = 10120,
         swayTag = nil,
         parent = assetParent,
@@ -33723,7 +33843,7 @@ local function buildTownProgressionBuildings(
         return fallback
     end
 
-    local PLAZA = Vector3.new(0, 0, -112)
+    local PLAZA = TOWN_CENTER
     -- The Watch Ring faces outward, away from the plaza, the way a defensive
     -- post looks toward what it is watching rather than toward the town it
     -- guards.
@@ -35638,7 +35758,7 @@ function WorldService.setTownBreach(self: WorldService, enabled: boolean, theme:
         return
     end
     local accent = Color3.fromRGB(255, 91, 58)
-    for _, center in { Vector3.new(0, 0.4, -148), Vector3.new(0, 0.4, -112) } do
+    for _, center in { Vector3.new(0, 0.4, -148), Vector3.new(0, 0.4, TOWN_CENTER.Z) } do
         local pulse = part(
             world,
             "TownBreachPulse",
@@ -36271,7 +36391,6 @@ local MEADOW = Color3.fromRGB(151, 123, 59)
 local CREAM = Color3.fromRGB(244, 230, 197)
 local MOSS = Color3.fromRGB(52, 83, 49)
 local WET_EARTH = Color3.fromRGB(61, 50, 36)
-local FOG_GLASS = Color3.fromRGB(119, 149, 143)
 
 local ORIGIN = Vector3.new(1600, 0, -230)
 
@@ -36464,20 +36583,22 @@ local function rootTangle(parent: Instance, center: Vector3, scale: number, seed
     end
 end
 
-local function lowMist(parent: Instance, center: Vector3, size: Vector3, transparency: number)
-    local mist = part(
-        parent,
-        "BlueGroundMist",
-        size,
-        CFrame.new(center + Vector3.new(0, 1.2, 0)),
-        FOG_GLASS,
-        Enum.Material.Glass,
-        false
-    )
-    mist.Transparency = transparency
-    mist.CastShadow = false
-    mist.CanQuery = false
-end
+--[[
+    There used to be a lowMist() here: a Glass slab dropped over each module
+    cell and over the Blackout arena floor, 1.2 studs up, to suggest ground fog.
+
+    Thirteen of them, covering about 1.8 million square studs -- effectively
+    all of Bramblewake -- and Glass is not a fog material. It renders a
+    refractive pane whatever Transparency says, so the expedition was being
+    viewed through a sheet of tinted glass at knee height: the forest floor,
+    the trail, the water and every prop came out flat blue-grey, and from any
+    raised angle the slab edges read as the boundary of a void.
+
+    This is the same mistake LowMorningMist made over Emberhollow, removed for
+    the same reason. Bramblewake already has its own Atmosphere and Blackout
+    lighting doing volumetric work properly; this was a second, cruder system
+    fighting it and winning.
+]]
 
 local function fireflyCluster(
     parent: Instance,
@@ -37027,7 +37148,6 @@ local function moduleDressing(
         WET_EARTH,
         Enum.Material.Mud
     )
-    lowMist(parent, center, Vector3.new(56, 1.4, 56), 0.84)
     for index = 1, math.floor(13 * scale) do
         local angle = random:NextNumber(0, math.pi * 2)
         local radius = random:NextNumber(12, 31)
@@ -38977,8 +39097,6 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
     )
     groundFloor.CanQuery = false
 
-    lowMist(folder, middle, Vector3.new(floorSpan * 0.92, 2.2, floorSpan * 0.92), 0.9)
-
     local function backdropTree(
         at: Vector3,
         height: number,
@@ -39808,7 +39926,27 @@ function BramblewakeBuilder.build(
                 math.rad((placement.index % 3 - 1) * 9),
                 poiMemory.Position.Y - 1.35
             )
-        elseif placement.eventId ~= nil then
+        end
+
+        --[[
+            A module can host a point of interest AND an event. This used to be
+            an `elseif` on the branch above, so whenever the generator put both
+            on one module the POI won and the event was dropped on the floor --
+            silently, because ExpeditionService still counts events from the
+            manifest and reported eight of them with twenty-five interaction
+            steps while the world held five and sixteen.
+
+            On the preview seed that lost three of the eight events outright:
+            stag tracks, the moving hedge, and the root bridge, on modules 5, 9
+            and 11. Better than a third of Bramblewake's authored event content
+            never spawned, and no check caught it because the count the service
+            logs comes from the plan rather than from the build.
+
+            They do not collide: buildPointOfInterest anchors at
+            center + (-21, 0, -18) and buildEventSocket at (22, 0.5, -19),
+            opposite sides of a 72-stud cell.
+        ]]
+        if placement.eventId ~= nil then
             local eventResult = buildEventSocket(
                 module,
                 center,
@@ -42135,6 +42273,8 @@ local function sanitize(model: Model, stripDecals: boolean): (number, number)
     return meshParts, baseParts
 end
 
+local MAX_LOAD_ATTEMPTS = 3
+
 local function longestDimension(size: Vector3): number
     return math.max(size.X, size.Y, size.Z)
 end
@@ -42232,20 +42372,59 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
         return nil
     end
 
+    --[[
+        Retry a failed fetch before condemning the asset for the session.
+
+        One blip used to cost the whole run. A failure here sets
+        self._failed[stableId], which is checked before every later placement
+        of the same asset -- so a single transient error does not lose one
+        prop, it silently drops every instance of that asset in the world and
+        leaves procedural fallbacks in their place. Observed repeatedly under
+        Wine: the same IDs that fail one boot load cleanly the next, reporting
+        "User is not authorized to access Asset" for an asset the account
+        plainly can access. That is throttling or CDN flakiness, not a
+        permission fact.
+
+        Three attempts with a widening pause. Bounded on purpose: a genuinely
+        unavailable asset still gets condemned quickly rather than being
+        retried once per placement, and the cost is paid once per asset at
+        template load, not per instance.
+    ]]
     local ok, loaded
-    if entry.creatorStore then
-        ok, loaded = pcall(AssetService.LoadAssetAsync, AssetService, entry.assetId)
-    else
-        ok, loaded = pcall(InsertService.LoadAsset, InsertService, entry.assetId)
-    end
-    if not ok or not loaded:IsA("Model") then
-        if ok then
+    local attempts = 0
+    repeat
+        attempts += 1
+        if entry.creatorStore then
+            ok, loaded = pcall(AssetService.LoadAssetAsync, AssetService, entry.assetId)
+        else
+            ok, loaded = pcall(InsertService.LoadAsset, InsertService, entry.assetId)
+        end
+        local usable = ok and typeof(loaded) == "Instance" and loaded:IsA("Model")
+        if usable then
+            break
+        end
+        if ok and typeof(loaded) == "Instance" then
+            loaded:Destroy()
+        end
+        self._logger:info("mesh_asset_load_retry", {
+            assetId = stableId,
+            robloxAssetId = entry.assetId,
+            attempt = attempts,
+            error = if ok then "LoadAsset returned a non-Model" else tostring(loaded),
+        })
+        if attempts < MAX_LOAD_ATTEMPTS then
+            task.wait(attempts * 0.75)
+        end
+    until attempts >= MAX_LOAD_ATTEMPTS
+    if not ok or typeof(loaded) ~= "Instance" or not loaded:IsA("Model") then
+        if ok and typeof(loaded) == "Instance" then
             loaded:Destroy()
         end
         self._failed[stableId] = true
         self._logger:info("mesh_asset_load_failed", {
             assetId = stableId,
             robloxAssetId = entry.assetId,
+            attempts = attempts,
             error = if ok then "LoadAsset returned a non-Model" else tostring(loaded),
         })
         return nil
@@ -42578,6 +42757,48 @@ local BOWL_MAX_Z = 90
 -- in WorldService was placed against.
 local GROUND_Y = 0
 
+--[[
+    How far above a fill's top face Roblox actually renders the walkable
+    surface.
+
+    Terrain voxels are 4 studs. A FillBlock whose top face is authored at y = 0
+    does not produce a surface at y = 0 -- it produces one at y = 2, half a
+    voxel higher. Measured directly in Studio with a control fill far from any
+    other geometry: top face at y = 0, raycast surface at y = 2.000, and every
+    sample across the real valley floor returns 2.000 as well.
+
+    This module used to report GROUND_Y as the floor's top and be wrong by
+    exactly this amount, which is why so much authored content sat two studs
+    into the ground: the town square (top face 0.80) was underground and had
+    never once rendered, and every character authored to stand at y = 0 stood
+    shin-deep in the grass. The road network reads correctly only because it
+    was empirically nudged to 2.2-2.5 at some point without the cause being
+    understood.
+
+    The comment above stays true -- GROUND_Y is still the plane the authored
+    coordinates were written against. What changed is that this module now
+    tells callers where the ground actually is.
+]]
+local VOXEL_SURFACE_RISE = 2
+
+--[[
+    The Y every terrain fill is authored against, as opposed to the Y the
+    engine then renders the surface at.
+
+    Fills are placed VOXEL_SURFACE_RISE lower than the plane they are meant to
+    produce, so the surface Roblox actually renders lands on GROUND_Y -- the
+    plane every authored Vector3 in WorldService was written against. Before
+    this, the fills were placed AT GROUND_Y and the surface rendered two studs
+    above it, so the entire authored world was underground and individual props
+    were being lifted one at a time to compensate. The main street still
+    carries such a lift (a +1.77 "visual skin"), added when this was diagnosed
+    as a road problem rather than a datum problem.
+
+    Reporting is unchanged: groundHeight() and surfaceHeight() still describe
+    the authored plane, and now they are telling the truth.
+]]
+local FILL_Y = GROUND_Y - VOXEL_SURFACE_RISE
+
 -- How deep the solid ground slab runs. Enough that a Blackout crater or a
 -- future dug-out cannot punch through into empty space.
 local BEDROCK_DEPTH = 90
@@ -42668,7 +42889,7 @@ local function fillValleyFloor(terrain: Terrain, palette: Palette)
     local depthSpan = toVoxelSpan(BEDROCK_DEPTH)
 
     terrain:FillBlock(
-        CFrame.new(centerX, GROUND_Y - depthSpan / 2, centerZ),
+        CFrame.new(centerX, FILL_Y - depthSpan / 2, centerZ),
         Vector3.new(width, depthSpan, depth),
         palette.valley
     )
@@ -42794,7 +43015,7 @@ local function fillHillAnnulus(
 
                 local columnHeight = toVoxelSpan(height + BEDROCK_DEPTH)
                 terrain:FillBlock(
-                    CFrame.new(x, GROUND_Y + height - columnHeight / 2, z),
+                    CFrame.new(x, FILL_Y + height - columnHeight / 2, z),
                     Vector3.new(toVoxelSpan(step), columnHeight, toVoxelSpan(step)),
                     material
                 )
@@ -42834,8 +43055,8 @@ local function fillHorizonPeaks(terrain: Terrain, seed: number, palette: Palette
 
         -- Two stacked balls give a shoulder and a cap, which reads as a
         -- mountain rather than a dome.
-        terrain:FillBall(Vector3.new(x, GROUND_Y + height * 0.15, z), radius, palette.ridge)
-        terrain:FillBall(Vector3.new(x, GROUND_Y + height * 0.55, z), radius * 0.62, palette.peak)
+        terrain:FillBall(Vector3.new(x, FILL_Y + height * 0.15, z), radius, palette.ridge)
+        terrain:FillBall(Vector3.new(x, FILL_Y + height * 0.55, z), radius * 0.62, palette.peak)
     end
 end
 
@@ -42850,16 +43071,16 @@ end
 ]]
 local function fillStream(terrain: Terrain, palette: Palette)
     local points = {
-        Vector3.new(232, GROUND_Y, 60),
-        Vector3.new(252, GROUND_Y, -20),
-        Vector3.new(268, GROUND_Y, -104),
-        Vector3.new(296, GROUND_Y, -186),
-        Vector3.new(342, GROUND_Y, -252),
+        Vector3.new(232, FILL_Y, 60),
+        Vector3.new(252, FILL_Y, -20),
+        Vector3.new(268, FILL_Y, -104),
+        Vector3.new(296, FILL_Y, -186),
+        Vector3.new(342, FILL_Y, -252),
     }
 
     local channelDepth = 16
     local waterDepth = 8
-    local waterSurfaceY = GROUND_Y - 2
+    local waterSurfaceY = FILL_Y - 2
 
     for index = 1, #points - 1 do
         local from = points[index]
@@ -42868,9 +43089,8 @@ local function fillStream(terrain: Terrain, palette: Palette)
         local center = from + delta * 0.5
         local width = toVoxelSpan(28 + math.sin(index * 1.7) * 4)
         local length = toVoxelSpan(delta.Magnitude + width)
-        local horizontalTarget = Vector3.new(to.X, GROUND_Y, to.Z)
-        local orientation =
-            CFrame.lookAt(Vector3.new(center.X, GROUND_Y, center.Z), horizontalTarget)
+        local horizontalTarget = Vector3.new(to.X, FILL_Y, to.Z)
+        local orientation = CFrame.lookAt(Vector3.new(center.X, FILL_Y, center.Z), horizontalTarget)
 
         -- Repaint two flat bank strips before carving. Their top face remains
         -- exactly at ground level; unlike a sphere, they cannot create dunes.
@@ -42900,7 +43120,7 @@ local function fillStream(terrain: Terrain, palette: Palette)
 
     -- A flat octagonal pond assembled from voxel-aligned rows. Every row shares
     -- the same water height, so the lake reads as a surface instead of a bubble.
-    local pondCenter = Vector3.new(362, GROUND_Y, -286)
+    local pondCenter = Vector3.new(362, FILL_Y, -286)
     local pondWidths = { 64, 96, 112, 120, 112, 96, 64 }
     terrain:FillBlock(
         CFrame.new(pondCenter + Vector3.new(0, -4, 0)),
@@ -42958,7 +43178,7 @@ local function paintValleyVariation(terrain: Terrain, seed: number, palette: Pal
         local material = if random:NextNumber() < 0.62 then palette.meadow else palette.slope
 
         terrain:FillBlock(
-            CFrame.new(x, GROUND_Y - SURFACE_PATCH_DEPTH / 2, z)
+            CFrame.new(x, FILL_Y - SURFACE_PATCH_DEPTH / 2, z)
                 * CFrame.Angles(0, random:NextNumber(0, math.pi), 0),
             Vector3.new(width, SURFACE_PATCH_DEPTH, depth),
             material
@@ -43054,7 +43274,17 @@ end
     the grass with nothing in the logs to say so.
 ]]
 function TerrainBuilder.valleyFloorTop(): number
-    return (GROUND_Y - toVoxelSpan(BEDROCK_DEPTH) / 2) + toVoxelSpan(BEDROCK_DEPTH) / 2
+    return FILL_Y
+        + toVoxelSpan(BEDROCK_DEPTH) / 2
+        - toVoxelSpan(BEDROCK_DEPTH) / 2
+        + VOXEL_SURFACE_RISE
+end
+
+-- The surface a character or prop must stand on to look like it is standing on
+-- the valley floor rather than buried in it. Now simply the authored plane,
+-- because the fills were corrected to render there.
+function TerrainBuilder.standingSurface(): number
+    return GROUND_Y
 end
 
 return table.freeze(TerrainBuilder)

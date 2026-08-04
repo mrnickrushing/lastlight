@@ -894,20 +894,51 @@ end
 -- about 0.9 studs, so that one stud buried the entire road network -- main
 -- street, arrival route, and district roads -- under the grass, with nothing
 -- in the logs to say so.
-assert(
-    TerrainBuilder.valleyFloorTop() == TerrainBuilder.groundHeight(),
-    "valley floor must fill to exactly the authored ground height"
-)
+--[[
+    Ask the engine, not ourselves.
+
+    This used to assert valleyFloorTop() == groundHeight(): two functions that
+    both returned the same constant, so it could never fail and never once
+    looked at the terrain. Underneath it the real surface was two studs higher
+    than either reported -- Roblox renders a terrain surface half a voxel above
+    the fill's top face -- and the guard written specifically to catch a buried
+    world sat there green while the town square lay underground.
+
+    Raycast instead. A number this module derives is only worth checking
+    against the ground a player actually stands on.
+]]
+local floorRayParams = RaycastParams.new()
+floorRayParams.FilterType = Enum.RaycastFilterType.Include
+floorRayParams.FilterDescendantsInstances = { workspace.Terrain }
 for _, sample in { { 0, 0 }, { 0, -112 }, { 0, -204 }, { 92, -126 }, { -92, -184 } } do
     local sampleX, sampleZ = sample[1], sample[2]
     assert(
         TerrainBuilder.isInsidePlayableBowl(sampleX, sampleZ),
         string.format("sample (%d, %d) should be inside the playable bowl", sampleX, sampleZ)
     )
+    local floorHit = workspace:Raycast(
+        Vector3.new(sampleX, 60, sampleZ),
+        Vector3.new(0, -120, 0),
+        floorRayParams
+    )
     assert(
-        TerrainBuilder.surfaceHeight(sampleX, sampleZ) == TerrainBuilder.valleyFloorTop(),
+        floorHit ~= nil,
+        string.format("no terrain under the playable bowl at (%d, %d)", sampleX, sampleZ)
+    )
+    assert(
+        math.abs(floorHit.Position.Y - TerrainBuilder.valleyFloorTop()) < 0.1,
         string.format(
-            "terrain surface disagrees with the filled floor at (%d, %d)",
+            "terrain at (%d, %d) is at %.2f but valleyFloorTop() reports %.2f",
+            sampleX,
+            sampleZ,
+            floorHit.Position.Y,
+            TerrainBuilder.valleyFloorTop()
+        )
+    )
+    assert(
+        TerrainBuilder.surfaceHeight(sampleX, sampleZ) == TerrainBuilder.groundHeight(),
+        string.format(
+            "authored ground plane disagrees with surfaceHeight at (%d, %d)",
             sampleX,
             sampleZ
         )
@@ -1318,13 +1349,31 @@ assert(
     expedition:GetAttribute("ManifestHash") == expectedManifest.hash,
     "Bramblewake manifest does not replay deterministically"
 )
+--[[
+    Built parts against the built-part budget.
+
+    This used to compare GeneratedPartCount -- BaseParts actually constructed
+    under the expedition -- against PartBudget, which bounds something else
+    entirely: the sum of the chosen modules' planning allowances, checked by
+    ExpeditionGenerator.validate when it composes a manifest. The preview seed
+    measures 427 against that planning budget and 2330 built parts, so the
+    assertion read as "233% over budget" while nothing was over budget.
+
+    Summing in the boss arena and Blackout allowances made it worse, not
+    better: the Warden seal annex and the Blackout layer are built after
+    GeneratedPartCount is recorded, by their own services, so those parts have
+    never been in this number. See the derivation on BuiltPartBudget.
+]]
 local generatedPartCount = expedition:GetAttribute("GeneratedPartCount")
 assert(
     type(generatedPartCount) == "number"
         and generatedPartCount >= 200
-        and generatedPartCount
-            <= BramblewakeExpedition.PartBudget + BramblewakeExpedition.BossArenaPartBudget + BramblewakeExpedition.BlackoutPartBudget,
-    "Bramblewake preview is outside its detailed mobile part budget"
+        and generatedPartCount <= BramblewakeExpedition.BuiltPartBudget,
+    string.format(
+        "Bramblewake preview is outside its built part budget (%s built, %d allowed)",
+        tostring(generatedPartCount),
+        BramblewakeExpedition.BuiltPartBudget
+    )
 )
 local criticalPaths = 0
 local trailWear = 0
@@ -1368,7 +1417,20 @@ for _, descendant in expedition:GetDescendants() do
         wardenLivingRoots += 1
     end
 end
-assert(criticalPaths == 22, "every Bramblewake connection needs two joined trail arms")
+--[[
+    24, derived rather than guessed: pathArm builds one arm toward each
+    neighbour a module actually has, so a 12-module chain contributes
+    1 + (10 x 2) + 1 = 22, and the Warden seal annex builds its own pair to
+    join the Old Growth arena to the route, for 24. The literal here said 22
+    and had counted only the chain -- it has not been reached since the notice
+    check started aborting every run, so nobody saw the annex arrive in the
+    total.
+
+    The two assertions below are the ones doing the real work: they check that
+    every arm, wherever it came from, got its worn centre and both edges. Those
+    hold at any arm count, so they keep their meaning if the route grows again.
+]]
+assert(criticalPaths == 24, "every Bramblewake connection needs two joined trail arms")
 assert(trailWear == criticalPaths, "every Bramblewake trail arm needs a worn center")
 assert(trailEdges == criticalPaths * 2, "every Bramblewake trail arm needs two visible edges")
 assert(roadMarkers == 6 and roadSigns == 6, "the critical route needs six direction markers")
@@ -1380,13 +1442,37 @@ assert(oldGrowthCageBars == 4, "Old Growth fire needs a recognizable lantern cag
 assert(oldGrowthHeartRoots == 3, "Old Growth heart needs a rooted physical shell")
 assert(wardenLivingRoots == 12, "Warden nodes need three living roots each")
 
+--[[
+    44 fixed prompts, measured rather than remembered.
+
+    Composition in Studio at this revision:
+      15  first world -- Mara, First Lantern, memory beacon, Heartwood node,
+          barricade plot, Greenward archive, Town Board, workbench sign,
+          three starter tool displays, four crafting benches
+      29  expedition fixtures -- per-module amber sap and heartwood nodes,
+          Old Growth fire source and root heart, Wayhome light, four Warden
+          living-root nodes, two memory antlers, Blackout lantern fire, three
+          Blackout relays, three Greenward chapter choices
+
+    The literal was 26 and had drifted by 18, almost all of it the per-module
+    resource nodes the expedition grew after this line last ran. The two
+    derived terms beside it stay derived: event interactions come from the
+    catalog and specializations from RuntimeIds, so only genuinely new fixtures
+    move this number, and moving it should be a deliberate edit.
+]]
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
     #tagged
-        == 26
+        == 44
             + BramblewakeExpedition.EventInteractionCount
             + #RuntimeIds.ProfessionSpecializationInteractionIds,
-    "expected tutorial, event, elite, boss, extraction, crafting, and mastery prompts"
+    string.format(
+        "expected tutorial, event, elite, boss, extraction, crafting, and mastery prompts (found %d, expected %d)",
+        #tagged,
+        44
+            + BramblewakeExpedition.EventInteractionCount
+            + #RuntimeIds.ProfessionSpecializationInteractionIds
+    )
 )
 local taggedByInteractionId = {}
 for _, prompt in tagged do

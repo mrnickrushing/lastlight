@@ -17,7 +17,6 @@ local MEADOW = Color3.fromRGB(151, 123, 59)
 local CREAM = Color3.fromRGB(244, 230, 197)
 local MOSS = Color3.fromRGB(52, 83, 49)
 local WET_EARTH = Color3.fromRGB(61, 50, 36)
-local FOG_GLASS = Color3.fromRGB(119, 149, 143)
 
 local ORIGIN = Vector3.new(1600, 0, -230)
 
@@ -210,20 +209,22 @@ local function rootTangle(parent: Instance, center: Vector3, scale: number, seed
     end
 end
 
-local function lowMist(parent: Instance, center: Vector3, size: Vector3, transparency: number)
-    local mist = part(
-        parent,
-        "BlueGroundMist",
-        size,
-        CFrame.new(center + Vector3.new(0, 1.2, 0)),
-        FOG_GLASS,
-        Enum.Material.Glass,
-        false
-    )
-    mist.Transparency = transparency
-    mist.CastShadow = false
-    mist.CanQuery = false
-end
+--[[
+    There used to be a lowMist() here: a Glass slab dropped over each module
+    cell and over the Blackout arena floor, 1.2 studs up, to suggest ground fog.
+
+    Thirteen of them, covering about 1.8 million square studs -- effectively
+    all of Bramblewake -- and Glass is not a fog material. It renders a
+    refractive pane whatever Transparency says, so the expedition was being
+    viewed through a sheet of tinted glass at knee height: the forest floor,
+    the trail, the water and every prop came out flat blue-grey, and from any
+    raised angle the slab edges read as the boundary of a void.
+
+    This is the same mistake LowMorningMist made over Emberhollow, removed for
+    the same reason. Bramblewake already has its own Atmosphere and Blackout
+    lighting doing volumetric work properly; this was a second, cruder system
+    fighting it and winning.
+]]
 
 local function fireflyCluster(
     parent: Instance,
@@ -773,7 +774,6 @@ local function moduleDressing(
         WET_EARTH,
         Enum.Material.Mud
     )
-    lowMist(parent, center, Vector3.new(56, 1.4, 56), 0.84)
     for index = 1, math.floor(13 * scale) do
         local angle = random:NextNumber(0, math.pi * 2)
         local radius = random:NextNumber(12, 31)
@@ -2723,8 +2723,6 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
     )
     groundFloor.CanQuery = false
 
-    lowMist(folder, middle, Vector3.new(floorSpan * 0.92, 2.2, floorSpan * 0.92), 0.9)
-
     local function backdropTree(
         at: Vector3,
         height: number,
@@ -3554,7 +3552,27 @@ function BramblewakeBuilder.build(
                 math.rad((placement.index % 3 - 1) * 9),
                 poiMemory.Position.Y - 1.35
             )
-        elseif placement.eventId ~= nil then
+        end
+
+        --[[
+            A module can host a point of interest AND an event. This used to be
+            an `elseif` on the branch above, so whenever the generator put both
+            on one module the POI won and the event was dropped on the floor --
+            silently, because ExpeditionService still counts events from the
+            manifest and reported eight of them with twenty-five interaction
+            steps while the world held five and sixteen.
+
+            On the preview seed that lost three of the eight events outright:
+            stag tracks, the moving hedge, and the root bridge, on modules 5, 9
+            and 11. Better than a third of Bramblewake's authored event content
+            never spawned, and no check caught it because the count the service
+            logs comes from the plan rather than from the build.
+
+            They do not collide: buildPointOfInterest anchors at
+            center + (-21, 0, -18) and buildEventSocket at (22, 0.5, -19),
+            opposite sides of a 72-stud cell.
+        ]]
+        if placement.eventId ~= nil then
             local eventResult = buildEventSocket(
                 module,
                 center,
