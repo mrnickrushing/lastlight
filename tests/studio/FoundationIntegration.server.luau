@@ -34,6 +34,7 @@ local StatusEffectState = require(root.StatusEffectState)
 local TownNightIncident = require(root.TownNightIncident)
 local TownGuardLastStand = require(root.TownGuardLastStand)
 local SaveSchema = require(root.SaveSchema)
+local ProfileBackup = require(root.ProfileBackup)
 local Registry = require(root.Content.Registry)
 local Regions = require(root.Content.Definitions.Regions)
 local ServiceRegistry = require(serverRoot.ServiceRegistry)
@@ -43,7 +44,7 @@ local TerrainBuilder = require(serverRoot.World.TerrainBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 12, "unexpected save schema version")
-assert(Config.BuildVersion == "0.47.0", "unexpected build version")
+assert(Config.BuildVersion == "0.48.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#MusicCatalog.regionIds() == 8, "every playable world needs an adaptive score")
@@ -72,6 +73,19 @@ assert(
         and studioLastStand.lanternCost == 12
         and studioLastStand.recoveryHealth == 50,
     "Town Guard Last Stand contract is missing"
+)
+-- The two properties a restore fails silently without: it has to out-rank the
+-- live save or ProfilePersistence refuses the write, and it must not carry the
+-- session lock that rode along inside the profile when the copy was taken.
+local studioBackupRing = ProfileBackup.capture(nil, {
+    revision = 4,
+    schemaVersion = Config.SaveSchemaVersion,
+    sessionLock = { jobId = "job", heartbeat = 1 },
+}, 100, "interval", Config.ProfileBackupRetained)
+local studioRestored = ProfileBackup.restoredProfile(ProfileBackup.newest(studioBackupRing), 9, 500)
+assert(
+    studioRestored.revision == 10 and studioRestored.sessionLock == nil,
+    "profile backup restore contract is missing"
 )
 
 local calls = 0

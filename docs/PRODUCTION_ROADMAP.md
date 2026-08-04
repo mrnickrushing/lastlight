@@ -200,6 +200,23 @@ technically healthy, and shows credible D1 intent in closed testing.
 
 ## Milestone 4 — Persistent town platform
 
+**Increment status (2026-08-04):** versioned profiles, session locking on the
+autosave beat, shutdown flushing, host/visitor permissions, resource-charged
+construction orders, sixteen staged buildings, read-only admin save inspection,
+and now profile backups with an audited restore are implemented in source. The
+persistence deliverable below is complete as written; the admin deliverable's
+read and write halves both exist. Backups are documented in
+[MILESTONE_4_PROFILE_BACKUPS.md](MILESTONE_4_PROFILE_BACKUPS.md), whose own open
+list is the honest one: restoring to a copy other than the newest, export
+tooling, and a migration fixture per released schema all remain open, and every
+DataStore behaviour needs a published staging place to evidence.
+
+Still absent in source, checked rather than inferred: resident jobs, injury,
+relationships, and the crisis framework; storage and decoration caps. Damage and
+repair exist as one town-wide integrity value rather than per building, and the
+"town visit flow" is implicit first-arrival hosting on a shared server rather
+than a deliberate visit mechanic.
+
 ### Deliverables
 
 - versioned profile, locking, autosave, shutdown, migrations, backups;

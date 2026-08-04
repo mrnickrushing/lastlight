@@ -2,7 +2,7 @@
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.47.0",
+    BuildVersion = "0.48.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -69,6 +69,18 @@ return table.freeze({
     -- again.
     ProfileLockHeartbeatSeconds = 10,
     ProfileLockStaleAfterSeconds = 90,
+    -- Backups. A copy every autosave would double the write traffic of the
+    -- busiest path in the game to photograph a profile that usually has not
+    -- meaningfully changed, so ordinary copies are taken at most this often.
+    -- A schema change ignores the interval entirely -- that is the one moment
+    -- the old shape stops being recoverable from the new one, and it is the
+    -- case TECHNICAL_ARCHITECTURE asks for a backup before.
+    ProfileBackupIntervalSeconds = 900,
+    -- How many copies are kept. Bounded because a DataStore value has a hard
+    -- size ceiling and a profile is not small: an unbounded history would
+    -- eventually fail every write to the backup key, taking backups down at
+    -- exactly the moment the save is growing fastest.
+    ProfileBackupRetained = 3,
     -- How often a client reports its own frame and memory samples, and the
     -- floor the server enforces on that remote. Telemetry only: nothing a
     -- client reports here grants it anything.

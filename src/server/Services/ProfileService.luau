@@ -27,10 +27,13 @@ export type ProfileService = typeof(setmetatable(
         _equipmentChangedEvent: BindableEvent,
         _saveSchema: any,
         _profilePersistence: any,
+        _profileBackup: any,
         _adminInspectionReport: any,
         _config: any,
         _jobId: string,
         _store: GlobalDataStore?,
+        _backupStore: GlobalDataStore?,
+        _lastBackupAt: { [number]: number },
     },
     ProfileService
 ))
@@ -50,10 +53,13 @@ function ProfileService.new(logger: Logger, persistent: boolean): ProfileService
         _equipmentChangedEvent = Instance.new("BindableEvent"),
         _saveSchema = nil,
         _profilePersistence = nil,
+        _profileBackup = nil,
         _adminInspectionReport = nil,
         _config = nil,
         _jobId = "",
         _store = nil,
+        _backupStore = nil,
+        _lastBackupAt = {},
     }, ProfileService)
 end
 
@@ -61,6 +67,7 @@ function ProfileService.Init(self: ProfileService, context: any)
     self._saveSchema = context.saveSchema
     self._profilePersistence =
         assert(context.profilePersistence, "profile persistence rules unavailable")
+    self._profileBackup = assert(context.profileBackup, "profile backup rules unavailable")
     self._adminInspectionReport =
         assert(context.adminInspectionReport, "admin inspection report unavailable")
     self._config = assert(context.config, "config unavailable")
@@ -71,7 +78,81 @@ function ProfileService.Init(self: ProfileService, context: any)
         else "studio-" .. tostring(os.time())
     if self._persistent then
         self._store = DataStoreService:GetDataStore("LastLightProfile_v1")
+        -- A separate store rather than another field on the profile: a backup
+        -- must survive whatever went wrong with the profile, and a ring of
+        -- snapshots living inside the value it is meant to protect would be
+        -- lost to the same bad write.
+        self._backupStore = DataStoreService:GetDataStore("LastLightProfileBackup_v1")
     end
+end
+
+--[[
+    Copy a save aside, if this one is worth copying.
+
+    Deliberately never raises: a backup is a best-effort safety net, and a
+    DataStore hiccup on this path must not take down the load or save that
+    triggered it. A failure is logged and the caller carries on -- the
+    alternative, refusing to save because the backup failed, would turn a
+    redundancy feature into a new way to lose progress.
+]]
+function ProfileService._captureBackup(
+    self: ProfileService,
+    userId: number,
+    profile: any,
+    storedSchemaVersion: any,
+    forcedReason: string?
+): string?
+    if not self._persistent or self._backupStore == nil or profile == nil then
+        return nil
+    end
+
+    local now = os.time()
+    local key = string.format("player_%d", userId)
+    local capturedReason: string? = nil
+
+    local ok, message = pcall(function()
+        (self._backupStore :: GlobalDataStore):UpdateAsync(key, function(current: any)
+            local decision = if forcedReason ~= nil
+                then { capture = true, reason = forcedReason }
+                else self._profileBackup.shouldCapture(
+                    current,
+                    storedSchemaVersion,
+                    self._config.SaveSchemaVersion,
+                    now,
+                    self._config.ProfileBackupIntervalSeconds
+                )
+            if not decision.capture then
+                return nil
+            end
+            capturedReason = decision.reason
+            return self._profileBackup.capture(
+                current,
+                profile,
+                now,
+                decision.reason,
+                self._config.ProfileBackupRetained
+            )
+        end)
+    end)
+
+    if not ok then
+        self._logger:warn("profile_backup_failed", {
+            player = userId,
+            reason = tostring(message),
+        })
+        return nil
+    end
+
+    if capturedReason ~= nil then
+        self._lastBackupAt[userId] = now
+        self._logger:info("profile_backup_captured", {
+            player = userId,
+            reason = capturedReason,
+            revision = profile.revision,
+            schemaVersion = profile.schemaVersion,
+        })
+    end
+    return capturedReason
 end
 
 function ProfileService._load(self: ProfileService, player: Player)
@@ -108,6 +189,20 @@ function ProfileService._load(self: ProfileService, player: Player)
         source = outcome.source
         writable = outcome.writable
         if outcome.useStored or outcome.source == "new" then
+            -- Photograph the stored bytes *before* normalize folds them into
+            -- the current shape. This is the moment TECHNICAL_ARCHITECTURE asks
+            -- for a backup: a migration here is not a numbered pipeline that
+            -- can be replayed backwards, it is a fold into the current default,
+            -- so anything it drops is gone with nothing left to compare against.
+            -- Spawned rather than awaited -- a player must never wait on the
+            -- join path for a redundancy write.
+            if outcome.useStored and type(result) == "table" then
+                local storedValue = result
+                local storedSchemaVersion = storedValue.schemaVersion
+                task.spawn(function()
+                    self:_captureBackup(player.UserId, storedValue, storedSchemaVersion, nil)
+                end)
+            end
             profile = self._saveSchema.normalize(if outcome.useStored then result else nil, now)
         elseif finished then
             self._logger:warn("profile_load_failed", {
@@ -1081,6 +1176,13 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
     -- path that actually reached the store.
     self._lockHeartbeat[player] = os.time()
 
+    -- Ordinary rate-limited copy of a save that has just been written. Spawned
+    -- for the same reason as the load-path capture: the autosave beat is the
+    -- busiest path in the game and must not wait on a second store.
+    task.spawn(function()
+        self:_captureBackup(player.UserId, profile, profile.schemaVersion, nil)
+    end)
+
     local activeProfile = self._profiles[player]
     if activeProfile ~= nil and activeProfile.revision == profile.revision then
         self._dirty[player] = nil
@@ -1192,6 +1294,138 @@ function ProfileService.forceUnlock(self: ProfileService, userId: number): any
     if not ok then
         self._logger:warn("profile_unlock_failed", { userId = userId, reason = tostring(err) })
         error("could not update that profile right now")
+    end
+
+    return outcome
+end
+
+--[[
+    What copies exist for a player, without restoring anything.
+
+    The read half of the repair tooling, and the one an operator should always
+    run first: a restore is a deliberate move backwards in a player's progress,
+    and the only way to make that judgement is to see how far back the copies go
+    and why each was taken.
+]]
+function ProfileService.backupSummary(self: ProfileService, userId: number): any
+    assert(type(userId) == "number" and userId > 0, "backup target must be a valid user ID")
+
+    if not self._persistent or self._backupStore == nil then
+        return self._profileBackup.summary(nil)
+    end
+
+    local ok, result = pcall(function()
+        return (self._backupStore :: GlobalDataStore):GetAsync(string.format("player_%d", userId))
+    end)
+    if not ok then
+        self._logger:warn("profile_backup_read_failed", {
+            userId = userId,
+            reason = tostring(result),
+        })
+        error("could not read that player's backups right now")
+    end
+
+    return self._profileBackup.summary(result)
+end
+
+--[[
+    Roll a save back to its most recent copy.
+
+    The safe-repair half of Milestone 4's admin deliverable, and the riskiest
+    call in this file, so the constraints are worth stating plainly:
+
+      * **It refuses while a live server holds the profile.** Restoring under a
+        session that is still writing would have that session's next autosave
+        immediately overwrite the restore -- or worse, land between the read and
+        the write. `lock_is_active` here means the same thing it means for
+        /unlock: something is genuinely still playing this, and forcing it is
+        the exact race the locking system exists to prevent.
+      * **The pre-restore profile is itself copied first.** A restore is
+        therefore undoable: an operator who rolls back the wrong player, or the
+        wrong far, has the state they replaced sitting in the same ring. Without
+        this the tool is a one-way door, and a one-way door in a repair tool is
+        how a repair becomes an incident.
+      * **It never invents progress.** The only thing written is a profile this
+        player previously had, at a revision above the live one so the write
+        actually lands. Nothing is merged, topped up, or granted.
+]]
+function ProfileService.restoreLatestBackup(self: ProfileService, userId: number): any
+    assert(type(userId) == "number" and userId > 0, "restore target must be a valid user ID")
+
+    if not self._persistent or self._store == nil or self._backupStore == nil then
+        return { applied = false, reason = "not_persistent" }
+    end
+
+    local readOk, stored = pcall(function()
+        return (self._backupStore :: GlobalDataStore):GetAsync(string.format("player_%d", userId))
+    end)
+    if not readOk then
+        self._logger:warn("profile_backup_read_failed", {
+            userId = userId,
+            reason = tostring(stored),
+        })
+        error("could not read that player's backups right now")
+    end
+
+    local snapshot = self._profileBackup.newest(stored)
+    if snapshot == nil then
+        return { applied = false, reason = "no_backup_on_record" }
+    end
+
+    local outcome: any = { applied = false, reason = "update_did_not_run" }
+    local replaced: any = nil
+    local ok, err = pcall(function()
+        (self._store :: GlobalDataStore):UpdateAsync(
+            string.format("player_%d", userId),
+            function(current: any)
+                if current == nil then
+                    outcome = { applied = false, reason = "no_save_on_record" }
+                    return nil
+                end
+
+                -- Decided against the value actually about to be committed
+                -- over, not against a snapshot read beforehand, for the same
+                -- reason forceUnlock does it here.
+                local existingLock = if type(current) == "table" then current.sessionLock else nil
+                if existingLock ~= nil then
+                    local decision = self._profilePersistence.acquireLock(
+                        existingLock,
+                        "admin-restore-check",
+                        os.time(),
+                        self._config.ProfileLockStaleAfterSeconds
+                    )
+                    if not decision.acquired then
+                        outcome = { applied = false, reason = "lock_is_active" }
+                        return nil
+                    end
+                end
+
+                local storedRevision = if type(current) == "table" then current.revision else nil
+                local restored =
+                    self._profileBackup.restoredProfile(snapshot, storedRevision, os.time())
+
+                replaced = current
+                outcome = {
+                    applied = true,
+                    reason = snapshot.reason,
+                    restoredRevision = restored.revision,
+                    fromRevision = storedRevision,
+                    capturedAt = snapshot.capturedAt,
+                    schemaVersion = snapshot.schemaVersion,
+                }
+                return restored
+            end
+        )
+    end)
+    if not ok then
+        self._logger:warn("profile_restore_failed", { userId = userId, reason = tostring(err) })
+        error("could not update that profile right now")
+    end
+
+    -- Only after the restore has actually committed, so a refused restore does
+    -- not spend a slot in the ring on a copy of a profile nothing replaced.
+    if outcome.applied and replaced ~= nil then
+        self:_captureBackup(userId, replaced, nil, "pre_restore")
     end
 
     return outcome

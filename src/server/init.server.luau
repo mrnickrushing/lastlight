@@ -48,6 +48,7 @@ local ActionPayloadContract = require(root.ActionPayloadContract)
 local AdminInspectionReport = require(root.AdminInspectionReport)
 local PerformanceBudget = require(root.PerformanceBudget)
 local ProfilePersistence = require(root.ProfilePersistence)
+local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
 local RunHandoff = require(root.RunHandoff)
 local AdminRoster = require(root.AdminRoster)
@@ -331,6 +332,7 @@ local services = ServiceRegistry.new({
     actionPayloadContract = ActionPayloadContract,
     adminInspectionReport = AdminInspectionReport,
     profilePersistence = ProfilePersistence,
+    profileBackup = ProfileBackup,
     config = Config,
 })
 services:register(featureFlags)
