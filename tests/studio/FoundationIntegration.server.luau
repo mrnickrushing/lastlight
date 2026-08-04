@@ -1318,13 +1318,31 @@ assert(
     expedition:GetAttribute("ManifestHash") == expectedManifest.hash,
     "Bramblewake manifest does not replay deterministically"
 )
+--[[
+    Built parts against the built-part budget.
+
+    This used to compare GeneratedPartCount -- BaseParts actually constructed
+    under the expedition -- against PartBudget, which bounds something else
+    entirely: the sum of the chosen modules' planning allowances, checked by
+    ExpeditionGenerator.validate when it composes a manifest. The preview seed
+    measures 427 against that planning budget and 2330 built parts, so the
+    assertion read as "233% over budget" while nothing was over budget.
+
+    Summing in the boss arena and Blackout allowances made it worse, not
+    better: the Warden seal annex and the Blackout layer are built after
+    GeneratedPartCount is recorded, by their own services, so those parts have
+    never been in this number. See the derivation on BuiltPartBudget.
+]]
 local generatedPartCount = expedition:GetAttribute("GeneratedPartCount")
 assert(
     type(generatedPartCount) == "number"
         and generatedPartCount >= 200
-        and generatedPartCount
-            <= BramblewakeExpedition.PartBudget + BramblewakeExpedition.BossArenaPartBudget + BramblewakeExpedition.BlackoutPartBudget,
-    "Bramblewake preview is outside its detailed mobile part budget"
+        and generatedPartCount <= BramblewakeExpedition.BuiltPartBudget,
+    string.format(
+        "Bramblewake preview is outside its built part budget (%s built, %d allowed)",
+        tostring(generatedPartCount),
+        BramblewakeExpedition.BuiltPartBudget
+    )
 )
 local criticalPaths = 0
 local trailWear = 0

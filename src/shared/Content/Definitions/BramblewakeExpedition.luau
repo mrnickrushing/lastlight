@@ -635,7 +635,46 @@ return table.freeze({
     PointOfInterestCount = 4,
     EventCount = 8,
     EventInteractionCount = eventInteractionCount,
+    --[[
+        Two different things have been called "the part budget", and conflating
+        them is why Bramblewake looked 233% over a budget it was never
+        breaching.
+
+        PartBudget bounds the MANIFEST: the sum of each chosen module's
+        `partBudget` allowance, which ExpeditionGenerator.validate checks when
+        it composes a run. That is a planning number, in units of "roughly how
+        much structure is this module allowed to ask for". The preview seed
+        totals 427 against 640, and has been comfortably inside it all along.
+
+        BuiltPartBudget bounds the WORLD: BaseParts actually constructed under
+        the expedition by BramblewakeBuilder, which is what
+        `GeneratedPartCount` records and what the Studio integration test
+        measures. Those are not the same quantity and never were -- a module
+        with a planning allowance of 44 legitimately builds several hundred
+        real parts once its trail stones, brambles, roots and dressing are
+        instantiated. The test had been comparing built parts against the
+        planning budget and failing on the mismatch.
+
+        Derivation of 2600: the preview seed
+        (Config.BramblewakePreviewSeed, which is the only seed the test ever
+        builds) measures 2330 in Studio -- twelve modules plus the regional
+        backdrop, before authored mesh dressing and before the Warden seal
+        annex and Blackout layer, which are built afterwards by their own
+        services and are therefore NOT in this number. 2600 is that measurement
+        plus about 12% headroom.
+
+        What this is: a regression guard. It catches the expedition quietly
+        growing a few hundred parts nobody intended.
+
+        What it is NOT: evidence that 2330 parts is affordable on a baseline
+        phone. Nothing here has been measured on device, and
+        TECHNICAL_ARCHITECTURE is explicit that Studio numbers are not hardware
+        evidence. The device capture the Milestone 3 gate asks for is still
+        owed, and if it comes back badly this ceiling should come down rather
+        than the guard be widened again.
+    ]]
     PartBudget = 640,
+    BuiltPartBudget = 2600,
     BossArenaPartBudget = 40,
     BlackoutPartBudget = 20,
     LightBudget = 32,

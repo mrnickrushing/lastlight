@@ -7,9 +7,9 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-04, at `main` = `fffa122` (PR #178), build `0.49.1`,
-save schema 13, 20 services. A first connected-Studio visual sweep is in
-flight on `agent/visual-sweep-fixes`.
+Last updated: 2026-08-04, at `main` = `7590abe` (PR #179), build `0.49.1`,
+save schema 13, 20 services. A first-world layout pass is in flight on
+`agent/first-world-layout`.
 
 ---
 
@@ -241,24 +241,35 @@ None of these can be completed from a session.
 
 ## Known open threads
 
-- **Bramblewake is 3.3x over its generated part budget, and this is now the one
-  thing stopping `PASS FoundationIntegration` from printing.** The preview
-  generates **2330** parts against a catalogued budget of **700**
-  (`PartBudget` 640 + `BossArenaPartBudget` 40 + `BlackoutPartBudget` 20 in
-  `BramblewakeExpedition.luau`). That budget has not moved since `fe31b24`
-  (2026-08-01), and everything added to the expedition since — the module
-  dressing pass, boss arena, blackout layer, story landmarks, backdrop — landed
-  on top of it without the number being revisited. Nothing caught it because
-  the test aborted 700 lines earlier.
+- **The town square moved and grew; three things now stand on it.** `TOWN_CENTER`
+  is (0, 0, -80) and `PLAZA_HALF` is 56, so the square spans z -24..-136 and
+  reaches Mara's clearing. Mara and the starter tool yard were authored to stand
+  on grass at y 0 and are now lifted onto the pad by `PLAZA_SURFACE_Y`; the
+  Heartwood gather node and the First Lantern's own plinth still embed ~0.8
+  studs in the paving, which reads as set-in rather than sunk but has not been
+  owner-reviewed. If the Heartwood stump on a paved plaza looks wrong, reseat it.
+- **`RouteGuideMarker` is a taste call nobody has made.** 26 Neon foxfire
+  waypoint inlays run the length of the critical route. Their rationale is
+  documented and deliberate -- they are the only thing that says "this way" in
+  the dark -- but in daylight they read as saturated cyan rectangles lying on
+  the paving. Left untouched. Decide whether daylight should dim them.
 
-  **This needs an owner decision, not a session's guess.** The M3 exit gate in
-  [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md)
-  reads "generated part count stays within catalog budget and target-device
-  frame/memory captures are attached", so the number is a product gate, and
-  raising it to match whatever the world happens to contain would delete the
-  gate rather than pass it. Either re-derive the budget from a real
-  baseline-phone capture and record why, or cut expedition density back toward
-  the existing one. A session can do either once told which.
+
+- **Bramblewake's part budget was never breached; the test was measuring the
+  wrong thing.** Recorded here previously as "3.3x over budget" -- that was
+  wrong, and the correction matters because it nearly cost the generator its
+  one working constraint. `PartBudget` (640) bounds the *manifest*: the sum of
+  the chosen modules' planning allowances, checked by
+  `ExpeditionGenerator.validate`. The preview seed totals **427** against it and
+  always has. `GeneratedPartCount` (**2330**) counts *built* BaseParts, which is
+  a different quantity entirely -- a module with a planning allowance of 44
+  legitimately builds several hundred real parts. The Studio test compared the
+  two, and summed in the boss-arena and Blackout allowances on top, though both
+  are built after that count is taken. Split into `PartBudget` (unchanged) and
+  a new `BuiltPartBudget` (2600 = measured 2330 + ~12%), derivation recorded in
+  `BramblewakeExpedition.luau`. **Still owed:** `BuiltPartBudget` is a
+  regression guard, not evidence 2330 parts is affordable on a phone. The
+  Milestone 3 device capture has still never been taken.
 - **Two selected Creator Store assets were never actually adopted.**
   `mesh_creator_hollow_rootling_a` and `mesh_creator_predatory_flower_a` are
   listed in `assets/meshes/candidates/creator-store-full-pass/selection.json`
