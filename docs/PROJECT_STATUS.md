@@ -7,9 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-04, at `main` = `7590abe` (PR #179), build `0.49.1`,
-save schema 13, 20 services. A layout and datum pass covering both levels is in
-flight on `agent/first-world-layout`.
+Last updated: 2026-08-04, at `main` = `f18a136` (PR #181), build `0.49.1`,
+save schema 13, 20 services.
 
 ---
 
@@ -25,15 +24,63 @@ there, not a copy here. Note the gate's own caveat: the layout validator only
 guards footprint clearance from source — the gate itself still needs a live
 Studio pathfinding pass.
 
-## Recently landed (PRs ~#151–#178)
+## Recently landed (PRs ~#151–#181)
 
 Verified against `git log`, newest first:
 
-- **In flight (not yet merged), `agent/visual-sweep-fixes`:** the first visual
-  sweep done through a connected Studio session, and the first time the
-  committed Studio integration test has ever been watched all the way through.
-  Five things a player could see were wrong, and none of them were visible from
-  source alone:
+- **#181** Full audit of the night-defense combat system: every combat source
+  file read end to end, then live-tested by firing the real gameplay remotes
+  (spawn, strike, profession, incident) through a connected Studio session,
+  including driving the real `TownNightService` day/dusk/night cycle through
+  five consecutive real nights. Two bugs found:
+  - **Enemies floating or sinking relative to the ground.**
+    `enemySpawnPosition()` held a stale hardcoded `Vector3.new(0, 2, -153)`
+    left over from before the #180 datum fix below, so every enemy in every
+    night defense fought ~2 studs above the ground for its whole encounter.
+    Separately and independently — proved algebraically: the sink is
+    `lift - groundOffset`, and the spawn origin's Y has always equaled the
+    rendered terrain height on both sides of the datum fix, so the gap
+    between them was never affected by it — four of six enemy species'
+    authored visual meshes were sinking ~2 studs *into* the ground.
+    `groundOffset` in `placeEnemyVisual` was each species' fallback-core
+    Y-lift plus 2.0 more, too consistent across four unrelated species to be
+    separate tuning mistakes. Both fixed; verified live that all six species
+    now land within ~0.1 studs of true ground.
+  - **Silent lantern damage from the hollow crow.** Its `spark_theft` status
+    effect — the most frequent source of lantern-health pressure in a night,
+    firing on every unblocked hit — mutated `_lanternHealth` with no log
+    line, unlike every other lantern-pressure path (incident failure, a
+    direct lantern impact, a Last Stand spend). Traced live: watched the
+    lantern crash from 100 to its floor of 18 with nothing in the server log
+    to explain it. Added the same `lantern_pressure_applied` event the other
+    paths already emit; no behavior change, confirmed by the same trace.
+  - Also live-verified with no changes needed: Town Guard Last Stand's four
+    branches (successful recovery, lantern-too-weak falling back to the
+    standard bleedout timer, already-spent-this-night rejection, and the
+    once-per-night reset), the Drowsy and Spark Theft status effects, and the
+    Warden/Engineer profession combat hooks.
+- **#180** The world's vertical datum fix, both levels' glass removal, the
+  town square move, and the Bramblewake part-budget re-derivation — see
+  "Known open threads" below for the mechanics of each; they stay there
+  because they are still worth checking against, not because they are
+  unresolved. Two more fixes from the same PR that belong here instead,
+  because they are fully closed:
+  - **Three of eight Bramblewake events had never existed.** A module can
+    carry both a point of interest and an event, and the builder placed them
+    on `if`/`elseif` — the POI always won and the event was silently
+    dropped. `ExpeditionService` logged `events=8` from the manifest while
+    the world held 5. Split into separate `if` blocks; verified 8 sockets,
+    25 steps.
+  - **One transient asset-fetch failure condemned an asset for the whole
+    server session**, silently dropping every instance of it rather than
+    just the one placement. `MeshTemplateLoader` now retries a failed
+    `LoadAsset`/`LoadAssetAsync` up to three times with backoff before
+    condemning it — this is what finally produced a clean boot
+    (`fallbacks=0` across all three asset groups).
+- **#179** The first visual sweep done through a connected Studio session, and
+  the first time the committed Studio integration test has ever been watched
+  all the way through. Five things a player could see were wrong, and none of
+  them were visible from source alone:
   - **All eight illustrated first-world notices were invisible.** Both the
     Greenward Archive board and the Town Board are mesh-replacement fallbacks,
     so `hideProceduralPlaceholder` blanked every notice paper to
@@ -76,16 +123,21 @@ Verified against `git log`, newest first:
   `[Last Light] PASS FoundationIntegration` — it aborted at the notice check,
   and everything past that line had gone unexercised long enough to rot. See
   the runbook note below.
-- **In flight (not yet merged):** setup for connecting an AI session directly to
-  Roblox Studio through Studio's own built-in MCP server, including a Wine
-  wrapper for Linux hosts running Studio under Vinegar. **This is the first
-  thing that moves the project's binding constraint** — the visual and
-  DataModel half of every runbook gate can now be closed by a session that can
-  see Studio, while the device and human half cannot. Read
-  [STUDIO_MCP_SETUP.md](STUDIO_MCP_SETUP.md) before claiming a gate closed; it
-  draws that line explicitly. The runbooks' journeys are renamed from "Windows
-  Studio journey" to "Studio journey" — the owner develops on Linux, and the
-  operating system was never what those steps depended on.
+- **#178** Setup for connecting an AI session directly to Roblox Studio through
+  Studio's own built-in MCP server, including a Wine wrapper for Linux hosts
+  running Studio under Vinegar. **This is the thing that moved the project's
+  binding constraint** — the visual and DataModel half of every runbook gate
+  can now be closed by a session that can see Studio, while the device and
+  human half cannot. Read [STUDIO_MCP_SETUP.md](STUDIO_MCP_SETUP.md) before
+  claiming a gate closed; it draws that line explicitly. The runbooks'
+  journeys are renamed from "Windows Studio journey" to "Studio journey" — the
+  owner develops on Linux, and the operating system was never what those steps
+  depended on. **Proven out since, not just wired up:** #179, #180, and #181
+  above were each done through a live connected session — spawning real
+  enemies, firing the actual gameplay remotes instead of mocking them, driving
+  several real day/dusk/night cycles end to end, and reading Studio's own
+  console output — not just DataModel inspection. See "Session gotchas" below
+  for what that surfaced about testing this way.
 - **#177** Two construction-site fixes to #176, found by
   CodeRabbit review after it merged. Both were reachable on ordinary paths:
   an explicitly empty damageable roster fell back to "every building", so a
@@ -218,12 +270,14 @@ None of these can be completed from a session.
 
 1. **Studio and device playtest evidence** — the M3 exit gates, the M4 gate's
    live pathfinding pass, and visual confirmation of the placement-correction
-   wave. **Partially unblocked:** a session running on the machine that runs
-   Studio can now close the Studio half through the MCP server — see
-   [STUDIO_MCP_SETUP.md](STUDIO_MCP_SETUP.md). It cannot run on a cloud session,
-   because MCP over stdio has no address to dial. What remains strictly human:
-   the baseline-phone pass, the ten-tester gate, DataStore behaviour across
-   servers, real multiplayer, and whether the slice is fun.
+   wave. **Unblocked for the Studio half, and now demonstrated rather than just
+   wired up:** a session running on the machine that runs Studio can close the
+   Studio half through the MCP server — see
+   [STUDIO_MCP_SETUP.md](STUDIO_MCP_SETUP.md). #179, #180, and #181 each did
+   this for real, across two separate sessions. It cannot run on a cloud
+   session, because MCP over stdio has no address to dial. What remains
+   strictly human: the baseline-phone pass, the ten-tester gate, DataStore
+   behaviour across servers, real multiplayer, and whether the slice is fun.
 2. **`ROBLOX_API_KEY` per session** — containers lose it on reset. It is
    needed only for asset upload/download (`scripts/upload_mesh_assets.py`,
    `scripts/download_creator_store_model.py`), never committed or logged.
@@ -231,13 +285,6 @@ None of these can be completed from a session.
    during the visual wave (beds below the floor; lantern regen cancelling
    revives). CodeRabbit still reviews, but expect nothing from Codex until
    credits are topped up.
-4. **First Lantern position report vs. source** — an owner playtest report
-   asked for the First Lantern to move "back towards the center of town in
-   the city square." Source already has it exactly there (see the
-   2026-08-04 entry above) with no history of it being elsewhere. Needs the
-   owner to say what they're actually seeing in the published/Studio game —
-   a stale published place, a different landmark entirely, or something a
-   session genuinely cannot see from source.
 
 ## Known open threads
 
