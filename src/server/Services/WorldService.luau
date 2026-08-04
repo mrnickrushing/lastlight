@@ -8783,10 +8783,12 @@ function WorldService.setTownCondition(self: WorldService, condition: any)
         local interactionId = if type(buildingId) == "string"
             then self._runtimeIds.TownRepairInteractionIdByBuilding[buildingId]
             else nil
-        -- A building with no recorded placement is one this town has not built
-        -- -- a stale profile can carry damage for it. Skipping is the safe
-        -- direction: no prompt appears for a building that is not there.
-        if placement == nil or interactionId == nil then
+        -- A building with no recorded placement, or one still standing as a
+        -- construction site, is not something this town has built -- and a
+        -- migrated profile can carry damage for either. The snapshot already
+        -- filters these out; this is the second gate, because the cost of
+        -- getting it wrong is a REPAIR prompt on an empty lot.
+        if placement == nil or placement.damageable ~= true or interactionId == nil then
             continue
         end
 

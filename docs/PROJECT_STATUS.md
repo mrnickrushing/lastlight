@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-04, at `main` = `4459b03` (PR #175), build `0.49.0`,
-save schema 13, 20 services. Per-building town damage is in flight on
+Last updated: 2026-08-04, at `main` = `bac6fa5` (PR #176), build `0.49.1`,
+save schema 13, 20 services. A review-fix follow-up to #176 is in flight on
 `claude/repo-docs-review-7iw0vr`.
 
 ---
@@ -29,8 +29,16 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
-- **In flight (not yet merged):** per-building town damage and repair. Storm
-  damage stops being one town-wide integrity number and becomes a property of
+- **In flight (not yet merged):** two construction-site fixes to #176, found by
+  CodeRabbit review after it merged. Both were reachable on ordinary paths:
+  an explicitly empty damageable roster fell back to "every building", so a
+  tier-zero town — which is entirely construction sites — would have had all
+  sixteen buildings damaged on a new save's first night; and a migrated
+  schema-12 profile could raise a REPAIR prompt on a construction lot, because
+  the renderer checked that a building had a recorded placement but not that it
+  was actually standing.
+- **#176** Per-building town damage and repair. Storm
+  damage stopped being one town-wide integrity number and became a property of
   each building, chosen by night number, repaired one building at a time
   through a prompt that carries its building's ID as a baked payload. Schema
   13; a schema-12 town-wide integrity spreads to every building on migration.
@@ -184,8 +192,8 @@ None of these can be completed from a session.
   "done" means here. Also weaker than the deliverable wording implies: "town
   visit flow" is only implicit first-arrival hosting on a shared server (no
   deliberate visit/teleport mechanic); damage/repair is one town-wide
-  integrity value (`TownCondition.luau`), not per-building — **now addressed by
-  the in-flight per-building damage work above**; eleven of the
+  integrity value (`TownCondition.luau`), not per-building — **addressed by #176
+  above**; eleven of the
   sixteen buildings are staged shells with construction prompts, not yet
   functionally distinct.
 

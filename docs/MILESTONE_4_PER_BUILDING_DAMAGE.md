@@ -1,6 +1,6 @@
 # Milestone 4 per-building damage and repair
 
-Build `0.49.0`, save schema `13`. Storm damage stops being one number for the
+Build `0.49.0` (fixes in `0.49.1`), save schema `13`. Storm damage stops being one number for the
 whole town and becomes a property of each building.
 
 ## What was wrong with the old model
@@ -103,7 +103,7 @@ missing accessor is a loud programming error instead of an unprotected town.
 
 ## Automated evidence
 
-`npm test` — 476 pure Luau tests, 21 of them the rewritten `TownCondition`
+`npm test` — 479 pure Luau tests, 24 of them the rewritten `TownCondition`
 suite, plus format, lint, strict typecheck, both place builds, and DataModel
 verification. The Studio integration place asserts the per-building repair
 contract directly. `SaveMigration.spec`'s existing coverage guard required a
@@ -145,6 +145,31 @@ without Studio and a published staging place.
 9. Confirm every damaged building remains navigable, with camera clearance and
    interaction reach intact on the baseline phone, at the maximum number of
    simultaneously damaged buildings.
+
+## Construction-site fixes (build `0.49.1`)
+
+Review after the first merge found two ways a building nobody has built could be
+treated as damaged. Both were reachable on ordinary paths, not edge cases.
+
+**An explicitly empty damageable roster meant "damage everything."** `afterNight`
+folded `nil` and `{}` together and fell back to the full building list for both.
+`WorldService.damageableBuildingIds()` returns `{}` when every building is still
+a construction site — which is exactly a tier-zero town, so a new save's first
+bad night would have damaged all sixteen buildings, none of which stand. `nil`
+now means "no roster supplied, use every known building" and an explicit table
+means exactly that set, empty included.
+
+**A migrated profile could raise a repair prompt on an empty lot.** Schema-12
+normalization marks *every* building damaged, because the old model never
+recorded which were hit. The renderer checked that a damaged building had a
+recorded placement, but construction sites record one too — with
+`damageable = false`. `snapshot` now takes the standing roster and omits damaged
+buildings outside it, so the HUD's repair count is right as well as the world;
+the renderer keeps a second gate on `placement.damageable`, because the cost of
+getting this wrong is a REPAIR prompt on bare ground.
+
+Both fixes were made to fail before being trusted: restoring either old
+behaviour fails the case that names it.
 
 ## Open work
 
