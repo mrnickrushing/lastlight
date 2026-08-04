@@ -218,12 +218,16 @@ function TownCondition.afterNight(
         return current, { applied = false, reason = "night_already_recorded" }
     end
 
-    -- No explicit roster means every known building is standing. Keeps the
-    -- caller honest for tests and safe for a server that has not yet resolved
-    -- its construction state.
-    local roster: { string } = if type(damageable) == "table" and #damageable > 0
-        then damageable
-        else TownProgression.buildingIds()
+    -- `nil` means no roster was supplied, so every known building counts. An
+    -- explicit table means exactly that set -- including an empty one, which
+    -- says nothing is standing to be damaged. Those two must not collapse into
+    -- each other: a tier-zero town is entirely construction sites, so the world
+    -- legitimately reports an empty roster on a new save's first night, and
+    -- treating that as "damage everything" would wreck sixteen buildings nobody
+    -- has built yet.
+    local roster: { string } = if damageable == nil
+        then TownProgression.buildingIds()
+        else damageable
 
     local lanternHealth = math.clamp(endingLanternHealth, 0, 100)
     local struck = TownCondition.struckBuildings(roster, lanternHealth, nightNumber)
@@ -297,9 +301,10 @@ end
 -- world attributes all speak in one number. It is derived from the buildings
 -- rather than stored, so it can never disagree with them.
 function TownCondition.averageIntegrity(state: any, roster: { string }?): number
-    local ids: { string } = if type(roster) == "table" and #roster > 0
-        then roster
-        else TownProgression.buildingIds()
+    -- Same roster rule as afterNight: nil is "every known building", an
+    -- explicit table is exactly that set, and an empty one means nothing stands
+    -- to be damaged -- which averages to a whole town, not a broken one.
+    local ids: { string } = if roster == nil then TownProgression.buildingIds() else roster
     if #ids == 0 then
         return FULL_INTEGRITY
     end
@@ -346,11 +351,31 @@ function TownCondition.merge(current: any, incoming: any): State
     return merged
 end
 
+--[[
+    What the world and the HUD read.
+
+    `roster` is the set of buildings that physically stand. Damaged buildings
+    outside it are omitted rather than reported, because a migrated schema-12
+    profile marks *every* building damaged -- including ones this town has only
+    ever had as construction sites -- and presenting repair work for a building
+    nobody has built would put a repair prompt on an empty lot.
+]]
 function TownCondition.snapshot(state: State, roster: { string }?): any
     local current = TownCondition.normalize(state)
+    local standing: { [string]: boolean }? = nil
+    if roster ~= nil then
+        standing = {}
+        for _, buildingId in roster do
+            (standing :: { [string]: boolean })[buildingId] = true
+        end
+    end
+
     local damaged = {}
     local repairsRemaining = 0
     for _, buildingId in TownProgression.buildingIds() do
+        if standing ~= nil and standing[buildingId] ~= true then
+            continue
+        end
         local integrity = TownCondition.integrityFor(current, buildingId)
         if integrity < FULL_INTEGRITY then
             table.insert(damaged, { buildingId = buildingId, integrity = integrity })

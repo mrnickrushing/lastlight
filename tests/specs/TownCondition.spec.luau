@@ -134,6 +134,53 @@ return {
             end,
         },
         {
+            name = "an explicitly empty roster damages nothing at all",
+            run = function()
+                -- A tier-zero town is entirely construction sites, so the world
+                -- legitimately reports an empty roster on a new save's first
+                -- night. Collapsing that into "no roster supplied" would damage
+                -- every building nobody has built yet -- on the most ordinary
+                -- path in the game.
+                local state, result = TownCondition.afterNight(TownCondition.default(), 0, 1, {})
+                TestRunner.equal(#result.struck, 0)
+                TestRunner.equal(result.damage, 0)
+                TestRunner.equal(next(state.buildings), nil)
+                for _, buildingId in TownProgression.buildingIds() do
+                    TestRunner.equal(TownCondition.integrityFor(state, buildingId), 100)
+                end
+            end,
+        },
+        {
+            name = "omitting the roster entirely still means every known building",
+            run = function()
+                local _, result = TownCondition.afterNight(TownCondition.default(), 0, 1)
+                TestRunner.equal(#result.struck, 3)
+            end,
+        },
+        {
+            name = "a snapshot never offers repair work on a building that is not standing",
+            run = function()
+                -- A migrated schema-12 profile marks every building damaged,
+                -- including ones this town has only ever had as construction
+                -- sites. Reporting those would put a REPAIR prompt on an empty
+                -- lot.
+                local migrated = TownCondition.normalize({ integrity = 60, lastNightNumber = 4 })
+                local everything = TownCondition.snapshot(migrated, nil)
+                TestRunner.equal(everything.damageLevel, #TownProgression.buildingIds())
+
+                local standingOnly = TownCondition.snapshot(migrated, { ARCHIVE })
+                TestRunner.equal(standingOnly.damageLevel, 1)
+                TestRunner.equal(standingOnly.damagedBuildings[1].buildingId, ARCHIVE)
+                TestRunner.equal(standingOnly.repairsRemaining, 2)
+
+                -- Nothing standing means nothing to repair, and a whole town.
+                local nothingBuilt = TownCondition.snapshot(migrated, {})
+                TestRunner.equal(nothingBuilt.damageLevel, 0)
+                TestRunner.equal(nothingBuilt.repairsRemaining, 0)
+                TestRunner.equal(nothingBuilt.integrity, 100)
+            end,
+        },
+        {
             name = "only buildings that exist to be broken are struck",
             run = function()
                 -- Whether a building is a finished structure or still a

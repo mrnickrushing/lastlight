@@ -422,7 +422,9 @@ function TownNightService._runCycle(self: TownNightService)
 end
 
 function TownNightService.conditionSnapshot(self: TownNightService): any
-    return self._townCondition.snapshot(self._condition)
+    -- Scoped to what physically stands, so a migrated profile that marks every
+    -- building damaged cannot present repair work on an empty construction lot.
+    return self._townCondition.snapshot(self._condition, self._worldService:damageableBuildingIds())
 end
 
 function TownNightService.attemptLastStand(
