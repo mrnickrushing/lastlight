@@ -7,7 +7,7 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-03, at `main` = `1f1bc1f` (PR #170), build `0.47.0`,
+Last updated: 2026-08-04, at `main` = `337cacf` (PR #172), build `0.47.0`,
 save schema 12.
 
 ---
@@ -24,10 +24,77 @@ there, not a copy here. Note the gate's own caveat: the layout validator only
 guards footprint clearance from source — the gate itself still needs a live
 Studio pathfinding pass.
 
-## Recently landed (PRs ~#151–#170)
+## Recently landed (PRs ~#151–#172)
 
 Verified against `git log`, newest first:
 
+- **#172** Fixed the committed Studio test's stale version assertions (it
+  still asserted build `0.46.1`/schema `11` after the bump to `0.47.0`/`12`,
+  so it failed its first line whenever a tester pressed Play); added a
+  drift guard to `scripts/verify-build.luau` so `npm test` catches the next
+  forgotten bump instead of the owner's Studio session.
+- **In flight, same wave as above (not yet merged):** first owner-playtest
+  fix pass on the tutorial-night first-town slice — five reports, four fixed
+  in source with file:line evidence, one investigated and explicitly not
+  acted on:
+  - **Dawn beacon missing / dark panel on the road** — fixed. The "wall/sign"
+    the owner saw was the memory-reliquary mesh itself, half-buried by two
+    already-documented failure modes stacking: its flame lived inside
+    `beaconFallback`, so `hideProceduralPlaceholder` blanked it dark the
+    moment the reviewed mesh loaded (same class of bug as the First Lantern
+    fix, see DECISIONS.md); and its authored position sat at the pre-lift
+    road height, so the raised cobblestone visual skin buried its lower ~2
+    studs. Hoisted a `BeaconCore` neon part out of the fallback (mirrors
+    `FirstLanternCore`) and reseated the reliquary, `DawnPathMarker`s,
+    `DawnGateStep`s, and the reveal pulse above the road surface. Also fixed
+    a pre-existing dead assertion in `FoundationIntegration.server.luau`
+    that checked a Creator-Store-prefixed key
+    (`mesh_creator_memory_reliquary_a`) nothing ever placed under — the real
+    ID has no `creator_` prefix since the reliquary is a generated original
+    asset — so it always read 0 and always failed.
+  - **Arch between the First Lantern and the beacon** — removed outright, in
+    the same edit as the beacon fix (both lived in the same construction
+    block). `mesh_creator_wood_arch_a` stays registered in
+    `MeshAssetRegistry` (unplaced, same status as other reviewed-but-retired
+    assets) but is no longer placed anywhere.
+  - **Mobile combat callout clutter** — fixed, one line.
+    `EnemyService._stepAttack` was re-writing the world-space attack label
+    with the full `"name\ninstruction · Ns"` two-line caption every tick of
+    the windup, duplicating the HUD threat banner exactly (a prior commit,
+    2856375, only fixed the label's *initial* text, not this per-tick
+    overwrite). Now writes `"name · Ns"` only; the instruction lives in the
+    HUD banner, matching the documented one-alert contract.
+  - **Crow enemy vanishes/respawns and is nearly untappable** — fixed. Not
+    designed motion: `placeEnemyVisual` computed the authored mesh's
+    placement `CFrame` from the enemy core's position *before* the
+    asset-load yield, so a fast mover (the crow, speed 9, fastest in the
+    roster) kept flying during the load and the visible mesh landed at a
+    stale, permanently-offset position from the actual (invisible)
+    authoritative hitbox — reading as vanish-then-respawn, and making taps
+    miss. Now re-pivots from the core's current frame right after the load
+    resolves. Also: fallback parts other than the hitbox core now get
+    `CanQuery = false` (they were silently swallowing taps with no
+    detector attached), and the `StrikeClick` `ClickDetector` moved from the
+    core part to the enemy model itself, so a tap anywhere on the model's
+    visible geometry can register.
+  - **Near-black morning shadows at the first-level start** — fixed. Raised
+    `DAY_AMBIENT`, day-phase `OutdoorAmbient`, and
+    `EnvironmentDiffuseScale`; reduced (less negative) day
+    `ExposureCompensation`; lowered day `ColorCorrectionEffect.Contrast`;
+    raised `ShadowSoftness`. Changed in both places these values are
+    duplicated (`_configureLighting` and `_applyTownLighting`'s day branch —
+    the file's own comments warn a one-sided edit silently reverts on the
+    first day/dusk transition). Night's separate, much lower floor is
+    untouched.
+  - **"Move the First Lantern back to the town square center"** — investigated,
+    not acted on. Source already places `FirstLanternCore` at `(0, 6.3,
+    -112)`, exactly the plaza center (`PLAZA = Vector3.new(0, 0, -112)`,
+    `PLAZA_HALF = 36`) that `scripts/validate_town_layout.py`'s own
+    docstring calls a "long-established fixed landmark." No evidence in
+    source explains the report; flagged back to the owner rather than
+    guessed at. Possible explanations worth checking next: a stale
+    published place versus this source revision, or the report referring to
+    something else entirely.
 - **#170** Construction orders now cost resources; existing towns grandfathered.
 - **#169** M4 unlock plus town layout: town buildings generated, prepared,
   uploaded, and placed (PR titles said eleven of sixteen staged;
@@ -69,17 +136,32 @@ None of these can be completed from a session.
    during the visual wave (beds below the floor; lantern regen cancelling
    revives). CodeRabbit still reviews, but expect nothing from Codex until
    credits are topped up.
+4. **First Lantern position report vs. source** — an owner playtest report
+   asked for the First Lantern to move "back towards the center of town in
+   the city square." Source already has it exactly there (see the
+   2026-08-04 entry above) with no history of it being elsewhere. Needs the
+   owner to say what they're actually seeing in the published/Studio game —
+   a stale published place, a different landmark entirely, or something a
+   session genuinely cannot see from source.
 
 ## Known open threads
 
 - `mesh_creator_first_lantern_a` is in the manifest but genuinely undecided —
   retire it explicitly or place it. Details in
   [ASSET_COVERAGE_AUDIT.md](ASSET_COVERAGE_AUDIT.md) §Intentionally unplaced.
-- The M4 deliverables not yet confirmed landed from commit history: resident
-  schedules/jobs/injury/relationships/crisis framework, storage and decoration
-  caps, backups. Check the roadmap gate against source before assuming either
-  way — this file records that the check has *not* been done, not that the
-  work is missing.
+- **Checked (2026-08-04) against source, not just commit history:** resident
+  jobs/injury/relationships/crisis framework, storage/decoration caps, and
+  profile backups are all **absent**. Residents exist only as ambient NPCs
+  with day/dusk/night positions and duty labels (`WorldService.luau`
+  ~8207-8250); no storage or decoration system exists to cap; `ProfileService`
+  has a single DataStore write path with no secondary/backup write. Multiple
+  grep patterns tried per item, all zero-hit — see the roadmap gate for what
+  "done" means here. Also weaker than the deliverable wording implies: "town
+  visit flow" is only implicit first-arrival hosting on a shared server (no
+  deliberate visit/teleport mechanic); damage/repair is one town-wide
+  integrity value (`TownCondition.luau`), not per-building; eleven of the
+  sixteen buildings are staged shells with construction prompts, not yet
+  functionally distinct.
 
 ## Getting caught up, in order
 

@@ -433,11 +433,16 @@ function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target:
         server still resolves range and damage, so this only decides which
         creature the player meant.
     ]]
+    -- Parented to the model, not the core: a ClickDetector on a Model fires
+    -- for a tap on ANY descendant BasePart, not just the (often small,
+    -- moving) core. A fast flier like the crow reads several studs wider
+    -- than its core across wings and beak; without this, every one of those
+    -- taps silently missed.
     local click = Instance.new("ClickDetector")
     click.Name = "StrikeClick"
     click.MaxActivationDistance = 26
     click.CursorIcon = ""
-    click.Parent = core
+    click.Parent = model
 
     local flatTarget = Vector3.new(target.X, core.Position.Y, target.Z)
     if (flatTarget - core.Position).Magnitude > 0.01 then

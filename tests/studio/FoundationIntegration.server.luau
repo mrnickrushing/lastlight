@@ -925,7 +925,7 @@ local creatorAssetCounts: { [string]: number } = {
     mesh_creator_raven_a = 0,
     mesh_creator_predatory_flower_a = 0,
     mesh_creator_wood_ibex_a = 0,
-    mesh_creator_memory_reliquary_a = 0,
+    mesh_memory_reliquary_a = 0,
     mesh_creator_bark_ram_a = 0,
     mesh_creator_old_growth_a = 0,
     mesh_creator_potion_shelf_a = 0,
@@ -1033,12 +1033,16 @@ assert(
     "the camp commons needs sourced furniture"
 )
 assert(
-    creatorAssetCounts.mesh_creator_wood_arch_a == 1,
-    "the Dawn Gate needs the sourced asymmetrical timber arch"
+    creatorAssetCounts.mesh_creator_wood_arch_a == 0,
+    "the Dawn Gate arch was removed -- an owner playtest read it as clutter between the First Lantern and the beacon"
 )
 assert(
-    creatorAssetCounts.mesh_creator_memory_reliquary_a >= 2,
-    "the Dawn Gate beacon and Warden seal need sourced memory reliquaries"
+    -- Was mesh_creator_memory_reliquary_a, a key nothing ever placed under --
+    -- the reliquary is a generated Last Light asset, not Creator Store, so
+    -- its real stable ID has no creator_ prefix. The counter silently stayed
+    -- at its initial 0 forever and this assertion always failed.
+    creatorAssetCounts.mesh_memory_reliquary_a >= 2,
+    "the town beacon and Warden seal need sourced memory reliquaries"
 )
 assert(
     creatorAssetCounts.mesh_creator_hollow_rootling_a >= 4,

@@ -15028,10 +15028,13 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
         targetPresent = attack.target.Parent ~= nil and root ~= nil,
     })
     if decision.status == "pending" then
+        -- Name + countdown only. The instruction line duplicated the HUD
+        -- threat banner every tick of the windup (see the comment on
+        -- _createAttackVisual above) -- this marker only says where the
+        -- attack is landing.
         attack.visual.label.Text = string.format(
-            "%s\n%s · %.1fs",
+            "%s · %.1fs",
             enemy.definition.attackName,
-            enemy.definition.instruction,
             math.max(0, decision.remaining or 0)
         )
         return
@@ -15465,11 +15468,10 @@ end
 -- only says which creature the player meant; damageNearest still resolves
 -- range, night state, and damage on the server exactly as the button did.
 function EnemyService.bindStrikeClicks(self: EnemyService, model: Model)
-    local core = model.PrimaryPart
-    if core == nil then
-        return
-    end
-    local click = core:FindFirstChild("StrikeClick")
+    -- StrikeClick is parented to the model, not the core, so a tap on any
+    -- visible descendant part fires it -- not only the (often small, moving)
+    -- core.
+    local click = model:FindFirstChild("StrikeClick")
     if click == nil or not click:IsA("ClickDetector") then
         return
     end
@@ -24615,6 +24617,7 @@ export type WorldService = typeof(setmetatable(
         _lantern: BasePart?,
         _lanternVisualHealth: number,
         _beacon: BasePart?,
+        _beaconCore: BasePart?,
         _barricadeBuilt: boolean,
         _dusk: boolean,
         _duskSignals: { BasePart },
@@ -24646,7 +24649,13 @@ export type WorldService = typeof(setmetatable(
     WorldService
 ))
 
-local DAY_AMBIENT = Color3.fromRGB(50, 63, 58)
+-- Raised from (50, 63, 58): on a phone, shadowed ground fell back to only
+-- this floor once exposure and contrast (both below) subtracted from it,
+-- and read as near-black at the very start of the first level. Night keeps
+-- its own separate, much lower floor (NIGHT_AMBIENT below), so this only
+-- lifts the day/morning shadow, not the dusk/night contrast the design
+-- docs ask for.
+local DAY_AMBIENT = Color3.fromRGB(82, 94, 88)
 local NIGHT_AMBIENT = Color3.fromRGB(19, 26, 43)
 local AMBER = Color3.fromRGB(255, 181, 76)
 local FOXFIRE = Color3.fromRGB(94, 206, 176)
@@ -26413,6 +26422,7 @@ function WorldService.new(
         _lantern = nil,
         _lanternVisualHealth = 100,
         _beacon = nil,
+        _beaconCore = nil,
         _barricadeBuilt = false,
         _dusk = false,
         _duskSignals = {},
@@ -26547,13 +26557,18 @@ function WorldService._configureLighting(_self: WorldService)
     Lighting.ClockTime = 6.65
     Lighting.Brightness = 2.05
     Lighting.Ambient = DAY_AMBIENT
-    Lighting.OutdoorAmbient = Color3.fromRGB(72, 91, 84)
-    Lighting.EnvironmentDiffuseScale = 0.72
+    -- Raised from (72, 91, 84) alongside DAY_AMBIENT and ExposureCompensation
+    -- below -- see the DAY_AMBIENT comment. Also duplicated in
+    -- _applyTownLighting's day branch; change both together.
+    Lighting.OutdoorAmbient = Color3.fromRGB(108, 122, 114)
+    Lighting.EnvironmentDiffuseScale = 0.9
     Lighting.EnvironmentSpecularScale = 0.48
     Lighting.GlobalShadows = true
-    Lighting.ExposureCompensation = -0.18
+    -- Raised (less negative) from -0.18 for the same reason as DAY_AMBIENT.
+    -- Also duplicated in _applyTownLighting's day branch.
+    Lighting.ExposureCompensation = -0.08
     pcall(function()
-        Lighting.ShadowSoftness = 0.42
+        Lighting.ShadowSoftness = 0.65
         Lighting.GeographicLatitude = 51
     end)
     for _, name in
@@ -26630,7 +26645,10 @@ function WorldService._configureLighting(_self: WorldService)
     local tone = Instance.new("ColorCorrectionEffect")
     tone.Name = "LastLightTone"
     tone.Brightness = -0.03
-    tone.Contrast = 0.24
+    -- Lowered from 0.24 -- contrast pushes shadow values toward black on top
+    -- of the already-low ambient floor; also duplicated in
+    -- _applyTownLighting's day branch.
+    tone.Contrast = 0.18
     tone.Saturation = -0.04
     tone.TintColor = Color3.fromRGB(232, 238, 224)
     tone.Parent = Lighting
@@ -27705,11 +27723,38 @@ function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKe
         })
         return false
     end
+    if model.Parent == nil then
+        -- The enemy despawned while the first-time asset load yielded.
+        -- Placing it anyway would leave a floating orphaned clone.
+        authored:Destroy()
+        return false
+    end
     authored.Name = "AuthoredEnemyVisual"
+    -- The load above can yield (first fetch of this enemy type per server),
+    -- during which a moving enemy -- the crow fastest of all -- keeps
+    -- flying. `at` was computed from the core's position *before* the yield,
+    -- so placing the clone at that stale frame let the visible mesh and the
+    -- authoritative hitbox drift permanently apart: the crow looked like it
+    -- vanished mid-flight and "respawned" behind, and every tap landed on
+    -- empty air. Recompute from the core's current frame right before the
+    -- clone is seated so the two start aligned; every later _poseEnemy pivot
+    -- of `model` then carries both together.
+    local currentBottom = core.Position - Vector3.new(0, profile.groundOffset, 0)
+    authored:PivotTo(
+        CFrame.new(currentBottom) * core.CFrame.Rotation * CFrame.Angles(0, profile.yaw, 0)
+    )
     for _, fallbackPart in fallbackParts do
         fallbackPart.Transparency = 1
         fallbackPart.CastShadow = false
-        fallbackPart:SetAttribute("AuthoritativeEnemyHitbox", fallbackPart == core)
+        local isCore = fallbackPart == core
+        fallbackPart:SetAttribute("AuthoritativeEnemyHitbox", isCore)
+        -- Only the authoritative hitbox may answer raycasts once the
+        -- authored mesh is up. Left true, the wing/beak/eye fallback parts
+        -- stayed queryable with no ClickDetector of their own and silently
+        -- swallowed taps aimed at the now-invisible crow.
+        if not isCore then
+            fallbackPart.CanQuery = false
+        end
     end
     model:SetAttribute("EnemyVisualAssetId", profile.assetId)
     model:SetAttribute("EnemyVisualReady", true)
@@ -29559,63 +29604,48 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     -- 28 studs back to the start of the approach (before the path markers
     -- and steps that already lead up to the beacon) keeps the arch as an
     -- entrance and leaves the beacon itself uncluttered.
-    local GATE_Z = -120
-    -- gateFallback holds only the primitive arch shape -- it is wired as this
-    -- placement's fallbackInstance, so hideProceduralPlaceholder makes it
-    -- transparent the moment the reviewed arch mesh loads. The steps and path
-    -- markers below are unrelated, always-visible approach dressing; the tool
-    -- yard hit this same mistake (see the comment above the workbench
-    -- placement) when a shared folder doubled as both the real content and a
-    -- mesh's fallback, and hideProceduralPlaceholder wiped everything in it
-    -- the moment that one mesh loaded.
-    local gateFallback = Instance.new("Folder")
-    gateFallback.Name = "BramblewakeDawnGateFallback"
-    gateFallback.Parent = interactables
-    for side = -1, 1, 2 do
-        part(
-            gateFallback,
-            "DawnGateRoot",
-            Vector3.new(1.35, 11, 1.35),
-            CFrame.new(side * 5.2, 5.5, GATE_Z) * CFrame.Angles(0, 0, math.rad(side * 7)),
-            WET_BARK,
-            Enum.Material.Wood
-        )
-        part(
-            gateFallback,
-            "DawnGateBrace",
-            Vector3.new(0.8, 6.2, 0.8),
-            CFrame.new(side * 3.7, 10.8, GATE_Z) * CFrame.Angles(0, 0, math.rad(side * 62)),
-            BARK,
-            Enum.Material.Wood
-        )
-    end
-    part(
-        gateFallback,
-        "DawnGateLintel",
-        Vector3.new(11.5, 1.2, 1.2),
-        CFrame.new(0, 11, GATE_Z),
-        BARK,
-        Enum.Material.WoodPlanks
-    )
-    local gate = Instance.new("Folder")
-    gate.Name = "BramblewakeDawnGate"
-    gate.Parent = interactables
+    -- The Dawn Gate arch used to stand at z -120, on the approach between the
+    -- First Lantern (z -112) and the memory beacon (z -148) -- an owner
+    -- playtest read it as clutter boxing in the walk between the two and
+    -- asked for it gone outright. It is removed entirely rather than pushed
+    -- somewhere else: mesh_creator_wood_arch_a stays registered in
+    -- MeshAssetRegistry (its provenance and measurements are still real) but
+    -- is no longer placed anywhere, the same status this codebase already
+    -- gives other reviewed-but-unplaced assets.
+    --
+    -- The steps and path markers below lead a walker to the beacon; they are
+    -- unrelated to the arch and are kept, only reseated (see the road-height
+    -- comment on the beacon placement just below) so they are not buried
+    -- under the road's raised visual skin.
+    local approach = Instance.new("Folder")
+    approach.Name = "BramblewakeDawnApproach"
+    approach.Parent = interactables
+    -- ROAD_SURFACE_Y matches the trail/wear-strip top computed in the
+    -- Emberhollow road loop above (route base y 0.42 + trail offset 1.77 +
+    -- half its 0.36 thickness, and the wear strip reaching to 0.42 + 2.05 +
+    -- half its 0.12 thickness) -- anything at or below the old y~0.2-0.4
+    -- authored here rendered buried under that raised visual skin.
+    local ROAD_SURFACE_Y = 2.45
     for stepIndex = 1, 3 do
         part(
-            gate,
+            approach,
             "DawnGateStep",
             Vector3.new(12 - stepIndex * 1.3, 0.45, 3.2),
-            CFrame.new(0, 0.22 + stepIndex * 0.08, -140 - stepIndex * 2.2),
+            CFrame.new(0, ROAD_SURFACE_Y + stepIndex * 0.08, -140 - stepIndex * 2.2),
             Color3.fromRGB(66, 73, 68),
             Enum.Material.Slate
         )
     end
     for markerIndex = 1, 6 do
         local marker = part(
-            gate,
+            approach,
             "DawnPathMarker",
             Vector3.new(0.72, 0.36, 0.72),
-            CFrame.new(if markerIndex % 2 == 0 then 4.8 else -4.8, 0.38, -114 - markerIndex * 4.3),
+            CFrame.new(
+                if markerIndex % 2 == 0 then 4.8 else -4.8,
+                ROAD_SURFACE_Y,
+                -114 - markerIndex * 4.3
+            ),
             FOXFIRE,
             Enum.Material.Glass,
             false
@@ -29624,17 +29654,6 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         marker.Transparency = 1
         marker.CastShadow = false
     end
-    table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_wood_arch_a",
-        fallbackKind = "asset_replacement",
-        position = Vector3.new(0, 0, GATE_Z),
-        scale = 1,
-        yaw = 0,
-        seed = 9910,
-        swayTag = nil,
-        parent = interactables,
-        fallbackInstance = gateFallback,
-    })
 
     local beacon = part(
         interactables,
@@ -29653,6 +29672,13 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     -- object is a thumbnail-reviewed crystal reliquary placed through
     -- MeshTemplateLoader below; this fallback only appears if the reviewed
     -- model cannot load.
+    --
+    -- Reseated from y 0.25 (and every fallback part below raised by the same
+    -- +2.2 delta): the road's raised visual skin (see ROAD_SURFACE_Y above)
+    -- buried roughly the bottom two studs of the vessel and the six
+    -- DawnPathMarker/DawnGateStep parts that lead to it -- what read as a
+    -- dark half-buried wall/sign on a phone was this reliquary, not a
+    -- separate object.
     local beaconFallback = Instance.new("Model")
     beaconFallback.Name = "MemoryReliquaryFallback"
     beaconFallback.Parent = interactables
@@ -29660,7 +29686,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         beaconFallback,
         "BeaconCradleMount",
         Vector3.new(0.34, 3.6, 0.34),
-        CFrame.new(0, 10.4, -148),
+        CFrame.new(0, 12.6, -148),
         Color3.fromRGB(47, 50, 52),
         Enum.Material.Metal,
         false
@@ -29672,7 +29698,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             beaconFallback,
             "BeaconCradleArm",
             Vector3.new(0.26, 2.9, 0.26),
-            CFrame.new(0, 8.05, -148)
+            CFrame.new(0, 10.25, -148)
                 * CFrame.Angles(0, armAngle, 0)
                 * CFrame.new(0, 0, -1.5)
                 * CFrame.Angles(math.rad(26), 0, 0),
@@ -29686,7 +29712,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         beaconFallback,
         "BeaconCradleCollar",
         Vector3.new(0.3, 2.9, 2.9),
-        CFrame.new(0, 8.6, -148) * CFrame.Angles(0, 0, math.rad(90)),
+        CFrame.new(0, 10.8, -148) * CFrame.Angles(0, 0, math.rad(90)),
         Color3.fromRGB(47, 50, 52),
         Enum.Material.Metal,
         false
@@ -29697,7 +29723,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         beaconFallback,
         "BeaconFallbackLens",
         Vector3.new(2.2, 2.6, 2.6),
-        CFrame.new(0, 6.25, -148) * CFrame.Angles(0, 0, math.rad(90)),
+        CFrame.new(0, 8.45, -148) * CFrame.Angles(0, 0, math.rad(90)),
         FOXFIRE,
         Enum.Material.Glass,
         false
@@ -29705,21 +29731,45 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     fallbackLens.Shape = Enum.PartType.Cylinder
     fallbackLens.Transparency = 0.22
     fallbackLens.CanQuery = false
-    local fallbackFlame = part(
-        beaconFallback,
-        "BeaconFallbackFlame",
+    --[[
+        The beacon's fire lives outside the fallback on purpose, exactly like
+        FirstLanternCore above.
+
+        BeaconFallbackFlame used to live inside beaconFallback, which is
+        exactly what hideProceduralPlaceholder blanks the moment the reviewed
+        reliquary mesh loads -- the mesh itself was deliberately generated
+        as an empty, unlit glass vessel ("both placements supply their own
+        light"), so the moment the fallback flame vanished, nothing was left
+        to light it. This core sits at the vessel's glass height and stays
+        visible whichever way the placement resolves.
+    ]]
+    local beaconCore = part(
+        interactables,
+        "BeaconCore",
         Vector3.new(0.72, 1.55, 0.64),
-        CFrame.new(0, 6.18, -148) * CFrame.Angles(0, math.rad(18), 0),
+        CFrame.new(0, 8.38, -148) * CFrame.Angles(0, math.rad(18), 0),
         FOXFIRE,
         Enum.Material.Neon,
         false
     )
-    fallbackFlame.Shape = Enum.PartType.Wedge
-    fallbackFlame.CanQuery = false
+    beaconCore.Shape = Enum.PartType.Wedge
+    beaconCore.CastShadow = false
+    beaconCore.CanQuery = false
+    -- Hidden until the dawn reveal, same as the invisible anchor's own light
+    -- below -- the beacon must not glow before First Light finishes.
+    beaconCore.Transparency = 1
+    local beaconCoreLight = Instance.new("PointLight")
+    beaconCoreLight.Color = FOXFIRE
+    beaconCoreLight.Brightness = 1.6
+    beaconCoreLight.Range = 26
+    beaconCoreLight.Shadows = false
+    beaconCoreLight.Enabled = false
+    beaconCoreLight.Parent = beaconCore
+    self._beaconCore = beaconCore
     table.insert(self._meshPlacements, {
         assetId = "mesh_memory_reliquary_a",
         fallbackKind = "asset_replacement",
-        position = Vector3.new(0, 0.25, -148),
+        position = Vector3.new(0, ROAD_SURFACE_Y, -148),
         scale = 1,
         yaw = math.pi,
         seed = 9911,
@@ -30963,6 +31013,14 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
     if oldLabel ~= nil then
         oldLabel:Destroy()
     end
+    local core = self._beaconCore
+    if core ~= nil then
+        core.Transparency = if visible then 0 else 1
+        local coreLight = core:FindFirstChildOfClass("PointLight")
+        if coreLight ~= nil then
+            coreLight.Enabled = visible
+        end
+    end
 
     local world = self._world
     if world ~= nil then
@@ -30984,7 +31042,9 @@ function WorldService.setBeaconVisible(self: WorldService, visible: boolean)
             assert(beacon.Parent, "beacon parent is missing"),
             "DawnRevealPulse",
             Vector3.new(0.16, 5, 5),
-            CFrame.new(beacon.Position.X, 0.24, beacon.Position.Z)
+            -- Was y 0.24 -- under the road's raised visual skin, same as the
+            -- reliquary and path markers above.
+            CFrame.new(beacon.Position.X, 2.45, beacon.Position.Z)
                 * CFrame.Angles(0, 0, math.rad(90)),
             FOXFIRE,
             Enum.Material.Neon,
@@ -34992,8 +35052,10 @@ function WorldService._applyTownLighting(_self: WorldService, night: boolean)
         Lighting.ClockTime = 6.65
         Lighting.Brightness = 2.05
         Lighting.Ambient = DAY_AMBIENT
-        Lighting.OutdoorAmbient = Color3.fromRGB(72, 91, 84)
-        Lighting.ExposureCompensation = -0.18
+        -- Must stay identical to _configureLighting's day values -- see the
+        -- comment on DAY_AMBIENT there and the atmosphere note just below.
+        Lighting.OutdoorAmbient = Color3.fromRGB(108, 122, 114)
+        Lighting.ExposureCompensation = -0.08
         if atmosphere ~= nil and atmosphere:IsA("Atmosphere") then
             -- Must stay identical to the daytime values _configureLighting
             -- sets on world build. This function re-runs on every day/dusk
@@ -35013,7 +35075,7 @@ function WorldService._applyTownLighting(_self: WorldService, night: boolean)
         end
         if tone ~= nil and tone:IsA("ColorCorrectionEffect") then
             tone.Brightness = -0.03
-            tone.Contrast = 0.24
+            tone.Contrast = 0.18
             tone.Saturation = -0.04
             tone.TintColor = Color3.fromRGB(232, 238, 224)
         end
@@ -39254,11 +39316,16 @@ function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target:
         server still resolves range and damage, so this only decides which
         creature the player meant.
     ]]
+    -- Parented to the model, not the core: a ClickDetector on a Model fires
+    -- for a tap on ANY descendant BasePart, not just the (often small,
+    -- moving) core. A fast flier like the crow reads several studs wider
+    -- than its core across wings and beak; without this, every one of those
+    -- taps silently missed.
     local click = Instance.new("ClickDetector")
     click.Name = "StrikeClick"
     click.MaxActivationDistance = 26
     click.CursorIcon = ""
-    click.Parent = core
+    click.Parent = model
 
     local flatTarget = Vector3.new(target.X, core.Position.Y, target.Z)
     if (flatTarget - core.Position).Magnitude > 0.01 then

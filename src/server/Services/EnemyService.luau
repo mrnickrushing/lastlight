@@ -739,10 +739,13 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
         targetPresent = attack.target.Parent ~= nil and root ~= nil,
     })
     if decision.status == "pending" then
+        -- Name + countdown only. The instruction line duplicated the HUD
+        -- threat banner every tick of the windup (see the comment on
+        -- _createAttackVisual above) -- this marker only says where the
+        -- attack is landing.
         attack.visual.label.Text = string.format(
-            "%s\n%s · %.1fs",
+            "%s · %.1fs",
             enemy.definition.attackName,
-            enemy.definition.instruction,
             math.max(0, decision.remaining or 0)
         )
         return
@@ -1176,11 +1179,10 @@ end
 -- only says which creature the player meant; damageNearest still resolves
 -- range, night state, and damage on the server exactly as the button did.
 function EnemyService.bindStrikeClicks(self: EnemyService, model: Model)
-    local core = model.PrimaryPart
-    if core == nil then
-        return
-    end
-    local click = core:FindFirstChild("StrikeClick")
+    -- StrikeClick is parented to the model, not the core, so a tap on any
+    -- visible descendant part fires it -- not only the (often small, moving)
+    -- core.
+    local click = model:FindFirstChild("StrikeClick")
     if click == nil or not click:IsA("ClickDetector") then
         return
     end
