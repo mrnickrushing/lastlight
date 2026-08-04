@@ -15856,8 +15856,23 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
             enemyId .. "_spark_theft",
             now
         )
+        local previousLanternHealth = self._lanternHealth
         self._lanternHealth = math.max(18, self._lanternHealth - lanternPressure)
         self._worldService:setLanternHealth(self._lanternHealth)
+        -- Every other path that moves _lanternHealth (incident failure via
+        -- applyLanternPressure, a direct lantern impact, a Last Stand spend)
+        -- logs what happened. This is the one exception: a hollow crow's
+        -- spark theft is the single most frequent source of lantern pressure
+        -- in a night (it fires on every unblocked hit) and used to mutate
+        -- the health pool completely silently, so a server log had no way to
+        -- explain a lantern that crashed to its floor mid-night with no
+        -- incident and no lantern-impact entries to account for it.
+        self._logger:info("lantern_pressure_applied", {
+            damage = previousLanternHealth - self._lanternHealth,
+            health = self._lanternHealth,
+            absorbed = lanternAbsorbed,
+            source = string.sub(enemyId .. "_spark_theft", 1, 48),
+        })
     end
     self._analyticsService:enemyAttackResult(
         target,
