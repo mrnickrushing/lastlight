@@ -70,7 +70,19 @@ function AdminRoster.adminUserIds(): { number }
 end
 
 function AdminRoster.commandNames(): { string }
-    return { "night", "give", "heal", "phase", "where", "go", "perf", "inspect", "unlock" }
+    return {
+        "night",
+        "give",
+        "heal",
+        "phase",
+        "where",
+        "go",
+        "perf",
+        "inspect",
+        "unlock",
+        "backups",
+        "restore",
+    }
 end
 
 --[[
@@ -177,6 +189,23 @@ function AdminRoster.authorize(userId: any, message: any, enabled: boolean): any
         -- clear is decided at the point of the write, not here.
         if command.text == nil or #command.text == 0 or #command.text > 32 then
             return { allowed = false, reason = "invalid_unlock_target", command = command.name }
+        end
+        return { allowed = true, command = command.name, text = command.text }
+    end
+
+    if command.name == "backups" or command.name == "restore" then
+        -- Same target shape again. Note what is deliberately absent: no way to
+        -- name *which* backup. /restore takes the newest and nothing else, so
+        -- the roster cannot be handed an index that selects an arbitrary point
+        -- in a player's history. Restoring further back is a real need and can
+        -- have its own command later; it is not one to reach by loosening this
+        -- parser.
+        if command.text == nil or #command.text == 0 or #command.text > 32 then
+            return {
+                allowed = false,
+                reason = "invalid_backup_target",
+                command = command.name,
+            }
         end
         return { allowed = true, command = command.name, text = command.text }
     end

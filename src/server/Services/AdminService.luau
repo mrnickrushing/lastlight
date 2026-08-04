@@ -167,6 +167,10 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
         self:_inspect(player, decision.text :: string)
     elseif command == "unlock" then
         self:_unlock(player, decision.text :: string)
+    elseif command == "backups" then
+        self:_backups(player, decision.text :: string)
+    elseif command == "restore" then
+        self:_restore(player, decision.text :: string)
     end
 
     self._logger:info("admin_command", {
@@ -255,6 +259,101 @@ function AdminService._inspect(self: AdminService, admin: Player, argument: stri
             if report.lock.held and report.lock.stale ~= true then " · LOCKED" else ""
         )
     )
+end
+
+--[[
+    Lists the copies held for a player, changing nothing.
+
+    Always the first half of a repair: /restore is a deliberate move backwards
+    in someone's progress, and this is how an operator sees how far back it
+    would go and why each copy was taken before deciding.
+]]
+function AdminService._backups(self: AdminService, admin: Player, argument: string)
+    local userId = self:_resolveTarget(admin, argument)
+    if userId == nil then
+        return
+    end
+
+    local summary = self._profileService:backupSummary(userId)
+    self._logger:info("admin_backup_list", {
+        admin = admin.UserId,
+        target = userId,
+        count = summary.count,
+        newestRevision = summary.newestRevision,
+        newestCapturedAt = summary.newestCapturedAt,
+        entries = summary.entries,
+    })
+
+    if summary.count == 0 then
+        self:_reply(admin, string.format("NO BACKUPS ON RECORD FOR %d", userId))
+        return
+    end
+
+    self:_reply(
+        admin,
+        string.format(
+            "%d — %d BACKUP%s · NEWEST REV %s — SEE OUTPUT",
+            userId,
+            summary.count,
+            if summary.count == 1 then "" else "S",
+            tostring(summary.newestRevision)
+        )
+    )
+end
+
+--[[
+    Rolls a save back to its newest copy.
+
+    The write half, and the one command here that changes a player's progress
+    rather than the world around them, so it is worth being explicit about what
+    keeps it safe. ProfileService refuses while a live server holds the profile,
+    copies the replaced profile before overwriting it -- so running /restore
+    twice undoes the first -- and writes only a profile this player already had.
+    Nothing here merges, tops up, or grants.
+]]
+function AdminService._restore(self: AdminService, admin: Player, argument: string)
+    local userId = self:_resolveTarget(admin, argument)
+    if userId == nil then
+        return
+    end
+
+    local result = self._profileService:restoreLatestBackup(userId)
+    self._logger:info("admin_restore", {
+        admin = admin.UserId,
+        target = userId,
+        applied = result.applied,
+        reason = result.reason,
+        fromRevision = result.fromRevision,
+        restoredRevision = result.restoredRevision,
+        capturedAt = result.capturedAt,
+        schemaVersion = result.schemaVersion,
+    })
+
+    if result.applied then
+        self:_reply(
+            admin,
+            string.format(
+                "%d — RESTORED TO REV %s (WAS %s) · RUN AGAIN TO UNDO",
+                userId,
+                tostring(result.restoredRevision),
+                tostring(result.fromRevision)
+            )
+        )
+        return
+    end
+
+    local reply = if result.reason == "no_backup_on_record"
+        then string.format("NO BACKUPS ON RECORD FOR %d", userId)
+        elseif result.reason == "no_save_on_record" then string.format(
+            "NO SAVE ON RECORD FOR %d",
+            userId
+        )
+        elseif result.reason == "lock_is_active" then string.format(
+            "%d — A SERVER IS STILL HOLDING THIS SAVE",
+            userId
+        )
+        else string.format("%d — RESTORE UNAVAILABLE RIGHT NOW", userId)
+    self:_reply(admin, reply)
 end
 
 --[[
@@ -348,6 +447,14 @@ function AdminService._onChatted(self: AdminService, player: Player, message: st
         self:_reply(player, "INSPECT TAKES A USERNAME OR USER ID")
     elseif decision.reason == "invalid_unlock_target" then
         self:_reply(player, "UNLOCK TAKES A USERNAME OR USER ID")
+    elseif decision.reason == "invalid_backup_target" then
+        self:_reply(
+            player,
+            string.format(
+                "%s TAKES A USERNAME OR USER ID",
+                string.upper(tostring(decision.command))
+            )
+        )
     elseif decision.reason == "admin_disabled" then
         self:_reply(player, "ADMIN COMMANDS ARE OFF")
     end

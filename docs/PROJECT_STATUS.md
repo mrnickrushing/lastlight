@@ -7,8 +7,9 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-04, at `main` = `370bcfe` (PR #173), build `0.47.0`,
-save schema 12, 20 services. No pull request or issue is open.
+Last updated: 2026-08-04, at `main` = `2fe5db0` (PR #174), build `0.48.0`,
+save schema 12, 20 services. Profile backups are in flight on
+`claude/repo-docs-review-7iw0vr`.
 
 ---
 
@@ -24,9 +25,25 @@ there, not a copy here. Note the gate's own caveat: the layout validator only
 guards footprint clearance from source — the gate itself still needs a live
 Studio pathfinding pass.
 
-## Recently landed (PRs ~#151–#173)
+## Recently landed (PRs ~#151–#174)
 
 Verified against `git log`, newest first:
+
+- **In flight (not yet merged):** profile backups and an audited restore —
+  the last unimplemented piece of M4's persistence deliverable, plus the write
+  half of its admin-tooling deliverable. Snapshots go to a separate
+  `LastLightProfileBackup_v1` store; the load path photographs the raw stored
+  bytes *before* `normalize` migrates them, which is the case
+  TECHNICAL_ARCHITECTURE asks for a backup before. `/backups` lists, `/restore`
+  rolls back to the newest copy, refuses while a live server holds the profile,
+  and copies the replaced profile first so running it twice undoes it. Details
+  and the DataStore exit gate in
+  [MILESTONE_4_PROFILE_BACKUPS.md](MILESTONE_4_PROFILE_BACKUPS.md).
+- **#174** Refreshed this handoff and stopped eight runbooks hard-coding build,
+  schema, and service-count literals that had gone thirty-plus PRs stale; they
+  now defer to `Config.luau`. `validate-plan.mjs` checks this file's own
+  `Last updated` line against source, so a version bump that forgets it fails
+  `npm test`.
 
 - **#172** Fixed the committed Studio test's stale version assertions (it
   still asserted build `0.46.1`/schema `11` after the bump to `0.47.0`/`12`,
@@ -149,11 +166,10 @@ None of these can be completed from a session.
   retire it explicitly or place it. Details in
   [ASSET_COVERAGE_AUDIT.md](ASSET_COVERAGE_AUDIT.md) §Intentionally unplaced.
 - **Checked (2026-08-04) against source, not just commit history:** resident
-  jobs/injury/relationships/crisis framework, storage/decoration caps, and
-  profile backups are all **absent**. Residents exist only as ambient NPCs
+  jobs/injury/relationships/crisis framework and storage/decoration caps are
+  **absent**. Residents exist only as ambient NPCs
   with day/dusk/night positions and duty labels (`WorldService.luau`
-  ~8207-8250); no storage or decoration system exists to cap; `ProfileService`
-  has a single DataStore write path with no secondary/backup write. Multiple
+  ~8207-8250); no storage or decoration system exists to cap. Multiple
   grep patterns tried per item, all zero-hit — see the roadmap gate for what
   "done" means here. Also weaker than the deliverable wording implies: "town
   visit flow" is only implicit first-arrival hosting on a shared server (no
@@ -178,10 +194,26 @@ None of these can be completed from a session.
 
 Hard-won, each one cost a real session real time:
 
-- **Remote containers:** `selene` cannot fetch the Roblox API dump through the
-  proxy and `luau-lsp` may be absent, so `npm test` cannot fully pass locally
-  there. Run what runs; say plainly which checks CI must cover. `lune` may not
-  be on `PATH` — find the binary before concluding it is missing.
+- **Remote containers: the toolchain can be installed, and the old note here
+  was wrong about why it could not.** Rokit's installer resolves releases
+  through `api.github.com`, which the egress policy denies (403) — but
+  `github.com/<org>/<repo>/releases/download/...` is allowed, so the five
+  pinned tools can be fetched directly and dropped on `PATH`:
+
+  ```bash
+  # rojo 7.7.0, lune 0.10.5, stylua 2.5.2, selene 0.31.0, luau-lsp 1.69.0
+  curl -sSL -o t.zip https://github.com/rojo-rbx/rojo/releases/download/v7.7.0/rojo-7.7.0-linux-x86_64.zip
+  unzip -o t.zip -d ~/.lltools/bin   # repeat per tool, then chmod +x
+  ```
+
+  That gets six of `npm test`'s seven steps running locally, **including
+  `npm run build`** — so place artifacts can be regenerated and committed from
+  a container after all. Only `selene` still cannot run, and not for a network
+  reason: it fetches the Roblox API dump with a bundled root store and rejects
+  the proxy CA (`invalid peer certificate: UnknownIssuer`). `curl` reaches the
+  same URL fine and the CA *is* in the system store; `SSL_CERT_FILE`,
+  `SSL_CERT_DIR`, `CARGO_HTTP_CAINFO`, and `REQUESTS_CA_BUNDLE` are all ignored
+  by it. Let CI cover lint; run everything else locally.
 - **`.rbxm` is globally gitignored** while reviewed Creator Store candidates
   are deliberately committed — new candidate downloads need `git add -f`.
 - **`scripts/validate_mesh_assets.py` reads a fixed 520-character window**
