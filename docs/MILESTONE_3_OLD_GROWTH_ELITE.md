@@ -116,7 +116,7 @@ At most one Old Growth model, one attack marker, and one carrier light exist.
 The model uses a small anchored part set, attacks step at a bounded 20 Hz, and
 there is no per-frame NPC physics or pathfinding cost.
 
-## Windows Studio journey
+## Studio journey
 
 1. Synchronize `main`, run `npm run bootstrap`, then run `npm test`.
 2. Open `build/LastLightTest.rbxlx`, start one server/player, and require

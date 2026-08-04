@@ -85,7 +85,7 @@ At most one enemy model and one attack marker are active. Each procedural model
 uses a small anchored part set, no particle emitter, no per-frame client
 animation loop, and a bounded 20 Hz server movement step.
 
-## Windows Studio journey
+## Studio journey
 
 1. Synchronize `main`, run `npm run bootstrap`, then run `npm test`.
 2. Open `build/LastLightTest.rbxlx` and require

@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-04, at `main` = `bac6fa5` (PR #176), build `0.49.1`,
-save schema 13, 20 services. A review-fix follow-up to #176 is in flight on
+Last updated: 2026-08-04, at `main` = `d6dfb5f` (PR #177), build `0.49.1`,
+save schema 13, 20 services. Studio MCP setup is in flight on
 `claude/repo-docs-review-7iw0vr`.
 
 ---
@@ -25,11 +25,21 @@ there, not a copy here. Note the gate's own caveat: the layout validator only
 guards footprint clearance from source — the gate itself still needs a live
 Studio pathfinding pass.
 
-## Recently landed (PRs ~#151–#174)
+## Recently landed (PRs ~#151–#177)
 
 Verified against `git log`, newest first:
 
-- **In flight (not yet merged):** two construction-site fixes to #176, found by
+- **In flight (not yet merged):** setup for connecting an AI session directly to
+  Roblox Studio through Studio's own built-in MCP server, including a Wine
+  wrapper for Linux hosts running Studio under Vinegar. **This is the first
+  thing that moves the project's binding constraint** — the visual and
+  DataModel half of every runbook gate can now be closed by a session that can
+  see Studio, while the device and human half cannot. Read
+  [STUDIO_MCP_SETUP.md](STUDIO_MCP_SETUP.md) before claiming a gate closed; it
+  draws that line explicitly. The runbooks' journeys are renamed from "Windows
+  Studio journey" to "Studio journey" — the owner develops on Linux, and the
+  operating system was never what those steps depended on.
+- **#177** Two construction-site fixes to #176, found by
   CodeRabbit review after it merged. Both were reachable on ordinary paths:
   an explicitly empty damageable roster fell back to "every building", so a
   tier-zero town — which is entirely construction sites — would have had all
@@ -161,8 +171,12 @@ None of these can be completed from a session.
 
 1. **Studio and device playtest evidence** — the M3 exit gates, the M4 gate's
    live pathfinding pass, and visual confirmation of the placement-correction
-   wave all need a human in Studio and on a phone. Sessions verify geometry
-   arithmetically and via asset thumbnails; neither substitutes for the gate.
+   wave. **Partially unblocked:** a session running on the machine that runs
+   Studio can now close the Studio half through the MCP server — see
+   [STUDIO_MCP_SETUP.md](STUDIO_MCP_SETUP.md). It cannot run on a cloud session,
+   because MCP over stdio has no address to dial. What remains strictly human:
+   the baseline-phone pass, the ten-tester gate, DataStore behaviour across
+   servers, real multiplayer, and whether the slice is fun.
 2. **`ROBLOX_API_KEY` per session** — containers lose it on reset. It is
    needed only for asset upload/download (`scripts/upload_mesh_assets.py`,
    `scripts/download_creator_store_model.py`), never committed or logged.

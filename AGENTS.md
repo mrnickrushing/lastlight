@@ -14,7 +14,8 @@ third-party games.
 4. Run `npm test` plus the milestone-specific checks.
 5. Commit the freshly generated `build/LastLight.rbxlx` and
    `build/LastLightTest.rbxlx` from that exact validated source revision so a
-   Windows tester can download the GitHub ZIP and open either place directly.
+   tester can open either place directly from a checkout or a GitHub ZIP,
+   without installing the command-line toolchain.
 6. Push the branch and open a pull request to `main`.
 7. Inspect the actual GitHub check rollup.
 8. Merge after required checks pass, then synchronize local `main`.

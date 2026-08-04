@@ -90,7 +90,7 @@ At the minimum 0.78 UI scale, the 84-pixel dodge target remains above 65
 equivalent pixels. Device evidence is still required for Roblox jump,
 thumbstick, top-bar, safe-inset, and preferred-text interactions.
 
-## Windows Studio journey
+## Studio journey
 
 1. Run `npm test`.
 2. Open `build/LastLightTest.rbxlx` in Roblox Studio.

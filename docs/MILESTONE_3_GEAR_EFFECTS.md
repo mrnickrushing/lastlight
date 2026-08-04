@@ -67,7 +67,7 @@ third, independent check — `PlayerCombatService:mitigateShieldedDamage` —
 at the same three call sites, applied after the profession mitigation so
 the two damage reductions compose instead of overriding each other.
 
-## Windows Studio journey
+## Studio journey
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open `build/LastLightTest.rbxlx`, press Play, and require

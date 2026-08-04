@@ -90,7 +90,7 @@ The implementation follows the
 The rail stays above the action controls, toasts shift above the rail, Roblox
 safe insets remain enabled, and combat/store actions disappear while downed.
 
-## Windows Studio journey
+## Studio journey
 
 1. Run `npm test` and open `build/LastLightTest.rbxlx`.
 2. Start a local server with two players and confirm Output contains

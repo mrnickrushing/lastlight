@@ -83,7 +83,7 @@ number. Crafting the same recipe again stacks the count rather than
 rejecting it, so a player who runs Bramblewake multiple times can keep
 converting materials into gear.
 
-## Windows Studio journey
+## Studio journey
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open `build/LastLightTest.rbxlx`, press Play, and require

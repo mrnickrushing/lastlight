@@ -63,7 +63,7 @@ event_reward:<run ID>:<manifest hash>:<event ID>
 Each contributing user can receive that transaction once. Profile persistence
 and the server-session fallback share the same stable transaction ID.
 
-## Windows Studio journey
+## Studio journey
 
 1. Run `npm test`, then open `build/LastLightTest.rbxlx`.
 2. Press Play and confirm Output contains
