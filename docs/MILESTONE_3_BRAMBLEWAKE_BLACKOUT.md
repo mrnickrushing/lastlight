@@ -17,7 +17,7 @@ first unresolved Bramblewake entry
 ```
 
 This is the vertical-slice preview cadence. It intentionally starts on the first
-unresolved Bramblewake entry after First Light so Windows and device testers can
+unresolved Bramblewake entry after First Light so Studio and device testers can
 reach the complete flow without simulating six additional town nights. The
 production seven-night recurring town scheduler remains later work; the runtime
 still uses the canonical nine-minute duration and seventh-night interval
@@ -163,7 +163,7 @@ The world layer uses one atomic streamed model, seven interaction targets, nine
 root-wall parts, one optional carried-fire light per player, and one
 ColorCorrection effect. All geometry is anchored.
 
-## Windows Studio journey
+## Studio journey
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open `build/LastLightTest.rbxlx`, press Play, and require

@@ -89,7 +89,7 @@ transactions.
   value remains safe and the transition can retry.
 - Empty-pouch extraction returns the player safely without inventing a transaction.
 
-## Windows Studio journey
+## Studio journey
 
 1. Run `npm test`, then open `build/LastLightTest.rbxlx`.
 2. Press Play and confirm Output contains

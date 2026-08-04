@@ -750,3 +750,34 @@ glTF convention — Blender `-Y` becomes Roblox `+Z`. Both builders put the
 creature's front at `-Z`, because `CFrame.lookAt` aims `-Z` at the target, so
 both profiles carry `yaw = math.rad(180)`. A backwards boss is a plausible
 mistake that only a player standing in the arena would ever catch.
+
+## 2026-08-04 — A session can connect to Studio, on the machine Studio runs on
+
+**Decision:** Studio's built-in MCP server is the supported way for an AI
+session to see this game running. Setup lives in
+[STUDIO_MCP_SETUP.md](STUDIO_MCP_SETUP.md), and Linux hosts running Studio under
+Wine use `scripts/studio-mcp-wrapper.sh`.
+
+**Reason:** Every open exit gate in this project's runbooks is blocked on
+somebody looking at Studio, and that has been the binding constraint for
+months while source work ran ahead of evidence. A connected session closes the
+DataModel and visual half of those gates directly -- Output assertions, asset
+placement and scale, per-building damage behaviour, prompt reachability -- which
+is precisely the class of failure this project keeps shipping (buried roads,
+sideways cylinders, a beacon hidden inside its own fallback).
+
+**Bounds on what this may claim:** the device and human half does not move. A
+baseline-phone pass, the ten-tester gate, DataStore behaviour across servers,
+real multiplayer, and whether the slice is fun all still require a person. A
+session that marks those closed is asserting, not evidencing.
+
+**Why not a third-party bridge:** the paid tooling in this space asks for a
+daemon, unsigned binaries, and OpenCloud credentials, and its own launch thread
+carried an account-compromise report. Studio's first-party server is local-only,
+needs no credentials, and ships in the editor.
+
+**Platform note:** the earlier "Windows testing" decision above still stands as
+written for build artifacts -- committed places remain how a tester opens the
+game without the toolchain. What changed is that the tester is no longer assumed
+to be on Windows, so the runbooks' journeys are named for Studio rather than an
+operating system.

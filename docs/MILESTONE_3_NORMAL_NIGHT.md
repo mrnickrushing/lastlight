@@ -118,7 +118,7 @@ when that night started. A bump after the loop has already started only
 affects nights that haven't begun their wave schedule yet, so it never
 retroactively changes a night already in progress.
 
-## Windows Studio journey
+## Studio journey
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open `build/LastLightTest.rbxlx`, press Play, and require

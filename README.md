@@ -387,6 +387,9 @@ The launch is done only when all of the following are true:
   pause, and rollback criteria.
 - [Development guide](docs/DEVELOPMENT.md) — pinned tools, setup, commands,
   test layers, environments, service patterns, and upgrades.
+- [Studio MCP setup](docs/STUDIO_MCP_SETUP.md) — connecting an AI session to a
+  live Studio, including Linux/Wine hosts, and what such a session can and
+  cannot verify.
 - [Publishing runbook](docs/PUBLISHING_RUNBOOK.md) — safe universe/place setup,
   private publishing, verification, promotion, and rollback.
 - [Decision log](docs/DECISIONS.md) — durable product and architecture decisions.

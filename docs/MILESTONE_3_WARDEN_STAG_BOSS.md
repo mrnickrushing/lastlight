@@ -122,7 +122,7 @@ At most one boss model and one attack marker exist. The service steps at a
 bounded 20 Hz, uses anchored geometry, and does not add per-frame pathfinding or
 physics-driven NPC movement.
 
-## Windows Studio journey
+## Studio journey
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open the committed `build/LastLightTest.rbxlx` in Roblox Studio, press Play,

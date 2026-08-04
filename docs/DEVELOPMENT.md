@@ -54,14 +54,22 @@ rojo serve default.project.json
 
 Generated `.rbxlx` files live under `build/`. Source and project mappings remain
 the source of truth, but the two current outputs are committed after every
-completed milestone so Windows testers can download the GitHub ZIP and open
-Studio without installing the command-line toolchain:
+completed milestone so a tester can open Studio from a checkout or a GitHub ZIP
+without installing the command-line toolchain:
 
 - `build/LastLight.rbxlx` — playable game place;
 - `build/LastLightTest.rbxlx` — automated Studio integration place.
 
 Do not hand-edit either place. Regenerate both with `npm test` from the exact
 source revision before committing.
+
+## Connecting a session to Studio
+
+An AI session can drive Studio directly through Studio's built-in MCP server,
+which is how the visual and DataModel half of the milestone exit gates gets
+closed. Setup, the Wine/Vinegar wrapper for Linux hosts, and an explicit list of
+what such a session can and cannot verify are in
+[STUDIO_MCP_SETUP.md](STUDIO_MCP_SETUP.md).
 
 ## Studio integration test
 

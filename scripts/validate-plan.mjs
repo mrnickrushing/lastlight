@@ -26,6 +26,8 @@ const requiredFiles = [
   "docs/PROJECT_STATUS.md",
   "docs/MILESTONE_4_PROFILE_BACKUPS.md",
   "docs/MILESTONE_4_PER_BUILDING_DAMAGE.md",
+  "docs/STUDIO_MCP_SETUP.md",
+  "scripts/studio-mcp-wrapper.sh",
   "docs/MILESTONE_2_PLAYTEST.md",
   "docs/MILESTONE_3_EXPEDITION_FOUNDATION.md",
   "docs/MILESTONE_3_BRAMBLEWAKE_EVENTS.md",

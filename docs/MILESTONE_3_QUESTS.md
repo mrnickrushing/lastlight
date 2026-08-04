@@ -84,7 +84,7 @@ can rarely overwrite the same-tick "DAWN BREAKS" toast — accepted as a
 one-time-per-player edge case consistent with other toast-priority
 decisions already made in this codebase.
 
-## Windows Studio journey
+## Studio journey
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open `build/LastLightTest.rbxlx`, press Play, and require

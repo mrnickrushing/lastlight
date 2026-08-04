@@ -53,7 +53,7 @@ The server records the selected seed, manifest hash, generation source, module
 count, POI count, event count, and generated part count. The same seed and
 catalog version must reproduce the same manifest hash.
 
-## Windows Studio journey
+## Studio journey
 
 1. Synchronize the repository and run `npm test`.
 2. Open `build/LastLightTest.rbxlx`, or connect Studio to
