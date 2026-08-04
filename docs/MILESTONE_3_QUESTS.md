@@ -88,8 +88,8 @@ decisions already made in this codebase.
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open `build/LastLightTest.rbxlx`, press Play, and require
-   `[Last Light] PASS FoundationIntegration`, build `0.19.0`, schema `9`,
-   and no red errors.
+   `[Last Light] PASS FoundationIntegration`, the build version and save schema
+   for the commit under test (see `src/shared/Config.luau`), and no red errors.
 3. Open `build/LastLight.rbxlx`, finish First Light, craft one item.
    Require a "CRAFTED ... · QUEST COMPLETE: FIRST CRAFT" toast and 3 Amber
    Sap added to the material bank.

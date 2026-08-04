@@ -71,8 +71,8 @@ the two damage reductions compose instead of overriding each other.
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open `build/LastLightTest.rbxlx`, press Play, and require
-   `[Last Light] PASS FoundationIntegration`, build `0.19.0`, and no red
-   errors.
+   `[Last Light] PASS FoundationIntegration`, the build version for the commit
+   under test (see `src/shared/Config.luau`), and no red errors.
 3. Open `build/LastLight.rbxlx`, finish First Light, craft one Meadow
    Satchel and one Amber Charm. Require both the "CHARM ×1" and
    "SATCHEL ×1" HUD buttons to appear, and to be absent before crafting.

@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-04, at `main` = `337cacf` (PR #172), build `0.47.0`,
-save schema 12.
+Last updated: 2026-08-04, at `main` = `370bcfe` (PR #173), build `0.47.0`,
+save schema 12, 20 services. No pull request or issue is open.
 
 ---
 
@@ -24,7 +24,7 @@ there, not a copy here. Note the gate's own caveat: the layout validator only
 guards footprint clearance from source — the gate itself still needs a live
 Studio pathfinding pass.
 
-## Recently landed (PRs ~#151–#172)
+## Recently landed (PRs ~#151–#173)
 
 Verified against `git log`, newest first:
 
@@ -33,10 +33,9 @@ Verified against `git log`, newest first:
   so it failed its first line whenever a tester pressed Play); added a
   drift guard to `scripts/verify-build.luau` so `npm test` catches the next
   forgotten bump instead of the owner's Studio session.
-- **In flight, same wave as above (not yet merged):** first owner-playtest
-  fix pass on the tutorial-night first-town slice — five reports, four fixed
-  in source with file:line evidence, one investigated and explicitly not
-  acted on:
+- **#173** First owner-playtest fix pass on the tutorial-night first-town
+  slice — five reports, four fixed in source with file:line evidence, one
+  investigated and explicitly not acted on:
   - **Dawn beacon missing / dark panel on the road** — fixed. The "wall/sign"
     the owner saw was the memory-reliquary mesh itself, half-buried by two
     already-documented failure modes stacking: its flame lived inside
@@ -198,6 +197,15 @@ Hard-won, each one cost a real session real time:
   source model, and record a non-zero modal yaw as `sourceYawDegrees` in
   `MeshAssetRegistry` — otherwise the asset places turned *and* undersized,
   silently.
+- **Version literals live in `Config.luau`, not in runbooks.** The playtest
+  runbooks used to hard-code the build, schema, and service count a tester
+  should see in Studio Output; they drifted, and a tester following one would
+  have failed the first line of their evidence run against a build that had not
+  existed for thirty-plus PRs. They now defer to `src/shared/Config.luau` and
+  `src/server/init.server.luau`. The `Last updated` line in *this* file is the
+  one place those numbers are still written out, and `scripts/validate-plan.mjs`
+  checks it against source — so a version bump that forgets this file fails
+  `npm test`. Keep the line's shape (build `X`, save schema `N`, `N` services).
 - **A passing guard is not evidence until it has been made to fail.** Inject
   the regression, watch the test fail, restore. Several checks in this
   project's history read correctly and verified nothing.

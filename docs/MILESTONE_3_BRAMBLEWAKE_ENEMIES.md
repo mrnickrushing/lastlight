@@ -89,8 +89,9 @@ animation loop, and a bounded 20 Hz server movement step.
 
 1. Synchronize `main`, run `npm run bootstrap`, then run `npm test`.
 2. Open `build/LastLightTest.rbxlx` and require
-   `[Last Light] PASS FoundationIntegration`, build `0.13.0`, `services=15`, and
-   no red errors.
+   `[Last Light] PASS FoundationIntegration`, the build version and service
+   count for the commit under test (see `src/shared/Config.luau` and
+   `src/server/init.server.luau`), and no red errors.
 3. Open `build/LastLight.rbxlx` or connect Rojo and complete First Light to dusk.
 4. For each enemy, capture the silhouette, targeted threat card, world shape,
    countdown, miss/dodge path, one hit, defeat, and next queued spawn.

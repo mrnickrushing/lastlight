@@ -209,7 +209,8 @@ failed asset request simply leaves the complete procedural landmark visible.
 - A failed asset request produces the established procedural equivalent.
 - Studio review covers phone, tablet, desktop, low graphics, and maximum
   graphics before the mesh kit replaces additional forest bands.
-- Studio Output reports client build `0.40.1`, world version
-  `bramblewake-blackout-v22`, `mesh_dressing_ready ... fallbacks=0`, and
+- Studio Output reports the client build and world version for the commit under
+  test, `mesh_dressing_ready ... fallbacks=0`, and
   `expedition_mesh_dressing_ready ... fallbacks=0` before the landmarks are
-  accepted as live visual evidence.
+  accepted as live visual evidence. (The build first satisfying this gate was
+  `0.40.1` / `bramblewake-blackout-v22`.)

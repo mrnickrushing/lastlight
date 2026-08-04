@@ -76,6 +76,8 @@ never silently repurpose the shipped V1 mapping.
 - Old Growth, Warden, and chapter-decision targets retain their interaction
   attributes while gaining recognizable physical shells.
 - `npm test` passes and both generated places contain the new registry, builder,
-  image asset ID, build `0.41.0`, and world version `bramblewake-blackout-v23`.
+  image asset ID, and the build and world version for the commit under test.
+  (The build first satisfying this gate was `0.41.0` /
+  `bramblewake-blackout-v23`.)
 - Studio screenshots with labels enabled and disabled, Studio Output, and the
   phone/device pass remain the final visual release gate.

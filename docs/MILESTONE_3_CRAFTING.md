@@ -87,8 +87,8 @@ converting materials into gear.
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open `build/LastLightTest.rbxlx`, press Play, and require
-   `[Last Light] PASS FoundationIntegration`, build `0.16.0`, schema `6`, and
-   no red errors.
+   `[Last Light] PASS FoundationIntegration`, the build version and save schema
+   for the commit under test (see `src/shared/Config.luau`), and no red errors.
 3. Open `build/LastLight.rbxlx` and attempt to interact with a crafting
    bench before finishing First Light. Require a
    "FINISH FIRST LIGHT TO CRAFT" rejection and no material change.

@@ -31,8 +31,13 @@ Open `build/LastLightTest.rbxlx`, start a server with one player, and require al
 of the following in Output:
 
 - `[Last Light] PASS FoundationIntegration`;
-- `server_boot_complete` with build `0.13.0` and `services=15`;
+- `server_boot_complete` reporting the build version and save schema declared
+  in `src/shared/Config.luau` for the commit under test, and a service count
+  matching the services registered in `src/server/init.server.luau`;
 - no red errors, infinite yields, or DataStore production writes.
+
+A build version that does not match the commit under test means the place was
+not built from that source. Rebuild rather than continuing the run.
 
 The integration assertion verifies the runtime remotes, world-ready signal,
 arrival spawn, Mara, Heartwood, construction plot, First Lantern, eight
