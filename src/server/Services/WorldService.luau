@@ -1486,21 +1486,6 @@ local function groundPatch(
     return patch
 end
 
-local function mistSheet(
-    parent: Instance,
-    name: string,
-    position: Vector3,
-    size: Vector3,
-    color: Color3,
-    transparency: number
-)
-    local mist = part(parent, name, size, CFrame.new(position), color, Enum.Material.Glass, false)
-    mist.Transparency = transparency
-    mist.CastShadow = false
-    mist.CanQuery = false
-    return mist
-end
-
 local function emberDrift(
     parent: Instance,
     position: Vector3,
@@ -2378,15 +2363,22 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
         Color3.fromRGB(43, 63, 45),
         Enum.Material.LeafyGrass
     )
-    mistSheet(
-        geometry,
-        "LowMorningMist",
-        Vector3.new(0, 2.3, -86),
-        Vector3.new(190, 1.4, 250),
-        Color3.fromRGB(132, 158, 151),
-        0.82
-    )
+    --[[
+        There used to be a "LowMorningMist" here: a 190 x 250 stud Glass slab
+        floating at y = 2.3 over the whole first playable area.
 
+        Glass is not a fog material. It renders a refractive pane no matter
+        what Transparency says, so the slab did not read as mist -- it tinted
+        every road stone, every patch of grass, and every building in the
+        starting town a flat cyan-green, and it ended in a hard rectangular
+        seam along x = +-95 and z = -211 where the washed ground met ordinary
+        grass. It also never turned off: nothing ever toggled it, so a thing
+        named "morning" mist sat over the town at dusk and through the night.
+
+        Aerial perspective is already handled properly, by LastLightAtmosphere
+        below, whose Density and Haze are eased per phase. That is the system
+        that owns haze here; the slab was a second, cruder one fighting it.
+    ]]
     local route = {
         -- Extend behind ArrivalSpawn so the opening camera visibly starts on
         -- the route instead of looking across an unbroken foreground of grass.
@@ -2952,11 +2944,43 @@ local function buildMeshFallback(parent: Instance, placement: MeshPlacement)
     end
 end
 
+--[[
+    Opt a subtree out of being blanked when its placement's authored mesh wins.
+
+    This project has now shipped the same bug four times: real, load-bearing
+    content authored *inside* a placement's fallbackInstance -- the First
+    Lantern's flame, the dawn beacon's flame, the three tool displays, and
+    every illustrated notice on both first-world boards -- goes invisible the
+    moment the unrelated mesh it shares a placement with finishes loading. The
+    first three were fixed by hoisting the part to a sibling. That works, but
+    it only fixes the one caller who remembered, and the notices proved the
+    pattern keeps finding new places to happen.
+
+    A part marked here, and everything under it, is skipped by the blanking
+    pass. The mesh still replaces the scratch geometry around it.
+]]
+local function survivesMeshReplacement(instance: Instance, placeholder: Instance): boolean
+    local node: Instance? = instance
+    while node ~= nil do
+        if node:GetAttribute("KeepVisibleOnReplacement") == true then
+            return true
+        end
+        if node == placeholder then
+            return false
+        end
+        node = node.Parent
+    end
+    return false
+end
+
 local function hideProceduralPlaceholder(placeholder: Instance)
     local removeSemanticGui = placeholder:GetAttribute("HideSemanticGuiOnReplacement") == true
     local instances = placeholder:GetDescendants()
     table.insert(instances, placeholder)
     for _, instance in instances do
+        if survivesMeshReplacement(instance, placeholder) then
+            continue
+        end
         if removeSemanticGui and (instance:IsA("SurfaceGui") or instance:IsA("BillboardGui")) then
             instance:Destroy()
         elseif instance:IsA("BasePart") then
@@ -8635,11 +8659,32 @@ function WorldService._rebuildTownProgression(self: WorldService)
     if existingBuildings ~= nil then
         existingBuildings:Destroy()
     end
+    --[[
+        The authored meshes this rebuild is about to queue used to be parented
+        straight to the world, while only GreenwardConsequence and
+        TownProgressionBuildings were torn down above. Every rebuild therefore
+        orphaned whatever the previous pass had already placed, stacked at
+        identical coordinates.
+
+        That is not a rare path. A profile load calls setTownConsequence and
+        setTownConstruction back to back, so the town rebuilds twice before a
+        player has done anything, and it rebuilds again on every construction
+        contribution for the rest of the session. Holding the placements in
+        their own container means one Destroy takes the whole previous pass
+        with it.
+    ]]
+    local existingAuthored = world:FindFirstChild("TownAuthoredMeshes")
+    if existingAuthored ~= nil then
+        existingAuthored:Destroy()
+    end
+    local authoredMeshes = Instance.new("Model")
+    authoredMeshes.Name = "TownAuthoredMeshes"
+    authoredMeshes.Parent = world
     local landscape = Instance.new("Model")
     landscape.Name = "GreenwardConsequence"
     landscape.Parent = world
     local townMeshPlacements: { MeshPlacement } = {}
-    buildTownConsequenceLandscape(landscape, resolved, world, townMeshPlacements)
+    buildTownConsequenceLandscape(landscape, resolved, authoredMeshes, townMeshPlacements)
     local buildings = Instance.new("Model")
     buildings.Name = "TownProgressionBuildings"
     buildings.Parent = world
@@ -8647,14 +8692,19 @@ function WorldService._rebuildTownProgression(self: WorldService)
         buildings,
         resolved,
         self._runtimeIds,
-        world,
+        authoredMeshes,
         townMeshPlacements,
         self._townConstruction,
         self._townConstructionRules
     )
     self._townResidents = residents
     self._buildingPlacements = buildingPlacements
-    self:_placeAuthoredMeshes(townMeshPlacements, world, buildings, "town_mesh_dressing_ready")
+    self:_placeAuthoredMeshes(
+        townMeshPlacements,
+        authoredMeshes,
+        buildings,
+        "town_mesh_dressing_ready"
+    )
     for residentId, resident in self._townResidents do
         local interactionId = self._runtimeIds.ResidentInteractionIds[residentId]
         if interactionId ~= nil and resident.interactionTarget ~= nil then

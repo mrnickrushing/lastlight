@@ -1099,7 +1099,12 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     lobbyFrame.BorderSizePixel = 0
     lobbyFrame.Visible = false
     lobbyFrame.ZIndex = 40
-    lobbyFrame.Parent = gui
+    -- Bottom-anchored, so it belongs on the canvas for the same reason every
+    -- other bottom-anchored control does: the canvas carries the UIScale and
+    -- is grown by its inverse so its edges land on the screen edges. Parented
+    -- straight to the ScreenGui it was the one panel that never scaled down on
+    -- a phone, and it sits directly above the touch action buttons.
+    lobbyFrame.Parent = canvas
     local lobbyCorner = Instance.new("UICorner")
     lobbyCorner.CornerRadius = UDim.new(0, 12)
     lobbyCorner.Parent = lobbyFrame
@@ -1180,7 +1185,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     actionFrame.BorderSizePixel = 0
     actionFrame.Visible = false
     actionFrame.ZIndex = 44
-    actionFrame.Parent = gui
+    actionFrame.Parent = canvas
     local actionCorner = Instance.new("UICorner")
     actionCorner.CornerRadius = UDim.new(0, 12)
     actionCorner.Parent = actionFrame

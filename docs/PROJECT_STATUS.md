@@ -7,9 +7,9 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-04, at `main` = `d6dfb5f` (PR #177), build `0.49.1`,
-save schema 13, 20 services. Studio MCP setup is in flight on
-`claude/repo-docs-review-7iw0vr`.
+Last updated: 2026-08-04, at `main` = `fffa122` (PR #178), build `0.49.1`,
+save schema 13, 20 services. A first connected-Studio visual sweep is in
+flight on `agent/visual-sweep-fixes`.
 
 ---
 
@@ -25,10 +25,57 @@ there, not a copy here. Note the gate's own caveat: the layout validator only
 guards footprint clearance from source — the gate itself still needs a live
 Studio pathfinding pass.
 
-## Recently landed (PRs ~#151–#177)
+## Recently landed (PRs ~#151–#178)
 
 Verified against `git log`, newest first:
 
+- **In flight (not yet merged), `agent/visual-sweep-fixes`:** the first visual
+  sweep done through a connected Studio session, and the first time the
+  committed Studio integration test has ever been watched all the way through.
+  Five things a player could see were wrong, and none of them were visible from
+  source alone:
+  - **All eight illustrated first-world notices were invisible.** Both the
+    Greenward Archive board and the Town Board are mesh-replacement fallbacks,
+    so `hideProceduralPlaceholder` blanked every notice paper to
+    `Transparency = 1` and switched off every artwork `SurfaceGui` the moment
+    the authored Creator Store board loaded — and that board is bare wood. A
+    player walked up to two blank planks. This is the fourth time this exact
+    failure has shipped (First Lantern flame, dawn beacon flame, the three tool
+    displays), so the fix is declarative rather than another hoist: a part
+    marked `KeepVisibleOnReplacement` and everything under it is skipped by the
+    blanking pass. Set on the notice papers, pins, wax seals, and header plate.
+  - **A glass slab was tinting the whole starting town.** `LowMorningMist` was
+    a 190 x 250 stud `Enum.Material.Glass` part floating at y = 2.3 over the
+    entire first playable area. Glass renders a refractive pane whatever
+    `Transparency` says, so it washed every road stone, building, and patch of
+    grass a flat cyan-green and ended in a hard rectangular seam at
+    x = ±95 / z = -211. Nothing ever toggled it either, so a "morning" mist sat
+    over the town at dusk and through the night. Removed; `LastLightAtmosphere`
+    already does aerial perspective properly and is eased per phase.
+  - **The town leaked authored meshes on every rebuild.** `_rebuildTownProgression`
+    destroyed `GreenwardConsequence` and `TownProgressionBuildings` but not the
+    authored placements the previous pass had parented straight to the world,
+    so duplicates stacked at identical coordinates. Not rare: a profile load
+    rebuilds twice back to back, and every construction contribution rebuilds
+    again. Measured 17 stray models against 16 real placements before the fix,
+    0 after. They now live in a `TownAuthoredMeshes` container that one
+    `Destroy` clears.
+  - **"DO NOT ENTER — THIS RESTRICTED CLEARANCE AREA"** in modern yellow-and-black
+    hazard type, on the two barricades flanking the tutorial's opening path,
+    at the exact moment the objective card says to follow the lantern path.
+    Baked-in decals on the Creator Store barricade model. New registry flag
+    `stripDecals` (honoured in `MeshTemplateLoader.sanitize`) drops `Decal` and
+    `Texture` off that asset; the geometry is kept.
+  - **Two HUD panels bypassed `SafeCanvas`.** `LobbyPanel` and `ActionProgress`
+    were parented to the `ScreenGui` rather than the canvas, so they were the
+    only bottom-anchored controls that never received the `UIScale` the canvas
+    carries — exactly the class of mobile layout bug that comment was written
+    about. Reparented.
+
+  The Studio test itself had never printed
+  `[Last Light] PASS FoundationIntegration` — it aborted at the notice check,
+  and everything past that line had gone unexercised long enough to rot. See
+  the runbook note below.
 - **In flight (not yet merged):** setup for connecting an AI session directly to
   Roblox Studio through Studio's own built-in MCP server, including a Wine
   wrapper for Linux hosts running Studio under Vinegar. **This is the first
@@ -194,6 +241,35 @@ None of these can be completed from a session.
 
 ## Known open threads
 
+- **Bramblewake is 3.3x over its generated part budget, and this is now the one
+  thing stopping `PASS FoundationIntegration` from printing.** The preview
+  generates **2330** parts against a catalogued budget of **700**
+  (`PartBudget` 640 + `BossArenaPartBudget` 40 + `BlackoutPartBudget` 20 in
+  `BramblewakeExpedition.luau`). That budget has not moved since `fe31b24`
+  (2026-08-01), and everything added to the expedition since — the module
+  dressing pass, boss arena, blackout layer, story landmarks, backdrop — landed
+  on top of it without the number being revisited. Nothing caught it because
+  the test aborted 700 lines earlier.
+
+  **This needs an owner decision, not a session's guess.** The M3 exit gate in
+  [MILESTONE_3_EXPEDITION_FOUNDATION.md](MILESTONE_3_EXPEDITION_FOUNDATION.md)
+  reads "generated part count stays within catalog budget and target-device
+  frame/memory captures are attached", so the number is a product gate, and
+  raising it to match whatever the world happens to contain would delete the
+  gate rather than pass it. Either re-derive the budget from a real
+  baseline-phone capture and record why, or cut expedition density back toward
+  the existing one. A session can do either once told which.
+- **Two selected Creator Store assets were never actually adopted.**
+  `mesh_creator_hollow_rootling_a` and `mesh_creator_predatory_flower_a` are
+  listed in `assets/meshes/candidates/creator-store-full-pass/selection.json`
+  and `scripts/generate_mesh_kit.py`, but neither was ever promoted into
+  `MeshAssetRegistry` and nothing places them. The Studio test asserted four of
+  the first and two of the second, so those assertions could not have passed in
+  any build ever made; they have been removed rather than left as permanent
+  red. **The content gap is real and still open:** the Warden and Blackout
+  living-root objects and the Old Growth root hearts have no sourced art. Decide
+  whether to adopt these two candidates or retire them explicitly, the same
+  question `mesh_creator_first_lantern_a` is waiting on below.
 - `mesh_creator_first_lantern_a` is in the manifest but genuinely undecided —
   retire it explicitly or place it. Details in
   [ASSET_COVERAGE_AUDIT.md](ASSET_COVERAGE_AUDIT.md) §Intentionally unplaced.
@@ -274,3 +350,18 @@ Hard-won, each one cost a real session real time:
 - **A passing guard is not evidence until it has been made to fail.** Inject
   the regression, watch the test fail, restore. Several checks in this
   project's history read correctly and verified nothing.
+- **An unreachable assertion rots silently, and this file's own runbooks were
+  built on one.** `FoundationIntegration` aborted at its Town Board notice
+  check on every run, because that check counts a board that only exists after
+  a profile load and the script runs at server boot. Everything after that line
+  — roughly two thirds of the test — had therefore never executed, and five
+  separate assertions had drifted out of agreement with the game while still
+  reading as if they passed: a tool-yard roof part renamed to a rafter frame
+  thirty commits earlier, a corner-post count that demanded completed buildings
+  a tier-zero save cannot have, a town asset census that silently started
+  counting Bramblewake once the expedition was dressed from the same library,
+  two assertions naming assets that were never registered, and a
+  fallback-visibility rule that directly contradicted the notice check beside
+  it. Ten milestone runbooks ask for `[Last Light] PASS FoundationIntegration`
+  as gate evidence; none of them could ever have got it. **When a gate line has
+  never been seen to print, treat every assertion behind it as unverified.**
