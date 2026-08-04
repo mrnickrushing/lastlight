@@ -35226,9 +35226,16 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
             marker.Adornee = target
             marker.AlwaysOnTop = true
             marker.LightInfluence = 0
-            marker.Size = UDim2.fromOffset(150, 32)
-            marker.StudsOffsetWorldSpace = Vector3.new(0, 4.8, 0)
-            marker.MaxDistance = 70
+            marker.Size = UDim2.fromOffset(190, 40)
+            marker.StudsOffsetWorldSpace = Vector3.new(0, 8, 0)
+            -- The relay legs are 120, 228, and 161 studs, and the carry timer
+            -- is 18 seconds. At the old MaxDistance of 70 the marker only
+            -- appeared once a carrier was already most of the way there, so
+            -- the one thing that says "this way" could not be seen from where
+            -- the fire is taken. 500 covers every leg from anywhere on the
+            -- route; AlwaysOnTop and zero light influence keep it readable in
+            -- Blackout darkness.
+            marker.MaxDistance = 500
             marker.Parent = target
             local markerText = marker:FindFirstChild("MarkerText")
             if markerText == nil or not markerText:IsA("TextLabel") then
@@ -35240,7 +35247,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
                 markerText.Font = Enum.Font.GothamBold
                 markerText.Size = UDim2.fromScale(1, 1)
                 markerText.TextColor3 = Color3.fromRGB(172, 255, 205)
-                markerText.TextSize = 13
+                markerText.TextSize = 16
                 markerText.Text = "▼  NEXT ROOT"
                 markerText.Parent = marker
                 local corner = Instance.new("UICorner")
