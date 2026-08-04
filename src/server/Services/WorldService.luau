@@ -96,23 +96,8 @@ local WET_BARK = Color3.fromRGB(36, 26, 24)
 local MOSS = Color3.fromRGB(58, 91, 54)
 local WET_EARTH = Color3.fromRGB(67, 55, 39)
 local HEARTWOOD_CENTER = Vector3.new(38, 0, -48)
---[[
-    The height a character has to stand at to be standing on the ground.
 
-    This started out as "the town square's pad surface, 0.8" and that was
-    wrong, because the pad itself is underground. Roblox renders a terrain
-    surface half a voxel above the fill's top face, so the valley floor
-    authored at y = 0 is walked on at y = 2 -- see VOXEL_SURFACE_RISE in
-    TerrainBuilder, measured with a control fill.
-
-    Everything authored to stand at y = 0 is therefore two studs into the
-    grass. Mara and all three residents were: feet at y 0.0 against a surface
-    at 2.0, which is why a villager read as a head and a torso on a box with
-    no legs. Lifting them here is a correction to their seating, not a
-    stylistic change.
-]]
-local VALLEY_SURFACE_Y = 2
-local TOOL_YARD_CENTER = Vector3.new(-42, VALLEY_SURFACE_Y, -68)
+local TOOL_YARD_CENTER = Vector3.new(-42, 0, -68)
 --[[
     The town square: Emberhollow's centre, and the arena every night fight
     happens in.
@@ -299,7 +284,7 @@ local function queueRoadAssetPlacements(
         table.insert(placements, {
             assetId = "mesh_creator_road_stones_a",
             fallbackKind = "asset_dressing",
-            position = Vector3.new(position.X, 2.42, position.Z),
+            position = Vector3.new(position.X, 0.42, position.Z),
             scale = 1,
             yaw = yaw,
             seed = seedBase + index,
@@ -1201,7 +1186,7 @@ local function buildEmberhollowSanctuary(
         parent,
         "TownMainStreetFoundation",
         Vector3.new(18, 0.34, 206),
-        CFrame.new(0, 1.81, -102),
+        CFrame.new(0, -0.19, -102),
         Color3.fromRGB(38, 41, 39),
         Enum.Material.Slate,
         false
@@ -1211,7 +1196,7 @@ local function buildEmberhollowSanctuary(
         parent,
         "TownMainStreet",
         Vector3.new(15.5, 0.32, 204),
-        CFrame.new(0, 2.17, -102),
+        CFrame.new(0, 0.17, -102),
         Color3.fromRGB(183, 143, 91),
         Enum.Material.Cobblestone,
         false
@@ -1221,7 +1206,7 @@ local function buildEmberhollowSanctuary(
         parent,
         "TownMainStreetWear",
         Vector3.new(3.8, 0.12, 202),
-        CFrame.new(0, 2.42, -102),
+        CFrame.new(0, 0.42, -102),
         Color3.fromRGB(88, 58, 37),
         Enum.Material.Mud,
         false
@@ -1232,7 +1217,7 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownStreetRut",
             Vector3.new(0.68, 0.08, 200),
-            CFrame.new(rutSide * 2.4, 2.5, -102),
+            CFrame.new(rutSide * 2.4, 0.5, -102),
             Color3.fromRGB(61, 43, 30),
             Enum.Material.Mud,
             false
@@ -1255,7 +1240,7 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownDistrictRoadFoundation",
             Vector3.new(8.6, 0.26, delta.Magnitude + 1.2),
-            frame * CFrame.new(0, 1.5, 0),
+            frame * CFrame.new(0, -0.5, 0),
             Color3.fromRGB(38, 41, 39),
             Enum.Material.Slate,
             false
@@ -1265,7 +1250,7 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownDistrictRoad",
             Vector3.new(7.2, 0.24, delta.Magnitude + 0.8),
-            frame * CFrame.new(0, 1.81, 0),
+            frame * CFrame.new(0, -0.19, 0),
             Color3.fromRGB(176, 137, 87),
             Enum.Material.Cobblestone,
             false
@@ -1275,7 +1260,7 @@ local function buildEmberhollowSanctuary(
             parent,
             "TownDistrictRoadWear",
             Vector3.new(2.1, 0.08, delta.Magnitude + 0.5),
-            frame * CFrame.new(0, 2.01, 0),
+            frame * CFrame.new(0, 0.01, 0),
             Color3.fromRGB(79, 52, 34),
             Enum.Material.Mud,
             false
@@ -1284,8 +1269,8 @@ local function buildEmberhollowSanctuary(
         queueRoadAssetPlacements(
             meshPlacements,
             parent,
-            start + Vector3.new(0, 1.38, 0),
-            finish + Vector3.new(0, 1.38, 0),
+            start + Vector3.new(0, -0.62, 0),
+            finish + Vector3.new(0, -0.62, 0),
             9700 + #meshPlacements
         )
     end
@@ -2448,7 +2433,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             geometry,
             "EmberhollowRoadFoundation",
             Vector3.new(17.2, 0.28, distance + 4),
-            roadFrame * CFrame.new(0, 1.42, 0),
+            roadFrame * CFrame.new(0, -0.58, 0),
             Color3.fromRGB(38, 41, 39),
             Enum.Material.Slate,
             false
@@ -2458,11 +2443,13 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             geometry,
             "EmberhollowRoad",
             Vector3.new(15.2, 0.36, distance + 3.6),
-            -- Studio verification showed the voxel-rendered valley surface
-            -- occluding the authored y=0 plane by about 1.5 studs. Keeping the
-            -- route non-colliding while lifting its visual skin preserves the
-            -- gameplay plane and makes the road actually render underfoot.
-            roadFrame * CFrame.new(0, 1.77, 0),
+            -- The whole road stack used to be lifted about two studs, because
+            -- the voxel-rendered valley surface was occluding the authored y=0
+            -- plane and this was diagnosed as a road problem. It was a datum
+            -- problem: see VOXEL_SURFACE_RISE in TerrainBuilder. The terrain
+            -- now renders on the authored plane, so the compensation is gone
+            -- and these offsets are back to describing the layer stack alone.
+            roadFrame * CFrame.new(0, -0.23, 0),
             Color3.fromRGB(190, 149, 94),
             Enum.Material.Cobblestone,
             false
@@ -2473,7 +2460,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             geometry,
             "EmberhollowRoadWear",
             Vector3.new(3.6, 0.12, distance + 2.8),
-            roadFrame * CFrame.new(0, 2.05, 0),
+            roadFrame * CFrame.new(0, 0.05, 0),
             Color3.fromRGB(78, 51, 33),
             Enum.Material.Mud,
             false
@@ -2488,7 +2475,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 geometry,
                 "RoadShoulder",
                 Vector3.new(1.15, 0.3, distance + 3.2),
-                roadFrame * CFrame.new(shoulderSide * 7.45, 1.83, 0),
+                roadFrame * CFrame.new(shoulderSide * 7.45, -0.17, 0),
                 Color3.fromRGB(57, 62, 59),
                 Enum.Material.Slate,
                 false
@@ -2501,7 +2488,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 geometry,
                 "RoadRut",
                 Vector3.new(0.62, 0.08, distance + 1),
-                roadFrame * CFrame.new(rutSide * 2.25, 2.14, 0),
+                roadFrame * CFrame.new(rutSide * 2.25, 0.14, 0),
                 Color3.fromRGB(57, 40, 28),
                 Enum.Material.Mud,
                 false
@@ -2518,7 +2505,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                     "RoadEdgeStone",
                     Vector3.new(1.3, 0.62, 1.75),
                     roadFrame
-                        * CFrame.new(side * 7.85, 2.13, along)
+                        * CFrame.new(side * 7.85, 0.13, along)
                         * CFrame.Angles(0, math.rad(side * (marker % 2) * 7), 0),
                     if marker % 3 == 0
                         then Color3.fromRGB(132, 124, 101)
@@ -2554,7 +2541,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
                 -- tops out at 0.91, so this offset puts the wedge's underside
                 -- at 0.89 -- inlaid into the road. At 0.94 it floated a full
                 -- 0.4 studs above the surface and pulsed in mid-air.
-                roadFrame * CFrame.new(0, 2.15, along) * CFrame.Angles(0, math.pi, 0),
+                roadFrame * CFrame.new(0, 0.15, along) * CFrame.Angles(0, math.pi, 0),
                 FOXFIRE,
                 Enum.Material.Neon,
                 false
@@ -3896,7 +3883,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
     local model = Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
     model.Name = "Mara"
     model:SetAttribute("ResidentId", "npc_mara")
-    model:PivotTo(CFrame.new(-3, 3 + VALLEY_SURFACE_Y, -30))
+    model:PivotTo(CFrame.new(-3, 3, -30))
 
     local maraHumanoid = model:WaitForChild("Humanoid") :: Humanoid
     maraHumanoid.DisplayName = "Mara"
@@ -4286,7 +4273,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
             trap,
             "FallenRootStump",
             Vector3.new(1.9, 2.2, 1.9),
-            CFrame.new(-3 + stumpSide * 5.4, 1.1 + VALLEY_SURFACE_Y, -30)
+            CFrame.new(-3 + stumpSide * 5.4, 1.1, -30)
                 * CFrame.Angles(0, 0, math.rad(stumpSide * 6)),
             WET_BARK,
             Enum.Material.Wood,
@@ -4301,7 +4288,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
         fallenRootsFallback,
         "FallenRoot",
         Vector3.new(13.6, 1.7, 1.7),
-        CFrame.new(-3, 2.55 + VALLEY_SURFACE_Y, -30) * CFrame.Angles(0, 0, math.rad(-5)),
+        CFrame.new(-3, 2.55, -30) * CFrame.Angles(0, 0, math.rad(-5)),
         BARK,
         Enum.Material.Wood,
         false
@@ -4311,7 +4298,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
             fallenRootsFallback,
             "FallenRootLimb",
             Vector3.new(0.85, 5.4, 0.85),
-            CFrame.new(-3 + limbIndex * 2.2, 2.1 + VALLEY_SURFACE_Y, -30 + limbIndex * 0.7)
+            CFrame.new(-3 + limbIndex * 2.2, 2.1, -30 + limbIndex * 0.7)
                 * CFrame.Angles(math.rad(limbIndex * 26), 0, math.rad(64)),
             BARK,
             Enum.Material.Wood,
@@ -4321,7 +4308,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
     table.insert(self._meshPlacements, {
         assetId = "mesh_deadfall_a",
         fallbackKind = "asset_replacement",
-        position = Vector3.new(-3, 1.9 + VALLEY_SURFACE_Y, -30),
+        position = Vector3.new(-3, 1.9, -30),
         scale = 1.15,
         yaw = math.rad(90),
         seed = 9320,
@@ -5121,11 +5108,11 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     approach.Name = "BramblewakeDawnApproach"
     approach.Parent = interactables
     -- ROAD_SURFACE_Y matches the trail/wear-strip top computed in the
-    -- Emberhollow road loop above (route base y 0.42 + trail offset 1.77 +
+    -- Emberhollow road loop above (route base y 0.42 + wear offset 0.05 +
     -- half its 0.36 thickness, and the wear strip reaching to 0.42 + 2.05 +
     -- half its 0.12 thickness) -- anything at or below the old y~0.2-0.4
     -- authored here rendered buried under that raised visual skin.
-    local ROAD_SURFACE_Y = 2.45
+    local ROAD_SURFACE_Y = 0.53
     for stepIndex = 1, 3 do
         part(
             approach,
@@ -8398,22 +8385,6 @@ local function buildTownProgressionBuildings(
     )
     noteConstructionTarget("building_trapworks", "TRAPWORKS", signAnchor(trapworks))
 
-    --[[
-        Stand a resident on the ground rather than in it.
-
-        Every anchor below is authored at y = 3, the rig height for standing on
-        a valley floor at y = 0. The floor is actually walked on at
-        VALLEY_SURFACE_Y, so all three residents stood two studs under it at
-        every hour of the day -- legs and arms swallowed, leaving a head and a
-        shoulder above the grass.
-
-        Applied to all nine anchors rather than to the ones over the square:
-        the burial has nothing to do with the plaza, it is the whole valley.
-    ]]
-    local function standOnTownSurface(anchor: CFrame): CFrame
-        return anchor + Vector3.new(0, VALLEY_SURFACE_Y, 0)
-    end
-
     local residentDefinitions = {
         npc_tomas_reed = {
             displayName = "TOMAS REED",
@@ -8423,13 +8394,9 @@ local function buildTownProgressionBuildings(
             skin = Color3.fromRGB(177, 124, 87),
             hair = Color3.fromRGB(55, 40, 34),
             prop = "cookpot",
-            day = standOnTownSurface(CFrame.new(-92, 3, -178) * CFrame.Angles(0, math.rad(180), 0)),
-            dusk = standOnTownSurface(
-                CFrame.new(-10, 3, -128) * CFrame.Angles(0, math.rad(-10), 0)
-            ),
-            night = standOnTownSurface(
-                CFrame.new(-9, 3, -138) * CFrame.Angles(0, math.rad(-15), 0)
-            ),
+            day = CFrame.new(-92, 3, -178) * CFrame.Angles(0, math.rad(180), 0),
+            dusk = CFrame.new(-10, 3, -128) * CFrame.Angles(0, math.rad(-10), 0),
+            night = CFrame.new(-9, 3, -138) * CFrame.Angles(0, math.rad(-15), 0),
             dayDuty = "PREPARING SUPPLIES",
         },
         npc_pip_wren = {
@@ -8440,9 +8407,9 @@ local function buildTownProgressionBuildings(
             skin = Color3.fromRGB(210, 157, 112),
             hair = Color3.fromRGB(111, 66, 43),
             prop = "route_map",
-            day = standOnTownSurface(CFrame.new(0, 3, -151) * CFrame.Angles(0, math.rad(180), 0)),
-            dusk = standOnTownSurface(CFrame.new(0, 3, -128)),
-            night = standOnTownSurface(CFrame.new(0, 3, -139)),
+            day = CFrame.new(0, 3, -151) * CFrame.Angles(0, math.rad(180), 0),
+            dusk = CFrame.new(0, 3, -128),
+            night = CFrame.new(0, 3, -139),
             dayDuty = "MAPPING SAFE ROUTES",
         },
         npc_ena_moss = {
@@ -8453,9 +8420,9 @@ local function buildTownProgressionBuildings(
             skin = Color3.fromRGB(126, 87, 65),
             hair = Color3.fromRGB(41, 35, 29),
             prop = "seed_basket",
-            day = standOnTownSurface(CFrame.new(96, 3, -146) * CFrame.Angles(0, math.rad(180), 0)),
-            dusk = standOnTownSurface(CFrame.new(10, 3, -128) * CFrame.Angles(0, math.rad(10), 0)),
-            night = standOnTownSurface(CFrame.new(9, 3, -138) * CFrame.Angles(0, math.rad(15), 0)),
+            day = CFrame.new(96, 3, -146) * CFrame.Angles(0, math.rad(180), 0),
+            dusk = CFrame.new(10, 3, -128) * CFrame.Angles(0, math.rad(10), 0),
+            night = CFrame.new(9, 3, -138) * CFrame.Angles(0, math.rad(15), 0),
             dayDuty = "TENDING THE GREENWARD",
         },
     }

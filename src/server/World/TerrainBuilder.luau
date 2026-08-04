@@ -81,6 +81,24 @@ local GROUND_Y = 0
 ]]
 local VOXEL_SURFACE_RISE = 2
 
+--[[
+    The Y every terrain fill is authored against, as opposed to the Y the
+    engine then renders the surface at.
+
+    Fills are placed VOXEL_SURFACE_RISE lower than the plane they are meant to
+    produce, so the surface Roblox actually renders lands on GROUND_Y -- the
+    plane every authored Vector3 in WorldService was written against. Before
+    this, the fills were placed AT GROUND_Y and the surface rendered two studs
+    above it, so the entire authored world was underground and individual props
+    were being lifted one at a time to compensate. The main street still
+    carries such a lift (a +1.77 "visual skin"), added when this was diagnosed
+    as a road problem rather than a datum problem.
+
+    Reporting is unchanged: groundHeight() and surfaceHeight() still describe
+    the authored plane, and now they are telling the truth.
+]]
+local FILL_Y = GROUND_Y - VOXEL_SURFACE_RISE
+
 -- How deep the solid ground slab runs. Enough that a Blackout crater or a
 -- future dug-out cannot punch through into empty space.
 local BEDROCK_DEPTH = 90
@@ -171,7 +189,7 @@ local function fillValleyFloor(terrain: Terrain, palette: Palette)
     local depthSpan = toVoxelSpan(BEDROCK_DEPTH)
 
     terrain:FillBlock(
-        CFrame.new(centerX, GROUND_Y - depthSpan / 2, centerZ),
+        CFrame.new(centerX, FILL_Y - depthSpan / 2, centerZ),
         Vector3.new(width, depthSpan, depth),
         palette.valley
     )
@@ -297,7 +315,7 @@ local function fillHillAnnulus(
 
                 local columnHeight = toVoxelSpan(height + BEDROCK_DEPTH)
                 terrain:FillBlock(
-                    CFrame.new(x, GROUND_Y + height - columnHeight / 2, z),
+                    CFrame.new(x, FILL_Y + height - columnHeight / 2, z),
                     Vector3.new(toVoxelSpan(step), columnHeight, toVoxelSpan(step)),
                     material
                 )
@@ -337,8 +355,8 @@ local function fillHorizonPeaks(terrain: Terrain, seed: number, palette: Palette
 
         -- Two stacked balls give a shoulder and a cap, which reads as a
         -- mountain rather than a dome.
-        terrain:FillBall(Vector3.new(x, GROUND_Y + height * 0.15, z), radius, palette.ridge)
-        terrain:FillBall(Vector3.new(x, GROUND_Y + height * 0.55, z), radius * 0.62, palette.peak)
+        terrain:FillBall(Vector3.new(x, FILL_Y + height * 0.15, z), radius, palette.ridge)
+        terrain:FillBall(Vector3.new(x, FILL_Y + height * 0.55, z), radius * 0.62, palette.peak)
     end
 end
 
@@ -353,16 +371,16 @@ end
 ]]
 local function fillStream(terrain: Terrain, palette: Palette)
     local points = {
-        Vector3.new(232, GROUND_Y, 60),
-        Vector3.new(252, GROUND_Y, -20),
-        Vector3.new(268, GROUND_Y, -104),
-        Vector3.new(296, GROUND_Y, -186),
-        Vector3.new(342, GROUND_Y, -252),
+        Vector3.new(232, FILL_Y, 60),
+        Vector3.new(252, FILL_Y, -20),
+        Vector3.new(268, FILL_Y, -104),
+        Vector3.new(296, FILL_Y, -186),
+        Vector3.new(342, FILL_Y, -252),
     }
 
     local channelDepth = 16
     local waterDepth = 8
-    local waterSurfaceY = GROUND_Y - 2
+    local waterSurfaceY = FILL_Y - 2
 
     for index = 1, #points - 1 do
         local from = points[index]
@@ -371,9 +389,8 @@ local function fillStream(terrain: Terrain, palette: Palette)
         local center = from + delta * 0.5
         local width = toVoxelSpan(28 + math.sin(index * 1.7) * 4)
         local length = toVoxelSpan(delta.Magnitude + width)
-        local horizontalTarget = Vector3.new(to.X, GROUND_Y, to.Z)
-        local orientation =
-            CFrame.lookAt(Vector3.new(center.X, GROUND_Y, center.Z), horizontalTarget)
+        local horizontalTarget = Vector3.new(to.X, FILL_Y, to.Z)
+        local orientation = CFrame.lookAt(Vector3.new(center.X, FILL_Y, center.Z), horizontalTarget)
 
         -- Repaint two flat bank strips before carving. Their top face remains
         -- exactly at ground level; unlike a sphere, they cannot create dunes.
@@ -403,7 +420,7 @@ local function fillStream(terrain: Terrain, palette: Palette)
 
     -- A flat octagonal pond assembled from voxel-aligned rows. Every row shares
     -- the same water height, so the lake reads as a surface instead of a bubble.
-    local pondCenter = Vector3.new(362, GROUND_Y, -286)
+    local pondCenter = Vector3.new(362, FILL_Y, -286)
     local pondWidths = { 64, 96, 112, 120, 112, 96, 64 }
     terrain:FillBlock(
         CFrame.new(pondCenter + Vector3.new(0, -4, 0)),
@@ -461,7 +478,7 @@ local function paintValleyVariation(terrain: Terrain, seed: number, palette: Pal
         local material = if random:NextNumber() < 0.62 then palette.meadow else palette.slope
 
         terrain:FillBlock(
-            CFrame.new(x, GROUND_Y - SURFACE_PATCH_DEPTH / 2, z)
+            CFrame.new(x, FILL_Y - SURFACE_PATCH_DEPTH / 2, z)
                 * CFrame.Angles(0, random:NextNumber(0, math.pi), 0),
             Vector3.new(width, SURFACE_PATCH_DEPTH, depth),
             material
@@ -557,15 +574,17 @@ end
     the grass with nothing in the logs to say so.
 ]]
 function TerrainBuilder.valleyFloorTop(): number
-    return (GROUND_Y - toVoxelSpan(BEDROCK_DEPTH) / 2)
+    return FILL_Y
         + toVoxelSpan(BEDROCK_DEPTH) / 2
+        - toVoxelSpan(BEDROCK_DEPTH) / 2
         + VOXEL_SURFACE_RISE
 end
 
 -- The surface a character or prop must stand on to look like it is standing on
--- the valley floor rather than buried in it.
+-- the valley floor rather than buried in it. Now simply the authored plane,
+-- because the fills were corrected to render there.
 function TerrainBuilder.standingSurface(): number
-    return GROUND_Y + VOXEL_SURFACE_RISE
+    return GROUND_Y
 end
 
 return table.freeze(TerrainBuilder)
