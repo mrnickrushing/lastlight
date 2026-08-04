@@ -8,8 +8,8 @@ hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
 Last updated: 2026-08-04, at `main` = `7590abe` (PR #179), build `0.49.1`,
-save schema 13, 20 services. A first-world layout pass is in flight on
-`agent/first-world-layout`.
+save schema 13, 20 services. A layout and datum pass covering both levels is in
+flight on `agent/first-world-layout`.
 
 ---
 
@@ -240,6 +240,35 @@ None of these can be completed from a session.
    session genuinely cannot see from source.
 
 ## Known open threads
+
+- **The world's vertical datum was wrong by two studs, and is now fixed --
+  re-read anything that reasons about height.** Roblox renders a terrain
+  surface half a voxel (2 studs) above the top face of the fill that made it.
+  `TerrainBuilder` reported the valley floor at `GROUND_Y = 0` while the engine
+  put it at 2, so every authored `Vector3` written against y = 0 was two studs
+  underground. Consequences that had been live for a long time: the town square
+  (top face 0.80) was **buried and had never once rendered** at either 72 or
+  112 studs across, and Mara and all three residents stood shin-deep with their
+  legs swallowed. The road network looked correct only because it had been
+  nudged to 2.2-2.5 one layer at a time -- `WorldService` still carried a
+  comment diagnosing this as a road problem and adding a "+1.77 visual skin".
+
+  Fixed at the source: fills are now placed at `FILL_Y = GROUND_Y -
+  VOXEL_SURFACE_RISE`, so the rendered surface lands on the authored plane
+  (measured 0.02 across the valley, was 2.00). Every compensation was then
+  removed -- arrival road stack, town main street, district roads, road edge
+  stones, cobblestone layer, `ROAD_SURFACE_Y` 2.45 -> 0.53. **If you find
+  height arithmetic anywhere that looks like it is dodging the ground, it is
+  probably another one of these; check it against the datum rather than nudging
+  it.**
+- **Bramblewake was being viewed through glass.** Thirteen `BlueGroundMist`
+  Glass slabs, one per module plus the Blackout arena, covering about 1.8
+  million square studs at knee height. Glass renders a refractive pane whatever
+  Transparency says, so the whole expedition came out flat blue-grey and from
+  any raised angle the slab edges read as the edge of a void. Removed, same as
+  `LowMorningMist` over Emberhollow. Both regions already have tuned
+  `Atmosphere` doing this properly.
+
 
 - **The town square moved and grew; three things now stand on it.** `TOWN_CENTER`
   is (0, 0, -80) and `PLAZA_HALF` is 56, so the square spans z -24..-136 and
