@@ -284,7 +284,9 @@ function BramblewakeBlackoutService._step(self: BramblewakeBlackoutService, now:
                     now
                 )
             end
-            self:_notify("CHAPTER I RESOLVED — " .. string.upper(self._state.decision))
+            self:_notify(
+                "CHAPTER I RESOLVED — " .. string.upper(self._state.decision:gsub("_", " "))
+            )
         end
     elseif self._state.status == "complete" then
         self:_persistResolution()
@@ -451,7 +453,8 @@ function BramblewakeBlackoutService.interact(
     elseif result.reason == "vote_recorded" then
         result.message = "GREENWARD VOTE RECORDED — WAITING FOR ACTIVE TRAVELERS"
     elseif result.reason == "resolved" then
-        result.message = "CHAPTER I RESOLVED — " .. string.upper(self._state.decision)
+        result.message = "CHAPTER I RESOLVED — "
+            .. string.upper(self._state.decision:gsub("_", " "))
         self._worldService:setBlackoutLighting(false)
         self:_persistResolution()
         self._analyticsService:blackoutResult(

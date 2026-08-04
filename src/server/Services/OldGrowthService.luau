@@ -638,9 +638,15 @@ function OldGrowthService._lineOfSight(
     end
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = { character }
+    -- Exclude the elite itself: its own invisible hitbox parts sit between
+    -- most angles and the heart, and a creature's body is not cover against
+    -- striking its exposed weak point. Only real world geometry blocks. The
+    -- old check demanded the ray hit the heart part first, which also failed
+    -- whenever the heart was non-queryable -- combined with the visual pass
+    -- clearing CanQuery, that made the encounter uncompletable.
+    params.FilterDescendantsInstances = { character, model }
     local result = workspace:Raycast(root.Position, heart.Position - root.Position, params)
-    return result ~= nil and result.Instance == heart
+    return result == nil
 end
 
 function OldGrowthService.damageNearest(self: OldGrowthService, player: Player): (boolean, string)
@@ -798,6 +804,15 @@ end
 
 function OldGrowthService.snapshot(self: OldGrowthService, player: Player): any
     if player:GetAttribute("LastLightInExpedition") ~= true then
+        return nil
+    end
+    -- The elite rail appears only near an active or just-completed encounter
+    -- (its runbook's words). A dormant snapshot leaked the full-health rail to
+    -- anyone within the arena radius -- during a Blackout relay, whose farm
+    -- root sits beside this arena, every carrier saw "OLD GROWTH · 360/360"
+    -- one stage before the encounter is even reachable, and the Blackout
+    -- runbook explicitly requires no health rail before the relay completes.
+    if self._state.status == "dormant" then
         return nil
     end
     local snapshot =

@@ -3270,6 +3270,18 @@ function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKe
         CFrame.new(currentBottom) * core.CFrame.Rotation * CFrame.Angles(0, profile.yaw, 0)
     )
     for _, fallbackPart in fallbackParts do
+        -- The same opt-out the world blanking pass honours. The Old Growth
+        -- and Warden Stag weak-point hearts are authored INSIDE the creature
+        -- (the meshes carry a hollow cavity for exactly this), and hiding
+        -- them here made both encounters uncompletable: the heart went
+        -- invisible, and clearing its CanQuery meant the strike line-of-sight
+        -- ray could never hit it, so every strike reported "behind the
+        -- trunk". Fifth instance of the blanked-fallback-content bug; see
+        -- survivesMeshReplacement above.
+        if survivesMeshReplacement(fallbackPart, model) then
+            fallbackPart:SetAttribute("AuthoritativeEnemyHitbox", false)
+            continue
+        end
         fallbackPart.Transparency = 1
         fallbackPart.CastShadow = false
         local isCore = fallbackPart == core
