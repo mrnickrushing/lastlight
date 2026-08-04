@@ -78,6 +78,15 @@ Verified against `git log`, newest first:
     placed roughly half-buried (its visible height is right, the method is
     odd). All three are taste calls needing the Future-lighting pass.
 
+  The same branch adds the owner-requested **arrival vignettes**: a short,
+  local, skippable letterboxed camera push with an original title card when
+  the night arrives ("NIGHT 3 · ROOTMOON" from the authored theme names), the
+  Blackout begins, or Old Growth / the Warden Stag awaken. Camera-only and
+  per-player (the server never waits), any input skips instantly, never plays
+  while downed / in compact HUD / on a reconnect into an already-active
+  state. Decision recorded in DECISIONS.md; live-verified in Studio (play,
+  letterbox, restore, and the downed guard all observed working).
+
   The first fruits of the same audit, from before the live playthrough:
   - **The town's main street was invisible.** Its top face (0.33) was exactly
     coplanar with the courtyard's, z-fighting where they overlapped, its

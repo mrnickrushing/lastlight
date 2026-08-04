@@ -781,3 +781,25 @@ written for build artifacts -- committed places remain how a tester opens the
 game without the toolchain. What changed is that the tester is no longer assumed
 to be on Windows, so the runbooks' journeys are named for Studio rather than an
 operating system.
+
+## 2026-08-04 — Arrival vignettes are local, skippable camera moments
+
+**Decision:** When a threat arrives — the night (with its theme name as the
+title card), the Blackout, an awakening Old Growth or Warden Stag — the client
+plays a short letterboxed camera push toward the threat with an original title
+card, then returns control. The vignette is presentation only: camera-local,
+never replicated, never blocking the server or another player; any input skips
+it instantly; it never plays while downed, in compact HUD mode, or on a
+reconnect into an already-active state; and it restores the follow camera
+exactly. Focus points are resolved from the live workspace at trigger time, so
+a missing or streamed-out landmark skips the shot rather than aiming at
+nothing.
+
+**Reason:** The owner asked for the arrival-cinematic beat popular survival
+games use well (99 Nights in the Forest's cultist arrival was the named
+reference). The technique is genre vocabulary; the content here is entirely
+Last Light's — its own threats, palette, and theme names. The camera rules in
+ART_AUDIO_DIRECTION (no control theft during active danger, skippable
+cinematics, reduced-motion respect) bound the implementation, which is why it
+is a three-second local camera tween rather than a server-owned cutscene
+system.
