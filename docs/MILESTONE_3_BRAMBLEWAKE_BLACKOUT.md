@@ -167,8 +167,10 @@ ColorCorrection effect. All geometry is anchored.
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open `build/LastLightTest.rbxlx`, press Play, and require
-   `[Last Light] PASS FoundationIntegration`, build `0.13.0`, schema `4`,
-   `services=15`, world `bramblewake-blackout-v6`, and no red errors.
+   `[Last Light] PASS FoundationIntegration`, the build version, save schema,
+   service count, and world version for the commit under test (see
+   `src/shared/Config.luau` and `src/server/init.server.luau`), and no red
+   errors.
 3. Open `build/LastLight.rbxlx`, finish First Light, and use the Bramblewake
    beacon. The first unresolved entry should start one Blackout automatically.
 4. Require the top phase capsule to show `BLACKOUT · 09:00` and the separate rail

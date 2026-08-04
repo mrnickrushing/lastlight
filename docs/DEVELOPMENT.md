@@ -72,8 +72,9 @@ full DataModel. The first engine integration test is intentionally separate:
 2. Open `build/LastLightTest.rbxlx` in Roblox Studio.
 3. Start a server with one player.
 4. Confirm server output contains `[Last Light] PASS FoundationIntegration`.
-5. Confirm `server_boot_complete` reports fifteen services without an
-   infinite-yield warning.
+5. Confirm `server_boot_complete` reports the build version and save schema
+   declared in `src/shared/Config.luau`, a service count matching the services
+   registered in `src/server/init.server.luau`, and no infinite-yield warning.
 6. Confirm the loader leaves the player at `ArrivalSpawn` on solid ground and
    the first objective is `FREE MARA`.
 7. Complete the journey in [MILESTONE_2_PLAYTEST.md](MILESTONE_2_PLAYTEST.md).

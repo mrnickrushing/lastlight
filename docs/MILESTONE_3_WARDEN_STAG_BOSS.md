@@ -126,8 +126,10 @@ physics-driven NPC movement.
 
 1. Download the merged repository ZIP from GitHub and extract it.
 2. Open the committed `build/LastLightTest.rbxlx` in Roblox Studio, press Play,
-   and require `[Last Light] PASS FoundationIntegration`, build `0.13.0`,
-   `services=15`, world `bramblewake-blackout-v6`, and no red errors.
+   and require `[Last Light] PASS FoundationIntegration`, the build version,
+   save schema, service count, and world version for the commit under test (see
+   `src/shared/Config.luau` and `src/server/init.server.luau`), and no red
+   errors.
 3. Open the committed `build/LastLight.rbxlx`, press Play, complete First Light,
    enter Bramblewake, and follow the route to Old Growth Approach.
 4. Before Old Growth is complete, approach the adjacent Warden's Seal. Require

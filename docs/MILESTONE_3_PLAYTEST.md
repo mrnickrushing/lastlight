@@ -32,8 +32,10 @@ or `npm run build` and open `build/LastLight.rbxlx` for play and
 `build/LastLightTest.rbxlx` for the integration assertions.
 
 Do not use an old downloaded `.rbxl` as evidence for current source. Confirm in
-Output that `server_boot_complete` reports build `0.46.1` and `services=20`
-before anything below counts.
+Output that `server_boot_complete` reports the build version and save schema
+declared in `src/shared/Config.luau` for the commit under test, and a service
+count matching the services registered in `src/server/init.server.luau`, before
+anything below counts.
 
 Local Studio uses session data by design. DataStore evidence — anything about
 rejoining, persistence, or duplicate rewards across sessions — requires a

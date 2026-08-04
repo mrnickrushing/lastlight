@@ -23,6 +23,7 @@ const requiredFiles = [
   "docs/QA_RELEASE_PLAN.md",
   "docs/RELEASE_GATES.md",
   "docs/DEVELOPMENT.md",
+  "docs/PROJECT_STATUS.md",
   "docs/MILESTONE_2_PLAYTEST.md",
   "docs/MILESTONE_3_EXPEDITION_FOUNDATION.md",
   "docs/MILESTONE_3_BRAMBLEWAKE_EVENTS.md",
@@ -173,6 +174,55 @@ for (const heading of [
   "## Current status"
 ]) {
   if (!readme.includes(heading)) failures.push(`README is missing heading: ${heading}`);
+}
+
+// The living handoff states the build, schema, and service count a session
+// should expect. A version bump that leaves those stale sends the next session
+// -- and any tester following a runbook back to it -- looking for a build that
+// no longer exists. Runbooks now defer to Config.luau rather than repeating the
+// numbers, so this is the one document that has to be checked.
+const statusPath = join(root, "docs/PROJECT_STATUS.md");
+const configPath = join(root, "src/shared/Config.luau");
+const bootstrapPath = join(root, "src/server/init.server.luau");
+if (existsSync(statusPath) && existsSync(configPath) && existsSync(bootstrapPath)) {
+  const config = readFileSync(configPath, "utf8");
+  const status = readFileSync(statusPath, "utf8");
+  const statusHeader = status.match(/^Last updated:[\s\S]*?(?=\n\n)/m)?.[0];
+
+  if (!statusHeader) {
+    failures.push(
+      "docs/PROJECT_STATUS.md must open with a `Last updated:` paragraph naming the build, save schema, and service count"
+    );
+  } else {
+    const declared = [
+      [
+        "build version",
+        config.match(/BuildVersion\s*=\s*"([^"]+)"/)?.[1],
+        statusHeader.match(/build `([^`]+)`/)?.[1]
+      ],
+      [
+        "save schema",
+        config.match(/SaveSchemaVersion\s*=\s*(\d+)/)?.[1],
+        statusHeader.match(/save schema (\d+)/)?.[1]
+      ],
+      [
+        "service count",
+        String([...readFileSync(bootstrapPath, "utf8").matchAll(/services:register\(/g)].length),
+        statusHeader.match(/(\d+) services/)?.[1]
+      ]
+    ];
+    for (const [label, actual, stated] of declared) {
+      if (actual === undefined) {
+        failures.push(`could not read the ${label} from source to check docs/PROJECT_STATUS.md`);
+      } else if (stated === undefined) {
+        failures.push(`docs/PROJECT_STATUS.md no longer states the ${label}`);
+      } else if (stated !== actual) {
+        failures.push(
+          `docs/PROJECT_STATUS.md states ${label} ${stated} but source declares ${actual} -- update the handoff`
+        );
+      }
+    }
+  }
 }
 
 const terrainBuilderPath = join(root, "src/server/World/TerrainBuilder.luau");
