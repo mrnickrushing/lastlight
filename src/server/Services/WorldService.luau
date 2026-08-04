@@ -96,7 +96,23 @@ local WET_BARK = Color3.fromRGB(36, 26, 24)
 local MOSS = Color3.fromRGB(58, 91, 54)
 local WET_EARTH = Color3.fromRGB(67, 55, 39)
 local HEARTWOOD_CENTER = Vector3.new(38, 0, -48)
-local TOOL_YARD_CENTER = Vector3.new(-42, 0.8, -68)
+--[[
+    The height a character has to stand at to be standing on the ground.
+
+    This started out as "the town square's pad surface, 0.8" and that was
+    wrong, because the pad itself is underground. Roblox renders a terrain
+    surface half a voxel above the fill's top face, so the valley floor
+    authored at y = 0 is walked on at y = 2 -- see VOXEL_SURFACE_RISE in
+    TerrainBuilder, measured with a control fill.
+
+    Everything authored to stand at y = 0 is therefore two studs into the
+    grass. Mara and all three residents were: feet at y 0.0 against a surface
+    at 2.0, which is why a villager read as a head and a torso on a box with
+    no legs. Lifting them here is a correction to their seating, not a
+    stylistic change.
+]]
+local VALLEY_SURFACE_Y = 2
+local TOOL_YARD_CENTER = Vector3.new(-42, VALLEY_SURFACE_Y, -68)
 --[[
     The town square: Emberhollow's centre, and the arena every night fight
     happens in.
@@ -121,22 +137,7 @@ local TOOL_YARD_CENTER = Vector3.new(-42, 0.8, -68)
 ]]
 local TOWN_CENTER = Vector3.new(0, 0, -80)
 local PLAZA_HALF = 56
---[[
-    Ground level inside the town square is the pad's surface, not y = 0.
 
-    FirstLanternTownSquare is a slab whose top sits 0.8 studs proud of the
-    terrain plane every prop in this file is authored against. That was
-    harmless while the square was 72 wide and covered only its own furniture.
-    At 112 it reaches Mara and the starter tool yard, and both were authored to
-    stand on grass -- so Mara stood shin-deep in stone with her feet
-    (bottom y 0.01, top 0.31) entirely inside a pad whose surface is at 0.80,
-    and the tool yard's dirt floor (top 0.38) vanished underneath it.
-
-    Props whose bases embed in paving still read correctly -- stumps, the
-    lantern plinth, benches, the edge stones that are meant to be set into the
-    ground -- so only the two things that must stand ON the surface are lifted.
-]]
-local PLAZA_SURFACE_Y = 0.8
 --[[
     Across the arrival road just past the spawn, so the thing the player is
     asked to build visibly defends the way they came in. It used to sit 44
@@ -3895,7 +3896,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
     local model = Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
     model.Name = "Mara"
     model:SetAttribute("ResidentId", "npc_mara")
-    model:PivotTo(CFrame.new(-3, 3 + PLAZA_SURFACE_Y, -30))
+    model:PivotTo(CFrame.new(-3, 3 + VALLEY_SURFACE_Y, -30))
 
     local maraHumanoid = model:WaitForChild("Humanoid") :: Humanoid
     maraHumanoid.DisplayName = "Mara"
@@ -4285,7 +4286,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
             trap,
             "FallenRootStump",
             Vector3.new(1.9, 2.2, 1.9),
-            CFrame.new(-3 + stumpSide * 5.4, 1.1 + PLAZA_SURFACE_Y, -30)
+            CFrame.new(-3 + stumpSide * 5.4, 1.1 + VALLEY_SURFACE_Y, -30)
                 * CFrame.Angles(0, 0, math.rad(stumpSide * 6)),
             WET_BARK,
             Enum.Material.Wood,
@@ -4300,7 +4301,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
         fallenRootsFallback,
         "FallenRoot",
         Vector3.new(13.6, 1.7, 1.7),
-        CFrame.new(-3, 2.55 + PLAZA_SURFACE_Y, -30) * CFrame.Angles(0, 0, math.rad(-5)),
+        CFrame.new(-3, 2.55 + VALLEY_SURFACE_Y, -30) * CFrame.Angles(0, 0, math.rad(-5)),
         BARK,
         Enum.Material.Wood,
         false
@@ -4310,7 +4311,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
             fallenRootsFallback,
             "FallenRootLimb",
             Vector3.new(0.85, 5.4, 0.85),
-            CFrame.new(-3 + limbIndex * 2.2, 2.1 + PLAZA_SURFACE_Y, -30 + limbIndex * 0.7)
+            CFrame.new(-3 + limbIndex * 2.2, 2.1 + VALLEY_SURFACE_Y, -30 + limbIndex * 0.7)
                 * CFrame.Angles(math.rad(limbIndex * 26), 0, math.rad(64)),
             BARK,
             Enum.Material.Wood,
@@ -4320,7 +4321,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
     table.insert(self._meshPlacements, {
         assetId = "mesh_deadfall_a",
         fallbackKind = "asset_replacement",
-        position = Vector3.new(-3, 1.9 + PLAZA_SURFACE_Y, -30),
+        position = Vector3.new(-3, 1.9 + VALLEY_SURFACE_Y, -30),
         scale = 1.15,
         yaw = math.rad(90),
         seed = 9320,
@@ -8397,6 +8398,22 @@ local function buildTownProgressionBuildings(
     )
     noteConstructionTarget("building_trapworks", "TRAPWORKS", signAnchor(trapworks))
 
+    --[[
+        Stand a resident on the ground rather than in it.
+
+        Every anchor below is authored at y = 3, the rig height for standing on
+        a valley floor at y = 0. The floor is actually walked on at
+        VALLEY_SURFACE_Y, so all three residents stood two studs under it at
+        every hour of the day -- legs and arms swallowed, leaving a head and a
+        shoulder above the grass.
+
+        Applied to all nine anchors rather than to the ones over the square:
+        the burial has nothing to do with the plaza, it is the whole valley.
+    ]]
+    local function standOnTownSurface(anchor: CFrame): CFrame
+        return anchor + Vector3.new(0, VALLEY_SURFACE_Y, 0)
+    end
+
     local residentDefinitions = {
         npc_tomas_reed = {
             displayName = "TOMAS REED",
@@ -8406,9 +8423,13 @@ local function buildTownProgressionBuildings(
             skin = Color3.fromRGB(177, 124, 87),
             hair = Color3.fromRGB(55, 40, 34),
             prop = "cookpot",
-            day = CFrame.new(-92, 3, -178) * CFrame.Angles(0, math.rad(180), 0),
-            dusk = CFrame.new(-10, 3, -128) * CFrame.Angles(0, math.rad(-10), 0),
-            night = CFrame.new(-9, 3, -138) * CFrame.Angles(0, math.rad(-15), 0),
+            day = standOnTownSurface(CFrame.new(-92, 3, -178) * CFrame.Angles(0, math.rad(180), 0)),
+            dusk = standOnTownSurface(
+                CFrame.new(-10, 3, -128) * CFrame.Angles(0, math.rad(-10), 0)
+            ),
+            night = standOnTownSurface(
+                CFrame.new(-9, 3, -138) * CFrame.Angles(0, math.rad(-15), 0)
+            ),
             dayDuty = "PREPARING SUPPLIES",
         },
         npc_pip_wren = {
@@ -8419,9 +8440,9 @@ local function buildTownProgressionBuildings(
             skin = Color3.fromRGB(210, 157, 112),
             hair = Color3.fromRGB(111, 66, 43),
             prop = "route_map",
-            day = CFrame.new(0, 3, -151) * CFrame.Angles(0, math.rad(180), 0),
-            dusk = CFrame.new(0, 3, -128),
-            night = CFrame.new(0, 3, -139),
+            day = standOnTownSurface(CFrame.new(0, 3, -151) * CFrame.Angles(0, math.rad(180), 0)),
+            dusk = standOnTownSurface(CFrame.new(0, 3, -128)),
+            night = standOnTownSurface(CFrame.new(0, 3, -139)),
             dayDuty = "MAPPING SAFE ROUTES",
         },
         npc_ena_moss = {
@@ -8432,9 +8453,9 @@ local function buildTownProgressionBuildings(
             skin = Color3.fromRGB(126, 87, 65),
             hair = Color3.fromRGB(41, 35, 29),
             prop = "seed_basket",
-            day = CFrame.new(96, 3, -146) * CFrame.Angles(0, math.rad(180), 0),
-            dusk = CFrame.new(10, 3, -128) * CFrame.Angles(0, math.rad(10), 0),
-            night = CFrame.new(9, 3, -138) * CFrame.Angles(0, math.rad(15), 0),
+            day = standOnTownSurface(CFrame.new(96, 3, -146) * CFrame.Angles(0, math.rad(180), 0)),
+            dusk = standOnTownSurface(CFrame.new(10, 3, -128) * CFrame.Angles(0, math.rad(10), 0)),
+            night = standOnTownSurface(CFrame.new(9, 3, -138) * CFrame.Angles(0, math.rad(15), 0)),
             dayDuty = "TENDING THE GREENWARD",
         },
     }

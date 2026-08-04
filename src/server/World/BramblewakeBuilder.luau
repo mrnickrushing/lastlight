@@ -3554,7 +3554,27 @@ function BramblewakeBuilder.build(
                 math.rad((placement.index % 3 - 1) * 9),
                 poiMemory.Position.Y - 1.35
             )
-        elseif placement.eventId ~= nil then
+        end
+
+        --[[
+            A module can host a point of interest AND an event. This used to be
+            an `elseif` on the branch above, so whenever the generator put both
+            on one module the POI won and the event was dropped on the floor --
+            silently, because ExpeditionService still counts events from the
+            manifest and reported eight of them with twenty-five interaction
+            steps while the world held five and sixteen.
+
+            On the preview seed that lost three of the eight events outright:
+            stag tracks, the moving hedge, and the root bridge, on modules 5, 9
+            and 11. Better than a third of Bramblewake's authored event content
+            never spawned, and no check caught it because the count the service
+            logs comes from the plan rather than from the build.
+
+            They do not collide: buildPointOfInterest anchors at
+            center + (-21, 0, -18) and buildEventSocket at (22, 0.5, -19),
+            opposite sides of a 72-stud cell.
+        ]]
+        if placement.eventId ~= nil then
             local eventResult = buildEventSocket(
                 module,
                 center,

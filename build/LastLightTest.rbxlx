@@ -25691,7 +25691,23 @@ local WET_BARK = Color3.fromRGB(36, 26, 24)
 local MOSS = Color3.fromRGB(58, 91, 54)
 local WET_EARTH = Color3.fromRGB(67, 55, 39)
 local HEARTWOOD_CENTER = Vector3.new(38, 0, -48)
-local TOOL_YARD_CENTER = Vector3.new(-42, 0.8, -68)
+--[[
+    The height a character has to stand at to be standing on the ground.
+
+    This started out as "the town square's pad surface, 0.8" and that was
+    wrong, because the pad itself is underground. Roblox renders a terrain
+    surface half a voxel above the fill's top face, so the valley floor
+    authored at y = 0 is walked on at y = 2 -- see VOXEL_SURFACE_RISE in
+    TerrainBuilder, measured with a control fill.
+
+    Everything authored to stand at y = 0 is therefore two studs into the
+    grass. Mara and all three residents were: feet at y 0.0 against a surface
+    at 2.0, which is why a villager read as a head and a torso on a box with
+    no legs. Lifting them here is a correction to their seating, not a
+    stylistic change.
+]]
+local VALLEY_SURFACE_Y = 2
+local TOOL_YARD_CENTER = Vector3.new(-42, VALLEY_SURFACE_Y, -68)
 --[[
     The town square: Emberhollow's centre, and the arena every night fight
     happens in.
@@ -25716,22 +25732,7 @@ local TOOL_YARD_CENTER = Vector3.new(-42, 0.8, -68)
 ]]
 local TOWN_CENTER = Vector3.new(0, 0, -80)
 local PLAZA_HALF = 56
---[[
-    Ground level inside the town square is the pad's surface, not y = 0.
 
-    FirstLanternTownSquare is a slab whose top sits 0.8 studs proud of the
-    terrain plane every prop in this file is authored against. That was
-    harmless while the square was 72 wide and covered only its own furniture.
-    At 112 it reaches Mara and the starter tool yard, and both were authored to
-    stand on grass -- so Mara stood shin-deep in stone with her feet
-    (bottom y 0.01, top 0.31) entirely inside a pad whose surface is at 0.80,
-    and the tool yard's dirt floor (top 0.38) vanished underneath it.
-
-    Props whose bases embed in paving still read correctly -- stumps, the
-    lantern plinth, benches, the edge stones that are meant to be set into the
-    ground -- so only the two things that must stand ON the surface are lifted.
-]]
-local PLAZA_SURFACE_Y = 0.8
 --[[
     Across the arrival road just past the spawn, so the thing the player is
     asked to build visibly defends the way they came in. It used to sit 44
@@ -29490,7 +29491,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
     local model = Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
     model.Name = "Mara"
     model:SetAttribute("ResidentId", "npc_mara")
-    model:PivotTo(CFrame.new(-3, 3 + PLAZA_SURFACE_Y, -30))
+    model:PivotTo(CFrame.new(-3, 3 + VALLEY_SURFACE_Y, -30))
 
     local maraHumanoid = model:WaitForChild("Humanoid") :: Humanoid
     maraHumanoid.DisplayName = "Mara"
@@ -29880,7 +29881,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
             trap,
             "FallenRootStump",
             Vector3.new(1.9, 2.2, 1.9),
-            CFrame.new(-3 + stumpSide * 5.4, 1.1 + PLAZA_SURFACE_Y, -30)
+            CFrame.new(-3 + stumpSide * 5.4, 1.1 + VALLEY_SURFACE_Y, -30)
                 * CFrame.Angles(0, 0, math.rad(stumpSide * 6)),
             WET_BARK,
             Enum.Material.Wood,
@@ -29895,7 +29896,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
         fallenRootsFallback,
         "FallenRoot",
         Vector3.new(13.6, 1.7, 1.7),
-        CFrame.new(-3, 2.55 + PLAZA_SURFACE_Y, -30) * CFrame.Angles(0, 0, math.rad(-5)),
+        CFrame.new(-3, 2.55 + VALLEY_SURFACE_Y, -30) * CFrame.Angles(0, 0, math.rad(-5)),
         BARK,
         Enum.Material.Wood,
         false
@@ -29905,7 +29906,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
             fallenRootsFallback,
             "FallenRootLimb",
             Vector3.new(0.85, 5.4, 0.85),
-            CFrame.new(-3 + limbIndex * 2.2, 2.1 + PLAZA_SURFACE_Y, -30 + limbIndex * 0.7)
+            CFrame.new(-3 + limbIndex * 2.2, 2.1 + VALLEY_SURFACE_Y, -30 + limbIndex * 0.7)
                 * CFrame.Angles(math.rad(limbIndex * 26), 0, math.rad(64)),
             BARK,
             Enum.Material.Wood,
@@ -29915,7 +29916,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
     table.insert(self._meshPlacements, {
         assetId = "mesh_deadfall_a",
         fallbackKind = "asset_replacement",
-        position = Vector3.new(-3, 1.9 + PLAZA_SURFACE_Y, -30),
+        position = Vector3.new(-3, 1.9 + VALLEY_SURFACE_Y, -30),
         scale = 1.15,
         yaw = math.rad(90),
         seed = 9320,
@@ -33992,6 +33993,22 @@ local function buildTownProgressionBuildings(
     )
     noteConstructionTarget("building_trapworks", "TRAPWORKS", signAnchor(trapworks))
 
+    --[[
+        Stand a resident on the ground rather than in it.
+
+        Every anchor below is authored at y = 3, the rig height for standing on
+        a valley floor at y = 0. The floor is actually walked on at
+        VALLEY_SURFACE_Y, so all three residents stood two studs under it at
+        every hour of the day -- legs and arms swallowed, leaving a head and a
+        shoulder above the grass.
+
+        Applied to all nine anchors rather than to the ones over the square:
+        the burial has nothing to do with the plaza, it is the whole valley.
+    ]]
+    local function standOnTownSurface(anchor: CFrame): CFrame
+        return anchor + Vector3.new(0, VALLEY_SURFACE_Y, 0)
+    end
+
     local residentDefinitions = {
         npc_tomas_reed = {
             displayName = "TOMAS REED",
@@ -34001,9 +34018,13 @@ local function buildTownProgressionBuildings(
             skin = Color3.fromRGB(177, 124, 87),
             hair = Color3.fromRGB(55, 40, 34),
             prop = "cookpot",
-            day = CFrame.new(-92, 3, -178) * CFrame.Angles(0, math.rad(180), 0),
-            dusk = CFrame.new(-10, 3, -128) * CFrame.Angles(0, math.rad(-10), 0),
-            night = CFrame.new(-9, 3, -138) * CFrame.Angles(0, math.rad(-15), 0),
+            day = standOnTownSurface(CFrame.new(-92, 3, -178) * CFrame.Angles(0, math.rad(180), 0)),
+            dusk = standOnTownSurface(
+                CFrame.new(-10, 3, -128) * CFrame.Angles(0, math.rad(-10), 0)
+            ),
+            night = standOnTownSurface(
+                CFrame.new(-9, 3, -138) * CFrame.Angles(0, math.rad(-15), 0)
+            ),
             dayDuty = "PREPARING SUPPLIES",
         },
         npc_pip_wren = {
@@ -34014,9 +34035,9 @@ local function buildTownProgressionBuildings(
             skin = Color3.fromRGB(210, 157, 112),
             hair = Color3.fromRGB(111, 66, 43),
             prop = "route_map",
-            day = CFrame.new(0, 3, -151) * CFrame.Angles(0, math.rad(180), 0),
-            dusk = CFrame.new(0, 3, -128),
-            night = CFrame.new(0, 3, -139),
+            day = standOnTownSurface(CFrame.new(0, 3, -151) * CFrame.Angles(0, math.rad(180), 0)),
+            dusk = standOnTownSurface(CFrame.new(0, 3, -128)),
+            night = standOnTownSurface(CFrame.new(0, 3, -139)),
             dayDuty = "MAPPING SAFE ROUTES",
         },
         npc_ena_moss = {
@@ -34027,9 +34048,9 @@ local function buildTownProgressionBuildings(
             skin = Color3.fromRGB(126, 87, 65),
             hair = Color3.fromRGB(41, 35, 29),
             prop = "seed_basket",
-            day = CFrame.new(96, 3, -146) * CFrame.Angles(0, math.rad(180), 0),
-            dusk = CFrame.new(10, 3, -128) * CFrame.Angles(0, math.rad(10), 0),
-            night = CFrame.new(9, 3, -138) * CFrame.Angles(0, math.rad(15), 0),
+            day = standOnTownSurface(CFrame.new(96, 3, -146) * CFrame.Angles(0, math.rad(180), 0)),
+            dusk = standOnTownSurface(CFrame.new(10, 3, -128) * CFrame.Angles(0, math.rad(10), 0)),
+            night = standOnTownSurface(CFrame.new(9, 3, -138) * CFrame.Angles(0, math.rad(15), 0)),
             dayDuty = "TENDING THE GREENWARD",
         },
     }
@@ -39934,7 +39955,27 @@ function BramblewakeBuilder.build(
                 math.rad((placement.index % 3 - 1) * 9),
                 poiMemory.Position.Y - 1.35
             )
-        elseif placement.eventId ~= nil then
+        end
+
+        --[[
+            A module can host a point of interest AND an event. This used to be
+            an `elseif` on the branch above, so whenever the generator put both
+            on one module the POI won and the event was dropped on the floor --
+            silently, because ExpeditionService still counts events from the
+            manifest and reported eight of them with twenty-five interaction
+            steps while the world held five and sixteen.
+
+            On the preview seed that lost three of the eight events outright:
+            stag tracks, the moving hedge, and the root bridge, on modules 5, 9
+            and 11. Better than a third of Bramblewake's authored event content
+            never spawned, and no check caught it because the count the service
+            logs comes from the plan rather than from the build.
+
+            They do not collide: buildPointOfInterest anchors at
+            center + (-21, 0, -18) and buildEventSocket at (22, 0.5, -19),
+            opposite sides of a 72-stud cell.
+        ]]
+        if placement.eventId ~= nil then
             local eventResult = buildEventSocket(
                 module,
                 center,
@@ -42261,6 +42302,8 @@ local function sanitize(model: Model, stripDecals: boolean): (number, number)
     return meshParts, baseParts
 end
 
+local MAX_LOAD_ATTEMPTS = 3
+
 local function longestDimension(size: Vector3): number
     return math.max(size.X, size.Y, size.Z)
 end
@@ -42358,20 +42401,59 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
         return nil
     end
 
+    --[[
+        Retry a failed fetch before condemning the asset for the session.
+
+        One blip used to cost the whole run. A failure here sets
+        self._failed[stableId], which is checked before every later placement
+        of the same asset -- so a single transient error does not lose one
+        prop, it silently drops every instance of that asset in the world and
+        leaves procedural fallbacks in their place. Observed repeatedly under
+        Wine: the same IDs that fail one boot load cleanly the next, reporting
+        "User is not authorized to access Asset" for an asset the account
+        plainly can access. That is throttling or CDN flakiness, not a
+        permission fact.
+
+        Three attempts with a widening pause. Bounded on purpose: a genuinely
+        unavailable asset still gets condemned quickly rather than being
+        retried once per placement, and the cost is paid once per asset at
+        template load, not per instance.
+    ]]
     local ok, loaded
-    if entry.creatorStore then
-        ok, loaded = pcall(AssetService.LoadAssetAsync, AssetService, entry.assetId)
-    else
-        ok, loaded = pcall(InsertService.LoadAsset, InsertService, entry.assetId)
-    end
-    if not ok or not loaded:IsA("Model") then
-        if ok then
+    local attempts = 0
+    repeat
+        attempts += 1
+        if entry.creatorStore then
+            ok, loaded = pcall(AssetService.LoadAssetAsync, AssetService, entry.assetId)
+        else
+            ok, loaded = pcall(InsertService.LoadAsset, InsertService, entry.assetId)
+        end
+        local usable = ok and typeof(loaded) == "Instance" and loaded:IsA("Model")
+        if usable then
+            break
+        end
+        if ok and typeof(loaded) == "Instance" then
+            loaded:Destroy()
+        end
+        self._logger:info("mesh_asset_load_retry", {
+            assetId = stableId,
+            robloxAssetId = entry.assetId,
+            attempt = attempts,
+            error = if ok then "LoadAsset returned a non-Model" else tostring(loaded),
+        })
+        if attempts < MAX_LOAD_ATTEMPTS then
+            task.wait(attempts * 0.75)
+        end
+    until attempts >= MAX_LOAD_ATTEMPTS
+    if not ok or typeof(loaded) ~= "Instance" or not loaded:IsA("Model") then
+        if ok and typeof(loaded) == "Instance" then
             loaded:Destroy()
         end
         self._failed[stableId] = true
         self._logger:info("mesh_asset_load_failed", {
             assetId = stableId,
             robloxAssetId = entry.assetId,
+            attempts = attempts,
             error = if ok then "LoadAsset returned a non-Model" else tostring(loaded),
         })
         return nil
@@ -42703,6 +42785,30 @@ local BOWL_MAX_Z = 90
 -- Ground surface height. Must stay 0: it is the plane every authored Vector3
 -- in WorldService was placed against.
 local GROUND_Y = 0
+
+--[[
+    How far above a fill's top face Roblox actually renders the walkable
+    surface.
+
+    Terrain voxels are 4 studs. A FillBlock whose top face is authored at y = 0
+    does not produce a surface at y = 0 -- it produces one at y = 2, half a
+    voxel higher. Measured directly in Studio with a control fill far from any
+    other geometry: top face at y = 0, raycast surface at y = 2.000, and every
+    sample across the real valley floor returns 2.000 as well.
+
+    This module used to report GROUND_Y as the floor's top and be wrong by
+    exactly this amount, which is why so much authored content sat two studs
+    into the ground: the town square (top face 0.80) was underground and had
+    never once rendered, and every character authored to stand at y = 0 stood
+    shin-deep in the grass. The road network reads correctly only because it
+    was empirically nudged to 2.2-2.5 at some point without the cause being
+    understood.
+
+    The comment above stays true -- GROUND_Y is still the plane the authored
+    coordinates were written against. What changed is that this module now
+    tells callers where the ground actually is.
+]]
+local VOXEL_SURFACE_RISE = 2
 
 -- How deep the solid ground slab runs. Enough that a Blackout crater or a
 -- future dug-out cannot punch through into empty space.
@@ -43180,7 +43286,15 @@ end
     the grass with nothing in the logs to say so.
 ]]
 function TerrainBuilder.valleyFloorTop(): number
-    return (GROUND_Y - toVoxelSpan(BEDROCK_DEPTH) / 2) + toVoxelSpan(BEDROCK_DEPTH) / 2
+    return (GROUND_Y - toVoxelSpan(BEDROCK_DEPTH) / 2)
+        + toVoxelSpan(BEDROCK_DEPTH) / 2
+        + VOXEL_SURFACE_RISE
+end
+
+-- The surface a character or prop must stand on to look like it is standing on
+-- the valley floor rather than buried in it.
+function TerrainBuilder.standingSurface(): number
+    return GROUND_Y + VOXEL_SURFACE_RISE
 end
 
 return table.freeze(TerrainBuilder)
@@ -44745,20 +44859,51 @@ end
 -- about 0.9 studs, so that one stud buried the entire road network -- main
 -- street, arrival route, and district roads -- under the grass, with nothing
 -- in the logs to say so.
-assert(
-    TerrainBuilder.valleyFloorTop() == TerrainBuilder.groundHeight(),
-    "valley floor must fill to exactly the authored ground height"
-)
+--[[
+    Ask the engine, not ourselves.
+
+    This used to assert valleyFloorTop() == groundHeight(): two functions that
+    both returned the same constant, so it could never fail and never once
+    looked at the terrain. Underneath it the real surface was two studs higher
+    than either reported -- Roblox renders a terrain surface half a voxel above
+    the fill's top face -- and the guard written specifically to catch a buried
+    world sat there green while the town square lay underground.
+
+    Raycast instead. A number this module derives is only worth checking
+    against the ground a player actually stands on.
+]]
+local floorRayParams = RaycastParams.new()
+floorRayParams.FilterType = Enum.RaycastFilterType.Include
+floorRayParams.FilterDescendantsInstances = { workspace.Terrain }
 for _, sample in { { 0, 0 }, { 0, -112 }, { 0, -204 }, { 92, -126 }, { -92, -184 } } do
     local sampleX, sampleZ = sample[1], sample[2]
     assert(
         TerrainBuilder.isInsidePlayableBowl(sampleX, sampleZ),
         string.format("sample (%d, %d) should be inside the playable bowl", sampleX, sampleZ)
     )
+    local floorHit = workspace:Raycast(
+        Vector3.new(sampleX, 60, sampleZ),
+        Vector3.new(0, -120, 0),
+        floorRayParams
+    )
     assert(
-        TerrainBuilder.surfaceHeight(sampleX, sampleZ) == TerrainBuilder.valleyFloorTop(),
+        floorHit ~= nil,
+        string.format("no terrain under the playable bowl at (%d, %d)", sampleX, sampleZ)
+    )
+    assert(
+        math.abs(floorHit.Position.Y - TerrainBuilder.valleyFloorTop()) < 0.1,
         string.format(
-            "terrain surface disagrees with the filled floor at (%d, %d)",
+            "terrain at (%d, %d) is at %.2f but valleyFloorTop() reports %.2f",
+            sampleX,
+            sampleZ,
+            floorHit.Position.Y,
+            TerrainBuilder.valleyFloorTop()
+        )
+    )
+    assert(
+        TerrainBuilder.surfaceHeight(sampleX, sampleZ) == TerrainBuilder.groundHeight(),
+        string.format(
+            "authored ground plane disagrees with surfaceHeight at (%d, %d)",
             sampleX,
             sampleZ
         )
@@ -45237,7 +45382,20 @@ for _, descendant in expedition:GetDescendants() do
         wardenLivingRoots += 1
     end
 end
-assert(criticalPaths == 22, "every Bramblewake connection needs two joined trail arms")
+--[[
+    24, derived rather than guessed: pathArm builds one arm toward each
+    neighbour a module actually has, so a 12-module chain contributes
+    1 + (10 x 2) + 1 = 22, and the Warden seal annex builds its own pair to
+    join the Old Growth arena to the route, for 24. The literal here said 22
+    and had counted only the chain -- it has not been reached since the notice
+    check started aborting every run, so nobody saw the annex arrive in the
+    total.
+
+    The two assertions below are the ones doing the real work: they check that
+    every arm, wherever it came from, got its worn centre and both edges. Those
+    hold at any arm count, so they keep their meaning if the route grows again.
+]]
+assert(criticalPaths == 24, "every Bramblewake connection needs two joined trail arms")
 assert(trailWear == criticalPaths, "every Bramblewake trail arm needs a worn center")
 assert(trailEdges == criticalPaths * 2, "every Bramblewake trail arm needs two visible edges")
 assert(roadMarkers == 6 and roadSigns == 6, "the critical route needs six direction markers")
@@ -45249,13 +45407,37 @@ assert(oldGrowthCageBars == 4, "Old Growth fire needs a recognizable lantern cag
 assert(oldGrowthHeartRoots == 3, "Old Growth heart needs a rooted physical shell")
 assert(wardenLivingRoots == 12, "Warden nodes need three living roots each")
 
+--[[
+    44 fixed prompts, measured rather than remembered.
+
+    Composition in Studio at this revision:
+      15  first world -- Mara, First Lantern, memory beacon, Heartwood node,
+          barricade plot, Greenward archive, Town Board, workbench sign,
+          three starter tool displays, four crafting benches
+      29  expedition fixtures -- per-module amber sap and heartwood nodes,
+          Old Growth fire source and root heart, Wayhome light, four Warden
+          living-root nodes, two memory antlers, Blackout lantern fire, three
+          Blackout relays, three Greenward chapter choices
+
+    The literal was 26 and had drifted by 18, almost all of it the per-module
+    resource nodes the expedition grew after this line last ran. The two
+    derived terms beside it stay derived: event interactions come from the
+    catalog and specializations from RuntimeIds, so only genuinely new fixtures
+    move this number, and moving it should be a deliberate edit.
+]]
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
     #tagged
-        == 26
+        == 44
             + BramblewakeExpedition.EventInteractionCount
             + #RuntimeIds.ProfessionSpecializationInteractionIds,
-    "expected tutorial, event, elite, boss, extraction, crafting, and mastery prompts"
+    string.format(
+        "expected tutorial, event, elite, boss, extraction, crafting, and mastery prompts (found %d, expected %d)",
+        #tagged,
+        44
+            + BramblewakeExpedition.EventInteractionCount
+            + #RuntimeIds.ProfessionSpecializationInteractionIds
+    )
 )
 local taggedByInteractionId = {}
 for _, prompt in tagged do

@@ -57,6 +57,30 @@ local BOWL_MAX_Z = 90
 -- in WorldService was placed against.
 local GROUND_Y = 0
 
+--[[
+    How far above a fill's top face Roblox actually renders the walkable
+    surface.
+
+    Terrain voxels are 4 studs. A FillBlock whose top face is authored at y = 0
+    does not produce a surface at y = 0 -- it produces one at y = 2, half a
+    voxel higher. Measured directly in Studio with a control fill far from any
+    other geometry: top face at y = 0, raycast surface at y = 2.000, and every
+    sample across the real valley floor returns 2.000 as well.
+
+    This module used to report GROUND_Y as the floor's top and be wrong by
+    exactly this amount, which is why so much authored content sat two studs
+    into the ground: the town square (top face 0.80) was underground and had
+    never once rendered, and every character authored to stand at y = 0 stood
+    shin-deep in the grass. The road network reads correctly only because it
+    was empirically nudged to 2.2-2.5 at some point without the cause being
+    understood.
+
+    The comment above stays true -- GROUND_Y is still the plane the authored
+    coordinates were written against. What changed is that this module now
+    tells callers where the ground actually is.
+]]
+local VOXEL_SURFACE_RISE = 2
+
 -- How deep the solid ground slab runs. Enough that a Blackout crater or a
 -- future dug-out cannot punch through into empty space.
 local BEDROCK_DEPTH = 90
@@ -533,7 +557,15 @@ end
     the grass with nothing in the logs to say so.
 ]]
 function TerrainBuilder.valleyFloorTop(): number
-    return (GROUND_Y - toVoxelSpan(BEDROCK_DEPTH) / 2) + toVoxelSpan(BEDROCK_DEPTH) / 2
+    return (GROUND_Y - toVoxelSpan(BEDROCK_DEPTH) / 2)
+        + toVoxelSpan(BEDROCK_DEPTH) / 2
+        + VOXEL_SURFACE_RISE
+end
+
+-- The surface a character or prop must stand on to look like it is standing on
+-- the valley floor rather than buried in it.
+function TerrainBuilder.standingSurface(): number
+    return GROUND_Y + VOXEL_SURFACE_RISE
 end
 
 return table.freeze(TerrainBuilder)
