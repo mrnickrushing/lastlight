@@ -1,6 +1,8 @@
 --!strict
 
 local SaveSchema = require("../../src/shared/SaveSchema")
+local Config = require("../../src/shared/Config")
+local TownProgression = require("../../src/shared/TownProgression")
 local TestRunner = require("../TestRunner")
 
 return {
@@ -10,7 +12,7 @@ return {
             name = "creates a safe first-session profile",
             run = function()
                 local profile = SaveSchema.default(100)
-                TestRunner.equal(profile.schemaVersion, 12)
+                TestRunner.equal(profile.schemaVersion, Config.SaveSchemaVersion)
                 TestRunner.equal(profile.tutorial.stage, "arrive")
                 TestRunner.equal(profile.tutorial.complete, false)
                 TestRunner.equal(profile.revision, 0)
@@ -52,7 +54,7 @@ return {
                 TestRunner.equal(profile.tutorial.stage, "build")
                 TestRunner.equal(profile.tutorial.selectedTool, "hammer")
                 TestRunner.equal(profile.revision, 4)
-                TestRunner.equal(profile.schemaVersion, 12)
+                TestRunner.equal(profile.schemaVersion, Config.SaveSchemaVersion)
             end,
         },
         {
@@ -68,7 +70,7 @@ return {
                         complete = true,
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 12)
+                TestRunner.equal(profile.schemaVersion, Config.SaveSchemaVersion)
                 TestRunner.equal(profile.revision, 7)
                 TestRunner.equal(profile.tutorial.complete, true)
                 TestRunner.equal(SaveSchema.expeditionPending(profile).count, 0)
@@ -154,7 +156,7 @@ return {
                         selectedId = "profession_hacker",
                     },
                 }, 300)
-                TestRunner.equal(migrated.schemaVersion, 12)
+                TestRunner.equal(migrated.schemaVersion, Config.SaveSchemaVersion)
                 TestRunner.equal(migrated.profession.selectedId, nil)
 
                 local selected = SaveSchema.withProfession(migrated, "profession_medic", 320)
@@ -176,7 +178,7 @@ return {
                         },
                     },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 12)
+                TestRunner.equal(profile.schemaVersion, Config.SaveSchemaVersion)
                 TestRunner.equal(profile.story.chapterOne.status, "unresolved")
                 TestRunner.equal(profile.story.chapterOne.decision, nil)
             end,
@@ -224,7 +226,7 @@ return {
                     revision = 3,
                     tutorial = { stage = "reveal", complete = false },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 12)
+                TestRunner.equal(profile.schemaVersion, Config.SaveSchemaVersion)
                 TestRunner.equal(profile.town.nightNumber, 1)
             end,
         },
@@ -285,7 +287,7 @@ return {
                     town = { nightNumber = 7 },
                 }, 300)
                 local condition = SaveSchema.townCondition(profile)
-                TestRunner.equal(profile.schemaVersion, 12)
+                TestRunner.equal(profile.schemaVersion, Config.SaveSchemaVersion)
                 TestRunner.equal(condition.integrity, 100)
                 TestRunner.equal(condition.damageLevel, 0)
                 TestRunner.equal(condition.lastNightNumber, 0)
@@ -303,10 +305,13 @@ return {
                 }, 200)
                 local condition = SaveSchema.townCondition(changed)
                 TestRunner.equal(condition.integrity, 58)
-                TestRunner.equal(condition.damageLevel, 2)
+                -- A schema-12 town-wide integrity has no record of which
+                -- buildings were hit, so the whole town inherits it: every
+                -- building is damaged rather than a chosen few.
+                TestRunner.equal(condition.damageLevel, #TownProgression.buildingIds())
                 TestRunner.equal(condition.repairsCompleted, 2)
                 TestRunner.equal(changed.revision, 1)
-                TestRunner.equal(profile.town.condition.integrity, 100)
+                TestRunner.equal(next(profile.town.condition.buildings), nil)
             end,
         },
         {
@@ -316,7 +321,7 @@ return {
                     schemaVersion = 5,
                     town = { nightNumber = 3 },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 12)
+                TestRunner.equal(profile.schemaVersion, Config.SaveSchemaVersion)
                 TestRunner.equal(next(profile.gear), nil)
             end,
         },
@@ -397,7 +402,7 @@ return {
                     schemaVersion = 6,
                     gear = { gear_meadow_satchel = 1 },
                 }, 300)
-                TestRunner.equal(profile.schemaVersion, 12)
+                TestRunner.equal(profile.schemaVersion, Config.SaveSchemaVersion)
                 TestRunner.equal(next(profile.quests.claimed), nil)
             end,
         },
@@ -456,7 +461,7 @@ return {
             name = "migrates schema nine profiles into empty recovery state",
             run = function()
                 local profile = SaveSchema.normalize({ schemaVersion = 9 }, 100)
-                TestRunner.equal(profile.schemaVersion, 12)
+                TestRunner.equal(profile.schemaVersion, Config.SaveSchemaVersion)
                 TestRunner.equal(SaveSchema.expeditionRecovery(profile), nil)
                 TestRunner.equal(#profile.inventory.recoveryOrder, 0)
             end,
@@ -510,7 +515,7 @@ return {
                     "specialization_pathfinder",
                     110
                 )
-                TestRunner.equal(profile.schemaVersion, 12)
+                TestRunner.equal(profile.schemaVersion, Config.SaveSchemaVersion)
                 TestRunner.equal(result.applied, true)
                 TestRunner.equal(
                     SaveSchema.masterySnapshot(specialized).profession_scout.specializationId,

@@ -2445,14 +2445,14 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.48.0",
+    BuildVersion = "0.49.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 12,
+    SaveSchemaVersion = 13,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -9357,8 +9357,13 @@ end
 -- off one table: a building added to the town gets an interaction ID for
 -- free instead of needing someone to remember to add one.
 local constructionInteractionIds = {}
+-- Storm damage is per building now, so a repair prompt belongs to a building
+-- the same way a construction prompt does. Generated from the same list for the
+-- same reason: a building added to the town gets both for free.
+local townRepairInteractionIds = {}
 for _, buildingId in TownProgression.buildingIds() do
     constructionInteractionIds[buildingId] = "construction_" .. buildingId
+    townRepairInteractionIds[buildingId] = "town_repair_" .. buildingId
 end
 
 local RuntimeIds = {
@@ -9458,11 +9463,7 @@ local RuntimeIds = {
         npc_ena_moss = "resident_ena_moss",
     }),
     ConstructionInteractionIds = table.freeze(constructionInteractionIds),
-    TownRepairInteractionIds = table.freeze({
-        "town_repair_archive",
-        "town_repair_workshop",
-        "town_repair_inn",
-    }),
+    TownRepairInteractionIdByBuilding = table.freeze(townRepairInteractionIds),
     ProfessionSpecializationInteractionIds = table.freeze(professionSpecializationInteractionIds),
     ProfessionSpecializationInteractionIdBySpecialization = table.freeze(
         professionSpecializationInteractionIdBySpecialization
@@ -9545,7 +9546,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 12,
+        schemaVersion = 13,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -9701,7 +9702,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 12
+    profile.schemaVersion = 13
     return profile
 end
 
@@ -9969,15 +9970,35 @@ function SaveSchema.nightNumber(profile: Profile): number
     return profile.town.nightNumber
 end
 
+-- Whether two condition states describe the same town. Compared building by
+-- building rather than through the derived average, because two different sets
+-- of damaged buildings can average to the same number and writing one over the
+-- other would lose a player's repairs without changing the revision.
+local function sameTownCondition(left: TownCondition.State, right: TownCondition.State): boolean
+    if
+        left.lastNightNumber ~= right.lastNightNumber
+        or left.lastDamage ~= right.lastDamage
+        or left.repairsCompleted ~= right.repairsCompleted
+    then
+        return false
+    end
+    for buildingId, integrity in left.buildings do
+        if right.buildings[buildingId] ~= integrity then
+            return false
+        end
+    end
+    for buildingId, integrity in right.buildings do
+        if left.buildings[buildingId] ~= integrity then
+            return false
+        end
+    end
+    return true
+end
+
 function SaveSchema.withTownCondition(profile: Profile, condition: any, now: number): Profile
     local normalized = TownCondition.normalize(condition)
     local current = TownCondition.normalize(profile.town.condition)
-    if
-        normalized.integrity == current.integrity
-        and normalized.lastNightNumber == current.lastNightNumber
-        and normalized.lastDamage == current.lastDamage
-        and normalized.repairsCompleted == current.repairsCompleted
-    then
+    if sameTownCondition(normalized, current) then
         return profile
     end
     local nextProfile = table.clone(profile)
@@ -10527,28 +10548,95 @@ return table.freeze(SurvivalState)
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
 
+local TownProgression = require("./TownProgression")
+
+--[[
+    How badly each building came through the night, and what repairing one
+    does.
+
+    Until build `0.49.0` this was a single town-wide integrity number and a
+    derived 0-3 "damage level" that decided how many of three hardcoded repair
+    piles appeared. That model had a specific tell that it was the wrong shape:
+    repairing the inn's storm frame could make the archive's roof brace vanish,
+    because no repair belonged to a building -- every repair added twenty to one
+    shared number, and which sites were visible was purely a function of that
+    number. A player could not damage one building, and could not fix one
+    either.
+
+    Now every building carries its own integrity, is damaged on its own, and is
+    repaired on its own. The state shape deliberately mirrors TownConstruction's
+    -- a `{ [buildingId]: number }` map normalized against
+    `TownProgression.buildingIds()` -- because the two describe the same set of
+    objects from two directions (how far built, how badly damaged) and there is
+    no reason for them to be read differently.
+
+    Three properties are worth stating because they are what makes the
+    per-building model behave in a shared town:
+
+      * **Which buildings take damage is chosen by night number alone.** The
+        same rule TownNightIncident already uses, for the same reason: a replay
+        is deterministic and a player who reconnects cannot reroll a gentler
+        night.
+      * **A building is never destroyed.** Damage floors at
+        MIN_BUILDING_INTEGRITY, so a bad night creates work rather than deleting
+        a building, its services, or the paths around it.
+      * **Merging prefers the newest night, then the better-repaired building --
+        per building.** Two players who repaired different buildings on the same
+        day both keep their work, which the old single-number merge could not
+        express: it had to pick one player's whole town over the other's.
+]]
+
 local TownCondition = {}
 
 export type State = {
-    integrity: number,
+    buildings: { [string]: number },
     lastNightNumber: number,
     lastDamage: number,
     repairsCompleted: number,
 }
 
-local MIN_INTEGRITY = 25
+local MIN_BUILDING_INTEGRITY = 25
+local FULL_INTEGRITY = 100
 local REPAIR_AMOUNT = 20
+-- What one struck building loses. Chosen so a single hit leaves an obviously
+-- damaged building that four repairs restore, rather than a scratch nobody
+-- would cross the square to fix.
+local DAMAGE_PER_BUILDING = 35
 
 local function validNumber(value: any): boolean
     return type(value) == "number" and value == value and value > -math.huge and value < math.huge
 end
 
-local function damageLevel(integrity: number): number
-    if integrity >= 90 then
+local function isValidBuildingId(buildingId: any): boolean
+    if type(buildingId) ~= "string" then
+        return false
+    end
+    for _, id in TownProgression.buildingIds() do
+        if id == buildingId then
+            return true
+        end
+    end
+    return false
+end
+
+local function clampIntegrity(value: any): number
+    return math.clamp(
+        math.floor(tonumber(value) or FULL_INTEGRITY),
+        MIN_BUILDING_INTEGRITY,
+        FULL_INTEGRITY
+    )
+end
+
+-- How many buildings a night of this severity strikes. The thresholds are the
+-- ones the single-number model already used to pick a damage amount, kept so
+-- that how hard a night felt does not change with this rewrite -- only where
+-- the damage lands.
+local function struckCount(lanternHealth: number): number
+    if lanternHealth >= 90 then
         return 0
-    elseif integrity >= 70 then
+    elseif lanternHealth >= 70 then
         return 1
-    elseif integrity >= 50 then
+    elseif lanternHealth >= 45 then
         return 2
     end
     return 3
@@ -10556,11 +10644,32 @@ end
 
 function TownCondition.default(): State
     return {
-        integrity = 100,
+        buildings = {},
         lastNightNumber = 0,
         lastDamage = 0,
         repairsCompleted = 0,
     }
+end
+
+--[[
+    An absent building is a whole one.
+
+    Storing only damaged buildings keeps the saved map small and, more usefully,
+    means a building added to the roster later starts undamaged everywhere
+    without a migration touching every profile.
+]]
+function TownCondition.integrityFor(state: any, buildingId: any): number
+    if type(state) ~= "table" or type(state.buildings) ~= "table" then
+        return FULL_INTEGRITY
+    end
+    if not isValidBuildingId(buildingId) then
+        return FULL_INTEGRITY
+    end
+    local stored = state.buildings[buildingId]
+    if not validNumber(stored) then
+        return FULL_INTEGRITY
+    end
+    return clampIntegrity(stored)
 end
 
 function TownCondition.normalize(value: any): State
@@ -10568,14 +10677,35 @@ function TownCondition.normalize(value: any): State
     if type(value) ~= "table" then
         return result
     end
-    if validNumber(value.integrity) then
-        result.integrity = math.clamp(math.floor(value.integrity), MIN_INTEGRITY, 100)
+
+    if type(value.buildings) == "table" then
+        for buildingId, integrity in value.buildings do
+            if isValidBuildingId(buildingId) and validNumber(integrity) then
+                local clamped = clampIntegrity(integrity)
+                if clamped < FULL_INTEGRITY then
+                    result.buildings[buildingId] = clamped
+                end
+            end
+        end
+    elseif validNumber(value.integrity) then
+        -- A schema-12 profile: one town-wide integrity, no per-building map.
+        -- Every building inherits the town's number, which preserves how
+        -- damaged the town was and how much repair work is outstanding. It
+        -- cannot recover *which* buildings were hit, because the old model
+        -- never recorded that.
+        local shared = clampIntegrity(value.integrity)
+        if shared < FULL_INTEGRITY then
+            for _, buildingId in TownProgression.buildingIds() do
+                result.buildings[buildingId] = shared
+            end
+        end
     end
+
     if validNumber(value.lastNightNumber) and value.lastNightNumber >= 0 then
         result.lastNightNumber = math.clamp(math.floor(value.lastNightNumber), 0, 1_000_000)
     end
     if validNumber(value.lastDamage) then
-        result.lastDamage = math.clamp(math.floor(value.lastDamage), 0, 55)
+        result.lastDamage = math.clamp(math.floor(value.lastDamage), 0, 999)
     end
     if validNumber(value.repairsCompleted) and value.repairsCompleted >= 0 then
         result.repairsCompleted = math.floor(value.repairsCompleted)
@@ -10583,16 +10713,49 @@ function TownCondition.normalize(value: any): State
     return result
 end
 
+--[[
+    Which buildings this night strikes.
+
+    `damageable` is the set of buildings that physically exist to be broken --
+    the caller's business, because whether a building is a finished structure or
+    still a construction site lives in TownConstruction, not here. Selection
+    walks forward from an offset derived from the night number, wrapping, so the
+    same night always strikes the same buildings no matter who is connected or
+    how many times the server restarts.
+]]
+function TownCondition.struckBuildings(
+    damageable: { string },
+    lanternHealth: number,
+    nightNumber: number
+): { string }
+    if type(damageable) ~= "table" or #damageable == 0 then
+        return {}
+    end
+    local ordered = table.clone(damageable)
+    table.sort(ordered)
+
+    local count = math.min(struckCount(math.clamp(lanternHealth, 0, 100)), #ordered)
+    if count <= 0 then
+        return {}
+    end
+
+    local struck = {}
+    local offset = (math.floor(nightNumber) - 1) % #ordered
+    for step = 0, count - 1 do
+        table.insert(struck, ordered[((offset + step) % #ordered) + 1])
+    end
+    return struck
+end
+
 function TownCondition.afterNight(
     state: State,
     endingLanternHealth: number,
-    nightNumber: number
+    nightNumber: number,
+    damageable: { string }?
 ): (State, any)
     local current = TownCondition.normalize(state)
     if
-        type(endingLanternHealth) ~= "number"
-        or not validNumber(endingLanternHealth)
-        or type(nightNumber) ~= "number"
+        not validNumber(endingLanternHealth)
         or not validNumber(nightNumber)
         or nightNumber < 1
         or nightNumber ~= math.floor(nightNumber)
@@ -10603,81 +10766,163 @@ function TownCondition.afterNight(
         return current, { applied = false, reason = "night_already_recorded" }
     end
 
+    -- No explicit roster means every known building is standing. Keeps the
+    -- caller honest for tests and safe for a server that has not yet resolved
+    -- its construction state.
+    local roster: { string } = if type(damageable) == "table" and #damageable > 0
+        then damageable
+        else TownProgression.buildingIds()
+
     local lanternHealth = math.clamp(endingLanternHealth, 0, 100)
-    local damage = if lanternHealth >= 90
-        then 0
-        elseif lanternHealth >= 70 then 15
-        elseif lanternHealth >= 45 then 35
-        else 55
-    local nextState = table.clone(current)
-    nextState.integrity = math.max(MIN_INTEGRITY, current.integrity - damage)
-    nextState.lastNightNumber = nightNumber
-    nextState.lastDamage = current.integrity - nextState.integrity
+    local struck = TownCondition.struckBuildings(roster, lanternHealth, nightNumber)
+
+    local nextState = TownCondition.normalize(current)
+    local applied = 0
+    local damagedIds = {}
+    for _, buildingId in struck do
+        local before = TownCondition.integrityFor(nextState, buildingId)
+        local after = math.max(MIN_BUILDING_INTEGRITY, before - DAMAGE_PER_BUILDING)
+        if after < FULL_INTEGRITY then
+            nextState.buildings[buildingId] = after
+        end
+        applied += before - after
+        table.insert(damagedIds, buildingId)
+    end
+
+    nextState.lastNightNumber = math.floor(nightNumber)
+    nextState.lastDamage = applied
     return nextState,
         {
             applied = true,
-            damage = nextState.lastDamage,
-            damageLevel = damageLevel(nextState.integrity),
-            integrity = nextState.integrity,
-            reason = if damage > 0 then "night_damage" else "clean_defense",
+            damage = applied,
+            struck = damagedIds,
+            damageLevel = #damagedIds,
+            integrity = TownCondition.averageIntegrity(nextState, roster),
+            reason = if applied > 0 then "night_damage" else "clean_defense",
         }
 end
 
-function TownCondition.repair(state: State): (State, any)
+--[[
+    Repair one building.
+
+    Deliberately narrow: a repair names its building and moves nothing else. The
+    old model could not express this -- every repair added to one shared number,
+    so fixing the inn could visibly un-damage the archive.
+]]
+function TownCondition.repair(state: State, buildingId: any): (State, any)
     local current = TownCondition.normalize(state)
-    if current.integrity >= 100 then
-        return current, { applied = false, reason = "town_already_repaired" }
+    if not isValidBuildingId(buildingId) then
+        return current, { applied = false, reason = "unknown_building" }
     end
-    local nextState = table.clone(current)
-    nextState.integrity = math.min(100, current.integrity + REPAIR_AMOUNT)
+
+    local before = TownCondition.integrityFor(current, buildingId)
+    if before >= FULL_INTEGRITY then
+        return current,
+            { applied = false, reason = "building_already_repaired", buildingId = buildingId }
+    end
+
+    local nextState = TownCondition.normalize(current)
+    local after = math.min(FULL_INTEGRITY, before + REPAIR_AMOUNT)
+    if after >= FULL_INTEGRITY then
+        nextState.buildings[buildingId] = nil
+    else
+        nextState.buildings[buildingId] = after
+    end
     nextState.repairsCompleted += 1
-    if nextState.integrity >= 100 then
-        nextState.lastDamage = 0
-    end
+
     return nextState,
         {
             applied = true,
-            restored = nextState.integrity - current.integrity,
-            integrity = nextState.integrity,
-            damageLevel = damageLevel(nextState.integrity),
-            reason = "town_repaired",
+            buildingId = buildingId,
+            restored = after - before,
+            buildingIntegrity = after,
+            integrity = TownCondition.averageIntegrity(nextState, nil),
+            reason = "building_repaired",
         }
 end
 
--- Prefer the newest defended night. Within that same day, higher integrity is
--- evidence of later repair work, so a stale player profile cannot re-damage a
--- shared server town after another player has already repaired it.
+-- The town's overall health, kept because analytics, the HUD, and the existing
+-- world attributes all speak in one number. It is derived from the buildings
+-- rather than stored, so it can never disagree with them.
+function TownCondition.averageIntegrity(state: any, roster: { string }?): number
+    local ids: { string } = if type(roster) == "table" and #roster > 0
+        then roster
+        else TownProgression.buildingIds()
+    if #ids == 0 then
+        return FULL_INTEGRITY
+    end
+    local total = 0
+    for _, buildingId in ids do
+        total += TownCondition.integrityFor(state, buildingId)
+    end
+    return math.floor(total / #ids)
+end
+
+--[[
+    Prefer the newest defended night; within the same night, prefer the
+    better-repaired copy of each building.
+
+    Per building rather than wholesale, which is the behaviour the old
+    single-number merge could not express: two players who repaired different
+    buildings on the same day would previously have had one player's entire town
+    chosen over the other's, silently discarding half the work.
+]]
 function TownCondition.merge(current: any, incoming: any): State
     local left = TownCondition.normalize(current)
     local right = TownCondition.normalize(incoming)
+
     if right.lastNightNumber > left.lastNightNumber then
         return right
     elseif left.lastNightNumber > right.lastNightNumber then
         return left
-    elseif right.integrity > left.integrity then
-        return right
-    elseif left.integrity > right.integrity then
-        return left
-    elseif right.repairsCompleted > left.repairsCompleted then
-        return right
     end
-    return left
+
+    local merged = TownCondition.default()
+    merged.lastNightNumber = left.lastNightNumber
+    merged.lastDamage = math.min(left.lastDamage, right.lastDamage)
+    merged.repairsCompleted = math.max(left.repairsCompleted, right.repairsCompleted)
+
+    for _, buildingId in TownProgression.buildingIds() do
+        local best = math.max(
+            TownCondition.integrityFor(left, buildingId),
+            TownCondition.integrityFor(right, buildingId)
+        )
+        if best < FULL_INTEGRITY then
+            merged.buildings[buildingId] = best
+        end
+    end
+    return merged
 end
 
-function TownCondition.snapshot(state: State): any
+function TownCondition.snapshot(state: State, roster: { string }?): any
     local current = TownCondition.normalize(state)
+    local damaged = {}
+    local repairsRemaining = 0
+    for _, buildingId in TownProgression.buildingIds() do
+        local integrity = TownCondition.integrityFor(current, buildingId)
+        if integrity < FULL_INTEGRITY then
+            table.insert(damaged, { buildingId = buildingId, integrity = integrity })
+            repairsRemaining += math.ceil((FULL_INTEGRITY - integrity) / REPAIR_AMOUNT)
+        end
+    end
+    table.sort(damaged, function(a, b)
+        return a.buildingId < b.buildingId
+    end)
+
     return {
-        integrity = current.integrity,
-        damageLevel = damageLevel(current.integrity),
+        integrity = TownCondition.averageIntegrity(current, roster),
+        damageLevel = #damaged,
+        damagedBuildings = damaged,
         lastNightNumber = current.lastNightNumber,
         lastDamage = current.lastDamage,
         repairsCompleted = current.repairsCompleted,
-        repairsRemaining = math.ceil((100 - current.integrity) / REPAIR_AMOUNT),
+        repairsRemaining = repairsRemaining,
     }
 end
 
-TownCondition.MinimumIntegrity = MIN_INTEGRITY
+TownCondition.MinimumIntegrity = MIN_BUILDING_INTEGRITY
 TownCondition.RepairAmount = REPAIR_AMOUNT
+TownCondition.DamagePerBuilding = DAMAGE_PER_BUILDING
 
 return table.freeze(TownCondition)
 ]]></string>
@@ -11431,11 +11676,14 @@ local function finite(value: any): boolean
     return type(value) == "number" and value == value and value > -math.huge and value < math.huge
 end
 
+-- Bounds an integrity reading supplied by the caller. Deliberately not a reader
+-- itself: where the number comes from is TownCondition's business, and a local
+-- copy of that knowledge is what silently broke this guard once already.
 local function integrityOf(value: any): number
-    if type(value) ~= "table" or not finite(value.integrity) then
+    if not finite(value) then
         return 0
     end
-    return math.clamp(value.integrity, 0, 100)
+    return math.clamp(value, 0, 100)
 end
 
 --[[
@@ -11476,9 +11724,17 @@ end
 --[[
     Resolve an incoming town condition against the current one.
 
-    `merge` is the existing TownCondition.merge, passed in rather than required
-    so this module stays free of a dependency it would only use once and so the
-    host path provably keeps its old behaviour.
+    `merge` is the existing TownCondition.merge and `readIntegrity` its
+    averageIntegrity, both passed in rather than required so this module stays
+    free of a dependency it would only use here and so the host path provably
+    keeps its old behaviour.
+
+    `readIntegrity` is required rather than optional on purpose. Town condition
+    stopped storing a single `integrity` field when damage became per building,
+    and the local reader that used to pluck it off the table silently answered
+    zero for every town once that happened -- which made `merged < current`
+    false in every case and quietly turned this guard off. A missing accessor is
+    a programming error and should say so, not degrade into an unprotected town.
 
     The visitor path never returns anything with lower integrity than what is
     already standing, whatever night number rides along with it.
@@ -11487,8 +11743,12 @@ function TownPermissions.resolveCondition(
     current: any,
     incoming: any,
     role: Role,
-    merge: (any, any) -> any
+    merge: (any, any) -> any,
+    readIntegrity: (any) -> number
 ): any
+    assert(type(merge) == "function", "resolveCondition needs a merge function")
+    assert(type(readIntegrity) == "function", "resolveCondition needs an integrity reader")
+
     local merged = merge(current, incoming)
     if role == "host" then
         return merged
@@ -11496,7 +11756,7 @@ function TownPermissions.resolveCondition(
 
     -- A visitor's contribution is accepted only where it does not cost the host
     -- anything. If the merge would lower integrity, the town keeps what it had.
-    if integrityOf(merged) < integrityOf(current) then
+    if integrityOf(readIntegrity(merged)) < integrityOf(readIntegrity(current)) then
         return current
     end
     return merged
@@ -22841,7 +23101,8 @@ function TownNightService.ensureStarted(
             self._condition,
             condition,
             role,
-            self._townCondition.merge
+            self._townCondition.merge,
+            self._townCondition.averageIntegrity
         )
         self._worldService:setTownCondition(self:conditionSnapshot())
     end
@@ -22941,8 +23202,16 @@ function TownNightService._runCycle(self: TownNightService)
         end
         self._worldService:clearTownIncident()
         local endingLanternHealth = self._enemyService:lanternHealth()
-        local nextCondition, damageResult =
-            self._townCondition.afterNight(self._condition, endingLanternHealth, activeNight)
+        -- What physically stands to be broken. A building still at stage zero
+        -- is a construction site, and damaging one would mean repairing
+        -- something nobody has built yet.
+        local damageable = self._worldService:damageableBuildingIds()
+        local nextCondition, damageResult = self._townCondition.afterNight(
+            self._condition,
+            endingLanternHealth,
+            activeNight,
+            damageable
+        )
         self._condition = nextCondition
         self._enemyService:stopNight()
         self._activeNightNumber = 0
@@ -23033,17 +23302,24 @@ function TownNightService.attemptLastStand(
     return result
 end
 
-function TownNightService.repairTown(self: TownNightService): any
+--[[
+    Repair one named building.
+
+    `buildingId` comes from the repair prompt's own Payload attribute, baked in
+    at world build time -- the same one-object-one-outcome route the crafting
+    benches use. The client sends the generic interaction ID and never names a
+    building, so a forged payload cannot repair something that was not there.
+]]
+function TownNightService.repairTown(self: TownNightService, buildingId: any): any
     if self._phase ~= "day" then
         return { accepted = false, message = "TOWN REPAIRS WAIT FOR DAYLIGHT", reason = "not_day" }
     end
-    local nextCondition, result = self._townCondition.repair(self._condition)
+    local nextCondition, result = self._townCondition.repair(self._condition, buildingId)
     if not result.applied then
-        return {
-            accepted = false,
-            message = "EMBERHOLLOW IS ALREADY FULLY REPAIRED",
-            reason = result.reason,
-        }
+        local message = if result.reason == "unknown_building"
+            then "THERE IS NOTHING TO REPAIR HERE"
+            else "THIS BUILDING IS ALREADY REPAIRED"
+        return { accepted = false, message = message, reason = result.reason }
     end
     self._condition = nextCondition
     self._worldService:setTownCondition(self:conditionSnapshot())
@@ -23052,9 +23328,10 @@ function TownNightService.repairTown(self: TownNightService): any
         accepted = true,
         condition = snapshot,
         message = string.format(
-            "TOWN REPAIR +%d · INTEGRITY %d%%",
+            "REPAIRED +%d · %d%% · %d LEFT IN TOWN",
             result.restored,
-            snapshot.integrity
+            result.buildingIntegrity,
+            snapshot.repairsRemaining
         ),
         reason = result.reason,
     }
@@ -23865,7 +24142,11 @@ function TutorialService._interact(
             self:_publish(player)
             return
         end
-        local result = self._townNightService:repairTown()
+        -- Read off the prompt, never off client input: the repair prompt beside
+        -- each damaged building carries that building's ID as its baked
+        -- Payload, the same route a crafting bench uses for its recipe.
+        local buildingId = prompt:GetAttribute("Payload")
+        local result = self._townNightService:repairTown(buildingId)
         if result.accepted then
             for sessionPlayer in self._sessions do
                 self._profileService:setTownCondition(sessionPlayer, result.condition)
@@ -25321,6 +25602,7 @@ export type WorldService = typeof(setmetatable(
         _townConstructionRules: any,
         _townCondition: any,
         _townResidents: { [string]: any },
+        _buildingPlacements: { [string]: any },
         _townIncidentModel: Model?,
         _engineerBraceModel: Model?,
         _meshTemplateLoader: MeshTemplateLoader.MeshTemplateLoader,
@@ -27126,6 +27408,7 @@ function WorldService.new(
         _townConstructionRules = townConstruction,
         _townCondition = { integrity = 100, damageLevel = 0, repairsRemaining = 0 },
         _townResidents = {},
+        _buildingPlacements = {},
         _townIncidentModel = nil,
         _engineerBraceModel = nil,
         _meshTemplateLoader = MeshTemplateLoader.new(logger),
@@ -32723,7 +33006,11 @@ local function buildTownProgressionBuildings(
     meshPlacements: { MeshPlacement },
     construction: any,
     townConstructionRules: any
-): ({ [string]: any }, { [string]: any })
+): (
+    { [string]: any },
+    { [string]: any },
+    { [string]: any }
+)
     local stages = if type(consequence.buildingStages) == "table"
         then consequence.buildingStages
         else {}
@@ -32733,6 +33020,16 @@ local function buildTownProgressionBuildings(
     -- show for it. A building already at its ceiling gets no entry, so
     -- nothing prompts a player to fund a stage nights have not unlocked yet.
     local constructionTargets: { [string]: { target: BasePart, displayName: string } } = {}
+
+    -- Where each building actually stands, recorded as it is placed rather than
+    -- duplicated into a second table of coordinates. Per-building storm damage
+    -- has to put its repair site at the building it damaged, and a hand-copied
+    -- position list would drift away from these call sites the first time a lot
+    -- moved -- the exact failure validate_town_layout.py exists to catch.
+    -- `damageable` is false for a construction site: a building nobody has
+    -- built yet cannot be storm-damaged, and asking a player to repair one
+    -- would be asking them to fix something that was never there.
+    local buildingPlacements: { [string]: { center: Vector3, damageable: boolean } } = {}
 
     -- The tier a building is *allowed* to reach right now, purely from nights
     -- and chapter one -- unchanged from before construction orders existed.
@@ -32796,6 +33093,7 @@ local function buildTownProgressionBuildings(
         local function at(offset: Vector3): CFrame
             return base * CFrame.new(offset)
         end
+        buildingPlacements[id] = { center = center, damageable = false }
         local model = Instance.new("Model")
         model.Name = id
         model:SetAttribute("BuildingId", id)
@@ -32933,6 +33231,7 @@ local function buildTownProgressionBuildings(
         if stage == 0 then
             return constructionSite(id, displayName, center, size, facingYaw)
         end
+        buildingPlacements[id] = { center = center, damageable = true }
         local model = Instance.new("Model")
         model.Name = id
         model:SetAttribute("BuildingId", id)
@@ -33805,7 +34104,7 @@ local function buildTownProgressionBuildings(
     parent:SetAttribute("ArchiveStage", archiveStage)
     parent:SetAttribute("WorkbenchStage", workbenchStage)
     parent:SetAttribute("InnStage", innStage)
-    return residents, constructionTargets
+    return residents, constructionTargets, buildingPlacements
 end
 
 function WorldService._setTownResidentRoutine(self: WorldService, phase: string)
@@ -33879,7 +34178,7 @@ function WorldService._rebuildTownProgression(self: WorldService)
     local buildings = Instance.new("Model")
     buildings.Name = "TownProgressionBuildings"
     buildings.Parent = world
-    local residents, constructionTargets = buildTownProgressionBuildings(
+    local residents, constructionTargets, buildingPlacements = buildTownProgressionBuildings(
         buildings,
         resolved,
         self._runtimeIds,
@@ -33889,6 +34188,7 @@ function WorldService._rebuildTownProgression(self: WorldService)
         self._townConstructionRules
     )
     self._townResidents = residents
+    self._buildingPlacements = buildingPlacements
     self:_placeAuthoredMeshes(townMeshPlacements, world, buildings, "town_mesh_dressing_ready")
     for residentId, resident in self._townResidents do
         local interactionId = self._runtimeIds.ResidentInteractionIds[residentId]
@@ -33957,23 +34257,36 @@ function WorldService.setTownConstruction(self: WorldService, construction: any)
     self:_rebuildTownProgression()
 end
 
+--[[
+    Rebuild the town's visible storm damage from a per-building condition
+    snapshot.
+
+    A repair site now stands beside the building it belongs to, at the centre
+    that building recorded when it was placed, and its prompt carries that
+    building's ID as its baked Payload -- so repairing the inn repairs the inn.
+    Under the single-integrity model this could not be true: every repair moved
+    one shared number, and which of three fixed piles appeared was a function of
+    that number, so fixing the inn could make the archive's damage vanish.
+]]
 function WorldService.setTownCondition(self: WorldService, condition: any)
     local world = self._world
     if world == nil or type(condition) ~= "table" then
         return
     end
     local integrity = math.clamp(math.floor(tonumber(condition.integrity) or 100), 25, 100)
-    local damageLevel = math.clamp(math.floor(tonumber(condition.damageLevel) or 0), 0, 3)
+    local damaged = if type(condition.damagedBuildings) == "table"
+        then condition.damagedBuildings
+        else {}
     self._townCondition = {
         integrity = integrity,
-        damageLevel = damageLevel,
+        damageLevel = #damaged,
         lastNightNumber = math.max(0, math.floor(tonumber(condition.lastNightNumber) or 0)),
         lastDamage = math.max(0, math.floor(tonumber(condition.lastDamage) or 0)),
         repairsCompleted = math.max(0, math.floor(tonumber(condition.repairsCompleted) or 0)),
         repairsRemaining = math.max(0, math.floor(tonumber(condition.repairsRemaining) or 0)),
     }
 
-    for _, interactionId in self._runtimeIds.TownRepairInteractionIds do
+    for _, interactionId in self._runtimeIds.TownRepairInteractionIdByBuilding do
         local prompt = self._interactions[interactionId]
         if prompt ~= nil then
             prompt:Destroy()
@@ -33985,47 +34298,52 @@ function WorldService.setTownCondition(self: WorldService, condition: any)
         existing:Destroy()
     end
     world:SetAttribute("TownIntegrity", integrity)
-    world:SetAttribute("TownDamageLevel", damageLevel)
-    if damageLevel == 0 then
+    world:SetAttribute("TownDamageLevel", #damaged)
+    if #damaged == 0 then
         return
     end
 
-    local damage = Instance.new("Model")
-    damage.Name = "TownDamageConsequences"
-    damage:SetAttribute("Integrity", integrity)
-    damage:SetAttribute("DamageLevel", damageLevel)
-    damage.Parent = world
-    local sites = {
-        {
-            id = self._runtimeIds.TownRepairInteractionIds[1],
-            name = "Archive Roof Brace",
-            position = Vector3.new(-40, 2.4, -96),
-        },
-        {
-            id = self._runtimeIds.TownRepairInteractionIds[2],
-            name = "Workbench Shutters",
-            position = Vector3.new(39, 2.4, -95),
-        },
-        {
-            id = self._runtimeIds.TownRepairInteractionIds[3],
-            name = "Inn Storm Frame",
-            position = Vector3.new(-40, 2.4, -140),
-        },
-    }
-    for siteIndex = 1, damageLevel do
-        local site = sites[siteIndex]
+    local damageModel = Instance.new("Model")
+    damageModel.Name = "TownDamageConsequences"
+    damageModel:SetAttribute("Integrity", integrity)
+    damageModel:SetAttribute("DamageLevel", #damaged)
+    damageModel.Parent = world
+
+    local placed = 0
+    for _, entry in damaged do
+        local buildingId = if type(entry) == "table" then entry.buildingId else nil
+        local placement = if type(buildingId) == "string"
+            then self._buildingPlacements[buildingId]
+            else nil
+        local interactionId = if type(buildingId) == "string"
+            then self._runtimeIds.TownRepairInteractionIdByBuilding[buildingId]
+            else nil
+        -- A building with no recorded placement is one this town has not built
+        -- -- a stale profile can carry damage for it. Skipping is the safe
+        -- direction: no prompt appears for a building that is not there.
+        if placement == nil or interactionId == nil then
+            continue
+        end
+
+        placed += 1
+        local buildingIntegrity = math.clamp(math.floor(tonumber(entry.integrity) or 100), 25, 100)
+        -- Offset toward the street so the work sits in front of the building
+        -- rather than inside its walls, and never on the building's own anchor.
+        local site = placement.center + Vector3.new(0, 2.4, 9.5)
         local target = part(
-            damage,
-            "RepairPile_" .. tostring(siteIndex),
+            damageModel,
+            "RepairPile_" .. buildingId,
             Vector3.new(5.5, 1.2, 2.8),
-            CFrame.new(site.position) * CFrame.Angles(0, math.rad(siteIndex * 8 - 16), 0),
+            CFrame.new(site) * CFrame.Angles(0, math.rad(placed * 8 - 16), 0),
             Color3.fromRGB(93, 65, 43),
             Enum.Material.WoodPlanks,
             false
         )
+        target:SetAttribute("BuildingId", buildingId)
+        target:SetAttribute("BuildingIntegrity", buildingIntegrity)
         for braceIndex = -1, 1 do
             part(
-                damage,
+                damageModel,
                 "StormBrokenBrace",
                 Vector3.new(0.55, 5.5, 0.55),
                 target.CFrame
@@ -34037,11 +34355,11 @@ function WorldService.setTownCondition(self: WorldService, condition: any)
             )
         end
         local canvas = part(
-            damage,
+            damageModel,
             "StormTarp",
             Vector3.new(5.8, 0.2, 4.4),
-            CFrame.new(site.position + Vector3.new(0, 4.2, 0))
-                * CFrame.Angles(0, 0, math.rad(siteIndex % 2 == 0 and -7 or 7)),
+            CFrame.new(site + Vector3.new(0, 4.2, 0))
+                * CFrame.Angles(0, 0, math.rad(placed % 2 == 0 and -7 or 7)),
             Color3.fromRGB(75, 87, 77),
             Enum.Material.Fabric,
             false
@@ -34049,19 +34367,50 @@ function WorldService.setTownCondition(self: WorldService, condition: any)
         canvas.Transparency = 0.06
         self:_registerInteraction(
             target,
-            site.id,
+            interactionId,
             self._runtimeIds.Actions.RepairTown,
             "REPAIR",
-            site.name,
-            nil,
+            string.format("%s · %d%%", self:_buildingDisplayName(buildingId), buildingIntegrity),
+            -- The building this prompt repairs, baked in at build time. The
+            -- client only ever sends the interaction ID, exactly as it does for
+            -- a crafting bench, so nothing a client says can name a building.
+            buildingId,
             1.1
         )
     end
     self:setTownRepairEnabled(not self._night and not self._dusk)
 end
 
+-- A readable name for a building ID, for a prompt that has to say which
+-- building it repairs. Falls back to the ID's own words rather than going
+-- blank on a building added without a display name.
+function WorldService._buildingDisplayName(self: WorldService, buildingId: string): string
+    local model = if self._world ~= nil then self._world:FindFirstChild(buildingId, true) else nil
+    if model ~= nil then
+        local sign = model:FindFirstChild("BuildingSign")
+        if sign ~= nil and sign:GetAttribute("DisplayName") ~= nil then
+            return tostring(sign:GetAttribute("DisplayName"))
+        end
+    end
+    local words = string.gsub(string.gsub(buildingId, "^building_", ""), "_", " ")
+    return string.upper(words)
+end
+
+-- Which buildings physically stand and can therefore be storm damaged. A
+-- construction site is excluded: nobody has built it yet.
+function WorldService.damageableBuildingIds(self: WorldService): { string }
+    local ids = {}
+    for buildingId, placement in self._buildingPlacements do
+        if type(placement) == "table" and placement.damageable == true then
+            table.insert(ids, buildingId)
+        end
+    end
+    table.sort(ids)
+    return ids
+end
+
 function WorldService.setTownRepairEnabled(self: WorldService, enabled: boolean)
-    for _, interactionId in self._runtimeIds.TownRepairInteractionIds do
+    for _, interactionId in self._runtimeIds.TownRepairInteractionIdByBuilding do
         local prompt = self._interactions[interactionId]
         if prompt ~= nil then
             prompt.Enabled = enabled and self._townCondition.damageLevel > 0

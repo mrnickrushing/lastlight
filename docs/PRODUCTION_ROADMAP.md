@@ -211,9 +211,12 @@ list is the honest one: restoring to a copy other than the newest, export
 tooling, and a migration fixture per released schema all remain open, and every
 DataStore behaviour needs a published staging place to evidence.
 
+Damage and repair are now per building: each carries its own integrity, is
+struck by a night-number-derived selection, and is repaired individually
+([MILESTONE_4_PER_BUILDING_DAMAGE.md](MILESTONE_4_PER_BUILDING_DAMAGE.md)).
+
 Still absent in source, checked rather than inferred: resident jobs, injury,
-relationships, and the crisis framework; storage and decoration caps. Damage and
-repair exist as one town-wide integrity value rather than per building, and the
+relationships, and the crisis framework; storage and decoration caps. The
 "town visit flow" is implicit first-arrival hosting on a shared server rather
 than a deliberate visit mechanic.
 

@@ -41,11 +41,14 @@ local function finite(value: any): boolean
     return type(value) == "number" and value == value and value > -math.huge and value < math.huge
 end
 
+-- Bounds an integrity reading supplied by the caller. Deliberately not a reader
+-- itself: where the number comes from is TownCondition's business, and a local
+-- copy of that knowledge is what silently broke this guard once already.
 local function integrityOf(value: any): number
-    if type(value) ~= "table" or not finite(value.integrity) then
+    if not finite(value) then
         return 0
     end
-    return math.clamp(value.integrity, 0, 100)
+    return math.clamp(value, 0, 100)
 end
 
 --[[
@@ -86,9 +89,17 @@ end
 --[[
     Resolve an incoming town condition against the current one.
 
-    `merge` is the existing TownCondition.merge, passed in rather than required
-    so this module stays free of a dependency it would only use once and so the
-    host path provably keeps its old behaviour.
+    `merge` is the existing TownCondition.merge and `readIntegrity` its
+    averageIntegrity, both passed in rather than required so this module stays
+    free of a dependency it would only use here and so the host path provably
+    keeps its old behaviour.
+
+    `readIntegrity` is required rather than optional on purpose. Town condition
+    stopped storing a single `integrity` field when damage became per building,
+    and the local reader that used to pluck it off the table silently answered
+    zero for every town once that happened -- which made `merged < current`
+    false in every case and quietly turned this guard off. A missing accessor is
+    a programming error and should say so, not degrade into an unprotected town.
 
     The visitor path never returns anything with lower integrity than what is
     already standing, whatever night number rides along with it.
@@ -97,8 +108,12 @@ function TownPermissions.resolveCondition(
     current: any,
     incoming: any,
     role: Role,
-    merge: (any, any) -> any
+    merge: (any, any) -> any,
+    readIntegrity: (any) -> number
 ): any
+    assert(type(merge) == "function", "resolveCondition needs a merge function")
+    assert(type(readIntegrity) == "function", "resolveCondition needs an integrity reader")
+
     local merged = merge(current, incoming)
     if role == "host" then
         return merged
@@ -106,7 +121,7 @@ function TownPermissions.resolveCondition(
 
     -- A visitor's contribution is accepted only where it does not cost the host
     -- anything. If the merge would lower integrity, the town keeps what it had.
-    if integrityOf(merged) < integrityOf(current) then
+    if integrityOf(readIntegrity(merged)) < integrityOf(readIntegrity(current)) then
         return current
     end
     return merged

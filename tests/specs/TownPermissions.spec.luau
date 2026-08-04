@@ -68,15 +68,16 @@ return {
                 local wrecked = condition(25, 50)
 
                 local plain = TownCondition.merge(standing, wrecked)
-                TestRunner.equal(plain.integrity, 25)
+                TestRunner.equal(TownCondition.averageIntegrity(plain), 25)
 
                 local guarded = TownPermissions.resolveCondition(
                     standing,
                     wrecked,
                     "visitor",
-                    TownCondition.merge
+                    TownCondition.merge,
+                    TownCondition.averageIntegrity
                 )
-                TestRunner.equal(guarded.integrity, 100)
+                TestRunner.equal(TownCondition.averageIntegrity(guarded), 100)
             end,
         },
         {
@@ -91,9 +92,10 @@ return {
                     standing,
                     afterABadNight,
                     "host",
-                    TownCondition.merge
+                    TownCondition.merge,
+                    TownCondition.averageIntegrity
                 )
-                TestRunner.equal(resolved.integrity, 35)
+                TestRunner.equal(TownCondition.averageIntegrity(resolved), 35)
             end,
         },
         {
@@ -108,10 +110,11 @@ return {
                     standing,
                     helpful,
                     "visitor",
-                    TownCondition.merge
+                    TownCondition.merge,
+                    TownCondition.averageIntegrity
                 )
                 TestRunner.truthy(
-                    resolved.integrity >= 90,
+                    TownCondition.averageIntegrity(resolved) >= 90,
                     "a visitor's repair work must survive the guard"
                 )
             end,
@@ -130,14 +133,16 @@ return {
                                 standing,
                                 incoming,
                                 "visitor",
-                                TownCondition.merge
+                                TownCondition.merge,
+                                TownCondition.averageIntegrity
                             )
                             TestRunner.truthy(
-                                resolved.integrity >= standing.integrity,
+                                TownCondition.averageIntegrity(resolved)
+                                    >= TownCondition.averageIntegrity(standing),
                                 string.format(
                                     "visitor lowered integrity from %d to %d",
-                                    standing.integrity,
-                                    resolved.integrity
+                                    TownCondition.averageIntegrity(standing),
+                                    TownCondition.averageIntegrity(resolved)
                                 )
                             )
                         end

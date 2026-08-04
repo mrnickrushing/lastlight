@@ -22,8 +22,13 @@ end
 -- off one table: a building added to the town gets an interaction ID for
 -- free instead of needing someone to remember to add one.
 local constructionInteractionIds = {}
+-- Storm damage is per building now, so a repair prompt belongs to a building
+-- the same way a construction prompt does. Generated from the same list for the
+-- same reason: a building added to the town gets both for free.
+local townRepairInteractionIds = {}
 for _, buildingId in TownProgression.buildingIds() do
     constructionInteractionIds[buildingId] = "construction_" .. buildingId
+    townRepairInteractionIds[buildingId] = "town_repair_" .. buildingId
 end
 
 local RuntimeIds = {
@@ -123,11 +128,7 @@ local RuntimeIds = {
         npc_ena_moss = "resident_ena_moss",
     }),
     ConstructionInteractionIds = table.freeze(constructionInteractionIds),
-    TownRepairInteractionIds = table.freeze({
-        "town_repair_archive",
-        "town_repair_workshop",
-        "town_repair_inn",
-    }),
+    TownRepairInteractionIdByBuilding = table.freeze(townRepairInteractionIds),
     ProfessionSpecializationInteractionIds = table.freeze(professionSpecializationInteractionIds),
     ProfessionSpecializationInteractionIdBySpecialization = table.freeze(
         professionSpecializationInteractionIdBySpecialization

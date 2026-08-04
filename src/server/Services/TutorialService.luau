@@ -772,7 +772,11 @@ function TutorialService._interact(
             self:_publish(player)
             return
         end
-        local result = self._townNightService:repairTown()
+        -- Read off the prompt, never off client input: the repair prompt beside
+        -- each damaged building carries that building's ID as its baked
+        -- Payload, the same route a crafting bench uses for its recipe.
+        local buildingId = prompt:GetAttribute("Payload")
+        local result = self._townNightService:repairTown(buildingId)
         if result.accepted then
             for sessionPlayer in self._sessions do
                 self._profileService:setTownCondition(sessionPlayer, result.condition)

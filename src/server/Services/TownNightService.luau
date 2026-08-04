@@ -270,7 +270,8 @@ function TownNightService.ensureStarted(
             self._condition,
             condition,
             role,
-            self._townCondition.merge
+            self._townCondition.merge,
+            self._townCondition.averageIntegrity
         )
         self._worldService:setTownCondition(self:conditionSnapshot())
     end
@@ -370,8 +371,16 @@ function TownNightService._runCycle(self: TownNightService)
         end
         self._worldService:clearTownIncident()
         local endingLanternHealth = self._enemyService:lanternHealth()
-        local nextCondition, damageResult =
-            self._townCondition.afterNight(self._condition, endingLanternHealth, activeNight)
+        -- What physically stands to be broken. A building still at stage zero
+        -- is a construction site, and damaging one would mean repairing
+        -- something nobody has built yet.
+        local damageable = self._worldService:damageableBuildingIds()
+        local nextCondition, damageResult = self._townCondition.afterNight(
+            self._condition,
+            endingLanternHealth,
+            activeNight,
+            damageable
+        )
         self._condition = nextCondition
         self._enemyService:stopNight()
         self._activeNightNumber = 0
@@ -462,17 +471,24 @@ function TownNightService.attemptLastStand(
     return result
 end
 
-function TownNightService.repairTown(self: TownNightService): any
+--[[
+    Repair one named building.
+
+    `buildingId` comes from the repair prompt's own Payload attribute, baked in
+    at world build time -- the same one-object-one-outcome route the crafting
+    benches use. The client sends the generic interaction ID and never names a
+    building, so a forged payload cannot repair something that was not there.
+]]
+function TownNightService.repairTown(self: TownNightService, buildingId: any): any
     if self._phase ~= "day" then
         return { accepted = false, message = "TOWN REPAIRS WAIT FOR DAYLIGHT", reason = "not_day" }
     end
-    local nextCondition, result = self._townCondition.repair(self._condition)
+    local nextCondition, result = self._townCondition.repair(self._condition, buildingId)
     if not result.applied then
-        return {
-            accepted = false,
-            message = "EMBERHOLLOW IS ALREADY FULLY REPAIRED",
-            reason = result.reason,
-        }
+        local message = if result.reason == "unknown_building"
+            then "THERE IS NOTHING TO REPAIR HERE"
+            else "THIS BUILDING IS ALREADY REPAIRED"
+        return { accepted = false, message = message, reason = result.reason }
     end
     self._condition = nextCondition
     self._worldService:setTownCondition(self:conditionSnapshot())
@@ -481,9 +497,10 @@ function TownNightService.repairTown(self: TownNightService): any
         accepted = true,
         condition = snapshot,
         message = string.format(
-            "TOWN REPAIR +%d · INTEGRITY %d%%",
+            "REPAIRED +%d · %d%% · %d LEFT IN TOWN",
             result.restored,
-            snapshot.integrity
+            result.buildingIntegrity,
+            snapshot.repairsRemaining
         ),
         reason = result.reason,
     }

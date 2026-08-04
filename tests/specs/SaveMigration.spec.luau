@@ -133,6 +133,39 @@ local ERA_PROFILES: { [number]: any } = {
         },
         profession = { selectedId = "profession_engineer" },
     },
+    -- Schema 12 is the last version to describe town damage as one town-wide
+    -- integrity number, and the first to carry a construction ledger. Both
+    -- matter to the 13 upgrade: the integrity has to spread across every
+    -- building, and the ledger has to survive rather than be re-grandfathered
+    -- from nights a second time.
+    [12] = {
+        schemaVersion = 12,
+        createdAt = 10,
+        updatedAt = 20,
+        revision = 21,
+        tutorial = { stage = "complete", complete = true },
+        town = {
+            nightNumber = 9,
+            condition = {
+                integrity = 60,
+                lastNightNumber = 8,
+                lastDamage = 35,
+                repairsCompleted = 3,
+            },
+            construction = { building_archive = 2, building_workbench = 1 },
+        },
+        story = {
+            chapterOne = {
+                status = "complete",
+                decision = "shared_agroforest",
+                wardenOutcome = "scarred",
+                transactionId = "chapter_1:era12:hash:1",
+                completedAt = 14,
+            },
+        },
+        profession = { selectedId = "profession_warden" },
+        gear = { gear_amber_charm = 2 },
+    },
 }
 
 -- Every field SaveSchema.default produces. A migrated profile that is missing

@@ -67,7 +67,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 12,
+        schemaVersion = 13,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -223,7 +223,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 12
+    profile.schemaVersion = 13
     return profile
 end
 
@@ -491,15 +491,35 @@ function SaveSchema.nightNumber(profile: Profile): number
     return profile.town.nightNumber
 end
 
+-- Whether two condition states describe the same town. Compared building by
+-- building rather than through the derived average, because two different sets
+-- of damaged buildings can average to the same number and writing one over the
+-- other would lose a player's repairs without changing the revision.
+local function sameTownCondition(left: TownCondition.State, right: TownCondition.State): boolean
+    if
+        left.lastNightNumber ~= right.lastNightNumber
+        or left.lastDamage ~= right.lastDamage
+        or left.repairsCompleted ~= right.repairsCompleted
+    then
+        return false
+    end
+    for buildingId, integrity in left.buildings do
+        if right.buildings[buildingId] ~= integrity then
+            return false
+        end
+    end
+    for buildingId, integrity in right.buildings do
+        if left.buildings[buildingId] ~= integrity then
+            return false
+        end
+    end
+    return true
+end
+
 function SaveSchema.withTownCondition(profile: Profile, condition: any, now: number): Profile
     local normalized = TownCondition.normalize(condition)
     local current = TownCondition.normalize(profile.town.condition)
-    if
-        normalized.integrity == current.integrity
-        and normalized.lastNightNumber == current.lastNightNumber
-        and normalized.lastDamage == current.lastDamage
-        and normalized.repairsCompleted == current.repairsCompleted
-    then
+    if sameTownCondition(normalized, current) then
         return profile
     end
     local nextProfile = table.clone(profile)
