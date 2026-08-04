@@ -255,6 +255,11 @@ function WorldSignBuilder.dressNoticeBoard(
         Enum.Material.WoodPlanks
     )
     addSurfaceText(titlePlate, title, accent)
+    -- Both notice boards are also mesh-replacement fallbacks, and the authored
+    -- Creator Store board carries no notices of its own -- it is bare wood. So
+    -- the header and the pinned art below have to outlive the replacement, or
+    -- the board a player walks up to says nothing at all.
+    titlePlate:SetAttribute("KeepVisibleOnReplacement", true)
 
     -- The header owns the wording; the board face holds actual pinned art.
     local boardSurface = board:FindFirstChild("PhysicalSignText")
@@ -286,6 +291,7 @@ function WorldSignBuilder.dressNoticeBoard(
             Enum.Material.Fabric
         )
         paper.CastShadow = false
+        paper:SetAttribute("KeepVisibleOnReplacement", true)
         addNoticeArtwork(paper, panelId)
 
         local pin = part(
@@ -297,6 +303,7 @@ function WorldSignBuilder.dressNoticeBoard(
             Enum.Material.Metal
         )
         pin.Shape = Enum.PartType.Ball
+        pin:SetAttribute("KeepVisibleOnReplacement", true)
         if index % 2 == 0 then
             local seal = part(
                 details,
@@ -307,6 +314,7 @@ function WorldSignBuilder.dressNoticeBoard(
                 Enum.Material.SmoothPlastic
             )
             seal.Shape = Enum.PartType.Ball
+            seal:SetAttribute("KeepVisibleOnReplacement", true)
         end
     end
     board:SetAttribute("NoticeCount", #panelIds)

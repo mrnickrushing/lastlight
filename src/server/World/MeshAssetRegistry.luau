@@ -25,6 +25,14 @@ export type Entry = {
     -- longest dimension. The loader cancels this once at template load, so
     -- call sites can specify the yaw they actually want.
     sourceYawDegrees: number?,
+    -- Strip Decals and Textures off the source model at template load.
+    --
+    -- Creator Store props sometimes ship with signage baked on as a decal
+    -- rather than modelled. That art was authored for whatever game the asset
+    -- came from, and it arrives already saying something -- in a readable
+    -- modern typeface -- that this world never agreed to. Set this when the
+    -- geometry is worth keeping and the printing on it is not.
+    stripDecals: boolean?,
 }
 
 local ENTRIES: { Entry } = {
@@ -487,6 +495,7 @@ local ENTRIES: { Entry } = {
         pbr = false,
         preserveSourceMaterials = true,
         creatorStore = true,
+        stripDecals = true,
     },
     {
         id = "mesh_creator_notice_board_a",

@@ -23,7 +23,7 @@ export type MeshTemplateLoader = typeof(setmetatable(
     MeshTemplateLoader
 ))
 
-local function sanitize(model: Model): (number, number)
+local function sanitize(model: Model, stripDecals: boolean): (number, number)
     local meshParts = 0
     local baseParts = 0
     for _, descendant in model:GetDescendants() do
@@ -54,6 +54,7 @@ local function sanitize(model: Model): (number, number)
             or descendant:IsA("Sound")
             or descendant:IsA("PostEffect")
             or descendant:IsA("BodyMover")
+            or (stripDecals and (descendant:IsA("Decal") or descendant:IsA("Texture")))
         then
             descendant:Destroy()
         end
@@ -178,7 +179,7 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
     end
 
     loaded.Name = "Template_" .. stableId
-    local meshPartCount, basePartCount = sanitize(loaded)
+    local meshPartCount, basePartCount = sanitize(loaded, entry.stripDecals == true)
     local styledParts, unstyledParts =
         applyBuiltInMaterials(loaded, entry.pbr, entry.preserveSourceMaterials)
     -- Cancel the source model's stored rotation BEFORE measuring anything. A
