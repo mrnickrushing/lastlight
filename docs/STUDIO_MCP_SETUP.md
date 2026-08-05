@@ -100,6 +100,41 @@ worse than one that verifies nothing.
 - **Whether the game is fun.** The Milestone 3 decision gate asks whether the
   slice is fun, readable, and shows credible D1 intent. Nothing automates that.
 
+## Restarting a stale Studio from the terminal
+
+A long-lived Studio session drifts behind `main` — one was found running
+code from twenty-one PRs ago, old enough that the file a bug lived in did
+not exist in any of its loaded scripts. A session on the same machine can
+replace it without touching the desktop, as long as the user's display
+session is alive (check `who` for a seat and `ls /tmp/.X11-unix/` for
+sockets):
+
+```bash
+pkill -f "RobloxStudioBeta.exe"
+DISPLAY=:1 XDG_RUNTIME_DIR=/run/user/1000 \
+DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus \
+flatpak run --command=vinegar --file-forwarding org.vinegarhq.Vinegar \
+    @@ /path/to/build/LastLightTest.rbxlx @@
+```
+
+The `@@` markers are Flatpak file-forwarding (they hand the place file
+through the document portal); the invocation comes straight from Vinegar's
+own desktop entry. Run it in the background — Studio takes a couple of
+minutes to boot the place. The MCP bridge (`StudioMCP.exe`) survives the
+kill because it belongs to the session's wrapper, not to Studio; after the
+relaunch, `list_roblox_studios` shows the new instance and
+`set_active_studio` attaches to it. This is how the profession-roster wave
+was live-verified minutes after being written: rebuild with `npm run
+build`, relaunch Studio on the fresh place file, and the world under test
+IS the working tree.
+
+Two cautions. Killing Studio discards anything unsaved in it — fine for a
+throwaway test session, not for one holding real edits; check with the
+owner if there is any doubt about what the open session contains. And
+chat-based admin commands (`TextChannel:SendAsync`) hang under this setup
+— the text-filtering round-trip never resolves in a local Wine session —
+so drive state with the remotes below or DataModel edits instead.
+
 ## Driving gameplay from a session
 
 Clicking through UI via synthesized input is slow and brittle. The reliable

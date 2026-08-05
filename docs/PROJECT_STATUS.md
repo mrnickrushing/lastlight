@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-05, at `main` = `7b43e8d` (PR #204), build `0.53.0`,
-save schema 16, 20 services. Published to Roblox as place version 65,
+Last updated: 2026-08-05, at `main` = `5a595d6` (PR #206), build `0.53.0`,
+save schema 16, 20 services. Published to Roblox as place version 66,
 matching this revision exactly.
 
 ---
@@ -16,7 +16,9 @@ matching this revision exactly.
 ## Where the project is
 
 **Milestone 3 (Bramblewake vertical slice)** is implemented in source; its
-Studio and device exit gates remain pending owner playtest evidence.
+Studio and device exit gates remain pending owner playtest evidence — though
+see #206: the Studio half of that evidence is now genuinely reachable, and
+`[Last Light] PASS FoundationIntegration` has printed for the first time.
 
 **Milestone 4 (persistent town platform)** is actively in flight and most of
 its deliverables have landed. The authoritative checklist is
@@ -25,10 +27,42 @@ there, not a copy here. Note the gate's own caveat: the layout validator only
 guards footprint clearance from source — the gate itself still needs a live
 Studio pathfinding pass.
 
-## Recently landed (PRs ~#151–#204)
+**Milestone 6 (complete systemic foundation) has started.** Its first
+deliverable — all seven professions — landed in #206 with basic kits.
+The natural next wave is the weapon/tool families and crafting depth: today
+`Equipment.luau` holds three items (one weapon) against the roadmap's six
+weapon and eight tool families, and `CraftingCatalog.luau` holds five
+recipes. Loadouts, repair, traits, and the status/reaction system remain
+unstarted.
+
+## Recently landed (PRs ~#151–#206)
 
 Verified against `git log`, newest first:
 
+- **#206** Milestone 6 wave A: **the seven-profession roster is complete.**
+  Alchemist (Sporebright Tonic: radius stamina restore + half-strength
+  mend), Beastkeeper (Briar Hound: the active night threat hunts the keeper
+  for 7s at a 0.8x slow, gated per-enemy so a queued successor never
+  inherits the lure), and Runebinder (Still Rune: 3.5s full hold that
+  cancels a telegraph in flight; the held enemy can still be struck). Each
+  kit maps onto an existing combat primitive, carries three level-10 paths
+  on the established bonus fields, and gets a mastery shrine growing the
+  grove's own columns (with matching FOLIAGE_KEEP_OUT entries). All three
+  abilities live-verified through the real remotes (tonic measured 51→100
+  stamina; hound turned a Hollow Zombie; rune froze a Hollow Crow to 0.35
+  studs of drift with attribute lifecycle on schedule). Also in the PR: a
+  pre-existing crash that flooded the console for the whole Blackout relay
+  stage (TutorialService iterated the snapshot's `deliveredNodes` count as
+  a map — snapshot now carries `deliveredNodeMap`), and **the
+  FoundationIntegration de-rot: eight stale assertions fixed** (three made
+  catalog-derived by the roster growth; five predating it — crafting
+  displays, farm/windmill shells and story landmarks vs. the selective
+  generator, determinism vs. the day-salted seed, and the interaction
+  census 54→70 with a full class-by-class live census recorded beside it).
+  **`[Last Light] PASS FoundationIntegration` printed for the first time in
+  the project's history**, and again on a clean fresh-save boot of the
+  final reviewed code. CodeRabbit's review contributed five real fixes.
+- **#205** Session-handoff refresh through #204.
 - **#204** The departure platform's ready-check was a circle (`RADIUS`
   magnitude) inscribed in the square WorldService actually builds (`RADIUS*2`
   per side), so a player standing in any of the platform's four corners —
