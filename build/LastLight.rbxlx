@@ -48448,9 +48448,12 @@ function HUDController.update(self: HUDController, state: any)
         to her produces a fresh line, which shows it again.
     ]]
     -- The guide line has a speaker now: Mara in town, the traveler's own
-    -- inner voice out in the expedition, where she is not.
-    local maraLine = tostring(state.guideSpeaker or "Mara") .. ": " .. tostring(state.mara or "")
-    if maraLine ~= self._maraText then
+    -- inner voice out in the expedition, where she is not. An empty line
+    -- stays silent even when the speaker changes -- otherwise crossing the
+    -- gate would flash a bare "You:" with nothing after it.
+    local guideText = tostring(state.mara or "")
+    local maraLine = tostring(state.guideSpeaker or "Mara") .. ": " .. guideText
+    if maraLine ~= self._maraText and guideText ~= "" then
         self._maraText = maraLine
         self._maraShownAt = os.clock()
         self._mara.Text = maraLine
