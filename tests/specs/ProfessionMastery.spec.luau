@@ -7,17 +7,54 @@ return {
     name = "ProfessionMastery",
     cases = {
         {
-            name = "publishes twelve unique specialization IDs in stable profession order",
+            name = "publishes twenty-one unique specialization IDs in stable profession order",
             run = function()
                 local ids = ProfessionMastery.specializationIds()
                 local seen = {}
-                TestRunner.equal(#ids, 12)
+                TestRunner.equal(#ids, 21)
                 TestRunner.equal(ids[1], "specialization_pathfinder")
                 TestRunner.equal(ids[12], "specialization_brightcap_herbalist")
+                TestRunner.equal(ids[13], "specialization_brewer")
+                TestRunner.equal(ids[21], "specialization_veilwalker")
                 for _, specializationId in ids do
                     TestRunner.equal(seen[specializationId], nil)
                     seen[specializationId] = true
                 end
+            end,
+        },
+        {
+            name = "the roster is the full seven professions, each with a complete kit",
+            run = function()
+                local ProfessionCatalog = require("../../src/shared/ProfessionCatalog")
+                local professions = ProfessionCatalog.list()
+                TestRunner.equal(#professions, 7)
+                local seenAbilities = {}
+                for _, definition in professions do
+                    TestRunner.truthy(#definition.abilityName > 0)
+                    TestRunner.truthy(#definition.abilityDescription > 0)
+                    TestRunner.truthy(definition.cooldownSeconds >= 1)
+                    TestRunner.equal(seenAbilities[definition.abilityId], nil)
+                    seenAbilities[definition.abilityId] = true
+                end
+                TestRunner.equal(ProfessionCatalog.Ids.Alchemist, "profession_alchemist")
+                TestRunner.equal(ProfessionCatalog.Ids.Beastkeeper, "profession_beastkeeper")
+                TestRunner.equal(ProfessionCatalog.Ids.Runebinder, "profession_runebinder")
+            end,
+        },
+        {
+            name = "each new profession carries exactly three selectable paths",
+            run = function()
+                local counts = {}
+                for _, specializationId in ProfessionMastery.specializationIds() do
+                    local professionId =
+                        ProfessionMastery.specializationProfession(specializationId)
+                    counts[professionId] = (counts[professionId] or 0) + 1
+                    local definition = ProfessionMastery.specializationDefinition(specializationId)
+                    TestRunner.truthy(#definition.description > 0)
+                end
+                TestRunner.equal(counts.profession_alchemist, 3)
+                TestRunner.equal(counts.profession_beastkeeper, 3)
+                TestRunner.equal(counts.profession_runebinder, 3)
             end,
         },
         {

@@ -25,6 +25,7 @@ export type ProfessionService = typeof(setmetatable(
         _analyticsService: any,
         _states: { [Player]: any },
         _enemyService: any,
+        _combatService: any,
         _switchProvider: ((Player) -> (boolean, string?))?,
         _onChanged: ((Player, string?) -> ())?,
     },
@@ -57,6 +58,7 @@ function ProfessionService.new(
         _analyticsService = analyticsService,
         _states = {},
         _enemyService = nil,
+        _combatService = nil,
         _switchProvider = nil,
         _onChanged = nil,
     }, ProfessionService)
@@ -83,6 +85,14 @@ end
 
 function ProfessionService.setEnemyService(self: ProfessionService, enemyService: any)
     self._enemyService = enemyService
+end
+
+-- Late-bound like the enemy service: the combat service exists before this
+-- one in the bootstrap, but taking it here rather than in the constructor
+-- keeps the constructor signature stable and mirrors how every other
+-- cross-service edge in this file is wired.
+function ProfessionService.setCombatService(self: ProfessionService, combatService: any)
+    self._combatService = combatService
 end
 
 function ProfessionService.setSwitchProvider(
@@ -296,6 +306,47 @@ function ProfessionService.selectSpecialization(
     }
 end
 
+--[[
+    Every ally the tonic can reach, by the same measure the pour will use.
+
+    Counted from the caster's root the way canHealInRadius counts, so the
+    preflight and the application cannot disagree about who is close enough.
+    Includes the caster: an Alchemist alone at low stamina is a valid pour.
+]]
+function ProfessionService._staminaNeedInRadius(
+    self: ProfessionService,
+    player: Player,
+    radius: number
+): { Player }
+    local needing = {}
+    local combatService = self._combatService
+    local character = player.Character
+    local sourceRoot = if character == nil
+        then nil
+        else character:FindFirstChild("HumanoidRootPart")
+    if combatService == nil or sourceRoot == nil or not sourceRoot:IsA("BasePart") then
+        return needing
+    end
+    for _, other in Players:GetPlayers() do
+        local otherCharacter = other.Character
+        local otherRoot = if otherCharacter == nil
+            then nil
+            else otherCharacter:FindFirstChild("HumanoidRootPart")
+        if
+            otherRoot ~= nil
+            and otherRoot:IsA("BasePart")
+            and self._survivalService:canAct(other)
+            and (otherRoot.Position - sourceRoot.Position).Magnitude <= radius
+        then
+            local snapshot = combatService:snapshot(other)
+            if snapshot ~= nil and snapshot.stamina < snapshot.maxStamina then
+                table.insert(needing, other)
+            end
+        end
+    end
+    return needing
+end
+
 function ProfessionService._abilityPreflight(
     self: ProfessionService,
     player: Player,
@@ -321,6 +372,25 @@ function ProfessionService._abilityPreflight(
         return enemyService:canRepairLantern(player, effectRadius)
     elseif definition.id == self._catalog.Ids.Medic then
         return self._survivalService:canHealInRadius(player, effectRadius)
+    elseif definition.id == self._catalog.Ids.Alchemist then
+        -- The tonic serves either need. Refusing only when nobody in reach
+        -- wants health OR stamina keeps the no-op-cast protection the other
+        -- kits have without making the brew fussier than the pulse.
+        local canHeal = self._survivalService:canHealInRadius(player, effectRadius)
+        if canHeal or #self:_staminaNeedInRadius(player, effectRadius) > 0 then
+            return true, "SPOREBRIGHT TONIC READY"
+        end
+        return false, "EVERYONE IN REACH IS ALREADY HALE"
+    elseif definition.id == self._catalog.Ids.Beastkeeper then
+        if enemyService == nil then
+            return false, "YOUR HOUND IS STILL WAKING"
+        end
+        return enemyService:canLureThreat(player, effectRadius)
+    elseif definition.id == self._catalog.Ids.Runebinder then
+        if enemyService == nil then
+            return false, "THE RUNES ARE STILL SETTLING"
+        end
+        return enemyService:canStillThreat(player, effectRadius)
     end
     return true, "LANTERN GUARD READY"
 end
@@ -335,6 +405,8 @@ function ProfessionService._applyAbility(
     local effectRadius = definition.effectRadius + tuning.effectRadiusBonus
     local activeSeconds = if definition.id == self._catalog.Ids.Scout
             or definition.id == self._catalog.Ids.Warden
+            or definition.id == self._catalog.Ids.Beastkeeper
+            or definition.id == self._catalog.Ids.Runebinder
         then definition.activeSeconds + tuning.activeSecondsBonus
         else definition.activeSeconds
     if definition.id == self._catalog.Ids.Scout then
@@ -344,6 +416,32 @@ function ProfessionService._applyAbility(
         return "LANTERN GUARD ACTIVE — ENEMY DAMAGE REDUCED", 1
     elseif definition.id == self._catalog.Ids.Engineer then
         local _, message = self._enemyService:repairLantern(player, effectRadius, effectAmount)
+        return message, 1
+    elseif definition.id == self._catalog.Ids.Alchemist then
+        -- One effectAmount, two effects: the full number is stamina, half of
+        -- it is the mend, so the Brewer specialization deepens both at once
+        -- and neither half competes with the Medic's dedicated heal.
+        local healResult =
+            self._survivalService:healInRadius(player, math.floor(effectAmount / 2), effectRadius)
+        local restored = 0
+        for _, other in self:_staminaNeedInRadius(player, effectRadius) do
+            local result = self._combatService:restoreStamina(other, effectAmount)
+            if result.applied then
+                restored += 1
+            end
+        end
+        local affected = math.max(healResult.affected, restored)
+        return string.format(
+            "SPOREBRIGHT TONIC — %d TRAVELER%s RESTORED",
+            affected,
+            if affected == 1 then "" else "S"
+        ),
+            affected
+    elseif definition.id == self._catalog.Ids.Beastkeeper then
+        local _, message = self._enemyService:lureThreat(player, effectRadius, activeSeconds)
+        return message, 1
+    elseif definition.id == self._catalog.Ids.Runebinder then
+        local _, message = self._enemyService:stillThreat(player, effectRadius, activeSeconds)
         return message, 1
     end
 
@@ -413,6 +511,8 @@ function ProfessionService.useAbility(self: ProfessionService, player: Player): 
     local cooldownSeconds = math.max(1, definition.cooldownSeconds - tuning.cooldownReduction)
     local activeSeconds = if definition.id == self._catalog.Ids.Scout
             or definition.id == self._catalog.Ids.Warden
+            or definition.id == self._catalog.Ids.Beastkeeper
+            or definition.id == self._catalog.Ids.Runebinder
         then definition.activeSeconds + tuning.activeSecondsBonus
         else definition.activeSeconds
     local nextState =

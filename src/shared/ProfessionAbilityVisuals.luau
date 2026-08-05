@@ -44,6 +44,30 @@ local DEFINITIONS: { [string]: Definition } = {
         pulseLifetime = 1.4,
         minimumRadius = 10,
     }),
+    profession_alchemist = table.freeze({
+        professionId = "profession_alchemist",
+        motif = "tonic_bloom",
+        color = table.freeze({ 154, 187, 92 }),
+        accent = table.freeze({ 226, 247, 180 }),
+        pulseLifetime = 1.3,
+        minimumRadius = 10,
+    }),
+    profession_beastkeeper = table.freeze({
+        professionId = "profession_beastkeeper",
+        motif = "hound_dash",
+        color = table.freeze({ 196, 120, 60 }),
+        accent = table.freeze({ 246, 214, 165 }),
+        pulseLifetime = 1.2,
+        minimumRadius = 9,
+    }),
+    profession_runebinder = table.freeze({
+        professionId = "profession_runebinder",
+        motif = "still_rune",
+        color = table.freeze({ 132, 150, 224 }),
+        accent = table.freeze({ 214, 226, 255 }),
+        pulseLifetime = 1.5,
+        minimumRadius = 9,
+    }),
 }
 
 function ProfessionAbilityVisuals.get(professionId: any): Definition?

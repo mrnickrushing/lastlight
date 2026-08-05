@@ -135,6 +135,66 @@ local SPECIALIZATIONS: { [string]: { Specialization } } = table.freeze({
             effectRadiusBonus = 10,
         }),
     }),
+    profession_alchemist = table.freeze({
+        specialization({
+            id = "specialization_brewer",
+            name = "BREWER",
+            description = "Sporebright Tonic restores 8 more stamina and mends deeper.",
+            effectAmountBonus = 8,
+        }),
+        specialization({
+            id = "specialization_catalyst",
+            name = "CATALYST",
+            description = "Sporebright Tonic recharges 4 seconds faster.",
+            cooldownReduction = 4,
+        }),
+        specialization({
+            id = "specialization_forager",
+            name = "FORAGER",
+            description = "Sporebright Tonic reaches 8 studs farther.",
+            effectRadiusBonus = 8,
+        }),
+    }),
+    profession_beastkeeper = table.freeze({
+        specialization({
+            id = "specialization_handler",
+            name = "HANDLER",
+            description = "Briar Hound harries the threat 2.5 seconds longer.",
+            activeSecondsBonus = 2.5,
+        }),
+        specialization({
+            id = "specialization_bondkeeper",
+            name = "BONDKEEPER",
+            description = "Briar Hound can be sent 10 studs farther.",
+            effectRadiusBonus = 10,
+        }),
+        specialization({
+            id = "specialization_wildspeaker",
+            name = "WILDSPEAKER",
+            description = "Briar Hound recharges 4 seconds faster.",
+            cooldownReduction = 4,
+        }),
+    }),
+    profession_runebinder = table.freeze({
+        specialization({
+            id = "specialization_scribe",
+            name = "SCRIBE",
+            description = "Still Rune holds the threat 1.25 seconds longer.",
+            activeSecondsBonus = 1.25,
+        }),
+        specialization({
+            id = "specialization_channeler",
+            name = "CHANNELER",
+            description = "Still Rune can be cast 10 studs farther.",
+            effectRadiusBonus = 10,
+        }),
+        specialization({
+            id = "specialization_veilwalker",
+            name = "VEILWALKER",
+            description = "Still Rune recharges 5 seconds faster.",
+            cooldownReduction = 5,
+        }),
+    }),
 })
 
 local SPECIALIZATION_PROFESSIONS: { [string]: string } = {}

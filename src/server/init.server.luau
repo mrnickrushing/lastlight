@@ -189,6 +189,7 @@ local enemyService = EnemyService.new(
     analyticsService
 )
 professionService:setEnemyService(enemyService)
+professionService:setCombatService(combatService)
 expeditionService:bindEnemyService(enemyService)
 enemyService:setProfessionService(professionService)
 local oldGrowthService = OldGrowthService.new(

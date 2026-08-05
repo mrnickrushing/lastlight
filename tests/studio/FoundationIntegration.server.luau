@@ -15,6 +15,7 @@ local MusicCatalog = require(root.MusicCatalog)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
 local BramblewakeEnemies = require(root.BramblewakeEnemies)
 local CombatState = require(root.CombatState)
+local CraftingCatalog = require(root.CraftingCatalog)
 local EnemyAttackFlow = require(root.EnemyAttackFlow)
 local EnemyCombatRules = require(root.EnemyCombatRules)
 local EngineerBrace = require(root.EngineerBrace)
@@ -55,7 +56,11 @@ assert(
         > MusicCatalog.resolve("region_bramblewake", "day", false).intensity,
     "Bramblewake night music must be scarier than its day music"
 )
-assert(#ProfessionAbilityVisuals.list() == 4, "profession ability visual catalog is incomplete")
+assert(
+    #ProfessionAbilityVisuals.list() == #ProfessionCatalog.list(),
+    "profession ability visual catalog is incomplete"
+)
+assert(#ProfessionCatalog.list() == 7, "the roster is the full seven professions")
 local studioBrace = EngineerBrace.deploy(EngineerBrace.default(), 10, 12, 14, 42)
 local studioBraceAfterHit, studioBraceHit = EngineerBrace.absorb(studioBrace, 9, 11)
 assert(
@@ -160,7 +165,7 @@ assert(
     "profession specialization action ID changed"
 )
 assert(
-    #RuntimeIds.ProfessionSpecializationInteractionIds == 12,
+    #RuntimeIds.ProfessionSpecializationInteractionIds == #ProfessionCatalog.list() * 3,
     "profession specialization interaction catalog is incomplete"
 )
 assert(
@@ -736,7 +741,10 @@ assert(entryPaths == 2, "each cabin needs one visible path to the square")
 assert(districtRoads == 5, "every outlying town district needs a road from the main street")
 assert(squareEdgeStones == 12, "town square edging must preserve four circulation gates")
 assert(workshopFloors == 2, "town needs two separated workshop bays")
-assert(masteryDaises == 4, "all four mastery clearings must remain available")
+assert(
+    masteryDaises == #ProfessionCatalog.list(),
+    "every profession needs its mastery clearing available"
+)
 local archiveBoard = world:FindFirstChild("GreenwardArchive", true)
 local greenwardGround = world:FindFirstChild("GreenwardGround", true)
 assert(
@@ -782,7 +790,16 @@ for _, descendant in world:GetDescendants() do
     end
 end
 assert(toolDisplays == 3, "all three starter tools need physical displays")
-assert(craftingDisplays == 4, "all four starter recipes need physical displays")
+--[[
+    Derived, not a literal: this line sat unreachable behind two earlier
+    failures long enough for the Thornwood Bow bench to make it stale -- the
+    world builds one display per catalog recipe, and the literal still said
+    four when the catalog had grown to five.
+]]
+assert(
+    craftingDisplays == #CraftingCatalog.list(),
+    "every starter recipe needs its physical display"
+)
 local toolYard = world:FindFirstChild("StarterToolYard", true)
 assert(toolYard ~= nil and toolYard:IsA("Model"), "starter tools need one readable work yard")
 --[[
@@ -1001,18 +1018,37 @@ assert(
 local expedition = world:FindFirstChild("BramblewakeExpedition")
 assert(expedition ~= nil and expedition:IsA("Model"), "Bramblewake expedition is missing")
 assert(expedition:GetAttribute("Ready") == true, "Bramblewake expedition is not ready")
-assert(
-    expedition:FindFirstChild("ProceduralCrookedFarmhouseShell", true) ~= nil,
-    "Crooked Farm needs its collision-safe procedural shell"
-)
-assert(
-    expedition:FindFirstChild("ProceduralFoxfireMillTowerShell", true) ~= nil,
-    "Foxfire Mill needs its collision-safe procedural shell"
-)
-assert(
-    expedition:FindFirstChild("WindmillRotor", true) ~= nil,
-    "Foxfire Mill must retain its independently animated rotor"
-)
+--[[
+    Conditional since the generator started SELECTING twelve modules from a
+    thirty-module pool: the farm and the windmill are catalog content, not
+    guaranteed manifest content, so their shells are asserted only when this
+    run's manifest actually placed them. Unconditional, these failed on any
+    day-salted seed whose selection skipped either module -- which is most
+    of them.
+]]
+local placedModuleIds = {}
+for _, moduleModel in CollectionService:GetTagged(RuntimeIds.ExpeditionModuleTag) do
+    local contentId = moduleModel:GetAttribute("ContentId")
+    if type(contentId) == "string" then
+        placedModuleIds[contentId] = true
+    end
+end
+if placedModuleIds.module_bw_hollow_farm then
+    assert(
+        expedition:FindFirstChild("ProceduralCrookedFarmhouseShell", true) ~= nil,
+        "Crooked Farm needs its collision-safe procedural shell"
+    )
+end
+if placedModuleIds.module_bw_windmill_copse then
+    assert(
+        expedition:FindFirstChild("ProceduralFoxfireMillTowerShell", true) ~= nil,
+        "Foxfire Mill needs its collision-safe procedural shell"
+    )
+    assert(
+        expedition:FindFirstChild("WindmillRotor", true) ~= nil,
+        "Foxfire Mill must retain its independently animated rotor"
+    )
+end
 --[[
     These deadlines are patience, not tolerance: what the assertions below
     accept is unchanged, they simply wait longer before giving up. Twelve
@@ -1331,7 +1367,10 @@ assert(
 local expectedStoryLandmarks = 0
 local expectedStoryLandmarkParts = 0
 for _, definition in BramblewakeExpedition.Modules do
-    if definition.storyLandmark ~= nil then
+    -- Scoped to the modules this run actually placed: the generator selects
+    -- twelve from a thirty-module pool, so a catalog-wide expectation counts
+    -- landmarks belonging to modules that are not in the world at all.
+    if definition.storyLandmark ~= nil and placedModuleIds[definition.id] then
         expectedStoryLandmarks += 1
         expectedStoryLandmarkParts += definition.storyPartCount
     end
@@ -1346,7 +1385,15 @@ assert(
 )
 assert(expedition:GetAttribute("BossArenaReady") == true, "Warden Stag arena is not ready")
 assert(expedition:GetAttribute("BlackoutLayerReady") == true, "Blackout layer is not ready")
-local expectedManifest = ExpeditionGenerator.generate(Config.BramblewakePreviewSeed)
+--[[
+    Replayed from the seed the world actually built with, not the preview
+    constant: the boot seed has been day-salted since the generator went
+    selective, so the preview seed only matches the built world on the one
+    day whose salt happens to be zero. The determinism claim is unchanged --
+    the same seed must reproduce the same manifest -- it is just asserted
+    against the seed that was really used.
+]]
+local expectedManifest = ExpeditionGenerator.generate(expedition:GetAttribute("Seed"))
 assert(
     expedition:GetAttribute("ManifestHash") == expectedManifest.hash,
     "Bramblewake manifest does not replay deterministically"
@@ -1459,21 +1506,30 @@ assert(wardenLivingRoots == 12, "Warden nodes need three living roots each")
           Blackout relays, three Greenward chapter choices
 
     The literal was 44, drifted to 53 when the per-module resource nodes
-    reached full count, and became 54 with the Thornwood Bow bench. The two
-    derived terms beside it stay derived: event interactions come from the
-    catalog and specializations from RuntimeIds, so only genuinely new fixtures
-    move this number, and moving it should be a deliberate edit.
+    reached full count, became 54 with the Thornwood Bow bench, and is 70 as
+    of the seven-profession roster: the M4/M5 waves added the eight
+    decoration slots and shifted the rest of the census while this line sat
+    unreachable behind earlier failures. The full 70, counted live from a
+    fresh-save boot so the next drift can be diagnosed line by line:
+    barricade 1, blackout 7, bramblewake reveal+wayhome 2, construction 2
+    (only stage>0 buildings carry a prompt on a fresh save), crafting
+    benches 5, decorations 8, first lantern 1, heartwood 1, mara 1, memory
+    fragments 8, resource nodes 22, old growth 2, quest board 1, starter
+    tools 3, warden stag 6. The two derived terms beside it stay derived:
+    event interactions come from the catalog and specializations from
+    RuntimeIds, so only genuinely new fixtures move this number, and moving
+    it should be a deliberate edit.
 ]]
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
     #tagged
-        == 54
+        == 70
             + BramblewakeExpedition.EventInteractionCount
             + #RuntimeIds.ProfessionSpecializationInteractionIds,
     string.format(
-        "expected tutorial, event, elite, boss, extraction, crafting, and mastery prompts (found %d, expected %d)",
+        "expected tutorial, event, elite, boss, extraction, crafting, decoration, and mastery prompts (found %d, expected %d)",
         #tagged,
-        54
+        70
             + BramblewakeExpedition.EventInteractionCount
             + #RuntimeIds.ProfessionSpecializationInteractionIds
     )

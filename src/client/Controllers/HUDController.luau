@@ -1063,10 +1063,13 @@ function HUDController.new(
     professionGrid.Size = UDim2.new(1, -40, 1, -130)
     professionGrid.ZIndex = 42
     professionGrid.Parent = professionPanel
+    -- Three columns, not the original two-by-two: the roster is seven kits
+    -- now, and 3 x 3 keeps every card on one page of the same panel rather
+    -- than growing the panel taller than a landscape phone viewport.
     local grid = Instance.new("UIGridLayout")
-    grid.CellPadding = UDim2.fromOffset(12, 12)
-    grid.CellSize = UDim2.new(0.5, -6, 0.5, -6)
-    grid.FillDirectionMaxCells = 2
+    grid.CellPadding = UDim2.fromOffset(10, 10)
+    grid.CellSize = UDim2.new(1 / 3, -7, 1 / 3, -7)
+    grid.FillDirectionMaxCells = 3
     grid.SortOrder = Enum.SortOrder.LayoutOrder
     grid.Parent = professionGrid
 
@@ -1088,7 +1091,9 @@ function HUDController.new(
             tostring(definition.abilityDescription)
         )
         card.TextColor3 = COLORS.cream
-        card.TextSize = 14
+        -- 12, not 14: seven cards share the panel three abreast now, and the
+        -- four-line card text has to wrap inside a third of the width.
+        card.TextSize = 12
         card.TextWrapped = true
         card.TextYAlignment = Enum.TextYAlignment.Center
         card.Selectable = true
