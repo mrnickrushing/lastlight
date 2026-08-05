@@ -9,6 +9,7 @@ local MemoryFragments = require("./MemoryFragments")
 local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
+local GearWear = require("./GearWear")
 local ResidentLife = require("./ResidentLife")
 local TownDecorations = require("./TownDecorations")
 local TownProgression = require("./TownProgression")
@@ -32,6 +33,7 @@ export type Profile = {
     tutorial: Tutorial,
     inventory: any,
     loadouts: { any },
+    gearWear: { [string]: number },
     profession: {
         selectedId: string?,
         mastery: ProfessionMastery.State,
@@ -76,7 +78,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 17,
+        schemaVersion = 18,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -88,6 +90,7 @@ function SaveSchema.default(now: number): Profile
         },
         inventory = ExpeditionInventory.default(),
         loadouts = {},
+        gearWear = {},
         profession = {
             selectedId = nil,
             mastery = ProfessionMastery.default(),
@@ -158,6 +161,10 @@ function SaveSchema.normalize(value: any, now: number): Profile
             end
         end
     end
+
+    -- Schema 18: equipment wear. Absent on any pre-18 save (nothing had
+    -- dulled yet); junk and retired items are stripped by GearWear itself.
+    profile.gearWear = GearWear.normalize(value.gearWear)
 
     local tutorial = value.tutorial
     if type(tutorial) == "table" then
@@ -294,7 +301,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 17
+    profile.schemaVersion = 18
     return profile
 end
 
@@ -949,6 +956,33 @@ function SaveSchema.loadoutAt(profile: Profile, slot: any): any
     end
     local loadouts = (profile :: any).loadouts
     return if type(loadouts) == "table" then loadouts[slot] else nil
+end
+
+function SaveSchema.withGearWear(profile: Profile, itemId: any, points: number): (Profile, any)
+    local nextWear, result = GearWear.accrue((profile :: any).gearWear or {}, itemId, points)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile: any = table.clone(profile)
+    nextProfile.gearWear = nextWear
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.withRepairedGear(profile: Profile, itemId: any, now: number): (Profile, any)
+    local materials = (profile :: any).inventory.materials or {}
+    local nextWear, nextMaterials, result =
+        GearWear.repair((profile :: any).gearWear or {}, materials, itemId)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile: any = table.clone(profile)
+    nextProfile.gearWear = nextWear
+    nextProfile.inventory = table.clone((profile :: any).inventory)
+    nextProfile.inventory.materials = nextMaterials
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
 end
 
 return table.freeze(SaveSchema)

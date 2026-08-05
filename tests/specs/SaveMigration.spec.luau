@@ -241,6 +241,26 @@ local ERA_PROFILES: { [number]: any } = {
     -- Schema 16 shipped decorations; 17 adds saved loadouts. A 16-era save
     -- carries decorations and gear that must survive, and must arrive in 17
     -- with no kits saved -- the slots did not exist.
+    -- Schema 17 shipped loadouts; 18 adds equipment wear. A 17-era save
+    -- carries kits that must survive, and must arrive in 18 with nothing
+    -- worn -- no blade had dulled yet.
+    [17] = {
+        schemaVersion = 17,
+        createdAt = 22,
+        updatedAt = 70,
+        revision = 101,
+        tutorial = { stage = "complete", complete = true, selectedTool = "sickle" },
+        profession = { selectedId = "profession_beastkeeper" },
+        gear = { gear_warden_cudgel = 1 },
+        equipped = { weapon = "gear_warden_cudgel" },
+        loadouts = {
+            {
+                professionId = "profession_beastkeeper",
+                weaponItemId = "gear_warden_cudgel",
+                toolId = "sickle",
+            },
+        },
+    },
     [16] = {
         schemaVersion = 16,
         createdAt = 20,
@@ -312,6 +332,7 @@ local REQUIRED_FIELDS: { string } = {
     "gear",
     "equipped",
     "loadouts",
+    "gearWear",
     "quests",
 }
 

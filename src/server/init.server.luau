@@ -46,6 +46,7 @@ local TownGuardLastStand = require(root.TownGuardLastStand)
 local LobbyDeparture = require(root.LobbyDeparture)
 local ActionProgress = require(root.ActionProgress)
 local ToolCatalog = require(root.ToolCatalog)
+local GearWear = require(root.GearWear)
 local ActionPayloadContract = require(root.ActionPayloadContract)
 local AdminInspectionReport = require(root.AdminInspectionReport)
 local PerformanceBudget = require(root.PerformanceBudget)
@@ -329,7 +330,8 @@ local tutorialService = TutorialService.new(
     Equipment,
     ResidentDialogue,
     ActionProgress,
-    ToolCatalog
+    ToolCatalog,
+    GearWear
 )
 
 local services = ServiceRegistry.new({

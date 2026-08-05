@@ -84,6 +84,7 @@ local RuntimeIds = {
         EquipGear = "equip_gear",
         LobbyDepart = "lobby_depart",
         SaveLoadout = "save_loadout",
+        RepairGear = "repair_gear",
         ApplyLoadout = "apply_loadout",
         GatherResource = "gather_resource",
         OpenFieldBook = "open_field_book",

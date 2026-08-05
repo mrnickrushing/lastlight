@@ -64,7 +64,7 @@ function ActionPayloadContract.extraField(runtimeIds: any, kind: string): string
         return "interactionId"
     elseif kind == actions.SelectProfession then
         return "professionId"
-    elseif kind == actions.UseGear or kind == actions.EquipGear then
+    elseif kind == actions.UseGear or kind == actions.EquipGear or kind == actions.RepairGear then
         return "itemId"
     elseif kind == actions.Sprint or kind == actions.CompactHud then
         return "enabled"
