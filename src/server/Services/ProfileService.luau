@@ -390,6 +390,44 @@ function ProfileService.setTutorial(
     return true
 end
 
+function ProfileService.accrueGearWear(self: ProfileService, player: Player, itemId: any): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { applied = false }
+    end
+    local nextProfile, result = self._saveSchema.withGearWear(profile, itemId, 2)
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent and self._writable[player] == true then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
+function ProfileService.repairGear(self: ProfileService, player: Player, itemId: any): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { applied = false, reason = "profile_loading" }
+    end
+    if not self:isWritable(player) then
+        return { applied = false, reason = "profile_read_only" }
+    end
+    local nextProfile, result = self._saveSchema.withRepairedGear(profile, itemId, os.time())
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent and self._writable[player] == true then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
+function ProfileService.gearWearOf(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    return if profile ~= nil then (profile :: any).gearWear or {} else {}
+end
+
 function ProfileService.saveLoadout(self: ProfileService, player: Player, slot: number): any
     local profile = self._profiles[player]
     if profile == nil then

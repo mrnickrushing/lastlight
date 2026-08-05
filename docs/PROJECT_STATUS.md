@@ -8,7 +8,7 @@ hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
 Last updated: 2026-08-05, at `main` = `9317535` (PR #216), build `0.53.0`,
-save schema 17, 20 services. Published to Roblox as place version 71,
+save schema 18, 20 services. Published to Roblox as place version 71,
 matching this revision exactly. #216 added loadouts (schema 16 → 17,
 era-16 fixture): three saved kits binding profession, weapon, and tool,
 applied through the same gates manual taps hit. **The owner's standing

@@ -763,7 +763,7 @@ function ActionPayloadContract.extraField(runtimeIds: any, kind: string): string
         return "interactionId"
     elseif kind == actions.SelectProfession then
         return "professionId"
-    elseif kind == actions.UseGear or kind == actions.EquipGear then
+    elseif kind == actions.UseGear or kind == actions.EquipGear or kind == actions.RepairGear then
         return "itemId"
     elseif kind == actions.Sprint or kind == actions.CompactHud then
         return "enabled"
@@ -2489,7 +2489,7 @@ return table.freeze({
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 17,
+    SaveSchemaVersion = 18,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -7069,6 +7069,153 @@ return table.freeze(GearVisualPlan)
       </Item>
       <Item class="ModuleScript" referent="35">
         <Properties>
+          <string name="Name">GearWear</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    Equipment wear and repair -- the M6 "repair" deliverable, scoped to
+    weapons first: a blade dulls as it lands blows, and whetting it costs
+    half its own recipe. Wear is friendly by design: a worn weapon works at
+    half strength and a failing one stops helping, but nothing is ever
+    destroyed or unequipped -- the player is nudged to the bench, not
+    punished with loss.
+
+    Pure state math over { [itemId]: wearPoints 0..100 }; the profile owns
+    persistence and the server owns when wear accrues. A client never
+    submits wear.
+]]
+
+local CraftingCatalog = require("./CraftingCatalog")
+
+local GearWear = {}
+
+local MAX_WEAR = 100
+local WORN_AT = 60
+
+export type Wear = { [string]: number }
+
+function GearWear.default(): Wear
+    return {}
+end
+
+function GearWear.normalize(value: any): Wear
+    local wear: Wear = {}
+    if type(value) ~= "table" then
+        return wear
+    end
+    for itemId, points in value do
+        if
+            CraftingCatalog.isKnownOutputItem(itemId)
+            and type(points) == "number"
+            and points > 0
+        then
+            wear[itemId] = math.clamp(math.floor(points), 0, MAX_WEAR)
+        end
+    end
+    return wear
+end
+
+function GearWear.accrue(wear: Wear, itemId: any, points: number): (Wear, any)
+    if not CraftingCatalog.isKnownOutputItem(itemId) then
+        return wear, { applied = false, reason = "unknown_item" }
+    end
+    if type(points) ~= "number" or points <= 0 then
+        return wear, { applied = false, reason = "invalid_points" }
+    end
+    local nextWear = table.clone(wear)
+    local before = nextWear[itemId] or 0
+    local after = math.clamp(before + math.floor(points), 0, MAX_WEAR)
+    nextWear[itemId] = after
+    return nextWear,
+        {
+            applied = after ~= before,
+            points = after,
+            conditionBefore = GearWear.condition(wear, itemId),
+            conditionAfter = GearWear.conditionForPoints(after),
+        }
+end
+
+function GearWear.conditionForPoints(points: number): string
+    if points >= MAX_WEAR then
+        return "failing"
+    elseif points >= WORN_AT then
+        return "worn"
+    end
+    return "sound"
+end
+
+function GearWear.condition(wear: Wear, itemId: any): string
+    return GearWear.conditionForPoints(if type(itemId) == "string" then wear[itemId] or 0 else 0)
+end
+
+-- What remains of the item's identity at its current wear: full, half, or
+-- nothing. Consumers multiply their own stat by this rather than knowing
+-- the thresholds.
+function GearWear.effectiveness(wear: Wear, itemId: any): number
+    local condition = GearWear.condition(wear, itemId)
+    if condition == "failing" then
+        return 0
+    elseif condition == "worn" then
+        return 0.5
+    end
+    return 1
+end
+
+-- Half the item's own recipe, rounded up per material: repair always costs
+-- something, and always costs less than crafting anew.
+function GearWear.repairCost(itemId: any): { [string]: number }?
+    if type(itemId) ~= "string" then
+        return nil
+    end
+    for _, recipe in CraftingCatalog.list() do
+        if recipe.outputItemId == itemId then
+            local cost: { [string]: number } = {}
+            for materialId, amount in recipe.materials do
+                cost[materialId] = math.max(1, math.ceil(amount / 2))
+            end
+            return cost
+        end
+    end
+    return nil
+end
+
+function GearWear.repair(
+    wear: Wear,
+    materials: { [string]: number },
+    itemId: any
+): (Wear, { [string]: number }, any)
+    local cost = GearWear.repairCost(itemId)
+    if cost == nil then
+        return wear, materials, { applied = false, reason = "unknown_item" }
+    end
+    if (wear[itemId] or 0) <= 0 then
+        return wear, materials, { applied = false, reason = "not_worn" }
+    end
+    for materialId, amount in cost do
+        if (materials[materialId] or 0) < amount then
+            return wear, materials, { applied = false, reason = "insufficient_materials" }
+        end
+    end
+    local nextWear = table.clone(wear)
+    nextWear[itemId] = nil
+    local nextMaterials = table.clone(materials)
+    for materialId, amount in cost do
+        nextMaterials[materialId] -= amount
+    end
+    return nextWear, nextMaterials, { applied = true, cost = cost }
+end
+
+GearWear.Constants = table.freeze({
+    MaxWear = MAX_WEAR,
+    WornAt = WORN_AT,
+})
+
+return table.freeze(GearWear)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="36">
+        <Properties>
           <string name="Name">LobbyDeparture</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -7243,7 +7390,7 @@ return table.freeze(LobbyDeparture)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">MemoryFragments</string>
           <string name="Source"><![CDATA[--!strict
@@ -7556,7 +7703,7 @@ return table.freeze(MemoryFragments)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">MusicCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -7917,7 +8064,7 @@ return table.freeze(MusicCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">NightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -7965,7 +8112,7 @@ return table.freeze(NightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">OldGrowthEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -8250,7 +8397,7 @@ return table.freeze(OldGrowthEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">PerformanceBudget</string>
           <string name="Source"><![CDATA[--!strict
@@ -8639,7 +8786,7 @@ return table.freeze(PerformanceBudget)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">ProfessionAbilityVisuals</string>
           <string name="Source"><![CDATA[--!strict
@@ -8733,7 +8880,7 @@ return table.freeze(ProfessionAbilityVisuals)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">ProfessionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -8899,7 +9046,7 @@ return table.freeze(ProfessionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">ProfessionMastery</string>
           <string name="Source"><![CDATA[--!strict
@@ -9340,7 +9487,7 @@ return table.freeze(ProfessionMastery)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">ProfessionRescue</string>
           <string name="Source"><![CDATA[--!strict
@@ -9419,7 +9566,7 @@ return table.freeze(ProfessionRescue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">ProfessionState</string>
           <string name="Source"><![CDATA[--!strict
@@ -9586,7 +9733,7 @@ return table.freeze(ProfessionState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">ProfileBackup</string>
           <string name="Source"><![CDATA[--!strict
@@ -9900,7 +10047,7 @@ return table.freeze(ProfileBackup)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">ProfilePersistence</string>
           <string name="Source"><![CDATA[--!strict
@@ -10074,7 +10221,7 @@ return table.freeze(ProfilePersistence)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">QuestCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -10145,7 +10292,7 @@ return table.freeze(QuestCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">Quests</string>
           <string name="Source"><![CDATA[--!strict
@@ -10262,7 +10409,7 @@ return table.freeze(Quests)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
@@ -10321,7 +10468,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
@@ -10438,7 +10585,7 @@ return table.freeze(ResidentDialogue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">ResidentLife</string>
           <string name="Source"><![CDATA[--!strict
@@ -10775,7 +10922,7 @@ return table.freeze(ResidentLife)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -10890,7 +11037,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -11019,7 +11166,7 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -11108,6 +11255,7 @@ local RuntimeIds = {
         EquipGear = "equip_gear",
         LobbyDepart = "lobby_depart",
         SaveLoadout = "save_loadout",
+        RepairGear = "repair_gear",
         ApplyLoadout = "apply_loadout",
         GatherResource = "gather_resource",
         OpenFieldBook = "open_field_book",
@@ -11178,7 +11326,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -11192,6 +11340,7 @@ local MemoryFragments = require("./MemoryFragments")
 local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
+local GearWear = require("./GearWear")
 local ResidentLife = require("./ResidentLife")
 local TownDecorations = require("./TownDecorations")
 local TownProgression = require("./TownProgression")
@@ -11215,6 +11364,7 @@ export type Profile = {
     tutorial: Tutorial,
     inventory: any,
     loadouts: { any },
+    gearWear: { [string]: number },
     profession: {
         selectedId: string?,
         mastery: ProfessionMastery.State,
@@ -11259,7 +11409,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 17,
+        schemaVersion = 18,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -11271,6 +11421,7 @@ function SaveSchema.default(now: number): Profile
         },
         inventory = ExpeditionInventory.default(),
         loadouts = {},
+        gearWear = {},
         profession = {
             selectedId = nil,
             mastery = ProfessionMastery.default(),
@@ -11341,6 +11492,10 @@ function SaveSchema.normalize(value: any, now: number): Profile
             end
         end
     end
+
+    -- Schema 18: equipment wear. Absent on any pre-18 save (nothing had
+    -- dulled yet); junk and retired items are stripped by GearWear itself.
+    profile.gearWear = GearWear.normalize(value.gearWear)
 
     local tutorial = value.tutorial
     if type(tutorial) == "table" then
@@ -11477,7 +11632,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 17
+    profile.schemaVersion = 18
     return profile
 end
 
@@ -12134,11 +12289,38 @@ function SaveSchema.loadoutAt(profile: Profile, slot: any): any
     return if type(loadouts) == "table" then loadouts[slot] else nil
 end
 
+function SaveSchema.withGearWear(profile: Profile, itemId: any, points: number): (Profile, any)
+    local nextWear, result = GearWear.accrue((profile :: any).gearWear or {}, itemId, points)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile: any = table.clone(profile)
+    nextProfile.gearWear = nextWear
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.withRepairedGear(profile: Profile, itemId: any, now: number): (Profile, any)
+    local materials = (profile :: any).inventory.materials or {}
+    local nextWear, nextMaterials, result =
+        GearWear.repair((profile :: any).gearWear or {}, materials, itemId)
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile: any = table.clone(profile)
+    nextProfile.gearWear = nextWear
+    nextProfile.inventory = table.clone((profile :: any).inventory)
+    nextProfile.inventory.materials = nextMaterials
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
 return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">SfxCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -12305,7 +12487,7 @@ return table.freeze(SfxCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -12424,7 +12606,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -12681,7 +12863,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -12825,7 +13007,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -13235,7 +13417,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -13416,7 +13598,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -13480,7 +13662,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -13654,7 +13836,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -13746,7 +13928,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -13958,7 +14140,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -14136,7 +14318,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="68">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -14289,7 +14471,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="69">
+      <Item class="ModuleScript" referent="70">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -14522,7 +14704,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="70">
+      <Item class="ModuleScript" referent="71">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -14684,7 +14866,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="71">
+      <Item class="ModuleScript" referent="72">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -14720,7 +14902,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="72">
+      <Item class="ModuleScript" referent="73">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -15102,7 +15284,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="73">
+      <Item class="ModuleScript" referent="74">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -15174,11 +15356,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="74">
+  <Item class="ServerScriptService" referent="75">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="75">
+    <Item class="Script" referent="76">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -15230,6 +15412,7 @@ local TownGuardLastStand = require(root.TownGuardLastStand)
 local LobbyDeparture = require(root.LobbyDeparture)
 local ActionProgress = require(root.ActionProgress)
 local ToolCatalog = require(root.ToolCatalog)
+local GearWear = require(root.GearWear)
 local ActionPayloadContract = require(root.ActionPayloadContract)
 local AdminInspectionReport = require(root.AdminInspectionReport)
 local PerformanceBudget = require(root.PerformanceBudget)
@@ -15513,7 +15696,8 @@ local tutorialService = TutorialService.new(
     Equipment,
     ResidentDialogue,
     ActionProgress,
-    ToolCatalog
+    ToolCatalog,
+    GearWear
 )
 
 local services = ServiceRegistry.new({
@@ -15585,7 +15769,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="76">
+      <Item class="ModuleScript" referent="77">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -15683,11 +15867,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="77">
+      <Item class="Folder" referent="78">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="78">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16302,7 +16486,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="80">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17173,7 +17357,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="80">
+        <Item class="ModuleScript" referent="81">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17674,7 +17858,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="81">
+        <Item class="ModuleScript" referent="82">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19232,7 +19416,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19925,7 +20109,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20029,7 +20213,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20314,7 +20498,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="85">
+        <Item class="ModuleScript" referent="86">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20720,7 +20904,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="86">
+        <Item class="ModuleScript" referent="87">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -20814,7 +20998,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="87">
+        <Item class="ModuleScript" referent="88">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21032,7 +21216,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="88">
+        <Item class="ModuleScript" referent="89">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21876,7 +22060,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="89">
+        <Item class="ModuleScript" referent="90">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22131,7 +22315,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="90">
+        <Item class="ModuleScript" referent="91">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22310,7 +22494,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="91">
+        <Item class="ModuleScript" referent="92">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22893,7 +23077,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="92">
+        <Item class="ModuleScript" referent="93">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23992,7 +24176,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="93">
+        <Item class="ModuleScript" referent="94">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24617,7 +24801,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="94">
+        <Item class="ModuleScript" referent="95">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -25010,6 +25194,44 @@ function ProfileService.setTutorial(
         )
     end
     return true
+end
+
+function ProfileService.accrueGearWear(self: ProfileService, player: Player, itemId: any): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { applied = false }
+    end
+    local nextProfile, result = self._saveSchema.withGearWear(profile, itemId, 2)
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent and self._writable[player] == true then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
+function ProfileService.repairGear(self: ProfileService, player: Player, itemId: any): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { applied = false, reason = "profile_loading" }
+    end
+    if not self:isWritable(player) then
+        return { applied = false, reason = "profile_read_only" }
+    end
+    local nextProfile, result = self._saveSchema.withRepairedGear(profile, itemId, os.time())
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent and self._writable[player] == true then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
+function ProfileService.gearWearOf(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    return if profile ~= nil then (profile :: any).gearWear or {} else {}
 end
 
 function ProfileService.saveLoadout(self: ProfileService, player: Player, slot: number): any
@@ -26254,7 +26476,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="95">
+        <Item class="ModuleScript" referent="96">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -26861,7 +27083,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="96">
+        <Item class="ModuleScript" referent="97">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -26927,6 +27149,7 @@ export type TutorialService = typeof(setmetatable(
         _residentDialogue: any,
         _actionProgress: any,
         _toolCatalog: any,
+        _gearWear: any,
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -26963,7 +27186,8 @@ function TutorialService.new(
     equipmentCatalog: any,
     residentDialogue: any,
     actionProgress: any,
-    toolCatalog: any
+    toolCatalog: any,
+    gearWear: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -26994,6 +27218,7 @@ function TutorialService.new(
         _residentDialogue = residentDialogue,
         _actionProgress = actionProgress,
         _toolCatalog = toolCatalog,
+        _gearWear = gearWear,
         _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -27569,17 +27794,36 @@ function TutorialService._strikeContext(self: TutorialService, player: Player): 
         context.damageMultiplier = tool.strikeDamageMultiplier or 1
     end
     local weapon = self._profileService:weaponStrikeProfile(player)
+    --[[
+        Wear gates the weapon, never the hand: a worn blade works at half
+        its multiplier bonus and loses its riders, and a failing one is no
+        weapon at all -- the strike falls back to bare hands (and the
+        starter tool's own identity) until the bench sees it. GearWear owns
+        the thresholds; this only multiplies.
+    ]]
+    local wearEffectiveness = 1
+    if weapon ~= nil then
+        wearEffectiveness =
+            self._gearWear.effectiveness(self._profileService:gearWearOf(player), weapon.itemId)
+    end
+    if weapon ~= nil and wearEffectiveness <= 0 then
+        weapon = nil
+    end
     if weapon ~= nil then
         -- The family decides the moveset: ranged families carry strikeRange
         -- and a projectile visual, the lance carries reach without one, and
         -- the rider fields pass through untouched for the strike to apply.
         context.weaponRange = weapon.strikeRange or weapon.meleeReach
-        context.damageMultiplier = weapon.strikeDamageMultiplier
+        -- 1 + (bonus * effectiveness): a worn 1.45x maul swings at 1.225x.
+        context.damageMultiplier = 1
+            + ((weapon.strikeDamageMultiplier or 1) - 1) * wearEffectiveness
         context.ranged = weapon.ranged == true
         context.weaponId = weapon.itemId
         context.weaponKind = weapon.kind
-        context.onHitStaminaRefund = weapon.onHitStaminaRefund
-        context.onHitSnareSeconds = weapon.onHitSnareSeconds
+        if wearEffectiveness >= 1 then
+            context.onHitStaminaRefund = weapon.onHitStaminaRefund
+            context.onHitSnareSeconds = weapon.onHitSnareSeconds
+        end
     end
     return context
 end
@@ -27605,7 +27849,19 @@ function TutorialService.strike(self: TutorialService, player: Player)
         )
     then
         local context = self:_strikeContext(player)
-        local _, message = self._enemyService:damageNearest(player, context)
+        local landed, message = self._enemyService:damageNearest(player, context)
+        if landed and context.weaponId ~= nil then
+            local wearResult = self._profileService:accrueGearWear(player, context.weaponId)
+            if
+                wearResult.applied
+                and wearResult.conditionAfter ~= wearResult.conditionBefore
+                and wearResult.conditionAfter ~= "sound"
+            then
+                message = if wearResult.conditionAfter == "failing"
+                    then "YOUR WEAPON FAILS — WHET IT AT ITS BENCH"
+                    else "YOUR WEAPON DULLS — HALF STRENGTH UNTIL WHETTED"
+            end
+        end
         self:_setToast(player, message)
         self:_publishAll()
     end
@@ -28302,6 +28558,22 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             )
             self:_publish(player)
         end
+    elseif kind == self._runtimeIds.Actions.RepairGear then
+        local itemId = payload.itemId
+        if type(itemId) == "string" and #itemId <= 32 then
+            local result = self._profileService:repairGear(player, itemId)
+            self:_setToast(
+                player,
+                if result.applied
+                    then "WHETTED — " .. string.upper(itemId) .. " IS SOUND AGAIN"
+                    elseif
+                        result.reason == "insufficient_materials"
+                    then "WHETTING TAKES HALF THE RECIPE'S MATERIALS"
+                    elseif result.reason == "not_worn" then "THAT GEAR IS ALREADY SOUND"
+                    else "THAT GEAR CANNOT BE WHETTED"
+            )
+            self:_publish(player)
+        end
     elseif kind == self._runtimeIds.Actions.EquipGear then
         local itemId = payload.itemId
         if type(itemId) == "string" and #itemId <= 32 then
@@ -28714,7 +28986,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="97">
+        <Item class="ModuleScript" referent="98">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -29564,7 +29836,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="98">
+        <Item class="ModuleScript" referent="99">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41850,11 +42122,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="99">
+      <Item class="Folder" referent="100">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="100">
+        <Item class="ModuleScript" referent="101">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -45634,7 +45906,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="101">
+        <Item class="ModuleScript" referent="102">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -46131,7 +46403,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="102">
+        <Item class="ModuleScript" referent="103">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -46826,7 +47098,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="103">
+        <Item class="ModuleScript" referent="104">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -47685,7 +47957,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="104">
+        <Item class="ModuleScript" referent="105">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -47771,7 +48043,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="105">
+        <Item class="ModuleScript" referent="106">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -48145,7 +48417,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="106">
+        <Item class="ModuleScript" referent="107">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -48325,7 +48597,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="107">
+        <Item class="ModuleScript" referent="108">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -48921,7 +49193,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="108">
+        <Item class="ModuleScript" referent="109">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -49158,7 +49430,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="109">
+        <Item class="ModuleScript" referent="110">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -49247,7 +49519,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="110">
+        <Item class="ModuleScript" referent="111">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -49583,11 +49855,11 @@ return table.freeze(WorldSignBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="111">
+    <Item class="Folder" referent="112">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="112">
+      <Item class="Script" referent="113">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -49639,7 +49911,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 local TerrainBuilder = require(serverRoot.World.TerrainBuilder)
 
 local content = Registry.new(Regions)
-assert(Config.SaveSchemaVersion == 17, "unexpected save schema version")
+assert(Config.SaveSchemaVersion == 18, "unexpected save schema version")
 assert(Config.BuildVersion == "0.53.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
@@ -51367,7 +51639,7 @@ print("[Last Light] PASS FoundationIntegration")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Script" referent="113">
+      <Item class="Script" referent="114">
         <Properties>
           <string name="Name">ModuleGallery</string>
           <token name="RunContext">0</token>
@@ -51458,15 +51730,15 @@ end
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="114">
+  <Item class="StarterPlayer" referent="115">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="115">
+    <Item class="StarterPlayerScripts" referent="116">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="116">
+      <Item class="LocalScript" referent="117">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -51757,11 +52029,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="117">
+        <Item class="Folder" referent="118">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="118">
+          <Item class="ModuleScript" referent="119">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51892,7 +52164,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="119">
+          <Item class="ModuleScript" referent="120">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -54697,7 +54969,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="120">
+          <Item class="ModuleScript" referent="121">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -54996,7 +55268,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="121">
+          <Item class="ModuleScript" referent="122">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55104,7 +55376,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="122">
+          <Item class="ModuleScript" referent="123">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55223,7 +55495,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="123">
+          <Item class="ModuleScript" referent="124">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55497,7 +55769,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="124">
+          <Item class="ModuleScript" referent="125">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55597,7 +55869,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="125">
+          <Item class="ModuleScript" referent="126">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55709,7 +55981,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="126">
+          <Item class="ModuleScript" referent="127">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55869,7 +56141,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="127">
+          <Item class="ModuleScript" referent="128">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -56078,7 +56350,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="128">
+          <Item class="ModuleScript" referent="129">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -56223,7 +56495,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="129">
+          <Item class="ModuleScript" referent="130">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -56523,13 +56795,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="130">
+  <Item class="TextChatService" referent="131">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="131">
+  <Item class="Workspace" referent="132">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

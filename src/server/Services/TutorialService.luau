@@ -61,6 +61,7 @@ export type TutorialService = typeof(setmetatable(
         _residentDialogue: any,
         _actionProgress: any,
         _toolCatalog: any,
+        _gearWear: any,
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -97,7 +98,8 @@ function TutorialService.new(
     equipmentCatalog: any,
     residentDialogue: any,
     actionProgress: any,
-    toolCatalog: any
+    toolCatalog: any,
+    gearWear: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -128,6 +130,7 @@ function TutorialService.new(
         _residentDialogue = residentDialogue,
         _actionProgress = actionProgress,
         _toolCatalog = toolCatalog,
+        _gearWear = gearWear,
         _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -703,17 +706,36 @@ function TutorialService._strikeContext(self: TutorialService, player: Player): 
         context.damageMultiplier = tool.strikeDamageMultiplier or 1
     end
     local weapon = self._profileService:weaponStrikeProfile(player)
+    --[[
+        Wear gates the weapon, never the hand: a worn blade works at half
+        its multiplier bonus and loses its riders, and a failing one is no
+        weapon at all -- the strike falls back to bare hands (and the
+        starter tool's own identity) until the bench sees it. GearWear owns
+        the thresholds; this only multiplies.
+    ]]
+    local wearEffectiveness = 1
+    if weapon ~= nil then
+        wearEffectiveness =
+            self._gearWear.effectiveness(self._profileService:gearWearOf(player), weapon.itemId)
+    end
+    if weapon ~= nil and wearEffectiveness <= 0 then
+        weapon = nil
+    end
     if weapon ~= nil then
         -- The family decides the moveset: ranged families carry strikeRange
         -- and a projectile visual, the lance carries reach without one, and
         -- the rider fields pass through untouched for the strike to apply.
         context.weaponRange = weapon.strikeRange or weapon.meleeReach
-        context.damageMultiplier = weapon.strikeDamageMultiplier
+        -- 1 + (bonus * effectiveness): a worn 1.45x maul swings at 1.225x.
+        context.damageMultiplier = 1
+            + ((weapon.strikeDamageMultiplier or 1) - 1) * wearEffectiveness
         context.ranged = weapon.ranged == true
         context.weaponId = weapon.itemId
         context.weaponKind = weapon.kind
-        context.onHitStaminaRefund = weapon.onHitStaminaRefund
-        context.onHitSnareSeconds = weapon.onHitSnareSeconds
+        if wearEffectiveness >= 1 then
+            context.onHitStaminaRefund = weapon.onHitStaminaRefund
+            context.onHitSnareSeconds = weapon.onHitSnareSeconds
+        end
     end
     return context
 end
@@ -739,7 +761,19 @@ function TutorialService.strike(self: TutorialService, player: Player)
         )
     then
         local context = self:_strikeContext(player)
-        local _, message = self._enemyService:damageNearest(player, context)
+        local landed, message = self._enemyService:damageNearest(player, context)
+        if landed and context.weaponId ~= nil then
+            local wearResult = self._profileService:accrueGearWear(player, context.weaponId)
+            if
+                wearResult.applied
+                and wearResult.conditionAfter ~= wearResult.conditionBefore
+                and wearResult.conditionAfter ~= "sound"
+            then
+                message = if wearResult.conditionAfter == "failing"
+                    then "YOUR WEAPON FAILS — WHET IT AT ITS BENCH"
+                    else "YOUR WEAPON DULLS — HALF STRENGTH UNTIL WHETTED"
+            end
+        end
         self:_setToast(player, message)
         self:_publishAll()
     end
@@ -1433,6 +1467,22 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
                 if #applied > 0
                     then string.format("KIT %d — %s READY", slot, table.concat(applied, " · "))
                     else "KIT COULD NOT BE APPLIED"
+            )
+            self:_publish(player)
+        end
+    elseif kind == self._runtimeIds.Actions.RepairGear then
+        local itemId = payload.itemId
+        if type(itemId) == "string" and #itemId <= 32 then
+            local result = self._profileService:repairGear(player, itemId)
+            self:_setToast(
+                player,
+                if result.applied
+                    then "WHETTED — " .. string.upper(itemId) .. " IS SOUND AGAIN"
+                    elseif
+                        result.reason == "insufficient_materials"
+                    then "WHETTING TAKES HALF THE RECIPE'S MATERIALS"
+                    elseif result.reason == "not_worn" then "THAT GEAR IS ALREADY SOUND"
+                    else "THAT GEAR CANNOT BE WHETTED"
             )
             self:_publish(player)
         end

@@ -12,6 +12,7 @@ TestRunner.run({
     require("./specs/ExpeditionSampling.spec"),
     require("./specs/Crafting.spec"),
     require("./specs/ToolCatalog.spec"),
+    require("./specs/GearWear.spec"),
     require("./specs/Environment.spec"),
     require("./specs/MemoryFragments.spec"),
     require("./specs/MeshAssetRegistry.spec"),
