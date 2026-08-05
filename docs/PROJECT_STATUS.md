@@ -28,6 +28,21 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
+- **(in flight: `agent/m5-generator-repetition`)** Milestone 5 wave A: the
+  full thirty-module Bramblewake set with repetition control. Catalog grew
+  12 → 30 (eighteen new definitions on proven visual recipes, tags balanced
+  against RequiredTags); the generator now SELECTS twelve per run — role-
+  aware arrival/extraction lookup, constrained middle selection (required
+  ids first, tag deficits greedily filled, then shuffle) — instead of
+  walking one fixed set; `generate` takes `avoidHashes` (novelty is a
+  preference, validity a requirement: cornered callers still get the last
+  valid manifest); the boot seed is salted by UTC day so servers vary while
+  `LastLightExpeditionSeed` still pins builds exactly; the known-good
+  fallback keeps the original twelve in authored order, seed-independent.
+  Evidence: new ExpeditionSampling spec (500 seeds in CI, six cases) and
+  `lune run scripts/sample_expedition_manifests` — the 10,000-seed gate run
+  PASSED: 0 invalid, 0 missing spine, 10,000 distinct layouts.
+
 - **(in flight: `agent/m4-backup-tooling`)** Milestone 4 wave C, closing the
   backup doc's open list that a session can close: **/restoreat <target>
   <copy#>** restores a named copy (1 = oldest kept; the roster's own comment

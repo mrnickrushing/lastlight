@@ -8,6 +8,7 @@ TestRunner.run({
     require("./specs/CombatState.spec"),
     require("./specs/ContentId.spec"),
     require("./specs/ContentRegistry.spec"),
+    require("./specs/ExpeditionSampling.spec"),
     require("./specs/Crafting.spec"),
     require("./specs/Environment.spec"),
     require("./specs/MemoryFragments.spec"),
