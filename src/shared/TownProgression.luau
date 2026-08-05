@@ -45,6 +45,16 @@ local BUILDING_FIRST_TIER: { [string]: number } = {
     building_waterworks = 3,
 }
 
+--[[
+    How much of each material the town's stores can hold. Tier is the only
+    input on purpose: storage is a thing the town grows, not a stat a player
+    buys. Tier 0 starts snug enough that a few good expeditions press against
+    it, and each tier earns real headroom.
+]]
+function TownProgression.storageCapForTier(tier: number): number
+    return 80 + math.clamp(math.floor(tonumber(tier) or 0), 0, 5) * 60
+end
+
 local function buildingStages(tier: number): { [string]: number }
     -- Stage zero is a readable construction site, while stages one through
     -- three are increasingly complete buildings. Core services arrive first;

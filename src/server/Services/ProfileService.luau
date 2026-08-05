@@ -969,6 +969,9 @@ function ProfileService.settleExpedition(
             then {}
             else table.clone(activeProfile.inventory.materials),
         materials = if settlementRecord == nil then {} else table.clone(settlementRecord.materials),
+        overflow = if settlementRecord ~= nil and settlementRecord.overflow ~= nil
+            then table.clone(settlementRecord.overflow)
+            else nil,
         reason = if durable then nil else "save_pending",
         settlementId = settlementId,
         sessionTransactionIds = sessionTransactionIds,

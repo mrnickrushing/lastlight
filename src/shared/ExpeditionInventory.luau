@@ -504,7 +504,8 @@ function ExpeditionInventory.settle(
     inventory: any,
     settlementId: string,
     manifestHash: string,
-    now: number
+    now: number,
+    storageCap: number?
 ): (any, any)
     if not validTransactionId(settlementId) then
         return inventory,
@@ -532,9 +533,21 @@ function ExpeditionInventory.settle(
     end
 
     local nextInventory = cloneInventory(inventory)
+    -- Milestone 4's storage cap. The town's stores hold what its tier has
+    -- earned room for; surplus is counted and REPORTED, never silently
+    -- discarded -- the toast that says "stores full" is the reason a player
+    -- funds the next tier.
+    local cap = math.min(MAX_MATERIAL_STACK, math.floor(tonumber(storageCap) or MAX_MATERIAL_STACK))
+    local overflow: { [string]: number } = {}
+    local overflowTotal = 0
     for materialId, amount in pending.materials do
-        nextInventory.materials[materialId] =
-            math.min(MAX_MATERIAL_STACK, (nextInventory.materials[materialId] or 0) + amount)
+        local current = nextInventory.materials[materialId] or 0
+        local accepted = math.max(0, math.min(cap, current + amount) - current)
+        nextInventory.materials[materialId] = current + accepted
+        if accepted < amount then
+            overflow[materialId] = amount - accepted
+            overflowTotal += amount - accepted
+        end
     end
     for _, transactionId in pending.transactionIds do
         local record = table.clone(nextInventory.expeditionRewards[transactionId])
@@ -546,6 +559,7 @@ function ExpeditionInventory.settle(
     local settlementRecord = {
         manifestHash = string.sub(manifestHash, 1, 32),
         materials = table.clone(pending.materials),
+        overflow = if overflowTotal > 0 then table.clone(overflow) else nil,
         rewardTransactionIds = table.clone(pending.transactionIds),
         settledAt = math.floor(now),
     }
@@ -560,6 +574,7 @@ function ExpeditionInventory.settle(
         {
             applied = true,
             record = table.clone(settlementRecord),
+            overflowTotal = overflowTotal,
         }
 end
 

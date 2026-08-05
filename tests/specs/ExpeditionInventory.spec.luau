@@ -95,6 +95,46 @@ return {
             end,
         },
         {
+            name = "the storage cap binds and overflow is reported, never silent",
+            run = function()
+                local inventory = ExpeditionInventory.default()
+                inventory = ExpeditionInventory.addUnbanked(
+                    inventory,
+                    "event_reward:capped:hash:event_a",
+                    "hash",
+                    { materialId = "material_heartwood", amount = 10 },
+                    100
+                )
+                local pending = ExpeditionInventory.pending(inventory)
+                local settlementId =
+                    ExpeditionInventory.settlementId("capped", 7, pending.fingerprint)
+                local settled, result =
+                    ExpeditionInventory.settle(inventory, settlementId, "hash", 120, 6)
+                TestRunner.equal(result.applied, true)
+                TestRunner.equal(settled.materials.material_heartwood, 6)
+                TestRunner.equal(result.overflowTotal, 4)
+                TestRunner.equal((result.record.overflow :: any).material_heartwood, 4)
+
+                -- Without a cap the old behaviour is untouched.
+                local roomy = ExpeditionInventory.default()
+                roomy = ExpeditionInventory.addUnbanked(
+                    roomy,
+                    "event_reward:roomy:hash:event_a",
+                    "hash",
+                    { materialId = "material_heartwood", amount = 10 },
+                    100
+                )
+                local roomyPending = ExpeditionInventory.pending(roomy)
+                local roomyId =
+                    ExpeditionInventory.settlementId("roomy", 7, roomyPending.fingerprint)
+                local roomySettled, roomyResult =
+                    ExpeditionInventory.settle(roomy, roomyId, "hash", 120)
+                TestRunner.equal(roomySettled.materials.material_heartwood, 10)
+                TestRunner.equal(roomyResult.overflowTotal, 0)
+                TestRunner.equal(roomyResult.record.overflow, nil)
+            end,
+        },
+        {
             name = "rejects unknown materials without changing the pouch",
             run = function()
                 local inventory = ExpeditionInventory.default()

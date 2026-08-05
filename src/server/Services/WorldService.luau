@@ -9554,11 +9554,25 @@ function WorldService.setTownRepairEnabled(self: WorldService, enabled: boolean)
     end
 end
 
-function WorldService.showExtractionPayoff(self: WorldService, player: Player, materials: any)
+function WorldService.showExtractionPayoff(
+    self: WorldService,
+    player: Player,
+    materials: any,
+    overflow: any?
+)
     local entries, total = self._extractionPayoff.summarize(materials)
     local world = self._world
     if world == nil or #entries == 0 or total <= 0 or player.Parent == nil then
         return
+    end
+    -- A full store is said at the moment of delivery, on the delivery
+    -- itself, where the player is already reading what they banked. Storage
+    -- caps that fail silently are just theft with paperwork.
+    local overflowLost = 0
+    if type(overflow) == "table" then
+        for _, amount in overflow do
+            overflowLost += tonumber(amount) or 0
+        end
     end
 
     local deliveries = world:FindFirstChild("WayhomeDeliveries")
@@ -9629,6 +9643,25 @@ function WorldService.showExtractionPayoff(self: WorldService, player: Player, m
             Color3.fromRGB(103, 91, 68),
             Enum.Material.Fabric,
             false
+        )
+    end
+    if overflowLost > 0 then
+        local warning = part(
+            delivery,
+            "WayhomeOverflowNotice",
+            Vector3.new(0.2, 0.2, 0.2),
+            CFrame.new(origin + Vector3.new(0, 4.6, 0)),
+            Color3.fromRGB(255, 138, 92),
+            Enum.Material.Neon,
+            false
+        )
+        warning.Transparency = 1
+        warning.CanQuery = false
+        addBillboard(
+            warning,
+            string.format("STORES FULL · %d SURPLUS TURNED AWAY", overflowLost),
+            Color3.fromRGB(255, 138, 92),
+            60
         )
     end
     addBillboard(

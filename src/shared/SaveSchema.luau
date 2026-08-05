@@ -429,8 +429,13 @@ function SaveSchema.withExpeditionSettlement(
     manifestHash: string,
     now: number
 ): (Profile, any)
-    local nextInventory, result =
-        ExpeditionInventory.settle(profile.inventory, settlementId, manifestHash, now)
+    local nextInventory, result = ExpeditionInventory.settle(
+        profile.inventory,
+        settlementId,
+        manifestHash,
+        now,
+        TownProgression.storageCapForTier(TownProgression.resolve(profile).tier)
+    )
     if not result.applied then
         return profile, result
     end
