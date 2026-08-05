@@ -3302,6 +3302,13 @@ function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKe
         fallbackPart.CastShadow = false
         local isCore = fallbackPart == core
         fallbackPart:SetAttribute("AuthoritativeEnemyHitbox", isCore)
+        -- The strike volume is the tap target and must keep answering
+        -- raycasts, or the creature becomes unhittable the moment its
+        -- authored mesh loads -- which is exactly the bug this volume
+        -- exists to fix.
+        if fallbackPart:GetAttribute("EnemyStrikeVolume") == true then
+            continue
+        end
         -- Only the authoritative hitbox may answer raycasts once the
         -- authored mesh is up. Left true, the wing/beak/eye fallback parts
         -- stayed queryable with no ClickDetector of their own and silently
@@ -3309,6 +3316,25 @@ function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKe
         if not isCore then
             fallbackPart.CanQuery = false
         end
+    end
+    --[[
+        Grow the tap target to the creature the player can actually see.
+
+        The volume is authored from the core, but every species' authored mesh
+        has its own silhouette -- the bark ram and the crow both read wider
+        than the box their hitbox lives in. Fitting the volume to the real
+        rendered bounds, plus a thumb's margin, is what makes "tap any part of
+        the monster" true rather than approximately true.
+    ]]
+    local strikeVolume = model:FindFirstChild("StrikeVolume")
+    if strikeVolume ~= nil and strikeVolume:IsA("BasePart") then
+        local authoredCFrame, authoredSize = authored:GetBoundingBox()
+        strikeVolume.Size = Vector3.new(
+            math.max(strikeVolume.Size.X, authoredSize.X + 4),
+            math.max(strikeVolume.Size.Y, authoredSize.Y + 3),
+            math.max(strikeVolume.Size.Z, authoredSize.Z + 4)
+        )
+        strikeVolume.CFrame = CFrame.new(authoredCFrame.Position)
     end
     model:SetAttribute("EnemyVisualAssetId", profile.assetId)
     model:SetAttribute("EnemyVisualReady", true)
@@ -9431,7 +9457,49 @@ function WorldService.buildBramblewake(
             shard.Name = "MemoryFragment_" .. fragment.id
             shard:SetAttribute("MemoryFragmentId", fragment.id)
             shard.Parent = result.model
-            local base = anchorPart.Position + Vector3.new(2.6, 0, 2.6)
+            --[[
+                Seat the shard on the ground, not on its anchor's height.
+
+                The anchors are whatever object holds the memory -- a harvest
+                table top, a well rim, the Wayhome gate's light. Their Y
+                values have nothing in common, so inheriting one put the
+                bell fragment 7.5 studs in the air above the extraction gate
+                and sank the Mothwell one into the rim stone. Measure the
+                surface instead, the same way foliage and enemy placement
+                already do; fall back to the anchor only if nothing is under
+                it at all.
+            ]]
+            local shardX = anchorPart.Position.X + 2.6
+            local shardZ = anchorPart.Position.Z + 2.6
+            local groundParams = RaycastParams.new()
+            groundParams.FilterType = Enum.RaycastFilterType.Exclude
+            local ignored: { Instance } = { shard }
+            groundParams.FilterDescendantsInstances = ignored
+            --[[
+                Ground is what a player can stand on, so anything that does
+                not collide is not ground. Without this the ray stopped on the
+                Wayhome Gate's own invisible interaction volume and seated the
+                bell fragment sixteen studs in the air -- click volumes are
+                deliberately queryable (that is what makes tap-to-interact
+                work), so they answer a raycast while being nothing anyone
+                could stand on.
+            ]]
+            local groundY = anchorPart.Position.Y
+            local origin = Vector3.new(shardX, anchorPart.Position.Y + 14, shardZ)
+            for _ = 1, 8 do
+                local groundHit = workspace:Raycast(origin, Vector3.new(0, -90, 0), groundParams)
+                if groundHit == nil then
+                    break
+                end
+                if groundHit.Instance:IsA("Terrain") or groundHit.Instance.CanCollide then
+                    groundY = groundHit.Position.Y
+                    break
+                end
+                table.insert(ignored, groundHit.Instance)
+                groundParams.FilterDescendantsInstances = ignored
+                origin = groundHit.Position - Vector3.new(0, 0.05, 0)
+            end
+            local base = Vector3.new(shardX, groundY, shardZ)
             local cradle = part(
                 shard,
                 "MemoryShardCradle",

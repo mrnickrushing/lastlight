@@ -159,7 +159,7 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
                 title = title,
                 subtitle = subtitle,
                 focus = focus,
-                duration = 3.0,
+                duration = 5.5,
             })
         end
     end
@@ -174,7 +174,7 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
                 title = "THE BLACKOUT",
                 subtitle = "CARRY THE ROOTFIRE",
                 focus = focus,
-                duration = 3.0,
+                duration = 5.5,
             })
         end
     end
@@ -189,7 +189,7 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
                 title = "OLD GROWTH",
                 subtitle = "STRIKE THE AMBER HEART",
                 focus = focus,
-                duration = 2.4,
+                duration = 4.5,
             })
         end
     end
@@ -204,7 +204,7 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
                 title = "THE WARDEN STAG",
                 subtitle = "CLEANSE THE LIVING ROOTS",
                 focus = focus,
-                duration = 2.4,
+                duration = 4.5,
             })
         end
     end

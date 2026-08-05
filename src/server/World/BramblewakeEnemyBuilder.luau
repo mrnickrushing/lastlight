@@ -438,9 +438,46 @@ function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target:
     -- moving) core. A fast flier like the crow reads several studs wider
     -- than its core across wings and beak; without this, every one of those
     -- taps silently missed.
+    --[[
+        A tap target big enough to actually hit on a phone.
+
+        A ClickDetector only fires when the tap ray lands on a part that
+        answers raycasts, and once the authored mesh loads there is almost
+        nothing left that does: MeshTemplateLoader.sanitize clears CanQuery on
+        every part of a loaded model (measured: 0 of 1 queryable on the
+        rootling), and placeEnemyVisual clears it on every fallback part but
+        the core. So the creature a player can SEE answers no taps at all, and
+        the only thing that does is one invisible box roughly the size of the
+        body -- which on a phone sits behind the threat banner and the lantern
+        rail. The result was a night defense that could not be fought.
+
+        This is the same generous invisible volume every other interaction in
+        the game already uses, sized past the silhouette so a thumb aimed at
+        the creature lands. It is CanCollide = false so it never changes
+        movement or the fight's geometry, and the server still resolves range,
+        facing, cover, and damage -- a tap only says which creature was meant.
+    ]]
+    local strikeVolume = Instance.new("Part")
+    strikeVolume.Name = "StrikeVolume"
+    strikeVolume.Size = Vector3.new(
+        math.max(9, core.Size.X + 5),
+        math.max(10, core.Size.Y + 4),
+        math.max(9, core.Size.Z + 5)
+    )
+    strikeVolume.CFrame = CFrame.new(core.Position)
+    strikeVolume.Anchored = true
+    strikeVolume.CanCollide = false
+    strikeVolume.CanTouch = false
+    strikeVolume.CanQuery = true
+    strikeVolume.CastShadow = false
+    strikeVolume.Transparency = 1
+    strikeVolume.Massless = true
+    strikeVolume:SetAttribute("EnemyStrikeVolume", true)
+    strikeVolume.Parent = model
+
     local click = Instance.new("ClickDetector")
     click.Name = "StrikeClick"
-    click.MaxActivationDistance = 26
+    click.MaxActivationDistance = 42
     click.CursorIcon = ""
     click.Parent = model
 
