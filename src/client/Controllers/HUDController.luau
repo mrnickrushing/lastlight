@@ -1864,6 +1864,41 @@ function HUDController._updateProgress(self: HUDController)
             end
         end
     end
+    local residentLife = state.residentLife
+    if type(residentLife) == "table" and type(residentLife.residents) == "table" then
+        table.insert(lines, "")
+        table.insert(lines, header("RESIDENTS"))
+        if type(residentLife.crisis) == "table" then
+            table.insert(
+                lines,
+                string.format(
+                    '<font color="#FF8A5C"><b>%s</b></font>  ·  %s',
+                    escape(tostring(residentLife.crisis.title)),
+                    muted(tostring(residentLife.crisis.detail))
+                )
+            )
+        end
+        for _, resident in residentLife.residents do
+            if resident.present then
+                local name = string.upper(
+                    (string.gsub(string.gsub(tostring(resident.residentId), "npc_", ""), "_", " "))
+                )
+                local status = if resident.injured then "RESTING — check on them" else "working"
+                table.insert(
+                    lines,
+                    string.format(
+                        "• %s  ·  %s  ·  %s  ·  %s",
+                        escape(name),
+                        escape(tostring(resident.title)),
+                        muted(status),
+                        muted(
+                            string.format("%s · %d", tostring(resident.bondTitle), resident.bond)
+                        )
+                    )
+                )
+            end
+        end
+    end
     table.insert(lines, "")
     table.insert(lines, header("PROFESSION MASTERY"))
     for professionId, mastery in state.mastery or {} do
