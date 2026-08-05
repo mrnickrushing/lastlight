@@ -775,6 +775,8 @@ function ActionPayloadContract.extraField(runtimeIds: any, kind: string): string
         return "enabled"
     elseif kind == actions.LobbyDepart then
         return "partySize"
+    elseif kind == actions.SaveLoadout or kind == actions.ApplyLoadout then
+        return "slot"
     end
     return nil
 end
@@ -2493,7 +2495,7 @@ return table.freeze({
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 16,
+    SaveSchemaVersion = 17,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -11111,6 +11113,8 @@ local RuntimeIds = {
         UseGear = "use_gear",
         EquipGear = "equip_gear",
         LobbyDepart = "lobby_depart",
+        SaveLoadout = "save_loadout",
+        ApplyLoadout = "apply_loadout",
         GatherResource = "gather_resource",
         OpenFieldBook = "open_field_book",
         TalkResident = "talk_resident",
@@ -11216,6 +11220,7 @@ export type Profile = {
     revision: number,
     tutorial: Tutorial,
     inventory: any,
+    loadouts: { any },
     profession: {
         selectedId: string?,
         mastery: ProfessionMastery.State,
@@ -11260,7 +11265,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 16,
+        schemaVersion = 17,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -11271,6 +11276,7 @@ function SaveSchema.default(now: number): Profile
             completedAt = nil,
         },
         inventory = ExpeditionInventory.default(),
+        loadouts = {},
         profession = {
             selectedId = nil,
             mastery = ProfessionMastery.default(),
@@ -11315,6 +11321,31 @@ function SaveSchema.normalize(value: any, now: number): Profile
     end
     if type(value.revision) == "number" and value.revision >= 0 then
         profile.revision = math.floor(value.revision)
+    end
+
+    --[[
+        Schema 17: saved loadouts. Up to three slots, each remembering a
+        profession, a weapon, and a tool -- every id revalidated against its
+        own catalog on load, so a retired item degrades to an empty field
+        rather than a faulting apply. Absent entirely (any pre-17 save),
+        the player simply has no kits saved yet.
+    ]]
+    profile.loadouts = {}
+    if type(value.loadouts) == "table" then
+        for slot = 1, 3 do
+            local raw = value.loadouts[slot]
+            if type(raw) == "table" then
+                profile.loadouts[slot] = {
+                    professionId = if ProfessionCatalog.isValid(raw.professionId)
+                        then raw.professionId
+                        else nil,
+                    weaponItemId = if Equipment.isKnown(raw.weaponItemId)
+                        then raw.weaponItemId
+                        else nil,
+                    toolId = if ToolCatalog.isValid(raw.toolId) then raw.toolId else nil,
+                }
+            end
+        end
     end
 
     local tutorial = value.tutorial
@@ -11452,7 +11483,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 16
+    profile.schemaVersion = 17
     return profile
 end
 
@@ -12075,6 +12106,38 @@ end
 
 function SaveSchema.townConsequence(profile: Profile): TownProgression.Consequence
     return TownProgression.resolve(profile)
+end
+
+--[[
+    Save the player's current kit into a slot: the profession they wear, the
+    weapon in their hand, the tool at their hip. Reads the profile's own
+    authoritative fields, so a loadout can never remember something the
+    save does not actually hold.
+]]
+function SaveSchema.withLoadout(profile: Profile, slot: number, now: number): (Profile, any)
+    if type(slot) ~= "number" or slot ~= math.floor(slot) or slot < 1 or slot > 3 then
+        return profile, { applied = false, reason = "invalid_slot" }
+    end
+    local nextProfile: any = table.clone(profile)
+    nextProfile.loadouts = table.clone((profile :: any).loadouts or {})
+    local equipped = (profile :: any).equipped or {}
+    local loadout = {
+        professionId = (profile :: any).profession.selectedId,
+        weaponItemId = equipped.weapon,
+        toolId = (profile :: any).tutorial.selectedTool,
+    }
+    nextProfile.loadouts[slot] = loadout
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, { applied = true, slot = slot, loadout = table.clone(loadout) }
+end
+
+function SaveSchema.loadoutAt(profile: Profile, slot: any): any
+    if type(slot) ~= "number" or slot ~= math.floor(slot) or slot < 1 or slot > 3 then
+        return nil
+    end
+    local loadouts = (profile :: any).loadouts
+    return if type(loadouts) == "table" then loadouts[slot] else nil
 end
 
 return table.freeze(SaveSchema)
@@ -24955,6 +25018,32 @@ function ProfileService.setTutorial(
     return true
 end
 
+function ProfileService.saveLoadout(self: ProfileService, player: Player, slot: number): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { applied = false, reason = "profile_loading" }
+    end
+    if not self:isWritable(player) then
+        return { applied = false, reason = "profile_read_only" }
+    end
+    local nextProfile, result = self._saveSchema.withLoadout(profile, slot, os.time())
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent and self._writable[player] == true then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
+function ProfileService.loadoutAt(self: ProfileService, player: Player, slot: any): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return self._saveSchema.loadoutAt(profile, slot)
+end
+
 function ProfileService.setProfession(
     self: ProfileService,
     player: Player,
@@ -28154,6 +28243,70 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         local itemId = payload.itemId
         if type(itemId) == "string" and #itemId <= 32 then
             self:_useGear(player, itemId)
+        end
+    elseif kind == self._runtimeIds.Actions.SaveLoadout then
+        local slot = payload.slot
+        if type(slot) == "number" then
+            local result = self._profileService:saveLoadout(player, slot)
+            self:_setToast(
+                player,
+                if result.applied
+                    then string.format("KIT %d SAVED", slot)
+                    else "KIT COULD NOT BE SAVED"
+            )
+            self:_publish(player)
+        end
+    elseif kind == self._runtimeIds.Actions.ApplyLoadout then
+        --[[
+            Applying a kit walks the same validated paths its pieces use one
+            at a time -- profession selection keeps its own daylight/town
+            gates, equipping checks ownership, and the tool swap keeps the
+            after-First-Light rule -- so a loadout can never smuggle a state
+            change past a gate that a manual tap would have hit.
+        ]]
+        local slot = payload.slot
+        local session2 = self._sessions[player]
+        local loadout = if type(slot) == "number"
+            then self._profileService:loadoutAt(player, slot)
+            else nil
+        if loadout == nil then
+            self:_setToast(player, "THAT KIT IS EMPTY")
+            self:_publish(player)
+        elseif
+            session2 == nil
+            or session2.stage ~= "complete"
+            or not self._survivalService:canAct(player)
+            or player:GetAttribute("LastLightInExpedition") == true
+        then
+            self:_setToast(player, "KITS SWAP IN TOWN, ON YOUR FEET")
+            self:_publish(player)
+        else
+            local applied = {}
+            if loadout.professionId ~= nil then
+                local result = self._professionService:select(player, loadout.professionId)
+                if result.accepted then
+                    table.insert(applied, "PROFESSION")
+                end
+            end
+            if loadout.weaponItemId ~= nil then
+                local result = self._profileService:equipItem(player, loadout.weaponItemId)
+                if result.accepted then
+                    table.insert(applied, "WEAPON")
+                end
+            end
+            if loadout.toolId ~= nil and self._toolCatalog.isValid(loadout.toolId) then
+                session2.selectedTool = loadout.toolId
+                self:_applyToolAttributes(player, loadout.toolId)
+                self._profileService:setTutorial(player, session2.stage, loadout.toolId)
+                table.insert(applied, "TOOL")
+            end
+            self:_setToast(
+                player,
+                if #applied > 0
+                    then string.format("KIT %d — %s READY", slot, table.concat(applied, " · "))
+                    else "KIT COULD NOT BE APPLIED"
+            )
+            self:_publish(player)
         end
     elseif kind == self._runtimeIds.Actions.EquipGear then
         local itemId = payload.itemId
@@ -49572,6 +49725,12 @@ hud:setLobbyDepartHandler(function(partySize: number, contractId: string)
     send(RuntimeIds.Actions.LobbyDepart, { partySize = partySize, contractId = contractId })
 end)
 
+hud:setLoadoutHandlers(function(slot: number)
+    send(RuntimeIds.Actions.SaveLoadout, { slot = slot })
+end, function(slot: number)
+    send(RuntimeIds.Actions.ApplyLoadout, { slot = slot })
+end)
+
 hud:setProfessionHandler(function(professionId: string)
     send(RuntimeIds.Actions.SelectProfession, { professionId = professionId })
 end)
@@ -50983,6 +51142,31 @@ function HUDController.new(
         button.TextXAlignment = Enum.TextXAlignment.Right
         equipmentButtons[item.id] = button
     end
+    -- Kit rows: three saved loadouts, save on the left, apply on the right,
+    -- stacked above the equipment buttons' rows.
+    local loadoutButtons: { [string]: TextButton } = {}
+    for slot = 1, 3 do
+        for _, kind in { "save", "apply" } do
+            local button = Instance.new("TextButton")
+            button.Name = string.format("Loadout_%s_%d", kind, slot)
+            button.Position =
+                UDim2.fromOffset(20 + (slot - 1) * 190 + (if kind == "apply" then 92 else 0), 104)
+            button.Size = UDim2.fromOffset(if kind == "apply" then 84 else 88, 30)
+            button.BackgroundColor3 = COLORS.panelSoft
+            button.Font = Enum.Font.GothamBold
+            button.Text = if kind == "save"
+                then string.format("SAVE %d", slot)
+                else string.format("KIT %d", slot)
+            button.TextColor3 = if kind == "apply" then COLORS.amber else COLORS.muted
+            button.TextSize = 11
+            button.ZIndex = 52
+            button.Parent = progressPanel
+            corner(button, 8)
+            stroke(button, if kind == "apply" then COLORS.amber else COLORS.cream, 0.6)
+            loadoutButtons[kind .. "_" .. slot] = button
+        end
+    end
+
     local progressClose = Instance.new("TextButton")
     progressClose.Name = "Close"
     progressClose.AnchorPoint = Vector2.new(1, 0)
@@ -51305,6 +51489,7 @@ function HUDController.new(
         _progressOverlay = progressOverlay,
         _progressText = progressText,
         _equipmentButtons = equipmentButtons,
+        _loadoutButtons = loadoutButtons,
         _currentState = nil,
         _interactionLabel = nil,
         _interactionAvailable = false,
@@ -51564,6 +51749,21 @@ function HUDController._updateLobby(self: HUDController, state: any)
         for size, button in self._lobbySizeButtons do
             button.Visible = size <= maximum
         end
+    end
+end
+
+function HUDController.setLoadoutHandlers(
+    self: HUDController,
+    onSave: (number) -> (),
+    onApply: (number) -> ()
+)
+    for slot = 1, 3 do
+        self._loadoutButtons["save_" .. slot].Activated:Connect(function()
+            onSave(slot)
+        end)
+        self._loadoutButtons["apply_" .. slot].Activated:Connect(function()
+            onApply(slot)
+        end)
     end
 end
 

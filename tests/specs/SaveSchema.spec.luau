@@ -9,6 +9,40 @@ return {
     name = "SaveSchema",
     cases = {
         {
+            name = "saves and revalidates loadout kits across the catalogs",
+            run = function()
+                local profile = SaveSchema.default(10)
+                profile.profession.selectedId = "profession_runebinder"
+                profile.equipped = { weapon = "gear_foxfire_sling" }
+                profile.tutorial.selectedTool = "survey_kit"
+                local saved, result = SaveSchema.withLoadout(profile, 2, 20)
+                TestRunner.truthy(result.applied)
+                local kit = SaveSchema.loadoutAt(saved, 2)
+                TestRunner.equal(kit.professionId, "profession_runebinder")
+                TestRunner.equal(kit.weaponItemId, "gear_foxfire_sling")
+                TestRunner.equal(kit.toolId, "survey_kit")
+                -- a normalize round-trip keeps valid kits and strips junk
+                local reloaded = SaveSchema.normalize({
+                    schemaVersion = 17,
+                    loadouts = {
+                        SaveSchema.loadoutAt(saved, 2),
+                        {
+                            professionId = "profession_fake",
+                            weaponItemId = "laser",
+                            toolId = "pick",
+                        },
+                    },
+                })
+                TestRunner.equal(reloaded.loadouts[1].toolId, "survey_kit")
+                TestRunner.equal(reloaded.loadouts[2].professionId, nil)
+                TestRunner.equal(reloaded.loadouts[2].weaponItemId, nil)
+                TestRunner.equal(reloaded.loadouts[2].toolId, "pick")
+                -- junk slots refuse without mutating
+                local _, bad = SaveSchema.withLoadout(profile, 9, 20)
+                TestRunner.equal(bad.applied, false)
+            end,
+        },
+        {
             name = "creates a safe first-session profile",
             run = function()
                 local profile = SaveSchema.default(100)

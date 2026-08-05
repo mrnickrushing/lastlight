@@ -103,7 +103,7 @@ return {
             name = "the profile transaction persists and reloads",
             run = function()
                 local profile = SaveSchema.normalize(nil, 100)
-                TestRunner.equal(profile.schemaVersion, 16)
+                TestRunner.equal(profile.schemaVersion, 17)
                 profile.inventory.materials.material_meadow_fiber = 6
                 profile.inventory.materials.material_heartwood = 4
                 local placed, result =

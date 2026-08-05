@@ -238,6 +238,23 @@ local ERA_PROFILES: { [number]: any } = {
     -- Schema 15 shipped resident life; 16 adds decorations. A 15-era save
     -- carries bonds and possibly an open crisis that must survive, and must
     -- arrive in 16 with no decorations placed -- the slots did not exist.
+    -- Schema 16 shipped decorations; 17 adds saved loadouts. A 16-era save
+    -- carries decorations and gear that must survive, and must arrive in 17
+    -- with no kits saved -- the slots did not exist.
+    [16] = {
+        schemaVersion = 16,
+        createdAt = 20,
+        updatedAt = 60,
+        revision = 90,
+        tutorial = { stage = "complete", complete = true, selectedTool = "pick" },
+        profession = { selectedId = "profession_alchemist" },
+        gear = { gear_amber_edge = 1 },
+        equipped = { weapon = "gear_amber_edge" },
+        town = {
+            nightNumber = 9,
+            decorations = { decor_plaza_banner_east = true },
+        },
+    },
     [15] = {
         schemaVersion = 15,
         createdAt = 14,
@@ -294,6 +311,7 @@ local REQUIRED_FIELDS: { string } = {
     "town",
     "gear",
     "equipped",
+    "loadouts",
     "quests",
 }
 
