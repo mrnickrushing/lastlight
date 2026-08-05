@@ -834,3 +834,14 @@ lantern shells) that sells expression rather than power.
 fragment ID, idempotent, with unknown IDs dropped at normalization. The client
 sends an interaction ID and nothing else. Nothing here grants materials,
 power, or currency — a fragment is worth reading, not worth farming.
+
+## SFX use engine-bundled rbxasset sounds (2026-08-04)
+
+The first sound-effects layer uses only `rbxasset://sounds/...` files that
+ship inside the Roblox client, not Creator Store audio. Uploaded/marketplace
+audio has exactly the failure modes that already bit the authored meshes —
+permissions, moderation, CDN fetches that throttle at boot — and a sound that
+sometimes doesn't play is worse than a modest palette. Distinct cues reuse a
+file at different playback speeds. Decision rule going forward: gameplay
+feedback cues stay engine-bundled; licensed audio is reserved for music,
+where MusicCatalog already handles missing assets gracefully.

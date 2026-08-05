@@ -51,6 +51,7 @@ export type PerformanceService = typeof(setmetatable(
         _windowStartedAt: number,
         _heartbeat: RBXScriptConnection?,
         _startedAt: number,
+        _lastBreachLogAt: { [string]: number },
     },
     PerformanceService
 ))
@@ -74,6 +75,7 @@ function PerformanceService.new(
         _windowStartedAt = 0,
         _heartbeat = nil,
         _startedAt = 0,
+        _lastBreachLogAt = {},
     }, PerformanceService)
 end
 
@@ -92,12 +94,21 @@ function PerformanceService._record(self: PerformanceService, metricId: string, 
     end
 
     -- A breach is worth saying out loud while the run is still happening, so
-    -- whoever is holding the phone knows which minute to look at later.
+    -- whoever is holding the phone knows which minute to look at later. Once
+    -- per metric per two minutes: a machine that sits at 15 fps otherwise
+    -- prints the same warning every second and buries every real error in
+    -- the log (observed: hundreds per session drowning a rejection that was
+    -- actually being hunted).
     if self._performanceBudget.classify(metricId, value) == "breach" then
-        self._logger:warn("performance_budget_breach", {
-            metric = metricId,
-            value = value,
-        })
+        local now = os.clock()
+        local lastAt = self._lastBreachLogAt[metricId]
+        if lastAt == nil or now - lastAt >= 120 then
+            self._lastBreachLogAt[metricId] = now
+            self._logger:warn("performance_budget_breach", {
+                metric = metricId,
+                value = value,
+            })
+        end
     end
 end
 

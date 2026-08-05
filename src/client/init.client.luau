@@ -9,6 +9,7 @@ assert(root ~= nil, "Last Light shared root did not replicate before client boot
 local Config = require(root.Config)
 local AmbientMotion = require(root.AmbientMotion)
 local MusicCatalog = require(root.MusicCatalog)
+local SfxCatalog = require(root.SfxCatalog)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local RuntimeIds = require(root.RuntimeIds)
 local TownNightSchedule = require(root.TownNightSchedule)
@@ -21,6 +22,7 @@ local VignetteController = require(script.Controllers.VignetteController)
 local InputController = require(script.Controllers.InputController)
 local InteractionController = require(script.Controllers.InteractionController)
 local MusicController = require(script.Controllers.MusicController)
+local SfxController = require(script.Controllers.SfxController)
 local PerformanceController = require(script.Controllers.PerformanceController)
 local WorldMotionController = require(script.Controllers.WorldMotionController)
 local WeatherController = require(script.Controllers.WeatherController)
@@ -61,6 +63,7 @@ local worldMotion = WorldMotionController.new(
 local weather = WeatherController.new(WeatherProfile)
 local interaction = InteractionController.new(RuntimeIds.InteractionTag, hud)
 local music = MusicController.new(MusicCatalog)
+local sfx = SfxController.new(SfxCatalog)
 PerformanceController.new(performanceReport :: RemoteEvent, Config.PerformanceReportIntervalSeconds)
 
 local function send(kind: string, fields: { [string]: any }?)
@@ -73,9 +76,11 @@ end
 InputController.new(hud, function()
     local interactionId = interaction:currentInteractionId()
     if interactionId ~= nil then
+        sfx:play("tap")
         send(RuntimeIds.Actions.Interact, { interactionId = interactionId })
     end
 end, function()
+    sfx:play("swing")
     send(RuntimeIds.Actions.UseTool)
 end, function(enabled: boolean)
     send(RuntimeIds.Actions.Sprint, { enabled = enabled })
@@ -99,8 +104,12 @@ end)
     tap in the camera-drag region of a phone screen into a click.
 ]]
 TapController.new(function()
+    -- The swing sounds on the tap itself: feedback that waits for the server
+    -- round-trip reads as lag, not as hitting.
+    sfx:play("swing")
     send(RuntimeIds.Actions.UseTool)
 end, function(interactionId: string)
+    sfx:play("tap")
     send(RuntimeIds.Actions.Interact, { interactionId = interactionId })
 end)
 
@@ -233,6 +242,7 @@ stateChanged.OnClientEvent:Connect(function(snapshot: any)
     worldMotion:setPhase(tostring(snapshot.phase or "day"))
     weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
     music:setSnapshot(snapshot)
+    sfx:setSnapshot(snapshot)
     objectiveMarkers:setTargets(snapshot.objectiveTargets)
     updateVignettes(snapshot)
 end)
@@ -247,6 +257,8 @@ task.spawn(function()
         worldMotion:setPhase(tostring(snapshot.phase or "day"))
         weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
         music:setSnapshot(snapshot)
+        -- Seeds the SFX signature only: joining mid-night is not a night falling.
+        sfx:setSnapshot(snapshot)
         objectiveMarkers:setTargets(snapshot.objectiveTargets)
         updateVignettes(snapshot, true)
     end
