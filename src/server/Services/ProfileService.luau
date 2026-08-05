@@ -719,6 +719,34 @@ function ProfileService.residentDawnBoons(self: ProfileService, player: Player):
     return self._saveSchema.residentDawnBoons(profile)
 end
 
+function ProfileService.placeDecoration(
+    self: ProfileService,
+    player: Player,
+    decorationId: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { applied = false, reason = "profile_unavailable" }
+    end
+    local nextProfile, result =
+        self._saveSchema.withPlacedDecoration(profile, decorationId, os.time())
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
+function ProfileService.decorationsSnapshot(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { placed = {}, count = 0, cap = 0 }
+    end
+    return self._saveSchema.decorationsSnapshot(profile)
+end
+
 function ProfileService.townConsequence(self: ProfileService, player: Player): any
     local profile = self._profiles[player]
     if profile == nil then

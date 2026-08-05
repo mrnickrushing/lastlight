@@ -2451,14 +2451,14 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.52.0",
+    BuildVersion = "0.53.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 15,
+    SaveSchemaVersion = 16,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -10185,6 +10185,7 @@ local RuntimeIds = {
         ChooseTool = "choose_tool",
         Build = "build",
         Prepare = "prepare",
+        PlaceDecoration = "place_decoration",
         Reveal = "reveal",
         Interact = "interact",
         UseTool = "use_tool",
@@ -10276,6 +10277,7 @@ local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
 local ResidentLife = require("./ResidentLife")
+local TownDecorations = require("./TownDecorations")
 local TownProgression = require("./TownProgression")
 local TownCondition = require("./TownCondition")
 local TownConstruction = require("./TownConstruction")
@@ -10316,6 +10318,7 @@ export type Profile = {
         construction: { [string]: number },
         residents: ResidentLife.State,
         crisis: ResidentLife.Crisis?,
+        decorations: TownDecorations.State,
     },
     gear: { [string]: number },
     equipped: Equipment.Equipped,
@@ -10339,7 +10342,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 15,
+        schemaVersion = 16,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -10370,6 +10373,7 @@ function SaveSchema.default(now: number): Profile
             construction = TownConstruction.default(),
             residents = ResidentLife.default(),
             crisis = nil,
+            decorations = TownDecorations.default(),
         },
         gear = Crafting.default(),
         equipped = Equipment.default(),
@@ -10524,13 +10528,17 @@ function SaveSchema.normalize(value: any, now: number): Profile
         profile.town.crisis = nil
     end
 
+    -- Decorations (schema 16): a pre-16 save simply has none placed.
+    profile.town.decorations =
+        TownDecorations.normalize(if type(town) == "table" then town.decorations else nil)
+
     profile.gear = Crafting.normalizeGear(value.gear)
     profile.equipped = Equipment.normalize(value.equipped)
     local quests = value.quests
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 15
+    profile.schemaVersion = 16
     return profile
 end
 
@@ -11025,6 +11033,40 @@ end
 
 function SaveSchema.constructionSnapshot(profile: Profile): { [string]: number }
     return table.clone(profile.town.construction)
+end
+
+function SaveSchema.withPlacedDecoration(
+    profile: Profile,
+    decorationId: string,
+    now: number
+): (Profile, any)
+    local tier = TownProgression.resolve(profile).tier
+    local nextMaterials, nextDecorations, result = TownDecorations.place(
+        profile.inventory.materials,
+        profile.town.decorations,
+        decorationId,
+        tier
+    )
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.inventory = table.clone(profile.inventory)
+    nextProfile.inventory.materials = nextMaterials
+    nextProfile.town = table.clone(profile.town)
+    nextProfile.town.decorations = nextDecorations
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.decorationsSnapshot(profile: Profile): any
+    local tier = TownProgression.resolve(profile).tier
+    return {
+        placed = table.clone(profile.town.decorations),
+        count = TownDecorations.count(profile.town.decorations),
+        cap = TownDecorations.capForTier(tier),
+    }
 end
 
 function SaveSchema.masterySnapshot(profile: Profile): ProfessionMastery.State
@@ -12325,6 +12367,180 @@ return table.freeze(TownConstructionCatalog)
       </Item>
       <Item class="ModuleScript" referent="63">
         <Properties>
+          <string name="Name">TownDecorations</string>
+          <string name="Source"><![CDATA[--!strict
+--[[
+    Town decorations: authored slots, material costs, and a tier cap.
+
+    Milestone 4's "decoration caps" deliverable, built the same shape as
+    construction: the player spends the material wallet to make the town
+    theirs, the tier decides how much of that the town can hold, and every
+    rule lives here pure so the spec can pin it. Slots are authored — a
+    banner goes where a banner pole stands — because free placement is a
+    griefing surface and a streaming problem this game does not need.
+
+    Decorations are identity, never power: no slot changes a stat anywhere.
+]]
+
+local TownDecorations = {}
+
+export type Slot = {
+    id: string,
+    displayName: string,
+    kind: string,
+    cost: { [string]: number },
+}
+
+export type State = { [string]: boolean }
+
+local SLOTS: { Slot } = table.freeze({
+    table.freeze({
+        id = "decor_plaza_banner_east",
+        displayName = "EAST PLAZA BANNER",
+        kind = "banner",
+        cost = table.freeze({ material_meadow_fiber = 3, material_heartwood = 1 }) :: { [string]: number },
+    }),
+    table.freeze({
+        id = "decor_plaza_banner_west",
+        displayName = "WEST PLAZA BANNER",
+        kind = "banner",
+        cost = table.freeze({ material_meadow_fiber = 3, material_heartwood = 1 }) :: { [string]: number },
+    }),
+    table.freeze({
+        id = "decor_road_garland_north",
+        displayName = "NORTH ROAD GARLAND",
+        kind = "garland",
+        cost = table.freeze({ material_meadow_fiber = 2, material_brightcap = 1 }) :: { [string]: number },
+    }),
+    table.freeze({
+        id = "decor_road_garland_south",
+        displayName = "SOUTH ROAD GARLAND",
+        kind = "garland",
+        cost = table.freeze({ material_meadow_fiber = 2, material_brightcap = 1 }) :: { [string]: number },
+    }),
+    table.freeze({
+        id = "decor_planter_gate",
+        displayName = "GATE PLANTER",
+        kind = "planter",
+        cost = table.freeze({ material_heartwood = 2, material_amber_sap = 1 }) :: { [string]: number },
+    }),
+    table.freeze({
+        id = "decor_planter_archive",
+        displayName = "ARCHIVE PLANTER",
+        kind = "planter",
+        cost = table.freeze({ material_heartwood = 2, material_amber_sap = 1 }) :: { [string]: number },
+    }),
+    table.freeze({
+        id = "decor_planter_inn",
+        displayName = "INN PLANTER",
+        kind = "planter",
+        cost = table.freeze({ material_heartwood = 2, material_amber_sap = 1 }) :: { [string]: number },
+    }),
+    table.freeze({
+        id = "decor_planter_workshop",
+        displayName = "WORKSHOP PLANTER",
+        kind = "planter",
+        cost = table.freeze({ material_heartwood = 2, material_amber_sap = 1 }) :: { [string]: number },
+    }),
+})
+
+local SLOTS_BY_ID: { [string]: Slot } = {}
+for _, slot in SLOTS do
+    SLOTS_BY_ID[slot.id] = slot
+end
+table.freeze(SLOTS_BY_ID)
+
+TownDecorations.Slots = SLOTS
+
+function TownDecorations.slot(id: string): Slot?
+    return SLOTS_BY_ID[id]
+end
+
+--[[
+    How many decorations the town can carry at a tier. Grows with the town
+    like storage does, and tops out below the slot count on purpose: a maxed
+    town still chooses which corners it dresses.
+]]
+function TownDecorations.capForTier(tier: number): number
+    return 2 + math.clamp(math.floor(tonumber(tier) or 0), 0, 3) * 2
+end
+
+function TownDecorations.default(): State
+    return {}
+end
+
+function TownDecorations.normalize(value: any): State
+    local state: State = {}
+    if type(value) ~= "table" then
+        return state
+    end
+    for id, placed in value do
+        if SLOTS_BY_ID[id] ~= nil and placed == true then
+            state[id] = true
+        end
+    end
+    return state
+end
+
+function TownDecorations.count(state: State): number
+    local total = 0
+    for _ in state do
+        total += 1
+    end
+    return total
+end
+
+--[[
+    Place a decoration. Same contract as construction's contribute: wallet
+    and state in, wallet and state out, with a reason a toast can speak. The
+    caller charges nothing on refusal because nothing here mutates.
+]]
+function TownDecorations.place(
+    materials: { [string]: number },
+    state: State,
+    decorationId: any,
+    tier: number
+): ({ [string]: number }, State, any)
+    local slot = if type(decorationId) == "string" then SLOTS_BY_ID[decorationId] else nil
+    if slot == nil then
+        return materials, state, { applied = false, reason = "unknown_decoration" }
+    end
+    if state[slot.id] == true then
+        return materials, state, { applied = false, reason = "already_placed" }
+    end
+    if TownDecorations.count(state) >= TownDecorations.capForTier(tier) then
+        return materials, state, { applied = false, reason = "decoration_cap" }
+    end
+    for materialId, amount in slot.cost do
+        if (materials[materialId] or 0) < amount then
+            return materials, state, { applied = false, reason = "insufficient_materials" }
+        end
+    end
+
+    local nextMaterials = table.clone(materials)
+    for materialId, amount in slot.cost do
+        nextMaterials[materialId] = nextMaterials[materialId] - amount
+    end
+    local nextState = table.clone(state)
+    nextState[slot.id] = true
+    return nextMaterials, nextState, { applied = true, decorationId = slot.id }
+end
+
+-- Shared towns keep every decoration either player paid for.
+function TownDecorations.merge(current: any, incoming: any): State
+    local merged = TownDecorations.normalize(current)
+    for id in TownDecorations.normalize(incoming) do
+        merged[id] = true
+    end
+    return merged
+end
+
+return table.freeze(TownDecorations)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="64">
+        <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -12415,7 +12631,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -12627,7 +12843,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -12780,7 +12996,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -12933,7 +13149,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -13166,7 +13382,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="68">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -13328,7 +13544,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="69">
+      <Item class="ModuleScript" referent="70">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -13364,7 +13580,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="70">
+      <Item class="ModuleScript" referent="71">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -13746,7 +13962,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="71">
+      <Item class="ModuleScript" referent="72">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -13779,11 +13995,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="72">
+  <Item class="ServerScriptService" referent="73">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="73">
+    <Item class="Script" referent="74">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -13841,6 +14057,7 @@ local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
 local RunHandoff = require(root.RunHandoff)
 local AdminRoster = require(root.AdminRoster)
+local TownDecorations = require(root.TownDecorations)
 local TownProgression = require(root.TownProgression)
 local MemoryFragments = require(root.MemoryFragments)
 local TownConstruction = require(root.TownConstruction)
@@ -13897,7 +14114,8 @@ local worldService = WorldService.new(
     TownProgression,
     ProfessionAbilityVisuals,
     TownConstruction,
-    MemoryFragments
+    MemoryFragments,
+    TownDecorations
 )
 local expeditionService = ExpeditionService.new(
     logger,
@@ -14182,7 +14400,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="74">
+      <Item class="ModuleScript" referent="75">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -14280,11 +14498,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="75">
+      <Item class="Folder" referent="76">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="76">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14813,7 +15031,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="77">
+        <Item class="ModuleScript" referent="78">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15684,7 +15902,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="78">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16185,7 +16403,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="80">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17551,7 +17769,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="80">
+        <Item class="ModuleScript" referent="81">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18198,7 +18416,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="81">
+        <Item class="ModuleScript" referent="82">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18302,7 +18520,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18587,7 +18805,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18980,7 +19198,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -19074,7 +19292,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="85">
+        <Item class="ModuleScript" referent="86">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19292,7 +19510,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="86">
+        <Item class="ModuleScript" referent="87">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20136,7 +20354,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="87">
+        <Item class="ModuleScript" referent="88">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20391,7 +20609,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="88">
+        <Item class="ModuleScript" referent="89">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20570,7 +20788,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="89">
+        <Item class="ModuleScript" referent="90">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21141,7 +21359,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="90">
+        <Item class="ModuleScript" referent="91">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22240,7 +22458,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="91">
+        <Item class="ModuleScript" referent="92">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22765,7 +22983,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="92">
+        <Item class="ModuleScript" referent="93">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23487,6 +23705,34 @@ function ProfileService.residentDawnBoons(self: ProfileService, player: Player):
         return {}
     end
     return self._saveSchema.residentDawnBoons(profile)
+end
+
+function ProfileService.placeDecoration(
+    self: ProfileService,
+    player: Player,
+    decorationId: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { applied = false, reason = "profile_unavailable" }
+    end
+    local nextProfile, result =
+        self._saveSchema.withPlacedDecoration(profile, decorationId, os.time())
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
+function ProfileService.decorationsSnapshot(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { placed = {}, count = 0, cap = 0 }
+    end
+    return self._saveSchema.decorationsSnapshot(profile)
 end
 
 function ProfileService.townConsequence(self: ProfileService, player: Player): any
@@ -24307,7 +24553,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="93">
+        <Item class="ModuleScript" referent="94">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24893,7 +25139,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="94">
+        <Item class="ModuleScript" referent="95">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -25334,6 +25580,7 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     -- regression this whole feature exists to avoid on the buildings a
     -- returning player already paid for (or was grandfathered into).
     self._worldService:setTownConstruction(self._profileService:townConstructionState(player))
+    self._worldService:setTownDecorations(self._profileService:decorationsSnapshot(player))
 
     if stage == "prepare" or stage == "survive" or stage == "reveal" or stage == "complete" then
         self._worldService:buildBarricade(false)
@@ -25801,6 +26048,23 @@ function TutorialService._interact(
         end
         local result = self._professionService:selectSpecialization(player, specializationId)
         self:_setToast(player, result.message)
+        self:_publish(player)
+        return
+    end
+    if actionId == self._runtimeIds.Actions.PlaceDecoration then
+        local decorationId = prompt:GetAttribute("Payload")
+        local result = self._profileService:placeDecoration(player, tostring(decorationId))
+        if result.applied then
+            self._worldService:setTownDecorations(self._profileService:decorationsSnapshot(player))
+            self:_setToast(player, "DECORATION PLACED — THE TOWN WEARS YOUR WORK")
+        else
+            local message = if result.reason == "decoration_cap"
+                then "DECORATION LIMIT REACHED — GROW THE TOWN FOR MORE ROOM"
+                elseif result.reason == "insufficient_materials" then "NOT ENOUGH MATERIALS"
+                elseif result.reason == "already_placed" then "ALREADY DECORATED"
+                else "THAT SPOT CANNOT BE DECORATED"
+            self:_setToast(player, message)
+        end
         self:_publish(player)
         return
     end
@@ -26487,6 +26751,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         equipmentCatalog = self._equipmentCatalog.list(),
         objectiveTargets = self:_objectiveTargets(player, session),
         residentLife = self._profileService:residentLifeSnapshot(player),
+        decorations = self._profileService:decorationsSnapshot(player),
         townHost = (function(): any
             local info = self._townNightService:hostInfo(player.UserId)
             if info == nil then
@@ -26525,7 +26790,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="95">
+        <Item class="ModuleScript" referent="96">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -27375,7 +27640,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="96">
+        <Item class="ModuleScript" referent="97">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -27454,6 +27719,7 @@ export type WorldService = typeof(setmetatable(
         _townIncidentModel: Model?,
         _engineerBraceModel: Model?,
         _meshTemplateLoader: MeshTemplateLoader.MeshTemplateLoader,
+        _townDecorationsCatalog: any,
         _meshPlacements: { MeshPlacement },
     },
     WorldService
@@ -29282,7 +29548,8 @@ function WorldService.new(
     townProgression: any,
     professionAbilityVisuals: any,
     townConstruction: any,
-    memoryFragments: any
+    memoryFragments: any,
+    townDecorations: any
 ): WorldService
     return setmetatable({
         Name = WorldService.Name,
@@ -29336,6 +29603,7 @@ function WorldService.new(
         _townIncidentModel = nil,
         _engineerBraceModel = nil,
         _meshTemplateLoader = MeshTemplateLoader.new(logger),
+        _townDecorationsCatalog = townDecorations,
         _meshPlacements = {},
     }, WorldService)
 end
@@ -34302,6 +34570,160 @@ function WorldService.setClickHandler(self: WorldService, handler: (Player, stri
 end
 
 --[[
+    Decoration slots: authored anchors, rendered from profile state.
+
+    Each slot is a small primitive assembly; empty slots carry a PLACE
+    prompt priced from the catalog. Rendering is idempotent -- call it with
+    every snapshot and it builds only what is missing, so placement,
+    session load, and shared-town merges all take the same path.
+]]
+local DECORATION_ANCHORS: { [string]: { position: Vector3, yaw: number } } = {
+    decor_plaza_banner_east = { position = Vector3.new(24, 0, -80), yaw = math.rad(-90) },
+    decor_plaza_banner_west = { position = Vector3.new(-24, 0, -80), yaw = math.rad(90) },
+    decor_road_garland_north = { position = Vector3.new(0, 0, -58), yaw = 0 },
+    decor_road_garland_south = { position = Vector3.new(0, 0, -104), yaw = 0 },
+    decor_planter_gate = { position = Vector3.new(12, 0, -152), yaw = 0 },
+    decor_planter_archive = { position = Vector3.new(-31, 0, -117), yaw = 0 },
+    decor_planter_inn = { position = Vector3.new(-84, 0, -178), yaw = 0 },
+    decor_planter_workshop = { position = Vector3.new(34, 0, -136), yaw = 0 },
+}
+
+function WorldService.setTownDecorations(self: WorldService, snapshot: any)
+    local world = self._world
+    if world == nil or type(snapshot) ~= "table" then
+        return
+    end
+    local folder = world:FindFirstChild("TownDecorations")
+    if folder == nil then
+        folder = Instance.new("Folder")
+        folder.Name = "TownDecorations"
+        folder.Parent = world
+    end
+    local placed = if type(snapshot.placed) == "table" then snapshot.placed else {}
+    for _, slot in self._townDecorationsCatalog.Slots do
+        local anchor = DECORATION_ANCHORS[slot.id]
+        if anchor == nil then
+            continue
+        end
+        local existing = folder:FindFirstChild(slot.id)
+        if placed[slot.id] == true then
+            local prompt = self._interactions["decor_place_" .. slot.id]
+            if prompt ~= nil then
+                prompt.Enabled = false
+            end
+            if existing ~= nil then
+                continue
+            end
+            local model = Instance.new("Model")
+            model.Name = slot.id
+            model.Parent = folder
+            local base = CFrame.new(anchor.position) * CFrame.Angles(0, anchor.yaw, 0)
+            if slot.kind == "banner" then
+                part(
+                    model,
+                    "DecorBannerPole",
+                    Vector3.new(0.55, 9.5, 0.55),
+                    base * CFrame.new(0, 4.75, 0),
+                    WET_BARK,
+                    Enum.Material.Wood
+                )
+                local cloth = part(
+                    model,
+                    "DecorBannerCloth",
+                    Vector3.new(0.18, 4.2, 2.6),
+                    base * CFrame.new(0, 6.4, 1.5) * CFrame.Angles(math.rad(-4), 0, 0),
+                    AMBER,
+                    Enum.Material.Fabric,
+                    false
+                )
+                cloth.CanQuery = false
+            elseif slot.kind == "garland" then
+                for span = -1, 1 do
+                    local rope = part(
+                        model,
+                        "DecorGarlandRope",
+                        Vector3.new(6.4, 0.22, 0.22),
+                        base
+                            * CFrame.new(span * 5.8, 8.2 - math.abs(span) * 0.7, 0)
+                            * CFrame.Angles(0, 0, math.rad(span * 7)),
+                        Color3.fromRGB(96, 84, 58),
+                        Enum.Material.Fabric,
+                        false
+                    )
+                    rope.CanQuery = false
+                    for lamp = -1, 1 do
+                        local mote = part(
+                            model,
+                            "DecorGarlandLamp",
+                            Vector3.new(0.45, 0.45, 0.45),
+                            base
+                                * CFrame.new(span * 5.8 + lamp * 1.9, 7.6 - math.abs(span) * 0.7, 0),
+                            FOXFIRE,
+                            Enum.Material.Neon,
+                            false
+                        )
+                        mote.Shape = Enum.PartType.Ball
+                        mote.CanQuery = false
+                        mote.CastShadow = false
+                    end
+                end
+            else
+                part(
+                    model,
+                    "DecorPlanterBox",
+                    Vector3.new(3.4, 1.1, 1.6),
+                    base * CFrame.new(0, 0.55, 0),
+                    Color3.fromRGB(78, 58, 39),
+                    Enum.Material.WoodPlanks
+                )
+                for stem = -1, 1 do
+                    local bloom = part(
+                        model,
+                        "DecorPlanterBloom",
+                        Vector3.new(0.5, 0.5, 0.5),
+                        base * CFrame.new(stem * 1.05, 1.55, 0),
+                        if stem == 0 then AMBER else FOXFIRE,
+                        Enum.Material.Neon,
+                        false
+                    )
+                    bloom.Shape = Enum.PartType.Ball
+                    bloom.CanQuery = false
+                    bloom.CastShadow = false
+                end
+            end
+        elseif existing == nil and self._interactions["decor_place_" .. slot.id] == nil then
+            -- Empty slot: a low marker with a priced PLACE prompt.
+            local marker = part(
+                folder,
+                slot.id .. "_Marker",
+                Vector3.new(1.6, 0.35, 1.6),
+                CFrame.new(anchor.position + Vector3.new(0, 0.2, 0)),
+                Color3.fromRGB(96, 92, 74),
+                Enum.Material.WoodPlanks,
+                false
+            )
+            marker.CanQuery = true
+            local costText = {}
+            for materialId, amount in slot.cost do
+                table.insert(
+                    costText,
+                    string.format("%d %s", amount, (string.gsub(materialId, "material_", "")))
+                )
+            end
+            table.sort(costText)
+            self:_registerInteraction(
+                marker,
+                "decor_place_" .. slot.id,
+                self._runtimeIds.Actions.PlaceDecoration,
+                "PLACE",
+                slot.displayName .. " · " .. table.concat(costText, " + "),
+                slot.id
+            )
+        end
+    end
+end
+
+--[[
     An injured resident wears it: attribute for systems, a RESTING suffix on
     the nameplate for players. Presentation only -- the truth lives in the
     profile's resident state.
@@ -39055,11 +39477,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="97">
+      <Item class="Folder" referent="98">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="98">
+        <Item class="ModuleScript" referent="99">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -42839,7 +43261,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="99">
+        <Item class="ModuleScript" referent="100">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -43336,7 +43758,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="100">
+        <Item class="ModuleScript" referent="101">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -44031,7 +44453,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="101">
+        <Item class="ModuleScript" referent="102">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -44890,7 +45312,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="102">
+        <Item class="ModuleScript" referent="103">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -44976,7 +45398,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="103">
+        <Item class="ModuleScript" referent="104">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -45350,7 +45772,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="104">
+        <Item class="ModuleScript" referent="105">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -45530,7 +45952,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="105">
+        <Item class="ModuleScript" referent="106">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -46126,7 +46548,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="106">
+        <Item class="ModuleScript" referent="107">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -46363,7 +46785,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="107">
+        <Item class="ModuleScript" referent="108">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -46452,7 +46874,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="108">
+        <Item class="ModuleScript" referent="109">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -46789,15 +47211,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="109">
+  <Item class="StarterPlayer" referent="110">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="110">
+    <Item class="StarterPlayerScripts" referent="111">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="111">
+      <Item class="LocalScript" referent="112">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -47073,11 +47495,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="112">
+        <Item class="Folder" referent="113">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="113">
+          <Item class="ModuleScript" referent="114">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -47208,7 +47630,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="114">
+          <Item class="ModuleScript" referent="115">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -49124,6 +49546,19 @@ function HUDController._updateProgress(self: HUDController)
             end
         end
     end
+    local decorations = state.decorations
+    if type(decorations) == "table" and (tonumber(decorations.cap) or 0) > 0 then
+        table.insert(
+            lines,
+            muted(
+                string.format(
+                    "Decorations placed · %d / %d — marked spots around town take materials.",
+                    tonumber(decorations.count) or 0,
+                    tonumber(decorations.cap) or 0
+                )
+            )
+        )
+    end
     table.insert(lines, "")
     table.insert(lines, header("PROFESSION MASTERY"))
     for professionId, mastery in state.mastery or {} do
@@ -49801,7 +50236,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="115">
+          <Item class="ModuleScript" referent="116">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -50100,7 +50535,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="116">
+          <Item class="ModuleScript" referent="117">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -50208,7 +50643,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="117">
+          <Item class="ModuleScript" referent="118">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -50327,7 +50762,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="118">
+          <Item class="ModuleScript" referent="119">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -50601,7 +51036,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="119">
+          <Item class="ModuleScript" referent="120">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -50701,7 +51136,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="120">
+          <Item class="ModuleScript" referent="121">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -50813,7 +51248,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="121">
+          <Item class="ModuleScript" referent="122">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -50973,7 +51408,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="122">
+          <Item class="ModuleScript" referent="123">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51182,7 +51617,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="123">
+          <Item class="ModuleScript" referent="124">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51314,7 +51749,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="124">
+          <Item class="ModuleScript" referent="125">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51614,13 +52049,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="125">
+  <Item class="TextChatService" referent="126">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="126">
+  <Item class="Workspace" referent="127">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

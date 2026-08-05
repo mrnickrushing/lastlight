@@ -52,6 +52,7 @@ local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
 local RunHandoff = require(root.RunHandoff)
 local AdminRoster = require(root.AdminRoster)
+local TownDecorations = require(root.TownDecorations)
 local TownProgression = require(root.TownProgression)
 local MemoryFragments = require(root.MemoryFragments)
 local TownConstruction = require(root.TownConstruction)
@@ -108,7 +109,8 @@ local worldService = WorldService.new(
     TownProgression,
     ProfessionAbilityVisuals,
     TownConstruction,
-    MemoryFragments
+    MemoryFragments,
+    TownDecorations
 )
 local expeditionService = ExpeditionService.new(
     logger,

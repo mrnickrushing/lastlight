@@ -1911,6 +1911,19 @@ function HUDController._updateProgress(self: HUDController)
             end
         end
     end
+    local decorations = state.decorations
+    if type(decorations) == "table" and (tonumber(decorations.cap) or 0) > 0 then
+        table.insert(
+            lines,
+            muted(
+                string.format(
+                    "Decorations placed · %d / %d — marked spots around town take materials.",
+                    tonumber(decorations.count) or 0,
+                    tonumber(decorations.cap) or 0
+                )
+            )
+        )
+    end
     table.insert(lines, "")
     table.insert(lines, header("PROFESSION MASTERY"))
     for professionId, mastery in state.mastery or {} do

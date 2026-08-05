@@ -234,6 +234,50 @@ local ERA_PROFILES: { [number]: any } = {
         gear = { gear_bramble_boots = 1 },
         quests = { claimed = { quest_first_craft = true } },
     },
+
+    -- Schema 15 shipped resident life; 16 adds decorations. A 15-era save
+    -- carries bonds and possibly an open crisis that must survive, and must
+    -- arrive in 16 with no decorations placed -- the slots did not exist.
+    [15] = {
+        schemaVersion = 15,
+        createdAt = 14,
+        updatedAt = 40,
+        revision = 77,
+        tutorial = { stage = "complete", complete = true },
+        town = {
+            nightNumber = 21,
+            condition = {
+                buildings = { building_inn = 35 },
+                lastNightNumber = 20,
+                repairsCompleted = 12,
+            },
+            construction = { building_inn = 2, building_archive = 3 },
+            residents = {
+                npc_tomas_reed = { injuredUntilNight = 22, bond = 30, lastVisitNight = 20 },
+                npc_pip_wren = { injuredUntilNight = 0, bond = 55, lastVisitNight = 21 },
+            },
+            crisis = {
+                id = "crisis_clinic_20",
+                kind = "care",
+                title = "THE CLINIC IS FULL",
+                detail = "Check on the injured residents.",
+                startedNight = 20,
+            },
+        },
+        story = {
+            chapterOne = {
+                status = "complete",
+                decision = "shared_agroforest",
+                wardenOutcome = "preserved",
+                transactionId = "chapter_1:era15:hash:1",
+                completedAt = 25,
+            },
+            fragments = { fragment_last_harvest = true },
+        },
+        profession = { selectedId = "profession_warden" },
+        gear = { gear_ironroot_hood = 1 },
+        quests = { claimed = { quest_first_craft = true } },
+    },
 }
 
 -- Every field SaveSchema.default produces. A migrated profile that is missing
