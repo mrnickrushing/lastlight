@@ -123,6 +123,11 @@ local RuntimeIds = {
         CraftIronrootHood = "craft_ironroot_hood_bench",
         CraftBrambleBoots = "craft_bramble_boots_bench",
         CraftThornwoodBow = "craft_thornwood_bow_bench",
+        CraftHeartwoodMaul = "craft_heartwood_maul_bench",
+        CraftBriarLance = "craft_briar_lance_bench",
+        CraftFoxfireSling = "craft_foxfire_sling_bench",
+        CraftAmberEdge = "craft_amber_edge_bench",
+        CraftWardenCudgel = "craft_warden_cudgel_bench",
         QuestBoard = "quest_board",
     }),
     ResidentInteractionIds = table.freeze({

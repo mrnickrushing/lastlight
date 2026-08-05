@@ -4068,6 +4068,11 @@ local ORDER = table.freeze({
     "recipe_ironroot_hood",
     "recipe_bramble_boots",
     "recipe_thornwood_bow",
+    "recipe_heartwood_maul",
+    "recipe_briar_lance",
+    "recipe_foxfire_sling",
+    "recipe_amber_edge",
+    "recipe_warden_cudgel",
 })
 
 local DEFINITIONS: { [string]: Recipe } = {
@@ -4121,6 +4126,56 @@ local DEFINITIONS: { [string]: Recipe } = {
             material_meadow_fiber = 3,
         }),
     }),
+    recipe_heartwood_maul = table.freeze({
+        id = "recipe_heartwood_maul",
+        displayName = "HEARTWOOD MAUL",
+        outputItemId = "gear_heartwood_maul",
+        outputDisplayName = "Heartwood Maul",
+        materials = table.freeze({
+            material_heartwood = 6,
+            material_spring_clay = 2,
+        }),
+    }),
+    recipe_briar_lance = table.freeze({
+        id = "recipe_briar_lance",
+        displayName = "BRIAR LANCE",
+        outputItemId = "gear_briar_lance",
+        outputDisplayName = "Briar Lance",
+        materials = table.freeze({
+            material_heartwood = 3,
+            material_meadow_fiber = 4,
+        }),
+    }),
+    recipe_foxfire_sling = table.freeze({
+        id = "recipe_foxfire_sling",
+        displayName = "FOXFIRE SLING",
+        outputItemId = "gear_foxfire_sling",
+        outputDisplayName = "Foxfire Sling",
+        materials = table.freeze({
+            material_meadow_fiber = 4,
+            material_brightcap = 3,
+        }),
+    }),
+    recipe_amber_edge = table.freeze({
+        id = "recipe_amber_edge",
+        displayName = "AMBER EDGE",
+        outputItemId = "gear_amber_edge",
+        outputDisplayName = "Amber Edge",
+        materials = table.freeze({
+            material_amber_sap = 4,
+            material_heartwood = 3,
+        }),
+    }),
+    recipe_warden_cudgel = table.freeze({
+        id = "recipe_warden_cudgel",
+        displayName = "WARDEN CUDGEL",
+        outputItemId = "gear_warden_cudgel",
+        outputDisplayName = "Warden Cudgel",
+        materials = table.freeze({
+            material_heartwood = 4,
+            material_spring_clay = 3,
+        }),
+    }),
 }
 
 function CraftingCatalog.isValid(id: any): boolean
@@ -4157,6 +4212,11 @@ CraftingCatalog.Ids = table.freeze({
     IronrootHood = "recipe_ironroot_hood",
     BrambleBoots = "recipe_bramble_boots",
     ThornwoodBow = "recipe_thornwood_bow",
+    HeartwoodMaul = "recipe_heartwood_maul",
+    BriarLance = "recipe_briar_lance",
+    FoxfireSling = "recipe_foxfire_sling",
+    AmberEdge = "recipe_amber_edge",
+    WardenCudgel = "recipe_warden_cudgel",
 })
 
 return table.freeze(CraftingCatalog)
@@ -4612,11 +4672,21 @@ type Definition = {
     description: string,
     damageReduction: number,
     staminaRegenMultiplier: number,
-    -- Weapon-slot statistics. Melee weapons leave these nil; a ranged weapon
-    -- declares how far a strike may resolve from and what it trades for the
-    -- reach. The server reads these -- a client never submits range or damage.
+    --[[
+        Weapon-slot statistics. The family (`kind`) decides the moveset the
+        way the roadmap asks: a ranged family declares `strikeRange` (the
+        strike resolves at distance and the client draws a shot), a reaching
+        melee family declares `meleeReach` (extended arm, no projectile), and
+        an on-hit family carries its rider (stamina refund to the striker, or
+        a snare on the struck enemy). The server reads all of these -- a
+        client never submits range, damage, or an effect.
+    ]]
+    kind: string?,
     strikeRange: number?,
+    meleeReach: number?,
     strikeDamageMultiplier: number?,
+    onHitStaminaRefund: number?,
+    onHitSnareSeconds: number?,
 }
 
 local DEFINITIONS: { [string]: Definition } = {
@@ -4640,8 +4710,68 @@ local DEFINITIONS: { [string]: Definition } = {
         description = "Strike from 30 studs. Arrows hit for 80% of a close blow.",
         damageReduction = 0,
         staminaRegenMultiplier = 1,
+        kind = "bow",
         strikeRange = 30,
         strikeDamageMultiplier = 0.8,
+    }),
+    --[[
+        The other five weapon families. Every number stays inside the bounds
+        combat already clamps (damage multiplier 0.5-1.5 at the strike,
+        damage reduction capped at 0.25 in stats), so no family can silence
+        an enemy's mechanics or stack into an economy problem. Identities
+        trade against each other: the maul is the damage ceiling with no
+        reach, the lance buys reach with no rider, the sling trades the
+        bow's range and damage for a snare, the edge sustains its wielder,
+        and the cudgel is the one weapon that also guards.
+    ]]
+    gear_heartwood_maul = table.freeze({
+        slot = "weapon",
+        displayName = "HEARTWOOD MAUL",
+        description = "Slow heavy blows land 45% harder up close.",
+        damageReduction = 0,
+        staminaRegenMultiplier = 1,
+        kind = "maul",
+        strikeDamageMultiplier = 1.45,
+    }),
+    gear_briar_lance = table.freeze({
+        slot = "weapon",
+        displayName = "BRIAR LANCE",
+        description = "Full-strength strikes from 14 studs of reach.",
+        damageReduction = 0,
+        staminaRegenMultiplier = 1,
+        kind = "lance",
+        meleeReach = 14,
+        strikeDamageMultiplier = 1,
+    }),
+    gear_foxfire_sling = table.freeze({
+        slot = "weapon",
+        displayName = "FOXFIRE SLING",
+        description = "Stones from 22 studs hit for 70% and briefly snare the threat.",
+        damageReduction = 0,
+        staminaRegenMultiplier = 1,
+        kind = "sling",
+        strikeRange = 22,
+        strikeDamageMultiplier = 0.7,
+        onHitSnareSeconds = 2.5,
+    }),
+    gear_amber_edge = table.freeze({
+        slot = "weapon",
+        displayName = "AMBER EDGE",
+        description = "Clean cuts hit 10% harder and return 6 stamina.",
+        damageReduction = 0,
+        staminaRegenMultiplier = 1,
+        kind = "edge",
+        strikeDamageMultiplier = 1.1,
+        onHitStaminaRefund = 6,
+    }),
+    gear_warden_cudgel = table.freeze({
+        slot = "weapon",
+        displayName = "WARDEN CUDGEL",
+        description = "A guard's weapon: 5% harder blows, 4% softer hits taken.",
+        damageReduction = 0.04,
+        staminaRegenMultiplier = 1,
+        kind = "cudgel",
+        strikeDamageMultiplier = 1.05,
     }),
 }
 
@@ -4710,9 +4840,10 @@ end
 --[[
     What the equipped weapon changes about a strike.
 
-    Returns nil for bare hands and melee tools: the caller keeps its own
-    defaults, so nothing about existing combat moves unless a ranged weapon is
-    actually equipped.
+    Returns nil for bare hands: the caller keeps its own defaults, so nothing
+    about existing combat moves unless a weapon is actually equipped. `ranged`
+    is what the client's projectile visual keys off -- only the bow and sling
+    families throw something; the lance's reach is an extended arm, not a shot.
 ]]
 function Equipment.weaponStrikeProfile(equipped: Equipped): any
     local normalized = Equipment.normalize(equipped)
@@ -4721,13 +4852,18 @@ function Equipment.weaponStrikeProfile(equipped: Equipped): any
         return nil
     end
     local definition = DEFINITIONS[weaponId]
-    if definition == nil or definition.strikeRange == nil then
+    if definition == nil or definition.kind == nil then
         return nil
     end
     return {
         itemId = weaponId,
+        kind = definition.kind,
+        ranged = definition.strikeRange ~= nil,
         strikeRange = definition.strikeRange,
+        meleeReach = definition.meleeReach,
         strikeDamageMultiplier = definition.strikeDamageMultiplier or 1,
+        onHitStaminaRefund = definition.onHitStaminaRefund,
+        onHitSnareSeconds = definition.onHitSnareSeconds,
     }
 end
 
@@ -6613,6 +6749,136 @@ local DEFINITIONS: { [string]: ItemPlan } = {
                 { 0, 0, 0 },
                 { 214, 205, 186 },
                 "Fabric"
+            ),
+        }),
+    }),
+    gear_heartwood_maul = table.freeze({
+        itemId = "gear_heartwood_maul",
+        slot = "weapon",
+        parts = table.freeze({
+            part(
+                "MaulHaft",
+                "RightHand",
+                "Block",
+                { 0.28, 3.2, 0.28 },
+                { 0, -0.7, 0 },
+                { 0, 0, 8 },
+                { 96, 68, 44 },
+                "Wood"
+            ),
+            part(
+                "MaulHead",
+                "RightHand",
+                "Block",
+                { 1.7, 0.95, 0.95 },
+                { 0.18, -2.15, 0 },
+                { 0, 0, 8 },
+                { 139, 98, 54 },
+                "Wood"
+            ),
+        }),
+    }),
+    gear_briar_lance = table.freeze({
+        itemId = "gear_briar_lance",
+        slot = "weapon",
+        parts = table.freeze({
+            part(
+                "LanceShaft",
+                "RightHand",
+                "Block",
+                { 0.24, 4.6, 0.24 },
+                { 0, -1.3, 0 },
+                { 0, 0, 4 },
+                { 104, 128, 68 },
+                "Wood"
+            ),
+            part(
+                "LanceTip",
+                "RightHand",
+                "Wedge",
+                { 0.4, 0.95, 0.4 },
+                { 0.16, -3.9, 0 },
+                { 0, 0, 184 },
+                { 74, 96, 46 },
+                "Wood"
+            ),
+        }),
+    }),
+    gear_foxfire_sling = table.freeze({
+        itemId = "gear_foxfire_sling",
+        slot = "weapon",
+        parts = table.freeze({
+            part(
+                "SlingStrap",
+                "RightHand",
+                "Block",
+                { 0.14, 2.3, 0.14 },
+                { 0, -0.5, 0 },
+                { 0, 0, 24 },
+                { 78, 58, 41 },
+                "Fabric"
+            ),
+            part(
+                "SlingPouch",
+                "RightHand",
+                "Ball",
+                { 0.68, 0.5, 0.68 },
+                { 0.45, -1.5, 0 },
+                { 0, 0, 0 },
+                { 94, 206, 176 },
+                "Fabric"
+            ),
+        }),
+    }),
+    gear_amber_edge = table.freeze({
+        itemId = "gear_amber_edge",
+        slot = "weapon",
+        parts = table.freeze({
+            part(
+                "EdgeGrip",
+                "RightHand",
+                "Block",
+                { 0.3, 0.95, 0.3 },
+                { 0, -0.25, 0 },
+                { 0, 0, 0 },
+                { 73, 54, 38 },
+                "Fabric"
+            ),
+            part(
+                "EdgeBlade",
+                "RightHand",
+                "Wedge",
+                { 0.24, 2.3, 0.72 },
+                { 0, -1.85, 0.1 },
+                { 0, 0, 0 },
+                { 255, 197, 106 },
+                "Glass"
+            ),
+        }),
+    }),
+    gear_warden_cudgel = table.freeze({
+        itemId = "gear_warden_cudgel",
+        slot = "weapon",
+        parts = table.freeze({
+            part(
+                "CudgelShaft",
+                "RightHand",
+                "Block",
+                { 0.34, 2.6, 0.34 },
+                { 0, -0.6, 0 },
+                { 0, 0, 6 },
+                { 91, 62, 40 },
+                "Wood"
+            ),
+            part(
+                "CudgelHead",
+                "RightHand",
+                "Ball",
+                { 0.85, 0.85, 0.85 },
+                { 0.12, -1.95, 0 },
+                { 0, 0, 0 },
+                { 112, 151, 119 },
+                "Wood"
             ),
         }),
     }),
@@ -10879,6 +11145,11 @@ local RuntimeIds = {
         CraftIronrootHood = "craft_ironroot_hood_bench",
         CraftBrambleBoots = "craft_bramble_boots_bench",
         CraftThornwoodBow = "craft_thornwood_bow_bench",
+        CraftHeartwoodMaul = "craft_heartwood_maul_bench",
+        CraftBriarLance = "craft_briar_lance_bench",
+        CraftFoxfireSling = "craft_foxfire_sling_bench",
+        CraftAmberEdge = "craft_amber_edge_bench",
+        CraftWardenCudgel = "craft_warden_cudgel_bench",
         QuestBoard = "quest_board",
     }),
     ResidentInteractionIds = table.freeze({
@@ -17207,6 +17478,7 @@ type Enemy = {
     luredUntil: number,
     markedUntil: number,
     model: Model,
+    snaredUntil: number,
     spawnedAt: number,
     stilledUntil: number,
 }
@@ -17696,6 +17968,7 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
         luredUntil = 0,
         markedUntil = 0,
         model = model,
+        snaredUntil = 0,
         spawnedAt = spawnedAt,
         stilledUntil = 0,
     }
@@ -18228,6 +18501,11 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
             * self._breachMultiplier
         if now < enemy.markedUntil then
             speed *= 0.65
+        elseif now < enemy.snaredUntil then
+            -- The sling's stone: between the mark's hard slow and the
+            -- hound's soft one, so the three sources read as different
+            -- strengths when a party stacks them.
+            speed *= 0.75
         elseif now < enemy.luredUntil then
             -- The hound harries rather than hobbles: a gentler slow than the
             -- Scout's mark, so the two kits stay distinct when stacked.
@@ -18637,6 +18915,23 @@ function EnemyService.damageNearest(
     enemy.health -= damage
     enemy.model:SetAttribute("EnemyHealth", math.max(0, enemy.health))
     self:_showDamageFeedback(enemy, damage, strikeResult)
+    --[[
+        Weapon-family riders, bounded and applied only on a landed hit: the
+        sling's stone snares the enemy briefly (0.75x speed, weaker than
+        the Scout's mark), and the edge returns a sliver of stamina to its
+        wielder through the same restore path items use. The numbers arrive
+        from Equipment's own definitions -- a client never submits either.
+    ]]
+    if context ~= nil then
+        local snareSeconds = tonumber(context.onHitSnareSeconds)
+        if snareSeconds ~= nil and snareSeconds > 0 then
+            enemy.snaredUntil = workspace:GetServerTimeNow() + math.clamp(snareSeconds, 0.5, 4)
+        end
+        local staminaRefund = tonumber(context.onHitStaminaRefund)
+        if staminaRefund ~= nil and staminaRefund > 0 and self._combatService ~= nil then
+            self._combatService:restoreStamina(player, math.clamp(staminaRefund, 1, 12))
+        end
+    end
     if enemy.health <= 0 then
         local defeatedId = enemy.definition.id
         self:_defeatActive(enemy)
@@ -26910,10 +27205,16 @@ function TutorialService._strikeContext(self: TutorialService, player: Player): 
     end
     local weapon = self._profileService:weaponStrikeProfile(player)
     if weapon ~= nil then
-        context.weaponRange = weapon.strikeRange
+        -- The family decides the moveset: ranged families carry strikeRange
+        -- and a projectile visual, the lance carries reach without one, and
+        -- the rider fields pass through untouched for the strike to apply.
+        context.weaponRange = weapon.strikeRange or weapon.meleeReach
         context.damageMultiplier = weapon.strikeDamageMultiplier
-        context.ranged = true
+        context.ranged = weapon.ranged == true
         context.weaponId = weapon.itemId
+        context.weaponKind = weapon.kind
+        context.onHitStaminaRefund = weapon.onHitStaminaRefund
+        context.onHitSnareSeconds = weapon.onHitSnareSeconds
     end
     return context
 end
@@ -34733,6 +35034,45 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             x = -60,
             color = Color3.fromRGB(164, 132, 78),
         },
+        -- The five other weapon families, filling the row outward from the
+        -- original five benches. Same shared bench construction; each gets
+        -- its own sample silhouette below so the row reads as ten different
+        -- crafts rather than ten copies of one table.
+        {
+            id = self._runtimeIds.InteractionIds.CraftHeartwoodMaul,
+            recipeId = "recipe_heartwood_maul",
+            label = "HEARTWOOD MAUL",
+            x = -72,
+            color = Color3.fromRGB(139, 98, 54),
+        },
+        {
+            id = self._runtimeIds.InteractionIds.CraftBriarLance,
+            recipeId = "recipe_briar_lance",
+            label = "BRIAR LANCE",
+            x = -24,
+            color = Color3.fromRGB(104, 128, 68),
+        },
+        {
+            id = self._runtimeIds.InteractionIds.CraftFoxfireSling,
+            recipeId = "recipe_foxfire_sling",
+            label = "FOXFIRE SLING",
+            x = 24,
+            color = Color3.fromRGB(94, 206, 176),
+        },
+        {
+            id = self._runtimeIds.InteractionIds.CraftAmberEdge,
+            recipeId = "recipe_amber_edge",
+            label = "AMBER EDGE",
+            x = 60,
+            color = Color3.fromRGB(255, 181, 76),
+        },
+        {
+            id = self._runtimeIds.InteractionIds.CraftWardenCudgel,
+            recipeId = "recipe_warden_cudgel",
+            label = "WARDEN CUDGEL",
+            x = 72,
+            color = Color3.fromRGB(112, 151, 119),
+        },
     }
     for _, definition in craftingBenches do
         local display = Instance.new("Model")
@@ -34869,7 +35209,11 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 Enum.Material.Wood,
                 false
             )
-        else
+        elseif definition.recipeId == "recipe_bramble_boots" then
+            -- Explicit, no longer the chain's else: the fallthrough put a
+            -- pair of boots on every bench without its own branch -- the bow
+            -- bench had displayed boots since it shipped, and all five new
+            -- weapon benches would have inherited the same pair.
             for bootSide = -1, 1, 2 do
                 part(
                     display,
@@ -34882,6 +35226,126 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                     false
                 )
             end
+        elseif definition.recipeId == "recipe_thornwood_bow" then
+            part(
+                display,
+                "BowSampleStave",
+                Vector3.new(0.3, 3, 0.5),
+                CFrame.new(definition.x + 0.35, 4.6, workshopZ) * CFrame.Angles(0, 0, math.rad(14)),
+                Color3.fromRGB(112, 84, 52),
+                Enum.Material.Wood,
+                false
+            )
+            part(
+                display,
+                "BowSampleString",
+                Vector3.new(0.08, 2.8, 0.08),
+                CFrame.new(definition.x - 0.45, 4.6, workshopZ),
+                Color3.fromRGB(214, 205, 186),
+                Enum.Material.Fabric,
+                false
+            )
+        elseif definition.recipeId == "recipe_heartwood_maul" then
+            part(
+                display,
+                "MaulSampleHaft",
+                Vector3.new(0.4, 3.1, 0.4),
+                CFrame.new(definition.x, 4.55, workshopZ) * CFrame.Angles(0, 0, math.rad(-18)),
+                Color3.fromRGB(96, 68, 44),
+                Enum.Material.Wood,
+                false
+            )
+            part(
+                display,
+                "MaulSampleHead",
+                Vector3.new(1.9, 1.15, 1.15),
+                CFrame.new(definition.x + 0.5, 5.9, workshopZ) * CFrame.Angles(0, 0, math.rad(-18)),
+                Color3.fromRGB(139, 98, 54),
+                Enum.Material.Wood,
+                false
+            )
+        elseif definition.recipeId == "recipe_briar_lance" then
+            part(
+                display,
+                "LanceSampleShaft",
+                Vector3.new(0.32, 4.4, 0.32),
+                CFrame.new(definition.x, 4.9, workshopZ) * CFrame.Angles(0, 0, math.rad(24)),
+                Color3.fromRGB(104, 128, 68),
+                Enum.Material.Wood,
+                false
+            )
+            local lanceTip = part(
+                display,
+                "LanceSampleTip",
+                Vector3.new(0.5, 1.1, 0.5),
+                CFrame.new(definition.x - 0.95, 6.85, workshopZ) * CFrame.Angles(0, 0, math.rad(24)),
+                Color3.fromRGB(74, 96, 46),
+                Enum.Material.Wood,
+                false
+            )
+            lanceTip.Shape = Enum.PartType.Wedge
+        elseif definition.recipeId == "recipe_foxfire_sling" then
+            part(
+                display,
+                "SlingSampleStrap",
+                Vector3.new(0.22, 2.6, 0.22),
+                CFrame.new(definition.x, 4.7, workshopZ) * CFrame.Angles(0, 0, math.rad(32)),
+                Color3.fromRGB(78, 58, 41),
+                Enum.Material.Fabric,
+                false
+            )
+            local slingPouch = part(
+                display,
+                "SlingSamplePouch",
+                Vector3.new(0.95, 0.7, 0.95),
+                CFrame.new(definition.x - 0.75, 3.75, workshopZ),
+                Color3.fromRGB(94, 206, 176),
+                Enum.Material.Fabric,
+                false
+            )
+            slingPouch.Shape = Enum.PartType.Ball
+        elseif definition.recipeId == "recipe_amber_edge" then
+            local edgeBlade = part(
+                display,
+                "EdgeSampleBlade",
+                Vector3.new(0.35, 2.5, 0.9),
+                CFrame.new(definition.x + 0.2, 4.95, workshopZ) * CFrame.Angles(0, 0, math.rad(-9)),
+                Color3.fromRGB(255, 197, 106),
+                Enum.Material.Glass,
+                false
+            )
+            edgeBlade.Shape = Enum.PartType.Wedge
+            part(
+                display,
+                "EdgeSampleGrip",
+                Vector3.new(0.42, 1.05, 0.42),
+                CFrame.new(definition.x - 0.15, 3.6, workshopZ) * CFrame.Angles(0, 0, math.rad(-9)),
+                Color3.fromRGB(73, 54, 38),
+                Enum.Material.Leather,
+                false
+            )
+        else
+            -- recipe_warden_cudgel and any future recipe without its own
+            -- silhouette yet: a club on a rest, not somebody else's boots.
+            part(
+                display,
+                "CudgelSampleShaft",
+                Vector3.new(0.45, 2.7, 0.45),
+                CFrame.new(definition.x, 4.5, workshopZ) * CFrame.Angles(0, 0, math.rad(12)),
+                Color3.fromRGB(91, 62, 40),
+                Enum.Material.Wood,
+                false
+            )
+            local cudgelHead = part(
+                display,
+                "CudgelSampleHead",
+                Vector3.new(1, 1, 1),
+                CFrame.new(definition.x - 0.35, 5.85, workshopZ),
+                Color3.fromRGB(112, 151, 119),
+                Enum.Material.Wood,
+                false
+            )
+            cudgelHead.Shape = Enum.PartType.Ball
         end
         local markerLight = Instance.new("PointLight")
         markerLight.Color = definition.color
@@ -49998,9 +50462,9 @@ assert(wardenLivingRoots == 12, "Warden nodes need three living roots each")
     fresh-save boot so the next drift can be diagnosed line by line:
     barricade 1, blackout 7, bramblewake reveal+wayhome 2, construction 2
     (only stage>0 buildings carry a prompt on a fresh save), crafting
-    benches 5, decorations 8, first lantern 1, heartwood 1, mara 1, memory
-    fragments 8, resource nodes 22, old growth 2, quest board 1, starter
-    tools 3, warden stag 6. The two derived terms beside it stay derived:
+    benches 10 (75 as of the six weapon families), decorations 8, first
+    lantern 1, heartwood 1, mara 1, memory fragments 8, resource nodes 22,
+    old growth 2, quest board 1, starter tools 3, warden stag 6. The two derived terms beside it stay derived:
     event interactions come from the catalog and specializations from
     RuntimeIds, so only genuinely new fixtures move this number, and moving
     it should be a deliberate edit.
@@ -50008,13 +50472,13 @@ assert(wardenLivingRoots == 12, "Warden nodes need three living roots each")
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
     #tagged
-        == 70
+        == 75
             + BramblewakeExpedition.EventInteractionCount
             + #RuntimeIds.ProfessionSpecializationInteractionIds,
     string.format(
         "expected tutorial, event, elite, boss, extraction, crafting, decoration, and mastery prompts (found %d, expected %d)",
         #tagged,
-        70
+        75
             + BramblewakeExpedition.EventInteractionCount
             + #RuntimeIds.ProfessionSpecializationInteractionIds
     )
@@ -50868,6 +51332,68 @@ local function createItemIcon(parent: Instance, itemId: string, size: number): V
             Vector3.new(-0.45, 0, 0),
             Color3.fromRGB(214, 205, 186)
         )
+    elseif itemId == "gear_heartwood_maul" then
+        shape(
+            "Haft",
+            Vector3.new(0.35, 2.8, 0.35),
+            Vector3.new(-0.2, -0.2, 0),
+            Color3.fromRGB(96, 68, 44)
+        )
+        shape(
+            "Head",
+            Vector3.new(1.6, 0.95, 0.95),
+            Vector3.new(0.15, 1.15, 0),
+            Color3.fromRGB(139, 98, 54)
+        )
+    elseif itemId == "gear_briar_lance" then
+        shape(
+            "Shaft",
+            Vector3.new(0.28, 3.2, 0.28),
+            Vector3.new(0, -0.2, 0),
+            Color3.fromRGB(104, 128, 68)
+        )
+        shape("Tip", Vector3.new(0.5, 0.8, 0.5), Vector3.new(0, 1.7, 0), Color3.fromRGB(74, 96, 46))
+    elseif itemId == "gear_foxfire_sling" then
+        shape(
+            "Strap",
+            Vector3.new(0.22, 2.4, 0.22),
+            Vector3.new(0.25, 0.2, 0),
+            Color3.fromRGB(78, 58, 41)
+        )
+        local pouch = shape(
+            "Pouch",
+            Vector3.new(1, 1, 1),
+            Vector3.new(-0.45, -0.85, 0),
+            Color3.fromRGB(94, 206, 176)
+        )
+        pouch.Shape = Enum.PartType.Ball
+    elseif itemId == "gear_amber_edge" then
+        shape(
+            "Grip",
+            Vector3.new(0.35, 1, 0.35),
+            Vector3.new(0, -1.15, 0),
+            Color3.fromRGB(73, 54, 38)
+        )
+        shape(
+            "Blade",
+            Vector3.new(0.3, 2.3, 0.75),
+            Vector3.new(0, 0.55, 0),
+            Color3.fromRGB(255, 197, 106)
+        )
+    elseif itemId == "gear_warden_cudgel" then
+        shape(
+            "Shaft",
+            Vector3.new(0.4, 2.5, 0.4),
+            Vector3.new(0, -0.4, 0),
+            Color3.fromRGB(91, 62, 40)
+        )
+        local head = shape(
+            "Head",
+            Vector3.new(1.05, 1.05, 1.05),
+            Vector3.new(0.1, 1.25, 0),
+            Color3.fromRGB(112, 151, 119)
+        )
+        head.Shape = Enum.PartType.Ball
     elseif itemId == "gear_ironroot_hood" then
         shape(
             "Hood",
@@ -51794,16 +52320,26 @@ function HUDController.new(
     progressText.TextYAlignment = Enum.TextYAlignment.Top
     progressText.ZIndex = 52
     local equipmentButtons: { [string]: TextButton } = {}
+    -- Three per row, newest row stacking upward: eight equippables no longer
+    -- fit the single strip the first three shipped on. Buttons stay hidden
+    -- until owned, so a fresh save still sees an empty margin, not a wall.
     for index, item in
         {
             { id = "gear_ironroot_hood", label = "EQUIP HOOD" },
             { id = "gear_bramble_boots", label = "EQUIP BOOTS" },
             { id = "gear_thornwood_bow", label = "EQUIP BOW" },
+            { id = "gear_heartwood_maul", label = "EQUIP MAUL" },
+            { id = "gear_briar_lance", label = "EQUIP LANCE" },
+            { id = "gear_foxfire_sling", label = "EQUIP SLING" },
+            { id = "gear_amber_edge", label = "EQUIP EDGE" },
+            { id = "gear_warden_cudgel", label = "EQUIP CUDGEL" },
         }
     do
         local button = Instance.new("TextButton")
         button.Name = item.id
-        button.Position = UDim2.new(0, 20 + (index - 1) * 190, 1, -58)
+        local buttonRow = math.floor((index - 1) / 3)
+        local buttonColumn = (index - 1) % 3
+        button.Position = UDim2.new(0, 20 + buttonColumn * 190, 1, -58 - buttonRow * 46)
         button.Size = UDim2.fromOffset(176, 38)
         button.BackgroundColor3 = COLORS.panelSoft
         button.Font = Enum.Font.GothamBold
@@ -52084,6 +52620,7 @@ function HUDController.new(
         _contractButtons = contractButtons,
         _selectedContractId = "contract_standard",
         _departurePlatformPart = nil,
+        _departurePlatformPosition = nil,
         _onLobbyDepart = nil,
         _canvas = canvas,
         _scale = scale,
@@ -52230,6 +52767,14 @@ function HUDController.new(
         if self._mara.Visible and not self:_maraLineIsFresh() then
             self._mara.Visible = false
         end
+        -- The departure panel's distance gate re-evaluates on the same
+        -- local clock, for the same reason: the gate reads the player's
+        -- position, which changes constantly between pushes, so a panel
+        -- opened at the platform used to follow the player across town
+        -- until the server happened to say something.
+        if self._currentState ~= nil then
+            self:_updateLobby(self._currentState)
+        end
     end)
 
     return self
@@ -52352,10 +52897,24 @@ function HUDController._updateLobby(self: HUDController, state: any)
         platform = workspace:FindFirstChild("DeparturePlatform", true)
         self._departurePlatformPart = platform
     end
+    --[[
+        The distance gate works from the platform's POSITION, not the
+        instance: under streaming, walking far enough from the lodge
+        unloads the platform on this client, and a nil instance used to
+        fail the gate open -- the panel followed the player across the
+        whole town once the lodge streamed out, which is the exact
+        carried-panel bug the gate was added to end. A position survives
+        streaming; it is cached the first time the platform is seen and
+        the platform never moves.
+    ]]
+    if platform ~= nil and platform:IsA("BasePart") then
+        self._departurePlatformPosition = platform.Position
+    end
+    local platformPosition = self._departurePlatformPosition
     local character = game:GetService("Players").LocalPlayer.Character
     local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
-    if platform ~= nil and root ~= nil and root:IsA("BasePart") and platform:IsA("BasePart") then
-        local offset = root.Position - platform.Position
+    if platformPosition ~= nil and root ~= nil and root:IsA("BasePart") then
+        local offset = root.Position - platformPosition
         if Vector3.new(offset.X, 0, offset.Z).Magnitude > 46 then
             self._lobbyFrame.Visible = false
             return

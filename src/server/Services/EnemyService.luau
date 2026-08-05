@@ -35,6 +35,7 @@ type Enemy = {
     luredUntil: number,
     markedUntil: number,
     model: Model,
+    snaredUntil: number,
     spawnedAt: number,
     stilledUntil: number,
 }
@@ -524,6 +525,7 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
         luredUntil = 0,
         markedUntil = 0,
         model = model,
+        snaredUntil = 0,
         spawnedAt = spawnedAt,
         stilledUntil = 0,
     }
@@ -1056,6 +1058,11 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
             * self._breachMultiplier
         if now < enemy.markedUntil then
             speed *= 0.65
+        elseif now < enemy.snaredUntil then
+            -- The sling's stone: between the mark's hard slow and the
+            -- hound's soft one, so the three sources read as different
+            -- strengths when a party stacks them.
+            speed *= 0.75
         elseif now < enemy.luredUntil then
             -- The hound harries rather than hobbles: a gentler slow than the
             -- Scout's mark, so the two kits stay distinct when stacked.
@@ -1465,6 +1472,23 @@ function EnemyService.damageNearest(
     enemy.health -= damage
     enemy.model:SetAttribute("EnemyHealth", math.max(0, enemy.health))
     self:_showDamageFeedback(enemy, damage, strikeResult)
+    --[[
+        Weapon-family riders, bounded and applied only on a landed hit: the
+        sling's stone snares the enemy briefly (0.75x speed, weaker than
+        the Scout's mark), and the edge returns a sliver of stamina to its
+        wielder through the same restore path items use. The numbers arrive
+        from Equipment's own definitions -- a client never submits either.
+    ]]
+    if context ~= nil then
+        local snareSeconds = tonumber(context.onHitSnareSeconds)
+        if snareSeconds ~= nil and snareSeconds > 0 then
+            enemy.snaredUntil = workspace:GetServerTimeNow() + math.clamp(snareSeconds, 0.5, 4)
+        end
+        local staminaRefund = tonumber(context.onHitStaminaRefund)
+        if staminaRefund ~= nil and staminaRefund > 0 and self._combatService ~= nil then
+            self._combatService:restoreStamina(player, math.clamp(staminaRefund, 1, 12))
+        end
+    end
     if enemy.health <= 0 then
         local defeatedId = enemy.definition.id
         self:_defeatActive(enemy)

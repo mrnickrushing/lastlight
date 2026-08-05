@@ -5942,6 +5942,45 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             x = -60,
             color = Color3.fromRGB(164, 132, 78),
         },
+        -- The five other weapon families, filling the row outward from the
+        -- original five benches. Same shared bench construction; each gets
+        -- its own sample silhouette below so the row reads as ten different
+        -- crafts rather than ten copies of one table.
+        {
+            id = self._runtimeIds.InteractionIds.CraftHeartwoodMaul,
+            recipeId = "recipe_heartwood_maul",
+            label = "HEARTWOOD MAUL",
+            x = -72,
+            color = Color3.fromRGB(139, 98, 54),
+        },
+        {
+            id = self._runtimeIds.InteractionIds.CraftBriarLance,
+            recipeId = "recipe_briar_lance",
+            label = "BRIAR LANCE",
+            x = -24,
+            color = Color3.fromRGB(104, 128, 68),
+        },
+        {
+            id = self._runtimeIds.InteractionIds.CraftFoxfireSling,
+            recipeId = "recipe_foxfire_sling",
+            label = "FOXFIRE SLING",
+            x = 24,
+            color = Color3.fromRGB(94, 206, 176),
+        },
+        {
+            id = self._runtimeIds.InteractionIds.CraftAmberEdge,
+            recipeId = "recipe_amber_edge",
+            label = "AMBER EDGE",
+            x = 60,
+            color = Color3.fromRGB(255, 181, 76),
+        },
+        {
+            id = self._runtimeIds.InteractionIds.CraftWardenCudgel,
+            recipeId = "recipe_warden_cudgel",
+            label = "WARDEN CUDGEL",
+            x = 72,
+            color = Color3.fromRGB(112, 151, 119),
+        },
     }
     for _, definition in craftingBenches do
         local display = Instance.new("Model")
@@ -6078,7 +6117,11 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 Enum.Material.Wood,
                 false
             )
-        else
+        elseif definition.recipeId == "recipe_bramble_boots" then
+            -- Explicit, no longer the chain's else: the fallthrough put a
+            -- pair of boots on every bench without its own branch -- the bow
+            -- bench had displayed boots since it shipped, and all five new
+            -- weapon benches would have inherited the same pair.
             for bootSide = -1, 1, 2 do
                 part(
                     display,
@@ -6091,6 +6134,126 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                     false
                 )
             end
+        elseif definition.recipeId == "recipe_thornwood_bow" then
+            part(
+                display,
+                "BowSampleStave",
+                Vector3.new(0.3, 3, 0.5),
+                CFrame.new(definition.x + 0.35, 4.6, workshopZ) * CFrame.Angles(0, 0, math.rad(14)),
+                Color3.fromRGB(112, 84, 52),
+                Enum.Material.Wood,
+                false
+            )
+            part(
+                display,
+                "BowSampleString",
+                Vector3.new(0.08, 2.8, 0.08),
+                CFrame.new(definition.x - 0.45, 4.6, workshopZ),
+                Color3.fromRGB(214, 205, 186),
+                Enum.Material.Fabric,
+                false
+            )
+        elseif definition.recipeId == "recipe_heartwood_maul" then
+            part(
+                display,
+                "MaulSampleHaft",
+                Vector3.new(0.4, 3.1, 0.4),
+                CFrame.new(definition.x, 4.55, workshopZ) * CFrame.Angles(0, 0, math.rad(-18)),
+                Color3.fromRGB(96, 68, 44),
+                Enum.Material.Wood,
+                false
+            )
+            part(
+                display,
+                "MaulSampleHead",
+                Vector3.new(1.9, 1.15, 1.15),
+                CFrame.new(definition.x + 0.5, 5.9, workshopZ) * CFrame.Angles(0, 0, math.rad(-18)),
+                Color3.fromRGB(139, 98, 54),
+                Enum.Material.Wood,
+                false
+            )
+        elseif definition.recipeId == "recipe_briar_lance" then
+            part(
+                display,
+                "LanceSampleShaft",
+                Vector3.new(0.32, 4.4, 0.32),
+                CFrame.new(definition.x, 4.9, workshopZ) * CFrame.Angles(0, 0, math.rad(24)),
+                Color3.fromRGB(104, 128, 68),
+                Enum.Material.Wood,
+                false
+            )
+            local lanceTip = part(
+                display,
+                "LanceSampleTip",
+                Vector3.new(0.5, 1.1, 0.5),
+                CFrame.new(definition.x - 0.95, 6.85, workshopZ) * CFrame.Angles(0, 0, math.rad(24)),
+                Color3.fromRGB(74, 96, 46),
+                Enum.Material.Wood,
+                false
+            )
+            lanceTip.Shape = Enum.PartType.Wedge
+        elseif definition.recipeId == "recipe_foxfire_sling" then
+            part(
+                display,
+                "SlingSampleStrap",
+                Vector3.new(0.22, 2.6, 0.22),
+                CFrame.new(definition.x, 4.7, workshopZ) * CFrame.Angles(0, 0, math.rad(32)),
+                Color3.fromRGB(78, 58, 41),
+                Enum.Material.Fabric,
+                false
+            )
+            local slingPouch = part(
+                display,
+                "SlingSamplePouch",
+                Vector3.new(0.95, 0.7, 0.95),
+                CFrame.new(definition.x - 0.75, 3.75, workshopZ),
+                Color3.fromRGB(94, 206, 176),
+                Enum.Material.Fabric,
+                false
+            )
+            slingPouch.Shape = Enum.PartType.Ball
+        elseif definition.recipeId == "recipe_amber_edge" then
+            local edgeBlade = part(
+                display,
+                "EdgeSampleBlade",
+                Vector3.new(0.35, 2.5, 0.9),
+                CFrame.new(definition.x + 0.2, 4.95, workshopZ) * CFrame.Angles(0, 0, math.rad(-9)),
+                Color3.fromRGB(255, 197, 106),
+                Enum.Material.Glass,
+                false
+            )
+            edgeBlade.Shape = Enum.PartType.Wedge
+            part(
+                display,
+                "EdgeSampleGrip",
+                Vector3.new(0.42, 1.05, 0.42),
+                CFrame.new(definition.x - 0.15, 3.6, workshopZ) * CFrame.Angles(0, 0, math.rad(-9)),
+                Color3.fromRGB(73, 54, 38),
+                Enum.Material.Leather,
+                false
+            )
+        else
+            -- recipe_warden_cudgel and any future recipe without its own
+            -- silhouette yet: a club on a rest, not somebody else's boots.
+            part(
+                display,
+                "CudgelSampleShaft",
+                Vector3.new(0.45, 2.7, 0.45),
+                CFrame.new(definition.x, 4.5, workshopZ) * CFrame.Angles(0, 0, math.rad(12)),
+                Color3.fromRGB(91, 62, 40),
+                Enum.Material.Wood,
+                false
+            )
+            local cudgelHead = part(
+                display,
+                "CudgelSampleHead",
+                Vector3.new(1, 1, 1),
+                CFrame.new(definition.x - 0.35, 5.85, workshopZ),
+                Color3.fromRGB(112, 151, 119),
+                Enum.Material.Wood,
+                false
+            )
+            cudgelHead.Shape = Enum.PartType.Ball
         end
         local markerLight = Instance.new("PointLight")
         markerLight.Color = definition.color
