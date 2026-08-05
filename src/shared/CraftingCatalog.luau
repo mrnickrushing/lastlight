@@ -15,6 +15,7 @@ local ORDER = table.freeze({
     "recipe_amber_charm",
     "recipe_ironroot_hood",
     "recipe_bramble_boots",
+    "recipe_thornwood_bow",
 })
 
 local DEFINITIONS: { [string]: Recipe } = {
@@ -58,6 +59,16 @@ local DEFINITIONS: { [string]: Recipe } = {
             material_brightcap = 3,
         }),
     }),
+    recipe_thornwood_bow = table.freeze({
+        id = "recipe_thornwood_bow",
+        displayName = "THORNWOOD BOW",
+        outputItemId = "gear_thornwood_bow",
+        outputDisplayName = "Thornwood Bow",
+        materials = table.freeze({
+            material_heartwood = 4,
+            material_meadow_fiber = 3,
+        }),
+    }),
 }
 
 function CraftingCatalog.isValid(id: any): boolean
@@ -93,6 +104,7 @@ CraftingCatalog.Ids = table.freeze({
     AmberCharm = "recipe_amber_charm",
     IronrootHood = "recipe_ironroot_hood",
     BrambleBoots = "recipe_bramble_boots",
+    ThornwoodBow = "recipe_thornwood_bow",
 })
 
 return table.freeze(CraftingCatalog)

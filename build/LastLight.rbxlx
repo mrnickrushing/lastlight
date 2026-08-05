@@ -918,7 +918,8 @@ function ActionProgress.begin(
     state: State?,
     actionId: any,
     interactionId: any,
-    now: any
+    now: any,
+    durationMultiplier: number?
 ): (State?, any)
     if not finite(now) or now < 0 then
         return state, { accepted = false, reason = "invalid_time" }
@@ -927,6 +928,11 @@ function ActionProgress.begin(
         return state, { accepted = false, reason = "invalid_interaction" }
     end
     local duration = ActionProgress.durationFor(actionId)
+    if duration ~= nil and type(durationMultiplier) == "number" then
+        -- The hammer's identity: work swings faster. Bounded so no tool can
+        -- make a timed action instant or absurdly slow.
+        duration *= math.clamp(durationMultiplier, 0.5, 1.5)
+    end
     if duration == nil then
         return state, { accepted = false, reason = "untimed_action" }
     end
@@ -2445,7 +2451,7 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.50.0",
+    BuildVersion = "0.51.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -3808,6 +3814,7 @@ local ORDER = table.freeze({
     "recipe_amber_charm",
     "recipe_ironroot_hood",
     "recipe_bramble_boots",
+    "recipe_thornwood_bow",
 })
 
 local DEFINITIONS: { [string]: Recipe } = {
@@ -3851,6 +3858,16 @@ local DEFINITIONS: { [string]: Recipe } = {
             material_brightcap = 3,
         }),
     }),
+    recipe_thornwood_bow = table.freeze({
+        id = "recipe_thornwood_bow",
+        displayName = "THORNWOOD BOW",
+        outputItemId = "gear_thornwood_bow",
+        outputDisplayName = "Thornwood Bow",
+        materials = table.freeze({
+            material_heartwood = 4,
+            material_meadow_fiber = 3,
+        }),
+    }),
 }
 
 function CraftingCatalog.isValid(id: any): boolean
@@ -3886,6 +3903,7 @@ CraftingCatalog.Ids = table.freeze({
     AmberCharm = "recipe_amber_charm",
     IronrootHood = "recipe_ironroot_hood",
     BrambleBoots = "recipe_bramble_boots",
+    ThornwoodBow = "recipe_thornwood_bow",
 })
 
 return table.freeze(CraftingCatalog)
@@ -4341,6 +4359,11 @@ type Definition = {
     description: string,
     damageReduction: number,
     staminaRegenMultiplier: number,
+    -- Weapon-slot statistics. Melee weapons leave these nil; a ranged weapon
+    -- declares how far a strike may resolve from and what it trades for the
+    -- reach. The server reads these -- a client never submits range or damage.
+    strikeRange: number?,
+    strikeDamageMultiplier: number?,
 }
 
 local DEFINITIONS: { [string]: Definition } = {
@@ -4357,6 +4380,15 @@ local DEFINITIONS: { [string]: Definition } = {
         description = "Recover stamina 10% faster.",
         damageReduction = 0,
         staminaRegenMultiplier = 1.1,
+    }),
+    gear_thornwood_bow = table.freeze({
+        slot = "weapon",
+        displayName = "THORNWOOD BOW",
+        description = "Strike from 30 studs. Arrows hit for 80% of a close blow.",
+        damageReduction = 0,
+        staminaRegenMultiplier = 1,
+        strikeRange = 30,
+        strikeDamageMultiplier = 0.8,
     }),
 }
 
@@ -4420,6 +4452,30 @@ function Equipment.unequip(equipped: Equipped, slot: any): (Equipped, any)
     end
     nextEquipped[slot] = nil
     return nextEquipped, { applied = true, slot = slot }
+end
+
+--[[
+    What the equipped weapon changes about a strike.
+
+    Returns nil for bare hands and melee tools: the caller keeps its own
+    defaults, so nothing about existing combat moves unless a ranged weapon is
+    actually equipped.
+]]
+function Equipment.weaponStrikeProfile(equipped: Equipped): any
+    local normalized = Equipment.normalize(equipped)
+    local weaponId = normalized.weapon
+    if type(weaponId) ~= "string" then
+        return nil
+    end
+    local definition = DEFINITIONS[weaponId]
+    if definition == nil or definition.strikeRange == nil then
+        return nil
+    end
+    return {
+        itemId = weaponId,
+        strikeRange = definition.strikeRange,
+        strikeDamageMultiplier = definition.strikeDamageMultiplier or 1,
+    }
 end
 
 function Equipment.stats(equipped: Equipped): any
@@ -6042,6 +6098,32 @@ local brambleSole = { 31, 28, 24 }
 local livingVine = { 78, 95, 48 }
 
 local DEFINITIONS: { [string]: ItemPlan } = {
+    gear_thornwood_bow = table.freeze({
+        itemId = "gear_thornwood_bow",
+        slot = "weapon",
+        parts = table.freeze({
+            part(
+                "BowStave",
+                "RightHand",
+                "Block",
+                { 0.22, 3.1, 0.5 },
+                { 0, -0.55, 0 },
+                { 0, 0, 12 },
+                { 112, 84, 52 },
+                "Wood"
+            ),
+            part(
+                "BowString",
+                "RightHand",
+                "Block",
+                { 0.06, 2.9, 0.06 },
+                { 0.3, -0.55, 0 },
+                { 0, 0, 0 },
+                { 214, 205, 186 },
+                "Fabric"
+            ),
+        }),
+    }),
     gear_ironroot_hood = table.freeze({
         itemId = "gear_ironroot_hood",
         slot = "head",
@@ -9808,6 +9890,7 @@ local RuntimeIds = {
         CraftAmberCharm = "craft_amber_charm_bench",
         CraftIronrootHood = "craft_ironroot_hood_bench",
         CraftBrambleBoots = "craft_bramble_boots_bench",
+        CraftThornwoodBow = "craft_thornwood_bow_bench",
         QuestBoard = "quest_board",
     }),
     ResidentInteractionIds = table.freeze({
@@ -10426,6 +10509,10 @@ function SaveSchema.memoryFragmentSnapshot(profile: Profile): any
         profile.story.fragments,
         profile.story.chapterOne.status == "complete"
     )
+end
+
+function SaveSchema.weaponStrikeProfile(profile: Profile): any
+    return Equipment.weaponStrikeProfile(profile.equipped)
 end
 
 function SaveSchema.gearSnapshot(profile: Profile): { [string]: number }
@@ -12497,7 +12584,7 @@ local DEFINITIONS: { [Stage]: Definition } = {
         action = "choose_tool",
         next = "build",
         objective = "CHOOSE A STARTER TOOL",
-        detail = "Axe, hammer, or torch — this choice is not permanent.",
+        detail = "Axe hits harder · hammer works faster · torch reaches further and lights the dark. Not permanent.",
         mara = "Choose what feels right. Emberhollow needs every kind of helper.",
     },
     build = {
@@ -16667,7 +16754,16 @@ function EnemyService.setStrikeHandler(self: EnemyService, handler: (Player) -> 
     self._strikeHandler = handler
 end
 
-function EnemyService.damageNearest(self: EnemyService, player: Player): (boolean, string)
+--[[
+    context carries what the striker is holding -- the server-derived tool and
+    weapon numbers TutorialService computed from the profile. Nil context means
+    bare defaults; a client never supplies any of it.
+]]
+function EnemyService.damageNearest(
+    self: EnemyService,
+    player: Player,
+    context: any
+): (boolean, string)
     local encounterService = self:_activeEncounterService()
     if encounterService ~= nil then
         return encounterService:damageNearest(player)
@@ -16687,7 +16783,12 @@ function EnemyService.damageNearest(self: EnemyService, player: Player): (boolea
     local displayName = enemy.definition.displayName
     local primary = enemy.model.PrimaryPart
     local distance = (root.Position - primary.Position).Magnitude
-    if distance > enemy.definition.strikeRange then
+    local reach = enemy.definition.strikeRange
+        + (if context ~= nil then context.rangeBonus or 0 else 0)
+    if context ~= nil and context.weaponRange ~= nil then
+        reach = math.max(reach, context.weaponRange)
+    end
+    if distance > reach then
         return false, "Move closer to the " .. displayName .. "."
     end
 
@@ -16703,7 +16804,16 @@ function EnemyService.damageNearest(self: EnemyService, player: Player): (boolea
     local facingDot = if directionToPlayer.Magnitude > 0.01
         then primary.CFrame.LookVector:Dot(directionToPlayer.Unit)
         else 1
+    -- The strike lands: show it. The player-side swing or arrow is world
+    -- presentation, so WorldService draws it; it needs the target to aim the
+    -- shot, and this is the one place both ends of the strike are known.
+    self._worldService:showStrikeFeedback(player, context, primary.Position)
     local damage, strikeResult = self._enemyCombatRules.strikeDamage(enemy.definition, facingDot)
+    if context ~= nil and type(context.damageMultiplier) == "number" then
+        -- Tool identity, bounded: the axe's edge and the bow's reach trade
+        -- against each other, and neither can silence an enemy's mechanics.
+        damage = math.floor(damage * math.clamp(context.damageMultiplier, 0.5, 1.5) + 0.5)
+    end
     enemy.health -= damage
     enemy.model:SetAttribute("EnemyHealth", math.max(0, enemy.health))
     self:_showDamageFeedback(enemy, damage, strikeResult)
@@ -17567,6 +17677,15 @@ local function targetFor(character: Model, targetName: string): BasePart?
     if targetName == "head" then
         return character:FindFirstChild("Head") :: BasePart?
     end
+    if targetName == "RightHand" then
+        for _, name in { "RightHand", "Right Arm" } do
+            local candidate = character:FindFirstChild(name)
+            if candidate ~= nil and candidate:IsA("BasePart") then
+                return candidate
+            end
+        end
+        return nil
+    end
     local names = if targetName == "leftFoot"
         then { "LeftFoot", "LeftLowerLeg", "Left Leg" }
         else { "RightFoot", "RightLowerLeg", "Right Leg" }
@@ -17623,6 +17742,20 @@ local function buildPart(parent: Model, target: BasePart, plan: any): BasePart
     return visual
 end
 
+local function buildHeldPart(model: Model, target: BasePart, visual: BasePart)
+    visual.Anchored = false
+    visual.CanCollide = false
+    visual.CanTouch = false
+    visual.CanQuery = false
+    visual.Massless = true
+    visual.CastShadow = true
+    visual.Parent = model
+    local weld = Instance.new("WeldConstraint")
+    weld.Part0 = target
+    weld.Part1 = visual
+    weld.Parent = visual
+end
+
 function GearVisualService._refresh(self: GearVisualService, player: Player)
     local character = player.Character
     if character == nil or character.Parent == nil then
@@ -17655,6 +17788,68 @@ function GearVisualService._refresh(self: GearVisualService, player: Player)
             end
         end
     end
+    --[[
+        The held tool, in the hand that uses it.
+
+        A strike used to happen with visibly empty hands. The selected starter
+        tool (and the bow when one is equipped) is welded to the right hand as
+        a small silhouette: enough to say what the character is holding at
+        gameplay distance, cheap enough to rebuild on every respawn. The torch
+        also actually lights -- its blurb says "lights the dark", and a claim
+        on a plaque has to be true in play.
+    ]]
+    local rightHand = targetFor(character, "RightHand")
+    -- The bow's visual comes from GearVisualPlan like every other equipment
+    -- piece; only the starter tools are held here, because they are tutorial
+    -- state rather than equipment. A weapon in the hand wins the hand.
+    local heldId = if equipped.weapon ~= nil then nil else self._profileService:selectedTool(player)
+    if rightHand ~= nil and heldId ~= nil then
+        local hold = CFrame.new(0, -0.55, 0)
+        if heldId == "axe" or heldId == "hammer" or heldId == "torch" then
+            local handle = Instance.new("Part")
+            handle.Name = "HeldToolHandle"
+            handle.Size = Vector3.new(0.28, 2.4, 0.28)
+            handle.Color = Color3.fromRGB(111, 76, 48)
+            handle.Material = Enum.Material.Wood
+            handle.CFrame = rightHand.CFrame * hold
+            buildHeldPart(model, rightHand, handle)
+            visualPartCount += 1
+            if heldId == "axe" then
+                local head = Instance.new("Part")
+                head.Name = "HeldAxeHead"
+                head.Size = Vector3.new(1.15, 0.5, 0.26)
+                head.Color = Color3.fromRGB(154, 169, 174)
+                head.Material = Enum.Material.Metal
+                head.CFrame = rightHand.CFrame * hold * CFrame.new(0.35, 1.0, 0)
+                buildHeldPart(model, rightHand, head)
+                visualPartCount += 1
+            elseif heldId == "hammer" then
+                local head = Instance.new("Part")
+                head.Name = "HeldHammerHead"
+                head.Size = Vector3.new(1.05, 0.55, 0.55)
+                head.Color = Color3.fromRGB(123, 132, 137)
+                head.Material = Enum.Material.Metal
+                head.CFrame = rightHand.CFrame * hold * CFrame.new(0, 1.05, 0)
+                buildHeldPart(model, rightHand, head)
+                visualPartCount += 1
+            else
+                local flame = Instance.new("Part")
+                flame.Name = "HeldTorchFlame"
+                flame.Size = Vector3.new(0.5, 0.9, 0.5)
+                flame.Color = Color3.fromRGB(255, 158, 54)
+                flame.Material = Enum.Material.Neon
+                flame.CFrame = rightHand.CFrame * hold * CFrame.new(0, 1.35, 0)
+                buildHeldPart(model, rightHand, flame)
+                local glow = Instance.new("PointLight")
+                glow.Color = Color3.fromRGB(255, 168, 82)
+                glow.Brightness = 1.6
+                glow.Range = 16
+                glow.Shadows = false
+                glow.Parent = flame
+                visualPartCount += 1
+            end
+        end
+    end
     model:SetAttribute("VisualPartCount", visualPartCount)
     model.Parent = character
 end
@@ -17673,6 +17868,17 @@ function GearVisualService._bindPlayer(self: GearVisualService, player: Player)
             self:_refresh(player)
         end)
     end
+end
+
+--[[
+    Public refresh: the tool yard calls this the moment a starter tool is
+    chosen, so the tool appears in the hand at the pedestal rather than on the
+    next respawn.
+]]
+function GearVisualService.refresh(self: GearVisualService, player: Player)
+    task.defer(function()
+        self:_refresh(player)
+    end)
 end
 
 function GearVisualService.Init(self: GearVisualService)
@@ -22253,9 +22459,19 @@ function ProfileService.setTutorial(
         return false
     end
 
+    local previousTool = profile.tutorial.selectedTool
     self._profiles[player] = self._saveSchema.withTutorial(profile, stage, selectedTool, os.time())
     if self._persistent and self._writable[player] == true then
         self._dirty[player] = true
+    end
+    if selectedTool ~= previousTool then
+        -- The held-tool visual rides the equipment-changed signal: choosing a
+        -- starter tool should put it in the hand at the pedestal, not on the
+        -- next respawn, and the gear visual service already listens here.
+        self._equipmentChangedEvent:Fire(
+            player,
+            self._saveSchema.equippedSnapshot(self._profiles[player])
+        )
     end
     return true
 end
@@ -22523,6 +22739,22 @@ function ProfileService.equippedSnapshot(self: ProfileService, player: Player): 
         return {}
     end
     return self._saveSchema.equippedSnapshot(profile)
+end
+
+function ProfileService.selectedTool(self: ProfileService, player: Player): string?
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return profile.tutorial.selectedTool
+end
+
+function ProfileService.weaponStrikeProfile(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return self._saveSchema.weaponStrikeProfile(profile)
 end
 
 function ProfileService.equipmentStats(self: ProfileService, player: Player): any
@@ -24350,8 +24582,20 @@ function TutorialService._beginTimedAction(
         return false
     end
     local now = workspace:GetServerTimeNow()
-    local nextState, result =
-        self._actionProgress.begin(self._actions[player], actionId, interactionId, now)
+    local session = self._sessions[player]
+    -- The hammer is the worker's tool: gather and build run a quarter faster
+    -- with it in hand. Combat identity lives in _strikeContext; this is the
+    -- hammer's half of "the three tools actually differ".
+    local durationMultiplier = if session ~= nil and session.selectedTool == "hammer"
+        then 0.75
+        else 1
+    local nextState, result = self._actionProgress.begin(
+        self._actions[player],
+        actionId,
+        interactionId,
+        now,
+        durationMultiplier
+    )
     self._actions[player] = nextState
     if not result.accepted then
         if result.reason == "already_working" then
@@ -24410,6 +24654,37 @@ function TutorialService.adminGrantResources(self: TutorialService, player: Play
     self:_publish(player)
 end
 
+--[[
+    What the striker is holding, resolved server-side.
+
+    The three starter tools finally mean something: the axe hits a quarter
+    harder, the torch's swung fire reaches four studs further at a small cost,
+    and the hammer keeps its identity at the workbench rather than in combat
+    (it swings build and repair work faster). A ranged weapon in the equipment
+    slot extends reach to its own range and marks the strike as a shot, which
+    is what the client's arrow visual keys off. All numbers live here and in
+    Equipment; a client never submits any of them.
+]]
+function TutorialService._strikeContext(self: TutorialService, player: Player): any
+    local session = self._sessions[player]
+    local context = { rangeBonus = 0, damageMultiplier = 1 }
+    local tool = if session ~= nil then session.selectedTool else nil
+    if tool == "axe" then
+        context.damageMultiplier = 1.25
+    elseif tool == "torch" then
+        context.rangeBonus = 4
+        context.damageMultiplier = 0.9
+    end
+    local weapon = self._profileService:weaponStrikeProfile(player)
+    if weapon ~= nil then
+        context.weaponRange = weapon.strikeRange
+        context.damageMultiplier = weapon.strikeDamageMultiplier
+        context.ranged = true
+        context.weaponId = weapon.itemId
+    end
+    return context
+end
+
 function TutorialService.strike(self: TutorialService, player: Player)
     local session = self._sessions[player]
     if
@@ -24417,7 +24692,8 @@ function TutorialService.strike(self: TutorialService, player: Player)
         and self._survivalService:canAct(player)
         and (session.stage == "survive" or player:GetAttribute("LastLightInExpedition") == true)
     then
-        local _, message = self._enemyService:damageNearest(player)
+        local context = self:_strikeContext(player)
+        local _, message = self._enemyService:damageNearest(player, context)
         self:_setToast(player, message)
         self:_publishAll()
     end
@@ -25015,7 +25291,73 @@ end
     interaction registry rather than a coordinate table, so a marker cannot
     drift from the thing it points at when a lot moves.
 ]]
-function TutorialService._objectiveTargets(self: TutorialService, session: Session): { any }
+function TutorialService._objectiveTargets(
+    self: TutorialService,
+    player: Player,
+    session: Session
+): { any }
+    --[[
+        In the expedition, the objective is whatever the Blackout wants next.
+        The owner's tablet run made the gap concrete: "take rootfire from the
+        Blackout Lantern" with no marker on the lantern, in the dark, in an
+        unfamiliar forest. Every stage of the chapter now points somewhere --
+        the fire source (or any lit root) when hands are empty, the next
+        unlit root while carrying, the arenas for the encounters, the
+        planters for the vote, and the Wayhome gate once the chapter is done.
+    ]]
+    if player:GetAttribute("LastLightInExpedition") == true then
+        local resolved = {}
+        local function add(part: BasePart?, label: string)
+            if part ~= nil and part:IsA("BasePart") then
+                table.insert(resolved, {
+                    interactionId = part.Name,
+                    x = part.Position.X,
+                    y = part.Position.Y,
+                    z = part.Position.Z,
+                    label = label,
+                })
+            end
+        end
+        local blackout = self._blackoutService:snapshot(player)
+        local arena = self._worldService:blackoutArena()
+        if blackout ~= nil and arena ~= nil then
+            if blackout.status == "relay" then
+                if blackout.carryingFire and blackout.nextNodeId ~= nil then
+                    add(arena.relayNodes[blackout.nextNodeId], "DELIVER ROOTFIRE")
+                else
+                    add(arena.fireSource, "TAKE ROOTFIRE")
+                    for nodeId, delivered in blackout.deliveredNodes or {} do
+                        if delivered == true then
+                            add(arena.relayNodes[nodeId], "TAKE ROOTFIRE")
+                        end
+                    end
+                end
+                return resolved
+            elseif blackout.status == "old_growth" then
+                local eliteArena = self._worldService:oldGrowthArena()
+                if eliteArena ~= nil then
+                    add(eliteArena.fireSource, "CLEANSE OLD GROWTH")
+                end
+                return resolved
+            elseif blackout.status == "warden" then
+                local bossSeal = self._worldService:wardenSealPart()
+                add(bossSeal, "FACE THE WARDEN STAG")
+                return resolved
+            elseif blackout.status == "resolution" then
+                for _, target in arena.decisions do
+                    add(target, "CAST YOUR VOTE")
+                end
+                return resolved
+            end
+        end
+        -- Chapter resolved or Blackout disabled: home is the objective.
+        local wayhome = self._worldService:interaction(self._runtimeIds.InteractionIds.Wayhome)
+        local holder = if wayhome ~= nil then wayhome.Parent else nil
+        if holder ~= nil and holder:IsA("BasePart") then
+            add(holder, "WAYHOME GATE")
+        end
+        return resolved
+    end
     local definition = self._tutorialFlow.definition(session.stage)
     local targets = definition.targets
     if targets == nil then
@@ -25259,7 +25601,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         townCondition = self._townNightService:conditionSnapshot(),
         recipes = self._craftingCatalog:list(),
         equipmentCatalog = self._equipmentCatalog.list(),
-        objectiveTargets = self:_objectiveTargets(session),
+        objectiveTargets = self:_objectiveTargets(player, session),
         quests = self._profileService:questSnapshot(player),
         memoryArchive = self._profileService:memoryFragments(player),
         combat = self._combatService:snapshot(player),
@@ -27435,6 +27777,45 @@ local function buildEmberhollowSanctuary(
     townSideRoad(Vector3.new(0, 0.45, -184), Vector3.new(-80, 0.45, -184))
     townSideRoad(Vector3.new(0, 0.45, -164), Vector3.new(80, 0.45, -164))
     townSideRoad(Vector3.new(0, 0.45, -198), Vector3.new(50, 0.45, -198))
+    --[[
+        A square that reads as a city centre.
+
+        The pad alone read as road-through-grass with a lantern on it. Two
+        rotated paving bands make a deliberate concentric plaza around the
+        shrine, and a lamp post at each corner frames the space the way the
+        watchtowers frame the gate. All visual skins; the walk plane and the
+        night-fight arena are unchanged.
+    ]]
+    for band = 1, 2 do
+        local size = PLAZA_HALF * 2 - band * 26
+        local paving = part(
+            parent,
+            "TownSquarePavingBand",
+            Vector3.new(size, 0.08, size),
+            CFrame.new(courtyard + Vector3.new(0, 0.36 + band * 0.03, 0))
+                * CFrame.Angles(0, math.rad(if band == 1 then 45 else 0), 0),
+            if band == 1 then Color3.fromRGB(96, 88, 70) else Color3.fromRGB(72, 68, 58),
+            Enum.Material.Cobblestone,
+            false
+        )
+        paving.CanQuery = false
+    end
+    for cornerX = -1, 1, 2 do
+        for cornerZ = -1, 1, 2 do
+            table.insert(meshPlacements, {
+                assetId = "mesh_lantern_post_a",
+                fallbackKind = "asset_dressing",
+                position = courtyard
+                    + Vector3.new(cornerX * (PLAZA_HALF - 7), 0.4, cornerZ * (PLAZA_HALF - 7)),
+                scale = 1,
+                yaw = math.atan2(-cornerX, -cornerZ),
+                seed = 9930 + cornerX * 2 + cornerZ,
+                swayTag = nil,
+                parent = parent,
+                fallbackInstance = nil,
+            })
+        end
+    end
     local square = part(
         parent,
         "FirstLanternTownSquare",
@@ -31093,7 +31474,18 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         )
         labelAnchor.Transparency = 1
         labelAnchor.CanQuery = false
-        addBillboard(labelAnchor, string.upper(definition.tool), definition.color)
+        --[[
+            The label finally says what the choice means. "AXE / HAMMER /
+            TORCH" told a player nothing -- the owner's words: "I have no idea
+            what to select because I don't know what the in-game difference
+            is." The second line is the difference, and the numbers behind it
+            live in TutorialService._strikeContext and ActionProgress.begin.
+        ]]
+        local toolBlurb = if definition.tool == "axe"
+            then "AXE\nHITS 25% HARDER"
+            elseif definition.tool == "hammer" then "HAMMER\nWORKS 25% FASTER"
+            else "TORCH\nLONGER REACH · LIGHTS THE DARK"
+        addBillboard(labelAnchor, toolBlurb, definition.color)
         self:_registerInteraction(
             pedestal,
             definition.id,
@@ -31221,6 +31613,92 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     -- the moment the mesh loads. They stay collidable while invisible, which
     -- is what keeps players able to walk up onto the dais either way, and
     -- lanternBase remains the interaction anchor exactly as before.
+    --[[
+        The shrine the lantern deserves.
+
+        The owner's note: the First Lantern read as "a lantern in the middle
+        of a road". The town's whole fiction hangs on this object -- it is
+        the reason Emberhollow exists -- so it now stands in a built place: a
+        two-ring walkable stone dais, four standing stones carrying amber
+        shrine lamps at the diagonals (the street's line stays open north and
+        south), and an inlaid amber ring in the paving. Everything here is a
+        few parts, collidable only where a player can stand, and none of it
+        moves the interaction anchor or the plinth the mesh sits on.
+    ]]
+    local shrineDais = part(
+        firstLanternFallback,
+        "ShrineDais",
+        Vector3.new(19, 0.9, 19),
+        CFrame.new(0, 0.45, TOWN_CENTER.Z) * CFrame.Angles(0, math.rad(45), 0),
+        Color3.fromRGB(74, 78, 74),
+        Enum.Material.Slate
+    )
+    shrineDais.CanQuery = false
+    local shrineUpper = part(
+        firstLanternFallback,
+        "ShrineDaisUpper",
+        Vector3.new(14, 0.8, 14),
+        CFrame.new(0, 1.05, TOWN_CENTER.Z),
+        Color3.fromRGB(84, 88, 82),
+        Enum.Material.Slate
+    )
+    shrineUpper.CanQuery = false
+    local shrineInlay = part(
+        firstLanternFallback,
+        "ShrineInlayRing",
+        Vector3.new(11, 0.1, 11),
+        CFrame.new(0, 1.5, TOWN_CENTER.Z) * CFrame.Angles(0, math.rad(45), 0),
+        AMBER,
+        Enum.Material.Neon,
+        false
+    )
+    shrineInlay.Transparency = 0.55
+    shrineInlay.CanQuery = false
+    shrineInlay.CastShadow = false
+    CollectionService:AddTag(shrineInlay, self._runtimeIds.AmbientLightTag)
+    for corner = 0, 3 do
+        local angle = math.rad(45 + corner * 90)
+        local offset = Vector3.new(math.cos(angle) * 10.5, 0, math.sin(angle) * 10.5)
+        local pillar = part(
+            firstLanternFallback,
+            "ShrineStone",
+            Vector3.new(1.4, 6.4, 1.4),
+            CFrame.new(Vector3.new(0, 3.2, TOWN_CENTER.Z) + offset)
+                * CFrame.Angles(math.rad(2), angle, math.rad(-2)),
+            Color3.fromRGB(64, 70, 68),
+            Enum.Material.Slate
+        )
+        pillar.CanQuery = false
+        local cap = part(
+            firstLanternFallback,
+            "ShrineStoneCap",
+            Vector3.new(1.8, 0.5, 1.8),
+            CFrame.new(Vector3.new(0, 6.6, TOWN_CENTER.Z) + offset) * CFrame.Angles(0, angle, 0),
+            Color3.fromRGB(52, 56, 55),
+            Enum.Material.Slate,
+            false
+        )
+        cap.CanQuery = false
+        local lamp = part(
+            firstLanternFallback,
+            "ShrineLamp",
+            Vector3.new(0.75, 0.75, 0.75),
+            CFrame.new(Vector3.new(0, 7.25, TOWN_CENTER.Z) + offset),
+            AMBER,
+            Enum.Material.Neon,
+            false
+        )
+        lamp.Shape = Enum.PartType.Ball
+        lamp.CanQuery = false
+        lamp.CastShadow = false
+        local lampLight = Instance.new("PointLight")
+        lampLight.Color = AMBER
+        lampLight.Brightness = 1.4
+        lampLight.Range = 16
+        lampLight.Shadows = false
+        lampLight.Parent = lamp
+        CollectionService:AddTag(lamp, self._runtimeIds.AmbientLightTag)
+    end
     local lanternBase = part(
         firstLanternFallback,
         "FirstLantern",
@@ -31234,7 +31712,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             firstLanternFallback,
             "FirstLanternPlinth",
             Vector3.new(10.5 - stepIndex * 1.45, 0.52, 10.5 - stepIndex * 1.45),
-            CFrame.new(0, -0.16 + stepIndex * 0.42, TOWN_CENTER.Z),
+            CFrame.new(0, 1.05 + stepIndex * 0.42, TOWN_CENTER.Z),
             if stepIndex % 2 == 0 then Color3.fromRGB(76, 79, 73) else Color3.fromRGB(61, 66, 62),
             Enum.Material.Slate
         )
@@ -31369,7 +31847,8 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         -- Base slightly set into the 0.38-top square pad. At y = 0 the
         -- lantern's own authored plinth was swallowed by the pad and the
         -- town's centrepiece read almost a stud shorter than authored.
-        position = Vector3.new(0, 0.32, TOWN_CENTER.Z),
+        -- Base atop the shrine dais (upper ring tops at 1.45).
+        position = Vector3.new(0, 1.5, TOWN_CENTER.Z),
         scale = 0.95,
         yaw = math.rad(8),
         seed = 9314,
@@ -31768,6 +32247,13 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             label = "BRAMBLE BOOTS",
             x = 48,
             color = Color3.fromRGB(142, 112, 84),
+        },
+        {
+            id = self._runtimeIds.InteractionIds.CraftThornwoodBow,
+            recipeId = "recipe_thornwood_bow",
+            label = "THORNWOOD BOW",
+            x = -60,
+            color = Color3.fromRGB(164, 132, 78),
         },
     }
     for _, definition in craftingBenches do
@@ -35953,6 +36439,12 @@ function WorldService.showRecoveryCache(self: WorldService, player: Player, cach
     prompt:SetAttribute("OwnerUserId", player.UserId)
 end
 
+function WorldService.wardenSealPart(self: WorldService): BasePart?
+    local arena = self._wardenStagArena
+    local seal = if arena ~= nil then arena.seal else nil
+    return if seal ~= nil and seal:IsA("BasePart") then seal else nil
+end
+
 function WorldService.blackoutArena(self: WorldService): any
     return self._blackoutArena
 end
@@ -36116,18 +36608,34 @@ function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
         so silhouettes separate, and brightness is down so the lantern-fire
         the Blackout is about is the brightest thing in frame.
     ]]
-    Lighting.Brightness = 1.15
-    Lighting.Ambient = Color3.fromRGB(58, 66, 74)
-    Lighting.OutdoorAmbient = Color3.fromRGB(46, 54, 64)
-    Lighting.ExposureCompensation = -0.1
+    --[[
+        Tablet screenshots from the owner showed what these values actually
+        render as on hardware: a black screen with a faint character outline.
+        The previous rewrite fixed the flat teal wash but kept a floor that
+        Studio-on-a-workstation flattered and a real device crushed to
+        nothing. A Blackout must read as a dangerous night the player can
+        still play: ground visible underfoot, trunks separating from sky,
+        and the carried fire still the brightest thing in frame.
+    ]]
+    Lighting.Brightness = 1.6
+    Lighting.Ambient = Color3.fromRGB(96, 104, 118)
+    Lighting.OutdoorAmbient = Color3.fromRGB(88, 98, 114)
+    Lighting.ExposureCompensation = 0.25
+    local atmosphere = Lighting:FindFirstChild("LastLightAtmosphere")
+    if atmosphere ~= nil and atmosphere:IsA("Atmosphere") then
+        -- Night haze was eating what little light survived; the Blackout
+        -- keeps its cool cast through the tint below instead.
+        atmosphere.Density = 0.28
+        atmosphere.Haze = 1.1
+    end
     local color = if effect ~= nil and effect:IsA("ColorCorrectionEffect")
         then effect
         else Instance.new("ColorCorrectionEffect")
     color.Name = "LastLightBlackoutColor"
-    color.Brightness = -0.02
-    color.Contrast = 0.16
-    color.Saturation = 0.04
-    color.TintColor = Color3.fromRGB(214, 228, 224)
+    color.Brightness = 0.03
+    color.Contrast = 0.12
+    color.Saturation = -0.05
+    color.TintColor = Color3.fromRGB(210, 222, 230)
     color.Parent = Lighting
 end
 
@@ -37271,6 +37779,106 @@ end
     prompt's own text changes for a player who already has it, which the
     tutorial service reports.
 ]]
+--[[
+    The visible half of a strike.
+
+    Tapping a monster used to change a number and nothing else -- no swing, no
+    shot, nothing on the character. The owner asked for the character to look
+    like he is hitting it with whatever he holds. Real rig animations are a
+    later asset pass; what sells the hit today is a fast arc of the tool's
+    colour swept toward the target for a melee blow, and a visible arrow that
+    flies the actual path for a bow shot. Both are short-lived anchored parts
+    the server spawns and Debris clears; they carry no collision, no queries,
+    and no authority -- the damage they illustrate was already applied.
+]]
+function WorldService.showStrikeFeedback(
+    _self: WorldService,
+    player: Player,
+    context: any,
+    targetPosition: Vector3
+)
+    local character = player.Character
+    local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+    if root == nil or not root:IsA("BasePart") then
+        return
+    end
+    local origin = root.Position + Vector3.new(0, 0.6, 0)
+    local toTarget = targetPosition - origin
+    if toTarget.Magnitude < 0.5 then
+        return
+    end
+    local direction = toTarget.Unit
+    if context ~= nil and context.ranged == true then
+        -- An arrow that flies the real path. Tween-free: two frames placed by
+        -- Heartbeat would jitter under load, so it is one anchored shaft
+        -- lerped by a spawned loop across a tenth of a second per 12 studs.
+        local arrow = Instance.new("Part")
+        arrow.Name = "StrikeArrow"
+        arrow.Size = Vector3.new(0.12, 0.12, 2.6)
+        arrow.Color = Color3.fromRGB(214, 178, 118)
+        arrow.Material = Enum.Material.Wood
+        arrow.Anchored = true
+        arrow.CanCollide = false
+        arrow.CanTouch = false
+        arrow.CanQuery = false
+        arrow.CastShadow = false
+        local tip = Instance.new("Part")
+        tip.Name = "StrikeArrowTip"
+        tip.Size = Vector3.new(0.2, 0.2, 0.34)
+        tip.Color = Color3.fromRGB(120, 129, 134)
+        tip.Material = Enum.Material.Metal
+        tip.Anchored = true
+        tip.CanCollide = false
+        tip.CanTouch = false
+        tip.CanQuery = false
+        tip.CastShadow = false
+        arrow.Parent = workspace
+        tip.Parent = workspace
+        local flightSeconds = math.clamp(toTarget.Magnitude / 120, 0.08, 0.35)
+        task.spawn(function()
+            local started = os.clock()
+            while true do
+                local alpha = math.clamp((os.clock() - started) / flightSeconds, 0, 1)
+                local position = origin:Lerp(targetPosition, alpha)
+                local frame = CFrame.lookAt(position, position + direction)
+                arrow.CFrame = frame
+                tip.CFrame = frame * CFrame.new(0, 0, -1.45)
+                if alpha >= 1 then
+                    break
+                end
+                task.wait()
+            end
+            arrow:Destroy()
+            tip:Destroy()
+        end)
+    else
+        -- A melee swing: a thin arc of the held tool's colour, swept from the
+        -- character toward the target and gone in a sixth of a second.
+        local swing = Instance.new("Part")
+        swing.Name = "StrikeSwingArc"
+        swing.Size = Vector3.new(3.4, 0.18, 1.4)
+        swing.Color = Color3.fromRGB(255, 220, 156)
+        swing.Material = Enum.Material.Neon
+        swing.Transparency = 0.25
+        swing.Anchored = true
+        swing.CanCollide = false
+        swing.CanTouch = false
+        swing.CanQuery = false
+        swing.CastShadow = false
+        swing.CFrame = CFrame.lookAt(origin + direction * 2.4, targetPosition)
+            * CFrame.Angles(0, 0, math.rad(24))
+        swing.Parent = workspace
+        task.spawn(function()
+            for step = 1, 4 do
+                swing.CFrame = swing.CFrame * CFrame.Angles(0, 0, math.rad(-16))
+                swing.Transparency = 0.25 + step * 0.17
+                task.wait(0.035)
+            end
+            swing:Destroy()
+        end)
+    end
+end
+
 function WorldService.memoryFragmentTarget(self: WorldService, interactionId: string): any
     return self._memoryFragmentTargets[interactionId]
 end
@@ -40570,19 +41178,26 @@ local function buildResourceNodes(
         anchor.Transparency = 1
         anchor.CanCollide = false
 
+        --[[
+            Small and quiet on purpose. At 1.15 studs and 0.62 transparency,
+            five of these in one camera frame read as a row of blinding
+            yellow orbs brighter than any actual objective -- the owner's
+            tablet screenshot showed exactly that. A resource cue should be
+            findable when looked for, not the loudest thing on screen.
+        ]]
         local glow = part(
             module,
             "ResourceGlow",
-            Vector3.new(1.15, 1.15, 1.15),
+            Vector3.new(0.7, 0.7, 0.7),
             CFrame.new(at + Vector3.new(0, 3.2, 0)),
             if isSap then Color3.fromRGB(255, 186, 84) else Color3.fromRGB(120, 214, 178),
             Enum.Material.Neon,
             false
         )
         glow.Shape = Enum.PartType.Ball
-        glow.Transparency = 0.62
+        glow.Transparency = 0.8
         glow.CastShadow = false
-        light(glow, glow.Color, 0.75, 17)
+        light(glow, glow.Color, 0.4, 12)
         CollectionService:AddTag(glow, runtimeIds.AmbientLightTag)
 
         table.insert(meshPlacements, {
@@ -45444,6 +46059,19 @@ local function createItemIcon(parent: Instance, itemId: string, size: number): V
         )
         ring.Shape = Enum.PartType.Cylinder
         ring.Orientation = Vector3.new(0, 0, 90)
+    elseif itemId == "gear_thornwood_bow" then
+        shape(
+            "Stave",
+            Vector3.new(0.35, 2.6, 0.5),
+            Vector3.new(0.2, 0, 0),
+            Color3.fromRGB(112, 84, 52)
+        )
+        shape(
+            "String",
+            Vector3.new(0.12, 2.4, 0.12),
+            Vector3.new(-0.45, 0, 0),
+            Color3.fromRGB(214, 205, 186)
+        )
     elseif itemId == "gear_ironroot_hood" then
         shape(
             "Hood",
@@ -46367,6 +46995,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         {
             { id = "gear_ironroot_hood", label = "EQUIP HOOD" },
             { id = "gear_bramble_boots", label = "EQUIP BOOTS" },
+            { id = "gear_thornwood_bow", label = "EQUIP BOW" },
         }
     do
         local button = Instance.new("TextButton")
@@ -47750,11 +48379,21 @@ function HUDController.update(self: HUDController, state: any)
         self._mara.Text = maraLine
         self._mara.TextTransparency = 0
     end
+    --[[
+        The held pill: what is in your hand right now. A weapon in the
+        equipment slot outranks the starter tool, matching the visual on the
+        character and the strike numbers on the server.
+    ]]
+    local equipped = state.equipped
+    local heldWeapon = if type(equipped) == "table" and equipped.weapon ~= nil then "BOW" else nil
     self._resource.Text = string.format(
         "HEARTWOOD · %d%s",
         tonumber(state.resources) or 0,
-        if state.selectedTool ~= nil
-            then "  ·  " .. string.upper(tostring(state.selectedTool))
+        if heldWeapon ~= nil
+            then "  ·  🏹 " .. heldWeapon
+            elseif state.selectedTool ~= nil then "  ·  " .. string.upper(
+                tostring(state.selectedTool)
+            )
             else ""
     )
     local nightActive = state.nightActive == true

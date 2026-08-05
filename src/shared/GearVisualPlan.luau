@@ -49,6 +49,32 @@ local brambleSole = { 31, 28, 24 }
 local livingVine = { 78, 95, 48 }
 
 local DEFINITIONS: { [string]: ItemPlan } = {
+    gear_thornwood_bow = table.freeze({
+        itemId = "gear_thornwood_bow",
+        slot = "weapon",
+        parts = table.freeze({
+            part(
+                "BowStave",
+                "RightHand",
+                "Block",
+                { 0.22, 3.1, 0.5 },
+                { 0, -0.55, 0 },
+                { 0, 0, 12 },
+                { 112, 84, 52 },
+                "Wood"
+            ),
+            part(
+                "BowString",
+                "RightHand",
+                "Block",
+                { 0.06, 2.9, 0.06 },
+                { 0.3, -0.55, 0 },
+                { 0, 0, 0 },
+                { 214, 205, 186 },
+                "Fabric"
+            ),
+        }),
+    }),
     gear_ironroot_hood = table.freeze({
         itemId = "gear_ironroot_hood",
         slot = "head",

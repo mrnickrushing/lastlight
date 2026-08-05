@@ -456,8 +456,20 @@ function TutorialService._beginTimedAction(
         return false
     end
     local now = workspace:GetServerTimeNow()
-    local nextState, result =
-        self._actionProgress.begin(self._actions[player], actionId, interactionId, now)
+    local session = self._sessions[player]
+    -- The hammer is the worker's tool: gather and build run a quarter faster
+    -- with it in hand. Combat identity lives in _strikeContext; this is the
+    -- hammer's half of "the three tools actually differ".
+    local durationMultiplier = if session ~= nil and session.selectedTool == "hammer"
+        then 0.75
+        else 1
+    local nextState, result = self._actionProgress.begin(
+        self._actions[player],
+        actionId,
+        interactionId,
+        now,
+        durationMultiplier
+    )
     self._actions[player] = nextState
     if not result.accepted then
         if result.reason == "already_working" then
@@ -516,6 +528,37 @@ function TutorialService.adminGrantResources(self: TutorialService, player: Play
     self:_publish(player)
 end
 
+--[[
+    What the striker is holding, resolved server-side.
+
+    The three starter tools finally mean something: the axe hits a quarter
+    harder, the torch's swung fire reaches four studs further at a small cost,
+    and the hammer keeps its identity at the workbench rather than in combat
+    (it swings build and repair work faster). A ranged weapon in the equipment
+    slot extends reach to its own range and marks the strike as a shot, which
+    is what the client's arrow visual keys off. All numbers live here and in
+    Equipment; a client never submits any of them.
+]]
+function TutorialService._strikeContext(self: TutorialService, player: Player): any
+    local session = self._sessions[player]
+    local context = { rangeBonus = 0, damageMultiplier = 1 }
+    local tool = if session ~= nil then session.selectedTool else nil
+    if tool == "axe" then
+        context.damageMultiplier = 1.25
+    elseif tool == "torch" then
+        context.rangeBonus = 4
+        context.damageMultiplier = 0.9
+    end
+    local weapon = self._profileService:weaponStrikeProfile(player)
+    if weapon ~= nil then
+        context.weaponRange = weapon.strikeRange
+        context.damageMultiplier = weapon.strikeDamageMultiplier
+        context.ranged = true
+        context.weaponId = weapon.itemId
+    end
+    return context
+end
+
 function TutorialService.strike(self: TutorialService, player: Player)
     local session = self._sessions[player]
     if
@@ -523,7 +566,8 @@ function TutorialService.strike(self: TutorialService, player: Player)
         and self._survivalService:canAct(player)
         and (session.stage == "survive" or player:GetAttribute("LastLightInExpedition") == true)
     then
-        local _, message = self._enemyService:damageNearest(player)
+        local context = self:_strikeContext(player)
+        local _, message = self._enemyService:damageNearest(player, context)
         self:_setToast(player, message)
         self:_publishAll()
     end
@@ -1121,7 +1165,73 @@ end
     interaction registry rather than a coordinate table, so a marker cannot
     drift from the thing it points at when a lot moves.
 ]]
-function TutorialService._objectiveTargets(self: TutorialService, session: Session): { any }
+function TutorialService._objectiveTargets(
+    self: TutorialService,
+    player: Player,
+    session: Session
+): { any }
+    --[[
+        In the expedition, the objective is whatever the Blackout wants next.
+        The owner's tablet run made the gap concrete: "take rootfire from the
+        Blackout Lantern" with no marker on the lantern, in the dark, in an
+        unfamiliar forest. Every stage of the chapter now points somewhere --
+        the fire source (or any lit root) when hands are empty, the next
+        unlit root while carrying, the arenas for the encounters, the
+        planters for the vote, and the Wayhome gate once the chapter is done.
+    ]]
+    if player:GetAttribute("LastLightInExpedition") == true then
+        local resolved = {}
+        local function add(part: BasePart?, label: string)
+            if part ~= nil and part:IsA("BasePart") then
+                table.insert(resolved, {
+                    interactionId = part.Name,
+                    x = part.Position.X,
+                    y = part.Position.Y,
+                    z = part.Position.Z,
+                    label = label,
+                })
+            end
+        end
+        local blackout = self._blackoutService:snapshot(player)
+        local arena = self._worldService:blackoutArena()
+        if blackout ~= nil and arena ~= nil then
+            if blackout.status == "relay" then
+                if blackout.carryingFire and blackout.nextNodeId ~= nil then
+                    add(arena.relayNodes[blackout.nextNodeId], "DELIVER ROOTFIRE")
+                else
+                    add(arena.fireSource, "TAKE ROOTFIRE")
+                    for nodeId, delivered in blackout.deliveredNodes or {} do
+                        if delivered == true then
+                            add(arena.relayNodes[nodeId], "TAKE ROOTFIRE")
+                        end
+                    end
+                end
+                return resolved
+            elseif blackout.status == "old_growth" then
+                local eliteArena = self._worldService:oldGrowthArena()
+                if eliteArena ~= nil then
+                    add(eliteArena.fireSource, "CLEANSE OLD GROWTH")
+                end
+                return resolved
+            elseif blackout.status == "warden" then
+                local bossSeal = self._worldService:wardenSealPart()
+                add(bossSeal, "FACE THE WARDEN STAG")
+                return resolved
+            elseif blackout.status == "resolution" then
+                for _, target in arena.decisions do
+                    add(target, "CAST YOUR VOTE")
+                end
+                return resolved
+            end
+        end
+        -- Chapter resolved or Blackout disabled: home is the objective.
+        local wayhome = self._worldService:interaction(self._runtimeIds.InteractionIds.Wayhome)
+        local holder = if wayhome ~= nil then wayhome.Parent else nil
+        if holder ~= nil and holder:IsA("BasePart") then
+            add(holder, "WAYHOME GATE")
+        end
+        return resolved
+    end
     local definition = self._tutorialFlow.definition(session.stage)
     local targets = definition.targets
     if targets == nil then
@@ -1365,7 +1475,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         townCondition = self._townNightService:conditionSnapshot(),
         recipes = self._craftingCatalog:list(),
         equipmentCatalog = self._equipmentCatalog.list(),
-        objectiveTargets = self:_objectiveTargets(session),
+        objectiveTargets = self:_objectiveTargets(player, session),
         quests = self._profileService:questSnapshot(player),
         memoryArchive = self._profileService:memoryFragments(player),
         combat = self._combatService:snapshot(player),

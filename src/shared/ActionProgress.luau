@@ -89,7 +89,8 @@ function ActionProgress.begin(
     state: State?,
     actionId: any,
     interactionId: any,
-    now: any
+    now: any,
+    durationMultiplier: number?
 ): (State?, any)
     if not finite(now) or now < 0 then
         return state, { accepted = false, reason = "invalid_time" }
@@ -98,6 +99,11 @@ function ActionProgress.begin(
         return state, { accepted = false, reason = "invalid_interaction" }
     end
     local duration = ActionProgress.durationFor(actionId)
+    if duration ~= nil and type(durationMultiplier) == "number" then
+        -- The hammer's identity: work swings faster. Bounded so no tool can
+        -- make a timed action instant or absurdly slow.
+        duration *= math.clamp(durationMultiplier, 0.5, 1.5)
+    end
     if duration == nil then
         return state, { accepted = false, reason = "untimed_action" }
     end

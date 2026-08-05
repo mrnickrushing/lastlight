@@ -10,6 +10,11 @@ type Definition = {
     description: string,
     damageReduction: number,
     staminaRegenMultiplier: number,
+    -- Weapon-slot statistics. Melee weapons leave these nil; a ranged weapon
+    -- declares how far a strike may resolve from and what it trades for the
+    -- reach. The server reads these -- a client never submits range or damage.
+    strikeRange: number?,
+    strikeDamageMultiplier: number?,
 }
 
 local DEFINITIONS: { [string]: Definition } = {
@@ -26,6 +31,15 @@ local DEFINITIONS: { [string]: Definition } = {
         description = "Recover stamina 10% faster.",
         damageReduction = 0,
         staminaRegenMultiplier = 1.1,
+    }),
+    gear_thornwood_bow = table.freeze({
+        slot = "weapon",
+        displayName = "THORNWOOD BOW",
+        description = "Strike from 30 studs. Arrows hit for 80% of a close blow.",
+        damageReduction = 0,
+        staminaRegenMultiplier = 1,
+        strikeRange = 30,
+        strikeDamageMultiplier = 0.8,
     }),
 }
 
@@ -89,6 +103,30 @@ function Equipment.unequip(equipped: Equipped, slot: any): (Equipped, any)
     end
     nextEquipped[slot] = nil
     return nextEquipped, { applied = true, slot = slot }
+end
+
+--[[
+    What the equipped weapon changes about a strike.
+
+    Returns nil for bare hands and melee tools: the caller keeps its own
+    defaults, so nothing about existing combat moves unless a ranged weapon is
+    actually equipped.
+]]
+function Equipment.weaponStrikeProfile(equipped: Equipped): any
+    local normalized = Equipment.normalize(equipped)
+    local weaponId = normalized.weapon
+    if type(weaponId) ~= "string" then
+        return nil
+    end
+    local definition = DEFINITIONS[weaponId]
+    if definition == nil or definition.strikeRange == nil then
+        return nil
+    end
+    return {
+        itemId = weaponId,
+        strikeRange = definition.strikeRange,
+        strikeDamageMultiplier = definition.strikeDamageMultiplier or 1,
+    }
 end
 
 function Equipment.stats(equipped: Equipped): any

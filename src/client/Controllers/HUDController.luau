@@ -77,6 +77,19 @@ local function createItemIcon(parent: Instance, itemId: string, size: number): V
         )
         ring.Shape = Enum.PartType.Cylinder
         ring.Orientation = Vector3.new(0, 0, 90)
+    elseif itemId == "gear_thornwood_bow" then
+        shape(
+            "Stave",
+            Vector3.new(0.35, 2.6, 0.5),
+            Vector3.new(0.2, 0, 0),
+            Color3.fromRGB(112, 84, 52)
+        )
+        shape(
+            "String",
+            Vector3.new(0.12, 2.4, 0.12),
+            Vector3.new(-0.45, 0, 0),
+            Color3.fromRGB(214, 205, 186)
+        )
     elseif itemId == "gear_ironroot_hood" then
         shape(
             "Hood",
@@ -1000,6 +1013,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         {
             { id = "gear_ironroot_hood", label = "EQUIP HOOD" },
             { id = "gear_bramble_boots", label = "EQUIP BOOTS" },
+            { id = "gear_thornwood_bow", label = "EQUIP BOW" },
         }
     do
         local button = Instance.new("TextButton")
@@ -2383,11 +2397,21 @@ function HUDController.update(self: HUDController, state: any)
         self._mara.Text = maraLine
         self._mara.TextTransparency = 0
     end
+    --[[
+        The held pill: what is in your hand right now. A weapon in the
+        equipment slot outranks the starter tool, matching the visual on the
+        character and the strike numbers on the server.
+    ]]
+    local equipped = state.equipped
+    local heldWeapon = if type(equipped) == "table" and equipped.weapon ~= nil then "BOW" else nil
     self._resource.Text = string.format(
         "HEARTWOOD · %d%s",
         tonumber(state.resources) or 0,
-        if state.selectedTool ~= nil
-            then "  ·  " .. string.upper(tostring(state.selectedTool))
+        if heldWeapon ~= nil
+            then "  ·  🏹 " .. heldWeapon
+            elseif state.selectedTool ~= nil then "  ·  " .. string.upper(
+                tostring(state.selectedTool)
+            )
             else ""
     )
     local nightActive = state.nightActive == true

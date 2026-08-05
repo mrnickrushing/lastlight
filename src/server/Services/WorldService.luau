@@ -1294,6 +1294,45 @@ local function buildEmberhollowSanctuary(
     townSideRoad(Vector3.new(0, 0.45, -184), Vector3.new(-80, 0.45, -184))
     townSideRoad(Vector3.new(0, 0.45, -164), Vector3.new(80, 0.45, -164))
     townSideRoad(Vector3.new(0, 0.45, -198), Vector3.new(50, 0.45, -198))
+    --[[
+        A square that reads as a city centre.
+
+        The pad alone read as road-through-grass with a lantern on it. Two
+        rotated paving bands make a deliberate concentric plaza around the
+        shrine, and a lamp post at each corner frames the space the way the
+        watchtowers frame the gate. All visual skins; the walk plane and the
+        night-fight arena are unchanged.
+    ]]
+    for band = 1, 2 do
+        local size = PLAZA_HALF * 2 - band * 26
+        local paving = part(
+            parent,
+            "TownSquarePavingBand",
+            Vector3.new(size, 0.08, size),
+            CFrame.new(courtyard + Vector3.new(0, 0.36 + band * 0.03, 0))
+                * CFrame.Angles(0, math.rad(if band == 1 then 45 else 0), 0),
+            if band == 1 then Color3.fromRGB(96, 88, 70) else Color3.fromRGB(72, 68, 58),
+            Enum.Material.Cobblestone,
+            false
+        )
+        paving.CanQuery = false
+    end
+    for cornerX = -1, 1, 2 do
+        for cornerZ = -1, 1, 2 do
+            table.insert(meshPlacements, {
+                assetId = "mesh_lantern_post_a",
+                fallbackKind = "asset_dressing",
+                position = courtyard
+                    + Vector3.new(cornerX * (PLAZA_HALF - 7), 0.4, cornerZ * (PLAZA_HALF - 7)),
+                scale = 1,
+                yaw = math.atan2(-cornerX, -cornerZ),
+                seed = 9930 + cornerX * 2 + cornerZ,
+                swayTag = nil,
+                parent = parent,
+                fallbackInstance = nil,
+            })
+        end
+    end
     local square = part(
         parent,
         "FirstLanternTownSquare",
@@ -4952,7 +4991,18 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         )
         labelAnchor.Transparency = 1
         labelAnchor.CanQuery = false
-        addBillboard(labelAnchor, string.upper(definition.tool), definition.color)
+        --[[
+            The label finally says what the choice means. "AXE / HAMMER /
+            TORCH" told a player nothing -- the owner's words: "I have no idea
+            what to select because I don't know what the in-game difference
+            is." The second line is the difference, and the numbers behind it
+            live in TutorialService._strikeContext and ActionProgress.begin.
+        ]]
+        local toolBlurb = if definition.tool == "axe"
+            then "AXE\nHITS 25% HARDER"
+            elseif definition.tool == "hammer" then "HAMMER\nWORKS 25% FASTER"
+            else "TORCH\nLONGER REACH · LIGHTS THE DARK"
+        addBillboard(labelAnchor, toolBlurb, definition.color)
         self:_registerInteraction(
             pedestal,
             definition.id,
@@ -5080,6 +5130,92 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     -- the moment the mesh loads. They stay collidable while invisible, which
     -- is what keeps players able to walk up onto the dais either way, and
     -- lanternBase remains the interaction anchor exactly as before.
+    --[[
+        The shrine the lantern deserves.
+
+        The owner's note: the First Lantern read as "a lantern in the middle
+        of a road". The town's whole fiction hangs on this object -- it is
+        the reason Emberhollow exists -- so it now stands in a built place: a
+        two-ring walkable stone dais, four standing stones carrying amber
+        shrine lamps at the diagonals (the street's line stays open north and
+        south), and an inlaid amber ring in the paving. Everything here is a
+        few parts, collidable only where a player can stand, and none of it
+        moves the interaction anchor or the plinth the mesh sits on.
+    ]]
+    local shrineDais = part(
+        firstLanternFallback,
+        "ShrineDais",
+        Vector3.new(19, 0.9, 19),
+        CFrame.new(0, 0.45, TOWN_CENTER.Z) * CFrame.Angles(0, math.rad(45), 0),
+        Color3.fromRGB(74, 78, 74),
+        Enum.Material.Slate
+    )
+    shrineDais.CanQuery = false
+    local shrineUpper = part(
+        firstLanternFallback,
+        "ShrineDaisUpper",
+        Vector3.new(14, 0.8, 14),
+        CFrame.new(0, 1.05, TOWN_CENTER.Z),
+        Color3.fromRGB(84, 88, 82),
+        Enum.Material.Slate
+    )
+    shrineUpper.CanQuery = false
+    local shrineInlay = part(
+        firstLanternFallback,
+        "ShrineInlayRing",
+        Vector3.new(11, 0.1, 11),
+        CFrame.new(0, 1.5, TOWN_CENTER.Z) * CFrame.Angles(0, math.rad(45), 0),
+        AMBER,
+        Enum.Material.Neon,
+        false
+    )
+    shrineInlay.Transparency = 0.55
+    shrineInlay.CanQuery = false
+    shrineInlay.CastShadow = false
+    CollectionService:AddTag(shrineInlay, self._runtimeIds.AmbientLightTag)
+    for corner = 0, 3 do
+        local angle = math.rad(45 + corner * 90)
+        local offset = Vector3.new(math.cos(angle) * 10.5, 0, math.sin(angle) * 10.5)
+        local pillar = part(
+            firstLanternFallback,
+            "ShrineStone",
+            Vector3.new(1.4, 6.4, 1.4),
+            CFrame.new(Vector3.new(0, 3.2, TOWN_CENTER.Z) + offset)
+                * CFrame.Angles(math.rad(2), angle, math.rad(-2)),
+            Color3.fromRGB(64, 70, 68),
+            Enum.Material.Slate
+        )
+        pillar.CanQuery = false
+        local cap = part(
+            firstLanternFallback,
+            "ShrineStoneCap",
+            Vector3.new(1.8, 0.5, 1.8),
+            CFrame.new(Vector3.new(0, 6.6, TOWN_CENTER.Z) + offset) * CFrame.Angles(0, angle, 0),
+            Color3.fromRGB(52, 56, 55),
+            Enum.Material.Slate,
+            false
+        )
+        cap.CanQuery = false
+        local lamp = part(
+            firstLanternFallback,
+            "ShrineLamp",
+            Vector3.new(0.75, 0.75, 0.75),
+            CFrame.new(Vector3.new(0, 7.25, TOWN_CENTER.Z) + offset),
+            AMBER,
+            Enum.Material.Neon,
+            false
+        )
+        lamp.Shape = Enum.PartType.Ball
+        lamp.CanQuery = false
+        lamp.CastShadow = false
+        local lampLight = Instance.new("PointLight")
+        lampLight.Color = AMBER
+        lampLight.Brightness = 1.4
+        lampLight.Range = 16
+        lampLight.Shadows = false
+        lampLight.Parent = lamp
+        CollectionService:AddTag(lamp, self._runtimeIds.AmbientLightTag)
+    end
     local lanternBase = part(
         firstLanternFallback,
         "FirstLantern",
@@ -5093,7 +5229,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             firstLanternFallback,
             "FirstLanternPlinth",
             Vector3.new(10.5 - stepIndex * 1.45, 0.52, 10.5 - stepIndex * 1.45),
-            CFrame.new(0, -0.16 + stepIndex * 0.42, TOWN_CENTER.Z),
+            CFrame.new(0, 1.05 + stepIndex * 0.42, TOWN_CENTER.Z),
             if stepIndex % 2 == 0 then Color3.fromRGB(76, 79, 73) else Color3.fromRGB(61, 66, 62),
             Enum.Material.Slate
         )
@@ -5228,7 +5364,8 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         -- Base slightly set into the 0.38-top square pad. At y = 0 the
         -- lantern's own authored plinth was swallowed by the pad and the
         -- town's centrepiece read almost a stud shorter than authored.
-        position = Vector3.new(0, 0.32, TOWN_CENTER.Z),
+        -- Base atop the shrine dais (upper ring tops at 1.45).
+        position = Vector3.new(0, 1.5, TOWN_CENTER.Z),
         scale = 0.95,
         yaw = math.rad(8),
         seed = 9314,
@@ -5627,6 +5764,13 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             label = "BRAMBLE BOOTS",
             x = 48,
             color = Color3.fromRGB(142, 112, 84),
+        },
+        {
+            id = self._runtimeIds.InteractionIds.CraftThornwoodBow,
+            recipeId = "recipe_thornwood_bow",
+            label = "THORNWOOD BOW",
+            x = -60,
+            color = Color3.fromRGB(164, 132, 78),
         },
     }
     for _, definition in craftingBenches do
@@ -9812,6 +9956,12 @@ function WorldService.showRecoveryCache(self: WorldService, player: Player, cach
     prompt:SetAttribute("OwnerUserId", player.UserId)
 end
 
+function WorldService.wardenSealPart(self: WorldService): BasePart?
+    local arena = self._wardenStagArena
+    local seal = if arena ~= nil then arena.seal else nil
+    return if seal ~= nil and seal:IsA("BasePart") then seal else nil
+end
+
 function WorldService.blackoutArena(self: WorldService): any
     return self._blackoutArena
 end
@@ -9975,18 +10125,34 @@ function WorldService.setBlackoutLighting(self: WorldService, active: boolean)
         so silhouettes separate, and brightness is down so the lantern-fire
         the Blackout is about is the brightest thing in frame.
     ]]
-    Lighting.Brightness = 1.15
-    Lighting.Ambient = Color3.fromRGB(58, 66, 74)
-    Lighting.OutdoorAmbient = Color3.fromRGB(46, 54, 64)
-    Lighting.ExposureCompensation = -0.1
+    --[[
+        Tablet screenshots from the owner showed what these values actually
+        render as on hardware: a black screen with a faint character outline.
+        The previous rewrite fixed the flat teal wash but kept a floor that
+        Studio-on-a-workstation flattered and a real device crushed to
+        nothing. A Blackout must read as a dangerous night the player can
+        still play: ground visible underfoot, trunks separating from sky,
+        and the carried fire still the brightest thing in frame.
+    ]]
+    Lighting.Brightness = 1.6
+    Lighting.Ambient = Color3.fromRGB(96, 104, 118)
+    Lighting.OutdoorAmbient = Color3.fromRGB(88, 98, 114)
+    Lighting.ExposureCompensation = 0.25
+    local atmosphere = Lighting:FindFirstChild("LastLightAtmosphere")
+    if atmosphere ~= nil and atmosphere:IsA("Atmosphere") then
+        -- Night haze was eating what little light survived; the Blackout
+        -- keeps its cool cast through the tint below instead.
+        atmosphere.Density = 0.28
+        atmosphere.Haze = 1.1
+    end
     local color = if effect ~= nil and effect:IsA("ColorCorrectionEffect")
         then effect
         else Instance.new("ColorCorrectionEffect")
     color.Name = "LastLightBlackoutColor"
-    color.Brightness = -0.02
-    color.Contrast = 0.16
-    color.Saturation = 0.04
-    color.TintColor = Color3.fromRGB(214, 228, 224)
+    color.Brightness = 0.03
+    color.Contrast = 0.12
+    color.Saturation = -0.05
+    color.TintColor = Color3.fromRGB(210, 222, 230)
     color.Parent = Lighting
 end
 
@@ -11130,6 +11296,106 @@ end
     prompt's own text changes for a player who already has it, which the
     tutorial service reports.
 ]]
+--[[
+    The visible half of a strike.
+
+    Tapping a monster used to change a number and nothing else -- no swing, no
+    shot, nothing on the character. The owner asked for the character to look
+    like he is hitting it with whatever he holds. Real rig animations are a
+    later asset pass; what sells the hit today is a fast arc of the tool's
+    colour swept toward the target for a melee blow, and a visible arrow that
+    flies the actual path for a bow shot. Both are short-lived anchored parts
+    the server spawns and Debris clears; they carry no collision, no queries,
+    and no authority -- the damage they illustrate was already applied.
+]]
+function WorldService.showStrikeFeedback(
+    _self: WorldService,
+    player: Player,
+    context: any,
+    targetPosition: Vector3
+)
+    local character = player.Character
+    local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+    if root == nil or not root:IsA("BasePart") then
+        return
+    end
+    local origin = root.Position + Vector3.new(0, 0.6, 0)
+    local toTarget = targetPosition - origin
+    if toTarget.Magnitude < 0.5 then
+        return
+    end
+    local direction = toTarget.Unit
+    if context ~= nil and context.ranged == true then
+        -- An arrow that flies the real path. Tween-free: two frames placed by
+        -- Heartbeat would jitter under load, so it is one anchored shaft
+        -- lerped by a spawned loop across a tenth of a second per 12 studs.
+        local arrow = Instance.new("Part")
+        arrow.Name = "StrikeArrow"
+        arrow.Size = Vector3.new(0.12, 0.12, 2.6)
+        arrow.Color = Color3.fromRGB(214, 178, 118)
+        arrow.Material = Enum.Material.Wood
+        arrow.Anchored = true
+        arrow.CanCollide = false
+        arrow.CanTouch = false
+        arrow.CanQuery = false
+        arrow.CastShadow = false
+        local tip = Instance.new("Part")
+        tip.Name = "StrikeArrowTip"
+        tip.Size = Vector3.new(0.2, 0.2, 0.34)
+        tip.Color = Color3.fromRGB(120, 129, 134)
+        tip.Material = Enum.Material.Metal
+        tip.Anchored = true
+        tip.CanCollide = false
+        tip.CanTouch = false
+        tip.CanQuery = false
+        tip.CastShadow = false
+        arrow.Parent = workspace
+        tip.Parent = workspace
+        local flightSeconds = math.clamp(toTarget.Magnitude / 120, 0.08, 0.35)
+        task.spawn(function()
+            local started = os.clock()
+            while true do
+                local alpha = math.clamp((os.clock() - started) / flightSeconds, 0, 1)
+                local position = origin:Lerp(targetPosition, alpha)
+                local frame = CFrame.lookAt(position, position + direction)
+                arrow.CFrame = frame
+                tip.CFrame = frame * CFrame.new(0, 0, -1.45)
+                if alpha >= 1 then
+                    break
+                end
+                task.wait()
+            end
+            arrow:Destroy()
+            tip:Destroy()
+        end)
+    else
+        -- A melee swing: a thin arc of the held tool's colour, swept from the
+        -- character toward the target and gone in a sixth of a second.
+        local swing = Instance.new("Part")
+        swing.Name = "StrikeSwingArc"
+        swing.Size = Vector3.new(3.4, 0.18, 1.4)
+        swing.Color = Color3.fromRGB(255, 220, 156)
+        swing.Material = Enum.Material.Neon
+        swing.Transparency = 0.25
+        swing.Anchored = true
+        swing.CanCollide = false
+        swing.CanTouch = false
+        swing.CanQuery = false
+        swing.CastShadow = false
+        swing.CFrame = CFrame.lookAt(origin + direction * 2.4, targetPosition)
+            * CFrame.Angles(0, 0, math.rad(24))
+        swing.Parent = workspace
+        task.spawn(function()
+            for step = 1, 4 do
+                swing.CFrame = swing.CFrame * CFrame.Angles(0, 0, math.rad(-16))
+                swing.Transparency = 0.25 + step * 0.17
+                task.wait(0.035)
+            end
+            swing:Destroy()
+        end)
+    end
+end
+
 function WorldService.memoryFragmentTarget(self: WorldService, interactionId: string): any
     return self._memoryFragmentTargets[interactionId]
 end
