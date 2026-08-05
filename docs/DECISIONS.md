@@ -803,3 +803,34 @@ ART_AUDIO_DIRECTION (no control theft during active danger, skippable
 cinematics, reduced-motion respect) bound the implementation, which is why it
 is a three-second local camera tween rather than a server-owned cutscene
 system.
+
+## 2026-08-04 — Chapter one is told in the world, and the archive is the hook
+
+**Decision:** Ten memory fragments carry Bramblewake's story, resting on
+scenery that already exists — the four authored story vignettes and the four
+points of interest — in three acts: what the forest kept (the evacuation), the
+keeper's trail (what Orin Vale was actually doing), and your part in it (why
+the eighth seal is yours). The last two are gated behind chapter one, and the
+final fragment sits at the Wayhome Gate, so a player learns what Chapter II is
+on the walk home from finishing Chapter I. The Field Book doubles as the
+Memory Archive: recovered fragments read back in authored order, unrecovered
+ones are named by the place that holds them.
+
+**Reason:** The world bible's premise — light is memory, the Long Night is the
+remainder of what a machine took because nobody could carry it — had never
+reached the player, and resolving chapter one produced one line and silence.
+That is the retention hole: the game had nothing to say about what comes next.
+Fragments were chosen over cutscenes or a quest chain because the scenes are
+already built and standing there mute, and because a collection whose missing
+entries are *named* creates the honest version of "one more run" — curiosity
+about a story, not a timer. This is deliberately the ethical retention model
+MONETIZATION_LIVEOPS_ANALYTICS already commits to (return for the world and
+the mystery, never for a streak), and it is also the commercial one: engaged
+players are the precondition for any cosmetic catalog, and archive completion
+opens legitimate cosmetic surface (keeper's-trail arrival effects, memory
+lantern shells) that sells expression rather than power.
+
+**Bounds:** Fragment recovery is a server transaction on the profile keyed by
+fragment ID, idempotent, with unknown IDs dropped at normalization. The client
+sends an interaction ID and nothing else. Nothing here grants materials,
+power, or currency — a fragment is worth reading, not worth farming.

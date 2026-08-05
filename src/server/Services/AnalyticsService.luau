@@ -506,6 +506,24 @@ function AnalyticsService.usedGear(
     end
 end
 
+function AnalyticsService.memoryFragmentRecovered(
+    self: AnalyticsService,
+    player: Player,
+    fragmentId: string
+)
+    self._logger:info("memory_fragment_recovered", {
+        player = player.UserId,
+        fragment = string.sub(fragmentId, 1, 48),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "MemoryFragmentRecovered", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = fragmentId,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.questClaimed(self: AnalyticsService, player: Player, questId: string)
     self._logger:info("quest_claimed", {
         player = player.UserId,

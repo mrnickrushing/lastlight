@@ -26,6 +26,8 @@ export type WorldService = typeof(setmetatable(
         Name: string,
         _logger: Logger,
         _extractionPayoff: any,
+        _memoryFragments: any,
+        _memoryFragmentTargets: { [string]: any },
         _townProgression: any,
         _professionAbilityVisuals: any,
         _runtimeIds: any,
@@ -1852,7 +1854,8 @@ function WorldService.new(
     extractionPayoff: any,
     townProgression: any,
     professionAbilityVisuals: any,
-    townConstruction: any
+    townConstruction: any,
+    memoryFragments: any
 ): WorldService
     return setmetatable({
         Name = WorldService.Name,
@@ -1860,6 +1863,8 @@ function WorldService.new(
         _extractionPayoff = extractionPayoff,
         _townProgression = townProgression,
         _professionAbilityVisuals = professionAbilityVisuals,
+        _memoryFragments = memoryFragments,
+        _memoryFragmentTargets = {},
         _runtimeIds = nil,
         _world = nil,
         _interactions = {},
@@ -2564,6 +2569,17 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             wedge.Transparency = 0.34 - progress * 0.16
             wedge.CastShadow = false
             wedge.CanQuery = false
+            --[[
+                Foxfire inlays are the only thing that says "this way" in the
+                dark, and they should own the night. In daylight they had
+                nothing to compete with and read as saturated cyan rectangles
+                lying on the paving -- the ambient light level floors at 0.58,
+                so the existing breathing never dimmed them meaningfully.
+                This asks the ambient controller for a real daytime fade, so
+                the road leads with its own worn surface by day and the
+                foxfire takes over as the light goes.
+            ]]
+            wedge:SetAttribute("DaylightFade", 0.62)
             CollectionService:AddTag(wedge, _self._runtimeIds.AmbientLightTag)
             local guideLight = Instance.new("PointLight")
             guideLight.Color = FOXFIRE
@@ -9362,6 +9378,136 @@ function WorldService.buildBramblewake(
         addBillboard(node.target, string.upper(node.objectText), AMBER, 90)
     end
 
+    --[[
+        Memory fragments: chapter one's story, resting on scenery that was
+        already standing there.
+
+        Anchors resolve against the world the builder just made rather than a
+        second table of coordinates, because a hand-maintained position list
+        drifts from the builder the first time a landmark moves -- the exact
+        failure validate_town_layout.py exists to catch. A fragment whose
+        anchor cannot be resolved is skipped silently: content should never be
+        able to break world construction.
+
+        The shard itself is physical, per the visual standard -- a slate
+        cradle holding an angular foxfire crystal, foxfire being the palette's
+        memory cue -- with the interaction on an invisible anchor inside it.
+    ]]
+    self._memoryFragmentTargets = {}
+    local function resolveFragmentAnchor(anchorKey: string): BasePart?
+        local kind, key = string.match(anchorKey, "^(%a+):(.+)$")
+        if kind == nil or key == nil then
+            return nil
+        end
+        if kind == "story" then
+            for _, descendant in result.model:GetDescendants() do
+                if
+                    descendant:IsA("BasePart")
+                    and descendant:GetAttribute("StoryLandmark") == key
+                then
+                    return descendant
+                end
+            end
+            return nil
+        elseif kind == "poi" then
+            local model = result.model:FindFirstChild("PhysicalPOI_" .. key, true)
+            local anchorPart = if model ~= nil
+                then model:FindFirstChild("PointOfInterest", true)
+                else nil
+            return if anchorPart ~= nil and anchorPart:IsA("BasePart") then anchorPart else nil
+        elseif kind == "site" and key == "wayhome" then
+            return result.extractionTarget
+        elseif kind == "site" and key == "warden_seal" then
+            local seal = result.bossArena ~= nil and result.bossArena.seal or nil
+            return if seal ~= nil and seal:IsA("BasePart") then seal else nil
+        end
+        return nil
+    end
+
+    for _, fragment in self._memoryFragments.List do
+        local anchorPart = resolveFragmentAnchor(fragment.anchorKey)
+        if anchorPart ~= nil then
+            local shard = Instance.new("Model")
+            shard.Name = "MemoryFragment_" .. fragment.id
+            shard:SetAttribute("MemoryFragmentId", fragment.id)
+            shard.Parent = result.model
+            local base = anchorPart.Position + Vector3.new(2.6, 0, 2.6)
+            local cradle = part(
+                shard,
+                "MemoryShardCradle",
+                Vector3.new(2.2, 0.5, 2.2),
+                CFrame.new(base + Vector3.new(0, 0.25, 0)) * CFrame.Angles(0, 0.4, 0),
+                Color3.fromRGB(58, 67, 63),
+                Enum.Material.Slate,
+                false
+            )
+            cradle.CanQuery = false
+            for index = 1, 3 do
+                local stone = part(
+                    shard,
+                    "MemoryShardStone",
+                    Vector3.new(0.7, 0.5, 0.6),
+                    CFrame.new(
+                        base
+                            + Vector3.new(
+                                math.cos(index * 2.1) * 0.85,
+                                0.62,
+                                math.sin(index * 2.1) * 0.85
+                            )
+                    ) * CFrame.Angles(0.2, index * 1.3, 0.15),
+                    Color3.fromRGB(74, 84, 78),
+                    Enum.Material.Slate,
+                    false
+                )
+                stone.CanQuery = false
+            end
+            local crystal = part(
+                shard,
+                "MemoryShardCrystal",
+                Vector3.new(0.62, 1.5, 0.62),
+                CFrame.new(base + Vector3.new(0, 1.35, 0)) * CFrame.Angles(0.16, 0.7, 0.1),
+                FOXFIRE,
+                Enum.Material.Neon,
+                false
+            )
+            crystal.CanQuery = false
+            crystal.CastShadow = false
+            local crystalLight = Instance.new("PointLight")
+            crystalLight.Color = FOXFIRE
+            crystalLight.Brightness = 1.1
+            crystalLight.Range = 13
+            crystalLight.Shadows = false
+            crystalLight.Parent = crystal
+            CollectionService:AddTag(crystal, self._runtimeIds.AmbientLightTag)
+            local target = part(
+                shard,
+                "MemoryFragmentAnchor",
+                Vector3.new(3.4, 4, 3.4),
+                CFrame.new(base + Vector3.new(0, 1.6, 0)),
+                FOXFIRE,
+                Enum.Material.Neon,
+                false
+            )
+            target.Transparency = 1
+            local interactionId = "memory_" .. fragment.id
+            self:_registerInteraction(
+                target,
+                interactionId,
+                self._runtimeIds.Actions.RecoverMemoryFragment,
+                "REMEMBER",
+                fragment.title,
+                nil,
+                nil,
+                Vector3.new(9, 11, 9)
+            )
+            self._memoryFragmentTargets[interactionId] = {
+                fragmentId = fragment.id,
+                model = shard,
+                crystal = crystal,
+            }
+        end
+    end
+
     for _, descriptor in result.eventInteractions do
         self:_registerInteraction(
             descriptor.target,
@@ -9622,8 +9768,16 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
                 and rootedWall.Name == "RootedWall"
                 and rootedWall:GetAttribute("BlackoutNodeId") == nodeId
             then
-                rootedWall.Color = if delivered then Color3.fromRGB(52, 90, 61) else BARK
-                rootedWall.Transparency = if delivered then 0.48 else 0
+                -- A lit root has been cleansed, so it should read as living
+                -- wood taking the light back -- not as a half-faded pane. The
+                -- old 0.48 transparency turned a solid rooted pillar into a
+                -- flat translucent green slab the moment it succeeded, which
+                -- made progress look like something breaking.
+                rootedWall.Color = if delivered then Color3.fromRGB(74, 118, 76) else BARK
+                rootedWall.Material = if delivered
+                    then Enum.Material.LeafyGrass
+                    else Enum.Material.Wood
+                rootedWall.Transparency = 0
             end
         end
     end
@@ -10834,6 +10988,18 @@ end
     does, means this can never drift out of sync with the terrain again --
     including if the datum ever moves a second time.
 ]]
+--[[
+    What a memory-fragment prompt refers to, and how it goes quiet.
+
+    Recovering is per player but the shard is one shared world object, so it
+    stays standing and lit for everyone else who has not read it. Only the
+    prompt's own text changes for a player who already has it, which the
+    tutorial service reports.
+]]
+function WorldService.memoryFragmentTarget(self: WorldService, interactionId: string): any
+    return self._memoryFragmentTargets[interactionId]
+end
+
 function WorldService.enemySpawnPosition(_self: WorldService): Vector3
     return Vector3.new(0, TerrainBuilder.surfaceHeight(0, -153), -153)
 end

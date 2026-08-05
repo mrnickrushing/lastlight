@@ -90,6 +90,7 @@ local RuntimeIds = {
         RecoverExpeditionCache = "recover_expedition_cache",
         SelectProfessionSpecialization = "select_profession_specialization",
         ContributeConstruction = "contribute_construction",
+        RecoverMemoryFragment = "recover_memory_fragment",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",

@@ -537,6 +537,39 @@ function ProfileService.craftItem(self: ProfileService, player: Player, recipeId
     }
 end
 
+function ProfileService.collectMemoryFragment(
+    self: ProfileService,
+    player: Player,
+    fragmentId: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { accepted = false, reason = "profile_loading" }
+    end
+    if not self:isWritable(player) then
+        return { accepted = false, reason = "profile_read_only" }
+    end
+
+    local nextProfile, result = self._saveSchema.withMemoryFragment(profile, fragmentId, os.time())
+    if not result.accepted then
+        return { accepted = false, reason = result.reason, fragment = result.fragment }
+    end
+
+    self._profiles[player] = nextProfile
+    if self._persistent and self._writable[player] == true then
+        self._dirty[player] = true
+    end
+    return { accepted = true, fragment = result.fragment }
+end
+
+function ProfileService.memoryFragments(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return self._saveSchema.memoryFragmentSnapshot(profile)
+end
+
 function ProfileService.useGearItem(self: ProfileService, player: Player, itemId: string): any
     local profile = self._profiles[player]
     if profile == nil then

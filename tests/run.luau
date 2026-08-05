@@ -10,6 +10,7 @@ TestRunner.run({
     require("./specs/ContentRegistry.spec"),
     require("./specs/Crafting.spec"),
     require("./specs/Environment.spec"),
+    require("./specs/MemoryFragments.spec"),
     require("./specs/MeshAssetRegistry.spec"),
     require("./specs/MeshMaterialPlan.spec"),
     require("./specs/MusicCatalog.spec"),
