@@ -2445,14 +2445,14 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.49.1",
+    BuildVersion = "0.50.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 13,
+    SaveSchemaVersion = 14,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -6403,6 +6403,319 @@ return table.freeze(LobbyDeparture)
       </Item>
       <Item class="ModuleScript" referent="36">
         <Properties>
+          <string name="Name">MemoryFragments</string>
+          <string name="Source"><![CDATA[--!strict
+--[[
+    Memory fragments -- Bramblewake's chapter-one story, told in the world.
+
+    The world bible's premise has never reached the player: light is memory
+    made shareable, the Long Night is the accumulated remainder of memories a
+    machine took because nobody could carry them, and the missing keeper Orin
+    Vale pulled seven seals deliberately. The player has been carrying the
+    eighth since the prologue without ever being told what it is.
+
+    A fragment is a remembered moment held by a place. Recovering one is a
+    single interaction on an object that is already standing there -- the four
+    authored story vignettes and the four points of interest -- so this adds
+    meaning to built content rather than new clutter to walk past.
+
+    The arc is three acts:
+
+      I.  What the forest kept -- the evacuation, told by the people who
+          failed it. Each one lands on a resident who is standing in
+          Emberhollow right now (Ena's orchard, Pip's grandfather's mill,
+          Tomas's bridge), so the town stops being scenery.
+      II. The keeper's trail -- Orin came through here, and what he was
+          actually doing was neither theft nor madness.
+      III. Your part in it -- why the eighth seal is yours, and where the
+          trail goes next. Gated behind chapter one, because it is the
+          answer, and because the last fragment sits at the exit gate: the
+          player learns what Chapter II is on their way home from finishing
+          Chapter I.
+
+    Everything here is content and pure logic. The server owns the collected
+    set on the profile; a client never decides what it has found.
+]]
+
+local MemoryFragments = {}
+
+export type Fragment = {
+    id: string,
+    title: string,
+    foundAt: string,
+    -- Where the shard physically sits. The builder resolves these against the
+    -- world it just built, so content owns placement and the builder owns
+    -- geometry: "story:<landmark>", "poi:<poi id>", or a named site.
+    anchorKey: string,
+    act: number,
+    body: string,
+    -- Fragments that only exist once the chapter is resolved. They are the
+    -- payoff and the hook, and both would be nonsense read early.
+    requiresChapterOne: boolean,
+}
+
+export type CollectResult = {
+    accepted: boolean,
+    reason: string?,
+    fragment: Fragment?,
+}
+
+local function fragment(definition: Fragment): Fragment
+    return table.freeze(definition)
+end
+
+local LIST: { Fragment } = table.freeze({
+    -- ACT I -- What the forest kept
+    fragment({
+        id = "fragment_last_harvest",
+        anchorKey = "story:last_harvest",
+        title = "THE LAST HARVEST",
+        foundAt = "Sunken Orchard",
+        act = 1,
+        requiresChapterOne = false,
+        body = "They brought it in anyway. Every apple, every root, knowing the "
+            .. "carts left at dawn and the cellar stayed behind. Ena Moss's "
+            .. "grandmother wrote the count in the ledger, and underneath it "
+            .. "she wrote: we did not waste it, we only failed to carry it. "
+            .. "The orchard has been holding that harvest ever since.",
+    }),
+    fragment({
+        id = "fragment_road_they_left",
+        anchorKey = "story:evacuation_cart",
+        title = "THE ROAD THEY LEFT",
+        foundAt = "Hollow Farm",
+        act = 1,
+        requiresChapterOne = false,
+        body = "Someone counted children at this bend. Counted twice, because "
+            .. "the first count came up one short and the second came up "
+            .. "right, and nobody afterward could agree which had been the "
+            .. "mistake. The road remembers the counting. It does not "
+            .. "remember the name it could not find.",
+    }),
+    fragment({
+        id = "fragment_last_repair",
+        anchorKey = "story:last_repair",
+        title = "THE LAST REPAIR",
+        foundAt = "Windmill Copse",
+        act = 1,
+        requiresChapterOne = false,
+        body = "The mill was still turning when the last cart left. That was "
+            .. "deliberate. A man named Ol' Wren stayed behind to keep it "
+            .. "turning, so anyone still walking would have something to "
+            .. "steer by. He is not in the arrival rolls at Emberhollow. The "
+            .. "sails turned eleven more days. Pip has never been told.",
+    }),
+    fragment({
+        id = "fragment_lost_crossing",
+        anchorKey = "story:lost_crossing",
+        title = "THE LOST CROSSING",
+        foundAt = "Tangle Bridge",
+        act = 1,
+        requiresChapterOne = false,
+        body = "The bridge went down under the third cart, not the first. "
+            .. "Tomas Reed was quartermaster that night, and he had loaded "
+            .. "the heavy stores last so the families could cross first. He "
+            .. "has never once told that story as a thing he got right.",
+    }),
+
+    -- ACT II -- The keeper's trail
+    fragment({
+        id = "fragment_house_that_answered",
+        anchorKey = "poi:poi_bw_reedstead_ruin",
+        title = "THE HOUSE THAT ANSWERED",
+        foundAt = "Reedstead Ruin",
+        act = 2,
+        requiresChapterOne = false,
+        body = "This house kept answering its door for two winters after "
+            .. "nobody lived in it. Not haunted -- remembered. The Long Night "
+            .. "does not only take. Sometimes it holds a habit so tightly "
+            .. "that the habit goes on without the person.",
+    }),
+    fragment({
+        id = "fragment_what_moths_carry",
+        anchorKey = "poi:poi_bw_mothwell",
+        title = "WHAT THE MOTHS CARRY",
+        foundAt = "Mothwell",
+        act = 2,
+        requiresChapterOne = false,
+        body = "Light-moths carry a little of whatever light they hatched "
+            .. "from. These hatched from evacuation lanterns. Follow enough "
+            .. "of them and you are walking the road as it was walked, at the "
+            .. "pace it was walked, behind people who are no longer there.",
+    }),
+    fragment({
+        id = "fragment_keeper_came_through",
+        anchorKey = "poi:poi_bw_sapglass_grove",
+        title = "THE KEEPER CAME THROUGH",
+        foundAt = "Sapglass Grove",
+        act = 2,
+        requiresChapterOne = false,
+        body = "He tapped these trees and left the vials full, which is not "
+            .. "what a thief does. The sap in them has gone to glass, and "
+            .. "inside the glass is light that does not flicker. Orin Vale "
+            .. "was testing whether a memory could be held outside a lantern. "
+            .. "It can. That is the frightening part.",
+    }),
+    fragment({
+        id = "fragment_what_orin_said",
+        anchorKey = "poi:poi_bw_root_chapel",
+        title = "WHAT ORIN SAID AT THE SEAL",
+        foundAt = "Root Chapel",
+        act = 2,
+        requiresChapterOne = false,
+        body = "I am not stealing them, he said. I am letting them out. The "
+            .. "chapel heard it and kept it, the way roots keep everything. "
+            .. "The machine has been eating what people could not carry -- "
+            .. "seven towns' worth of grief, filed where nobody has to feel "
+            .. "it. I have felt it, he said. Somebody had to.",
+    }),
+
+    -- ACT III -- Your part in it
+    fragment({
+        id = "fragment_eighth_seal",
+        anchorKey = "site:warden_seal",
+        title = "THE EIGHTH SEAL",
+        foundAt = "The Warden's Seal",
+        act = 3,
+        requiresChapterOne = true,
+        body = "He woke the Stag on purpose -- not to guard the seal against "
+            .. "you, but to guard it for you, until someone arrived who would "
+            .. "open it slowly. The eighth was never his to take. It answers "
+            .. "to whoever chooses to carry it. You picked it up on the first "
+            .. "morning without being asked, and it has been answering ever "
+            .. "since.",
+    }),
+    fragment({
+        id = "fragment_bell_beneath_iron",
+        anchorKey = "site:wayhome",
+        title = "A BELL, FAR UNDER",
+        foundAt = "Wayhome Gate",
+        act = 3,
+        requiresChapterOne = true,
+        body = "There is a bell ringing under Ironroot Delve. Nobody is "
+            .. "pulling it. The shift-bell rang three times a day for forty "
+            .. "years, and the crews who answered it were owed wages "
+            .. "Emberhollow never paid; now it rings on time in an empty "
+            .. "shaft. Orin went that way. He is walking one town's debt at a "
+            .. "time, and the next question waiting for you is what a town "
+            .. "owes the people whose labour built it. Bring an answer.",
+    }),
+})
+
+local BY_ID: { [string]: Fragment } = {}
+for _, entry in LIST do
+    BY_ID[entry.id] = entry
+end
+table.freeze(BY_ID)
+
+MemoryFragments.List = LIST
+MemoryFragments.Count = #LIST
+
+function MemoryFragments.byId(id: string): Fragment?
+    return BY_ID[id]
+end
+
+function MemoryFragments.isKnown(id: string): boolean
+    return BY_ID[id] ~= nil
+end
+
+--[[
+    Normalize a stored collected set.
+
+    Anything not in the current catalog is dropped, exactly the way gear and
+    quest state already drop unknown IDs, so a retired fragment cannot keep
+    occupying a player's archive count forever.
+]]
+function MemoryFragments.normalize(value: any): { [string]: boolean }
+    local result: { [string]: boolean } = {}
+    if type(value) ~= "table" then
+        return result
+    end
+    for id, collected in value do
+        if type(id) == "string" and collected == true and BY_ID[id] ~= nil then
+            result[id] = true
+        end
+    end
+    return result
+end
+
+--[[
+    Recover one fragment.
+
+    Pure and idempotent: recovering the same fragment twice is accepted once
+    and reports the repeat, so a duplicated remote or a second tap can never
+    double-count the archive.
+]]
+function MemoryFragments.collect(
+    collected: { [string]: boolean },
+    id: string,
+    chapterResolved: boolean
+): ({ [string]: boolean }, CollectResult)
+    local entry = BY_ID[id]
+    if entry == nil then
+        return collected, { accepted = false, reason = "unknown_fragment" }
+    end
+    if entry.requiresChapterOne and not chapterResolved then
+        return collected, { accepted = false, reason = "chapter_unresolved" }
+    end
+    if collected[id] == true then
+        return collected, { accepted = false, reason = "already_recovered", fragment = entry }
+    end
+    local nextCollected = table.clone(collected)
+    nextCollected[id] = true
+    return nextCollected, { accepted = true, fragment = entry }
+end
+
+--[[
+    What the Memory Archive shows.
+
+    Recovered fragments read in authored order so the story assembles rather
+    than arriving as a shuffled list. Missing ones are named by where they
+    are, never hidden behind a question mark: the pull is "there is more to
+    know and I know where to look", not a checklist with the labels torn off.
+]]
+function MemoryFragments.snapshot(
+    collected: { [string]: boolean },
+    chapterResolved: boolean
+): {
+    total: number,
+    found: number,
+    entries: { any },
+    nextHint: string?,
+}
+    local entries = {}
+    local found = 0
+    local total = 0
+    local nextHint: string? = nil
+    for _, entry in LIST do
+        local locked = entry.requiresChapterOne and not chapterResolved
+        if not locked then
+            total += 1
+            local recovered = collected[entry.id] == true
+            if recovered then
+                found += 1
+            elseif nextHint == nil then
+                nextHint = entry.foundAt
+            end
+            table.insert(entries, {
+                id = entry.id,
+                title = entry.title,
+                foundAt = entry.foundAt,
+                act = entry.act,
+                recovered = recovered,
+                body = if recovered then entry.body else nil,
+            })
+        end
+    end
+    return { total = total, found = found, entries = entries, nextHint = nextHint }
+end
+
+return table.freeze(MemoryFragments)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="37">
+        <Properties>
           <string name="Name">MusicCatalog</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -6762,7 +7075,7 @@ return table.freeze(MusicCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">NightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -6810,7 +7123,7 @@ return table.freeze(NightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">OldGrowthEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -7095,7 +7408,7 @@ return table.freeze(OldGrowthEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">PerformanceBudget</string>
           <string name="Source"><![CDATA[--!strict
@@ -7484,7 +7797,7 @@ return table.freeze(PerformanceBudget)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">ProfessionAbilityVisuals</string>
           <string name="Source"><![CDATA[--!strict
@@ -7554,7 +7867,7 @@ return table.freeze(ProfessionAbilityVisuals)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">ProfessionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -7664,7 +7977,7 @@ return table.freeze(ProfessionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">ProfessionMastery</string>
           <string name="Source"><![CDATA[--!strict
@@ -8045,7 +8358,7 @@ return table.freeze(ProfessionMastery)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">ProfessionRescue</string>
           <string name="Source"><![CDATA[--!strict
@@ -8124,7 +8437,7 @@ return table.freeze(ProfessionRescue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">ProfessionState</string>
           <string name="Source"><![CDATA[--!strict
@@ -8291,7 +8604,7 @@ return table.freeze(ProfessionState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">ProfileBackup</string>
           <string name="Source"><![CDATA[--!strict
@@ -8587,7 +8900,7 @@ return table.freeze(ProfileBackup)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">ProfilePersistence</string>
           <string name="Source"><![CDATA[--!strict
@@ -8761,7 +9074,7 @@ return table.freeze(ProfilePersistence)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">QuestCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -8832,7 +9145,7 @@ return table.freeze(QuestCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">Quests</string>
           <string name="Source"><![CDATA[--!strict
@@ -8949,7 +9262,7 @@ return table.freeze(Quests)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
@@ -9008,7 +9321,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
@@ -9125,7 +9438,7 @@ return table.freeze(ResidentDialogue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -9240,7 +9553,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -9369,7 +9682,7 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -9464,6 +9777,7 @@ local RuntimeIds = {
         RecoverExpeditionCache = "recover_expedition_cache",
         SelectProfessionSpecialization = "select_profession_specialization",
         ContributeConstruction = "contribute_construction",
+        RecoverMemoryFragment = "recover_memory_fragment",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -9513,7 +9827,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -9522,6 +9836,7 @@ local TutorialFlow = require("./TutorialFlow")
 local ExpeditionInventory = require("./ExpeditionInventory")
 local ProfessionCatalog = require("./ProfessionCatalog")
 local Crafting = require("./Crafting")
+local MemoryFragments = require("./MemoryFragments")
 local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
@@ -9557,6 +9872,7 @@ export type Profile = {
             transactionId: string?,
             wardenOutcome: string?,
         },
+        fragments: { [string]: boolean },
     },
     town: {
         nightNumber: number,
@@ -9585,7 +9901,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 13,
+        schemaVersion = 14,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -9608,6 +9924,7 @@ function SaveSchema.default(now: number): Profile
                 transactionId = nil,
                 wardenOutcome = nil,
             },
+            fragments = MemoryFragments.normalize(nil),
         },
         town = {
             nightNumber = 1,
@@ -9695,6 +10012,13 @@ function SaveSchema.normalize(value: any, now: number): Profile
             wardenOutcome = chapterOne.wardenOutcome,
         }
     end
+    -- Recovered memory fragments. Unknown IDs are dropped the same way gear
+    -- and quest claims drop theirs, so a retired fragment cannot keep
+    -- occupying an archive count. A schema-13 profile simply arrives with
+    -- none recovered, which is the truthful migration: nothing was collected
+    -- before the system existed.
+    profile.story.fragments =
+        MemoryFragments.normalize(if type(story) == "table" then story.fragments else nil)
     local town = value.town
     if
         type(town) == "table"
@@ -9741,7 +10065,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 13
+    profile.schemaVersion = 14
     return profile
 end
 
@@ -10068,6 +10392,42 @@ function SaveSchema.withCraftedItem(profile: Profile, recipeId: string, now: num
     return nextProfile, result
 end
 
+--[[
+    Recover one memory fragment.
+
+    Idempotent by way of MemoryFragments.collect: a repeat recovery is
+    reported, never applied, so a duplicated interaction cannot double-count
+    the archive or bump the revision.
+]]
+function SaveSchema.withMemoryFragment(
+    profile: Profile,
+    fragmentId: string,
+    now: number
+): (Profile, any)
+    local nextFragments, result = MemoryFragments.collect(
+        profile.story.fragments,
+        fragmentId,
+        profile.story.chapterOne.status == "complete"
+    )
+    if not result.accepted then
+        return profile, result
+    end
+
+    local nextProfile = table.clone(profile)
+    nextProfile.story = table.clone(profile.story)
+    nextProfile.story.fragments = nextFragments
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.memoryFragmentSnapshot(profile: Profile): any
+    return MemoryFragments.snapshot(
+        profile.story.fragments,
+        profile.story.chapterOne.status == "complete"
+    )
+end
+
 function SaveSchema.gearSnapshot(profile: Profile): { [string]: number }
     return table.clone(profile.gear)
 end
@@ -10206,7 +10566,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -10325,7 +10685,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -10582,7 +10942,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -10992,7 +11352,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -11173,7 +11533,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -11237,7 +11597,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -11329,7 +11689,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -11541,7 +11901,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -11694,7 +12054,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -11847,7 +12207,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -12070,7 +12430,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -12220,7 +12580,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -12256,7 +12616,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -12638,7 +12998,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="68">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -12671,11 +13031,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="69">
+  <Item class="ServerScriptService" referent="70">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="70">
+    <Item class="Script" referent="71">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -12734,6 +13094,7 @@ local TownPermissions = require(root.TownPermissions)
 local RunHandoff = require(root.RunHandoff)
 local AdminRoster = require(root.AdminRoster)
 local TownProgression = require(root.TownProgression)
+local MemoryFragments = require(root.MemoryFragments)
 local TownConstruction = require(root.TownConstruction)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
@@ -12787,7 +13148,8 @@ local worldService = WorldService.new(
     ExtractionPayoff,
     TownProgression,
     ProfessionAbilityVisuals,
-    TownConstruction
+    TownConstruction,
+    MemoryFragments
 )
 local expeditionService = ExpeditionService.new(
     logger,
@@ -13072,7 +13434,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="71">
+      <Item class="ModuleScript" referent="72">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -13170,11 +13532,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="72">
+      <Item class="Folder" referent="73">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -13703,7 +14065,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="74">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14214,6 +14576,24 @@ function AnalyticsService.usedGear(
     end
 end
 
+function AnalyticsService.memoryFragmentRecovered(
+    self: AnalyticsService,
+    player: Player,
+    fragmentId: string
+)
+    self._logger:info("memory_fragment_recovered", {
+        player = player.UserId,
+        fragment = string.sub(fragmentId, 1, 48),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "MemoryFragmentRecovered", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = fragmentId,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.questClaimed(self: AnalyticsService, player: Player, questId: string)
     self._logger:info("quest_claimed", {
         player = player.UserId,
@@ -14556,7 +14936,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="75">
+        <Item class="ModuleScript" referent="76">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15057,7 +15437,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="76">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16379,7 +16759,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="77">
+        <Item class="ModuleScript" referent="78">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17023,7 +17403,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="78">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17127,7 +17507,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="80">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17316,7 +17696,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="80">
+        <Item class="ModuleScript" referent="81">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17709,7 +18089,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="81">
+        <Item class="ModuleScript" referent="82">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -17803,7 +18183,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18021,7 +18401,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18865,7 +19245,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19109,7 +19489,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="85">
+        <Item class="ModuleScript" referent="86">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19288,7 +19668,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="86">
+        <Item class="ModuleScript" referent="87">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19859,7 +20239,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="87">
+        <Item class="ModuleScript" referent="88">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20958,7 +21338,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="88">
+        <Item class="ModuleScript" referent="89">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21483,7 +21863,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="89">
+        <Item class="ModuleScript" referent="90">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22023,6 +22403,39 @@ function ProfileService.craftItem(self: ProfileService, player: Player, recipeId
         accepted = true,
         itemId = result.itemId,
     }
+end
+
+function ProfileService.collectMemoryFragment(
+    self: ProfileService,
+    player: Player,
+    fragmentId: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { accepted = false, reason = "profile_loading" }
+    end
+    if not self:isWritable(player) then
+        return { accepted = false, reason = "profile_read_only" }
+    end
+
+    local nextProfile, result = self._saveSchema.withMemoryFragment(profile, fragmentId, os.time())
+    if not result.accepted then
+        return { accepted = false, reason = result.reason, fragment = result.fragment }
+    end
+
+    self._profiles[player] = nextProfile
+    if self._persistent and self._writable[player] == true then
+        self._dirty[player] = true
+    end
+    return { accepted = true, fragment = result.fragment }
+end
+
+function ProfileService.memoryFragments(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return self._saveSchema.memoryFragmentSnapshot(profile)
 end
 
 function ProfileService.useGearItem(self: ProfileService, player: Player, itemId: string): any
@@ -22923,7 +23336,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="90">
+        <Item class="ModuleScript" referent="91">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23464,7 +23877,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="91">
+        <Item class="ModuleScript" referent="92">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24050,6 +24463,41 @@ function TutorialService._interact(
         return
     end
 
+    if actionId == self._runtimeIds.Actions.RecoverMemoryFragment then
+        --[[
+            Recovering a memory fragment.
+
+            Handled before the tutorial-stage machinery for the same reason
+            harvest nodes are: fragments belong to the expedition, not to the
+            First Light sequence, and must neither advance it nor be gated by
+            it. The client sends only the interaction ID; the server resolves
+            which fragment that prompt carries, and the profile transaction is
+            idempotent, so a duplicated tap re-reads rather than re-collecting.
+        ]]
+        local descriptor = self._worldService:memoryFragmentTarget(interactionId)
+        if descriptor == nil then
+            return
+        end
+        local result = self._profileService:collectMemoryFragment(player, descriptor.fragmentId)
+        if result.accepted and result.fragment ~= nil then
+            self:_setToast(
+                player,
+                string.format("%s — %s", result.fragment.title, result.fragment.body)
+            )
+            self._analyticsService:memoryFragmentRecovered(player, descriptor.fragmentId)
+        elseif result.reason == "already_recovered" and result.fragment ~= nil then
+            self:_setToast(
+                player,
+                string.format("%s — %s", result.fragment.title, result.fragment.body)
+            )
+        elseif result.reason == "chapter_unresolved" then
+            self:_setToast(player, "THIS MEMORY IS NOT YET YOURS TO READ")
+        else
+            self:_setToast(player, "THE MEMORY SLIPS AWAY — TRY AGAIN")
+        end
+        self:_publish(player)
+        return
+    end
     if actionId == self._runtimeIds.Actions.GatherResource then
         --[[
             Harvesting a Bramblewake node.
@@ -24768,6 +25216,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         recipes = self._craftingCatalog:list(),
         equipmentCatalog = self._equipmentCatalog.list(),
         quests = self._profileService:questSnapshot(player),
+        memoryArchive = self._profileService:memoryFragments(player),
         combat = self._combatService:snapshot(player),
         profession = self._professionService:snapshot(player),
         elite = elite,
@@ -24792,7 +25241,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="92">
+        <Item class="ModuleScript" referent="93">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -25642,7 +26091,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="93">
+        <Item class="ModuleScript" referent="94">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -25673,6 +26122,8 @@ export type WorldService = typeof(setmetatable(
         Name: string,
         _logger: Logger,
         _extractionPayoff: any,
+        _memoryFragments: any,
+        _memoryFragmentTargets: { [string]: any },
         _townProgression: any,
         _professionAbilityVisuals: any,
         _runtimeIds: any,
@@ -27499,7 +27950,8 @@ function WorldService.new(
     extractionPayoff: any,
     townProgression: any,
     professionAbilityVisuals: any,
-    townConstruction: any
+    townConstruction: any,
+    memoryFragments: any
 ): WorldService
     return setmetatable({
         Name = WorldService.Name,
@@ -27507,6 +27959,8 @@ function WorldService.new(
         _extractionPayoff = extractionPayoff,
         _townProgression = townProgression,
         _professionAbilityVisuals = professionAbilityVisuals,
+        _memoryFragments = memoryFragments,
+        _memoryFragmentTargets = {},
         _runtimeIds = nil,
         _world = nil,
         _interactions = {},
@@ -28211,6 +28665,17 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
             wedge.Transparency = 0.34 - progress * 0.16
             wedge.CastShadow = false
             wedge.CanQuery = false
+            --[[
+                Foxfire inlays are the only thing that says "this way" in the
+                dark, and they should own the night. In daylight they had
+                nothing to compete with and read as saturated cyan rectangles
+                lying on the paving -- the ambient light level floors at 0.58,
+                so the existing breathing never dimmed them meaningfully.
+                This asks the ambient controller for a real daytime fade, so
+                the road leads with its own worn surface by day and the
+                foxfire takes over as the light goes.
+            ]]
+            wedge:SetAttribute("DaylightFade", 0.62)
             CollectionService:AddTag(wedge, _self._runtimeIds.AmbientLightTag)
             local guideLight = Instance.new("PointLight")
             guideLight.Color = FOXFIRE
@@ -35009,6 +35474,136 @@ function WorldService.buildBramblewake(
         addBillboard(node.target, string.upper(node.objectText), AMBER, 90)
     end
 
+    --[[
+        Memory fragments: chapter one's story, resting on scenery that was
+        already standing there.
+
+        Anchors resolve against the world the builder just made rather than a
+        second table of coordinates, because a hand-maintained position list
+        drifts from the builder the first time a landmark moves -- the exact
+        failure validate_town_layout.py exists to catch. A fragment whose
+        anchor cannot be resolved is skipped silently: content should never be
+        able to break world construction.
+
+        The shard itself is physical, per the visual standard -- a slate
+        cradle holding an angular foxfire crystal, foxfire being the palette's
+        memory cue -- with the interaction on an invisible anchor inside it.
+    ]]
+    self._memoryFragmentTargets = {}
+    local function resolveFragmentAnchor(anchorKey: string): BasePart?
+        local kind, key = string.match(anchorKey, "^(%a+):(.+)$")
+        if kind == nil or key == nil then
+            return nil
+        end
+        if kind == "story" then
+            for _, descendant in result.model:GetDescendants() do
+                if
+                    descendant:IsA("BasePart")
+                    and descendant:GetAttribute("StoryLandmark") == key
+                then
+                    return descendant
+                end
+            end
+            return nil
+        elseif kind == "poi" then
+            local model = result.model:FindFirstChild("PhysicalPOI_" .. key, true)
+            local anchorPart = if model ~= nil
+                then model:FindFirstChild("PointOfInterest", true)
+                else nil
+            return if anchorPart ~= nil and anchorPart:IsA("BasePart") then anchorPart else nil
+        elseif kind == "site" and key == "wayhome" then
+            return result.extractionTarget
+        elseif kind == "site" and key == "warden_seal" then
+            local seal = result.bossArena ~= nil and result.bossArena.seal or nil
+            return if seal ~= nil and seal:IsA("BasePart") then seal else nil
+        end
+        return nil
+    end
+
+    for _, fragment in self._memoryFragments.List do
+        local anchorPart = resolveFragmentAnchor(fragment.anchorKey)
+        if anchorPart ~= nil then
+            local shard = Instance.new("Model")
+            shard.Name = "MemoryFragment_" .. fragment.id
+            shard:SetAttribute("MemoryFragmentId", fragment.id)
+            shard.Parent = result.model
+            local base = anchorPart.Position + Vector3.new(2.6, 0, 2.6)
+            local cradle = part(
+                shard,
+                "MemoryShardCradle",
+                Vector3.new(2.2, 0.5, 2.2),
+                CFrame.new(base + Vector3.new(0, 0.25, 0)) * CFrame.Angles(0, 0.4, 0),
+                Color3.fromRGB(58, 67, 63),
+                Enum.Material.Slate,
+                false
+            )
+            cradle.CanQuery = false
+            for index = 1, 3 do
+                local stone = part(
+                    shard,
+                    "MemoryShardStone",
+                    Vector3.new(0.7, 0.5, 0.6),
+                    CFrame.new(
+                        base
+                            + Vector3.new(
+                                math.cos(index * 2.1) * 0.85,
+                                0.62,
+                                math.sin(index * 2.1) * 0.85
+                            )
+                    ) * CFrame.Angles(0.2, index * 1.3, 0.15),
+                    Color3.fromRGB(74, 84, 78),
+                    Enum.Material.Slate,
+                    false
+                )
+                stone.CanQuery = false
+            end
+            local crystal = part(
+                shard,
+                "MemoryShardCrystal",
+                Vector3.new(0.62, 1.5, 0.62),
+                CFrame.new(base + Vector3.new(0, 1.35, 0)) * CFrame.Angles(0.16, 0.7, 0.1),
+                FOXFIRE,
+                Enum.Material.Neon,
+                false
+            )
+            crystal.CanQuery = false
+            crystal.CastShadow = false
+            local crystalLight = Instance.new("PointLight")
+            crystalLight.Color = FOXFIRE
+            crystalLight.Brightness = 1.1
+            crystalLight.Range = 13
+            crystalLight.Shadows = false
+            crystalLight.Parent = crystal
+            CollectionService:AddTag(crystal, self._runtimeIds.AmbientLightTag)
+            local target = part(
+                shard,
+                "MemoryFragmentAnchor",
+                Vector3.new(3.4, 4, 3.4),
+                CFrame.new(base + Vector3.new(0, 1.6, 0)),
+                FOXFIRE,
+                Enum.Material.Neon,
+                false
+            )
+            target.Transparency = 1
+            local interactionId = "memory_" .. fragment.id
+            self:_registerInteraction(
+                target,
+                interactionId,
+                self._runtimeIds.Actions.RecoverMemoryFragment,
+                "REMEMBER",
+                fragment.title,
+                nil,
+                nil,
+                Vector3.new(9, 11, 9)
+            )
+            self._memoryFragmentTargets[interactionId] = {
+                fragmentId = fragment.id,
+                model = shard,
+                crystal = crystal,
+            }
+        end
+    end
+
     for _, descriptor in result.eventInteractions do
         self:_registerInteraction(
             descriptor.target,
@@ -35232,9 +35827,16 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
             marker.Adornee = target
             marker.AlwaysOnTop = true
             marker.LightInfluence = 0
-            marker.Size = UDim2.fromOffset(150, 32)
-            marker.StudsOffsetWorldSpace = Vector3.new(0, 4.8, 0)
-            marker.MaxDistance = 70
+            marker.Size = UDim2.fromOffset(190, 40)
+            marker.StudsOffsetWorldSpace = Vector3.new(0, 8, 0)
+            -- The relay legs are 120, 228, and 161 studs, and the carry timer
+            -- is 18 seconds. At the old MaxDistance of 70 the marker only
+            -- appeared once a carrier was already most of the way there, so
+            -- the one thing that says "this way" could not be seen from where
+            -- the fire is taken. 500 covers every leg from anywhere on the
+            -- route; AlwaysOnTop and zero light influence keep it readable in
+            -- Blackout darkness.
+            marker.MaxDistance = 500
             marker.Parent = target
             local markerText = marker:FindFirstChild("MarkerText")
             if markerText == nil or not markerText:IsA("TextLabel") then
@@ -35246,7 +35848,7 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
                 markerText.Font = Enum.Font.GothamBold
                 markerText.Size = UDim2.fromScale(1, 1)
                 markerText.TextColor3 = Color3.fromRGB(172, 255, 205)
-                markerText.TextSize = 13
+                markerText.TextSize = 16
                 markerText.Text = "▼  NEXT ROOT"
                 markerText.Parent = marker
                 local corner = Instance.new("UICorner")
@@ -35262,8 +35864,16 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
                 and rootedWall.Name == "RootedWall"
                 and rootedWall:GetAttribute("BlackoutNodeId") == nodeId
             then
-                rootedWall.Color = if delivered then Color3.fromRGB(52, 90, 61) else BARK
-                rootedWall.Transparency = if delivered then 0.48 else 0
+                -- A lit root has been cleansed, so it should read as living
+                -- wood taking the light back -- not as a half-faded pane. The
+                -- old 0.48 transparency turned a solid rooted pillar into a
+                -- flat translucent green slab the moment it succeeded, which
+                -- made progress look like something breaking.
+                rootedWall.Color = if delivered then Color3.fromRGB(74, 118, 76) else BARK
+                rootedWall.Material = if delivered
+                    then Enum.Material.LeafyGrass
+                    else Enum.Material.Wood
+                rootedWall.Transparency = 0
             end
         end
     end
@@ -36474,6 +37084,18 @@ end
     does, means this can never drift out of sync with the terrain again --
     including if the datum ever moves a second time.
 ]]
+--[[
+    What a memory-fragment prompt refers to, and how it goes quiet.
+
+    Recovering is per player but the shard is one shared world object, so it
+    stays standing and lit for everyone else who has not read it. Only the
+    prompt's own text changes for a player who already has it, which the
+    tutorial service reports.
+]]
+function WorldService.memoryFragmentTarget(self: WorldService, interactionId: string): any
+    return self._memoryFragmentTargets[interactionId]
+end
+
 function WorldService.enemySpawnPosition(_self: WorldService): Vector3
     return Vector3.new(0, TerrainBuilder.surfaceHeight(0, -153), -153)
 end
@@ -36483,11 +37105,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="94">
+      <Item class="Folder" referent="95">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="95">
+        <Item class="ModuleScript" referent="96">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -40242,7 +40864,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="96">
+        <Item class="ModuleScript" referent="97">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -40702,7 +41324,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="97">
+        <Item class="ModuleScript" referent="98">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -41397,7 +42019,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="98">
+        <Item class="ModuleScript" referent="99">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -42256,7 +42878,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="99">
+        <Item class="ModuleScript" referent="100">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -42342,7 +42964,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="100">
+        <Item class="ModuleScript" referent="101">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -42686,7 +43308,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="101">
+        <Item class="ModuleScript" referent="102">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -42866,7 +43488,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="102">
+        <Item class="ModuleScript" referent="103">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -43462,7 +44084,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="103">
+        <Item class="ModuleScript" referent="104">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -43699,7 +44321,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="104">
+        <Item class="ModuleScript" referent="105">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -43788,7 +44410,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="105">
+        <Item class="ModuleScript" referent="106">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -44121,15 +44743,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="106">
+  <Item class="StarterPlayer" referent="107">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="107">
+    <Item class="StarterPlayerScripts" referent="108">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="108">
+      <Item class="LocalScript" referent="109">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -44145,9 +44767,11 @@ local AmbientMotion = require(root.AmbientMotion)
 local MusicCatalog = require(root.MusicCatalog)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local RuntimeIds = require(root.RuntimeIds)
+local TownNightSchedule = require(root.TownNightSchedule)
 local WeatherProfile = require(root.WeatherProfile)
 local AmbientController = require(script.Controllers.AmbientController)
 local HUDController = require(script.Controllers.HUDController)
+local VignetteController = require(script.Controllers.VignetteController)
 local InputController = require(script.Controllers.InputController)
 local InteractionController = require(script.Controllers.InteractionController)
 local MusicController = require(script.Controllers.MusicController)
@@ -44179,6 +44803,7 @@ local playerGui = player:WaitForChild("PlayerGui", Config.BootstrapTimeoutSecond
 assert(playerGui ~= nil and playerGui:IsA("PlayerGui"), "PlayerGui unavailable")
 
 local hud = HUDController.new(playerGui, ProfessionCatalog.list())
+local vignette = VignetteController.new(playerGui)
 local ambient = AmbientController.new(RuntimeIds.AmbientMoteTag)
 local worldMotion = WorldMotionController.new(
     RuntimeIds.AmbientMotionTag,
@@ -44235,12 +44860,120 @@ hud:setEquipHandler(function(itemId: string)
     send(RuntimeIds.Actions.EquipGear, { itemId = itemId })
 end)
 
+--[[
+    Arrival vignettes ride the same state stream the HUD already consumes:
+    each one fires on a specific transition, locally, at most once per
+    arrival. The focus points are found in the workspace at trigger time so a
+    streamed-out or missing landmark simply skips the shot instead of aiming
+    a camera at nothing.
+]]
+local lastNightActive = false
+local lastBlackoutStatus: string? = nil
+local lastEliteActive = false
+local lastBossActive = false
+
+local function focusPart(name: string): Vector3?
+    local found = workspace:FindFirstChild(name, true)
+    return if found ~= nil and found:IsA("BasePart")
+        then found.Position
+        elseif found ~= nil and found:IsA("Model") then found:GetPivot().Position
+        else nil
+end
+
+local function updateVignettes(snapshot: any, suppress: boolean?)
+    vignette:setCompact(snapshot.compactHud == true)
+
+    local nightActive = snapshot.nightActive == true
+    if suppress then
+        -- A reconnect mid-arrival is not an arrival: seed the trackers from
+        -- the first snapshot so a player who joins during a night or an
+        -- active encounter is not greeted by a stale cinematic.
+        lastNightActive = nightActive
+        local seedBlackout = snapshot.blackout
+        lastBlackoutStatus = if type(seedBlackout) == "table"
+            then tostring(seedBlackout.status)
+            else nil
+        local seedElite = snapshot.elite
+        lastEliteActive = type(seedElite) == "table" and seedElite.active == true
+        local seedBoss = snapshot.boss
+        lastBossActive = type(seedBoss) == "table" and seedBoss.active == true
+        return
+    end
+    if nightActive and not lastNightActive and snapshot.expeditionActive ~= true then
+        local nightNumber = tonumber(snapshot.nightNumber) or 0
+        local title = "THE FIRST NIGHT"
+        local subtitle = "KEEP THE LIGHT ALIVE"
+        if nightNumber >= 1 then
+            local theme = TownNightSchedule.theme(nightNumber)
+            local profile = TownNightSchedule.profile(nightNumber)
+            title = string.format("NIGHT %d · %s", nightNumber, theme)
+            subtitle = tostring(profile.instruction)
+        end
+        local focus = focusPart("FirstLantern")
+        if focus ~= nil then
+            vignette:play({
+                title = title,
+                subtitle = subtitle,
+                focus = focus,
+                duration = 3.0,
+            })
+        end
+    end
+    lastNightActive = nightActive
+
+    local blackout = snapshot.blackout
+    local blackoutStatus = if type(blackout) == "table" then tostring(blackout.status) else nil
+    if blackoutStatus == "relay" and lastBlackoutStatus ~= "relay" then
+        local focus = focusPart("BlackoutLanternFire")
+        if focus ~= nil then
+            vignette:play({
+                title = "THE BLACKOUT",
+                subtitle = "CARRY THE ROOTFIRE",
+                focus = focus,
+                duration = 3.0,
+            })
+        end
+    end
+    lastBlackoutStatus = blackoutStatus
+
+    local elite = snapshot.elite
+    local eliteActive = type(elite) == "table" and elite.active == true
+    if eliteActive and not lastEliteActive then
+        local focus = focusPart("OldGrowthElite")
+        if focus ~= nil then
+            vignette:play({
+                title = "OLD GROWTH",
+                subtitle = "STRIKE THE AMBER HEART",
+                focus = focus,
+                duration = 2.4,
+            })
+        end
+    end
+    lastEliteActive = eliteActive
+
+    local boss = snapshot.boss
+    local bossActive = type(boss) == "table" and boss.active == true
+    if bossActive and not lastBossActive then
+        local focus = focusPart("WardenStagBoss")
+        if focus ~= nil then
+            vignette:play({
+                title = "THE WARDEN STAG",
+                subtitle = "CLEANSE THE LIVING ROOTS",
+                focus = focus,
+                duration = 2.4,
+            })
+        end
+    end
+    lastBossActive = bossActive
+end
+
 stateChanged.OnClientEvent:Connect(function(snapshot: any)
     hud:update(snapshot)
     ambient:setPhase(tostring(snapshot.phase or "day"))
     worldMotion:setPhase(tostring(snapshot.phase or "day"))
     weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
     music:setSnapshot(snapshot)
+    updateVignettes(snapshot)
 end)
 
 task.spawn(function()
@@ -44253,17 +44986,18 @@ task.spawn(function()
         worldMotion:setPhase(tostring(snapshot.phase or "day"))
         weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
         music:setSnapshot(snapshot)
+        updateVignettes(snapshot, true)
     end
 end)
 
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="109">
+        <Item class="Folder" referent="110">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="110">
+          <Item class="ModuleScript" referent="111">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -44394,7 +45128,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="111">
+          <Item class="ModuleScript" referent="112">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -46182,6 +46916,38 @@ function HUDController._updateProgress(self: HUDController)
             else string.format("%d/%d", quest.progress, quest.threshold)
         table.insert(lines, string.format("• %s  ·  %s", quest.displayName, status))
     end
+    --[[
+        The Memory Archive.
+
+        Missing fragments are listed by the place that holds them rather than
+        hidden behind a blank, because the pull this system is for is "there
+        is more to know and I know where to look" -- not a checklist with the
+        labels torn off. Recovered ones show their text, so the archive is
+        where the chapter can actually be read back.
+    ]]
+    local archive = state.memoryArchive
+    if type(archive) == "table" then
+        table.insert(lines, "")
+        table.insert(
+            lines,
+            string.format(
+                "MEMORY ARCHIVE  ·  %d / %d RECOVERED",
+                tonumber(archive.found) or 0,
+                tonumber(archive.total) or 0
+            )
+        )
+        for _, entry in archive.entries or {} do
+            if entry.recovered then
+                table.insert(lines, string.format("• %s", tostring(entry.title)))
+                table.insert(lines, string.format("    %s", tostring(entry.body)))
+            else
+                table.insert(
+                    lines,
+                    string.format("• UNRECOVERED  ·  %s", string.upper(tostring(entry.foundAt)))
+                )
+            end
+        end
+    end
     table.insert(lines, "")
     table.insert(lines, "PROFESSION MASTERY")
     for professionId, mastery in state.mastery or {} do
@@ -46817,7 +47583,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="112">
+          <Item class="ModuleScript" referent="113">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -47116,7 +47882,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="113">
+          <Item class="ModuleScript" referent="114">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -47224,7 +47990,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="114">
+          <Item class="ModuleScript" referent="115">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -47343,7 +48109,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="115">
+          <Item class="ModuleScript" referent="116">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -47443,7 +48209,214 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="116">
+          <Item class="ModuleScript" referent="117">
+            <Properties>
+              <string name="Name">VignetteController</string>
+              <string name="Source"><![CDATA[--!strict
+--[[
+    Short, local, skippable arrival vignettes.
+
+    When a threat arrives -- the night, the Blackout, an awakening elite or
+    boss -- the camera spends a moment on it: a slow push toward the threat
+    under letterbox bars with a title card, then control returns. The moment
+    is presentation only, and every rule here exists to keep it that way:
+
+    - Camera-only and local. The server never waits, other players never
+      pause, and the character keeps its position and physics. Movement input
+      still works during the shot; pressing anything also skips it.
+    - Short and bounded. No vignette runs past a few seconds, and the arrival
+      beats that trigger them all carry more quiet time than that before any
+      attack pressure begins.
+    - Never while downed, never in compact HUD mode (the documented
+      low-effects/accessibility preset), and never twice for one arrival.
+    - Restores exactly: the camera returns to the player follow-cam it took
+      over from, whatever happened mid-shot.
+]]
+
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+
+local VignetteController = {}
+VignetteController.__index = VignetteController
+
+export type Shot = {
+    title: string,
+    subtitle: string,
+    focus: Vector3,
+    duration: number,
+}
+
+export type VignetteController = typeof(setmetatable(
+    {} :: {
+        _gui: ScreenGui,
+        _topBar: Frame,
+        _bottomBar: Frame,
+        _title: TextLabel,
+        _subtitle: TextLabel,
+        _playing: boolean,
+        _compact: boolean,
+        _skipConnection: RBXScriptConnection?,
+    },
+    VignetteController
+))
+
+local BAR_HEIGHT = 0.14
+local EASE = TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+
+function VignetteController.new(playerGui: PlayerGui): VignetteController
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "LastLightVignette"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = true
+    gui.DisplayOrder = 40
+    gui.Enabled = false
+    gui.Parent = playerGui
+
+    local function bar(name: string, anchor: number): Frame
+        local frame = Instance.new("Frame")
+        frame.Name = name
+        frame.BackgroundColor3 = Color3.fromRGB(4, 5, 7)
+        frame.BorderSizePixel = 0
+        frame.AnchorPoint = Vector2.new(0.5, anchor)
+        frame.Position = UDim2.fromScale(0.5, anchor)
+        frame.Size = UDim2.fromScale(1, 0)
+        frame.Parent = gui
+        return frame
+    end
+    local topBar = bar("TopBar", 0)
+    local bottomBar = bar("BottomBar", 1)
+
+    local title = Instance.new("TextLabel")
+    title.Name = "VignetteTitle"
+    title.BackgroundTransparency = 1
+    title.AnchorPoint = Vector2.new(0.5, 1)
+    title.Position = UDim2.new(0.5, 0, 1, -8)
+    title.Size = UDim2.new(0.9, 0, 0, 40)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 30
+    title.TextColor3 = Color3.fromRGB(244, 236, 214)
+    title.TextTransparency = 1
+    title.Text = ""
+    title.Parent = bottomBar
+
+    local subtitle = Instance.new("TextLabel")
+    subtitle.Name = "VignetteSubtitle"
+    subtitle.BackgroundTransparency = 1
+    subtitle.AnchorPoint = Vector2.new(0.5, 0)
+    subtitle.Position = UDim2.new(0.5, 0, 1, 6)
+    subtitle.Size = UDim2.new(0.9, 0, 0, 22)
+    subtitle.Font = Enum.Font.Gotham
+    subtitle.TextSize = 15
+    subtitle.TextColor3 = Color3.fromRGB(214, 182, 118)
+    subtitle.TextTransparency = 1
+    subtitle.Text = ""
+    subtitle.Parent = bottomBar
+
+    return setmetatable({
+        _gui = gui,
+        _topBar = topBar,
+        _bottomBar = bottomBar,
+        _title = title,
+        _subtitle = subtitle,
+        _playing = false,
+        _compact = false,
+        _skipConnection = nil,
+    }, VignetteController)
+end
+
+function VignetteController.setCompact(self: VignetteController, compact: boolean)
+    self._compact = compact
+end
+
+function VignetteController._restore(self: VignetteController, camera: Camera)
+    if self._skipConnection ~= nil then
+        self._skipConnection:Disconnect()
+        self._skipConnection = nil
+    end
+    local player = Players.LocalPlayer
+    local character = player.Character
+    local humanoid = if character ~= nil then character:FindFirstChildOfClass("Humanoid") else nil
+    camera.CameraType = Enum.CameraType.Custom
+    if humanoid ~= nil then
+        camera.CameraSubject = humanoid
+    end
+    self._gui.Enabled = false
+    self._playing = false
+end
+
+function VignetteController.play(self: VignetteController, shot: Shot)
+    if self._playing or self._compact then
+        return
+    end
+    local player = Players.LocalPlayer
+    if player:GetAttribute("LastLightDowned") == true then
+        return
+    end
+    local character = player.Character
+    local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+    local camera = workspace.CurrentCamera
+    if root == nil or not root:IsA("BasePart") or camera == nil then
+        return
+    end
+    self._playing = true
+
+    -- Frame the threat from the player's side of it, high enough to clear
+    -- ground clutter, and push in slowly. All offsets are derived, so the
+    -- same shot works in the town square and the expedition.
+    local focus = shot.focus
+    local toPlayer = root.Position - focus
+    local flat = Vector3.new(toPlayer.X, 0, toPlayer.Z)
+    local direction = if flat.Magnitude > 1 then flat.Unit else Vector3.new(0, 0, 1)
+    local startFrame =
+        CFrame.lookAt(focus + direction * 34 + Vector3.new(0, 14, 0), focus + Vector3.new(0, 3, 0))
+    local endFrame =
+        CFrame.lookAt(focus + direction * 22 + Vector3.new(0, 9, 0), focus + Vector3.new(0, 3, 0))
+
+    camera.CameraType = Enum.CameraType.Scriptable
+    camera.CFrame = startFrame
+
+    self._gui.Enabled = true
+    self._topBar.Size = UDim2.fromScale(1, 0)
+    self._bottomBar.Size = UDim2.fromScale(1, 0)
+    self._title.Text = shot.title
+    self._subtitle.Text = shot.subtitle
+    self._title.TextTransparency = 1
+    self._subtitle.TextTransparency = 1
+
+    TweenService:Create(self._topBar, EASE, { Size = UDim2.fromScale(1, BAR_HEIGHT) }):Play()
+    TweenService:Create(self._bottomBar, EASE, { Size = UDim2.fromScale(1, BAR_HEIGHT) }):Play()
+    TweenService:Create(self._title, EASE, { TextTransparency = 0 }):Play()
+    TweenService:Create(self._subtitle, EASE, { TextTransparency = 0.15 }):Play()
+    TweenService:Create(
+        camera,
+        TweenInfo.new(shot.duration, Enum.EasingStyle.Sine, Enum.EasingDirection.Out),
+        { CFrame = endFrame }
+    ):Play()
+
+    local finished = false
+    local function finish()
+        if finished then
+            return
+        end
+        finished = true
+        self:_restore(camera)
+    end
+    -- Any input returns the camera immediately: the vignette must never cost
+    -- a player who wants their hands back more than a keypress.
+    self._skipConnection = UserInputService.InputBegan:Connect(function(_input, processed)
+        if not processed then
+            finish()
+        end
+    end)
+    task.delay(shot.duration, finish)
+end
+
+return table.freeze(VignetteController)
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="118">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -47575,7 +48548,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="117">
+          <Item class="ModuleScript" referent="119">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -47818,9 +48791,21 @@ function WorldMotionController._step(self: WorldMotionController, deltaTime: num
                 self._ambientMotion.lightLevel(self._elapsed, state.phaseOffset, self._phase)
             local sizeScale = 0.94 + level * 0.08
             glow.Size = state.baseSize * sizeScale
-            glow.Transparency = math.clamp(state.baseTransparency + (1 - level) * 0.18, 0.02, 0.55)
+            -- An opt-in daytime fade for glows whose job is night navigation.
+            -- lightLevel floors at 0.58, so the ordinary breathing above can
+            -- never take a marker far enough down to stop shouting in
+            -- daylight; this can.
+            local daylightFade = glow:GetAttribute("DaylightFade")
+            local fade = if self._phase == "day" and type(daylightFade) == "number"
+                then daylightFade
+                else 0
+            glow.Transparency = math.clamp(
+                state.baseTransparency + (1 - level) * 0.18 + (1 - state.baseTransparency) * fade,
+                0.02,
+                0.985
+            )
             if pointLight ~= nil and state.baseBrightness ~= nil and state.baseRange ~= nil then
-                pointLight.Brightness = state.baseBrightness * (0.72 + level * 0.3)
+                pointLight.Brightness = state.baseBrightness * (0.72 + level * 0.3) * (1 - fade)
                 pointLight.Range = state.baseRange * (0.94 + level * 0.05)
             end
             state.active = true
@@ -47863,13 +48848,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="118">
+  <Item class="TextChatService" referent="120">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="119">
+  <Item class="Workspace" referent="121">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

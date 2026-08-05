@@ -581,6 +581,41 @@ function TutorialService._interact(
         return
     end
 
+    if actionId == self._runtimeIds.Actions.RecoverMemoryFragment then
+        --[[
+            Recovering a memory fragment.
+
+            Handled before the tutorial-stage machinery for the same reason
+            harvest nodes are: fragments belong to the expedition, not to the
+            First Light sequence, and must neither advance it nor be gated by
+            it. The client sends only the interaction ID; the server resolves
+            which fragment that prompt carries, and the profile transaction is
+            idempotent, so a duplicated tap re-reads rather than re-collecting.
+        ]]
+        local descriptor = self._worldService:memoryFragmentTarget(interactionId)
+        if descriptor == nil then
+            return
+        end
+        local result = self._profileService:collectMemoryFragment(player, descriptor.fragmentId)
+        if result.accepted and result.fragment ~= nil then
+            self:_setToast(
+                player,
+                string.format("%s — %s", result.fragment.title, result.fragment.body)
+            )
+            self._analyticsService:memoryFragmentRecovered(player, descriptor.fragmentId)
+        elseif result.reason == "already_recovered" and result.fragment ~= nil then
+            self:_setToast(
+                player,
+                string.format("%s — %s", result.fragment.title, result.fragment.body)
+            )
+        elseif result.reason == "chapter_unresolved" then
+            self:_setToast(player, "THIS MEMORY IS NOT YET YOURS TO READ")
+        else
+            self:_setToast(player, "THE MEMORY SLIPS AWAY — TRY AGAIN")
+        end
+        self:_publish(player)
+        return
+    end
     if actionId == self._runtimeIds.Actions.GatherResource then
         --[[
             Harvesting a Bramblewake node.
@@ -1299,6 +1334,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         recipes = self._craftingCatalog:list(),
         equipmentCatalog = self._equipmentCatalog.list(),
         quests = self._profileService:questSnapshot(player),
+        memoryArchive = self._profileService:memoryFragments(player),
         combat = self._combatService:snapshot(player),
         profession = self._professionService:snapshot(player),
         elite = elite,

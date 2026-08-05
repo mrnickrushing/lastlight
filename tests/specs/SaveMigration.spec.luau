@@ -166,6 +166,39 @@ local ERA_PROFILES: { [number]: any } = {
         profession = { selectedId = "profession_warden" },
         gear = { gear_amber_charm = 2 },
     },
+    -- Schema 13 is the last version before memory fragments existed, and the
+    -- first with per-building damage. The 14 upgrade must therefore leave the
+    -- per-building map alone and arrive with an empty archive: nothing was
+    -- collected before there was anything to collect, and inventing recoveries
+    -- for a returning player would hand them a story they never found.
+    [13] = {
+        schemaVersion = 13,
+        createdAt = 10,
+        updatedAt = 20,
+        revision = 34,
+        tutorial = { stage = "complete", complete = true },
+        town = {
+            nightNumber = 12,
+            condition = {
+                buildings = { building_archive = 55, building_inn = 25 },
+                lastNightNumber = 11,
+                repairsCompleted = 4,
+            },
+            construction = { building_archive = 3, building_workbench = 2 },
+        },
+        story = {
+            chapterOne = {
+                status = "complete",
+                decision = "wild_regrowth",
+                wardenOutcome = "preserved",
+                transactionId = "chapter_1:era13:hash:1",
+                completedAt = 16,
+            },
+        },
+        profession = { selectedId = "profession_medic" },
+        gear = { gear_meadow_satchel = 1 },
+        quests = { claimed = { quest_first_craft = true } },
+    },
 }
 
 -- Every field SaveSchema.default produces. A migrated profile that is missing

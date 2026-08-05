@@ -238,9 +238,21 @@ function WorldMotionController._step(self: WorldMotionController, deltaTime: num
                 self._ambientMotion.lightLevel(self._elapsed, state.phaseOffset, self._phase)
             local sizeScale = 0.94 + level * 0.08
             glow.Size = state.baseSize * sizeScale
-            glow.Transparency = math.clamp(state.baseTransparency + (1 - level) * 0.18, 0.02, 0.55)
+            -- An opt-in daytime fade for glows whose job is night navigation.
+            -- lightLevel floors at 0.58, so the ordinary breathing above can
+            -- never take a marker far enough down to stop shouting in
+            -- daylight; this can.
+            local daylightFade = glow:GetAttribute("DaylightFade")
+            local fade = if self._phase == "day" and type(daylightFade) == "number"
+                then daylightFade
+                else 0
+            glow.Transparency = math.clamp(
+                state.baseTransparency + (1 - level) * 0.18 + (1 - state.baseTransparency) * fade,
+                0.02,
+                0.985
+            )
             if pointLight ~= nil and state.baseBrightness ~= nil and state.baseRange ~= nil then
-                pointLight.Brightness = state.baseBrightness * (0.72 + level * 0.3)
+                pointLight.Brightness = state.baseBrightness * (0.72 + level * 0.3) * (1 - fade)
                 pointLight.Range = state.baseRange * (0.94 + level * 0.05)
             end
             state.active = true

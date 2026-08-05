@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-04, at `main` = `bcb0fb4` (PR #182), build `0.49.1`,
-save schema 13, 20 services.
+Last updated: 2026-08-04, at `main` = `ae0ad4b` (PR #184), build `0.50.0`,
+save schema 14, 20 services.
 
 ---
 
@@ -28,8 +28,8 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
-- **(in flight, this branch: `agent/chapter-one-strikes`; the town-surface
-  half below already merged as #183)** Level-2 playability and visual audit,
+- **(in flight, this branch: `agent/memory-fragments`; the chapter-one strike
+  fix merged as #184 and the town-surface half as #183)** Level-2 playability and visual audit,
   driven live through a connected Studio session. The headline: **chapter
   one had become uncompletable, and is fixed.** The
   `part()` tap-to-interact change (#173) left the Old Growth AmberHeart and
@@ -65,18 +65,54 @@ Verified against `git log`, newest first:
   `[Last Light] PASS FoundationIntegration` was then seen to print with zero
   errors — the first time since #180.
 
-  Flagged for the owner, deliberately not acted on:
+  **Memory fragments — chapter one's story, finally told in the world.**
+  The premise had never reached the player: light is memory, the Long Night is
+  the remainder of memories a machine took because nobody could carry them,
+  and the eighth seal has been in the player's hands since the prologue
+  unexplained. Ten fragments now rest on scenery that was already standing —
+  the four authored story vignettes and the four POIs — in three acts: what
+  the forest kept (the evacuation, each beat landing on a resident standing in
+  Emberhollow today), the keeper's trail (what Orin was actually doing), and
+  your part in it (why the seal is yours). The last two are gated behind
+  chapter one; the final one sits **at the Wayhome Gate**, so a player learns
+  what Chapter II is on the walk home from finishing Chapter I. The Field Book
+  is now also the Memory Archive: recovered fragments read back in authored
+  order, unrecovered ones are named by the place that holds them, so the pull
+  is "there is more to know and I know where to look" rather than a checklist
+  with the labels torn off. Save schema 14; `MemoryFragments.luau` owns
+  catalog, placement anchors, and pure claim logic; 10 new tests.
+
+  Taste calls made rather than deferred:
+  - **Daylight foxfire route markers** dimmed properly. `AmbientMotion.lightLevel`
+    floors at 0.58, so the existing breathing could never take the 26 neon
+    inlays down meaningfully and they read as saturated cyan slabs by day. New
+    opt-in `DaylightFade` attribute the ambient controller honours: the road
+    leads with its own worn surface by day, foxfire owns the night.
+  - **Cleansed Blackout roots** stopped going 48% transparent — a lit root read
+    as a flat translucent pane, which made progress look like breakage. They
+    now stay solid and turn living green (LeafyGrass), so cleansing reads as
+    regrowth taking the light back.
+
+  Still flagged for the owner, needing eyes rather than a decision:
   - **Bramblewake reads very dark at dawn/day mid-route** in the test place;
     the test place does not set `Lighting.Technology = Future` (the game
     place does), so judge lighting there before tuning anything.
   - **A solo Blackout leaves the town lantern undefended** through however
     many normal nights elapse — it hit the 18-health floor during this run,
-    which means three damaged buildings at dawn. Design tension, not a bug.
-  - The Blackout `RootedWall` barriers read as flat translucent green panes;
-    the market-stall canopies (restyled from fairground red to deep moss
-    Fabric) read near-black in shade; the archive/board notice-board mesh is
-    placed roughly half-buried (its visible height is right, the method is
-    odd). All three are taste calls needing the Future-lighting pass.
+    which means three damaged buildings at dawn. Design tension, not a bug;
+    the owner's call among pause-the-cycle, exempt-when-empty, or keep.
+  - The market-stall canopies (restyled from fairground red to deep moss
+    Fabric) read near-black in shade, and the notice-board mesh is placed
+    roughly half-buried (its visible height is right, the method is odd).
+
+  The same branch adds the owner-requested **arrival vignettes**: a short,
+  local, skippable letterboxed camera push with an original title card when
+  the night arrives ("NIGHT 3 · ROOTMOON" from the authored theme names), the
+  Blackout begins, or Old Growth / the Warden Stag awaken. Camera-only and
+  per-player (the server never waits), any input skips instantly, never plays
+  while downed / in compact HUD / on a reconnect into an already-active
+  state. Decision recorded in DECISIONS.md; live-verified in Studio (play,
+  letterbox, restore, and the downed guard all observed working).
 
   The first fruits of the same audit, from before the live playthrough:
   - **The town's main street was invisible.** Its top face (0.33) was exactly

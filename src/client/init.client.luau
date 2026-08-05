@@ -11,9 +11,11 @@ local AmbientMotion = require(root.AmbientMotion)
 local MusicCatalog = require(root.MusicCatalog)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local RuntimeIds = require(root.RuntimeIds)
+local TownNightSchedule = require(root.TownNightSchedule)
 local WeatherProfile = require(root.WeatherProfile)
 local AmbientController = require(script.Controllers.AmbientController)
 local HUDController = require(script.Controllers.HUDController)
+local VignetteController = require(script.Controllers.VignetteController)
 local InputController = require(script.Controllers.InputController)
 local InteractionController = require(script.Controllers.InteractionController)
 local MusicController = require(script.Controllers.MusicController)
@@ -45,6 +47,7 @@ local playerGui = player:WaitForChild("PlayerGui", Config.BootstrapTimeoutSecond
 assert(playerGui ~= nil and playerGui:IsA("PlayerGui"), "PlayerGui unavailable")
 
 local hud = HUDController.new(playerGui, ProfessionCatalog.list())
+local vignette = VignetteController.new(playerGui)
 local ambient = AmbientController.new(RuntimeIds.AmbientMoteTag)
 local worldMotion = WorldMotionController.new(
     RuntimeIds.AmbientMotionTag,
@@ -101,12 +104,120 @@ hud:setEquipHandler(function(itemId: string)
     send(RuntimeIds.Actions.EquipGear, { itemId = itemId })
 end)
 
+--[[
+    Arrival vignettes ride the same state stream the HUD already consumes:
+    each one fires on a specific transition, locally, at most once per
+    arrival. The focus points are found in the workspace at trigger time so a
+    streamed-out or missing landmark simply skips the shot instead of aiming
+    a camera at nothing.
+]]
+local lastNightActive = false
+local lastBlackoutStatus: string? = nil
+local lastEliteActive = false
+local lastBossActive = false
+
+local function focusPart(name: string): Vector3?
+    local found = workspace:FindFirstChild(name, true)
+    return if found ~= nil and found:IsA("BasePart")
+        then found.Position
+        elseif found ~= nil and found:IsA("Model") then found:GetPivot().Position
+        else nil
+end
+
+local function updateVignettes(snapshot: any, suppress: boolean?)
+    vignette:setCompact(snapshot.compactHud == true)
+
+    local nightActive = snapshot.nightActive == true
+    if suppress then
+        -- A reconnect mid-arrival is not an arrival: seed the trackers from
+        -- the first snapshot so a player who joins during a night or an
+        -- active encounter is not greeted by a stale cinematic.
+        lastNightActive = nightActive
+        local seedBlackout = snapshot.blackout
+        lastBlackoutStatus = if type(seedBlackout) == "table"
+            then tostring(seedBlackout.status)
+            else nil
+        local seedElite = snapshot.elite
+        lastEliteActive = type(seedElite) == "table" and seedElite.active == true
+        local seedBoss = snapshot.boss
+        lastBossActive = type(seedBoss) == "table" and seedBoss.active == true
+        return
+    end
+    if nightActive and not lastNightActive and snapshot.expeditionActive ~= true then
+        local nightNumber = tonumber(snapshot.nightNumber) or 0
+        local title = "THE FIRST NIGHT"
+        local subtitle = "KEEP THE LIGHT ALIVE"
+        if nightNumber >= 1 then
+            local theme = TownNightSchedule.theme(nightNumber)
+            local profile = TownNightSchedule.profile(nightNumber)
+            title = string.format("NIGHT %d · %s", nightNumber, theme)
+            subtitle = tostring(profile.instruction)
+        end
+        local focus = focusPart("FirstLantern")
+        if focus ~= nil then
+            vignette:play({
+                title = title,
+                subtitle = subtitle,
+                focus = focus,
+                duration = 3.0,
+            })
+        end
+    end
+    lastNightActive = nightActive
+
+    local blackout = snapshot.blackout
+    local blackoutStatus = if type(blackout) == "table" then tostring(blackout.status) else nil
+    if blackoutStatus == "relay" and lastBlackoutStatus ~= "relay" then
+        local focus = focusPart("BlackoutLanternFire")
+        if focus ~= nil then
+            vignette:play({
+                title = "THE BLACKOUT",
+                subtitle = "CARRY THE ROOTFIRE",
+                focus = focus,
+                duration = 3.0,
+            })
+        end
+    end
+    lastBlackoutStatus = blackoutStatus
+
+    local elite = snapshot.elite
+    local eliteActive = type(elite) == "table" and elite.active == true
+    if eliteActive and not lastEliteActive then
+        local focus = focusPart("OldGrowthElite")
+        if focus ~= nil then
+            vignette:play({
+                title = "OLD GROWTH",
+                subtitle = "STRIKE THE AMBER HEART",
+                focus = focus,
+                duration = 2.4,
+            })
+        end
+    end
+    lastEliteActive = eliteActive
+
+    local boss = snapshot.boss
+    local bossActive = type(boss) == "table" and boss.active == true
+    if bossActive and not lastBossActive then
+        local focus = focusPart("WardenStagBoss")
+        if focus ~= nil then
+            vignette:play({
+                title = "THE WARDEN STAG",
+                subtitle = "CLEANSE THE LIVING ROOTS",
+                focus = focus,
+                duration = 2.4,
+            })
+        end
+    end
+    lastBossActive = bossActive
+end
+
 stateChanged.OnClientEvent:Connect(function(snapshot: any)
     hud:update(snapshot)
     ambient:setPhase(tostring(snapshot.phase or "day"))
     worldMotion:setPhase(tostring(snapshot.phase or "day"))
     weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
     music:setSnapshot(snapshot)
+    updateVignettes(snapshot)
 end)
 
 task.spawn(function()
@@ -119,6 +230,7 @@ task.spawn(function()
         worldMotion:setPhase(tostring(snapshot.phase or "day"))
         weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
         music:setSnapshot(snapshot)
+        updateVignettes(snapshot, true)
     end
 end)
 

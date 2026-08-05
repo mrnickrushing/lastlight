@@ -1783,6 +1783,38 @@ function HUDController._updateProgress(self: HUDController)
             else string.format("%d/%d", quest.progress, quest.threshold)
         table.insert(lines, string.format("• %s  ·  %s", quest.displayName, status))
     end
+    --[[
+        The Memory Archive.
+
+        Missing fragments are listed by the place that holds them rather than
+        hidden behind a blank, because the pull this system is for is "there
+        is more to know and I know where to look" -- not a checklist with the
+        labels torn off. Recovered ones show their text, so the archive is
+        where the chapter can actually be read back.
+    ]]
+    local archive = state.memoryArchive
+    if type(archive) == "table" then
+        table.insert(lines, "")
+        table.insert(
+            lines,
+            string.format(
+                "MEMORY ARCHIVE  ·  %d / %d RECOVERED",
+                tonumber(archive.found) or 0,
+                tonumber(archive.total) or 0
+            )
+        )
+        for _, entry in archive.entries or {} do
+            if entry.recovered then
+                table.insert(lines, string.format("• %s", tostring(entry.title)))
+                table.insert(lines, string.format("    %s", tostring(entry.body)))
+            else
+                table.insert(
+                    lines,
+                    string.format("• UNRECOVERED  ·  %s", string.upper(tostring(entry.foundAt)))
+                )
+            end
+        end
+    end
     table.insert(lines, "")
     table.insert(lines, "PROFESSION MASTERY")
     for professionId, mastery in state.mastery or {} do

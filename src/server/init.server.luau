@@ -53,6 +53,7 @@ local TownPermissions = require(root.TownPermissions)
 local RunHandoff = require(root.RunHandoff)
 local AdminRoster = require(root.AdminRoster)
 local TownProgression = require(root.TownProgression)
+local MemoryFragments = require(root.MemoryFragments)
 local TownConstruction = require(root.TownConstruction)
 local TutorialFlow = require(root.TutorialFlow)
 local Registry = require(root.Content.Registry)
@@ -106,7 +107,8 @@ local worldService = WorldService.new(
     ExtractionPayoff,
     TownProgression,
     ProfessionAbilityVisuals,
-    TownConstruction
+    TownConstruction,
+    MemoryFragments
 )
 local expeditionService = ExpeditionService.new(
     logger,

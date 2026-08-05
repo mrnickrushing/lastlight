@@ -4,6 +4,7 @@ local TutorialFlow = require("./TutorialFlow")
 local ExpeditionInventory = require("./ExpeditionInventory")
 local ProfessionCatalog = require("./ProfessionCatalog")
 local Crafting = require("./Crafting")
+local MemoryFragments = require("./MemoryFragments")
 local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
@@ -39,6 +40,7 @@ export type Profile = {
             transactionId: string?,
             wardenOutcome: string?,
         },
+        fragments: { [string]: boolean },
     },
     town: {
         nightNumber: number,
@@ -67,7 +69,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 13,
+        schemaVersion = 14,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -90,6 +92,7 @@ function SaveSchema.default(now: number): Profile
                 transactionId = nil,
                 wardenOutcome = nil,
             },
+            fragments = MemoryFragments.normalize(nil),
         },
         town = {
             nightNumber = 1,
@@ -177,6 +180,13 @@ function SaveSchema.normalize(value: any, now: number): Profile
             wardenOutcome = chapterOne.wardenOutcome,
         }
     end
+    -- Recovered memory fragments. Unknown IDs are dropped the same way gear
+    -- and quest claims drop theirs, so a retired fragment cannot keep
+    -- occupying an archive count. A schema-13 profile simply arrives with
+    -- none recovered, which is the truthful migration: nothing was collected
+    -- before the system existed.
+    profile.story.fragments =
+        MemoryFragments.normalize(if type(story) == "table" then story.fragments else nil)
     local town = value.town
     if
         type(town) == "table"
@@ -223,7 +233,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 13
+    profile.schemaVersion = 14
     return profile
 end
 
@@ -548,6 +558,42 @@ function SaveSchema.withCraftedItem(profile: Profile, recipeId: string, now: num
     nextProfile.updatedAt = now
     nextProfile.revision += 1
     return nextProfile, result
+end
+
+--[[
+    Recover one memory fragment.
+
+    Idempotent by way of MemoryFragments.collect: a repeat recovery is
+    reported, never applied, so a duplicated interaction cannot double-count
+    the archive or bump the revision.
+]]
+function SaveSchema.withMemoryFragment(
+    profile: Profile,
+    fragmentId: string,
+    now: number
+): (Profile, any)
+    local nextFragments, result = MemoryFragments.collect(
+        profile.story.fragments,
+        fragmentId,
+        profile.story.chapterOne.status == "complete"
+    )
+    if not result.accepted then
+        return profile, result
+    end
+
+    local nextProfile = table.clone(profile)
+    nextProfile.story = table.clone(profile.story)
+    nextProfile.story.fragments = nextFragments
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.memoryFragmentSnapshot(profile: Profile): any
+    return MemoryFragments.snapshot(
+        profile.story.fragments,
+        profile.story.chapterOne.status == "complete"
+    )
 end
 
 function SaveSchema.gearSnapshot(profile: Profile): { [string]: number }
