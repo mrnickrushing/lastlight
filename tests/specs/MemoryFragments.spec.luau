@@ -129,7 +129,7 @@ return {
                     story = { chapterOne = { status = "unresolved" } },
                 }
                 local profile = SaveSchema.normalize(legacy, 1000)
-                TestRunner.equal(profile.schemaVersion, 15)
+                TestRunner.equal(profile.schemaVersion, 16)
                 TestRunner.equal(next(profile.story.fragments), nil)
             end,
         },

@@ -436,6 +436,7 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     -- regression this whole feature exists to avoid on the buildings a
     -- returning player already paid for (or was grandfathered into).
     self._worldService:setTownConstruction(self._profileService:townConstructionState(player))
+    self._worldService:setTownDecorations(self._profileService:decorationsSnapshot(player))
 
     if stage == "prepare" or stage == "survive" or stage == "reveal" or stage == "complete" then
         self._worldService:buildBarricade(false)
@@ -903,6 +904,23 @@ function TutorialService._interact(
         end
         local result = self._professionService:selectSpecialization(player, specializationId)
         self:_setToast(player, result.message)
+        self:_publish(player)
+        return
+    end
+    if actionId == self._runtimeIds.Actions.PlaceDecoration then
+        local decorationId = prompt:GetAttribute("Payload")
+        local result = self._profileService:placeDecoration(player, tostring(decorationId))
+        if result.applied then
+            self._worldService:setTownDecorations(self._profileService:decorationsSnapshot(player))
+            self:_setToast(player, "DECORATION PLACED — THE TOWN WEARS YOUR WORK")
+        else
+            local message = if result.reason == "decoration_cap"
+                then "DECORATION LIMIT REACHED — GROW THE TOWN FOR MORE ROOM"
+                elseif result.reason == "insufficient_materials" then "NOT ENOUGH MATERIALS"
+                elseif result.reason == "already_placed" then "ALREADY DECORATED"
+                else "THAT SPOT CANNOT BE DECORATED"
+            self:_setToast(player, message)
+        end
         self:_publish(player)
         return
     end
@@ -1589,6 +1607,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         equipmentCatalog = self._equipmentCatalog.list(),
         objectiveTargets = self:_objectiveTargets(player, session),
         residentLife = self._profileService:residentLifeSnapshot(player),
+        decorations = self._profileService:decorationsSnapshot(player),
         townHost = (function(): any
             local info = self._townNightService:hostInfo(player.UserId)
             if info == nil then

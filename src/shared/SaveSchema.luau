@@ -9,6 +9,7 @@ local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
 local ResidentLife = require("./ResidentLife")
+local TownDecorations = require("./TownDecorations")
 local TownProgression = require("./TownProgression")
 local TownCondition = require("./TownCondition")
 local TownConstruction = require("./TownConstruction")
@@ -49,6 +50,7 @@ export type Profile = {
         construction: { [string]: number },
         residents: ResidentLife.State,
         crisis: ResidentLife.Crisis?,
+        decorations: TownDecorations.State,
     },
     gear: { [string]: number },
     equipped: Equipment.Equipped,
@@ -72,7 +74,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 15,
+        schemaVersion = 16,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -103,6 +105,7 @@ function SaveSchema.default(now: number): Profile
             construction = TownConstruction.default(),
             residents = ResidentLife.default(),
             crisis = nil,
+            decorations = TownDecorations.default(),
         },
         gear = Crafting.default(),
         equipped = Equipment.default(),
@@ -257,13 +260,17 @@ function SaveSchema.normalize(value: any, now: number): Profile
         profile.town.crisis = nil
     end
 
+    -- Decorations (schema 16): a pre-16 save simply has none placed.
+    profile.town.decorations =
+        TownDecorations.normalize(if type(town) == "table" then town.decorations else nil)
+
     profile.gear = Crafting.normalizeGear(value.gear)
     profile.equipped = Equipment.normalize(value.equipped)
     local quests = value.quests
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 15
+    profile.schemaVersion = 16
     return profile
 end
 
@@ -758,6 +765,40 @@ end
 
 function SaveSchema.constructionSnapshot(profile: Profile): { [string]: number }
     return table.clone(profile.town.construction)
+end
+
+function SaveSchema.withPlacedDecoration(
+    profile: Profile,
+    decorationId: string,
+    now: number
+): (Profile, any)
+    local tier = TownProgression.resolve(profile).tier
+    local nextMaterials, nextDecorations, result = TownDecorations.place(
+        profile.inventory.materials,
+        profile.town.decorations,
+        decorationId,
+        tier
+    )
+    if not result.applied then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.inventory = table.clone(profile.inventory)
+    nextProfile.inventory.materials = nextMaterials
+    nextProfile.town = table.clone(profile.town)
+    nextProfile.town.decorations = nextDecorations
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
+function SaveSchema.decorationsSnapshot(profile: Profile): any
+    local tier = TownProgression.resolve(profile).tier
+    return {
+        placed = table.clone(profile.town.decorations),
+        count = TownDecorations.count(profile.town.decorations),
+        cap = TownDecorations.capForTier(tier),
+    }
 end
 
 function SaveSchema.masterySnapshot(profile: Profile): ProfessionMastery.State

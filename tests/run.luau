@@ -43,6 +43,7 @@ TestRunner.run({
     require("./specs/SaveMigration.spec"),
     require("./specs/ProfilePersistence.spec"),
     require("./specs/ResidentLife.spec"),
+    require("./specs/TownDecorations.spec"),
     require("./specs/ProfileBackup.spec"),
     require("./specs/ServiceRegistry.spec"),
     require("./specs/SfxCatalog.spec"),

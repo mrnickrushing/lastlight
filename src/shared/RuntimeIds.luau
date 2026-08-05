@@ -64,6 +64,7 @@ local RuntimeIds = {
         ChooseTool = "choose_tool",
         Build = "build",
         Prepare = "prepare",
+        PlaceDecoration = "place_decoration",
         Reveal = "reveal",
         Interact = "interact",
         UseTool = "use_tool",

@@ -8,7 +8,7 @@ hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
 Last updated: 2026-08-05, at `main` = `ae0ad4b`+ (audit waves #191–#194 merged),
-build `0.52.0`, save schema 15, 20 services.
+build `0.53.0`, save schema 16, 20 services.
 
 ---
 
@@ -27,6 +27,17 @@ Studio pathfinding pass.
 ## Recently landed (PRs ~#151–#181)
 
 Verified against `git log`, newest first:
+
+- **(in flight: `agent/m4-decorations`)** Milestone 4's decoration system
+  and caps, closing wave B. New pure `TownDecorations.luau` (save schema
+  16, era-15 fixture): eight authored slots (plaza banners, road garlands,
+  planters at gate/archive/inn/workshop) with material costs; cap 2+tier×2,
+  topping out below the slot count so a maxed town still chooses its
+  corners; placement charges the wallet through the same transaction shape
+  construction uses; shared towns merge decorations upward. WorldService
+  renders placed slots idempotently and hangs a priced PLACE prompt on
+  empty markers; Field Book shows placed/cap. Identity only — no slot
+  changes a stat. Build 0.53.0.
 
 - **(in flight: `agent/m4-visit-flow`)** Milestone 4's deliberate town-visit
   flow. The role model was always enforced (TownPermissions: visitors

@@ -74,6 +74,7 @@ export type WorldService = typeof(setmetatable(
         _townIncidentModel: Model?,
         _engineerBraceModel: Model?,
         _meshTemplateLoader: MeshTemplateLoader.MeshTemplateLoader,
+        _townDecorationsCatalog: any,
         _meshPlacements: { MeshPlacement },
     },
     WorldService
@@ -1902,7 +1903,8 @@ function WorldService.new(
     townProgression: any,
     professionAbilityVisuals: any,
     townConstruction: any,
-    memoryFragments: any
+    memoryFragments: any,
+    townDecorations: any
 ): WorldService
     return setmetatable({
         Name = WorldService.Name,
@@ -1956,6 +1958,7 @@ function WorldService.new(
         _townIncidentModel = nil,
         _engineerBraceModel = nil,
         _meshTemplateLoader = MeshTemplateLoader.new(logger),
+        _townDecorationsCatalog = townDecorations,
         _meshPlacements = {},
     }, WorldService)
 end
@@ -6919,6 +6922,160 @@ end
 
 function WorldService.setClickHandler(self: WorldService, handler: (Player, string) -> ())
     self._clickHandler = handler
+end
+
+--[[
+    Decoration slots: authored anchors, rendered from profile state.
+
+    Each slot is a small primitive assembly; empty slots carry a PLACE
+    prompt priced from the catalog. Rendering is idempotent -- call it with
+    every snapshot and it builds only what is missing, so placement,
+    session load, and shared-town merges all take the same path.
+]]
+local DECORATION_ANCHORS: { [string]: { position: Vector3, yaw: number } } = {
+    decor_plaza_banner_east = { position = Vector3.new(24, 0, -80), yaw = math.rad(-90) },
+    decor_plaza_banner_west = { position = Vector3.new(-24, 0, -80), yaw = math.rad(90) },
+    decor_road_garland_north = { position = Vector3.new(0, 0, -58), yaw = 0 },
+    decor_road_garland_south = { position = Vector3.new(0, 0, -104), yaw = 0 },
+    decor_planter_gate = { position = Vector3.new(12, 0, -152), yaw = 0 },
+    decor_planter_archive = { position = Vector3.new(-31, 0, -117), yaw = 0 },
+    decor_planter_inn = { position = Vector3.new(-84, 0, -178), yaw = 0 },
+    decor_planter_workshop = { position = Vector3.new(34, 0, -136), yaw = 0 },
+}
+
+function WorldService.setTownDecorations(self: WorldService, snapshot: any)
+    local world = self._world
+    if world == nil or type(snapshot) ~= "table" then
+        return
+    end
+    local folder = world:FindFirstChild("TownDecorations")
+    if folder == nil then
+        folder = Instance.new("Folder")
+        folder.Name = "TownDecorations"
+        folder.Parent = world
+    end
+    local placed = if type(snapshot.placed) == "table" then snapshot.placed else {}
+    for _, slot in self._townDecorationsCatalog.Slots do
+        local anchor = DECORATION_ANCHORS[slot.id]
+        if anchor == nil then
+            continue
+        end
+        local existing = folder:FindFirstChild(slot.id)
+        if placed[slot.id] == true then
+            local prompt = self._interactions["decor_place_" .. slot.id]
+            if prompt ~= nil then
+                prompt.Enabled = false
+            end
+            if existing ~= nil then
+                continue
+            end
+            local model = Instance.new("Model")
+            model.Name = slot.id
+            model.Parent = folder
+            local base = CFrame.new(anchor.position) * CFrame.Angles(0, anchor.yaw, 0)
+            if slot.kind == "banner" then
+                part(
+                    model,
+                    "DecorBannerPole",
+                    Vector3.new(0.55, 9.5, 0.55),
+                    base * CFrame.new(0, 4.75, 0),
+                    WET_BARK,
+                    Enum.Material.Wood
+                )
+                local cloth = part(
+                    model,
+                    "DecorBannerCloth",
+                    Vector3.new(0.18, 4.2, 2.6),
+                    base * CFrame.new(0, 6.4, 1.5) * CFrame.Angles(math.rad(-4), 0, 0),
+                    AMBER,
+                    Enum.Material.Fabric,
+                    false
+                )
+                cloth.CanQuery = false
+            elseif slot.kind == "garland" then
+                for span = -1, 1 do
+                    local rope = part(
+                        model,
+                        "DecorGarlandRope",
+                        Vector3.new(6.4, 0.22, 0.22),
+                        base
+                            * CFrame.new(span * 5.8, 8.2 - math.abs(span) * 0.7, 0)
+                            * CFrame.Angles(0, 0, math.rad(span * 7)),
+                        Color3.fromRGB(96, 84, 58),
+                        Enum.Material.Fabric,
+                        false
+                    )
+                    rope.CanQuery = false
+                    for lamp = -1, 1 do
+                        local mote = part(
+                            model,
+                            "DecorGarlandLamp",
+                            Vector3.new(0.45, 0.45, 0.45),
+                            base
+                                * CFrame.new(span * 5.8 + lamp * 1.9, 7.6 - math.abs(span) * 0.7, 0),
+                            FOXFIRE,
+                            Enum.Material.Neon,
+                            false
+                        )
+                        mote.Shape = Enum.PartType.Ball
+                        mote.CanQuery = false
+                        mote.CastShadow = false
+                    end
+                end
+            else
+                part(
+                    model,
+                    "DecorPlanterBox",
+                    Vector3.new(3.4, 1.1, 1.6),
+                    base * CFrame.new(0, 0.55, 0),
+                    Color3.fromRGB(78, 58, 39),
+                    Enum.Material.WoodPlanks
+                )
+                for stem = -1, 1 do
+                    local bloom = part(
+                        model,
+                        "DecorPlanterBloom",
+                        Vector3.new(0.5, 0.5, 0.5),
+                        base * CFrame.new(stem * 1.05, 1.55, 0),
+                        if stem == 0 then AMBER else FOXFIRE,
+                        Enum.Material.Neon,
+                        false
+                    )
+                    bloom.Shape = Enum.PartType.Ball
+                    bloom.CanQuery = false
+                    bloom.CastShadow = false
+                end
+            end
+        elseif existing == nil and self._interactions["decor_place_" .. slot.id] == nil then
+            -- Empty slot: a low marker with a priced PLACE prompt.
+            local marker = part(
+                folder,
+                slot.id .. "_Marker",
+                Vector3.new(1.6, 0.35, 1.6),
+                CFrame.new(anchor.position + Vector3.new(0, 0.2, 0)),
+                Color3.fromRGB(96, 92, 74),
+                Enum.Material.WoodPlanks,
+                false
+            )
+            marker.CanQuery = true
+            local costText = {}
+            for materialId, amount in slot.cost do
+                table.insert(
+                    costText,
+                    string.format("%d %s", amount, (string.gsub(materialId, "material_", "")))
+                )
+            end
+            table.sort(costText)
+            self:_registerInteraction(
+                marker,
+                "decor_place_" .. slot.id,
+                self._runtimeIds.Actions.PlaceDecoration,
+                "PLACE",
+                slot.displayName .. " · " .. table.concat(costText, " + "),
+                slot.id
+            )
+        end
+    end
 end
 
 --[[
