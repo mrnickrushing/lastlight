@@ -19611,9 +19611,22 @@ function LobbyService.readyPlayers(self: LobbyService): { Player }
             local root = rootOf(player)
             if root ~= nil then
                 local offset = root.Position - center
-                local flat = Vector3.new(offset.X, 0, offset.Z)
+                --[[
+                    The built platform (WorldService) is a square, RADIUS*2 on
+                    a side -- but this used to test the flat offset's
+                    magnitude against RADIUS, which is the circle *inscribed*
+                    in that square. A circle's corners fall short of the
+                    square's, so a player standing in any of the platform's
+                    four corners -- visibly on the dais, arguably the part of
+                    it closest to the doorway -- was told to stand on the
+                    platform while doing exactly that. About a fifth of the
+                    platform's own surface area (1 - pi/4) was a dead zone.
+                    Testing each axis against RADIUS independently matches the
+                    square WorldService actually builds, corners included.
+                ]]
                 if
-                    flat.Magnitude <= radius
+                    math.abs(offset.X) <= radius
+                    and math.abs(offset.Z) <= radius
                     and math.abs(offset.Y) <= PLATFORM_VERTICAL_TOLERANCE
                 then
                     table.insert(ready, player)
