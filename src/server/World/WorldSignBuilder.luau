@@ -49,7 +49,11 @@ local function applySignTextPadding(label: TextLabel)
     padding.Parent = label
 end
 
-local function addSurfaceText(board: BasePart, title: string, accent: Color3)
+-- `singleLine` keeps the whole title on one row. A narrow header plank that
+-- lets its title wrap ends up rendering two lines of glyphs a fraction of a
+-- stud tall -- unreadable mush spilling over the plank edges, which is
+-- exactly what the owner photographed on the notice-board headers.
+local function addSurfaceText(board: BasePart, title: string, accent: Color3, singleLine: boolean?)
     local surface = Instance.new("SurfaceGui")
     surface.Name = "PhysicalSignText"
     surface.Face = Enum.NormalId.Front
@@ -67,7 +71,7 @@ local function addSurfaceText(board: BasePart, title: string, accent: Color3)
     shadow.Text = title
     shadow.TextColor3 = Color3.fromRGB(19, 17, 15)
     shadow.TextScaled = true
-    shadow.TextWrapped = true
+    shadow.TextWrapped = singleLine ~= true
     shadow.Parent = surface
     applySignTextPadding(shadow)
 
@@ -79,7 +83,7 @@ local function addSurfaceText(board: BasePart, title: string, accent: Color3)
     label.Text = title
     label.TextColor3 = accent
     label.TextScaled = true
-    label.TextWrapped = true
+    label.TextWrapped = singleLine ~= true
     label.Parent = surface
     applySignTextPadding(label)
 end
@@ -247,14 +251,14 @@ function WorldSignBuilder.dressNoticeBoard(
     local titlePlate = part(
         details,
         "NoticeBoardHeader",
-        Vector3.new(math.min(board.Size.X * 0.7, 8), 1.05, 0.3),
+        Vector3.new(math.min(board.Size.X * 0.92, 10.6), 1.45, 0.3),
         board.CFrame
-            * CFrame.new(0, board.Size.Y * 0.5 + 0.72, -(board.Size.Z * 0.5 + 0.3))
+            * CFrame.new(0, board.Size.Y * 0.5 + 0.92, -(board.Size.Z * 0.5 + 0.3))
             * CFrame.Angles(0, 0, math.rad(-1.5)),
         WET_BARK,
         Enum.Material.WoodPlanks
     )
-    addSurfaceText(titlePlate, title, accent)
+    addSurfaceText(titlePlate, title, accent, true)
     -- Both notice boards are also mesh-replacement fallbacks, and the authored
     -- Creator Store board carries no notices of its own -- it is bare wood. So
     -- the header and the pinned art below have to outlive the replacement, or
