@@ -28,6 +28,21 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
+- **(in flight: `agent/m5-weather-gallery`)** Milestone 5 wave C. **Contract
+  weather is visible now:** WeatherProfile.contractWeather maps each
+  contract's weather kind to streak count/speed/opacity/color scales
+  (storm doubles and darkens the fall, mist thins it to a drift, spores
+  hang amber), the client controller renders whatever the snapshot's
+  contract says, both call sites pass it. **Module gallery:** new Studio
+  script (tests/studio/ModuleGallery.server.luau) — always verifies all 30
+  catalog modules carry a visual; set the LastLightBuildModuleGallery
+  DataModel attribute to build the whole catalog side-by-side at Z+4000
+  for an art walk. **Recovery cache reviewed:** the failure-cache /
+  recovery / settlement-exclusion loop already ships and was live-tested;
+  no open source work found. M5's remaining gate items are owner-gated:
+  reserved-server teleport hangs on the multi-place decision, and the
+  1,000-Studio-assembly pass needs a live Studio session.
+
 - **(in flight: `agent/m5-contracts`)** Milestone 5 wave B: expedition
   contracts and risk modifiers. New pure `ExpeditionContracts.luau` (4
   contracts, spec-pinned invariant: risk and reward move TOGETHER — no

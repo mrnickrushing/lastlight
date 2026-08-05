@@ -14476,6 +14476,45 @@ function WeatherProfile.streakCount(phase: string): number
     return STREAK_COUNTS[string.lower(phase)] or STREAK_COUNTS.day
 end
 
+--[[
+    The contract's face. A weather kind scales what the base phase would
+    show rather than replacing it: storm doubles the falling streaks and
+    darkens them, mist thins them to a slow drift, spores tint the fall
+    amber and let it hang. Pure data so the client controller stays a
+    renderer and this table stays testable.
+]]
+local CONTRACT_WEATHER = {
+    clear = {
+        countScale = 1,
+        speedScale = 1,
+        transparency = 0.68,
+        color = { 163, 193, 201 },
+    },
+    mist = {
+        countScale = 0.45,
+        speedScale = 0.35,
+        transparency = 0.82,
+        color = { 190, 205, 208 },
+    },
+    storm = {
+        countScale = 2,
+        speedScale = 1.55,
+        transparency = 0.5,
+        color = { 140, 168, 182 },
+    },
+    spores = {
+        countScale = 0.8,
+        speedScale = 0.25,
+        transparency = 0.62,
+        color = { 214, 182, 118 },
+    },
+}
+
+function WeatherProfile.contractWeather(kind: any): any
+    local key = if type(kind) == "string" then string.lower(kind) else "clear"
+    return CONTRACT_WEATHER[key] or CONTRACT_WEATHER.clear
+end
+
 function WeatherProfile.wrapHeight(height: number, floor: number, ceiling: number): number
     assert(ceiling > floor, "weather ceiling must be above floor")
     if height >= floor then
@@ -48164,7 +48203,11 @@ stateChanged.OnClientEvent:Connect(function(snapshot: any)
     hud:update(snapshot)
     ambient:setPhase(tostring(snapshot.phase or "day"))
     worldMotion:setPhase(tostring(snapshot.phase or "day"))
-    weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
+    weather:setContext(
+        snapshot.expeditionActive == true,
+        tostring(snapshot.phase or "day"),
+        if type(snapshot.contract) == "table" then snapshot.contract.weather else nil
+    )
     music:setSnapshot(snapshot)
     sfx:setSnapshot(snapshot)
     objectiveMarkers:setTargets(
@@ -48181,7 +48224,11 @@ task.spawn(function()
         hud:update(snapshot)
         ambient:setPhase(tostring(snapshot.phase or "day"))
         worldMotion:setPhase(tostring(snapshot.phase or "day"))
-        weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
+        weather:setContext(
+            snapshot.expeditionActive == true,
+            tostring(snapshot.phase or "day"),
+            if type(snapshot.contract) == "table" then snapshot.contract.weather else nil
+        )
         music:setSnapshot(snapshot)
         -- Seeds the SFX signature only: joining mid-night is not a night falling.
         sfx:setSnapshot(snapshot)
@@ -52400,6 +52447,7 @@ export type WeatherController = typeof(setmetatable(
         _streaks: { Streak },
         _active: boolean,
         _phase: string,
+        _weather: any,
         _elapsed: number,
         _connection: RBXScriptConnection?,
     },
@@ -52449,6 +52497,7 @@ function WeatherController.new(profile: any): WeatherController
         _streaks = streaks,
         _active = false,
         _phase = "day",
+        _weather = profile.contractWeather(nil),
         _elapsed = 0,
         _connection = nil,
     }, WeatherController)
@@ -52469,10 +52518,12 @@ end
 function WeatherController.setContext(
     self: WeatherController,
     expeditionActive: boolean,
-    phase: string
+    phase: string,
+    weatherKind: string?
 )
     self._active = expeditionActive
     self._phase = string.lower(phase)
+    self._weather = self._profile.contractWeather(weatherKind)
     if not expeditionActive then
         for _, streak in self._streaks do
             streak.part.Transparency = 1
@@ -52490,16 +52541,25 @@ function WeatherController._step(self: WeatherController, deltaTime: number)
         return
     end
     local cameraPosition = camera.CFrame.Position
-    local visibleCount = self._profile.streakCount(self._phase)
+    local weather = self._weather
+    local visibleCount = math.min(
+        MAX_STREAKS,
+        math.floor(self._profile.streakCount(self._phase) * weather.countScale)
+    )
+    local weatherColor = Color3.fromRGB(weather.color[1], weather.color[2], weather.color[3])
     for index, streak in self._streaks do
-        local nextY =
-            self._profile.wrapHeight(streak.offset.Y - streak.speed * deltaTime, FLOOR, CEILING)
+        local nextY = self._profile.wrapHeight(
+            streak.offset.Y - streak.speed * weather.speedScale * deltaTime,
+            FLOOR,
+            CEILING
+        )
         streak.offset = Vector3.new(streak.offset.X, nextY, streak.offset.Z)
         local wind = math.sin(self._elapsed * 0.43 + index) * 0.55
         local fallDrift = (CEILING - nextY) * 0.22 * streak.drift
         local position = cameraPosition + streak.offset + Vector3.new(fallDrift + wind, 0, 0)
         streak.part.CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(-7))
-        streak.part.Transparency = if index <= visibleCount then 0.68 else 1
+        streak.part.Color = weatherColor
+        streak.part.Transparency = if index <= visibleCount then weather.transparency else 1
     end
 end
 

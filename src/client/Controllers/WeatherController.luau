@@ -20,6 +20,7 @@ export type WeatherController = typeof(setmetatable(
         _streaks: { Streak },
         _active: boolean,
         _phase: string,
+        _weather: any,
         _elapsed: number,
         _connection: RBXScriptConnection?,
     },
@@ -69,6 +70,7 @@ function WeatherController.new(profile: any): WeatherController
         _streaks = streaks,
         _active = false,
         _phase = "day",
+        _weather = profile.contractWeather(nil),
         _elapsed = 0,
         _connection = nil,
     }, WeatherController)
@@ -89,10 +91,12 @@ end
 function WeatherController.setContext(
     self: WeatherController,
     expeditionActive: boolean,
-    phase: string
+    phase: string,
+    weatherKind: string?
 )
     self._active = expeditionActive
     self._phase = string.lower(phase)
+    self._weather = self._profile.contractWeather(weatherKind)
     if not expeditionActive then
         for _, streak in self._streaks do
             streak.part.Transparency = 1
@@ -110,16 +114,25 @@ function WeatherController._step(self: WeatherController, deltaTime: number)
         return
     end
     local cameraPosition = camera.CFrame.Position
-    local visibleCount = self._profile.streakCount(self._phase)
+    local weather = self._weather
+    local visibleCount = math.min(
+        MAX_STREAKS,
+        math.floor(self._profile.streakCount(self._phase) * weather.countScale)
+    )
+    local weatherColor = Color3.fromRGB(weather.color[1], weather.color[2], weather.color[3])
     for index, streak in self._streaks do
-        local nextY =
-            self._profile.wrapHeight(streak.offset.Y - streak.speed * deltaTime, FLOOR, CEILING)
+        local nextY = self._profile.wrapHeight(
+            streak.offset.Y - streak.speed * weather.speedScale * deltaTime,
+            FLOOR,
+            CEILING
+        )
         streak.offset = Vector3.new(streak.offset.X, nextY, streak.offset.Z)
         local wind = math.sin(self._elapsed * 0.43 + index) * 0.55
         local fallDrift = (CEILING - nextY) * 0.22 * streak.drift
         local position = cameraPosition + streak.offset + Vector3.new(fallDrift + wind, 0, 0)
         streak.part.CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(-7))
-        streak.part.Transparency = if index <= visibleCount then 0.68 else 1
+        streak.part.Color = weatherColor
+        streak.part.Transparency = if index <= visibleCount then weather.transparency else 1
     end
 end
 
