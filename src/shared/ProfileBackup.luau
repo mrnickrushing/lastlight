@@ -233,6 +233,24 @@ function ProfileBackup.newest(ring: any): Snapshot?
 end
 
 --[[
+    A specific copy, 1 = the oldest kept. Bounded and explicit: an operator
+    restoring history names the copy they read in /backups, and an index off
+    either end is nil rather than a clamp -- silently restoring a different
+    copy than the one asked for is the one unforgivable behaviour here.
+]]
+function ProfileBackup.snapshotAt(ring: any, index: number): Snapshot?
+    local normalized = if type(ring) == "table"
+            and type(ring.snapshots) == "table"
+            and ring.version ~= nil
+        then ring :: Ring
+        else ProfileBackup.normalize(ring)
+    if type(index) ~= "number" or index ~= math.floor(index) then
+        return nil
+    end
+    return normalized.snapshots[index]
+end
+
+--[[
     The profile a restore should write.
 
     `storedRevision` is the revision currently sitting in the live profile key,

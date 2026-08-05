@@ -28,6 +28,17 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
+- **(in flight: `agent/m4-backup-tooling`)** Milestone 4 wave C, closing the
+  backup doc's open list that a session can close: **/restoreat <target>
+  <copy#>** restores a named copy (1 = oldest kept; the roster's own comment
+  asked for a separate command rather than loosening /restore, and got one —
+  bounded 1–8, refuses rather than clamps, same pre-restore capture and lock
+  rails), and **/export <target>** dumps the raw stored profile as JSON into
+  the server log in bounded chunks with a chat summary — the export channel
+  is the log because chat truncates. `ProfileBackup.snapshotAt` is exact or
+  nil, never a clamp. Remaining open on backups, still owner-gated:
+  DataStore behaviour evidence on a published staging place.
+
 - **(in flight: `agent/m4-decorations`)** Milestone 4's decoration system
   and caps, closing wave B. New pure `TownDecorations.luau` (save schema
   16, era-15 fixture): eight authored slots (plaza banners, road garlands,

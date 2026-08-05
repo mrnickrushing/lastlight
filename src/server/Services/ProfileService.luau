@@ -1479,7 +1479,40 @@ end
         player previously had, at a revision above the live one so the write
         actually lands. Nothing is merged, topped up, or granted.
 ]]
-function ProfileService.restoreLatestBackup(self: ProfileService, userId: number): any
+--[[
+    The raw stored profile as JSON, for the export half of the admin
+    tooling. Reads the stored bytes, not the in-memory session, because an
+    export exists to answer "what is actually in the datastore" -- the same
+    question a migration audit asks.
+]]
+function ProfileService.exportProfile(self: ProfileService, userId: number): any
+    assert(type(userId) == "number" and userId > 0, "export target must be a valid user ID")
+    if not self._persistent or self._store == nil then
+        return { ok = false, reason = "not_persistent" }
+    end
+    local readOk, stored = pcall(function()
+        return (self._store :: GlobalDataStore):GetAsync(string.format("player_%d", userId))
+    end)
+    if not readOk then
+        return { ok = false, reason = "read_failed" }
+    end
+    if stored == nil then
+        return { ok = false, reason = "no_save_on_record" }
+    end
+    local encodeOk, encoded = pcall(function()
+        return game:GetService("HttpService"):JSONEncode(stored)
+    end)
+    if not encodeOk then
+        return { ok = false, reason = "encode_failed" }
+    end
+    return { ok = true, json = encoded }
+end
+
+function ProfileService.restoreLatestBackup(
+    self: ProfileService,
+    userId: number,
+    copyIndex: number?
+): any
     assert(type(userId) == "number" and userId > 0, "restore target must be a valid user ID")
 
     if not self._persistent or self._store == nil or self._backupStore == nil then
@@ -1497,9 +1530,17 @@ function ProfileService.restoreLatestBackup(self: ProfileService, userId: number
         error("could not read that player's backups right now")
     end
 
-    local snapshot = self._profileBackup.newest(stored)
+    -- An explicit copy index restores history; no index keeps the everyday
+    -- newest-copy behaviour. An index with no copy behind it refuses rather
+    -- than falling back -- see ProfileBackup.snapshotAt.
+    local snapshot = if copyIndex ~= nil
+        then self._profileBackup.snapshotAt(stored, copyIndex)
+        else self._profileBackup.newest(stored)
     if snapshot == nil then
-        return { applied = false, reason = "no_backup_on_record" }
+        return {
+            applied = false,
+            reason = if copyIndex ~= nil then "no_such_copy" else "no_backup_on_record",
+        }
     end
 
     local outcome: any = { applied = false, reason = "update_did_not_run" }
