@@ -28,6 +28,15 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
+- **(in flight: `agent/m4-visit-flow`)** Milestone 4's deliberate town-visit
+  flow. The role model was always enforced (TownPermissions: visitors
+  contribute upward, never damage); now players are TOLD which side they
+  stand on: `TownNightService.hostInfo` exposes host + role, a visitor's
+  first toast reads "YOU ARE A GUEST IN X'S EMBERHOLLOW — HELP IT GROW",
+  the snapshot carries `townHost`, and the Field Book RESIDENTS section
+  opens with the guest line for visitors. Remaining in wave B: decoration
+  system + caps.
+
 - **(in flight: `agent/m4-storage-caps`)** Milestone 4 storage caps, the
   first half of wave B. Town stores now hold what the tier has earned:
   `TownProgression.storageCapForTier` (80 + tier×60), enforced inside

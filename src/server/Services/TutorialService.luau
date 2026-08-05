@@ -413,6 +413,19 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
             else "FOLLOW THE LANTERN TRAIL",
         toastRevision = 1,
     }
+    -- A guest is told they are one, at the door. The permission model has
+    -- always protected the host's town; the visit only becomes deliberate
+    -- when the visitor knows whose lanterns they are standing under.
+    local hostInfo = self._townNightService:hostInfo(player.UserId)
+    if hostInfo ~= nil and hostInfo.role == "visitor" then
+        local hostPlayer = Players:GetPlayerByUserId(hostInfo.hostUserId)
+        local hostName = if hostPlayer ~= nil then hostPlayer.DisplayName else "A FOUNDER"
+        session.toast = string.format(
+            "YOU ARE A GUEST IN %s'S EMBERHOLLOW — HELP IT GROW",
+            string.upper(hostName)
+        )
+        session.toastRevision += 1
+    end
     self._sessions[player] = session
     self._worldService:setTownConsequence(self._profileService:townConsequence(player))
     -- Seeds the server's live construction accumulator from this player's
@@ -1576,6 +1589,17 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         equipmentCatalog = self._equipmentCatalog.list(),
         objectiveTargets = self:_objectiveTargets(player, session),
         residentLife = self._profileService:residentLifeSnapshot(player),
+        townHost = (function(): any
+            local info = self._townNightService:hostInfo(player.UserId)
+            if info == nil then
+                return nil
+            end
+            local hostPlayer = Players:GetPlayerByUserId(info.hostUserId)
+            return {
+                role = info.role,
+                hostName = if hostPlayer ~= nil then hostPlayer.DisplayName else nil,
+            }
+        end)(),
         guideSpeaker = guideSpeaker,
         quests = self._profileService:questSnapshot(player),
         memoryArchive = self._profileService:memoryFragments(player),

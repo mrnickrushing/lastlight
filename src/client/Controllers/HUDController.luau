@@ -1868,6 +1868,18 @@ function HUDController._updateProgress(self: HUDController)
     if type(residentLife) == "table" and type(residentLife.residents) == "table" then
         table.insert(lines, "")
         table.insert(lines, header("RESIDENTS"))
+        local townHost = state.townHost
+        if type(townHost) == "table" and townHost.role == "visitor" then
+            table.insert(
+                lines,
+                muted(
+                    string.format(
+                        "You are a guest in %s's Emberhollow — your help carries, your damage doesn't.",
+                        tostring(townHost.hostName or "a founder")
+                    )
+                )
+            )
+        end
         if type(residentLife.crisis) == "table" then
             table.insert(
                 lines,
