@@ -1269,6 +1269,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
     local objective = definition.objective
     local detail = definition.detail
     local mara = definition.mara
+    local guideSpeaker = "Mara"
     local trailName = "FIRST LIGHT"
     local expedition = self._expeditionService:snapshot(player)
     if expedition.active then
@@ -1284,8 +1285,9 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             else string.format("%s · %s", expedition.moduleName, discovery)
         -- A landmark gets to speak for itself; the generic line is only for
         -- the stretches of road between them.
+        guideSpeaker = "You"
         mara = expedition.pointOfInterestDetail
-            or "The roots remember every traveler. Keep to the amber path."
+            or "The roots remember every traveler who walked out. Stay on the amber path and they remember me kindly."
         local event = expedition.event
         if event ~= nil then
             if event.status == "dormant" then
@@ -1350,17 +1352,26 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
                 string.upper(tostring(blackout.wardenOutcome):gsub("_", " "))
             )
             else "THE BLACKOUT HAS NOT BEGUN"
+        --[[
+            The traveler talks to themself out here -- the owner asked for
+            exactly this: a voice saying what is actually going on and what to
+            do next. Mara stayed in Emberhollow, so the expedition's guide
+            voice is first person, and each line carries a piece of the
+            chapter's story along with the instruction. The marker system says
+            WHERE; this says WHY.
+        ]]
+        guideSpeaker = "You"
         mara = if blackout.status == "relay"
             then if blackout.carryingFire
-                then "Follow the green NEXT ROOT marker and deliver before the flame fades."
-                else "Take rootfire from the Blackout Lantern, then follow the green NEXT ROOT marker."
+                then "It burns fast. The marked root, before the flame forgets my hands."
+                else "The evacuation's fire still burns in that lantern. The living roots are starving for it — I carry, they wake."
             elseif
                 blackout.status == "resolution"
-            then "Every active traveler votes. A tie becomes the shared agroforest."
+            then "The Greenward is asking what this land becomes. Whatever we plant here, the town inherits."
             elseif
                 blackout.status == "complete"
-            then "The Greenward will remember this choice when the town grows."
-            else "Keep the living path open. The Blackout clock never erases earned progress."
+            then "The seal answered me. Whatever I am carrying, it is time to bring it home."
+            else "The dark out here is old grief, not weather. Keep moving — nothing I have earned can be taken by the clock."
     end
     local elite = self._oldGrowthService:snapshot(player)
     if elite ~= nil and (blackout == nil or blackout.status == "old_growth") then
@@ -1373,8 +1384,8 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
                 elite.maxHealth
             )
             mara = if elite.shielded
-                then "The shield drinks force. Carry lantern fire from the ember to its heart."
-                else "The amber heart is exposed. Strike, then clear the roots when they rise."
+                then "Steel means nothing to that shield. Fire does — carry it from the ember to the heart."
+                else "There — the amber heart. Strike it, and mind the roots when they rise."
         elseif elite.complete then
             objective = "OLD GROWTH CLEANSED — CONTINUE TO WAYHOME"
             detail = if elite.rewardEligible
@@ -1476,6 +1487,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         recipes = self._craftingCatalog:list(),
         equipmentCatalog = self._equipmentCatalog.list(),
         objectiveTargets = self:_objectiveTargets(player, session),
+        guideSpeaker = guideSpeaker,
         quests = self._profileService:questSnapshot(player),
         memoryArchive = self._profileService:memoryFragments(player),
         combat = self._combatService:snapshot(player),

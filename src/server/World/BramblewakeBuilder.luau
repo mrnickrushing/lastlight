@@ -2745,8 +2745,11 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
         local canopy = part(
             folder,
             "BackdropCanopy",
-            Vector3.new(width * 4.4, height * 0.72, width * 4.4),
-            CFrame.new(at + Vector3.new(0, height * 0.86, 0))
+            -- Narrower and set higher: a ball nearly five trunks wide sitting
+            -- at shoulder height is a bush; a crown riding a visible trunk is
+            -- a tree.
+            Vector3.new(width * 3.4, height * 0.6, width * 3.4),
+            CFrame.new(at + Vector3.new(0, height * 0.95, 0))
                 * CFrame.Angles(lean, (seed % 211) * 0.021, 0),
             Color3.fromRGB(math.floor(38 * shade), math.floor(58 * shade), math.floor(41 * shade)),
             Enum.Material.Grass,
@@ -2759,10 +2762,17 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
     -- Four ranks. The near one is sparse enough to walk toward and see
     -- through; each one out is denser, darker and taller, so the horizon
     -- closes gradually rather than ending at a wall.
+    --[[
+        The owner's tablet run read the old near rank as "so many bushes":
+        34 ball canopies at reach+40, plus the hero ring, packed into one
+        hedge the route ran straight at. The near rank now stands further
+        off and thinner, so the forest frames the route instead of crowding
+        it -- density still climbs with distance, just starting politely.
+    ]]
     local ranks = {
-        { radius = reach + 40, count = 34, height = 46, width = 4.2, shade = 1.0 },
-        { radius = reach + 130, count = 46, height = 62, width = 5.0, shade = 0.86 },
-        { radius = reach + 240, count = 58, height = 84, width = 6.0, shade = 0.7 },
+        { radius = reach + 72, count = 20, height = 46, width = 4.2, shade = 1.0 },
+        { radius = reach + 150, count = 40, height = 62, width = 5.0, shade = 0.86 },
+        { radius = reach + 250, count = 56, height = 84, width = 6.0, shade = 0.7 },
         { radius = reach + 360, count = 66, height = 108, width = 7.2, shade = 0.56 },
     }
     for rankIndex, rank in ranks do
@@ -2785,9 +2795,9 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
     -- read one. Past the first rank the silhouette is all that survives, and
     -- a mesh costs the same there as it does underfoot.
     local heroes = { "mesh_conifer_hero_a", "mesh_conifer_hero_b", "mesh_broadleaf_hero_a" }
-    for index = 1, 22 do
-        local angle = (index / 22) * math.pi * 2 + 0.4
-        local radius = reach + 6 + ((index * 29) % 34)
+    for index = 1, 14 do
+        local angle = (index / 14) * math.pi * 2 + 0.4
+        local radius = reach + 12 + ((index * 29) % 56)
         dress(
             extra,
             heroes[(index % #heroes) + 1],
@@ -3658,15 +3668,23 @@ function BramblewakeBuilder.build(
         math.rad(180),
         bossArena.center.Y + 0.28
     )
+    --[[
+        Living roots look like roots now. These nodes and the relay roots
+        below wore the rootling CREATURE mesh -- the same silhouette as the
+        enemy -- so on a dark tablet screen the objectives read as a crowd of
+        pale ghosts standing in the forest. An objective may never share a
+        silhouette with a threat: the living stump carries "alive and rooted"
+        without impersonating the roster.
+    ]]
     for nodeIndex, node in bossArena.nodes do
         queueItemAsset(
             meshPlacements,
             node,
-            "mesh_rootling_a",
-            0.78,
+            "mesh_heartwood_stump_a",
+            0.82,
             7200 + string.len(nodeIndex),
             math.rad(string.len(nodeIndex) * 7),
-            node.Position.Y - 2.6
+            node.Position.Y - 3
         )
     end
     queueItemAsset(
@@ -3684,11 +3702,11 @@ function BramblewakeBuilder.build(
         queueItemAsset(
             meshPlacements,
             node,
-            "mesh_rootling_a",
-            0.86,
+            "mesh_heartwood_stump_a",
+            0.94,
             7310 + relaySeed,
             math.rad((relaySeed - 2) * 13),
-            node.Position.Y - 2.7
+            node.Position.Y - 3
         )
     end
     local decisionAssets = {

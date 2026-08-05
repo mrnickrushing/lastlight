@@ -86,7 +86,11 @@ export type WorldService = typeof(setmetatable(
 -- lifts the day/morning shadow, not the dusk/night contrast the design
 -- docs ask for.
 local DAY_AMBIENT = Color3.fromRGB(82, 94, 88)
-local NIGHT_AMBIENT = Color3.fromRGB(19, 26, 43)
+-- Raised from (19, 26, 43) after the owner's tablet screenshots: values a
+-- workstation renders as moody night, a real device crushes to black. Night
+-- still reads as night -- the practicals and foxfire own it -- but ground
+-- and silhouettes survive on hardware now.
+local NIGHT_AMBIENT = Color3.fromRGB(36, 44, 60)
 local AMBER = Color3.fromRGB(255, 181, 76)
 local FOXFIRE = Color3.fromRGB(94, 206, 176)
 local CREAM = Color3.fromRGB(244, 230, 197)
@@ -1439,6 +1443,10 @@ local function buildEmberhollowSanctuary(
         CFrame.new(0, 3.2, signZ) * CFrame.Angles(0, math.pi, 0),
         "EMBERHOLLOW · SAFE CAMP"
     )
+    -- Same reason as the FOLLOW THE LANTERNS sign: the authored forest sign
+    -- has its own two-board silhouette, and the surviving SurfaceGui projects
+    -- one wide sentence across both boards as clipped fragments.
+    campSign:SetAttribute("HideSemanticGuiOnReplacement", true)
     table.insert(meshPlacements, {
         assetId = "mesh_creator_forest_sign_a",
         fallbackKind = "asset_replacement",
@@ -4020,6 +4028,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
 
     local maraHumanoid = model:WaitForChild("Humanoid") :: Humanoid
     maraHumanoid.DisplayName = "Mara"
+    maraHumanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
     maraHumanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
     maraHumanoid.BreakJointsOnDeath = false
     maraHumanoid.RequiresNeck = false
@@ -5160,19 +5169,32 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         Enum.Material.Slate
     )
     shrineUpper.CanQuery = false
-    local shrineInlay = part(
-        firstLanternFallback,
-        "ShrineInlayRing",
-        Vector3.new(11, 0.1, 11),
-        CFrame.new(0, 1.5, TOWN_CENTER.Z) * CFrame.Angles(0, math.rad(45), 0),
-        AMBER,
-        Enum.Material.Neon,
-        false
-    )
-    shrineInlay.Transparency = 0.55
-    shrineInlay.CanQuery = false
-    shrineInlay.CastShadow = false
-    CollectionService:AddTag(shrineInlay, self._runtimeIds.AmbientLightTag)
+    -- An inlaid ring, drawn as four thin bands along the rotated square's
+    -- edges. The first pass used one full 11x11 neon plate, and on a real
+    -- device that rendered as a blinding flat yellow square in the middle of
+    -- the square -- the owner's screenshot, not a subtle inlay.
+    for edge = 0, 3 do
+        local along = edge % 2 == 0
+        local shrineInlay = part(
+            firstLanternFallback,
+            "ShrineInlayRing",
+            if along then Vector3.new(0.55, 0.1, 11) else Vector3.new(11, 0.1, 0.55),
+            CFrame.new(0, 1.5, TOWN_CENTER.Z)
+                * CFrame.Angles(0, math.rad(45), 0)
+                * CFrame.new(
+                    if along then (if edge == 0 then 5.225 else -5.225) else 0,
+                    0,
+                    if along then 0 else (if edge == 1 then 5.225 else -5.225)
+                ),
+            AMBER,
+            Enum.Material.Neon,
+            false
+        )
+        shrineInlay.Transparency = 0.4
+        shrineInlay.CanQuery = false
+        shrineInlay.CastShadow = false
+        CollectionService:AddTag(shrineInlay, self._runtimeIds.AmbientLightTag)
+    end
     for corner = 0, 3 do
         local angle = math.rad(45 + corner * 90)
         local offset = Vector3.new(math.cos(angle) * 10.5, 0, math.sin(angle) * 10.5)
@@ -5951,8 +5973,10 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         })
     end
 
-    local archiveX = -20
-    local archiveZ = -132
+    -- North-west of the gate rather than at the west tower's base, where the
+    -- board stood in the scaffold's lap and its header read as tower junk.
+    local archiveX = -26
+    local archiveZ = -120
     local archiveFallback = Instance.new("Model")
     archiveFallback.Name = "ArchiveVisualFallback"
     archiveFallback.Parent = interactables
@@ -5993,7 +6017,10 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         Enum.Material.Slate,
         false
     )
-    WorldSignBuilder.dressNoticeBoard(archive, "GREENWARD ARCHIVE · FIELD BOOK", CREAM, {
+    -- "FIELD BOOK" and nothing more: it is the name every prompt and HUD
+    -- button already uses, and the previous five-word title shrank to
+    -- unreadable wrapped mush on the header plank.
+    WorldSignBuilder.dressNoticeBoard(archive, "FIELD BOOK", CREAM, {
         "field_botany",
         "evacuation_route",
         "bramble_hazard",
@@ -8413,8 +8440,14 @@ local function buildTownProgressionBuildings(
         across the road. A reader now stands beside the road looking west,
         rather than standing on the road blocking the walk south, and the
         reliquary keeps a clear backdrop.
+
+        Then the Dawn Gate towers moved out to x = +/-19, and (-24, -150) put
+        this board five studs from the west tower -- swallowed by its
+        scaffold, with the header plank reading as a sign nailed sideways to
+        the stairs. The owner photographed exactly that. South of the gate on
+        the same verge keeps the original intent with the tower well clear.
     ]]
-    local boardBase = CFrame.new(-24, 0, -150) * CFrame.Angles(0, math.rad(-90), 0)
+    local boardBase = CFrame.new(-32, 0, -162) * CFrame.Angles(0, math.rad(-90), 0)
     for side = -1, 1, 2 do
         part(
             boardModel,
@@ -8444,7 +8477,7 @@ local function buildTownProgressionBuildings(
     table.insert(meshPlacements, {
         assetId = "mesh_creator_notice_board_a",
         fallbackKind = "asset_replacement",
-        position = Vector3.new(-24, 0, -150),
+        position = Vector3.new(-32, 0, -162),
         scale = 1.05,
         yaw = math.rad(-90),
         seed = 10120,
@@ -8778,6 +8811,9 @@ local function buildTownProgressionBuildings(
 
         local residentHumanoid = model:WaitForChild("Humanoid") :: Humanoid
         residentHumanoid.DisplayName = definition.displayName
+        -- The engine's own floating name renders bubble-less at 100 studs,
+        -- stacked over the bubbled plate below at close range. One tag.
+        residentHumanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
         residentHumanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
         residentHumanoid.BreakJointsOnDeath = false
         residentHumanoid.RequiresNeck = false
@@ -8956,7 +8992,12 @@ local function buildTownProgressionBuildings(
             parent = model,
             fallbackInstance = nil,
         })
-        addBillboard(head, definition.displayName .. " · " .. definition.role, definition.accent)
+        addBillboard(
+            head,
+            definition.displayName .. " · " .. definition.role,
+            definition.accent,
+            40
+        )
         CollectionService:AddTag(model, runtimeIds.AmbientMotionTag)
         residents[residentId] = {
             model = model,
@@ -11166,15 +11207,15 @@ function WorldService._applyTownLighting(_self: WorldService, night: boolean)
 
     if night then
         Lighting.ClockTime = 0.15
-        Lighting.Brightness = 0.82
+        Lighting.Brightness = 1.0
         Lighting.Ambient = NIGHT_AMBIENT
-        Lighting.OutdoorAmbient = Color3.fromRGB(25, 35, 56)
-        Lighting.ExposureCompensation = -0.38
+        Lighting.OutdoorAmbient = Color3.fromRGB(46, 56, 74)
+        Lighting.ExposureCompensation = -0.18
         if atmosphere ~= nil and atmosphere:IsA("Atmosphere") then
             atmosphere.Color = Color3.fromRGB(82, 106, 126)
             atmosphere.Decay = Color3.fromRGB(12, 18, 36)
-            atmosphere.Density = 0.4
-            atmosphere.Haze = 1.75
+            atmosphere.Density = 0.32
+            atmosphere.Haze = 1.3
             atmosphere.Glare = 0.08
         end
         if tone ~= nil and tone:IsA("ColorCorrectionEffect") then

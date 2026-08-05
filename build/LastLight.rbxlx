@@ -25395,6 +25395,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
     local objective = definition.objective
     local detail = definition.detail
     local mara = definition.mara
+    local guideSpeaker = "Mara"
     local trailName = "FIRST LIGHT"
     local expedition = self._expeditionService:snapshot(player)
     if expedition.active then
@@ -25410,8 +25411,9 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             else string.format("%s · %s", expedition.moduleName, discovery)
         -- A landmark gets to speak for itself; the generic line is only for
         -- the stretches of road between them.
+        guideSpeaker = "You"
         mara = expedition.pointOfInterestDetail
-            or "The roots remember every traveler. Keep to the amber path."
+            or "The roots remember every traveler who walked out. Stay on the amber path and they remember me kindly."
         local event = expedition.event
         if event ~= nil then
             if event.status == "dormant" then
@@ -25476,17 +25478,26 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
                 string.upper(tostring(blackout.wardenOutcome):gsub("_", " "))
             )
             else "THE BLACKOUT HAS NOT BEGUN"
+        --[[
+            The traveler talks to themself out here -- the owner asked for
+            exactly this: a voice saying what is actually going on and what to
+            do next. Mara stayed in Emberhollow, so the expedition's guide
+            voice is first person, and each line carries a piece of the
+            chapter's story along with the instruction. The marker system says
+            WHERE; this says WHY.
+        ]]
+        guideSpeaker = "You"
         mara = if blackout.status == "relay"
             then if blackout.carryingFire
-                then "Follow the green NEXT ROOT marker and deliver before the flame fades."
-                else "Take rootfire from the Blackout Lantern, then follow the green NEXT ROOT marker."
+                then "It burns fast. The marked root, before the flame forgets my hands."
+                else "The evacuation's fire still burns in that lantern. The living roots are starving for it — I carry, they wake."
             elseif
                 blackout.status == "resolution"
-            then "Every active traveler votes. A tie becomes the shared agroforest."
+            then "The Greenward is asking what this land becomes. Whatever we plant here, the town inherits."
             elseif
                 blackout.status == "complete"
-            then "The Greenward will remember this choice when the town grows."
-            else "Keep the living path open. The Blackout clock never erases earned progress."
+            then "The seal answered me. Whatever I am carrying, it is time to bring it home."
+            else "The dark out here is old grief, not weather. Keep moving — nothing I have earned can be taken by the clock."
     end
     local elite = self._oldGrowthService:snapshot(player)
     if elite ~= nil and (blackout == nil or blackout.status == "old_growth") then
@@ -25499,8 +25510,8 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
                 elite.maxHealth
             )
             mara = if elite.shielded
-                then "The shield drinks force. Carry lantern fire from the ember to its heart."
-                else "The amber heart is exposed. Strike, then clear the roots when they rise."
+                then "Steel means nothing to that shield. Fire does — carry it from the ember to the heart."
+                else "There — the amber heart. Strike it, and mind the roots when they rise."
         elseif elite.complete then
             objective = "OLD GROWTH CLEANSED — CONTINUE TO WAYHOME"
             detail = if elite.rewardEligible
@@ -25602,6 +25613,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         recipes = self._craftingCatalog:list(),
         equipmentCatalog = self._equipmentCatalog.list(),
         objectiveTargets = self:_objectiveTargets(player, session),
+        guideSpeaker = guideSpeaker,
         quests = self._profileService:questSnapshot(player),
         memoryArchive = self._profileService:memoryFragments(player),
         combat = self._combatService:snapshot(player),
@@ -26569,7 +26581,11 @@ export type WorldService = typeof(setmetatable(
 -- lifts the day/morning shadow, not the dusk/night contrast the design
 -- docs ask for.
 local DAY_AMBIENT = Color3.fromRGB(82, 94, 88)
-local NIGHT_AMBIENT = Color3.fromRGB(19, 26, 43)
+-- Raised from (19, 26, 43) after the owner's tablet screenshots: values a
+-- workstation renders as moody night, a real device crushes to black. Night
+-- still reads as night -- the practicals and foxfire own it -- but ground
+-- and silhouettes survive on hardware now.
+local NIGHT_AMBIENT = Color3.fromRGB(36, 44, 60)
 local AMBER = Color3.fromRGB(255, 181, 76)
 local FOXFIRE = Color3.fromRGB(94, 206, 176)
 local CREAM = Color3.fromRGB(244, 230, 197)
@@ -27922,6 +27938,10 @@ local function buildEmberhollowSanctuary(
         CFrame.new(0, 3.2, signZ) * CFrame.Angles(0, math.pi, 0),
         "EMBERHOLLOW · SAFE CAMP"
     )
+    -- Same reason as the FOLLOW THE LANTERNS sign: the authored forest sign
+    -- has its own two-board silhouette, and the surviving SurfaceGui projects
+    -- one wide sentence across both boards as clipped fragments.
+    campSign:SetAttribute("HideSemanticGuiOnReplacement", true)
     table.insert(meshPlacements, {
         assetId = "mesh_creator_forest_sign_a",
         fallbackKind = "asset_replacement",
@@ -30503,6 +30523,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
 
     local maraHumanoid = model:WaitForChild("Humanoid") :: Humanoid
     maraHumanoid.DisplayName = "Mara"
+    maraHumanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
     maraHumanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
     maraHumanoid.BreakJointsOnDeath = false
     maraHumanoid.RequiresNeck = false
@@ -31643,19 +31664,32 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         Enum.Material.Slate
     )
     shrineUpper.CanQuery = false
-    local shrineInlay = part(
-        firstLanternFallback,
-        "ShrineInlayRing",
-        Vector3.new(11, 0.1, 11),
-        CFrame.new(0, 1.5, TOWN_CENTER.Z) * CFrame.Angles(0, math.rad(45), 0),
-        AMBER,
-        Enum.Material.Neon,
-        false
-    )
-    shrineInlay.Transparency = 0.55
-    shrineInlay.CanQuery = false
-    shrineInlay.CastShadow = false
-    CollectionService:AddTag(shrineInlay, self._runtimeIds.AmbientLightTag)
+    -- An inlaid ring, drawn as four thin bands along the rotated square's
+    -- edges. The first pass used one full 11x11 neon plate, and on a real
+    -- device that rendered as a blinding flat yellow square in the middle of
+    -- the square -- the owner's screenshot, not a subtle inlay.
+    for edge = 0, 3 do
+        local along = edge % 2 == 0
+        local shrineInlay = part(
+            firstLanternFallback,
+            "ShrineInlayRing",
+            if along then Vector3.new(0.55, 0.1, 11) else Vector3.new(11, 0.1, 0.55),
+            CFrame.new(0, 1.5, TOWN_CENTER.Z)
+                * CFrame.Angles(0, math.rad(45), 0)
+                * CFrame.new(
+                    if along then (if edge == 0 then 5.225 else -5.225) else 0,
+                    0,
+                    if along then 0 else (if edge == 1 then 5.225 else -5.225)
+                ),
+            AMBER,
+            Enum.Material.Neon,
+            false
+        )
+        shrineInlay.Transparency = 0.4
+        shrineInlay.CanQuery = false
+        shrineInlay.CastShadow = false
+        CollectionService:AddTag(shrineInlay, self._runtimeIds.AmbientLightTag)
+    end
     for corner = 0, 3 do
         local angle = math.rad(45 + corner * 90)
         local offset = Vector3.new(math.cos(angle) * 10.5, 0, math.sin(angle) * 10.5)
@@ -32434,8 +32468,10 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         })
     end
 
-    local archiveX = -20
-    local archiveZ = -132
+    -- North-west of the gate rather than at the west tower's base, where the
+    -- board stood in the scaffold's lap and its header read as tower junk.
+    local archiveX = -26
+    local archiveZ = -120
     local archiveFallback = Instance.new("Model")
     archiveFallback.Name = "ArchiveVisualFallback"
     archiveFallback.Parent = interactables
@@ -32476,7 +32512,10 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         Enum.Material.Slate,
         false
     )
-    WorldSignBuilder.dressNoticeBoard(archive, "GREENWARD ARCHIVE · FIELD BOOK", CREAM, {
+    -- "FIELD BOOK" and nothing more: it is the name every prompt and HUD
+    -- button already uses, and the previous five-word title shrank to
+    -- unreadable wrapped mush on the header plank.
+    WorldSignBuilder.dressNoticeBoard(archive, "FIELD BOOK", CREAM, {
         "field_botany",
         "evacuation_route",
         "bramble_hazard",
@@ -34896,8 +34935,14 @@ local function buildTownProgressionBuildings(
         across the road. A reader now stands beside the road looking west,
         rather than standing on the road blocking the walk south, and the
         reliquary keeps a clear backdrop.
+
+        Then the Dawn Gate towers moved out to x = +/-19, and (-24, -150) put
+        this board five studs from the west tower -- swallowed by its
+        scaffold, with the header plank reading as a sign nailed sideways to
+        the stairs. The owner photographed exactly that. South of the gate on
+        the same verge keeps the original intent with the tower well clear.
     ]]
-    local boardBase = CFrame.new(-24, 0, -150) * CFrame.Angles(0, math.rad(-90), 0)
+    local boardBase = CFrame.new(-32, 0, -162) * CFrame.Angles(0, math.rad(-90), 0)
     for side = -1, 1, 2 do
         part(
             boardModel,
@@ -34927,7 +34972,7 @@ local function buildTownProgressionBuildings(
     table.insert(meshPlacements, {
         assetId = "mesh_creator_notice_board_a",
         fallbackKind = "asset_replacement",
-        position = Vector3.new(-24, 0, -150),
+        position = Vector3.new(-32, 0, -162),
         scale = 1.05,
         yaw = math.rad(-90),
         seed = 10120,
@@ -35261,6 +35306,9 @@ local function buildTownProgressionBuildings(
 
         local residentHumanoid = model:WaitForChild("Humanoid") :: Humanoid
         residentHumanoid.DisplayName = definition.displayName
+        -- The engine's own floating name renders bubble-less at 100 studs,
+        -- stacked over the bubbled plate below at close range. One tag.
+        residentHumanoid.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
         residentHumanoid.HealthDisplayType = Enum.HumanoidHealthDisplayType.AlwaysOff
         residentHumanoid.BreakJointsOnDeath = false
         residentHumanoid.RequiresNeck = false
@@ -35439,7 +35487,12 @@ local function buildTownProgressionBuildings(
             parent = model,
             fallbackInstance = nil,
         })
-        addBillboard(head, definition.displayName .. " · " .. definition.role, definition.accent)
+        addBillboard(
+            head,
+            definition.displayName .. " · " .. definition.role,
+            definition.accent,
+            40
+        )
         CollectionService:AddTag(model, runtimeIds.AmbientMotionTag)
         residents[residentId] = {
             model = model,
@@ -37649,15 +37702,15 @@ function WorldService._applyTownLighting(_self: WorldService, night: boolean)
 
     if night then
         Lighting.ClockTime = 0.15
-        Lighting.Brightness = 0.82
+        Lighting.Brightness = 1.0
         Lighting.Ambient = NIGHT_AMBIENT
-        Lighting.OutdoorAmbient = Color3.fromRGB(25, 35, 56)
-        Lighting.ExposureCompensation = -0.38
+        Lighting.OutdoorAmbient = Color3.fromRGB(46, 56, 74)
+        Lighting.ExposureCompensation = -0.18
         if atmosphere ~= nil and atmosphere:IsA("Atmosphere") then
             atmosphere.Color = Color3.fromRGB(82, 106, 126)
             atmosphere.Decay = Color3.fromRGB(12, 18, 36)
-            atmosphere.Density = 0.4
-            atmosphere.Haze = 1.75
+            atmosphere.Density = 0.32
+            atmosphere.Haze = 1.3
             atmosphere.Glare = 0.08
         end
         if tone ~= nil and tone:IsA("ColorCorrectionEffect") then
@@ -40646,8 +40699,11 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
         local canopy = part(
             folder,
             "BackdropCanopy",
-            Vector3.new(width * 4.4, height * 0.72, width * 4.4),
-            CFrame.new(at + Vector3.new(0, height * 0.86, 0))
+            -- Narrower and set higher: a ball nearly five trunks wide sitting
+            -- at shoulder height is a bush; a crown riding a visible trunk is
+            -- a tree.
+            Vector3.new(width * 3.4, height * 0.6, width * 3.4),
+            CFrame.new(at + Vector3.new(0, height * 0.95, 0))
                 * CFrame.Angles(lean, (seed % 211) * 0.021, 0),
             Color3.fromRGB(math.floor(38 * shade), math.floor(58 * shade), math.floor(41 * shade)),
             Enum.Material.Grass,
@@ -40660,10 +40716,17 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
     -- Four ranks. The near one is sparse enough to walk toward and see
     -- through; each one out is denser, darker and taller, so the horizon
     -- closes gradually rather than ending at a wall.
+    --[[
+        The owner's tablet run read the old near rank as "so many bushes":
+        34 ball canopies at reach+40, plus the hero ring, packed into one
+        hedge the route ran straight at. The near rank now stands further
+        off and thinner, so the forest frames the route instead of crowding
+        it -- density still climbs with distance, just starting politely.
+    ]]
     local ranks = {
-        { radius = reach + 40, count = 34, height = 46, width = 4.2, shade = 1.0 },
-        { radius = reach + 130, count = 46, height = 62, width = 5.0, shade = 0.86 },
-        { radius = reach + 240, count = 58, height = 84, width = 6.0, shade = 0.7 },
+        { radius = reach + 72, count = 20, height = 46, width = 4.2, shade = 1.0 },
+        { radius = reach + 150, count = 40, height = 62, width = 5.0, shade = 0.86 },
+        { radius = reach + 250, count = 56, height = 84, width = 6.0, shade = 0.7 },
         { radius = reach + 360, count = 66, height = 108, width = 7.2, shade = 0.56 },
     }
     for rankIndex, rank in ranks do
@@ -40686,9 +40749,9 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
     -- read one. Past the first rank the silhouette is all that survives, and
     -- a mesh costs the same there as it does underfoot.
     local heroes = { "mesh_conifer_hero_a", "mesh_conifer_hero_b", "mesh_broadleaf_hero_a" }
-    for index = 1, 22 do
-        local angle = (index / 22) * math.pi * 2 + 0.4
-        local radius = reach + 6 + ((index * 29) % 34)
+    for index = 1, 14 do
+        local angle = (index / 14) * math.pi * 2 + 0.4
+        local radius = reach + 12 + ((index * 29) % 56)
         dress(
             extra,
             heroes[(index % #heroes) + 1],
@@ -41559,15 +41622,23 @@ function BramblewakeBuilder.build(
         math.rad(180),
         bossArena.center.Y + 0.28
     )
+    --[[
+        Living roots look like roots now. These nodes and the relay roots
+        below wore the rootling CREATURE mesh -- the same silhouette as the
+        enemy -- so on a dark tablet screen the objectives read as a crowd of
+        pale ghosts standing in the forest. An objective may never share a
+        silhouette with a threat: the living stump carries "alive and rooted"
+        without impersonating the roster.
+    ]]
     for nodeIndex, node in bossArena.nodes do
         queueItemAsset(
             meshPlacements,
             node,
-            "mesh_rootling_a",
-            0.78,
+            "mesh_heartwood_stump_a",
+            0.82,
             7200 + string.len(nodeIndex),
             math.rad(string.len(nodeIndex) * 7),
-            node.Position.Y - 2.6
+            node.Position.Y - 3
         )
     end
     queueItemAsset(
@@ -41585,11 +41656,11 @@ function BramblewakeBuilder.build(
         queueItemAsset(
             meshPlacements,
             node,
-            "mesh_rootling_a",
-            0.86,
+            "mesh_heartwood_stump_a",
+            0.94,
             7310 + relaySeed,
             math.rad((relaySeed - 2) * 13),
-            node.Position.Y - 2.7
+            node.Position.Y - 3
         )
     end
     local decisionAssets = {
@@ -45295,7 +45366,11 @@ local function applySignTextPadding(label: TextLabel)
     padding.Parent = label
 end
 
-local function addSurfaceText(board: BasePart, title: string, accent: Color3)
+-- `singleLine` keeps the whole title on one row. A narrow header plank that
+-- lets its title wrap ends up rendering two lines of glyphs a fraction of a
+-- stud tall -- unreadable mush spilling over the plank edges, which is
+-- exactly what the owner photographed on the notice-board headers.
+local function addSurfaceText(board: BasePart, title: string, accent: Color3, singleLine: boolean?)
     local surface = Instance.new("SurfaceGui")
     surface.Name = "PhysicalSignText"
     surface.Face = Enum.NormalId.Front
@@ -45313,7 +45388,7 @@ local function addSurfaceText(board: BasePart, title: string, accent: Color3)
     shadow.Text = title
     shadow.TextColor3 = Color3.fromRGB(19, 17, 15)
     shadow.TextScaled = true
-    shadow.TextWrapped = true
+    shadow.TextWrapped = singleLine ~= true
     shadow.Parent = surface
     applySignTextPadding(shadow)
 
@@ -45325,7 +45400,7 @@ local function addSurfaceText(board: BasePart, title: string, accent: Color3)
     label.Text = title
     label.TextColor3 = accent
     label.TextScaled = true
-    label.TextWrapped = true
+    label.TextWrapped = singleLine ~= true
     label.Parent = surface
     applySignTextPadding(label)
 end
@@ -45493,14 +45568,14 @@ function WorldSignBuilder.dressNoticeBoard(
     local titlePlate = part(
         details,
         "NoticeBoardHeader",
-        Vector3.new(math.min(board.Size.X * 0.7, 8), 1.05, 0.3),
+        Vector3.new(math.min(board.Size.X * 0.92, 10.6), 1.45, 0.3),
         board.CFrame
-            * CFrame.new(0, board.Size.Y * 0.5 + 0.72, -(board.Size.Z * 0.5 + 0.3))
+            * CFrame.new(0, board.Size.Y * 0.5 + 0.92, -(board.Size.Z * 0.5 + 0.3))
             * CFrame.Angles(0, 0, math.rad(-1.5)),
         WET_BARK,
         Enum.Material.WoodPlanks
     )
-    addSurfaceText(titlePlate, title, accent)
+    addSurfaceText(titlePlate, title, accent, true)
     -- Both notice boards are also mesh-replacement fallbacks, and the authored
     -- Creator Store board carries no notices of its own -- it is bare wood. So
     -- the header and the pinned art below have to outlive the replacement, or
@@ -48372,7 +48447,9 @@ function HUDController.update(self: HUDController, state: any)
         something new to say and fades a few seconds afterwards; walking back
         to her produces a fresh line, which shows it again.
     ]]
-    local maraLine = "Mara: " .. tostring(state.mara or "")
+    -- The guide line has a speaker now: Mara in town, the traveler's own
+    -- inner voice out in the expedition, where she is not.
+    local maraLine = tostring(state.guideSpeaker or "Mara") .. ": " .. tostring(state.mara or "")
     if maraLine ~= self._maraText then
         self._maraText = maraLine
         self._maraShownAt = os.clock()

@@ -2390,7 +2390,9 @@ function HUDController.update(self: HUDController, state: any)
         something new to say and fades a few seconds afterwards; walking back
         to her produces a fresh line, which shows it again.
     ]]
-    local maraLine = "Mara: " .. tostring(state.mara or "")
+    -- The guide line has a speaker now: Mara in town, the traveler's own
+    -- inner voice out in the expedition, where she is not.
+    local maraLine = tostring(state.guideSpeaker or "Mara") .. ": " .. tostring(state.mara or "")
     if maraLine ~= self._maraText then
         self._maraText = maraLine
         self._maraShownAt = os.clock()
