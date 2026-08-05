@@ -75,6 +75,136 @@ local DEFINITIONS: { [string]: ItemPlan } = {
             ),
         }),
     }),
+    gear_heartwood_maul = table.freeze({
+        itemId = "gear_heartwood_maul",
+        slot = "weapon",
+        parts = table.freeze({
+            part(
+                "MaulHaft",
+                "RightHand",
+                "Block",
+                { 0.28, 3.2, 0.28 },
+                { 0, -0.7, 0 },
+                { 0, 0, 8 },
+                { 96, 68, 44 },
+                "Wood"
+            ),
+            part(
+                "MaulHead",
+                "RightHand",
+                "Block",
+                { 1.7, 0.95, 0.95 },
+                { 0.18, -2.15, 0 },
+                { 0, 0, 8 },
+                { 139, 98, 54 },
+                "Wood"
+            ),
+        }),
+    }),
+    gear_briar_lance = table.freeze({
+        itemId = "gear_briar_lance",
+        slot = "weapon",
+        parts = table.freeze({
+            part(
+                "LanceShaft",
+                "RightHand",
+                "Block",
+                { 0.24, 4.6, 0.24 },
+                { 0, -1.3, 0 },
+                { 0, 0, 4 },
+                { 104, 128, 68 },
+                "Wood"
+            ),
+            part(
+                "LanceTip",
+                "RightHand",
+                "Wedge",
+                { 0.4, 0.95, 0.4 },
+                { 0.16, -3.9, 0 },
+                { 0, 0, 184 },
+                { 74, 96, 46 },
+                "Wood"
+            ),
+        }),
+    }),
+    gear_foxfire_sling = table.freeze({
+        itemId = "gear_foxfire_sling",
+        slot = "weapon",
+        parts = table.freeze({
+            part(
+                "SlingStrap",
+                "RightHand",
+                "Block",
+                { 0.14, 2.3, 0.14 },
+                { 0, -0.5, 0 },
+                { 0, 0, 24 },
+                { 78, 58, 41 },
+                "Fabric"
+            ),
+            part(
+                "SlingPouch",
+                "RightHand",
+                "Ball",
+                { 0.68, 0.5, 0.68 },
+                { 0.45, -1.5, 0 },
+                { 0, 0, 0 },
+                { 94, 206, 176 },
+                "Fabric"
+            ),
+        }),
+    }),
+    gear_amber_edge = table.freeze({
+        itemId = "gear_amber_edge",
+        slot = "weapon",
+        parts = table.freeze({
+            part(
+                "EdgeGrip",
+                "RightHand",
+                "Block",
+                { 0.3, 0.95, 0.3 },
+                { 0, -0.25, 0 },
+                { 0, 0, 0 },
+                { 73, 54, 38 },
+                "Fabric"
+            ),
+            part(
+                "EdgeBlade",
+                "RightHand",
+                "Wedge",
+                { 0.24, 2.3, 0.72 },
+                { 0, -1.85, 0.1 },
+                { 0, 0, 0 },
+                { 255, 197, 106 },
+                "Glass"
+            ),
+        }),
+    }),
+    gear_warden_cudgel = table.freeze({
+        itemId = "gear_warden_cudgel",
+        slot = "weapon",
+        parts = table.freeze({
+            part(
+                "CudgelShaft",
+                "RightHand",
+                "Block",
+                { 0.34, 2.6, 0.34 },
+                { 0, -0.6, 0 },
+                { 0, 0, 6 },
+                { 91, 62, 40 },
+                "Wood"
+            ),
+            part(
+                "CudgelHead",
+                "RightHand",
+                "Ball",
+                { 0.85, 0.85, 0.85 },
+                { 0.12, -1.95, 0 },
+                { 0, 0, 0 },
+                { 112, 151, 119 },
+                "Wood"
+            ),
+        }),
+    }),
     gear_ironroot_hood = table.freeze({
         itemId = "gear_ironroot_hood",
         slot = "head",

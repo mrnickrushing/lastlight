@@ -90,6 +90,68 @@ local function createItemIcon(parent: Instance, itemId: string, size: number): V
             Vector3.new(-0.45, 0, 0),
             Color3.fromRGB(214, 205, 186)
         )
+    elseif itemId == "gear_heartwood_maul" then
+        shape(
+            "Haft",
+            Vector3.new(0.35, 2.8, 0.35),
+            Vector3.new(-0.2, -0.2, 0),
+            Color3.fromRGB(96, 68, 44)
+        )
+        shape(
+            "Head",
+            Vector3.new(1.6, 0.95, 0.95),
+            Vector3.new(0.15, 1.15, 0),
+            Color3.fromRGB(139, 98, 54)
+        )
+    elseif itemId == "gear_briar_lance" then
+        shape(
+            "Shaft",
+            Vector3.new(0.28, 3.2, 0.28),
+            Vector3.new(0, -0.2, 0),
+            Color3.fromRGB(104, 128, 68)
+        )
+        shape("Tip", Vector3.new(0.5, 0.8, 0.5), Vector3.new(0, 1.7, 0), Color3.fromRGB(74, 96, 46))
+    elseif itemId == "gear_foxfire_sling" then
+        shape(
+            "Strap",
+            Vector3.new(0.22, 2.4, 0.22),
+            Vector3.new(0.25, 0.2, 0),
+            Color3.fromRGB(78, 58, 41)
+        )
+        local pouch = shape(
+            "Pouch",
+            Vector3.new(1, 1, 1),
+            Vector3.new(-0.45, -0.85, 0),
+            Color3.fromRGB(94, 206, 176)
+        )
+        pouch.Shape = Enum.PartType.Ball
+    elseif itemId == "gear_amber_edge" then
+        shape(
+            "Grip",
+            Vector3.new(0.35, 1, 0.35),
+            Vector3.new(0, -1.15, 0),
+            Color3.fromRGB(73, 54, 38)
+        )
+        shape(
+            "Blade",
+            Vector3.new(0.3, 2.3, 0.75),
+            Vector3.new(0, 0.55, 0),
+            Color3.fromRGB(255, 197, 106)
+        )
+    elseif itemId == "gear_warden_cudgel" then
+        shape(
+            "Shaft",
+            Vector3.new(0.4, 2.5, 0.4),
+            Vector3.new(0, -0.4, 0),
+            Color3.fromRGB(91, 62, 40)
+        )
+        local head = shape(
+            "Head",
+            Vector3.new(1.05, 1.05, 1.05),
+            Vector3.new(0.1, 1.25, 0),
+            Color3.fromRGB(112, 151, 119)
+        )
+        head.Shape = Enum.PartType.Ball
     elseif itemId == "gear_ironroot_hood" then
         shape(
             "Hood",
@@ -1016,16 +1078,26 @@ function HUDController.new(
     progressText.TextYAlignment = Enum.TextYAlignment.Top
     progressText.ZIndex = 52
     local equipmentButtons: { [string]: TextButton } = {}
+    -- Three per row, newest row stacking upward: eight equippables no longer
+    -- fit the single strip the first three shipped on. Buttons stay hidden
+    -- until owned, so a fresh save still sees an empty margin, not a wall.
     for index, item in
         {
             { id = "gear_ironroot_hood", label = "EQUIP HOOD" },
             { id = "gear_bramble_boots", label = "EQUIP BOOTS" },
             { id = "gear_thornwood_bow", label = "EQUIP BOW" },
+            { id = "gear_heartwood_maul", label = "EQUIP MAUL" },
+            { id = "gear_briar_lance", label = "EQUIP LANCE" },
+            { id = "gear_foxfire_sling", label = "EQUIP SLING" },
+            { id = "gear_amber_edge", label = "EQUIP EDGE" },
+            { id = "gear_warden_cudgel", label = "EQUIP CUDGEL" },
         }
     do
         local button = Instance.new("TextButton")
         button.Name = item.id
-        button.Position = UDim2.new(0, 20 + (index - 1) * 190, 1, -58)
+        local buttonRow = math.floor((index - 1) / 3)
+        local buttonColumn = (index - 1) % 3
+        button.Position = UDim2.new(0, 20 + buttonColumn * 190, 1, -58 - buttonRow * 46)
         button.Size = UDim2.fromOffset(176, 38)
         button.BackgroundColor3 = COLORS.panelSoft
         button.Font = Enum.Font.GothamBold
@@ -1306,6 +1378,7 @@ function HUDController.new(
         _contractButtons = contractButtons,
         _selectedContractId = "contract_standard",
         _departurePlatformPart = nil,
+        _departurePlatformPosition = nil,
         _onLobbyDepart = nil,
         _canvas = canvas,
         _scale = scale,
@@ -1452,6 +1525,14 @@ function HUDController.new(
         if self._mara.Visible and not self:_maraLineIsFresh() then
             self._mara.Visible = false
         end
+        -- The departure panel's distance gate re-evaluates on the same
+        -- local clock, for the same reason: the gate reads the player's
+        -- position, which changes constantly between pushes, so a panel
+        -- opened at the platform used to follow the player across town
+        -- until the server happened to say something.
+        if self._currentState ~= nil then
+            self:_updateLobby(self._currentState)
+        end
     end)
 
     return self
@@ -1574,10 +1655,24 @@ function HUDController._updateLobby(self: HUDController, state: any)
         platform = workspace:FindFirstChild("DeparturePlatform", true)
         self._departurePlatformPart = platform
     end
+    --[[
+        The distance gate works from the platform's POSITION, not the
+        instance: under streaming, walking far enough from the lodge
+        unloads the platform on this client, and a nil instance used to
+        fail the gate open -- the panel followed the player across the
+        whole town once the lodge streamed out, which is the exact
+        carried-panel bug the gate was added to end. A position survives
+        streaming; it is cached the first time the platform is seen and
+        the platform never moves.
+    ]]
+    if platform ~= nil and platform:IsA("BasePart") then
+        self._departurePlatformPosition = platform.Position
+    end
+    local platformPosition = self._departurePlatformPosition
     local character = game:GetService("Players").LocalPlayer.Character
     local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
-    if platform ~= nil and root ~= nil and root:IsA("BasePart") and platform:IsA("BasePart") then
-        local offset = root.Position - platform.Position
+    if platformPosition ~= nil and root ~= nil and root:IsA("BasePart") then
+        local offset = root.Position - platformPosition
         if Vector3.new(offset.X, 0, offset.Z).Magnitude > 46 then
             self._lobbyFrame.Visible = false
             return

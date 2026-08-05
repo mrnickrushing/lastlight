@@ -634,10 +634,16 @@ function TutorialService._strikeContext(self: TutorialService, player: Player): 
     end
     local weapon = self._profileService:weaponStrikeProfile(player)
     if weapon ~= nil then
-        context.weaponRange = weapon.strikeRange
+        -- The family decides the moveset: ranged families carry strikeRange
+        -- and a projectile visual, the lance carries reach without one, and
+        -- the rider fields pass through untouched for the strike to apply.
+        context.weaponRange = weapon.strikeRange or weapon.meleeReach
         context.damageMultiplier = weapon.strikeDamageMultiplier
-        context.ranged = true
+        context.ranged = weapon.ranged == true
         context.weaponId = weapon.itemId
+        context.weaponKind = weapon.kind
+        context.onHitStaminaRefund = weapon.onHitStaminaRefund
+        context.onHitSnareSeconds = weapon.onHitSnareSeconds
     end
     return context
 end

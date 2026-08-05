@@ -1,11 +1,62 @@
 --!strict
 
+local CraftingCatalog = require("../../src/shared/CraftingCatalog")
 local Equipment = require("../../src/shared/Equipment")
 local TestRunner = require("../TestRunner")
 
 return {
     name = "Equipment",
     cases = {
+        {
+            name = "the six weapon families each declare a distinct bounded moveset",
+            run = function()
+                local weaponIds = {}
+                for _, entry in Equipment.list() do
+                    if entry.slot == "weapon" then
+                        table.insert(weaponIds, entry.itemId)
+                    end
+                end
+                TestRunner.equal(#weaponIds, 6)
+                local seenKinds = {}
+                for _, itemId in weaponIds do
+                    local profile = Equipment.weaponStrikeProfile({ weapon = itemId })
+                    TestRunner.truthy(profile ~= nil)
+                    TestRunner.equal(seenKinds[profile.kind], nil)
+                    seenKinds[profile.kind] = true
+                    -- Every family stays inside the clamps combat applies:
+                    -- damage 0.5-1.5, and only ranged kinds carry a range.
+                    TestRunner.truthy(profile.strikeDamageMultiplier >= 0.5)
+                    TestRunner.truthy(profile.strikeDamageMultiplier <= 1.5)
+                    TestRunner.equal(profile.ranged, profile.strikeRange ~= nil)
+                    if profile.onHitStaminaRefund ~= nil then
+                        TestRunner.truthy(profile.onHitStaminaRefund <= 12)
+                    end
+                    if profile.onHitSnareSeconds ~= nil then
+                        TestRunner.truthy(profile.onHitSnareSeconds <= 4)
+                    end
+                end
+            end,
+        },
+        {
+            name = "every weapon family is craftable at a bench",
+            run = function()
+                local craftable = {}
+                for _, recipe in CraftingCatalog.list() do
+                    craftable[recipe.outputItemId] = true
+                end
+                for _, entry in Equipment.list() do
+                    if entry.slot == "weapon" then
+                        TestRunner.truthy(craftable[entry.itemId] == true)
+                    end
+                end
+            end,
+        },
+        {
+            name = "bare hands keep their defaults",
+            run = function()
+                TestRunner.equal(Equipment.weaponStrikeProfile({}), nil)
+            end,
+        },
         {
             name = "equips owned passive gear into its slot",
             run = function()

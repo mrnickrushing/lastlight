@@ -16,6 +16,11 @@ local ORDER = table.freeze({
     "recipe_ironroot_hood",
     "recipe_bramble_boots",
     "recipe_thornwood_bow",
+    "recipe_heartwood_maul",
+    "recipe_briar_lance",
+    "recipe_foxfire_sling",
+    "recipe_amber_edge",
+    "recipe_warden_cudgel",
 })
 
 local DEFINITIONS: { [string]: Recipe } = {
@@ -69,6 +74,56 @@ local DEFINITIONS: { [string]: Recipe } = {
             material_meadow_fiber = 3,
         }),
     }),
+    recipe_heartwood_maul = table.freeze({
+        id = "recipe_heartwood_maul",
+        displayName = "HEARTWOOD MAUL",
+        outputItemId = "gear_heartwood_maul",
+        outputDisplayName = "Heartwood Maul",
+        materials = table.freeze({
+            material_heartwood = 6,
+            material_spring_clay = 2,
+        }),
+    }),
+    recipe_briar_lance = table.freeze({
+        id = "recipe_briar_lance",
+        displayName = "BRIAR LANCE",
+        outputItemId = "gear_briar_lance",
+        outputDisplayName = "Briar Lance",
+        materials = table.freeze({
+            material_heartwood = 3,
+            material_meadow_fiber = 4,
+        }),
+    }),
+    recipe_foxfire_sling = table.freeze({
+        id = "recipe_foxfire_sling",
+        displayName = "FOXFIRE SLING",
+        outputItemId = "gear_foxfire_sling",
+        outputDisplayName = "Foxfire Sling",
+        materials = table.freeze({
+            material_meadow_fiber = 4,
+            material_brightcap = 3,
+        }),
+    }),
+    recipe_amber_edge = table.freeze({
+        id = "recipe_amber_edge",
+        displayName = "AMBER EDGE",
+        outputItemId = "gear_amber_edge",
+        outputDisplayName = "Amber Edge",
+        materials = table.freeze({
+            material_amber_sap = 4,
+            material_heartwood = 3,
+        }),
+    }),
+    recipe_warden_cudgel = table.freeze({
+        id = "recipe_warden_cudgel",
+        displayName = "WARDEN CUDGEL",
+        outputItemId = "gear_warden_cudgel",
+        outputDisplayName = "Warden Cudgel",
+        materials = table.freeze({
+            material_heartwood = 4,
+            material_spring_clay = 3,
+        }),
+    }),
 }
 
 function CraftingCatalog.isValid(id: any): boolean
@@ -105,6 +160,11 @@ CraftingCatalog.Ids = table.freeze({
     IronrootHood = "recipe_ironroot_hood",
     BrambleBoots = "recipe_bramble_boots",
     ThornwoodBow = "recipe_thornwood_bow",
+    HeartwoodMaul = "recipe_heartwood_maul",
+    BriarLance = "recipe_briar_lance",
+    FoxfireSling = "recipe_foxfire_sling",
+    AmberEdge = "recipe_amber_edge",
+    WardenCudgel = "recipe_warden_cudgel",
 })
 
 return table.freeze(CraftingCatalog)
