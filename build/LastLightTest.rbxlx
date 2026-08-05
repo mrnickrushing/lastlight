@@ -29812,10 +29812,16 @@ function WorldService._placeAuthoredMeshes(
     task.spawn(function()
         local authored = 0
         local fallbacks = 0
-        for index, placement in queued do
+        -- Placements that failed but kept an authored-replacement fallback
+        -- visible. These are worth another try later: a boot-burst throttle
+        -- error otherwise leaves the whole town ring as dark shells for the
+        -- server's lifetime (observed live -- all eleven Milestone 4
+        -- buildings, every boot the burst went badly).
+        local recoverable: { MeshPlacement } = {}
+        local function tryPlace(placement: MeshPlacement): boolean
             local placementParent = placement.parent or defaultParent
             if attributeTarget.Parent == nil or placementParent.Parent == nil then
-                return
+                return false
             end
             local placementFrame, profileScale = authoredPlacementTransform(placement)
             local placed, result = pcall(
@@ -29835,15 +29841,30 @@ function WorldService._placeAuthoredMeshes(
                 })
             end
             if model == nil then
+                return false
+            end
+            if placement.fallbackInstance ~= nil then
+                hideProceduralPlaceholder(placement.fallbackInstance)
+            end
+            return true
+        end
+
+        for index, placement in queued do
+            if attributeTarget.Parent == nil then
+                return
+            end
+            if tryPlace(placement) then
+                authored += 1
+            else
                 if placement.fallbackInstance == nil then
-                    buildMeshFallback(placementParent, placement)
+                    local placementParent = placement.parent or defaultParent
+                    if placementParent.Parent ~= nil then
+                        buildMeshFallback(placementParent, placement)
+                    end
+                else
+                    table.insert(recoverable, placement)
                 end
                 fallbacks += 1
-            else
-                if placement.fallbackInstance ~= nil then
-                    hideProceduralPlaceholder(placement.fallbackInstance)
-                end
-                authored += 1
             end
             if index % 5 == 0 then
                 task.wait()
@@ -29857,6 +29878,43 @@ function WorldService._placeAuthoredMeshes(
             fallbacks = fallbacks,
             placements = #queued,
         })
+
+        -- Recovery rounds. Widening pauses so a throttled boot has time to
+        -- cool off; each round forgives only transient load failures and
+        -- re-attempts the placements still wearing fallbacks. Success swaps
+        -- the authored mesh in and hides the shell exactly as the first pass
+        -- would have.
+        for _, delay in { 75, 180, 360 } do
+            if #recoverable == 0 then
+                return
+            end
+            task.wait(delay)
+            if attributeTarget.Parent == nil then
+                return
+            end
+            self._meshTemplateLoader:forgetTransientFailures()
+            local remaining: { MeshPlacement } = {}
+            local recovered = 0
+            for _, placement in recoverable do
+                if tryPlace(placement) then
+                    recovered += 1
+                    authored += 1
+                    fallbacks -= 1
+                else
+                    table.insert(remaining, placement)
+                end
+                task.wait()
+            end
+            recoverable = remaining
+            if recovered > 0 then
+                attributeTarget:SetAttribute("AuthoredMeshCount", authored)
+                attributeTarget:SetAttribute("AuthoredMeshFallbackCount", fallbacks)
+                self._logger:info("mesh_recovery_pass", {
+                    recovered = recovered,
+                    remaining = #remaining,
+                })
+            end
+        end
     end)
 end
 
@@ -30347,19 +30405,68 @@ function WorldService._buildLobby(self: WorldService, world: Model)
     end
 
     -- Warm interior light so the room is lit from inside, not by the sky.
+    -- Each lamp is a housed fixture -- iron bracket, cap, and corner posts
+    -- around the glow -- because a bare neon cube on a wall reads as a
+    -- missing texture, not a lantern. That is exactly how the owner's first
+    -- screenshot of this room read.
     for lampIndex = -1, 1, 2 do
         for lampZ = -1, 1, 2 do
             local lampAt = LOBBY_CENTER
                 + Vector3.new(lampIndex * (halfWidth - 9), wallHeight - 4, lampZ * (halfDepth - 8))
+            local bracket = part(
+                lobby,
+                "LodgeLampBracket",
+                Vector3.new(0.35, 2.6, 0.35),
+                CFrame.new(lampAt + Vector3.new(0, 1.6, 0)),
+                Color3.fromRGB(50, 54, 58),
+                Enum.Material.Metal,
+                false
+            )
+            bracket.CanQuery = false
+            local cap = part(
+                lobby,
+                "LodgeLampCap",
+                Vector3.new(1.9, 0.4, 1.9),
+                CFrame.new(lampAt + Vector3.new(0, 1.15, 0)),
+                Color3.fromRGB(50, 54, 58),
+                Enum.Material.Metal,
+                false
+            )
+            cap.CanQuery = false
+            for postX = -1, 1, 2 do
+                for postZ = -1, 1, 2 do
+                    local post = part(
+                        lobby,
+                        "LodgeLampPost",
+                        Vector3.new(0.18, 1.9, 0.18),
+                        CFrame.new(lampAt + Vector3.new(postX * 0.78, 0, postZ * 0.78)),
+                        Color3.fromRGB(50, 54, 58),
+                        Enum.Material.Metal,
+                        false
+                    )
+                    post.CanQuery = false
+                end
+            end
+            local base = part(
+                lobby,
+                "LodgeLampBase",
+                Vector3.new(1.9, 0.3, 1.9),
+                CFrame.new(lampAt + Vector3.new(0, -1.05, 0)),
+                Color3.fromRGB(50, 54, 58),
+                Enum.Material.Metal,
+                false
+            )
+            base.CanQuery = false
             local lamp = part(
                 lobby,
                 "LodgeLamp",
-                Vector3.new(1.5, 1.8, 1.5),
+                Vector3.new(1.1, 1.5, 1.1),
                 CFrame.new(lampAt),
                 AMBER,
                 Enum.Material.Neon,
                 false
             )
+            lamp.Transparency = 0.15
             lamp.CastShadow = false
             lamp.CanQuery = false
             local lampLight = Instance.new("PointLight")
@@ -30435,16 +30542,42 @@ function WorldService._buildLobby(self: WorldService, world: Model)
             false
         )
     end
-    local hearthFire = part(
+    -- The fire is layered wedge flames over a coal bed, the same recipe the
+    -- rebuilt torch uses. The old single neon box read as a flat yellow
+    -- rectangle stuck to the chimney -- the owner's screenshot, again.
+    local coals = part(
         lobby,
-        "LodgeHearthFire",
-        Vector3.new(4.5, 3, 1.8),
-        CFrame.new(hearthAt + Vector3.new(0, 2.6, 0.2)),
-        AMBER,
+        "LodgeHearthCoals",
+        Vector3.new(4.2, 0.5, 2.2),
+        CFrame.new(hearthAt + Vector3.new(0, 1.35, 0.2)),
+        Color3.fromRGB(255, 120, 40),
         Enum.Material.Neon,
         false
     )
-    hearthFire.CastShadow = false
+    coals.Transparency = 0.25
+    coals.CastShadow = false
+    local hearthFire: BasePart? = nil
+    for flameIndex = -1, 1 do
+        local flameHeight = if flameIndex == 0 then 3.1 else 2.1
+        local flame = part(
+            lobby,
+            "LodgeHearthFlame",
+            Vector3.new(if flameIndex == 0 then 2.1 else 1.4, flameHeight, 1.1),
+            CFrame.new(hearthAt + Vector3.new(flameIndex * 1.35, 1.6 + flameHeight / 2, 0.2))
+                * CFrame.Angles(0, math.rad(flameIndex * 22), 0),
+            if flameIndex == 0 then AMBER else Color3.fromRGB(255, 150, 60),
+            Enum.Material.Neon,
+            false
+        )
+        flame.Shape = Enum.PartType.Wedge
+        flame.Transparency = if flameIndex == 0 then 0.1 else 0.3
+        flame.CastShadow = false
+        flame.CanQuery = false
+        if flameIndex == 0 then
+            hearthFire = flame
+        end
+    end
+    assert(hearthFire ~= nil, "hearth flame missing")
     local hearthLight = Instance.new("PointLight")
     hearthLight.Color = AMBER
     hearthLight.Brightness = 1.5
@@ -30650,8 +30783,11 @@ function WorldService._buildLobby(self: WorldService, world: Model)
     local lobbySpawn = Instance.new("SpawnLocation")
     lobbySpawn.Name = "LobbySpawn"
     lobbySpawn.Size = Vector3.new(16, 1, 10)
+    -- Unrotated on purpose: a Part's LookVector is its -Z axis, and the
+    -- platform sits at lower Z than the spawn. The old 180-degree yaw did
+    -- the opposite of this comment's promise and greeted every new player
+    -- with a close-up of the hearth wall.
     lobbySpawn.CFrame = CFrame.new(LOBBY_CENTER + Vector3.new(0, 1.5, halfDepth - 12))
-        * CFrame.Angles(0, math.rad(180), 0)
     lobbySpawn.Transparency = 1
     lobbySpawn.Anchored = true
     lobbySpawn.CanCollide = true
@@ -44069,6 +44205,7 @@ export type MeshTemplateLoader = typeof(setmetatable(
         _templates: { [string]: Model },
         _templateScale: { [string]: number },
         _failed: { [string]: boolean },
+        _permanentFailure: { [string]: boolean },
     },
     MeshTemplateLoader
 ))
@@ -44216,6 +44353,7 @@ function MeshTemplateLoader.new(logger: Logger): MeshTemplateLoader
         _templates = {},
         _templateScale = {},
         _failed = {},
+        _permanentFailure = {},
     }, MeshTemplateLoader)
 end
 
@@ -44231,11 +44369,13 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
     local entry = MeshAssetRegistry.get(stableId)
     if entry == nil then
         self._failed[stableId] = true
+        self._permanentFailure[stableId] = true
         self._logger:info("mesh_asset_unknown", { assetId = stableId })
         return nil
     end
     if entry.placementBand == "retired_visual_failure" then
         self._failed[stableId] = true
+        self._permanentFailure[stableId] = true
         self._logger:info("mesh_asset_retired", { assetId = stableId })
         return nil
     end
@@ -44383,6 +44523,32 @@ function MeshTemplateLoader.place(
     clone:SetAttribute("ProfileScale", resolvedProfileScale)
     clone.Parent = parent
     return clone
+end
+
+--[[
+    Give condemned assets another chance.
+
+    A load failure marks an asset failed for the whole session, which is the
+    right call per placement -- but boot loads sixty assets in a burst, and
+    the platform sometimes answers a burst with throttling errors dressed as
+    permission errors (see the retry comment in _load). One bad boot minute
+    left all eleven town-ring buildings as dark fallback shells for the whole
+    server lifetime. This clears only the transient failures, so a later
+    recovery pass can try again; unknown and retired assets stay condemned.
+
+    Returns the asset ids that were forgiven.
+]]
+function MeshTemplateLoader.forgetTransientFailures(self: MeshTemplateLoader): { string }
+    local forgiven = {}
+    for stableId in self._failed do
+        if not self._permanentFailure[stableId] then
+            table.insert(forgiven, stableId)
+        end
+    end
+    for _, stableId in forgiven do
+        self._failed[stableId] = nil
+    end
+    return forgiven
 end
 
 return table.freeze(MeshTemplateLoader)
