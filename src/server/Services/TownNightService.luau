@@ -421,6 +421,22 @@ function TownNightService._runCycle(self: TownNightService)
     end
 end
 
+--[[
+    Whose town this server is, and what the asking player is in it. The
+    deliberate half of the visit flow: the role has always been enforced,
+    but nobody was ever told which side of it they stood on.
+]]
+function TownNightService.hostInfo(self: TownNightService, actorUserId: number?): any
+    local hostUserId = self._hostUserId
+    if hostUserId == nil then
+        return nil
+    end
+    return {
+        hostUserId = hostUserId,
+        role = self._townPermissions.roleFor(actorUserId, hostUserId),
+    }
+end
+
 function TownNightService.conditionSnapshot(self: TownNightService): any
     -- Scoped to what physically stands, so a migrated profile that marks every
     -- building damaged cannot present repair work on an empty construction lot.
