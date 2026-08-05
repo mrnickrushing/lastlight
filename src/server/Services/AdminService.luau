@@ -171,6 +171,10 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
         self:_backups(player, decision.text :: string)
     elseif command == "restore" then
         self:_restore(player, decision.text :: string)
+    elseif command == "restoreat" then
+        self:_restoreAt(player, decision.text :: string, decision.value :: number)
+    elseif command == "export" then
+        self:_export(player, decision.text :: string)
     end
 
     self._logger:info("admin_command", {
@@ -311,6 +315,88 @@ end
     twice undoes the first -- and writes only a profile this player already had.
     Nothing here merges, tops up, or grants.
 ]]
+--[[
+    Restores a named copy (1 = oldest kept). The same safety rails as
+    /restore -- pre-restore capture, lock refusal, revision advance -- with
+    the one difference that the operator explicitly chose the point in
+    history after reading /backups.
+]]
+function AdminService._restoreAt(
+    self: AdminService,
+    admin: Player,
+    argument: string,
+    copyIndex: number
+)
+    local userId = self:_resolveTarget(admin, argument)
+    if userId == nil then
+        return
+    end
+    local result = self._profileService:restoreLatestBackup(userId, copyIndex)
+    self._logger:info("admin_restore_at", {
+        admin = admin.UserId,
+        target = userId,
+        copyIndex = copyIndex,
+        applied = result.applied,
+        reason = result.reason,
+        restoredRevision = result.restoredRevision,
+    })
+    if result.applied then
+        self:_reply(
+            admin,
+            string.format(
+                "%d — RESTORED COPY %d · REV %s (WAS %s)",
+                userId,
+                copyIndex,
+                tostring(result.restoredRevision),
+                tostring(result.fromRevision)
+            )
+        )
+    elseif result.reason == "no_such_copy" then
+        self:_reply(admin, string.format("%d — NO COPY %d ON RECORD", userId, copyIndex))
+    else
+        self:_reply(
+            admin,
+            string.format("%d — RESTORE UNAVAILABLE (%s)", userId, tostring(result.reason))
+        )
+    end
+end
+
+--[[
+    Dumps the stored profile as JSON into the server log, chunked under the
+    log line ceiling, and answers with a summary. The log is the export
+    channel because chat truncates and this game ships no file I/O.
+]]
+function AdminService._export(self: AdminService, admin: Player, argument: string)
+    local userId = self:_resolveTarget(admin, argument)
+    if userId == nil then
+        return
+    end
+    local result = self._profileService:exportProfile(userId)
+    if not result.ok then
+        self:_reply(
+            admin,
+            string.format("%d — EXPORT FAILED (%s)", userId, tostring(result.reason))
+        )
+        return
+    end
+    local json = result.json :: string
+    local chunkSize = 3500
+    local chunks = math.ceil(#json / chunkSize)
+    for index = 1, chunks do
+        self._logger:info("admin_export_chunk", {
+            admin = admin.UserId,
+            target = userId,
+            chunk = index,
+            of = chunks,
+            data = string.sub(json, (index - 1) * chunkSize + 1, index * chunkSize),
+        })
+    end
+    self:_reply(
+        admin,
+        string.format("%d — EXPORTED %d CHARS IN %d LOG CHUNKS", userId, #json, chunks)
+    )
+end
+
 function AdminService._restore(self: AdminService, admin: Player, argument: string)
     local userId = self:_resolveTarget(admin, argument)
     if userId == nil then

@@ -170,5 +170,28 @@ return {
                 TestRunner.equal(ids[2], ZACK)
             end,
         },
+        {
+            name = "restoreat demands a bounded copy index and export a target",
+            run = function()
+                local good = AdminRoster.authorize(OWNER, "/restoreat 555 2", true)
+                TestRunner.equal(good.allowed, true)
+                TestRunner.equal(good.text, "555")
+                TestRunner.equal(good.value, 2)
+
+                local noIndex = AdminRoster.authorize(OWNER, "/restoreat 555", true)
+                TestRunner.equal(noIndex.allowed, false)
+                TestRunner.equal(noIndex.reason, "invalid_backup_index")
+
+                local wild = AdminRoster.authorize(OWNER, "/restoreat 555 99", true)
+                TestRunner.equal(wild.allowed, false)
+
+                local exportGood = AdminRoster.authorize(OWNER, "/export 555", true)
+                TestRunner.equal(exportGood.allowed, true)
+                TestRunner.equal(exportGood.text, "555")
+
+                local exportBare = AdminRoster.authorize(OWNER, "/export", true)
+                TestRunner.equal(exportBare.allowed, false)
+            end,
+        },
     },
 }

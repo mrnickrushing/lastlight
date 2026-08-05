@@ -27,6 +27,7 @@ export type Command = {
     name: string,
     value: number?,
     text: string?,
+    extra: number?,
 }
 
 -- Nick (owner) and zacksigma472.
@@ -82,6 +83,8 @@ function AdminRoster.commandNames(): { string }
         "unlock",
         "backups",
         "restore",
+        "restoreat",
+        "export",
     }
 end
 
@@ -112,11 +115,17 @@ function AdminRoster.parse(message: any): Command?
     if not known then
         return nil
     end
-    local argument = if type(rest) == "string" then string.match(rest, "^%s*(%S*)") else nil
+    local argument, second = nil, nil
+    if type(rest) == "string" then
+        argument, second = string.match(rest, "^%s*(%S*)%s*(%S*)")
+    end
     return {
         name = name,
         value = if argument ~= nil then tonumber(argument) else nil,
         text = if argument ~= nil and #argument > 0 then string.lower(argument) else nil,
+        -- Second token, numeric only. Exists for /restoreat's copy index and
+        -- deliberately nothing else -- one extra slot, not a general parser.
+        extra = if second ~= nil and #second > 0 then tonumber(second) else nil,
     }
 end
 
@@ -189,6 +198,27 @@ function AdminRoster.authorize(userId: any, message: any, enabled: boolean): any
         -- clear is decided at the point of the write, not here.
         if command.text == nil or #command.text == 0 or #command.text > 32 then
             return { allowed = false, reason = "invalid_unlock_target", command = command.name }
+        end
+        return { allowed = true, command = command.name, text = command.text }
+    end
+
+    if command.name == "restoreat" then
+        -- The deeper-history restore the /restore comment promised: it names
+        -- its copy explicitly (1 = oldest kept), so the everyday command
+        -- stays impossible to point at an arbitrary past by accident.
+        if command.text == nil or #command.text == 0 or #command.text > 32 then
+            return { allowed = false, reason = "invalid_backup_target", command = command.name }
+        end
+        local index = command.extra
+        if index == nil or index ~= math.floor(index) or index < 1 or index > 8 then
+            return { allowed = false, reason = "invalid_backup_index", command = command.name }
+        end
+        return { allowed = true, command = command.name, text = command.text, value = index }
+    end
+
+    if command.name == "export" then
+        if command.text == nil or #command.text == 0 or #command.text > 32 then
+            return { allowed = false, reason = "invalid_backup_target", command = command.name }
         end
         return { allowed = true, command = command.name, text = command.text }
     end

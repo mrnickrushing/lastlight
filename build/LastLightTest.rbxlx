@@ -1166,6 +1166,7 @@ export type Command = {
     name: string,
     value: number?,
     text: string?,
+    extra: number?,
 }
 
 -- Nick (owner) and zacksigma472.
@@ -1221,6 +1222,8 @@ function AdminRoster.commandNames(): { string }
         "unlock",
         "backups",
         "restore",
+        "restoreat",
+        "export",
     }
 end
 
@@ -1251,11 +1254,17 @@ function AdminRoster.parse(message: any): Command?
     if not known then
         return nil
     end
-    local argument = if type(rest) == "string" then string.match(rest, "^%s*(%S*)") else nil
+    local argument, second = nil, nil
+    if type(rest) == "string" then
+        argument, second = string.match(rest, "^%s*(%S*)%s*(%S*)")
+    end
     return {
         name = name,
         value = if argument ~= nil then tonumber(argument) else nil,
         text = if argument ~= nil and #argument > 0 then string.lower(argument) else nil,
+        -- Second token, numeric only. Exists for /restoreat's copy index and
+        -- deliberately nothing else -- one extra slot, not a general parser.
+        extra = if second ~= nil and #second > 0 then tonumber(second) else nil,
     }
 end
 
@@ -1328,6 +1337,27 @@ function AdminRoster.authorize(userId: any, message: any, enabled: boolean): any
         -- clear is decided at the point of the write, not here.
         if command.text == nil or #command.text == 0 or #command.text > 32 then
             return { allowed = false, reason = "invalid_unlock_target", command = command.name }
+        end
+        return { allowed = true, command = command.name, text = command.text }
+    end
+
+    if command.name == "restoreat" then
+        -- The deeper-history restore the /restore comment promised: it names
+        -- its copy explicitly (1 = oldest kept), so the everyday command
+        -- stays impossible to point at an arbitrary past by accident.
+        if command.text == nil or #command.text == 0 or #command.text > 32 then
+            return { allowed = false, reason = "invalid_backup_target", command = command.name }
+        end
+        local index = command.extra
+        if index == nil or index ~= math.floor(index) or index < 1 or index > 8 then
+            return { allowed = false, reason = "invalid_backup_index", command = command.name }
+        end
+        return { allowed = true, command = command.name, text = command.text, value = index }
+    end
+
+    if command.name == "export" then
+        if command.text == nil or #command.text == 0 or #command.text > 32 then
+            return { allowed = false, reason = "invalid_backup_target", command = command.name }
         end
         return { allowed = true, command = command.name, text = command.text }
     end
@@ -8933,6 +8963,24 @@ function ProfileBackup.newest(ring: any): Snapshot?
 end
 
 --[[
+    A specific copy, 1 = the oldest kept. Bounded and explicit: an operator
+    restoring history names the copy they read in /backups, and an index off
+    either end is nil rather than a clamp -- silently restoring a different
+    copy than the one asked for is the one unforgivable behaviour here.
+]]
+function ProfileBackup.snapshotAt(ring: any, index: number): Snapshot?
+    local normalized = if type(ring) == "table"
+            and type(ring.snapshots) == "table"
+            and ring.version ~= nil
+        then ring :: Ring
+        else ProfileBackup.normalize(ring)
+    if type(index) ~= "number" or index ~= math.floor(index) then
+        return nil
+    end
+    return normalized.snapshots[index]
+end
+
+--[[
     The profile a restore should write.
 
     `storedRevision` is the revision currently sitting in the live profile key,
@@ -14672,6 +14720,10 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
         self:_backups(player, decision.text :: string)
     elseif command == "restore" then
         self:_restore(player, decision.text :: string)
+    elseif command == "restoreat" then
+        self:_restoreAt(player, decision.text :: string, decision.value :: number)
+    elseif command == "export" then
+        self:_export(player, decision.text :: string)
     end
 
     self._logger:info("admin_command", {
@@ -14812,6 +14864,88 @@ end
     twice undoes the first -- and writes only a profile this player already had.
     Nothing here merges, tops up, or grants.
 ]]
+--[[
+    Restores a named copy (1 = oldest kept). The same safety rails as
+    /restore -- pre-restore capture, lock refusal, revision advance -- with
+    the one difference that the operator explicitly chose the point in
+    history after reading /backups.
+]]
+function AdminService._restoreAt(
+    self: AdminService,
+    admin: Player,
+    argument: string,
+    copyIndex: number
+)
+    local userId = self:_resolveTarget(admin, argument)
+    if userId == nil then
+        return
+    end
+    local result = self._profileService:restoreLatestBackup(userId, copyIndex)
+    self._logger:info("admin_restore_at", {
+        admin = admin.UserId,
+        target = userId,
+        copyIndex = copyIndex,
+        applied = result.applied,
+        reason = result.reason,
+        restoredRevision = result.restoredRevision,
+    })
+    if result.applied then
+        self:_reply(
+            admin,
+            string.format(
+                "%d — RESTORED COPY %d · REV %s (WAS %s)",
+                userId,
+                copyIndex,
+                tostring(result.restoredRevision),
+                tostring(result.fromRevision)
+            )
+        )
+    elseif result.reason == "no_such_copy" then
+        self:_reply(admin, string.format("%d — NO COPY %d ON RECORD", userId, copyIndex))
+    else
+        self:_reply(
+            admin,
+            string.format("%d — RESTORE UNAVAILABLE (%s)", userId, tostring(result.reason))
+        )
+    end
+end
+
+--[[
+    Dumps the stored profile as JSON into the server log, chunked under the
+    log line ceiling, and answers with a summary. The log is the export
+    channel because chat truncates and this game ships no file I/O.
+]]
+function AdminService._export(self: AdminService, admin: Player, argument: string)
+    local userId = self:_resolveTarget(admin, argument)
+    if userId == nil then
+        return
+    end
+    local result = self._profileService:exportProfile(userId)
+    if not result.ok then
+        self:_reply(
+            admin,
+            string.format("%d — EXPORT FAILED (%s)", userId, tostring(result.reason))
+        )
+        return
+    end
+    local json = result.json :: string
+    local chunkSize = 3500
+    local chunks = math.ceil(#json / chunkSize)
+    for index = 1, chunks do
+        self._logger:info("admin_export_chunk", {
+            admin = admin.UserId,
+            target = userId,
+            chunk = index,
+            of = chunks,
+            data = string.sub(json, (index - 1) * chunkSize + 1, index * chunkSize),
+        })
+    end
+    self:_reply(
+        admin,
+        string.format("%d — EXPORTED %d CHARS IN %d LOG CHUNKS", userId, #json, chunks)
+    )
+end
+
 function AdminService._restore(self: AdminService, admin: Player, argument: string)
     local userId = self:_resolveTarget(admin, argument)
     if userId == nil then
@@ -24461,7 +24595,40 @@ end
         player previously had, at a revision above the live one so the write
         actually lands. Nothing is merged, topped up, or granted.
 ]]
-function ProfileService.restoreLatestBackup(self: ProfileService, userId: number): any
+--[[
+    The raw stored profile as JSON, for the export half of the admin
+    tooling. Reads the stored bytes, not the in-memory session, because an
+    export exists to answer "what is actually in the datastore" -- the same
+    question a migration audit asks.
+]]
+function ProfileService.exportProfile(self: ProfileService, userId: number): any
+    assert(type(userId) == "number" and userId > 0, "export target must be a valid user ID")
+    if not self._persistent or self._store == nil then
+        return { ok = false, reason = "not_persistent" }
+    end
+    local readOk, stored = pcall(function()
+        return (self._store :: GlobalDataStore):GetAsync(string.format("player_%d", userId))
+    end)
+    if not readOk then
+        return { ok = false, reason = "read_failed" }
+    end
+    if stored == nil then
+        return { ok = false, reason = "no_save_on_record" }
+    end
+    local encodeOk, encoded = pcall(function()
+        return game:GetService("HttpService"):JSONEncode(stored)
+    end)
+    if not encodeOk then
+        return { ok = false, reason = "encode_failed" }
+    end
+    return { ok = true, json = encoded }
+end
+
+function ProfileService.restoreLatestBackup(
+    self: ProfileService,
+    userId: number,
+    copyIndex: number?
+): any
     assert(type(userId) == "number" and userId > 0, "restore target must be a valid user ID")
 
     if not self._persistent or self._store == nil or self._backupStore == nil then
@@ -24479,9 +24646,17 @@ function ProfileService.restoreLatestBackup(self: ProfileService, userId: number
         error("could not read that player's backups right now")
     end
 
-    local snapshot = self._profileBackup.newest(stored)
+    -- An explicit copy index restores history; no index keeps the everyday
+    -- newest-copy behaviour. An index with no copy behind it refuses rather
+    -- than falling back -- see ProfileBackup.snapshotAt.
+    local snapshot = if copyIndex ~= nil
+        then self._profileBackup.snapshotAt(stored, copyIndex)
+        else self._profileBackup.newest(stored)
     if snapshot == nil then
-        return { applied = false, reason = "no_backup_on_record" }
+        return {
+            applied = false,
+            reason = if copyIndex ~= nil then "no_such_copy" else "no_backup_on_record",
+        }
     end
 
     local outcome: any = { applied = false, reason = "update_did_not_run" }

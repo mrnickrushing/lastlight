@@ -359,5 +359,31 @@ return {
                 TestRunner.equal(summary.newestRevision, nil)
             end,
         },
+        {
+            name = "snapshotAt names its copy exactly or answers nil",
+            run = function()
+                local ring = ProfileBackup.default()
+                for revision = 1, 3 do
+                    ring = ProfileBackup.capture(
+                        ring,
+                        { schemaVersion = 16, revision = revision },
+                        100 + revision,
+                        "interval",
+                        3
+                    )
+                end
+                local oldest = ProfileBackup.snapshotAt(ring, 1)
+                local newest = ProfileBackup.snapshotAt(ring, 3)
+                TestRunner.equal(oldest ~= nil and oldest.revision, 1)
+                TestRunner.equal(newest ~= nil and newest.revision, 3)
+                TestRunner.equal(
+                    newest ~= nil and newest.revision,
+                    (ProfileBackup.newest(ring) :: any).revision
+                )
+                TestRunner.equal(ProfileBackup.snapshotAt(ring, 4), nil)
+                TestRunner.equal(ProfileBackup.snapshotAt(ring, 0), nil)
+                TestRunner.equal(ProfileBackup.snapshotAt(ring, 1.5), nil)
+            end,
+        },
     },
 }
