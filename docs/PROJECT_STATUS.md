@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-05, at `main` = `5a595d6` (PR #206), build `0.53.0`,
-save schema 16, 20 services. Published to Roblox as place version 66,
+Last updated: 2026-08-05, at `main` = `c44d731` (PR #208), build `0.53.0`,
+save schema 16, 20 services. Published to Roblox as place version 67,
 matching this revision exactly.
 
 ---
@@ -27,18 +27,40 @@ there, not a copy here. Note the gate's own caveat: the layout validator only
 guards footprint clearance from source — the gate itself still needs a live
 Studio pathfinding pass.
 
-**Milestone 6 (complete systemic foundation) has started.** Its first
-deliverable — all seven professions — landed in #206 with basic kits.
-The natural next wave is the weapon/tool families and crafting depth: today
-`Equipment.luau` holds three items (one weapon) against the roadmap's six
-weapon and eight tool families, and `CraftingCatalog.luau` holds five
-recipes. Loadouts, repair, traits, and the status/reaction system remain
-unstarted.
+**Milestone 6 (complete systemic foundation) is two waves in.** Wave A
+(#206) landed all seven professions; wave B (#208) landed the six weapon
+families with benches, held visuals, and recipes. Still open on the M6
+deliverable: the eight tool families (today: axe/hammer/torch starter
+tools), loadouts, repair, equipment traits, the status/reaction system,
+companions, the enemy director, and defense plots. Per-family live strike
+verification (sling snare, edge refund) needs the crafting economy driven
+end to end — banked materials → craft → equip — recorded as open in
+[MILESTONE_6_WEAPON_FAMILIES.md](MILESTONE_6_WEAPON_FAMILIES.md).
 
-## Recently landed (PRs ~#151–#206)
+## Recently landed (PRs ~#151–#208)
 
 Verified against `git log`, newest first:
 
+- **#208** Milestone 6 wave B: **the six weapon families.** Heartwood Maul
+  (1.45x melee ceiling), Briar Lance (full-strength 14-stud reach), Foxfire
+  Sling (ranged 22, 0.7x, 2.5s snare at 0.75x speed — between the mark and
+  the lure so stacked slows read), Amber Edge (1.1x, +6 stamina per landed
+  hit), Warden Cudgel (1.05x, +4% damage reduction) beside the existing
+  Thornwood Bow. Each family: a materials-priced recipe, its own physical
+  bench (workshop row 5 → 10, every bench with an explicit sample
+  silhouette — which surfaced that the bow bench had displayed a pair of
+  boots since it shipped, via the sample chain's else branch), a held
+  visual plan (3 → 8), and a Field Book equip button + icon (the count
+  formatter's hardcoded hood/boots pair had every other button reading
+  "EQUIP BOOTS ×N"; buttons now carry their own labels). Also fixed, found
+  live: **the departure panel followed players across the whole town** —
+  the distance gate held the platform instance (streamed to nil once the
+  lodge unloads → gate fails open) and only re-evaluated on server pushes;
+  it now works from the platform's cached position and re-evaluates on the
+  local render tick. PASS FoundationIntegration reconfirmed on a fresh-save
+  boot with all ten benches; census 70 → 75.
+- **#207** Handoff refresh through #206 + the terminal Studio-restart
+  recipe in STUDIO_MCP_SETUP.md.
 - **#206** Milestone 6 wave A: **the seven-profession roster is complete.**
   Alchemist (Sporebright Tonic: radius stamina restore + half-strength
   mend), Beastkeeper (Briar Hound: the active night threat hunts the keeper
