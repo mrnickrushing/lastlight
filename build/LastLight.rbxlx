@@ -790,6 +790,19 @@ function ActionPayloadContract.allowedFields(runtimeIds: any, kind: string): { [
     if extra ~= nil then
         allowed[extra] = true
     end
+    --[[
+        The departure press carries TWO fields: the party size and the
+        chosen contract. The single-extra-field shape above silently
+        dropped every real press from the moment contracts shipped --
+        isValidForKind saw contractId, an unknown key, and rejected the
+        whole payload before any handler could run. No toast, no log,
+        no countdown: the platform just did nothing, exactly as the owner
+        reported twice. Direct remote tests that omitted contractId passed,
+        which is how it hid from every synthetic check.
+    ]]
+    if kind == runtimeIds.Actions.LobbyDepart then
+        allowed.contractId = true
+    end
     return allowed
 end
 
