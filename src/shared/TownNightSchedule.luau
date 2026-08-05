@@ -26,6 +26,9 @@ local ROSTER: { string } = {
 
 local MIN_WAVES = 3
 local MAX_WAVES = 8
+-- The director's ceiling for a full party. Solo nights keep MAX_WAVES; the
+-- extra headroom only opens as real defenders stand in the town.
+local MAX_WAVES_GROUP = 12
 local THEMES = table.freeze({ "EMBERFALL", "MIRETIDE", "ROOTMOON", "ASHEN VEIL" })
 local THEME_PROFILES = table.freeze({
     EMBERFALL = table.freeze({
@@ -72,20 +75,37 @@ function TownNightSchedule.profile(nightNumber: number): any
     return THEME_PROFILES[theme]
 end
 
-function TownNightSchedule.waveCount(nightNumber: number): number
+--[[
+    The enemy director, in one function: the night's pressure scales with
+    how many defenders actually stand in the town. partySize 1 (or absent)
+    is EXACTLY the pre-director schedule -- solo nights were tuned to
+    breathe and this must not move them -- and each additional eligible
+    defender adds one wave, up to a group ceiling above the solo cap.
+    Deterministic like everything else in this module: same night, same
+    party size, same layout.
+]]
+function TownNightSchedule.waveCount(nightNumber: number, partySize: number?): number
     assert(
         nightNumber >= 1 and nightNumber == math.floor(nightNumber),
         "night number must be a positive integer"
     )
-    return math.clamp(MIN_WAVES - 1 + nightNumber, MIN_WAVES, MAX_WAVES)
+    local solo = math.clamp(MIN_WAVES - 1 + nightNumber, MIN_WAVES, MAX_WAVES)
+    local size = if type(partySize) == "number" and partySize == partySize
+        then math.clamp(math.floor(partySize), 1, 8)
+        else 1
+    return math.clamp(solo + (size - 1), MIN_WAVES, MAX_WAVES_GROUP)
 end
 
 -- Deterministic by design (no randomness) so a night's wave layout is fully
 -- reproducible and testable, matching this project's existing expedition and
 -- first-night schedules.
-function TownNightSchedule.beats(duration: number, nightNumber: number): { Beat }
+function TownNightSchedule.beats(
+    duration: number,
+    nightNumber: number,
+    partySize: number?
+): { Beat }
     assert(duration > 0, "duration must be positive")
-    local waves = TownNightSchedule.waveCount(nightNumber)
+    local waves = TownNightSchedule.waveCount(nightNumber, partySize)
     local theme = TownNightSchedule.theme(nightNumber)
     local result: { Beat } = {
         { at = 0, kind = "warning", enemyId = nil, theme = theme, wave = nil },
@@ -134,9 +154,14 @@ function TownNightSchedule.beats(duration: number, nightNumber: number): { Beat 
     return result
 end
 
-function TownNightSchedule.pending(duration: number, nightNumber: number, elapsed: number): { Beat }
+function TownNightSchedule.pending(
+    duration: number,
+    nightNumber: number,
+    elapsed: number,
+    partySize: number?
+): { Beat }
     local result: { Beat } = {}
-    for _, beat in TownNightSchedule.beats(duration, nightNumber) do
+    for _, beat in TownNightSchedule.beats(duration, nightNumber, partySize) do
         if beat.at >= elapsed then
             table.insert(result, beat)
         end

@@ -15,6 +15,54 @@ return {
             end,
         },
         {
+            name = "the director leaves solo nights exactly as they were",
+            run = function()
+                for night = 1, 12 do
+                    TestRunner.equal(
+                        TownNightSchedule.waveCount(night, 1),
+                        TownNightSchedule.waveCount(night)
+                    )
+                    local plain = TownNightSchedule.beats(360, night)
+                    local solo = TownNightSchedule.beats(360, night, 1)
+                    TestRunner.equal(#solo, #plain)
+                    for index, beat in plain do
+                        TestRunner.equal(solo[index].at, beat.at)
+                        TestRunner.equal(solo[index].kind, beat.kind)
+                        TestRunner.equal(solo[index].enemyId, beat.enemyId)
+                    end
+                end
+            end,
+        },
+        {
+            name = "each additional defender adds one wave up to the group ceiling",
+            run = function()
+                -- night 1 solo = 3 waves; a party of 4 faces 6
+                TestRunner.equal(TownNightSchedule.waveCount(1, 4), 6)
+                -- night 6 solo caps at 8; a full party of 8 reaches the
+                -- group ceiling of 12, never beyond
+                TestRunner.equal(TownNightSchedule.waveCount(6, 8), 12)
+                TestRunner.equal(TownNightSchedule.waveCount(12, 8), 12)
+                -- junk party sizes fall back to solo
+                TestRunner.equal(
+                    TownNightSchedule.waveCount(3, 0 / 0),
+                    TownNightSchedule.waveCount(3)
+                )
+                -- the bigger night still fits inside its duration, sorted
+                local beats = TownNightSchedule.beats(360, 6, 8)
+                local spawns = 0
+                local lastAt = -1
+                for _, beat in beats do
+                    TestRunner.truthy(beat.at >= lastAt)
+                    lastAt = beat.at
+                    TestRunner.truthy(beat.at < 360)
+                    if beat.kind == "spawn" then
+                        spawns += 1
+                    end
+                end
+                TestRunner.equal(spawns, 12)
+            end,
+        },
+        {
             name = "rejects a non-positive or fractional night number",
             run = function()
                 TestRunner.throws(function()
