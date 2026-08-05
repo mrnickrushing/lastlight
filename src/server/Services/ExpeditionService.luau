@@ -487,7 +487,7 @@ function ExpeditionService._deliverPendingPayoff(self: ExpeditionService, player
     if payoff == nil then
         return false
     end
-    self._worldService:showExtractionPayoff(player, payoff.materials)
+    self._worldService:showExtractionPayoff(player, payoff.materials, payoff.overflow)
     return true
 end
 
@@ -560,8 +560,11 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
             sessionPending.transactionIds
         )
     end
+    -- Overflow rides the payoff so whoever announces the banked delivery can
+    -- also say the stores were full -- one moment, one message stream.
     self._pendingExtractionPayoffs[player] = {
         materials = settlement.materials or {},
+        overflow = settlement.overflow,
         settlementId = settlement.settlementId,
     }
     if not self:_exitWithPayoff(player) then

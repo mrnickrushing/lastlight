@@ -5727,7 +5727,8 @@ function ExpeditionInventory.settle(
     inventory: any,
     settlementId: string,
     manifestHash: string,
-    now: number
+    now: number,
+    storageCap: number?
 ): (any, any)
     if not validTransactionId(settlementId) then
         return inventory,
@@ -5755,9 +5756,21 @@ function ExpeditionInventory.settle(
     end
 
     local nextInventory = cloneInventory(inventory)
+    -- Milestone 4's storage cap. The town's stores hold what its tier has
+    -- earned room for; surplus is counted and REPORTED, never silently
+    -- discarded -- the toast that says "stores full" is the reason a player
+    -- funds the next tier.
+    local cap = math.min(MAX_MATERIAL_STACK, math.floor(tonumber(storageCap) or MAX_MATERIAL_STACK))
+    local overflow: { [string]: number } = {}
+    local overflowTotal = 0
     for materialId, amount in pending.materials do
-        nextInventory.materials[materialId] =
-            math.min(MAX_MATERIAL_STACK, (nextInventory.materials[materialId] or 0) + amount)
+        local current = nextInventory.materials[materialId] or 0
+        local accepted = math.max(0, math.min(cap, current + amount) - current)
+        nextInventory.materials[materialId] = current + accepted
+        if accepted < amount then
+            overflow[materialId] = amount - accepted
+            overflowTotal += amount - accepted
+        end
     end
     for _, transactionId in pending.transactionIds do
         local record = table.clone(nextInventory.expeditionRewards[transactionId])
@@ -5769,6 +5782,7 @@ function ExpeditionInventory.settle(
     local settlementRecord = {
         manifestHash = string.sub(manifestHash, 1, 32),
         materials = table.clone(pending.materials),
+        overflow = if overflowTotal > 0 then table.clone(overflow) else nil,
         rewardTransactionIds = table.clone(pending.transactionIds),
         settledAt = math.floor(now),
     }
@@ -5783,6 +5797,7 @@ function ExpeditionInventory.settle(
         {
             applied = true,
             record = table.clone(settlementRecord),
+            overflowTotal = overflowTotal,
         }
 end
 
@@ -10675,8 +10690,13 @@ function SaveSchema.withExpeditionSettlement(
     manifestHash: string,
     now: number
 ): (Profile, any)
-    local nextInventory, result =
-        ExpeditionInventory.settle(profile.inventory, settlementId, manifestHash, now)
+    local nextInventory, result = ExpeditionInventory.settle(
+        profile.inventory,
+        settlementId,
+        manifestHash,
+        now,
+        TownProgression.storageCapForTier(TownProgression.resolve(profile).tier)
+    )
     if not result.applied then
         return profile, result
     end
@@ -12956,6 +12976,16 @@ local BUILDING_FIRST_TIER: { [string]: number } = {
     building_trapworks = 3,
     building_waterworks = 3,
 }
+
+--[[
+    How much of each material the town's stores can hold. Tier is the only
+    input on purpose: storage is a thing the town grows, not a stat a player
+    buys. Tier 0 starts snug enough that a few good expeditions press against
+    it, and each tier earns real headroom.
+]]
+function TownProgression.storageCapForTier(tier: number): number
+    return 80 + math.clamp(math.floor(tonumber(tier) or 0), 0, 5) * 60
+end
 
 local function buildingStages(tier: number): { [string]: number }
     -- Stage zero is a readable construction site, while stages one through
@@ -18007,7 +18037,7 @@ function ExpeditionService._deliverPendingPayoff(self: ExpeditionService, player
     if payoff == nil then
         return false
     end
-    self._worldService:showExtractionPayoff(player, payoff.materials)
+    self._worldService:showExtractionPayoff(player, payoff.materials, payoff.overflow)
     return true
 end
 
@@ -18080,8 +18110,11 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
             sessionPending.transactionIds
         )
     end
+    -- Overflow rides the payoff so whoever announces the banked delivery can
+    -- also say the stores were full -- one moment, one message stream.
     self._pendingExtractionPayoffs[player] = {
         materials = settlement.materials or {},
+        overflow = settlement.overflow,
         settlementId = settlement.settlementId,
     }
     if not self:_exitWithPayoff(player) then
@@ -23700,6 +23733,9 @@ function ProfileService.settleExpedition(
             then {}
             else table.clone(activeProfile.inventory.materials),
         materials = if settlementRecord == nil then {} else table.clone(settlementRecord.materials),
+        overflow = if settlementRecord ~= nil and settlementRecord.overflow ~= nil
+            then table.clone(settlementRecord.overflow)
+            else nil,
         reason = if durable then nil else "save_pending",
         settlementId = settlementId,
         sessionTransactionIds = sessionTransactionIds,
@@ -36852,11 +36888,25 @@ function WorldService.setTownRepairEnabled(self: WorldService, enabled: boolean)
     end
 end
 
-function WorldService.showExtractionPayoff(self: WorldService, player: Player, materials: any)
+function WorldService.showExtractionPayoff(
+    self: WorldService,
+    player: Player,
+    materials: any,
+    overflow: any?
+)
     local entries, total = self._extractionPayoff.summarize(materials)
     local world = self._world
     if world == nil or #entries == 0 or total <= 0 or player.Parent == nil then
         return
+    end
+    -- A full store is said at the moment of delivery, on the delivery
+    -- itself, where the player is already reading what they banked. Storage
+    -- caps that fail silently are just theft with paperwork.
+    local overflowLost = 0
+    if type(overflow) == "table" then
+        for _, amount in overflow do
+            overflowLost += tonumber(amount) or 0
+        end
     end
 
     local deliveries = world:FindFirstChild("WayhomeDeliveries")
@@ -36927,6 +36977,25 @@ function WorldService.showExtractionPayoff(self: WorldService, player: Player, m
             Color3.fromRGB(103, 91, 68),
             Enum.Material.Fabric,
             false
+        )
+    end
+    if overflowLost > 0 then
+        local warning = part(
+            delivery,
+            "WayhomeOverflowNotice",
+            Vector3.new(0.2, 0.2, 0.2),
+            CFrame.new(origin + Vector3.new(0, 4.6, 0)),
+            Color3.fromRGB(255, 138, 92),
+            Enum.Material.Neon,
+            false
+        )
+        warning.Transparency = 1
+        warning.CanQuery = false
+        addBillboard(
+            warning,
+            string.format("STORES FULL · %d SURPLUS TURNED AWAY", overflowLost),
+            Color3.fromRGB(255, 138, 92),
+            60
         )
     end
     addBillboard(

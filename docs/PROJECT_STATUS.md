@@ -28,6 +28,16 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
+- **(in flight: `agent/m4-storage-caps`)** Milestone 4 storage caps, the
+  first half of wave B. Town stores now hold what the tier has earned:
+  `TownProgression.storageCapForTier` (80 + tier×60), enforced inside
+  `ExpeditionInventory.settle` per material, with overflow COUNTED AND
+  REPORTED — the settlement record carries an `overflow` map, the Wayhome
+  delivery pallet grows a "STORES FULL · N SURPLUS TURNED AWAY" notice, and
+  the spec pins both the cap binding and the uncapped legacy path.
+  Remaining in wave B: decoration system + caps, deliberate town-visit
+  flow. Then wave C (backup restore-to-copy + export), M5 waves.
+
 - **(in flight: `agent/m4-resident-life`)** Milestone 4's resident-life
   deliverable: jobs, injury, bonds, and the crisis framework. New pure
   `ResidentLife.luau` (save schema 15, era-14 migration fixture added):
