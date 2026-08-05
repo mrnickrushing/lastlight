@@ -7,7 +7,7 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-04, at `main` = `1cfd2e5` (PR #183), build `0.50.0`,
+Last updated: 2026-08-04, at `main` = `ae0ad4b` (PR #184), build `0.50.0`,
 save schema 14, 20 services.
 
 ---
@@ -28,8 +28,8 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
-- **(in flight, this branch: `agent/chapter-one-strikes`; the town-surface
-  half below already merged as #183)** Level-2 playability and visual audit,
+- **(in flight, this branch: `agent/memory-fragments`; the chapter-one strike
+  fix merged as #184 and the town-surface half as #183)** Level-2 playability and visual audit,
   driven live through a connected Studio session. The headline: **chapter
   one had become uncompletable, and is fixed.** The
   `part()` tap-to-interact change (#173) left the Old Growth AmberHeart and
