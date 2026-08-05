@@ -255,6 +255,8 @@ export type HUDController = typeof(setmetatable(
         _lobbyDetail: TextLabel,
         _lobbySizes: Frame,
         _lobbySizeButtons: { TextButton },
+        _contractButtons: { [string]: TextButton },
+        _selectedContractId: string,
         _onLobbyDepart: ((number) -> ())?,
         _progressButton: TextButton,
         _useCharm: TextButton,
@@ -287,7 +289,11 @@ export type HUDController = typeof(setmetatable(
     HUDController
 ))
 
-function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDController
+function HUDController.new(
+    playerGui: PlayerGui,
+    professions: { any },
+    contracts: { any }?
+): HUDController
     local existing = playerGui:FindFirstChild("LastLightHUD")
     if existing ~= nil then
         existing:Destroy()
@@ -1109,7 +1115,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     lobbyFrame.Name = "LobbyPanel"
     lobbyFrame.AnchorPoint = Vector2.new(0.5, 1)
     lobbyFrame.Position = UDim2.new(0.5, 0, 1, -104)
-    lobbyFrame.Size = UDim2.fromOffset(420, 132)
+    lobbyFrame.Size = UDim2.fromOffset(420, 186)
     lobbyFrame.BackgroundColor3 = Color3.fromRGB(16, 22, 26)
     lobbyFrame.BackgroundTransparency = 0.12
     lobbyFrame.BorderSizePixel = 0
@@ -1190,6 +1196,46 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         table.insert(lobbySizeButtons, sizeButton)
     end
 
+    --[[
+        The contract row: the party names its risk beside its size. One
+        selected at a time; the selection rides the depart payload and the
+        server resolves it (junk falls back to the standard sweep).
+    ]]
+    local contractRow = Instance.new("Frame")
+    contractRow.Name = "LobbyContracts"
+    contractRow.BackgroundTransparency = 1
+    contractRow.Position = UDim2.fromOffset(14, 116)
+    contractRow.Size = UDim2.new(1, -28, 0, 58)
+    contractRow.ZIndex = 41
+    contractRow.Parent = lobbyFrame
+    local contractLayout = Instance.new("UIListLayout")
+    contractLayout.FillDirection = Enum.FillDirection.Horizontal
+    contractLayout.Padding = UDim.new(0, 6)
+    contractLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    contractLayout.Parent = contractRow
+    local contractButtons: { [string]: TextButton } = {}
+    for order, contract in contracts or {} do
+        local contractButton = Instance.new("TextButton")
+        contractButton.Name = "Contract_" .. contract.id
+        contractButton.LayoutOrder = order
+        contractButton.Size = UDim2.new(0.25, -6, 1, 0)
+        contractButton.BackgroundColor3 = if order == 1
+            then Color3.fromRGB(37, 68, 55)
+            else Color3.fromRGB(31, 40, 44)
+        contractButton.AutoButtonColor = true
+        contractButton.Font = Enum.Font.GothamBold
+        contractButton.TextWrapped = true
+        contractButton.Text = contract.title
+        contractButton.TextColor3 = Color3.fromRGB(244, 230, 197)
+        contractButton.TextSize = 11
+        contractButton.ZIndex = 42
+        contractButton.Parent = contractRow
+        local contractCorner = Instance.new("UICorner")
+        contractCorner.CornerRadius = UDim.new(0, 8)
+        contractCorner.Parent = contractButton
+        contractButtons[contract.id] = contractButton
+    end
+
     -- Action progress: what a timed gather or build looks like while it runs.
     local actionFrame = Instance.new("Frame")
     actionFrame.Name = "ActionProgress"
@@ -1252,6 +1298,8 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         _lobbyDetail = lobbyDetail,
         _lobbySizes = lobbySizes,
         _lobbySizeButtons = lobbySizeButtons,
+        _contractButtons = contractButtons,
+        _selectedContractId = "contract_standard",
         _departurePlatformPart = nil,
         _onLobbyDepart = nil,
         _canvas = canvas,
@@ -1458,13 +1506,23 @@ function HUDController.setCompactHandler(self: HUDController, callback: (boolean
     self._onCompact = callback
 end
 
-function HUDController.setLobbyDepartHandler(self: HUDController, callback: (number) -> ())
+function HUDController.setLobbyDepartHandler(self: HUDController, callback: (number, string) -> ())
     self._onLobbyDepart = callback
     for size, button in self._lobbySizeButtons do
         button.Activated:Connect(function()
             local handler = self._onLobbyDepart
             if handler ~= nil then
-                handler(size)
+                handler(size, self._selectedContractId)
+            end
+        end)
+    end
+    for contractId, button in self._contractButtons do
+        button.Activated:Connect(function()
+            self._selectedContractId = contractId
+            for otherId, otherButton in self._contractButtons do
+                otherButton.BackgroundColor3 = if otherId == contractId
+                    then Color3.fromRGB(37, 68, 55)
+                    else Color3.fromRGB(31, 40, 44)
             end
         end)
     end

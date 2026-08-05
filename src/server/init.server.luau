@@ -19,6 +19,7 @@ local EnemyMotion = require(root.EnemyMotion)
 local EngineerBrace = require(root.EngineerBrace)
 local Environment = require(root.Environment)
 local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
+local ExpeditionContracts = require(root.ExpeditionContracts)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local ExpeditionRewardLedger = require(root.ExpeditionRewardLedger)
 local ExtractionPayoff = require(root.ExtractionPayoff)
@@ -123,7 +124,8 @@ local expeditionService = ExpeditionService.new(
     ExtractionPayoff,
     profileService,
     analyticsService,
-    Config.BramblewakePreviewSeed
+    Config.BramblewakePreviewSeed,
+    ExpeditionContracts
 )
 local survivalService = PlayerSurvivalService.new(
     logger,
@@ -187,6 +189,7 @@ local enemyService = EnemyService.new(
     analyticsService
 )
 professionService:setEnemyService(enemyService)
+expeditionService:bindEnemyService(enemyService)
 enemyService:setProfessionService(professionService)
 local oldGrowthService = OldGrowthService.new(
     logger,

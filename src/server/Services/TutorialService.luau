@@ -1205,6 +1205,15 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
     if kind == self._runtimeIds.Actions.LobbyDepart then
         -- The client only ever asks. LobbyDeparture re-checks the size, the
         -- server's own ready count, and the capacity before anything starts.
+        -- The departing party names its contract before the platform fires.
+        -- Resolution is server-side and forgiving: junk becomes the standard
+        -- sweep, never extra risk or reward.
+        if payload.contractId ~= nil then
+            local contractId = payload.contractId
+            if type(contractId) == "string" and #contractId <= 40 then
+                self._expeditionService:setContract(contractId)
+            end
+        end
         local result = self._lobbyService:requestDeparture(player, payload.partySize)
         if not result.accepted and result.reason == "invalid_party_size" then
             self:_setToast(player, "CHOOSE A PARTY SIZE FIRST")
@@ -1608,6 +1617,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         objectiveTargets = self:_objectiveTargets(player, session),
         residentLife = self._profileService:residentLifeSnapshot(player),
         decorations = self._profileService:decorationsSnapshot(player),
+        contract = self._expeditionService:contractSnapshot(),
         townHost = (function(): any
             local info = self._townNightService:hostInfo(player.UserId)
             if info == nil then

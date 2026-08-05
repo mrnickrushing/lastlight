@@ -8,6 +8,7 @@ assert(root ~= nil, "Last Light shared root did not replicate before client boot
 
 local Config = require(root.Config)
 local AmbientMotion = require(root.AmbientMotion)
+local ExpeditionContracts = require(root.ExpeditionContracts)
 local MusicCatalog = require(root.MusicCatalog)
 local SfxCatalog = require(root.SfxCatalog)
 local ProfessionCatalog = require(root.ProfessionCatalog)
@@ -50,7 +51,7 @@ local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui", Config.BootstrapTimeoutSeconds)
 assert(playerGui ~= nil and playerGui:IsA("PlayerGui"), "PlayerGui unavailable")
 
-local hud = HUDController.new(playerGui, ProfessionCatalog.list())
+local hud = HUDController.new(playerGui, ProfessionCatalog.list(), ExpeditionContracts.List)
 local vignette = VignetteController.new(playerGui)
 local objectiveMarkers = ObjectiveMarkerController.new(playerGui)
 local ambient = AmbientController.new(RuntimeIds.AmbientMoteTag)
@@ -117,8 +118,8 @@ hud:setCompactHandler(function(enabled: boolean)
     send(RuntimeIds.Actions.CompactHud, { enabled = enabled })
 end)
 
-hud:setLobbyDepartHandler(function(partySize: number)
-    send(RuntimeIds.Actions.LobbyDepart, { partySize = partySize })
+hud:setLobbyDepartHandler(function(partySize: number, contractId: string)
+    send(RuntimeIds.Actions.LobbyDepart, { partySize = partySize, contractId = contractId })
 end)
 
 hud:setProfessionHandler(function(professionId: string)
