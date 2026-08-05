@@ -7,7 +7,7 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-04, at `main` = `ae0ad4b` (PR #184), build `0.50.0`,
+Last updated: 2026-08-04, at `main` = `ae0ad4b` (PR #184), build `0.51.0`,
 save schema 14, 20 services.
 
 ---

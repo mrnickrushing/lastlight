@@ -3277,19 +3277,26 @@ local function buildResourceNodes(
         anchor.Transparency = 1
         anchor.CanCollide = false
 
+        --[[
+            Small and quiet on purpose. At 1.15 studs and 0.62 transparency,
+            five of these in one camera frame read as a row of blinding
+            yellow orbs brighter than any actual objective -- the owner's
+            tablet screenshot showed exactly that. A resource cue should be
+            findable when looked for, not the loudest thing on screen.
+        ]]
         local glow = part(
             module,
             "ResourceGlow",
-            Vector3.new(1.15, 1.15, 1.15),
+            Vector3.new(0.7, 0.7, 0.7),
             CFrame.new(at + Vector3.new(0, 3.2, 0)),
             if isSap then Color3.fromRGB(255, 186, 84) else Color3.fromRGB(120, 214, 178),
             Enum.Material.Neon,
             false
         )
         glow.Shape = Enum.PartType.Ball
-        glow.Transparency = 0.62
+        glow.Transparency = 0.8
         glow.CastShadow = false
-        light(glow, glow.Color, 0.75, 17)
+        light(glow, glow.Color, 0.4, 12)
         CollectionService:AddTag(glow, runtimeIds.AmbientLightTag)
 
         table.insert(meshPlacements, {

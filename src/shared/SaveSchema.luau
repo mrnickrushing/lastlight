@@ -596,6 +596,10 @@ function SaveSchema.memoryFragmentSnapshot(profile: Profile): any
     )
 end
 
+function SaveSchema.weaponStrikeProfile(profile: Profile): any
+    return Equipment.weaponStrikeProfile(profile.equipped)
+end
+
 function SaveSchema.gearSnapshot(profile: Profile): { [string]: number }
     return table.clone(profile.gear)
 end

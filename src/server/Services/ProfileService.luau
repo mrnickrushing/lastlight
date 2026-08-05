@@ -373,9 +373,19 @@ function ProfileService.setTutorial(
         return false
     end
 
+    local previousTool = profile.tutorial.selectedTool
     self._profiles[player] = self._saveSchema.withTutorial(profile, stage, selectedTool, os.time())
     if self._persistent and self._writable[player] == true then
         self._dirty[player] = true
+    end
+    if selectedTool ~= previousTool then
+        -- The held-tool visual rides the equipment-changed signal: choosing a
+        -- starter tool should put it in the hand at the pedestal, not on the
+        -- next respawn, and the gear visual service already listens here.
+        self._equipmentChangedEvent:Fire(
+            player,
+            self._saveSchema.equippedSnapshot(self._profiles[player])
+        )
     end
     return true
 end
@@ -643,6 +653,22 @@ function ProfileService.equippedSnapshot(self: ProfileService, player: Player): 
         return {}
     end
     return self._saveSchema.equippedSnapshot(profile)
+end
+
+function ProfileService.selectedTool(self: ProfileService, player: Player): string?
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return profile.tutorial.selectedTool
+end
+
+function ProfileService.weaponStrikeProfile(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return self._saveSchema.weaponStrikeProfile(profile)
 end
 
 function ProfileService.equipmentStats(self: ProfileService, player: Player): any

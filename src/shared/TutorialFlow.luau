@@ -62,7 +62,7 @@ local DEFINITIONS: { [Stage]: Definition } = {
         action = "choose_tool",
         next = "build",
         objective = "CHOOSE A STARTER TOOL",
-        detail = "Axe, hammer, or torch — this choice is not permanent.",
+        detail = "Axe hits harder · hammer works faster · torch reaches further and lights the dark. Not permanent.",
         mara = "Choose what feels right. Emberhollow needs every kind of helper.",
     },
     build = {

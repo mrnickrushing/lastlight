@@ -1213,7 +1213,16 @@ function EnemyService.setStrikeHandler(self: EnemyService, handler: (Player) -> 
     self._strikeHandler = handler
 end
 
-function EnemyService.damageNearest(self: EnemyService, player: Player): (boolean, string)
+--[[
+    context carries what the striker is holding -- the server-derived tool and
+    weapon numbers TutorialService computed from the profile. Nil context means
+    bare defaults; a client never supplies any of it.
+]]
+function EnemyService.damageNearest(
+    self: EnemyService,
+    player: Player,
+    context: any
+): (boolean, string)
     local encounterService = self:_activeEncounterService()
     if encounterService ~= nil then
         return encounterService:damageNearest(player)
@@ -1233,7 +1242,12 @@ function EnemyService.damageNearest(self: EnemyService, player: Player): (boolea
     local displayName = enemy.definition.displayName
     local primary = enemy.model.PrimaryPart
     local distance = (root.Position - primary.Position).Magnitude
-    if distance > enemy.definition.strikeRange then
+    local reach = enemy.definition.strikeRange
+        + (if context ~= nil then context.rangeBonus or 0 else 0)
+    if context ~= nil and context.weaponRange ~= nil then
+        reach = math.max(reach, context.weaponRange)
+    end
+    if distance > reach then
         return false, "Move closer to the " .. displayName .. "."
     end
 
@@ -1249,7 +1263,16 @@ function EnemyService.damageNearest(self: EnemyService, player: Player): (boolea
     local facingDot = if directionToPlayer.Magnitude > 0.01
         then primary.CFrame.LookVector:Dot(directionToPlayer.Unit)
         else 1
+    -- The strike lands: show it. The player-side swing or arrow is world
+    -- presentation, so WorldService draws it; it needs the target to aim the
+    -- shot, and this is the one place both ends of the strike are known.
+    self._worldService:showStrikeFeedback(player, context, primary.Position)
     local damage, strikeResult = self._enemyCombatRules.strikeDamage(enemy.definition, facingDot)
+    if context ~= nil and type(context.damageMultiplier) == "number" then
+        -- Tool identity, bounded: the axe's edge and the bow's reach trade
+        -- against each other, and neither can silence an enemy's mechanics.
+        damage = math.floor(damage * math.clamp(context.damageMultiplier, 0.5, 1.5) + 0.5)
+    end
     enemy.health -= damage
     enemy.model:SetAttribute("EnemyHealth", math.max(0, enemy.health))
     self:_showDamageFeedback(enemy, damage, strikeResult)
