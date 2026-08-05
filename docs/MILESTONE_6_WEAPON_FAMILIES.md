@@ -59,14 +59,24 @@ prompts) with its class-by-class derivation updated.
 - The departure-panel fix verified live at the platform, at 230 studs, and
   on return.
 
+## Economy-loop evidence (recorded after the fact)
+
+The full loop was driven end to end in a connected session: 4 amber sap +
+3 heartwood harvested, "WAYHOME — 7 MATERIALS BANKED", "CRAFTED AMBER
+EDGE" (which also completed the FIRST CRAFT quest), "EQUIPPED
+GEAR_AMBER_EDGE", and then landed strikes on a Night 1 Rootling. The
+edge's rider measured exactly: a dodge leaves 65 stamina with regen
+blocked for 0.75s, and the reading 0.6s after a landed strike inside that
+window was **71 = 65 + 6**, both trials. Driving the loop also surfaced
+and fixed two blockers recorded in the delivery PR: node harvests threw
+"reward contract is invalid" on every grant (wrong reward shape at the
+call site — no node had ever paid out), and post-tutorial strikes were
+gated to the tutorial's survive stage (a completed save could not fight
+town nights at all).
+
 ## Open work
 
-Live strike verification per family requires an equipped weapon, which
-requires crafting, which requires banked expedition materials — a full
-economy loop this increment did not drive. The families' numbers are
-unit-bounded and the strike path is shared with the already-live-verified
-bow; recording a per-family live strike (especially the sling's snare and
-the edge's refund) belongs to the next owner playtest or a session that
-drives the harvest loop. The eight tool families, loadouts, repair,
-equipment traits, and the status/reaction system remain open on the M6
-deliverable.
+Per-family live strikes for the maul, lance, sling, and cudgel (the loop
+is proven; each is one more craft), the sling's snare observed live, and
+the remaining M6 systemic items: loadouts, repair, equipment traits, the
+status/reaction system, companions, the enemy director, defense plots.

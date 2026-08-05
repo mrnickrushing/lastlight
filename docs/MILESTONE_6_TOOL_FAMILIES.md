@@ -49,9 +49,10 @@ for them yet — recorded in the asset backlog).
 
 ## Open work
 
-Pick/sickle harvest-timing and the survey marker want a live expedition
-pass (harvest an amber node with the pick against a stopwatch; walk the
-trail with the glass and watch the marker move). The fishing kit's pond
+**Pick timing verified live since**: with the pick, Amber Sap harvests
+measured 1.10–1.17s against Heartwood's 1.46s (base 1.4s, expected 0.75x
+= 1.05s plus poll latency) — the material-scoped discount is exact. The
+survey marker on a live trail remains the one open tool check. The fishing kit's pond
 catch loop and the climbing kit's real traversal are future mechanics —
 their stat identities ship now, honestly labeled. Reviewed meshes for the
 five new displays. The remaining M6 systemic items: loadouts, repair,
