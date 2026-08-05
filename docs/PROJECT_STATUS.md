@@ -28,6 +28,29 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
+- **(in flight, this branch: `agent/level2-legibility-and-town-signs`, PR
+  #189)** The level-2 legibility batch plus the town-sign fixes from the
+  owner's third round of tablet screenshots. Level 2: guide lines carry a
+  speaker now ("You" in the expedition, "Mara" in town) and the
+  blackout/expedition lines are first-person story narration — the owner's
+  "him talking to himself telling what's actually going on"; warden nodes and
+  relay roots wear heartwood stumps instead of the rootling (enemy)
+  silhouette; the near backdrop tree rank is pushed from reach+40 to reach+72
+  and thinned (34→20 canopies, 22→14 heroes, crowns raised) — that rank was
+  the "so many bushes" hedge; normal-night lighting floor raised the way
+  Blackout's was in #188. Town, from the screenshots: notice-board header
+  text is single-line on a wider plate (it was TextScaled wrapped mush
+  spilling off the planks — "the words go outside the bubbles"); the archive
+  header now just says FIELD BOOK; the town board moved from (-24,-150) —
+  five studs inside the west Dawn Gate tower's scaffold, which is why its
+  TIER 1 plank hung sideways off the stairs — to (-32,-162), and the archive
+  board from the same tower's base to (-26,-120); residents and Mara no
+  longer show the engine's naked DisplayName stacked over the bubbled plate
+  (DisplayDistanceType None, plate range 40); the safe-camp sign hides its
+  procedural text on authored replacement like FOLLOW THE LANTERNS; the
+  shrine inlay is four thin bands forming a ring instead of one 11×11 neon
+  plate that rendered as a blinding yellow square on device.
+
 - **(in flight, this branch: `agent/memory-fragments`; the chapter-one strike
   fix merged as #184 and the town-surface half as #183)** Level-2 playability and visual audit,
   driven live through a connected Studio session. The headline: **chapter
