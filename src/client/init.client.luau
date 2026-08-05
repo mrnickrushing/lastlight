@@ -15,6 +15,8 @@ local TownNightSchedule = require(root.TownNightSchedule)
 local WeatherProfile = require(root.WeatherProfile)
 local AmbientController = require(script.Controllers.AmbientController)
 local HUDController = require(script.Controllers.HUDController)
+local ObjectiveMarkerController = require(script.Controllers.ObjectiveMarkerController)
+local TapController = require(script.Controllers.TapController)
 local VignetteController = require(script.Controllers.VignetteController)
 local InputController = require(script.Controllers.InputController)
 local InteractionController = require(script.Controllers.InteractionController)
@@ -48,6 +50,7 @@ assert(playerGui ~= nil and playerGui:IsA("PlayerGui"), "PlayerGui unavailable")
 
 local hud = HUDController.new(playerGui, ProfessionCatalog.list())
 local vignette = VignetteController.new(playerGui)
+local objectiveMarkers = ObjectiveMarkerController.new(playerGui)
 local ambient = AmbientController.new(RuntimeIds.AmbientMoteTag)
 local worldMotion = WorldMotionController.new(
     RuntimeIds.AmbientMotionTag,
@@ -86,6 +89,19 @@ end, function()
     send(RuntimeIds.Actions.UseGear, { itemId = "gear_amber_charm" })
 end, function()
     send(RuntimeIds.Actions.UseGear, { itemId = "gear_meadow_satchel" })
+end)
+
+--[[
+    Tapping the world is the interaction model, and it has to work on a
+    finger. The server ClickDetectors stay -- they are what a mouse uses and
+    they carry the server-side validation -- but touch resolves its own tap
+    here and sends the same requests, because Roblox will not reliably turn a
+    tap in the camera-drag region of a phone screen into a click.
+]]
+TapController.new(function()
+    send(RuntimeIds.Actions.UseTool)
+end, function(interactionId: string)
+    send(RuntimeIds.Actions.Interact, { interactionId = interactionId })
 end)
 
 hud:setCompactHandler(function(enabled: boolean)
@@ -217,6 +233,7 @@ stateChanged.OnClientEvent:Connect(function(snapshot: any)
     worldMotion:setPhase(tostring(snapshot.phase or "day"))
     weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
     music:setSnapshot(snapshot)
+    objectiveMarkers:setTargets(snapshot.objectiveTargets)
     updateVignettes(snapshot)
 end)
 
@@ -230,6 +247,7 @@ task.spawn(function()
         worldMotion:setPhase(tostring(snapshot.phase or "day"))
         weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
         music:setSnapshot(snapshot)
+        objectiveMarkers:setTargets(snapshot.objectiveTargets)
         updateVignettes(snapshot, true)
     end
 end)

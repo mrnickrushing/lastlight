@@ -1112,6 +1112,38 @@ function TutorialService.broadcastLobby(self: TutorialService, toast: string?)
     self:_publishAll()
 end
 
+--[[
+    Where the current objective physically is.
+
+    The objective card names what to do; nothing ever said where. "Choose a
+    starter tool" and "gather heartwood" both sent a new player wandering,
+    which is the owner's report. Positions are resolved from the live
+    interaction registry rather than a coordinate table, so a marker cannot
+    drift from the thing it points at when a lot moves.
+]]
+function TutorialService._objectiveTargets(self: TutorialService, session: Session): { any }
+    local definition = self._tutorialFlow.definition(session.stage)
+    local targets = definition.targets
+    if targets == nil then
+        return {}
+    end
+    local resolved = {}
+    for _, interactionId in targets do
+        local prompt = self._worldService:interaction(interactionId)
+        local holder = if prompt ~= nil then prompt.Parent else nil
+        if holder ~= nil and holder:IsA("BasePart") then
+            table.insert(resolved, {
+                interactionId = interactionId,
+                x = holder.Position.X,
+                y = holder.Position.Y,
+                z = holder.Position.Z,
+                label = definition.objective,
+            })
+        end
+    end
+    return resolved
+end
+
 function TutorialService.snapshot(self: TutorialService, player: Player): any
     local session = self._sessions[player]
     if session == nil then
@@ -1333,6 +1365,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         townCondition = self._townNightService:conditionSnapshot(),
         recipes = self._craftingCatalog:list(),
         equipmentCatalog = self._equipmentCatalog.list(),
+        objectiveTargets = self:_objectiveTargets(session),
         quests = self._profileService:questSnapshot(player),
         memoryArchive = self._profileService:memoryFragments(player),
         combat = self._combatService:snapshot(player),

@@ -4827,45 +4827,117 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             )
             head.Shape = Enum.PartType.Cylinder
         else
+            --[[
+                A torch, built as a torch.
+
+                This was a bare stick with a Neon ball stuck on the end, tinted
+                the display's plaque colour -- pale blue-white, which is not a
+                colour fire is. At gameplay distance it read as a lollipop, and
+                the owner said so. A torch is legible from four things: a
+                tapered handle, a wrapped cloth head, a charred cup, and a
+                flame with a silhouette. Wedges give the flame a shape that
+                narrows toward the tip; three of them at different angles and
+                warmths read as fire rather than as a lamp.
+            ]]
+            local wrap = part(
+                toolFallback,
+                "TorchWrap",
+                Vector3.new(0.62, 1.35, 0.62),
+                displayFrame * CFrame.new(0, 5.6, 0),
+                Color3.fromRGB(74, 58, 42),
+                Enum.Material.Fabric,
+                false
+            )
+            wrap.CanQuery = false
             local cup = part(
                 toolFallback,
                 "TorchCup",
                 -- Cylinder axis is local X: (height, diameter, diameter).
-                Vector3.new(0.72, 1.2, 1.2),
-                displayFrame * CFrame.new(0, 6.05, 0) * CFrame.Angles(0, 0, math.rad(90)),
-                Color3.fromRGB(92, 71, 48),
+                Vector3.new(0.66, 1.05, 1.05),
+                displayFrame * CFrame.new(0, 6.28, 0) * CFrame.Angles(0, 0, math.rad(90)),
+                Color3.fromRGB(48, 40, 36),
                 Enum.Material.Metal,
                 false
             )
             cup.Shape = Enum.PartType.Cylinder
-            local flame = part(
+            local embers = part(
                 toolFallback,
-                "TorchFlame",
-                Vector3.new(1.15, 1.55, 1.15),
-                displayFrame * CFrame.new(0, 6.95, 0),
-                definition.color,
+                "TorchEmbers",
+                Vector3.new(0.78, 0.34, 0.78),
+                displayFrame * CFrame.new(0, 6.62, 0),
+                Color3.fromRGB(196, 84, 30),
                 Enum.Material.Neon,
                 false
             )
-            flame.Shape = Enum.PartType.Ball
+            embers.CanQuery = false
+            local flameShapes = {
+                {
+                    size = Vector3.new(1.05, 1.5, 1.05),
+                    y = 7.05,
+                    yaw = 0,
+                    color = Color3.fromRGB(224, 104, 34),
+                },
+                {
+                    size = Vector3.new(0.78, 1.9, 0.78),
+                    y = 7.35,
+                    yaw = 128,
+                    color = Color3.fromRGB(255, 158, 54),
+                },
+                {
+                    size = Vector3.new(0.46, 1.35, 0.46),
+                    y = 7.85,
+                    yaw = 246,
+                    color = Color3.fromRGB(255, 214, 128),
+                },
+            }
+            local flame
+            for index, shape in flameShapes do
+                local piece = part(
+                    toolFallback,
+                    if index == 1 then "TorchFlame" else "TorchFlameTip",
+                    shape.size,
+                    displayFrame
+                        * CFrame.new(0, shape.y, 0)
+                        * CFrame.Angles(0, math.rad(shape.yaw), math.rad(index * 4 - 6)),
+                    shape.color,
+                    Enum.Material.Neon,
+                    false
+                )
+                piece.Shape = Enum.PartType.Wedge
+                piece.CanQuery = false
+                piece.CastShadow = false
+                if index == 1 then
+                    flame = piece
+                end
+                CollectionService:AddTag(piece, self._runtimeIds.AmbientLightTag)
+            end
             local flameLight = Instance.new("PointLight")
-            flameLight.Color = definition.color
-            flameLight.Brightness = 2.0
-            flameLight.Range = 18
+            flameLight.Color = Color3.fromRGB(255, 168, 82)
+            flameLight.Brightness = 2.2
+            flameLight.Range = 19
             flameLight.Parent = flame
-            CollectionService:AddTag(flame, self._runtimeIds.AmbientLightTag)
         end
-        table.insert(self._meshPlacements, {
-            assetId = definition.assetId,
-            fallbackKind = "asset_replacement",
-            position = (toolAnchor * CFrame.new(0, -0.3, 0)).Position,
-            scale = 1,
-            yaw = math.rad(90),
-            seed = definition.seed,
-            swayTag = nil,
-            parent = display,
-            fallbackInstance = toolFallback,
-        })
+        --[[
+            The axe and hammer use their reviewed meshes. The torch does not:
+            the sourced handheld torch renders as a pale stick whose own glow
+            reads blue-white, which is what made this display look like a
+            lollipop on a phone. The layered flame built above is the better
+            object, so for the torch the "fallback" is the finished art and
+            nothing is allowed to replace it.
+        ]]
+        if definition.tool ~= "torch" then
+            table.insert(self._meshPlacements, {
+                assetId = definition.assetId,
+                fallbackKind = "asset_replacement",
+                position = (toolAnchor * CFrame.new(0, -0.3, 0)).Position,
+                scale = 1,
+                yaw = math.rad(90),
+                seed = definition.seed,
+                swayTag = nil,
+                parent = display,
+                fallbackInstance = toolFallback,
+            })
+        end
         -- A dedicated, always-visible anchor for the name label, since the
         -- tool shape it used to hang from gets hidden once the reviewed
         -- mesh replaces it.
@@ -4895,23 +4967,17 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             Vector3.new(7, 9, 7)
         )
     end
-    -- toolDisplayFallback is not scratch geometry for this workbench prop --
-    -- it holds the three real, interactive axe/hammer/torch displays players
-    -- choose their starting tool from. Wiring it as this placement's
-    -- fallbackInstance meant hideProceduralPlaceholder wiped all three
-    -- displays the moment the (unrelated) workbench mesh finished loading,
-    -- leaving the building with nothing visible to select.
-    table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_workbench_a",
-        fallbackKind = "asset_replacement",
-        position = TOOL_YARD_CENTER + Vector3.new(0, 0, -1.5),
-        scale = 1,
-        yaw = math.rad(90),
-        seed = 9890,
-        swayTag = nil,
-        parent = toolYard,
-        fallbackInstance = nil,
-    })
+    --[[
+        No workbench behind the middle stand.
+
+        A 10-stud-tall workbench mesh used to sit at the yard centre, directly
+        behind the hammer. The three stands are built from one loop and are
+        otherwise identical, so that single prop made the middle choice look
+        deliberately different from its neighbours -- the owner read it as "a
+        wall holding up the hammer" and asked why that one was special. It is
+        not, and nothing should imply it is: the yard's whole job is to
+        present three equal choices.
+    ]]
     -- No extra tool rack here. The yard exists to present exactly three
     -- choices -- axe, hammer, torch -- and a spare set of tools floating
     -- alongside them just read as clutter the player had to visually discard
