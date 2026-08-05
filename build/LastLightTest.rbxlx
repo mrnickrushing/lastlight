@@ -2886,6 +2886,230 @@ local modules = {
         lightBudget = 3,
         effectBudget = 2,
     }),
+
+    --[[
+        The Milestone 5 expansion: eighteen more modules, taking the catalog
+        to the full thirty-module set. Every run still walks twelve — the
+        generator now SELECTS from this pool under the same tag minima — so
+        each definition below reuses a proven visual recipe with its own
+        role, tags, and budget rather than inventing untested geometry.
+    ]]
+    frozenDefinition({
+        id = "module_bw_upper_orchard",
+        displayName = "Upper Orchard",
+        role = "resource",
+        visual = "orchard",
+        tags = { "resource", "farm", "story" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 42,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_bw_bramble_span",
+        displayName = "Bramble Span",
+        role = "traversal",
+        visual = "bridge",
+        tags = { "traversal", "puzzle" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 34,
+        lightBudget = 2,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_bw_fern_hollow",
+        displayName = "Fern Hollow",
+        role = "connector",
+        visual = "root_arch",
+        tags = { "safe", "connector" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 28,
+        lightBudget = 1,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_bw_foxfire_glade",
+        displayName = "Foxfire Glade",
+        role = "traversal",
+        visual = "foxglove",
+        tags = { "traversal", "foxfire" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 30,
+        lightBudget = 4,
+        effectBudget = 3,
+    }),
+    frozenDefinition({
+        id = "module_bw_thorn_gauntlet",
+        displayName = "Thorn Gauntlet",
+        role = "combat",
+        visual = "briar_ring",
+        tags = { "combat" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 36,
+        lightBudget = 1,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_bw_sap_terraces",
+        displayName = "Sap Terraces",
+        role = "resource",
+        visual = "sapfall",
+        tags = { "resource" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 38,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_bw_mill_row",
+        displayName = "Mill Row",
+        role = "story",
+        visual = "windmill",
+        tags = { "story", "farm" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_bw_moth_hollow",
+        displayName = "Moth Hollow",
+        role = "puzzle",
+        visual = "moth_meadow",
+        tags = { "puzzle", "story" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 32,
+        lightBudget = 3,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_bw_drowned_farm",
+        displayName = "Drowned Farm",
+        role = "resource",
+        visual = "farm",
+        tags = { "resource", "farm", "story" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_bw_arch_row",
+        displayName = "Arch Row",
+        role = "connector",
+        visual = "root_arch",
+        tags = { "safe", "traversal" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 30,
+        lightBudget = 1,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_bw_petal_run",
+        displayName = "Petal Run",
+        role = "traversal",
+        visual = "foxglove",
+        tags = { "traversal", "foxfire" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 30,
+        lightBudget = 4,
+        effectBudget = 3,
+    }),
+    frozenDefinition({
+        id = "module_bw_briar_knot",
+        displayName = "Briar Knot",
+        role = "combat",
+        visual = "briar_ring",
+        tags = { "combat", "puzzle" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 36,
+        lightBudget = 1,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_bw_amber_falls",
+        displayName = "Amber Falls",
+        role = "resource",
+        visual = "sapfall",
+        tags = { "landmark", "resource" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 38,
+        lightBudget = 3,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_bw_wind_shear",
+        displayName = "Wind Shear",
+        role = "story",
+        visual = "windmill",
+        tags = { "story" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_bw_moon_meadow",
+        displayName = "Moon Meadow",
+        role = "connector",
+        visual = "moth_meadow",
+        tags = { "safe", "story" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 32,
+        lightBudget = 3,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_bw_root_span",
+        displayName = "Root Span",
+        role = "traversal",
+        visual = "bridge",
+        tags = { "traversal" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 34,
+        lightBudget = 2,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_bw_gleaners_yard",
+        displayName = "Gleaner's Yard",
+        role = "resource",
+        visual = "farm",
+        tags = { "resource", "combat", "farm" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_bw_watch_knoll",
+        displayName = "Watch Knoll",
+        role = "combat",
+        visual = "root_arch",
+        tags = { "landmark", "safe", "combat" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 30,
+        lightBudget = 2,
+        effectBudget = 1,
+    }),
 }
 
 local pointsOfInterest = {
@@ -5004,21 +5228,129 @@ local function placeContent(manifest: any, random: (number) -> number)
     end
 end
 
-local function assemble(seed: number, attempt: number, source: string, fixed: boolean): any
-    local random = randomSource(seed + attempt * 7919)
-    local middle = {}
-    for index = 2, #Catalog.Modules - 1 do
-        table.insert(middle, Catalog.Modules[index])
+-- The known-good fallback's middle, in its original authored order. This is
+-- the exact twelve-module walk that shipped before the catalog grew to
+-- thirty, so the fallback stays the manifest every prior test proved.
+local FIXED_MIDDLE_IDS = table.freeze({
+    "module_bw_root_arch",
+    "module_bw_sunken_orchard",
+    "module_bw_foxglove_run",
+    "module_bw_hollow_farm",
+    "module_bw_briar_ring",
+    "module_bw_sapfall_gully",
+    "module_bw_windmill_copse",
+    "module_bw_tangle_bridge",
+    "module_bw_moth_meadow",
+    "module_bw_old_growth_approach",
+})
+
+local function moduleByRole(role: string): any
+    for _, definition in Catalog.Modules do
+        if definition.role == role then
+            return definition
+        end
     end
-    if not fixed then
-        middle = shuffled(middle, random)
+    error("Bramblewake catalog has no module with role " .. role)
+end
+
+--[[
+    Choose the run's middle from the full pool.
+
+    Every run still walks ModuleCount modules; the pool is what grew. The
+    selection is constrained, not blind: required module ids come first,
+    then each required tag's deficit is filled from the shuffled pool, then
+    the remaining slots take whatever the shuffle offers. Attempts and the
+    validator catch the rare shuffle this greedy pass cannot rescue.
+]]
+local function selectMiddle(arrival: any, extraction: any, random: (number) -> number): { any }
+    local target = Catalog.ModuleCount - 2
+    local pool = {}
+    for _, definition in Catalog.Modules do
+        if definition.role ~= "arrival" and definition.role ~= "extraction" then
+            table.insert(pool, definition)
+        end
+    end
+    pool = shuffled(pool, random)
+
+    local chosen: { any } = {}
+    local chosenIds: { [string]: boolean } = {}
+    local tagCounts: { [string]: number } = {}
+    local function countTags(definition: any)
+        for _, tag in definition.tags do
+            tagCounts[tag] = (tagCounts[tag] or 0) + 1
+        end
+    end
+    countTags(arrival)
+    countTags(extraction)
+    local function take(definition: any)
+        if chosenIds[definition.id] then
+            return
+        end
+        chosenIds[definition.id] = true
+        table.insert(chosen, definition)
+        countTags(definition)
     end
 
-    local sequence = { Catalog.Modules[1] }
+    for _, moduleId in Catalog.RequiredModuleIds do
+        for _, definition in pool do
+            if definition.id == moduleId then
+                take(definition)
+                break
+            end
+        end
+    end
+    for tag, minimum in Catalog.RequiredTags :: { [string]: number } do
+        while (tagCounts[tag] or 0) < minimum and #chosen < target do
+            local found = false
+            for _, definition in pool do
+                if not chosenIds[definition.id] then
+                    for _, candidateTag in definition.tags do
+                        if candidateTag == tag then
+                            take(definition)
+                            found = true
+                            break
+                        end
+                    end
+                end
+                if found then
+                    break
+                end
+            end
+            if not found then
+                break
+            end
+        end
+    end
+    for _, definition in pool do
+        if #chosen >= target then
+            break
+        end
+        take(definition)
+    end
+    -- Selection order carries shuffle bias toward required content at the
+    -- front; one more shuffle makes the walk order its own surprise.
+    return shuffled(chosen, random)
+end
+
+local function assemble(seed: number, attempt: number, source: string, fixed: boolean): any
+    local random = randomSource(seed + attempt * 7919)
+    local arrival = moduleByRole("arrival")
+    local extraction = moduleByRole("extraction")
+    local middle
+    if fixed then
+        middle = {}
+        for _, moduleId in FIXED_MIDDLE_IDS do
+            table.insert(middle, MODULES_BY_ID[moduleId])
+        end
+    else
+        middle = selectMiddle(arrival, extraction, random)
+    end
+
+    local sequence = { arrival }
     for _, definition in middle do
         table.insert(sequence, definition)
     end
-    table.insert(sequence, Catalog.Modules[#Catalog.Modules])
+    table.insert(sequence, extraction)
 
     local route = if fixed then ROUTES[1] else ROUTES[random(#ROUTES)]
     local modules = {}
@@ -5214,15 +5546,30 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
     return #issues == 0, issues
 end
 
-function ExpeditionGenerator.generate(seed: number, forceFallback: boolean?): any
+function ExpeditionGenerator.generate(
+    seed: number,
+    forceFallback: boolean?,
+    avoidHashes: { [string]: boolean }?
+): any
     local normalizedSeed = normalizeSeed(seed)
     if not forceFallback then
-        for attempt = 1, 3 do
+        -- Repetition control: a caller that remembers recent manifests can
+        -- ask for something it has not walked lately. A repeat is a
+        -- preference, validity is a requirement — if every attempt lands on
+        -- an avoided hash, the last valid manifest wins anyway.
+        local lastValid = nil
+        for attempt = 1, if avoidHashes ~= nil then 5 else 3 do
             local manifest = assemble(normalizedSeed, attempt, "generated", false)
             local valid = ExpeditionGenerator.validate(manifest)
             if valid then
-                return manifest
+                if avoidHashes == nil or avoidHashes[manifest.hash] ~= true then
+                    return manifest
+                end
+                lastValid = manifest
             end
+        end
+        if lastValid ~= nil then
+            return lastValid
         end
     end
 
@@ -17980,7 +18327,13 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
         then jobId
         else string.format("studio_%d_%d", os.time(), math.floor(os.clock() * 1000))
     local requestedSeed = game:GetAttribute("LastLightExpeditionSeed")
-    local seed = if type(requestedSeed) == "number" then requestedSeed else self._seed
+    -- Seed history, the boot half: with a thirty-module pool the same base
+    -- seed forever would make every server walk one layout. The UTC day
+    -- salts the default so consecutive days field different woods, while an
+    -- explicit LastLightExpeditionSeed attribute still pins a build exactly
+    -- (Studio tests and repro sessions depend on that).
+    local daySalt = (tonumber(os.date("!%j")) or 0) * 131 + (tonumber(os.date("!%Y")) or 0)
+    local seed = if type(requestedSeed) == "number" then requestedSeed else self._seed + daySalt
     local manifest = self._generator.generate(seed)
     local valid, issues = self._generator.validate(manifest)
     assert(valid, "Bramblewake expedition manifest is invalid: " .. table.concat(issues, "; "))

@@ -78,7 +78,13 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
         then jobId
         else string.format("studio_%d_%d", os.time(), math.floor(os.clock() * 1000))
     local requestedSeed = game:GetAttribute("LastLightExpeditionSeed")
-    local seed = if type(requestedSeed) == "number" then requestedSeed else self._seed
+    -- Seed history, the boot half: with a thirty-module pool the same base
+    -- seed forever would make every server walk one layout. The UTC day
+    -- salts the default so consecutive days field different woods, while an
+    -- explicit LastLightExpeditionSeed attribute still pins a build exactly
+    -- (Studio tests and repro sessions depend on that).
+    local daySalt = (tonumber(os.date("!%j")) or 0) * 131 + (tonumber(os.date("!%Y")) or 0)
+    local seed = if type(requestedSeed) == "number" then requestedSeed else self._seed + daySalt
     local manifest = self._generator.generate(seed)
     local valid, issues = self._generator.validate(manifest)
     assert(valid, "Bramblewake expedition manifest is invalid: " .. table.concat(issues, "; "))
