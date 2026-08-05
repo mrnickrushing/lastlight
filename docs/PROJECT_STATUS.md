@@ -7,8 +7,9 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-05, at `main` = `ae0ad4b`+ (audit waves #191–#194 merged),
-build `0.53.0`, save schema 16, 20 services.
+Last updated: 2026-08-05, at `main` = `7b43e8d` (PR #204), build `0.53.0`,
+save schema 16, 20 services. Published to Roblox as place version 65,
+matching this revision exactly.
 
 ---
 
@@ -24,11 +25,25 @@ there, not a copy here. Note the gate's own caveat: the layout validator only
 guards footprint clearance from source — the gate itself still needs a live
 Studio pathfinding pass.
 
-## Recently landed (PRs ~#151–#181)
+## Recently landed (PRs ~#151–#204)
 
 Verified against `git log`, newest first:
 
-- **(in flight: `agent/m5-weather-gallery`)** Milestone 5 wave C. **Contract
+- **#204** The departure platform's ready-check was a circle (`RADIUS`
+  magnitude) inscribed in the square WorldService actually builds (`RADIUS*2`
+  per side), so a player standing in any of the platform's four corners —
+  visibly on the dais — read as not on the platform, and a party-size tap
+  there was silently rejected. Fixed by checking each axis against `RADIUS`
+  independently, matching the real footprint; strictly more permissive than
+  the old check. Reported live by the owner ("touching the number of players
+  ... doesn't do anything anymore"). Found while investigating: **the
+  connected Studio session at the time predated `LobbyService.luau` entirely**
+  (no `readyPlayers` anywhere in its loaded scripts) — Studio had drifted far
+  enough behind `main` that a live replay of this specific fix wasn't
+  possible in that session. If a future session's Studio testing looks like
+  it's exercising a different code path than what's on disk, check for this
+  before assuming the bug is real or the fix didn't take.
+- **#203** Milestone 5 wave C. **Contract
   weather is visible now:** WeatherProfile.contractWeather maps each
   contract's weather kind to streak count/speed/opacity/color scales
   (storm doubles and darkens the fall, mist thins it to a drift, spores
@@ -43,7 +58,7 @@ Verified against `git log`, newest first:
   reserved-server teleport hangs on the multi-place decision, and the
   1,000-Studio-assembly pass needs a live Studio session.
 
-- **(in flight: `agent/m5-contracts`)** Milestone 5 wave B: expedition
+- **#202** Milestone 5 wave B: expedition
   contracts and risk modifiers. New pure `ExpeditionContracts.luau` (4
   contracts, spec-pinned invariant: risk and reward move TOGETHER — no
   contract pays more while hurting less): Standard Sweep, Quiet Roads
@@ -57,7 +72,7 @@ Verified against `git log`, newest first:
   party never hardens the town night for whoever stayed home. Weather
   presentation depth and recovery-cache completion continue in wave C.
 
-- **(in flight: `agent/m5-generator-repetition`)** Milestone 5 wave A: the
+- **#201** Milestone 5 wave A: the
   full thirty-module Bramblewake set with repetition control. Catalog grew
   12 → 30 (eighteen new definitions on proven visual recipes, tags balanced
   against RequiredTags); the generator now SELECTS twelve per run — role-
@@ -72,7 +87,7 @@ Verified against `git log`, newest first:
   `lune run scripts/sample_expedition_manifests` — the 10,000-seed gate run
   PASSED: 0 invalid, 0 missing spine, 10,000 distinct layouts.
 
-- **(in flight: `agent/m4-backup-tooling`)** Milestone 4 wave C, closing the
+- **#199** Milestone 4 wave C, closing the
   backup doc's open list that a session can close: **/restoreat <target>
   <copy#>** restores a named copy (1 = oldest kept; the roster's own comment
   asked for a separate command rather than loosening /restore, and got one —
@@ -83,7 +98,7 @@ Verified against `git log`, newest first:
   nil, never a clamp. Remaining open on backups, still owner-gated:
   DataStore behaviour evidence on a published staging place.
 
-- **(in flight: `agent/m4-decorations`)** Milestone 4's decoration system
+- **#198** Milestone 4's decoration system
   and caps, closing wave B. New pure `TownDecorations.luau` (save schema
   16, era-15 fixture): eight authored slots (plaza banners, road garlands,
   planters at gate/archive/inn/workshop) with material costs; cap 2+tier×2,
@@ -94,7 +109,7 @@ Verified against `git log`, newest first:
   empty markers; Field Book shows placed/cap. Identity only — no slot
   changes a stat. Build 0.53.0.
 
-- **(in flight: `agent/m4-visit-flow`)** Milestone 4's deliberate town-visit
+- **#197** Milestone 4's deliberate town-visit
   flow. The role model was always enforced (TownPermissions: visitors
   contribute upward, never damage); now players are TOLD which side they
   stand on: `TownNightService.hostInfo` exposes host + role, a visitor's
@@ -103,7 +118,7 @@ Verified against `git log`, newest first:
   opens with the guest line for visitors. Remaining in wave B: decoration
   system + caps.
 
-- **(in flight: `agent/m4-storage-caps`)** Milestone 4 storage caps, the
+- **#196** Milestone 4 storage caps, the
   first half of wave B. Town stores now hold what the tier has earned:
   `TownProgression.storageCapForTier` (80 + tier×60), enforced inside
   `ExpeditionInventory.settle` per material, with overflow COUNTED AND
@@ -113,7 +128,7 @@ Verified against `git log`, newest first:
   Remaining in wave B: decoration system + caps, deliberate town-visit
   flow. Then wave C (backup restore-to-copy + export), M5 waves.
 
-- **(in flight: `agent/m4-resident-life`)** Milestone 4's resident-life
+- **#195** Milestone 4's resident-life
   deliverable: jobs, injury, bonds, and the crisis framework. New pure
   `ResidentLife.luau` (save schema 15, era-14 migration fixture added):
   each resident holds a job at a real building (Tomas/inn, Pip/town board,
@@ -127,7 +142,7 @@ Verified against `git log`, newest first:
   the worst-hit building, Pip forewarns the night theme, Ena banks a spark
   reserve) — never player power. Build 0.52.0.
 
-- **(in flight: `agent/wave4-meta-balance`)** Audit wave 4, the last of the
+- **#194** Audit wave 4, the last of the
   audit's fix waves. **Solo night pressure:** hollow-crow spark theft now
   scales with defender count (×0.55 solo, ×0.8 duo, full at 3+) — a lone
   player watched the light fall 100 → its 18 floor in under a minute while
@@ -140,7 +155,7 @@ Verified against `git log`, newest first:
   visibility post-#188/#191 lighting, interaction-prompt card reliability)
   and the deferred taste items already listed under open threads.
 
-- **(in flight: `agent/wave3-guidance`)** Audit wave 3, guidance and
+- **#193** Audit wave 3, guidance and
   fiction. The lobby no longer leaks the story: the objective card, guide
   line, and objective markers hide until `departed` — "FREE MARA" was
   showing over the departure panel, pointing across the map at a town the
@@ -153,7 +168,7 @@ Verified against `git log`, newest first:
   PROFESSION / "ROLE · name" — "KIT" is reserved for the purchasable
   character kits so the free system and the paid one never share a word.
 
-- **(in flight: `agent/wave2-world-recovery`)** Audit wave 2. **Mesh-load
+- **#192** Audit wave 2. **Mesh-load
   recovery:** a boot-burst throttle error used to condemn an asset for the
   whole server session — observed live as all eleven Milestone-4 town-ring
   buildings rendering as dark fallback shells. MeshTemplateLoader now
@@ -166,7 +181,7 @@ Verified against `git log`, newest first:
   are housed iron fixtures instead of bare neon cubes, and the hearth fire
   is layered wedge flames over coals instead of a flat neon rectangle.
 
-- **(in flight: `agent/wave1-light-and-sound`)** Full-game audit performed in
+- **#191** Full-game audit performed in
   a live Studio session (owner directive: audit everything, fix in waves).
   Wave 1 ships the three feel fixes: **day sun raised** (ClockTime 6.65 →
   10.2 in both lighting sites — the sun sat at dawn height all day, which is
