@@ -241,7 +241,11 @@ stateChanged.OnClientEvent:Connect(function(snapshot: any)
     hud:update(snapshot)
     ambient:setPhase(tostring(snapshot.phase or "day"))
     worldMotion:setPhase(tostring(snapshot.phase or "day"))
-    weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
+    weather:setContext(
+        snapshot.expeditionActive == true,
+        tostring(snapshot.phase or "day"),
+        if type(snapshot.contract) == "table" then snapshot.contract.weather else nil
+    )
     music:setSnapshot(snapshot)
     sfx:setSnapshot(snapshot)
     objectiveMarkers:setTargets(
@@ -258,7 +262,11 @@ task.spawn(function()
         hud:update(snapshot)
         ambient:setPhase(tostring(snapshot.phase or "day"))
         worldMotion:setPhase(tostring(snapshot.phase or "day"))
-        weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
+        weather:setContext(
+            snapshot.expeditionActive == true,
+            tostring(snapshot.phase or "day"),
+            if type(snapshot.contract) == "table" then snapshot.contract.weather else nil
+        )
         music:setSnapshot(snapshot)
         -- Seeds the SFX signature only: joining mid-night is not a night falling.
         sfx:setSnapshot(snapshot)

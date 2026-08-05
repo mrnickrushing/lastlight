@@ -14470,6 +14470,45 @@ function WeatherProfile.streakCount(phase: string): number
     return STREAK_COUNTS[string.lower(phase)] or STREAK_COUNTS.day
 end
 
+--[[
+    The contract's face. A weather kind scales what the base phase would
+    show rather than replacing it: storm doubles the falling streaks and
+    darkens them, mist thins them to a slow drift, spores tint the fall
+    amber and let it hang. Pure data so the client controller stays a
+    renderer and this table stays testable.
+]]
+local CONTRACT_WEATHER = {
+    clear = {
+        countScale = 1,
+        speedScale = 1,
+        transparency = 0.68,
+        color = { 163, 193, 201 },
+    },
+    mist = {
+        countScale = 0.45,
+        speedScale = 0.35,
+        transparency = 0.82,
+        color = { 190, 205, 208 },
+    },
+    storm = {
+        countScale = 2,
+        speedScale = 1.55,
+        transparency = 0.5,
+        color = { 140, 168, 182 },
+    },
+    spores = {
+        countScale = 0.8,
+        speedScale = 0.25,
+        transparency = 0.62,
+        color = { 214, 182, 118 },
+    },
+}
+
+function WeatherProfile.contractWeather(kind: any): any
+    local key = if type(kind) == "string" then string.lower(kind) else "clear"
+    return CONTRACT_WEATHER[key] or CONTRACT_WEATHER.clear
+end
+
 function WeatherProfile.wrapHeight(height: number, floor: number, ceiling: number): number
     assert(ceiling > floor, "weather ceiling must be above floor")
     if height >= floor then
@@ -49626,17 +49665,106 @@ print("[Last Light] PASS FoundationIntegration")
 ]]></string>
         </Properties>
       </Item>
+      <Item class="Script" referent="112">
+        <Properties>
+          <string name="Name">ModuleGallery</string>
+          <token name="RunContext">0</token>
+          <string name="Source"><![CDATA[--!strict
+--[[
+    The module gallery: every module in the catalog, built once, in a row.
+
+    Milestone 5's authoring tool half. A human reviewing the thirty-module
+    set should not need thirty seeds to see it — this builds the whole
+    catalog side by side under one model so an art pass can walk the line.
+
+    Off by default because it doubles the built world: set the
+    `LastLightBuildModuleGallery` attribute on the DataModel to true before
+    pressing Play (or from the command bar, then re-run) and the gallery
+    assembles at a far offset with one label per module. The script still
+    runs a cheap automated check either way: every catalog module must have
+    a visual the builder recognizes, which guards against a new definition
+    referencing a visual kind nobody wrote.
+]]
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local ServerScriptService = game:GetService("ServerScriptService")
+
+local root = ReplicatedStorage:WaitForChild("LastLight")
+local Catalog = require(root.Content.Definitions.BramblewakeExpedition)
+local ExpeditionGenerator = require(root.ExpeditionGenerator)
+local RuntimeIds = require(root.RuntimeIds)
+
+local serverRoot = ServerScriptService:WaitForChild("LastLightServer")
+local BramblewakeBuilder = require(serverRoot.World.BramblewakeBuilder)
+
+-- A synthetic manifest holding the entire catalog in one straight walk.
+-- Never validated by the generator on purpose: validation enforces the
+-- twelve-module run shape, and a gallery is not a run.
+local function galleryManifest(): any
+    local modules = {}
+    for index, definition in Catalog.Modules do
+        table.insert(modules, {
+            index = index,
+            moduleId = definition.id,
+            cellX = index - 1,
+            cellZ = 0,
+            rotation = 0,
+        })
+    end
+    return {
+        version = Catalog.Version,
+        regionId = Catalog.RegionId,
+        seed = 0,
+        source = "module_gallery",
+        modules = modules,
+        hash = "gallery",
+    }
+end
+
+local knownCount = 0
+for _, definition in Catalog.Modules do
+    assert(type(definition.visual) == "string" and #definition.visual > 0, definition.id)
+    knownCount += 1
+end
+assert(knownCount == 30, "module gallery expects the full thirty-module catalog")
+print(string.format("[Last Light] Module gallery: %d catalog modules verified", knownCount))
+
+if game:GetAttribute("LastLightBuildModuleGallery") == true then
+    local holder = Instance.new("Folder")
+    holder.Name = "LastLightModuleGallery"
+    holder.Parent = workspace
+    local result = BramblewakeBuilder.build(
+        holder,
+        galleryManifest(),
+        ExpeditionGenerator,
+        Catalog,
+        RuntimeIds
+    )
+    local expedition = holder:FindFirstChild("BramblewakeExpedition")
+    assert(expedition ~= nil, "gallery build produced no expedition model")
+    expedition:PivotTo(expedition:GetPivot() + Vector3.new(0, 0, 4000))
+    print(
+        string.format(
+            "[Last Light] Module gallery built: %d modules, %d parts, at Z+4000",
+            #Catalog.Modules,
+            tonumber(result and result.partCount) or 0
+        )
+    )
+end
+]]></string>
+        </Properties>
+      </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="112">
+  <Item class="StarterPlayer" referent="113">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="113">
+    <Item class="StarterPlayerScripts" referent="114">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="114">
+      <Item class="LocalScript" referent="115">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -49882,7 +50010,11 @@ stateChanged.OnClientEvent:Connect(function(snapshot: any)
     hud:update(snapshot)
     ambient:setPhase(tostring(snapshot.phase or "day"))
     worldMotion:setPhase(tostring(snapshot.phase or "day"))
-    weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
+    weather:setContext(
+        snapshot.expeditionActive == true,
+        tostring(snapshot.phase or "day"),
+        if type(snapshot.contract) == "table" then snapshot.contract.weather else nil
+    )
     music:setSnapshot(snapshot)
     sfx:setSnapshot(snapshot)
     objectiveMarkers:setTargets(
@@ -49899,7 +50031,11 @@ task.spawn(function()
         hud:update(snapshot)
         ambient:setPhase(tostring(snapshot.phase or "day"))
         worldMotion:setPhase(tostring(snapshot.phase or "day"))
-        weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
+        weather:setContext(
+            snapshot.expeditionActive == true,
+            tostring(snapshot.phase or "day"),
+            if type(snapshot.contract) == "table" then snapshot.contract.weather else nil
+        )
         music:setSnapshot(snapshot)
         -- Seeds the SFX signature only: joining mid-night is not a night falling.
         sfx:setSnapshot(snapshot)
@@ -49913,11 +50049,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="115">
+        <Item class="Folder" referent="116">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="116">
+          <Item class="ModuleScript" referent="117">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -50048,7 +50184,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="117">
+          <Item class="ModuleScript" referent="118">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -52712,7 +52848,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="118">
+          <Item class="ModuleScript" referent="119">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -53011,7 +53147,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="119">
+          <Item class="ModuleScript" referent="120">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -53119,7 +53255,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="120">
+          <Item class="ModuleScript" referent="121">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -53238,7 +53374,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="121">
+          <Item class="ModuleScript" referent="122">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -53512,7 +53648,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="122">
+          <Item class="ModuleScript" referent="123">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -53612,7 +53748,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="123">
+          <Item class="ModuleScript" referent="124">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -53724,7 +53860,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="124">
+          <Item class="ModuleScript" referent="125">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -53884,7 +54020,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="125">
+          <Item class="ModuleScript" referent="126">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -54093,7 +54229,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="126">
+          <Item class="ModuleScript" referent="127">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -54118,6 +54254,7 @@ export type WeatherController = typeof(setmetatable(
         _streaks: { Streak },
         _active: boolean,
         _phase: string,
+        _weather: any,
         _elapsed: number,
         _connection: RBXScriptConnection?,
     },
@@ -54167,6 +54304,7 @@ function WeatherController.new(profile: any): WeatherController
         _streaks = streaks,
         _active = false,
         _phase = "day",
+        _weather = profile.contractWeather(nil),
         _elapsed = 0,
         _connection = nil,
     }, WeatherController)
@@ -54187,10 +54325,12 @@ end
 function WeatherController.setContext(
     self: WeatherController,
     expeditionActive: boolean,
-    phase: string
+    phase: string,
+    weatherKind: string?
 )
     self._active = expeditionActive
     self._phase = string.lower(phase)
+    self._weather = self._profile.contractWeather(weatherKind)
     if not expeditionActive then
         for _, streak in self._streaks do
             streak.part.Transparency = 1
@@ -54208,16 +54348,25 @@ function WeatherController._step(self: WeatherController, deltaTime: number)
         return
     end
     local cameraPosition = camera.CFrame.Position
-    local visibleCount = self._profile.streakCount(self._phase)
+    local weather = self._weather
+    local visibleCount = math.min(
+        MAX_STREAKS,
+        math.floor(self._profile.streakCount(self._phase) * weather.countScale)
+    )
+    local weatherColor = Color3.fromRGB(weather.color[1], weather.color[2], weather.color[3])
     for index, streak in self._streaks do
-        local nextY =
-            self._profile.wrapHeight(streak.offset.Y - streak.speed * deltaTime, FLOOR, CEILING)
+        local nextY = self._profile.wrapHeight(
+            streak.offset.Y - streak.speed * weather.speedScale * deltaTime,
+            FLOOR,
+            CEILING
+        )
         streak.offset = Vector3.new(streak.offset.X, nextY, streak.offset.Z)
         local wind = math.sin(self._elapsed * 0.43 + index) * 0.55
         local fallDrift = (CEILING - nextY) * 0.22 * streak.drift
         local position = cameraPosition + streak.offset + Vector3.new(fallDrift + wind, 0, 0)
         streak.part.CFrame = CFrame.new(position) * CFrame.Angles(0, 0, math.rad(-7))
-        streak.part.Transparency = if index <= visibleCount then 0.68 else 1
+        streak.part.Color = weatherColor
+        streak.part.Transparency = if index <= visibleCount then weather.transparency else 1
     end
 end
 
@@ -54225,7 +54374,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="127">
+          <Item class="ModuleScript" referent="128">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -54525,13 +54674,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="128">
+  <Item class="TextChatService" referent="129">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="129">
+  <Item class="Workspace" referent="130">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>
