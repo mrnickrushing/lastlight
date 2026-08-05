@@ -28,6 +28,20 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
+- **(in flight: `agent/m5-contracts`)** Milestone 5 wave B: expedition
+  contracts and risk modifiers. New pure `ExpeditionContracts.luau` (4
+  contracts, spec-pinned invariant: risk and reward move TOGETHER — no
+  contract pays more while hurting less): Standard Sweep, Quiet Roads
+  (×0.75 reward, ×0.8 enemy damage), Storm Salvage (×1.25/×1.2), Deep
+  Growth (×1.5/×1.35), each carrying a weather identity. The lobby panel
+  grew a contract row beside party size; the chosen id rides the depart
+  payload and the server resolves it (junk → standard, never extra risk or
+  reward). Reward multiplication lands at the single grant site with
+  transaction ids untouched (idempotency preserved); the enemy-damage half
+  applies only to players with LastLightInExpedition, so a Deep Growth
+  party never hardens the town night for whoever stayed home. Weather
+  presentation depth and recovery-cache completion continue in wave C.
+
 - **(in flight: `agent/m5-generator-repetition`)** Milestone 5 wave A: the
   full thirty-module Bramblewake set with repetition control. Catalog grew
   12 → 30 (eighteen new definitions on proven visual recipes, tags balanced

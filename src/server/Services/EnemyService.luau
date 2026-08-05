@@ -62,6 +62,7 @@ export type EnemyService = typeof(setmetatable(
         _strikeHandler: ((Player) -> ())?,
         _lanternHealth: number,
         _lanternFloor: number,
+        _expeditionDamageMultiplier: number,
         _breachMultiplier: number,
         _nightModifiers: any,
         _engineerBraceState: any,
@@ -115,6 +116,7 @@ function EnemyService.new(
         _strikeHandler = nil,
         _lanternHealth = 100,
         _lanternFloor = 18,
+        _expeditionDamageMultiplier = 1,
         _breachMultiplier = 1,
         _nightModifiers = {
             healthMultiplier = 1,
@@ -420,6 +422,13 @@ end
     next night. Reset when that night ends -- a reserve is banked each dawn
     by a healthy seedkeeper, not owned forever.
 ]]
+-- The active contract's risk half. Applies only to players standing in the
+-- expedition, so a Deep Growth party never hardens the town night for
+-- whoever stayed home.
+function EnemyService.setExpeditionDamageMultiplier(self: EnemyService, multiplier: number)
+    self._expeditionDamageMultiplier = math.clamp(tonumber(multiplier) or 1, 0.5, 1.5)
+end
+
 function EnemyService.grantLanternReserve(self: EnemyService, amount: number)
     self._lanternFloor = 18 + math.clamp(amount, 0, 12)
 end
@@ -784,7 +793,15 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
 
     local damage = math.max(
         1,
-        math.ceil(enemy.definition.playerDamage * self._nightModifiers.playerDamageMultiplier)
+        math.ceil(
+            enemy.definition.playerDamage
+                * self._nightModifiers.playerDamageMultiplier
+                * (
+                    if target:GetAttribute("LastLightInExpedition") == true
+                        then self._expeditionDamageMultiplier
+                        else 1
+                )
+        )
     )
     local guarded = false
     if self._professionService ~= nil then

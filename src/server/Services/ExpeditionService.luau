@@ -47,11 +47,15 @@ function ExpeditionService.new(
     extractionPayoff: any,
     profileService: any,
     analyticsService: any,
-    seed: number
+    seed: number,
+    contracts: any
 ): ExpeditionService
     return setmetatable({
         Name = ExpeditionService.Name,
         _logger = logger,
+        _contracts = contracts,
+        _enemyService = nil,
+        _contract = contracts.default(),
         _worldService = worldService,
         _generator = generator,
         _catalog = catalog,
@@ -77,6 +81,7 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
     self._runId = if jobId ~= ""
         then jobId
         else string.format("studio_%d_%d", os.time(), math.floor(os.clock() * 1000))
+    self._contract = self._contracts.default()
     local requestedSeed = game:GetAttribute("LastLightExpeditionSeed")
     -- Seed history, the boot half: with a thirty-module pool the same base
     -- seed forever would make every server walk one layout. The UTC day
@@ -284,11 +289,16 @@ function ExpeditionService._grant(
     self._logger:info("expedition_" .. sourceKind .. "_reward_granted", grantedFields)
     local player = Players:GetPlayerByUserId(userId)
     if player ~= nil then
+        -- The active contract's trade lands here, at the single point every
+        -- expedition reward passes through. The transaction id is untouched,
+        -- so idempotency and replay behave exactly as before.
+        local contracted = table.clone(reward)
+        contracted.amount = self._contracts.applyReward(self._contract, reward.amount)
         local profileResult = self._profileService:grantUnbankedExpeditionReward(
             player,
             transactionId,
             manifestHash,
-            reward
+            contracted
         )
         local persistedFields: { [string]: any } = {
             durable = profileResult.durable == true,
@@ -485,6 +495,36 @@ function ExpeditionService._combinedPending(self: ExpeditionService, player: Pla
         materials = materials,
         recovery = profileInventory.recovery,
         rewards = rewards,
+    }
+end
+
+--[[
+    The departing party names its contract; the server resolves it safely
+    (unknown ids become the standard sweep) and everything downstream reads
+    the resolved contract, never the requested id.
+]]
+function ExpeditionService.bindEnemyService(self: ExpeditionService, enemyService: any)
+    -- Late-bound: EnemyService is constructed after this service in the
+    -- bootstrap, and the contract multiplier is the only thing crossing.
+    self._enemyService = enemyService
+end
+
+function ExpeditionService.setContract(self: ExpeditionService, contractId: any)
+    self._contract = self._contracts.resolve(contractId)
+    if self._enemyService ~= nil then
+        self._enemyService:setExpeditionDamageMultiplier(self._contract.enemyDamageMultiplier)
+    end
+    self._logger:info("expedition_contract_set", { contract = self._contract.id })
+end
+
+function ExpeditionService.contractSnapshot(self: ExpeditionService): any
+    return {
+        id = self._contract.id,
+        title = self._contract.title,
+        detail = self._contract.detail,
+        rewardMultiplier = self._contract.rewardMultiplier,
+        enemyDamageMultiplier = self._contract.enemyDamageMultiplier,
+        weather = self._contract.weather,
     }
 end
 
