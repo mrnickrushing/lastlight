@@ -44,6 +44,7 @@ TestRunner.run({
     require("./specs/ProfilePersistence.spec"),
     require("./specs/ProfileBackup.spec"),
     require("./specs/ServiceRegistry.spec"),
+    require("./specs/SfxCatalog.spec"),
     require("./specs/SurvivalState.spec"),
     require("./specs/StatusEffectState.spec"),
     require("./specs/TutorialFlow.spec"),

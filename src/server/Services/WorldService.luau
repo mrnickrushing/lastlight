@@ -2061,7 +2061,12 @@ function WorldService._registerInteraction(
 end
 
 function WorldService._configureLighting(_self: WorldService)
-    Lighting.ClockTime = 6.65
+    -- 10.2, not 6.65: with GeographicLatitude 51 a 6.65 clock keeps the sun
+    -- at dawn height for the entire day phase, so "DAY · 11:51" rendered as
+    -- murky dusk on the owner's tablet. Mid-morning sun lights the ground
+    -- and still throws real shadows. Duplicated in _applyTownLighting's day
+    -- branch; change both together.
+    Lighting.ClockTime = 10.2
     Lighting.Brightness = 2.05
     Lighting.Ambient = DAY_AMBIENT
     -- Raised from (72, 91, 84) alongside DAY_AMBIENT and ExposureCompensation
@@ -11233,7 +11238,9 @@ function WorldService._applyTownLighting(_self: WorldService, night: boolean)
             depth.FocusDistance = 72
         end
     else
-        Lighting.ClockTime = 6.65
+        -- Must stay identical to _configureLighting's day ClockTime -- see
+        -- the comment there.
+        Lighting.ClockTime = 10.2
         Lighting.Brightness = 2.05
         Lighting.Ambient = DAY_AMBIENT
         -- Must stay identical to _configureLighting's day values -- see the

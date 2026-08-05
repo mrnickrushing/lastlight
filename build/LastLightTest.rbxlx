@@ -10649,6 +10649,173 @@ return table.freeze(SaveSchema)
       </Item>
       <Item class="ModuleScript" referent="55">
         <Properties>
+          <string name="Name">SfxCatalog</string>
+          <string name="Source"><![CDATA[--!strict
+--[[
+    Every sound effect in the game, and the rules for when state changes make
+    one play.
+
+    The game shipped with music and nothing else: a silent axe, silent
+    gathering, a silent night falling. Feedback sound is half of what makes
+    tapping feel like hitting, so this catalog exists — but the decisions
+    about WHEN a cue fires live here as pure data-in data-out, so a spec can
+    hold them still, and the controller that owns actual Sound instances
+    stays too thin to break.
+
+    Every cue uses an engine-bundled rbxasset sound. Bundled files ship with
+    the client: no moderation queue, no asset permissions, no CDN fetch —
+    exactly the failure modes that already bit the authored meshes. The trade
+    is a small palette, so distinct cues reuse a file at different playback
+    speeds.
+]]
+
+local SfxCatalog = {}
+
+export type Cue = {
+    id: string,
+    soundId: string,
+    volume: number,
+    minSpeed: number,
+    maxSpeed: number,
+    cooldown: number,
+}
+
+local function cue(
+    id: string,
+    soundId: string,
+    volume: number,
+    minSpeed: number,
+    maxSpeed: number,
+    cooldown: number
+): Cue
+    return table.freeze({
+        id = id,
+        soundId = soundId,
+        volume = volume,
+        minSpeed = minSpeed,
+        maxSpeed = maxSpeed,
+        cooldown = cooldown,
+    })
+end
+
+local SLASH = "rbxasset://sounds/swordslash.wav"
+local PING = "rbxasset://sounds/electronicpingshort.wav"
+local BUTTON = "rbxasset://sounds/button.wav"
+local SNAP = "rbxasset://sounds/snap.mp3"
+local BASS = "rbxasset://sounds/bass.wav"
+
+local CUES: { [string]: Cue } = {
+    -- Input feedback: played directly by input handlers, not by the resolver,
+    -- because a swing must sound on the tap, not a snapshot later.
+    swing = cue("swing", SLASH, 0.35, 0.92, 1.08, 0.12),
+    tap = cue("tap", BUTTON, 0.4, 0.95, 1.1, 0.1),
+
+    -- Snapshot-driven cues.
+    gather = cue("gather", PING, 0.32, 1.1, 1.3, 0.15),
+    bank = cue("bank", PING, 0.4, 0.72, 0.82, 0.3),
+    objective = cue("objective", SNAP, 0.45, 0.98, 1.05, 0.8),
+    night = cue("night", BASS, 0.6, 0.7, 0.78, 2),
+    encounter = cue("encounter", BASS, 0.65, 0.55, 0.62, 2),
+    downed = cue("downed", BASS, 0.55, 0.42, 0.48, 2),
+    revived = cue("revived", PING, 0.4, 1.35, 1.5, 1),
+}
+
+SfxCatalog.Cues = table.freeze(CUES)
+
+function SfxCatalog.get(id: string): Cue?
+    return CUES[id]
+end
+
+--[[
+    What the previous snapshot's relevant corners looked like, extracted so
+    the comparison never holds a reference to a whole snapshot.
+]]
+export type Signature = {
+    resources: number,
+    banked: number,
+    objective: string,
+    nightActive: boolean,
+    blackoutStatus: string,
+    encounterActive: boolean,
+    downed: boolean,
+}
+
+local function bankedTotal(bankedMaterials: any): number
+    if type(bankedMaterials) == "number" then
+        return bankedMaterials
+    end
+    if type(bankedMaterials) ~= "table" then
+        return 0
+    end
+    local total = 0
+    for _, amount in bankedMaterials do
+        if type(amount) == "number" then
+            total += amount
+        end
+    end
+    return total
+end
+
+function SfxCatalog.signature(snapshot: any): Signature
+    local elite = if type(snapshot.elite) == "table" then snapshot.elite else nil
+    local boss = if type(snapshot.boss) == "table" then snapshot.boss else nil
+    local blackout = if type(snapshot.blackout) == "table" then snapshot.blackout else nil
+    local survival = if type(snapshot.survival) == "table" then snapshot.survival else nil
+    return {
+        resources = tonumber(snapshot.resources) or 0,
+        banked = bankedTotal(snapshot.bankedMaterials),
+        objective = tostring(snapshot.objective or ""),
+        nightActive = snapshot.nightActive == true,
+        blackoutStatus = if blackout ~= nil then tostring(blackout.status or "") else "",
+        encounterActive = (elite ~= nil and elite.active == true)
+            or (boss ~= nil and boss.active == true),
+        downed = survival ~= nil and survival.downed == true,
+    }
+end
+
+--[[
+    The cues a state change earns. Pure: previous signature + new snapshot in,
+    cue ids out. The first snapshot of a session passes previous = nil and
+    earns nothing — a reconnect mid-night is not a night falling.
+]]
+function SfxCatalog.resolveTransitions(previous: Signature?, snapshot: any): ({ string }, Signature)
+    local nextSignature = SfxCatalog.signature(snapshot)
+    if previous == nil then
+        return {}, nextSignature
+    end
+    local cues: { string } = {}
+    if nextSignature.resources > previous.resources then
+        table.insert(cues, "gather")
+    end
+    if nextSignature.banked > previous.banked then
+        table.insert(cues, "bank")
+    end
+    if nextSignature.objective ~= previous.objective and nextSignature.objective ~= "" then
+        table.insert(cues, "objective")
+    end
+    if nextSignature.nightActive and not previous.nightActive then
+        table.insert(cues, "night")
+    end
+    if nextSignature.blackoutStatus == "relay" and previous.blackoutStatus ~= "relay" then
+        table.insert(cues, "encounter")
+    end
+    if nextSignature.encounterActive and not previous.encounterActive then
+        table.insert(cues, "encounter")
+    end
+    if nextSignature.downed and not previous.downed then
+        table.insert(cues, "downed")
+    elseif previous.downed and not nextSignature.downed then
+        table.insert(cues, "revived")
+    end
+    return cues, nextSignature
+end
+
+return table.freeze(SfxCatalog)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="56">
+        <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -10766,7 +10933,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -11023,7 +11190,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -11433,7 +11600,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -11614,7 +11781,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -11678,7 +11845,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -11770,7 +11937,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -11982,7 +12149,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -12135,7 +12302,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -12288,7 +12455,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -12511,7 +12678,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -12673,7 +12840,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -12709,7 +12876,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -13091,7 +13258,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="68">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -13124,11 +13291,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="69">
+  <Item class="ServerScriptService" referent="70">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="70">
+    <Item class="Script" referent="71">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -13527,7 +13694,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="71">
+      <Item class="ModuleScript" referent="72">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -13625,11 +13792,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="72">
+      <Item class="Folder" referent="73">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="73">
+        <Item class="ModuleScript" referent="74">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14158,7 +14325,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="74">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15029,7 +15196,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="75">
+        <Item class="ModuleScript" referent="76">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15530,7 +15697,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="76">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16875,7 +17042,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="77">
+        <Item class="ModuleScript" referent="78">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17519,7 +17686,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="78">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17623,7 +17790,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="80">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17908,7 +18075,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="80">
+        <Item class="ModuleScript" referent="81">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18301,7 +18468,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="81">
+        <Item class="ModuleScript" referent="82">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -18395,7 +18562,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18613,7 +18780,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19457,7 +19624,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19513,6 +19680,7 @@ export type PerformanceService = typeof(setmetatable(
         _windowStartedAt: number,
         _heartbeat: RBXScriptConnection?,
         _startedAt: number,
+        _lastBreachLogAt: { [string]: number },
     },
     PerformanceService
 ))
@@ -19536,6 +19704,7 @@ function PerformanceService.new(
         _windowStartedAt = 0,
         _heartbeat = nil,
         _startedAt = 0,
+        _lastBreachLogAt = {},
     }, PerformanceService)
 end
 
@@ -19554,12 +19723,21 @@ function PerformanceService._record(self: PerformanceService, metricId: string, 
     end
 
     -- A breach is worth saying out loud while the run is still happening, so
-    -- whoever is holding the phone knows which minute to look at later.
+    -- whoever is holding the phone knows which minute to look at later. Once
+    -- per metric per two minutes: a machine that sits at 15 fps otherwise
+    -- prints the same warning every second and buries every real error in
+    -- the log (observed: hundreds per session drowning a rejection that was
+    -- actually being hunted).
     if self._performanceBudget.classify(metricId, value) == "breach" then
-        self._logger:warn("performance_budget_breach", {
-            metric = metricId,
-            value = value,
-        })
+        local now = os.clock()
+        local lastAt = self._lastBreachLogAt[metricId]
+        if lastAt == nil or now - lastAt >= 120 then
+            self._lastBreachLogAt[metricId] = now
+            self._logger:warn("performance_budget_breach", {
+                metric = metricId,
+                value = value,
+            })
+        end
     end
 end
 
@@ -19701,7 +19879,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="85">
+        <Item class="ModuleScript" referent="86">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19880,7 +20058,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="86">
+        <Item class="ModuleScript" referent="87">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20451,7 +20629,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="87">
+        <Item class="ModuleScript" referent="88">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21550,7 +21728,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="88">
+        <Item class="ModuleScript" referent="89">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22075,7 +22253,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="89">
+        <Item class="ModuleScript" referent="90">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23574,7 +23752,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="90">
+        <Item class="ModuleScript" referent="91">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24115,7 +24293,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="91">
+        <Item class="ModuleScript" referent="92">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -25634,7 +25812,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="92">
+        <Item class="ModuleScript" referent="93">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -26484,7 +26662,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="93">
+        <Item class="ModuleScript" referent="94">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -28550,7 +28728,12 @@ function WorldService._registerInteraction(
 end
 
 function WorldService._configureLighting(_self: WorldService)
-    Lighting.ClockTime = 6.65
+    -- 10.2, not 6.65: with GeographicLatitude 51 a 6.65 clock keeps the sun
+    -- at dawn height for the entire day phase, so "DAY · 11:51" rendered as
+    -- murky dusk on the owner's tablet. Mid-morning sun lights the ground
+    -- and still throws real shadows. Duplicated in _applyTownLighting's day
+    -- branch; change both together.
+    Lighting.ClockTime = 10.2
     Lighting.Brightness = 2.05
     Lighting.Ambient = DAY_AMBIENT
     -- Raised from (72, 91, 84) alongside DAY_AMBIENT and ExposureCompensation
@@ -37722,7 +37905,9 @@ function WorldService._applyTownLighting(_self: WorldService, night: boolean)
             depth.FocusDistance = 72
         end
     else
-        Lighting.ClockTime = 6.65
+        -- Must stay identical to _configureLighting's day ClockTime -- see
+        -- the comment there.
+        Lighting.ClockTime = 10.2
         Lighting.Brightness = 2.05
         Lighting.Ambient = DAY_AMBIENT
         -- Must stay identical to _configureLighting's day values -- see the
@@ -37939,11 +38124,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="94">
+      <Item class="Folder" referent="95">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="95">
+        <Item class="ModuleScript" referent="96">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -41723,7 +41908,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="96">
+        <Item class="ModuleScript" referent="97">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -42220,7 +42405,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="97">
+        <Item class="ModuleScript" referent="98">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -42915,7 +43100,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="98">
+        <Item class="ModuleScript" referent="99">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -43774,7 +43959,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="99">
+        <Item class="ModuleScript" referent="100">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -43860,7 +44045,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="100">
+        <Item class="ModuleScript" referent="101">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -44204,7 +44389,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="101">
+        <Item class="ModuleScript" referent="102">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -44384,7 +44569,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="102">
+        <Item class="ModuleScript" referent="103">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -44980,7 +45165,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="103">
+        <Item class="ModuleScript" referent="104">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -45217,7 +45402,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="104">
+        <Item class="ModuleScript" referent="105">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -45306,7 +45491,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="105">
+        <Item class="ModuleScript" referent="106">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -45642,11 +45827,11 @@ return table.freeze(WorldSignBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="106">
+    <Item class="Folder" referent="107">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="107">
+      <Item class="Script" referent="108">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -47367,15 +47552,15 @@ print("[Last Light] PASS FoundationIntegration")
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="108">
+  <Item class="StarterPlayer" referent="109">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="109">
+    <Item class="StarterPlayerScripts" referent="110">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="110">
+      <Item class="LocalScript" referent="111">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -47389,6 +47574,7 @@ assert(root ~= nil, "Last Light shared root did not replicate before client boot
 local Config = require(root.Config)
 local AmbientMotion = require(root.AmbientMotion)
 local MusicCatalog = require(root.MusicCatalog)
+local SfxCatalog = require(root.SfxCatalog)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local RuntimeIds = require(root.RuntimeIds)
 local TownNightSchedule = require(root.TownNightSchedule)
@@ -47401,6 +47587,7 @@ local VignetteController = require(script.Controllers.VignetteController)
 local InputController = require(script.Controllers.InputController)
 local InteractionController = require(script.Controllers.InteractionController)
 local MusicController = require(script.Controllers.MusicController)
+local SfxController = require(script.Controllers.SfxController)
 local PerformanceController = require(script.Controllers.PerformanceController)
 local WorldMotionController = require(script.Controllers.WorldMotionController)
 local WeatherController = require(script.Controllers.WeatherController)
@@ -47441,6 +47628,7 @@ local worldMotion = WorldMotionController.new(
 local weather = WeatherController.new(WeatherProfile)
 local interaction = InteractionController.new(RuntimeIds.InteractionTag, hud)
 local music = MusicController.new(MusicCatalog)
+local sfx = SfxController.new(SfxCatalog)
 PerformanceController.new(performanceReport :: RemoteEvent, Config.PerformanceReportIntervalSeconds)
 
 local function send(kind: string, fields: { [string]: any }?)
@@ -47453,9 +47641,11 @@ end
 InputController.new(hud, function()
     local interactionId = interaction:currentInteractionId()
     if interactionId ~= nil then
+        sfx:play("tap")
         send(RuntimeIds.Actions.Interact, { interactionId = interactionId })
     end
 end, function()
+    sfx:play("swing")
     send(RuntimeIds.Actions.UseTool)
 end, function(enabled: boolean)
     send(RuntimeIds.Actions.Sprint, { enabled = enabled })
@@ -47479,8 +47669,12 @@ end)
     tap in the camera-drag region of a phone screen into a click.
 ]]
 TapController.new(function()
+    -- The swing sounds on the tap itself: feedback that waits for the server
+    -- round-trip reads as lag, not as hitting.
+    sfx:play("swing")
     send(RuntimeIds.Actions.UseTool)
 end, function(interactionId: string)
+    sfx:play("tap")
     send(RuntimeIds.Actions.Interact, { interactionId = interactionId })
 end)
 
@@ -47613,6 +47807,7 @@ stateChanged.OnClientEvent:Connect(function(snapshot: any)
     worldMotion:setPhase(tostring(snapshot.phase or "day"))
     weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
     music:setSnapshot(snapshot)
+    sfx:setSnapshot(snapshot)
     objectiveMarkers:setTargets(snapshot.objectiveTargets)
     updateVignettes(snapshot)
 end)
@@ -47627,6 +47822,8 @@ task.spawn(function()
         worldMotion:setPhase(tostring(snapshot.phase or "day"))
         weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
         music:setSnapshot(snapshot)
+        -- Seeds the SFX signature only: joining mid-night is not a night falling.
+        sfx:setSnapshot(snapshot)
         objectiveMarkers:setTargets(snapshot.objectiveTargets)
         updateVignettes(snapshot, true)
     end
@@ -47635,11 +47832,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="111">
+        <Item class="Folder" referent="112">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="112">
+          <Item class="ModuleScript" referent="113">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -47770,7 +47967,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="113">
+          <Item class="ModuleScript" referent="114">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -50267,7 +50464,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="114">
+          <Item class="ModuleScript" referent="115">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -50566,7 +50763,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="115">
+          <Item class="ModuleScript" referent="116">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -50674,7 +50871,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="116">
+          <Item class="ModuleScript" referent="117">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -50793,7 +50990,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="117">
+          <Item class="ModuleScript" referent="118">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51067,7 +51264,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="118">
+          <Item class="ModuleScript" referent="119">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51167,7 +51364,119 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="119">
+          <Item class="ModuleScript" referent="120">
+            <Properties>
+              <string name="Name">SfxController</string>
+              <string name="Source"><![CDATA[--!strict
+--[[
+    Owns the Sound instances and plays what SfxCatalog decides.
+
+    Thin on purpose: all judgement about when a cue fires lives in the
+    catalog's pure resolver where the specs are. This controller only pools
+    sounds, rolls a little pitch variation so repetition doesn't grate, and
+    enforces each cue's cooldown so a burst of snapshots cannot machine-gun
+    a sound.
+]]
+
+local SoundService = game:GetService("SoundService")
+
+local SfxController = {}
+SfxController.__index = SfxController
+
+export type SfxController = typeof(setmetatable(
+    {} :: {
+        _catalog: any,
+        _group: SoundGroup,
+        _sounds: { [string]: { Sound } },
+        _nextSlot: { [string]: number },
+        _lastPlayedAt: { [string]: number },
+        _signature: any,
+        _random: Random,
+    },
+    SfxController
+))
+
+-- Two slots per cue: a gather can land while the previous gather's tail is
+-- still ringing without cutting it off.
+local SLOTS_PER_CUE = 2
+
+-- The catalog arrives injected, the same way MusicController receives its
+-- catalog: shared modules live under ReplicatedStorage.LastLight and the
+-- bootstrap owns requiring them.
+function SfxController.new(catalog: any): SfxController
+    local group = Instance.new("SoundGroup")
+    group.Name = "LastLightSfx"
+    group.Volume = 0.85
+    group.Parent = SoundService
+
+    local sounds: { [string]: { Sound } } = {}
+    local nextSlot: { [string]: number } = {}
+    for id, definition in catalog.Cues do
+        local slots = {}
+        for slot = 1, SLOTS_PER_CUE do
+            local sound = Instance.new("Sound")
+            sound.Name = "Sfx_" .. id .. "_" .. slot
+            sound.SoundId = definition.soundId
+            sound.Volume = definition.volume
+            sound.SoundGroup = group
+            sound.Parent = group
+            table.insert(slots, sound)
+        end
+        sounds[id] = slots
+        nextSlot[id] = 1
+    end
+
+    return setmetatable({
+        _catalog = catalog,
+        _group = group,
+        _sounds = sounds,
+        _nextSlot = nextSlot,
+        _lastPlayedAt = {},
+        _signature = nil,
+        _random = Random.new(),
+    }, SfxController)
+end
+
+function SfxController.play(self: SfxController, cueId: string)
+    local definition = self._catalog.get(cueId)
+    local slots = self._sounds[cueId]
+    if definition == nil or slots == nil then
+        return
+    end
+    local now = os.clock()
+    local lastAt = self._lastPlayedAt[cueId]
+    if lastAt ~= nil and now - lastAt < definition.cooldown then
+        return
+    end
+    self._lastPlayedAt[cueId] = now
+    local slot = self._nextSlot[cueId]
+    self._nextSlot[cueId] = if slot >= #slots then 1 else slot + 1
+    local sound = slots[slot]
+    sound:Stop()
+    sound.PlaybackSpeed = self._random:NextNumber(definition.minSpeed, definition.maxSpeed)
+    sound:Play()
+end
+
+--[[
+    Feed every server snapshot through. The first one only seeds the
+    signature — joining mid-night must not play the night sting.
+]]
+function SfxController.setSnapshot(self: SfxController, snapshot: any)
+    if type(snapshot) ~= "table" then
+        return
+    end
+    local cues, signature = self._catalog.resolveTransitions(self._signature, snapshot)
+    self._signature = signature
+    for _, cueId in cues do
+        self:play(cueId)
+    end
+end
+
+return table.freeze(SfxController)
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="121">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51327,7 +51636,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="120">
+          <Item class="ModuleScript" referent="122">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51536,7 +51845,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="121">
+          <Item class="ModuleScript" referent="123">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51668,7 +51977,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="122">
+          <Item class="ModuleScript" referent="124">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51968,13 +52277,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="123">
+  <Item class="TextChatService" referent="125">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="124">
+  <Item class="Workspace" referent="126">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

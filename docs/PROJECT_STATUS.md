@@ -28,6 +28,22 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
+- **(in flight: `agent/wave1-light-and-sound`)** Full-game audit performed in
+  a live Studio session (owner directive: audit everything, fix in waves).
+  Wave 1 ships the three feel fixes: **day sun raised** (ClockTime 6.65 →
+  10.2 in both lighting sites — the sun sat at dawn height all day, which is
+  why the owner's tablet read daytime as dusk); **the game has sound now** —
+  new shared SfxCatalog (pure transition resolver, 7 spec cases) + client
+  SfxController pooling engine-bundled rbxasset sounds: swing/tap on the
+  input itself, gather/bank/objective/night/encounter/downed/revived on
+  snapshot edges, first snapshot seeds silently; **performance-breach log
+  spam throttled** to once per metric per two minutes (it was printing
+  hundreds of identical WARNs per session, burying real errors). Remaining
+  audit waves (lobby visuals, mesh-load recovery for the 11 town-ring
+  buildings that silently fall back when boot asset loads throttle, lobby
+  objective leak, Mara pose, Field Book layout, solo night drain) are logged
+  in the session scratchpad AUDIT.md and land as waves 2–4.
+
 - **(in flight, this branch: `agent/level2-legibility-and-town-signs`, PR
   #189)** The level-2 legibility batch plus the town-sign fixes from the
   owner's third round of tablet screenshots. Level 2: guide lines carry a
