@@ -7,9 +7,15 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-05, at `main` = `65a916c` (PR #214), build `0.53.0`,
-save schema 17, 20 services. Published to Roblox as place version 70,
-matching this revision exactly. #214 added the enemy director: town-night
+Last updated: 2026-08-05, at `main` = `9317535` (PR #216), build `0.53.0`,
+save schema 17, 20 services. Published to Roblox as place version 71,
+matching this revision exactly. #216 added loadouts (schema 16 → 17,
+era-16 fixture): three saved kits binding profession, weapon, and tool,
+applied through the same gates manual taps hit. **The owner's standing
+directive: finish Milestones 6 and 7 entirely, wave by wave, each merged
+and published.** M6 remaining: repair, equipment traits, status/reaction
+system, companions, defense plots, trading review, and the recorded live
+checks. M7 (regions wave A) has not started. #214 added the enemy director: town-night
 wave counts scale with the defenders standing in town (solo nights pinned
 bit-identical by spec; +1 wave per extra eligible defender to a ceiling of
 twelve, census taken once at nightfall and logged). **#212 matters beyond its size**: driving
