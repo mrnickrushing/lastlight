@@ -122,6 +122,12 @@ hud:setLobbyDepartHandler(function(partySize: number, contractId: string)
     send(RuntimeIds.Actions.LobbyDepart, { partySize = partySize, contractId = contractId })
 end)
 
+hud:setLoadoutHandlers(function(slot: number)
+    send(RuntimeIds.Actions.SaveLoadout, { slot = slot })
+end, function(slot: number)
+    send(RuntimeIds.Actions.ApplyLoadout, { slot = slot })
+end)
+
 hud:setProfessionHandler(function(professionId: string)
     send(RuntimeIds.Actions.SelectProfession, { professionId = professionId })
 end)

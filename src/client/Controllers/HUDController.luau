@@ -1113,6 +1113,31 @@ function HUDController.new(
         button.TextXAlignment = Enum.TextXAlignment.Right
         equipmentButtons[item.id] = button
     end
+    -- Kit rows: three saved loadouts, save on the left, apply on the right,
+    -- stacked above the equipment buttons' rows.
+    local loadoutButtons: { [string]: TextButton } = {}
+    for slot = 1, 3 do
+        for _, kind in { "save", "apply" } do
+            local button = Instance.new("TextButton")
+            button.Name = string.format("Loadout_%s_%d", kind, slot)
+            button.Position =
+                UDim2.fromOffset(20 + (slot - 1) * 190 + (if kind == "apply" then 92 else 0), 104)
+            button.Size = UDim2.fromOffset(if kind == "apply" then 84 else 88, 30)
+            button.BackgroundColor3 = COLORS.panelSoft
+            button.Font = Enum.Font.GothamBold
+            button.Text = if kind == "save"
+                then string.format("SAVE %d", slot)
+                else string.format("KIT %d", slot)
+            button.TextColor3 = if kind == "apply" then COLORS.amber else COLORS.muted
+            button.TextSize = 11
+            button.ZIndex = 52
+            button.Parent = progressPanel
+            corner(button, 8)
+            stroke(button, if kind == "apply" then COLORS.amber else COLORS.cream, 0.6)
+            loadoutButtons[kind .. "_" .. slot] = button
+        end
+    end
+
     local progressClose = Instance.new("TextButton")
     progressClose.Name = "Close"
     progressClose.AnchorPoint = Vector2.new(1, 0)
@@ -1435,6 +1460,7 @@ function HUDController.new(
         _progressOverlay = progressOverlay,
         _progressText = progressText,
         _equipmentButtons = equipmentButtons,
+        _loadoutButtons = loadoutButtons,
         _currentState = nil,
         _interactionLabel = nil,
         _interactionAvailable = false,
@@ -1694,6 +1720,21 @@ function HUDController._updateLobby(self: HUDController, state: any)
         for size, button in self._lobbySizeButtons do
             button.Visible = size <= maximum
         end
+    end
+end
+
+function HUDController.setLoadoutHandlers(
+    self: HUDController,
+    onSave: (number) -> (),
+    onApply: (number) -> ()
+)
+    for slot = 1, 3 do
+        self._loadoutButtons["save_" .. slot].Activated:Connect(function()
+            onSave(slot)
+        end)
+        self._loadoutButtons["apply_" .. slot].Activated:Connect(function()
+            onApply(slot)
+        end)
     end
 end
 

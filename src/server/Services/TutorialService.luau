@@ -1372,6 +1372,70 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         if type(itemId) == "string" and #itemId <= 32 then
             self:_useGear(player, itemId)
         end
+    elseif kind == self._runtimeIds.Actions.SaveLoadout then
+        local slot = payload.slot
+        if type(slot) == "number" then
+            local result = self._profileService:saveLoadout(player, slot)
+            self:_setToast(
+                player,
+                if result.applied
+                    then string.format("KIT %d SAVED", slot)
+                    else "KIT COULD NOT BE SAVED"
+            )
+            self:_publish(player)
+        end
+    elseif kind == self._runtimeIds.Actions.ApplyLoadout then
+        --[[
+            Applying a kit walks the same validated paths its pieces use one
+            at a time -- profession selection keeps its own daylight/town
+            gates, equipping checks ownership, and the tool swap keeps the
+            after-First-Light rule -- so a loadout can never smuggle a state
+            change past a gate that a manual tap would have hit.
+        ]]
+        local slot = payload.slot
+        local session2 = self._sessions[player]
+        local loadout = if type(slot) == "number"
+            then self._profileService:loadoutAt(player, slot)
+            else nil
+        if loadout == nil then
+            self:_setToast(player, "THAT KIT IS EMPTY")
+            self:_publish(player)
+        elseif
+            session2 == nil
+            or session2.stage ~= "complete"
+            or not self._survivalService:canAct(player)
+            or player:GetAttribute("LastLightInExpedition") == true
+        then
+            self:_setToast(player, "KITS SWAP IN TOWN, ON YOUR FEET")
+            self:_publish(player)
+        else
+            local applied = {}
+            if loadout.professionId ~= nil then
+                local result = self._professionService:select(player, loadout.professionId)
+                if result.accepted then
+                    table.insert(applied, "PROFESSION")
+                end
+            end
+            if loadout.weaponItemId ~= nil then
+                local result = self._profileService:equipItem(player, loadout.weaponItemId)
+                if result.accepted then
+                    table.insert(applied, "WEAPON")
+                end
+            end
+            if loadout.toolId ~= nil and self._toolCatalog.isValid(loadout.toolId) then
+                session2.selectedTool = loadout.toolId
+                self:_applyToolAttributes(player, loadout.toolId)
+                self._profileService:setTutorial(player, session2.stage, loadout.toolId)
+                table.insert(applied, "TOOL")
+            end
+            self:_setToast(
+                player,
+                if #applied > 0
+                    then string.format("KIT %d — %s READY", slot, table.concat(applied, " · "))
+                    else "KIT COULD NOT BE APPLIED"
+            )
+            self:_publish(player)
+        end
     elseif kind == self._runtimeIds.Actions.EquipGear then
         local itemId = payload.itemId
         if type(itemId) == "string" and #itemId <= 32 then

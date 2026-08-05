@@ -70,6 +70,8 @@ function ActionPayloadContract.extraField(runtimeIds: any, kind: string): string
         return "enabled"
     elseif kind == actions.LobbyDepart then
         return "partySize"
+    elseif kind == actions.SaveLoadout or kind == actions.ApplyLoadout then
+        return "slot"
     end
     return nil
 end

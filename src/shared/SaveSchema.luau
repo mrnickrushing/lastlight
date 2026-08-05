@@ -31,6 +31,7 @@ export type Profile = {
     revision: number,
     tutorial: Tutorial,
     inventory: any,
+    loadouts: { any },
     profession: {
         selectedId: string?,
         mastery: ProfessionMastery.State,
@@ -75,7 +76,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 16,
+        schemaVersion = 17,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -86,6 +87,7 @@ function SaveSchema.default(now: number): Profile
             completedAt = nil,
         },
         inventory = ExpeditionInventory.default(),
+        loadouts = {},
         profession = {
             selectedId = nil,
             mastery = ProfessionMastery.default(),
@@ -130,6 +132,31 @@ function SaveSchema.normalize(value: any, now: number): Profile
     end
     if type(value.revision) == "number" and value.revision >= 0 then
         profile.revision = math.floor(value.revision)
+    end
+
+    --[[
+        Schema 17: saved loadouts. Up to three slots, each remembering a
+        profession, a weapon, and a tool -- every id revalidated against its
+        own catalog on load, so a retired item degrades to an empty field
+        rather than a faulting apply. Absent entirely (any pre-17 save),
+        the player simply has no kits saved yet.
+    ]]
+    profile.loadouts = {}
+    if type(value.loadouts) == "table" then
+        for slot = 1, 3 do
+            local raw = value.loadouts[slot]
+            if type(raw) == "table" then
+                profile.loadouts[slot] = {
+                    professionId = if ProfessionCatalog.isValid(raw.professionId)
+                        then raw.professionId
+                        else nil,
+                    weaponItemId = if Equipment.isKnown(raw.weaponItemId)
+                        then raw.weaponItemId
+                        else nil,
+                    toolId = if ToolCatalog.isValid(raw.toolId) then raw.toolId else nil,
+                }
+            end
+        end
     end
 
     local tutorial = value.tutorial
@@ -267,7 +294,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 16
+    profile.schemaVersion = 17
     return profile
 end
 
@@ -890,6 +917,38 @@ end
 
 function SaveSchema.townConsequence(profile: Profile): TownProgression.Consequence
     return TownProgression.resolve(profile)
+end
+
+--[[
+    Save the player's current kit into a slot: the profession they wear, the
+    weapon in their hand, the tool at their hip. Reads the profile's own
+    authoritative fields, so a loadout can never remember something the
+    save does not actually hold.
+]]
+function SaveSchema.withLoadout(profile: Profile, slot: number, now: number): (Profile, any)
+    if type(slot) ~= "number" or slot ~= math.floor(slot) or slot < 1 or slot > 3 then
+        return profile, { applied = false, reason = "invalid_slot" }
+    end
+    local nextProfile: any = table.clone(profile)
+    nextProfile.loadouts = table.clone((profile :: any).loadouts or {})
+    local equipped = (profile :: any).equipped or {}
+    local loadout = {
+        professionId = (profile :: any).profession.selectedId,
+        weaponItemId = equipped.weapon,
+        toolId = (profile :: any).tutorial.selectedTool,
+    }
+    nextProfile.loadouts[slot] = loadout
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, { applied = true, slot = slot, loadout = table.clone(loadout) }
+end
+
+function SaveSchema.loadoutAt(profile: Profile, slot: any): any
+    if type(slot) ~= "number" or slot ~= math.floor(slot) or slot < 1 or slot > 3 then
+        return nil
+    end
+    local loadouts = (profile :: any).loadouts
+    return if type(loadouts) == "table" then loadouts[slot] else nil
 end
 
 return table.freeze(SaveSchema)

@@ -390,6 +390,32 @@ function ProfileService.setTutorial(
     return true
 end
 
+function ProfileService.saveLoadout(self: ProfileService, player: Player, slot: number): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { applied = false, reason = "profile_loading" }
+    end
+    if not self:isWritable(player) then
+        return { applied = false, reason = "profile_read_only" }
+    end
+    local nextProfile, result = self._saveSchema.withLoadout(profile, slot, os.time())
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent and self._writable[player] == true then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
+function ProfileService.loadoutAt(self: ProfileService, player: Player, slot: any): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return self._saveSchema.loadoutAt(profile, slot)
+end
+
 function ProfileService.setProfession(
     self: ProfileService,
     player: Player,
