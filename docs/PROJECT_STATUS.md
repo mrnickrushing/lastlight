@@ -28,6 +28,19 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
+- **(in flight: `agent/wave2-world-recovery`)** Audit wave 2. **Mesh-load
+  recovery:** a boot-burst throttle error used to condemn an asset for the
+  whole server session — observed live as all eleven Milestone-4 town-ring
+  buildings rendering as dark fallback shells. MeshTemplateLoader now
+  separates transient from permanent failures and exposes
+  `forgetTransientFailures()`; `_placeAuthoredMeshes` keeps the failed
+  placements that still wear an authored-replacement fallback and runs three
+  recovery rounds (75/180/360s), swapping authored meshes in and hiding the
+  shells when a retry lands. **Lobby:** spawn no longer greets players with
+  the hearth wall (the 180° yaw contradicted its own comment), wall lamps
+  are housed iron fixtures instead of bare neon cubes, and the hearth fire
+  is layered wedge flames over coals instead of a flat neon rectangle.
+
 - **(in flight: `agent/wave1-light-and-sound`)** Full-game audit performed in
   a live Studio session (owner directive: audit everything, fix in waves).
   Wave 1 ships the three feel fixes: **day sun raised** (ClockTime 6.65 →

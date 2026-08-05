@@ -19,6 +19,7 @@ export type MeshTemplateLoader = typeof(setmetatable(
         _templates: { [string]: Model },
         _templateScale: { [string]: number },
         _failed: { [string]: boolean },
+        _permanentFailure: { [string]: boolean },
     },
     MeshTemplateLoader
 ))
@@ -166,6 +167,7 @@ function MeshTemplateLoader.new(logger: Logger): MeshTemplateLoader
         _templates = {},
         _templateScale = {},
         _failed = {},
+        _permanentFailure = {},
     }, MeshTemplateLoader)
 end
 
@@ -181,11 +183,13 @@ function MeshTemplateLoader._load(self: MeshTemplateLoader, stableId: string): M
     local entry = MeshAssetRegistry.get(stableId)
     if entry == nil then
         self._failed[stableId] = true
+        self._permanentFailure[stableId] = true
         self._logger:info("mesh_asset_unknown", { assetId = stableId })
         return nil
     end
     if entry.placementBand == "retired_visual_failure" then
         self._failed[stableId] = true
+        self._permanentFailure[stableId] = true
         self._logger:info("mesh_asset_retired", { assetId = stableId })
         return nil
     end
@@ -333,6 +337,32 @@ function MeshTemplateLoader.place(
     clone:SetAttribute("ProfileScale", resolvedProfileScale)
     clone.Parent = parent
     return clone
+end
+
+--[[
+    Give condemned assets another chance.
+
+    A load failure marks an asset failed for the whole session, which is the
+    right call per placement -- but boot loads sixty assets in a burst, and
+    the platform sometimes answers a burst with throttling errors dressed as
+    permission errors (see the retry comment in _load). One bad boot minute
+    left all eleven town-ring buildings as dark fallback shells for the whole
+    server lifetime. This clears only the transient failures, so a later
+    recovery pass can try again; unknown and retired assets stay condemned.
+
+    Returns the asset ids that were forgiven.
+]]
+function MeshTemplateLoader.forgetTransientFailures(self: MeshTemplateLoader): { string }
+    local forgiven = {}
+    for stableId in self._failed do
+        if not self._permanentFailure[stableId] then
+            table.insert(forgiven, stableId)
+        end
+    end
+    for _, stableId in forgiven do
+        self._failed[stableId] = nil
+    end
+    return forgiven
 end
 
 return table.freeze(MeshTemplateLoader)
