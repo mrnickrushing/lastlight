@@ -28,6 +28,19 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
+- **(in flight: `agent/wave3-guidance`)** Audit wave 3, guidance and
+  fiction. The lobby no longer leaks the story: the objective card, guide
+  line, and objective markers hide until `departed` — "FREE MARA" was
+  showing over the departure panel, pointing across the map at a town the
+  player hadn't left for. Mara is visibly pinned now: her rig stands on the
+  approach side of the deadfall facing arriving players instead of inside
+  the authored trunk (a rescue objective starring a floating nameplate),
+  and freeing her breaks the trunk apart over ~a second instead of
+  deleting it in one frame. Phase countdown reads "DAY · 02:58 LEFT" —
+  the bare mm:ss read as three in the morning. The profession button says
+  PROFESSION / "ROLE · name" — "KIT" is reserved for the purchasable
+  character kits so the free system and the paid one never share a word.
+
 - **(in flight: `agent/wave2-world-recovery`)** Audit wave 2. **Mesh-load
   recovery:** a boot-burst throttle error used to condemn an asset for the
   whole server session — observed live as all eleven Milestone-4 town-ring
