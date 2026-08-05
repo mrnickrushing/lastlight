@@ -32,9 +32,11 @@ type Enemy = {
     facingPosition: Vector3,
     health: number,
     lastAttackAt: number,
+    luredUntil: number,
     markedUntil: number,
     model: Model,
     spawnedAt: number,
+    stilledUntil: number,
 }
 
 export type EnemyService = typeof(setmetatable(
@@ -59,6 +61,8 @@ export type EnemyService = typeof(setmetatable(
         _queue: { string },
         _nextSpawnAt: number,
         _nightActive: boolean,
+        _lurePlayer: Player?,
+        _lureUntil: number,
         _strikeHandler: ((Player) -> ())?,
         _lanternHealth: number,
         _lanternFloor: number,
@@ -113,6 +117,8 @@ function EnemyService.new(
         _queue = {},
         _nextSpawnAt = 0,
         _nightActive = false,
+        _lurePlayer = nil,
+        _lureUntil = 0,
         _strikeHandler = nil,
         _lanternHealth = 100,
         _lanternFloor = 18,
@@ -397,6 +403,8 @@ end
 function EnemyService.startNight(self: EnemyService, modifiers: any?)
     self:_destroyActive()
     table.clear(self._queue)
+    self._lurePlayer = nil
+    self._lureUntil = 0
     self._nightActive = true
     self._lanternHealth = 100
     self._worldService:setLanternHealth(self._lanternHealth)
@@ -513,9 +521,11 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
             else self._worldService:lanternPosition(),
         health = themedHealth,
         lastAttackAt = spawnedAt,
+        luredUntil = 0,
         markedUntil = 0,
         model = model,
         spawnedAt = spawnedAt,
+        stilledUntil = 0,
     }
     self._logger:info("bramblewake_enemy_spawned", {
         enemy = definition.id,
@@ -895,6 +905,30 @@ function EnemyService._closestPlayer(self: EnemyService, enemy: Enemy): (Player?
     if primary == nil then
         return nil, closestDistance
     end
+    --[[
+        A Beastkeeper's hound overrides proximity: while the lure holds, the
+        threat hunts the keeper rather than whoever stands closest — that is
+        the whole point of the ability, peeling an enemy off an ally. The
+        keeper must still be a legal target (able to act, in the town fight,
+        not off in the expedition) and within a sanity range, so a keeper who
+        goes down or leaves hands the enemy back to normal selection instead
+        of freezing it on an untouchable target.
+    ]]
+    local lurePlayer = self._lurePlayer
+    if lurePlayer ~= nil and workspace:GetServerTimeNow() < self._lureUntil then
+        local lureRoot = rootPart(lurePlayer)
+        if
+            lureRoot ~= nil
+            and self._survivalService:canAct(lurePlayer)
+            and lurePlayer:GetAttribute("LastLightTutorialSurvivalReady") == true
+            and lurePlayer:GetAttribute("LastLightInExpedition") ~= true
+        then
+            local lureDistance = (lureRoot.Position - primary.Position).Magnitude
+            if lureDistance <= 120 then
+                return lurePlayer, lureDistance
+            end
+        end
+    end
     for _, player in Players:GetPlayers() do
         local root = rootPart(player)
         if
@@ -969,8 +1003,24 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
         self:_setMarkedVisual(enemy, false)
         self:_notify(nil)
     end
+    if enemy.stilledUntil > 0 and now >= enemy.stilledUntil then
+        enemy.stilledUntil = 0
+        self:_setStilledVisual(enemy, false)
+        -- The hold may have overlapped a Scout's mark; give the outline back
+        -- to whichever state is still live rather than always the plain one.
+        self:_setMarkedVisual(enemy, now < enemy.markedUntil)
+        self:_notify(nil)
+    end
     if enemy.attack ~= nil then
         self:_stepAttack(enemy, now)
+        return
+    end
+    -- A stilled enemy takes no action at all: no attack starts, no movement,
+    -- no lantern impact. Casting the rune cancels any telegraph in flight, so
+    -- reaching here with the hold active means the enemy simply stands. It
+    -- can still be struck -- the hold is the Runebinder's window, not mercy.
+    if now < enemy.stilledUntil then
+        self:_poseEnemy(enemy, now, "idle", nil)
         return
     end
 
@@ -1006,6 +1056,10 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
             * self._breachMultiplier
         if now < enemy.markedUntil then
             speed *= 0.65
+        elseif now < enemy.luredUntil then
+            -- The hound harries rather than hobbles: a gentler slow than the
+            -- Scout's mark, so the two kits stay distinct when stacked.
+            speed *= 0.8
         end
         local distance = math.min(delta.Magnitude - stoppingDistance, speed * deltaTime)
         if distance > 0 then
@@ -1094,6 +1148,103 @@ function EnemyService.markNearest(
     local message = "FOXFIRE MARK — "
         .. string.upper(enemy.definition.displayName)
         .. " REVEALED AND SLOWED"
+    self:_notify(message)
+    return true, message
+end
+
+--[[
+    The Beastkeeper's hound. Sending it needs the same things marking does --
+    an active night threat, in range, not behind cover -- so it shares
+    _enemyInRange. While the lure holds, target selection prefers the keeper
+    (see _closestPlayer) and the enemy moves slightly slower.
+
+    Deliberately not delegated to an elite/boss encounter service the way
+    markNearest is: a hound can turn a night creature, not an Old Growth
+    elite or the Warden Stag. During those encounters this reads as the
+    ordinary no-target refusal rather than pretending a lure it cannot do.
+]]
+function EnemyService.canLureThreat(
+    self: EnemyService,
+    player: Player,
+    range: number
+): (boolean, string)
+    local enemy, reason = self:_enemyInRange(player, range)
+    if enemy == nil then
+        return false, reason or "NO THREAT CAN BE LURED"
+    end
+    return true, "BRIAR HOUND READY"
+end
+
+function EnemyService.lureThreat(
+    self: EnemyService,
+    player: Player,
+    range: number,
+    duration: number
+): (boolean, string)
+    local enemy, reason = self:_enemyInRange(player, range)
+    if enemy == nil then
+        return false, reason or "NO THREAT CAN BE LURED"
+    end
+    local now = workspace:GetServerTimeNow()
+    self._lurePlayer = player
+    self._lureUntil = now + duration
+    enemy.luredUntil = now + duration
+    local message = "BRIAR HOUND — "
+        .. string.upper(enemy.definition.displayName)
+        .. " TURNS TO HUNT YOU"
+    self:_notify(message)
+    return true, message
+end
+
+function EnemyService._setStilledVisual(_self: EnemyService, enemy: Enemy, stilled: boolean)
+    enemy.model:SetAttribute("LastLightStilled", stilled)
+    local highlight = enemy.model:FindFirstChild("ThreatOutline")
+    if highlight ~= nil and highlight:IsA("Highlight") then
+        if stilled then
+            highlight.FillColor = Color3.fromRGB(132, 150, 224)
+            highlight.FillTransparency = 0.42
+            highlight.OutlineColor = Color3.fromRGB(214, 226, 255)
+        else
+            highlight.FillColor = Color3.fromRGB(80, 29, 29)
+            highlight.FillTransparency = 0.76
+            highlight.OutlineColor = Color3.fromRGB(255, 143, 91)
+        end
+    end
+end
+
+--[[
+    The Runebinder's hold. Same target contract as the mark and the hound;
+    the cast also cancels a telegraph in flight, because "held still" that
+    lets the wound-up swing land anyway would read as the ability failing.
+]]
+function EnemyService.canStillThreat(
+    self: EnemyService,
+    player: Player,
+    range: number
+): (boolean, string)
+    local enemy, reason = self:_enemyInRange(player, range)
+    if enemy == nil then
+        return false, reason or "NO THREAT CAN BE BOUND"
+    end
+    return true, "STILL RUNE READY"
+end
+
+function EnemyService.stillThreat(
+    self: EnemyService,
+    player: Player,
+    range: number,
+    duration: number
+): (boolean, string)
+    local enemy, reason = self:_enemyInRange(player, range)
+    if enemy == nil then
+        return false, reason or "NO THREAT CAN BE BOUND"
+    end
+    self:_clearAttack(enemy)
+    enemy.stilledUntil = workspace:GetServerTimeNow() + duration
+    self:_setStilledVisual(enemy, true)
+    local message = "STILL RUNE — "
+        .. string.upper(enemy.definition.displayName)
+        .. " IS BOUND IN LIGHT"
     self:_notify(message)
     return true, message
 end

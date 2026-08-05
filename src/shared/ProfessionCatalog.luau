@@ -21,6 +21,9 @@ local ORDER = table.freeze({
     "profession_warden",
     "profession_engineer",
     "profession_medic",
+    "profession_alchemist",
+    "profession_beastkeeper",
+    "profession_runebinder",
 })
 
 local DEFINITIONS: { [string]: Definition } = {
@@ -76,6 +79,56 @@ local DEFINITIONS: { [string]: Definition } = {
         effectAmount = 22,
         effectRadius = 28,
     }),
+    --[[
+        The final three of the seven-profession roster. Each maps onto an
+        existing combat primitive rather than inventing a parallel system:
+        the tonic is the Medic's radius pattern applied to stamina as well
+        as health, the hound is enemy target selection with a preference,
+        and the rune is the same held-state the mark's slow already uses,
+        taken to a full stop. effectAmount doubles as the tonic's stamina
+        number (its heal is derived as half), and activeSeconds is the
+        hound's and rune's duration, so the mastery bonus fields mean the
+        same thing here that they mean for the first four kits.
+    ]]
+    profession_alchemist = table.freeze({
+        id = "profession_alchemist",
+        displayName = "ALCHEMIST",
+        shortName = "ALCHEMIST",
+        role = "BREW · RESTORE · SUSTAIN",
+        abilityId = "ability_sporebright_tonic",
+        abilityName = "SPOREBRIGHT TONIC",
+        abilityDescription = "Share a tonic that restores stamina and mends nearby allies.",
+        cooldownSeconds = 22,
+        activeSeconds = 0,
+        effectAmount = 30,
+        effectRadius = 26,
+    }),
+    profession_beastkeeper = table.freeze({
+        id = "profession_beastkeeper",
+        displayName = "BEASTKEEPER",
+        shortName = "KEEPER",
+        role = "BOND · LURE · PROTECT",
+        abilityId = "ability_briar_hound",
+        abilityName = "BRIAR HOUND",
+        abilityDescription = "Send your hound to harry the threat so it hunts you instead.",
+        cooldownSeconds = 20,
+        activeSeconds = 7,
+        effectAmount = 0,
+        effectRadius = 50,
+    }),
+    profession_runebinder = table.freeze({
+        id = "profession_runebinder",
+        displayName = "RUNEBINDER",
+        shortName = "BINDER",
+        role = "BIND · STILL · WARD",
+        abilityId = "ability_still_rune",
+        abilityName = "STILL RUNE",
+        abilityDescription = "Bind the threat in light, holding it still for a few breaths.",
+        cooldownSeconds = 26,
+        activeSeconds = 3.5,
+        effectAmount = 0,
+        effectRadius = 45,
+    }),
 }
 
 function ProfessionCatalog.isValid(id: any): boolean
@@ -99,6 +152,9 @@ ProfessionCatalog.Ids = table.freeze({
     Warden = "profession_warden",
     Engineer = "profession_engineer",
     Medic = "profession_medic",
+    Alchemist = "profession_alchemist",
+    Beastkeeper = "profession_beastkeeper",
+    Runebinder = "profession_runebinder",
 })
 
 return table.freeze(ProfessionCatalog)

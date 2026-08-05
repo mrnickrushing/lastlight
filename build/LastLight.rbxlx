@@ -1883,6 +1883,11 @@ function BramblewakeBlackout.snapshot(state: State, userId: number, now: number)
         chapterComplete = state.status == "complete",
         decision = state.decision,
         deliveredNodes = delivered,
+        -- The count above and this map answer different questions -- "how
+        -- many are lit" for the HUD's N/3 rail, and "which ones" for the
+        -- objective-marker resolver. TutorialService used to iterate the
+        -- count and threw on every publish for the whole relay stage.
+        deliveredNodeMap = table.clone(state.deliveredNodes),
         duration = state.duration,
         elapsed = elapsed,
         enabled = state.status ~= "disabled",
@@ -8421,6 +8426,30 @@ local DEFINITIONS: { [string]: Definition } = {
         pulseLifetime = 1.4,
         minimumRadius = 10,
     }),
+    profession_alchemist = table.freeze({
+        professionId = "profession_alchemist",
+        motif = "tonic_bloom",
+        color = table.freeze({ 154, 187, 92 }),
+        accent = table.freeze({ 226, 247, 180 }),
+        pulseLifetime = 1.3,
+        minimumRadius = 10,
+    }),
+    profession_beastkeeper = table.freeze({
+        professionId = "profession_beastkeeper",
+        motif = "hound_dash",
+        color = table.freeze({ 196, 120, 60 }),
+        accent = table.freeze({ 246, 214, 165 }),
+        pulseLifetime = 1.2,
+        minimumRadius = 9,
+    }),
+    profession_runebinder = table.freeze({
+        professionId = "profession_runebinder",
+        motif = "still_rune",
+        color = table.freeze({ 132, 150, 224 }),
+        accent = table.freeze({ 214, 226, 255 }),
+        pulseLifetime = 1.5,
+        minimumRadius = 9,
+    }),
 }
 
 function ProfessionAbilityVisuals.get(professionId: any): Definition?
@@ -8468,6 +8497,9 @@ local ORDER = table.freeze({
     "profession_warden",
     "profession_engineer",
     "profession_medic",
+    "profession_alchemist",
+    "profession_beastkeeper",
+    "profession_runebinder",
 })
 
 local DEFINITIONS: { [string]: Definition } = {
@@ -8523,6 +8555,56 @@ local DEFINITIONS: { [string]: Definition } = {
         effectAmount = 22,
         effectRadius = 28,
     }),
+    --[[
+        The final three of the seven-profession roster. Each maps onto an
+        existing combat primitive rather than inventing a parallel system:
+        the tonic is the Medic's radius pattern applied to stamina as well
+        as health, the hound is enemy target selection with a preference,
+        and the rune is the same held-state the mark's slow already uses,
+        taken to a full stop. effectAmount doubles as the tonic's stamina
+        number (its heal is derived as half), and activeSeconds is the
+        hound's and rune's duration, so the mastery bonus fields mean the
+        same thing here that they mean for the first four kits.
+    ]]
+    profession_alchemist = table.freeze({
+        id = "profession_alchemist",
+        displayName = "ALCHEMIST",
+        shortName = "ALCHEMIST",
+        role = "BREW · RESTORE · SUSTAIN",
+        abilityId = "ability_sporebright_tonic",
+        abilityName = "SPOREBRIGHT TONIC",
+        abilityDescription = "Share a tonic that restores stamina and mends nearby allies.",
+        cooldownSeconds = 22,
+        activeSeconds = 0,
+        effectAmount = 30,
+        effectRadius = 26,
+    }),
+    profession_beastkeeper = table.freeze({
+        id = "profession_beastkeeper",
+        displayName = "BEASTKEEPER",
+        shortName = "KEEPER",
+        role = "BOND · LURE · PROTECT",
+        abilityId = "ability_briar_hound",
+        abilityName = "BRIAR HOUND",
+        abilityDescription = "Send your hound to harry the threat so it hunts you instead.",
+        cooldownSeconds = 20,
+        activeSeconds = 7,
+        effectAmount = 0,
+        effectRadius = 50,
+    }),
+    profession_runebinder = table.freeze({
+        id = "profession_runebinder",
+        displayName = "RUNEBINDER",
+        shortName = "BINDER",
+        role = "BIND · STILL · WARD",
+        abilityId = "ability_still_rune",
+        abilityName = "STILL RUNE",
+        abilityDescription = "Bind the threat in light, holding it still for a few breaths.",
+        cooldownSeconds = 26,
+        activeSeconds = 3.5,
+        effectAmount = 0,
+        effectRadius = 45,
+    }),
 }
 
 function ProfessionCatalog.isValid(id: any): boolean
@@ -8546,6 +8628,9 @@ ProfessionCatalog.Ids = table.freeze({
     Warden = "profession_warden",
     Engineer = "profession_engineer",
     Medic = "profession_medic",
+    Alchemist = "profession_alchemist",
+    Beastkeeper = "profession_beastkeeper",
+    Runebinder = "profession_runebinder",
 })
 
 return table.freeze(ProfessionCatalog)
@@ -8690,6 +8775,66 @@ local SPECIALIZATIONS: { [string]: { Specialization } } = table.freeze({
             name = "BRIGHTCAP HERBALIST",
             description = "Guiding Pulse reaches 10 studs farther.",
             effectRadiusBonus = 10,
+        }),
+    }),
+    profession_alchemist = table.freeze({
+        specialization({
+            id = "specialization_brewer",
+            name = "BREWER",
+            description = "Sporebright Tonic restores 8 more stamina and mends deeper.",
+            effectAmountBonus = 8,
+        }),
+        specialization({
+            id = "specialization_catalyst",
+            name = "CATALYST",
+            description = "Sporebright Tonic recharges 4 seconds faster.",
+            cooldownReduction = 4,
+        }),
+        specialization({
+            id = "specialization_forager",
+            name = "FORAGER",
+            description = "Sporebright Tonic reaches 8 studs farther.",
+            effectRadiusBonus = 8,
+        }),
+    }),
+    profession_beastkeeper = table.freeze({
+        specialization({
+            id = "specialization_handler",
+            name = "HANDLER",
+            description = "Briar Hound harries the threat 2.5 seconds longer.",
+            activeSecondsBonus = 2.5,
+        }),
+        specialization({
+            id = "specialization_bondkeeper",
+            name = "BONDKEEPER",
+            description = "Briar Hound can be sent 10 studs farther.",
+            effectRadiusBonus = 10,
+        }),
+        specialization({
+            id = "specialization_wildspeaker",
+            name = "WILDSPEAKER",
+            description = "Briar Hound recharges 4 seconds faster.",
+            cooldownReduction = 4,
+        }),
+    }),
+    profession_runebinder = table.freeze({
+        specialization({
+            id = "specialization_scribe",
+            name = "SCRIBE",
+            description = "Still Rune holds the threat 1.25 seconds longer.",
+            activeSecondsBonus = 1.25,
+        }),
+        specialization({
+            id = "specialization_channeler",
+            name = "CHANNELER",
+            description = "Still Rune can be cast 10 studs farther.",
+            effectRadiusBonus = 10,
+        }),
+        specialization({
+            id = "specialization_veilwalker",
+            name = "VEILWALKER",
+            description = "Still Rune recharges 5 seconds faster.",
+            cooldownReduction = 5,
         }),
     }),
 })
@@ -14729,6 +14874,7 @@ local enemyService = EnemyService.new(
     analyticsService
 )
 professionService:setEnemyService(enemyService)
+professionService:setCombatService(combatService)
 expeditionService:bindEnemyService(enemyService)
 enemyService:setProfessionService(professionService)
 local oldGrowthService = OldGrowthService.new(
@@ -17064,9 +17210,11 @@ type Enemy = {
     facingPosition: Vector3,
     health: number,
     lastAttackAt: number,
+    luredUntil: number,
     markedUntil: number,
     model: Model,
     spawnedAt: number,
+    stilledUntil: number,
 }
 
 export type EnemyService = typeof(setmetatable(
@@ -17091,6 +17239,8 @@ export type EnemyService = typeof(setmetatable(
         _queue: { string },
         _nextSpawnAt: number,
         _nightActive: boolean,
+        _lurePlayer: Player?,
+        _lureUntil: number,
         _strikeHandler: ((Player) -> ())?,
         _lanternHealth: number,
         _lanternFloor: number,
@@ -17145,6 +17295,8 @@ function EnemyService.new(
         _queue = {},
         _nextSpawnAt = 0,
         _nightActive = false,
+        _lurePlayer = nil,
+        _lureUntil = 0,
         _strikeHandler = nil,
         _lanternHealth = 100,
         _lanternFloor = 18,
@@ -17429,6 +17581,8 @@ end
 function EnemyService.startNight(self: EnemyService, modifiers: any?)
     self:_destroyActive()
     table.clear(self._queue)
+    self._lurePlayer = nil
+    self._lureUntil = 0
     self._nightActive = true
     self._lanternHealth = 100
     self._worldService:setLanternHealth(self._lanternHealth)
@@ -17545,9 +17699,11 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
             else self._worldService:lanternPosition(),
         health = themedHealth,
         lastAttackAt = spawnedAt,
+        luredUntil = 0,
         markedUntil = 0,
         model = model,
         spawnedAt = spawnedAt,
+        stilledUntil = 0,
     }
     self._logger:info("bramblewake_enemy_spawned", {
         enemy = definition.id,
@@ -17927,6 +18083,30 @@ function EnemyService._closestPlayer(self: EnemyService, enemy: Enemy): (Player?
     if primary == nil then
         return nil, closestDistance
     end
+    --[[
+        A Beastkeeper's hound overrides proximity: while the lure holds, the
+        threat hunts the keeper rather than whoever stands closest — that is
+        the whole point of the ability, peeling an enemy off an ally. The
+        keeper must still be a legal target (able to act, in the town fight,
+        not off in the expedition) and within a sanity range, so a keeper who
+        goes down or leaves hands the enemy back to normal selection instead
+        of freezing it on an untouchable target.
+    ]]
+    local lurePlayer = self._lurePlayer
+    if lurePlayer ~= nil and workspace:GetServerTimeNow() < self._lureUntil then
+        local lureRoot = rootPart(lurePlayer)
+        if
+            lureRoot ~= nil
+            and self._survivalService:canAct(lurePlayer)
+            and lurePlayer:GetAttribute("LastLightTutorialSurvivalReady") == true
+            and lurePlayer:GetAttribute("LastLightInExpedition") ~= true
+        then
+            local lureDistance = (lureRoot.Position - primary.Position).Magnitude
+            if lureDistance <= 120 then
+                return lurePlayer, lureDistance
+            end
+        end
+    end
     for _, player in Players:GetPlayers() do
         local root = rootPart(player)
         if
@@ -18001,8 +18181,24 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
         self:_setMarkedVisual(enemy, false)
         self:_notify(nil)
     end
+    if enemy.stilledUntil > 0 and now >= enemy.stilledUntil then
+        enemy.stilledUntil = 0
+        self:_setStilledVisual(enemy, false)
+        -- The hold may have overlapped a Scout's mark; give the outline back
+        -- to whichever state is still live rather than always the plain one.
+        self:_setMarkedVisual(enemy, now < enemy.markedUntil)
+        self:_notify(nil)
+    end
     if enemy.attack ~= nil then
         self:_stepAttack(enemy, now)
+        return
+    end
+    -- A stilled enemy takes no action at all: no attack starts, no movement,
+    -- no lantern impact. Casting the rune cancels any telegraph in flight, so
+    -- reaching here with the hold active means the enemy simply stands. It
+    -- can still be struck -- the hold is the Runebinder's window, not mercy.
+    if now < enemy.stilledUntil then
+        self:_poseEnemy(enemy, now, "idle", nil)
         return
     end
 
@@ -18038,6 +18234,10 @@ function EnemyService._step(self: EnemyService, deltaTime: number)
             * self._breachMultiplier
         if now < enemy.markedUntil then
             speed *= 0.65
+        elseif now < enemy.luredUntil then
+            -- The hound harries rather than hobbles: a gentler slow than the
+            -- Scout's mark, so the two kits stay distinct when stacked.
+            speed *= 0.8
         end
         local distance = math.min(delta.Magnitude - stoppingDistance, speed * deltaTime)
         if distance > 0 then
@@ -18126,6 +18326,103 @@ function EnemyService.markNearest(
     local message = "FOXFIRE MARK — "
         .. string.upper(enemy.definition.displayName)
         .. " REVEALED AND SLOWED"
+    self:_notify(message)
+    return true, message
+end
+
+--[[
+    The Beastkeeper's hound. Sending it needs the same things marking does --
+    an active night threat, in range, not behind cover -- so it shares
+    _enemyInRange. While the lure holds, target selection prefers the keeper
+    (see _closestPlayer) and the enemy moves slightly slower.
+
+    Deliberately not delegated to an elite/boss encounter service the way
+    markNearest is: a hound can turn a night creature, not an Old Growth
+    elite or the Warden Stag. During those encounters this reads as the
+    ordinary no-target refusal rather than pretending a lure it cannot do.
+]]
+function EnemyService.canLureThreat(
+    self: EnemyService,
+    player: Player,
+    range: number
+): (boolean, string)
+    local enemy, reason = self:_enemyInRange(player, range)
+    if enemy == nil then
+        return false, reason or "NO THREAT CAN BE LURED"
+    end
+    return true, "BRIAR HOUND READY"
+end
+
+function EnemyService.lureThreat(
+    self: EnemyService,
+    player: Player,
+    range: number,
+    duration: number
+): (boolean, string)
+    local enemy, reason = self:_enemyInRange(player, range)
+    if enemy == nil then
+        return false, reason or "NO THREAT CAN BE LURED"
+    end
+    local now = workspace:GetServerTimeNow()
+    self._lurePlayer = player
+    self._lureUntil = now + duration
+    enemy.luredUntil = now + duration
+    local message = "BRIAR HOUND — "
+        .. string.upper(enemy.definition.displayName)
+        .. " TURNS TO HUNT YOU"
+    self:_notify(message)
+    return true, message
+end
+
+function EnemyService._setStilledVisual(_self: EnemyService, enemy: Enemy, stilled: boolean)
+    enemy.model:SetAttribute("LastLightStilled", stilled)
+    local highlight = enemy.model:FindFirstChild("ThreatOutline")
+    if highlight ~= nil and highlight:IsA("Highlight") then
+        if stilled then
+            highlight.FillColor = Color3.fromRGB(132, 150, 224)
+            highlight.FillTransparency = 0.42
+            highlight.OutlineColor = Color3.fromRGB(214, 226, 255)
+        else
+            highlight.FillColor = Color3.fromRGB(80, 29, 29)
+            highlight.FillTransparency = 0.76
+            highlight.OutlineColor = Color3.fromRGB(255, 143, 91)
+        end
+    end
+end
+
+--[[
+    The Runebinder's hold. Same target contract as the mark and the hound;
+    the cast also cancels a telegraph in flight, because "held still" that
+    lets the wound-up swing land anyway would read as the ability failing.
+]]
+function EnemyService.canStillThreat(
+    self: EnemyService,
+    player: Player,
+    range: number
+): (boolean, string)
+    local enemy, reason = self:_enemyInRange(player, range)
+    if enemy == nil then
+        return false, reason or "NO THREAT CAN BE BOUND"
+    end
+    return true, "STILL RUNE READY"
+end
+
+function EnemyService.stillThreat(
+    self: EnemyService,
+    player: Player,
+    range: number,
+    duration: number
+): (boolean, string)
+    local enemy, reason = self:_enemyInRange(player, range)
+    if enemy == nil then
+        return false, reason or "NO THREAT CAN BE BOUND"
+    end
+    self:_clearAttack(enemy)
+    enemy.stilledUntil = workspace:GetServerTimeNow() + duration
+    self:_setStilledVisual(enemy, true)
+    local message = "STILL RUNE — "
+        .. string.upper(enemy.definition.displayName)
+        .. " IS BOUND IN LIGHT"
     self:_notify(message)
     return true, message
 end
@@ -23188,6 +23485,7 @@ export type ProfessionService = typeof(setmetatable(
         _analyticsService: any,
         _states: { [Player]: any },
         _enemyService: any,
+        _combatService: any,
         _switchProvider: ((Player) -> (boolean, string?))?,
         _onChanged: ((Player, string?) -> ())?,
     },
@@ -23220,6 +23518,7 @@ function ProfessionService.new(
         _analyticsService = analyticsService,
         _states = {},
         _enemyService = nil,
+        _combatService = nil,
         _switchProvider = nil,
         _onChanged = nil,
     }, ProfessionService)
@@ -23246,6 +23545,14 @@ end
 
 function ProfessionService.setEnemyService(self: ProfessionService, enemyService: any)
     self._enemyService = enemyService
+end
+
+-- Late-bound like the enemy service: the combat service exists before this
+-- one in the bootstrap, but taking it here rather than in the constructor
+-- keeps the constructor signature stable and mirrors how every other
+-- cross-service edge in this file is wired.
+function ProfessionService.setCombatService(self: ProfessionService, combatService: any)
+    self._combatService = combatService
 end
 
 function ProfessionService.setSwitchProvider(
@@ -23459,6 +23766,47 @@ function ProfessionService.selectSpecialization(
     }
 end
 
+--[[
+    Every ally the tonic can reach, by the same measure the pour will use.
+
+    Counted from the caster's root the way canHealInRadius counts, so the
+    preflight and the application cannot disagree about who is close enough.
+    Includes the caster: an Alchemist alone at low stamina is a valid pour.
+]]
+function ProfessionService._staminaNeedInRadius(
+    self: ProfessionService,
+    player: Player,
+    radius: number
+): { Player }
+    local needing = {}
+    local combatService = self._combatService
+    local character = player.Character
+    local sourceRoot = if character == nil
+        then nil
+        else character:FindFirstChild("HumanoidRootPart")
+    if combatService == nil or sourceRoot == nil or not sourceRoot:IsA("BasePart") then
+        return needing
+    end
+    for _, other in Players:GetPlayers() do
+        local otherCharacter = other.Character
+        local otherRoot = if otherCharacter == nil
+            then nil
+            else otherCharacter:FindFirstChild("HumanoidRootPart")
+        if
+            otherRoot ~= nil
+            and otherRoot:IsA("BasePart")
+            and self._survivalService:canAct(other)
+            and (otherRoot.Position - sourceRoot.Position).Magnitude <= radius
+        then
+            local snapshot = combatService:snapshot(other)
+            if snapshot ~= nil and snapshot.stamina < snapshot.maxStamina then
+                table.insert(needing, other)
+            end
+        end
+    end
+    return needing
+end
+
 function ProfessionService._abilityPreflight(
     self: ProfessionService,
     player: Player,
@@ -23484,6 +23832,25 @@ function ProfessionService._abilityPreflight(
         return enemyService:canRepairLantern(player, effectRadius)
     elseif definition.id == self._catalog.Ids.Medic then
         return self._survivalService:canHealInRadius(player, effectRadius)
+    elseif definition.id == self._catalog.Ids.Alchemist then
+        -- The tonic serves either need. Refusing only when nobody in reach
+        -- wants health OR stamina keeps the no-op-cast protection the other
+        -- kits have without making the brew fussier than the pulse.
+        local canHeal = self._survivalService:canHealInRadius(player, effectRadius)
+        if canHeal or #self:_staminaNeedInRadius(player, effectRadius) > 0 then
+            return true, "SPOREBRIGHT TONIC READY"
+        end
+        return false, "EVERYONE IN REACH IS ALREADY HALE"
+    elseif definition.id == self._catalog.Ids.Beastkeeper then
+        if enemyService == nil then
+            return false, "YOUR HOUND IS STILL WAKING"
+        end
+        return enemyService:canLureThreat(player, effectRadius)
+    elseif definition.id == self._catalog.Ids.Runebinder then
+        if enemyService == nil then
+            return false, "THE RUNES ARE STILL SETTLING"
+        end
+        return enemyService:canStillThreat(player, effectRadius)
     end
     return true, "LANTERN GUARD READY"
 end
@@ -23498,6 +23865,8 @@ function ProfessionService._applyAbility(
     local effectRadius = definition.effectRadius + tuning.effectRadiusBonus
     local activeSeconds = if definition.id == self._catalog.Ids.Scout
             or definition.id == self._catalog.Ids.Warden
+            or definition.id == self._catalog.Ids.Beastkeeper
+            or definition.id == self._catalog.Ids.Runebinder
         then definition.activeSeconds + tuning.activeSecondsBonus
         else definition.activeSeconds
     if definition.id == self._catalog.Ids.Scout then
@@ -23507,6 +23876,32 @@ function ProfessionService._applyAbility(
         return "LANTERN GUARD ACTIVE — ENEMY DAMAGE REDUCED", 1
     elseif definition.id == self._catalog.Ids.Engineer then
         local _, message = self._enemyService:repairLantern(player, effectRadius, effectAmount)
+        return message, 1
+    elseif definition.id == self._catalog.Ids.Alchemist then
+        -- One effectAmount, two effects: the full number is stamina, half of
+        -- it is the mend, so the Brewer specialization deepens both at once
+        -- and neither half competes with the Medic's dedicated heal.
+        local healResult =
+            self._survivalService:healInRadius(player, math.floor(effectAmount / 2), effectRadius)
+        local restored = 0
+        for _, other in self:_staminaNeedInRadius(player, effectRadius) do
+            local result = self._combatService:restoreStamina(other, effectAmount)
+            if result.applied then
+                restored += 1
+            end
+        end
+        local affected = math.max(healResult.affected, restored)
+        return string.format(
+            "SPOREBRIGHT TONIC — %d TRAVELER%s RESTORED",
+            affected,
+            if affected == 1 then "" else "S"
+        ),
+            affected
+    elseif definition.id == self._catalog.Ids.Beastkeeper then
+        local _, message = self._enemyService:lureThreat(player, effectRadius, activeSeconds)
+        return message, 1
+    elseif definition.id == self._catalog.Ids.Runebinder then
+        local _, message = self._enemyService:stillThreat(player, effectRadius, activeSeconds)
         return message, 1
     end
 
@@ -23576,6 +23971,8 @@ function ProfessionService.useAbility(self: ProfessionService, player: Player): 
     local cooldownSeconds = math.max(1, definition.cooldownSeconds - tuning.cooldownReduction)
     local activeSeconds = if definition.id == self._catalog.Ids.Scout
             or definition.id == self._catalog.Ids.Warden
+            or definition.id == self._catalog.Ids.Beastkeeper
+            or definition.id == self._catalog.Ids.Runebinder
         then definition.activeSeconds + tuning.activeSecondsBonus
         else definition.activeSeconds
     local nextState =
@@ -27213,7 +27610,11 @@ function TutorialService._objectiveTargets(
                     add(arena.relayNodes[blackout.nextNodeId], "DELIVER ROOTFIRE")
                 else
                     add(arena.fireSource, "TAKE ROOTFIRE")
-                    for nodeId, delivered in blackout.deliveredNodes or {} do
+                    -- deliveredNodeMap, not deliveredNodes: the latter is the
+                    -- HUD's lit-count (a number), and iterating it threw
+                    -- "attempt to iterate over a number value" on every
+                    -- snapshot publish for the whole relay stage.
+                    for nodeId, delivered in blackout.deliveredNodeMap or {} do
                         if delivered == true then
                             add(arena.relayNodes[nodeId], "TAKE ROOTFIRE")
                         end
@@ -34635,6 +35036,46 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 { id = "specialization_brightcap_herbalist", name = "BRIGHTCAP HERBALIST" },
             },
         },
+        --[[
+            The roster's last three shrines grow the grove along its own
+            columns: the Alchemist fills the west column's empty middle row,
+            and the Beastkeeper and Runebinder open a third row to the
+            south, toward the Watch Ring. All three centres were checked
+            against every authored building footprint and placement before
+            being chosen -- the nearest neighbours are the Lantern Workbench
+            (92, -126) and the Waterworks (110, -212), both comfortably
+            clear. Colors match each profession's ability visual.
+        ]]
+        {
+            center = Vector3.new(-78, 0, -122),
+            color = Color3.fromRGB(154, 187, 92),
+            name = "ALCHEMIST",
+            paths = {
+                { id = "specialization_brewer", name = "BREWER" },
+                { id = "specialization_catalyst", name = "CATALYST" },
+                { id = "specialization_forager", name = "FORAGER" },
+            },
+        },
+        {
+            center = Vector3.new(78, 0, -214),
+            color = Color3.fromRGB(196, 120, 60),
+            name = "BEASTKEEPER",
+            paths = {
+                { id = "specialization_handler", name = "HANDLER" },
+                { id = "specialization_bondkeeper", name = "BONDKEEPER" },
+                { id = "specialization_wildspeaker", name = "WILDSPEAKER" },
+            },
+        },
+        {
+            center = Vector3.new(-78, 0, -214),
+            color = Color3.fromRGB(132, 150, 224),
+            name = "RUNEBINDER",
+            paths = {
+                { id = "specialization_scribe", name = "SCRIBE" },
+                { id = "specialization_channeler", name = "CHANNELER" },
+                { id = "specialization_veilwalker", name = "VEILWALKER" },
+            },
+        },
     }
     local authoredInteractionIds = {}
     local authoredInteractionCount = 0
@@ -35809,6 +36250,85 @@ function WorldService.showProfessionAbility(
             )
             cap.Shape = Enum.PartType.Ball
             cap.Transparency = 0.12
+        end
+    elseif visual.motif == "tonic_bloom" then
+        -- Corked vials tipping outward in a ring: the pour, not the garden --
+        -- the Medic's bloom already owns mushroom caps.
+        for index = 1, 5 do
+            local angle = math.rad(index * 72)
+            local vialPosition = origin
+                + Vector3.new(math.cos(angle) * 3.9, 0.85, math.sin(angle) * 3.9)
+            local vial = part(
+                model,
+                "TonicVial_" .. tostring(index),
+                Vector3.new(0.6, 1.35, 0.6),
+                CFrame.new(vialPosition) * CFrame.Angles(math.rad(24), angle, 0),
+                if index % 2 == 0 then color else accent,
+                Enum.Material.Glass,
+                false
+            )
+            vial.Transparency = 0.18
+            local cork = part(
+                model,
+                "TonicCork_" .. tostring(index),
+                Vector3.new(0.3, 0.26, 0.3),
+                vial.CFrame * CFrame.new(0, 0.78, 0),
+                Color3.fromRGB(110, 82, 54),
+                Enum.Material.Wood,
+                false
+            )
+            cork.Transparency = 0.05
+        end
+    elseif visual.motif == "hound_dash" then
+        -- A dash of paw-fall chevrons running out ahead of the keeper, the
+        -- direction the hound was sent. Root orientation is the only honest
+        -- signal of where the player was facing at cast.
+        local forward = root.CFrame.LookVector
+        local flat = Vector3.new(forward.X, 0, forward.Z)
+        local direction = if flat.Magnitude > 0.05 then flat.Unit else Vector3.new(0, 0, -1)
+        for index = 1, 4 do
+            local step = origin + direction * (2.4 + index * 2.3) + Vector3.new(0, 0.24, 0)
+            local sideways = Vector3.new(-direction.Z, 0, direction.X)
+                * (if index % 2 == 0 then 0.9 else -0.9)
+            local paw = part(
+                model,
+                "HoundDashStep_" .. tostring(index),
+                Vector3.new(0.95, 0.2, 1.5),
+                CFrame.lookAt(step + sideways, step + sideways + direction),
+                if index == 4 then accent else color,
+                Enum.Material.Neon,
+                false
+            )
+            paw.Transparency = 0.1 + index * 0.08
+        end
+    elseif visual.motif == "still_rune" then
+        -- A bound circle: four glyph bars crossing a thin ring, holding
+        -- rather than radiating -- this is the one ability motif about
+        -- stopping something, so nothing in it points outward.
+        local ring = part(
+            model,
+            "StillRuneRing",
+            Vector3.new(0.18, 7.6, 7.6),
+            CFrame.new(origin + Vector3.new(0, 0.3, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+            color,
+            Enum.Material.Neon,
+            false
+        )
+        ring.Shape = Enum.PartType.Cylinder
+        ring.Transparency = 0.35
+        for index = 1, 4 do
+            local angle = math.rad(45 + (index - 1) * 90)
+            local bar = part(
+                model,
+                "StillRuneGlyph_" .. tostring(index),
+                Vector3.new(0.4, 0.22, 3.1),
+                CFrame.new(origin + Vector3.new(math.cos(angle) * 2.4, 0.42, math.sin(angle) * 2.4))
+                    * CFrame.Angles(0, -angle + math.rad(90), 0),
+                accent,
+                Enum.Material.Neon,
+                false
+            )
+            bar.Transparency = 0.08
         end
     end
 
@@ -49458,10 +49978,13 @@ function HUDController.new(
     professionGrid.Size = UDim2.new(1, -40, 1, -130)
     professionGrid.ZIndex = 42
     professionGrid.Parent = professionPanel
+    -- Three columns, not the original two-by-two: the roster is seven kits
+    -- now, and 3 x 3 keeps every card on one page of the same panel rather
+    -- than growing the panel taller than a landscape phone viewport.
     local grid = Instance.new("UIGridLayout")
-    grid.CellPadding = UDim2.fromOffset(12, 12)
-    grid.CellSize = UDim2.new(0.5, -6, 0.5, -6)
-    grid.FillDirectionMaxCells = 2
+    grid.CellPadding = UDim2.fromOffset(10, 10)
+    grid.CellSize = UDim2.new(1 / 3, -7, 1 / 3, -7)
+    grid.FillDirectionMaxCells = 3
     grid.SortOrder = Enum.SortOrder.LayoutOrder
     grid.Parent = professionGrid
 
@@ -49483,7 +50006,9 @@ function HUDController.new(
             tostring(definition.abilityDescription)
         )
         card.TextColor3 = COLORS.cream
-        card.TextSize = 14
+        -- 12, not 14: seven cards share the panel three abreast now, and the
+        -- four-line card text has to wrap inside a third of the width.
+        card.TextSize = 12
         card.TextWrapped = true
         card.TextYAlignment = Enum.TextYAlignment.Center
         card.Selectable = true

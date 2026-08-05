@@ -6239,6 +6239,46 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 { id = "specialization_brightcap_herbalist", name = "BRIGHTCAP HERBALIST" },
             },
         },
+        --[[
+            The roster's last three shrines grow the grove along its own
+            columns: the Alchemist fills the west column's empty middle row,
+            and the Beastkeeper and Runebinder open a third row to the
+            south, toward the Watch Ring. All three centres were checked
+            against every authored building footprint and placement before
+            being chosen -- the nearest neighbours are the Lantern Workbench
+            (92, -126) and the Waterworks (110, -212), both comfortably
+            clear. Colors match each profession's ability visual.
+        ]]
+        {
+            center = Vector3.new(-78, 0, -122),
+            color = Color3.fromRGB(154, 187, 92),
+            name = "ALCHEMIST",
+            paths = {
+                { id = "specialization_brewer", name = "BREWER" },
+                { id = "specialization_catalyst", name = "CATALYST" },
+                { id = "specialization_forager", name = "FORAGER" },
+            },
+        },
+        {
+            center = Vector3.new(78, 0, -214),
+            color = Color3.fromRGB(196, 120, 60),
+            name = "BEASTKEEPER",
+            paths = {
+                { id = "specialization_handler", name = "HANDLER" },
+                { id = "specialization_bondkeeper", name = "BONDKEEPER" },
+                { id = "specialization_wildspeaker", name = "WILDSPEAKER" },
+            },
+        },
+        {
+            center = Vector3.new(-78, 0, -214),
+            color = Color3.fromRGB(132, 150, 224),
+            name = "RUNEBINDER",
+            paths = {
+                { id = "specialization_scribe", name = "SCRIBE" },
+                { id = "specialization_channeler", name = "CHANNELER" },
+                { id = "specialization_veilwalker", name = "VEILWALKER" },
+            },
+        },
     }
     local authoredInteractionIds = {}
     local authoredInteractionCount = 0
@@ -7413,6 +7453,85 @@ function WorldService.showProfessionAbility(
             )
             cap.Shape = Enum.PartType.Ball
             cap.Transparency = 0.12
+        end
+    elseif visual.motif == "tonic_bloom" then
+        -- Corked vials tipping outward in a ring: the pour, not the garden --
+        -- the Medic's bloom already owns mushroom caps.
+        for index = 1, 5 do
+            local angle = math.rad(index * 72)
+            local vialPosition = origin
+                + Vector3.new(math.cos(angle) * 3.9, 0.85, math.sin(angle) * 3.9)
+            local vial = part(
+                model,
+                "TonicVial_" .. tostring(index),
+                Vector3.new(0.6, 1.35, 0.6),
+                CFrame.new(vialPosition) * CFrame.Angles(math.rad(24), angle, 0),
+                if index % 2 == 0 then color else accent,
+                Enum.Material.Glass,
+                false
+            )
+            vial.Transparency = 0.18
+            local cork = part(
+                model,
+                "TonicCork_" .. tostring(index),
+                Vector3.new(0.3, 0.26, 0.3),
+                vial.CFrame * CFrame.new(0, 0.78, 0),
+                Color3.fromRGB(110, 82, 54),
+                Enum.Material.Wood,
+                false
+            )
+            cork.Transparency = 0.05
+        end
+    elseif visual.motif == "hound_dash" then
+        -- A dash of paw-fall chevrons running out ahead of the keeper, the
+        -- direction the hound was sent. Root orientation is the only honest
+        -- signal of where the player was facing at cast.
+        local forward = root.CFrame.LookVector
+        local flat = Vector3.new(forward.X, 0, forward.Z)
+        local direction = if flat.Magnitude > 0.05 then flat.Unit else Vector3.new(0, 0, -1)
+        for index = 1, 4 do
+            local step = origin + direction * (2.4 + index * 2.3) + Vector3.new(0, 0.24, 0)
+            local sideways = Vector3.new(-direction.Z, 0, direction.X)
+                * (if index % 2 == 0 then 0.9 else -0.9)
+            local paw = part(
+                model,
+                "HoundDashStep_" .. tostring(index),
+                Vector3.new(0.95, 0.2, 1.5),
+                CFrame.lookAt(step + sideways, step + sideways + direction),
+                if index == 4 then accent else color,
+                Enum.Material.Neon,
+                false
+            )
+            paw.Transparency = 0.1 + index * 0.08
+        end
+    elseif visual.motif == "still_rune" then
+        -- A bound circle: four glyph bars crossing a thin ring, holding
+        -- rather than radiating -- this is the one ability motif about
+        -- stopping something, so nothing in it points outward.
+        local ring = part(
+            model,
+            "StillRuneRing",
+            Vector3.new(0.18, 7.6, 7.6),
+            CFrame.new(origin + Vector3.new(0, 0.3, 0)) * CFrame.Angles(0, 0, math.rad(90)),
+            color,
+            Enum.Material.Neon,
+            false
+        )
+        ring.Shape = Enum.PartType.Cylinder
+        ring.Transparency = 0.35
+        for index = 1, 4 do
+            local angle = math.rad(45 + (index - 1) * 90)
+            local bar = part(
+                model,
+                "StillRuneGlyph_" .. tostring(index),
+                Vector3.new(0.4, 0.22, 3.1),
+                CFrame.new(origin + Vector3.new(math.cos(angle) * 2.4, 0.42, math.sin(angle) * 2.4))
+                    * CFrame.Angles(0, -angle + math.rad(90), 0),
+                accent,
+                Enum.Material.Neon,
+                false
+            )
+            bar.Transparency = 0.08
         end
     end
 
