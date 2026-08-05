@@ -7,9 +7,16 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-05, at `main` = `f7e75f6` (PR #210), build `0.53.0`,
-save schema 16, 20 services. Published to Roblox as place version 68,
-matching this revision exactly.
+Last updated: 2026-08-05, at `main` = `3b153df` (PR #212), build `0.53.0`,
+save schema 16, 20 services. Published to Roblox as place version 69,
+matching this revision exactly. **#212 matters beyond its size**: driving
+the harvest → bank → craft → equip → strike loop end to end for the first
+time revealed that no resource node had ever paid out (wrong reward shape
+at the grant call site) and that a completed save could not strike
+town-night enemies at all (the combat gate ignored its own
+eligible-stages helper). Both fixed and re-verified live in one run, with
+the pick's harvest discount and the Amber Edge's stamina refund measured
+exactly. The economy works now; it did not before.
 
 ---
 
