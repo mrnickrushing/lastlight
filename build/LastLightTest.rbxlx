@@ -30832,7 +30832,11 @@ function WorldService._buildMara(self: WorldService, world: Model)
     local model = Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
     model.Name = "Mara"
     model:SetAttribute("ResidentId", "npc_mara")
-    model:PivotTo(CFrame.new(-3, 3, -30))
+    -- On the approach side of the fallen trunk, facing the player walking
+    -- in, so the pinned figure is actually visible. At (-3, 3, -30) she
+    -- stood at the deadfall's own centre and the authored trunk swallowed
+    -- her whole -- a rescue objective starring a floating nameplate.
+    model:PivotTo(CFrame.new(-3, 3, -27.4) * CFrame.Angles(0, math.pi, 0))
 
     local maraHumanoid = model:WaitForChild("Humanoid") :: Humanoid
     maraHumanoid.DisplayName = "Mara"
@@ -33590,7 +33594,25 @@ function WorldService.freeMara(self: WorldService)
         return
     end
     self._maraTrap = nil
-    trap:Destroy()
+    -- The trunk breaks and settles instead of blinking out of existence: a
+    -- thirty-stud log vanishing in one frame reads as a bug, not a rescue.
+    task.spawn(function()
+        local parts = {}
+        for _, descendant in trap:GetDescendants() do
+            if descendant:IsA("BasePart") then
+                table.insert(parts, descendant)
+            end
+        end
+        for _step = 1, 10 do
+            for index, item in parts do
+                local roll = if index % 2 == 0 then 0.02 else -0.02
+                item.CFrame = item.CFrame * CFrame.Angles(0, 0, roll) + Vector3.new(0, -0.16, 0)
+                item.Transparency = math.min(1, item.Transparency + 0.1)
+            end
+            task.wait(0.09)
+        end
+        trap:Destroy()
+    end)
 end
 
 -- The physical departure platform and where a launched party lands. Owned
@@ -47974,7 +47996,9 @@ stateChanged.OnClientEvent:Connect(function(snapshot: any)
     weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
     music:setSnapshot(snapshot)
     sfx:setSnapshot(snapshot)
-    objectiveMarkers:setTargets(snapshot.objectiveTargets)
+    objectiveMarkers:setTargets(
+        if snapshot.departed == true then snapshot.objectiveTargets else nil
+    )
     updateVignettes(snapshot)
 end)
 
@@ -47990,7 +48014,9 @@ task.spawn(function()
         music:setSnapshot(snapshot)
         -- Seeds the SFX signature only: joining mid-night is not a night falling.
         sfx:setSnapshot(snapshot)
-        objectiveMarkers:setTargets(snapshot.objectiveTargets)
+        objectiveMarkers:setTargets(
+            if snapshot.departed == true then snapshot.objectiveTargets else nil
+        )
         updateVignettes(snapshot, true)
     end
 end)
@@ -48979,7 +49005,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     professionButton.BackgroundColor3 = COLORS.panel
     professionButton.BackgroundTransparency = 0.08
     professionButton.Font = Enum.Font.GothamBold
-    professionButton.Text = "CHOOSE KIT"
+    professionButton.Text = "PROFESSION"
     professionButton.TextColor3 = COLORS.amber
     professionButton.TextSize = 12
     professionButton.Visible = false
@@ -49836,9 +49862,12 @@ function HUDController._updateProfessionClock(self: HUDController)
     self._professionButton.TextColor3 = if self._professionSwitchable
         then COLORS.amber
         else COLORS.muted
+    -- "Profession", not "kit": kit is reserved for the purchasable
+    -- character kits (docs/CHARACTER_KITS_SPEC.md), and selling one word
+    -- while the HUD uses it for a free system would be a bait.
     self._professionButton.Text = if displayName == nil
-        then "CHOOSE KIT"
-        else "KIT · " .. displayName
+        then "PROFESSION"
+        else "ROLE · " .. displayName
 
     for professionId, card in self._professionCards do
         local selected = professionId == selectedId
@@ -50273,8 +50302,10 @@ function HUDController._updateClock(self: HUDController)
         clockText = "DAWN · CHAPTER I"
     elseif phaseEndsAt > 0 then
         local remaining = math.max(0, math.ceil(phaseEndsAt - workspace:GetServerTimeNow()))
+        -- "LEFT" because "DAY · 02:58" reads as three in the morning, not as
+        -- a countdown. Two glyphs of clarity beat two glyphs of mystery.
         clockText =
-            string.format("%s · %02d:%02d", phase, math.floor(remaining / 60), remaining % 60)
+            string.format("%s · %02d:%02d LEFT", phase, math.floor(remaining / 60), remaining % 60)
     else
         clockText = if phase == "REVEAL" then "DAWN · FIRST LIGHT" else phase .. " · MORNING"
     end
@@ -50511,6 +50542,13 @@ function HUDController.update(self: HUDController, state: any)
     self._toast.Position = if self._playerDowned
         then UDim2.new(0.5, 0, 1, -264)
         else UDim2.new(0.5, 0, 1, -222)
+    -- In the lobby the story has not started: the objective card was
+    -- already reading "FREE MARA" over the departure panel, pointing at a
+    -- woman in a town the player had not left for. The card and the guide
+    -- line belong to the world past the platform.
+    local departedWorld = state.departed == true
+    self._objectiveFrame.Visible = departedWorld
+    self._mara.Visible = departedWorld
     self._objective.Text = tostring(state.objective or "")
     self._detail.Text = tostring(state.detail or "")
     self._progress.Text = string.format(

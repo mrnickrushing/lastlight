@@ -4165,7 +4165,11 @@ function WorldService._buildMara(self: WorldService, world: Model)
     local model = Players:CreateHumanoidModelFromDescription(description, Enum.HumanoidRigType.R15)
     model.Name = "Mara"
     model:SetAttribute("ResidentId", "npc_mara")
-    model:PivotTo(CFrame.new(-3, 3, -30))
+    -- On the approach side of the fallen trunk, facing the player walking
+    -- in, so the pinned figure is actually visible. At (-3, 3, -30) she
+    -- stood at the deadfall's own centre and the authored trunk swallowed
+    -- her whole -- a rescue objective starring a floating nameplate.
+    model:PivotTo(CFrame.new(-3, 3, -27.4) * CFrame.Angles(0, math.pi, 0))
 
     local maraHumanoid = model:WaitForChild("Humanoid") :: Humanoid
     maraHumanoid.DisplayName = "Mara"
@@ -6923,7 +6927,25 @@ function WorldService.freeMara(self: WorldService)
         return
     end
     self._maraTrap = nil
-    trap:Destroy()
+    -- The trunk breaks and settles instead of blinking out of existence: a
+    -- thirty-stud log vanishing in one frame reads as a bug, not a rescue.
+    task.spawn(function()
+        local parts = {}
+        for _, descendant in trap:GetDescendants() do
+            if descendant:IsA("BasePart") then
+                table.insert(parts, descendant)
+            end
+        end
+        for _step = 1, 10 do
+            for index, item in parts do
+                local roll = if index % 2 == 0 then 0.02 else -0.02
+                item.CFrame = item.CFrame * CFrame.Angles(0, 0, roll) + Vector3.new(0, -0.16, 0)
+                item.Transparency = math.min(1, item.Transparency + 0.1)
+            end
+            task.wait(0.09)
+        end
+        trap:Destroy()
+    end)
 end
 
 -- The physical departure platform and where a launched party lands. Owned

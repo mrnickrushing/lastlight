@@ -841,7 +841,7 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
     professionButton.BackgroundColor3 = COLORS.panel
     professionButton.BackgroundTransparency = 0.08
     professionButton.Font = Enum.Font.GothamBold
-    professionButton.Text = "CHOOSE KIT"
+    professionButton.Text = "PROFESSION"
     professionButton.TextColor3 = COLORS.amber
     professionButton.TextSize = 12
     professionButton.Visible = false
@@ -1698,9 +1698,12 @@ function HUDController._updateProfessionClock(self: HUDController)
     self._professionButton.TextColor3 = if self._professionSwitchable
         then COLORS.amber
         else COLORS.muted
+    -- "Profession", not "kit": kit is reserved for the purchasable
+    -- character kits (docs/CHARACTER_KITS_SPEC.md), and selling one word
+    -- while the HUD uses it for a free system would be a bait.
     self._professionButton.Text = if displayName == nil
-        then "CHOOSE KIT"
-        else "KIT · " .. displayName
+        then "PROFESSION"
+        else "ROLE · " .. displayName
 
     for professionId, card in self._professionCards do
         local selected = professionId == selectedId
@@ -2135,8 +2138,10 @@ function HUDController._updateClock(self: HUDController)
         clockText = "DAWN · CHAPTER I"
     elseif phaseEndsAt > 0 then
         local remaining = math.max(0, math.ceil(phaseEndsAt - workspace:GetServerTimeNow()))
+        -- "LEFT" because "DAY · 02:58" reads as three in the morning, not as
+        -- a countdown. Two glyphs of clarity beat two glyphs of mystery.
         clockText =
-            string.format("%s · %02d:%02d", phase, math.floor(remaining / 60), remaining % 60)
+            string.format("%s · %02d:%02d LEFT", phase, math.floor(remaining / 60), remaining % 60)
     else
         clockText = if phase == "REVEAL" then "DAWN · FIRST LIGHT" else phase .. " · MORNING"
     end
@@ -2373,6 +2378,13 @@ function HUDController.update(self: HUDController, state: any)
     self._toast.Position = if self._playerDowned
         then UDim2.new(0.5, 0, 1, -264)
         else UDim2.new(0.5, 0, 1, -222)
+    -- In the lobby the story has not started: the objective card was
+    -- already reading "FREE MARA" over the departure panel, pointing at a
+    -- woman in a town the player had not left for. The card and the guide
+    -- line belong to the world past the platform.
+    local departedWorld = state.departed == true
+    self._objectiveFrame.Visible = departedWorld
+    self._mara.Visible = departedWorld
     self._objective.Text = tostring(state.objective or "")
     self._detail.Text = tostring(state.detail or "")
     self._progress.Text = string.format(
