@@ -1,5 +1,7 @@
 --!strict
 
+local Players = game:GetService("Players")
+
 local TownNightService = {}
 TownNightService.__index = TownNightService
 TownNightService.Name = "TownNightService"
@@ -339,12 +341,31 @@ function TownNightService._runCycle(self: TownNightService)
                     themeProfile.instruction
                 )
         )
+        --[[
+            The director's census: defenders who are actually in this fight
+            -- past First Light's survival gate and standing in the town, not
+            off in Bramblewake. Counted once at nightfall so the night's
+            layout stays deterministic even as players come and go; a defender
+            who leaves mid-night thins the line, not the schedule.
+        ]]
+        local partySize = 0
+        for _, player in Players:GetPlayers() do
+            if
+                player:GetAttribute("LastLightTutorialSurvivalReady") == true
+                and player:GetAttribute("LastLightInExpedition") ~= true
+            then
+                partySize += 1
+            end
+        end
+        partySize = math.max(partySize, 1)
         self._logger:info("town_night_started", {
             blackoutDue = blackoutDue,
             night = activeNight,
+            partySize = partySize,
+            waves = self._townNightSchedule.waveCount(activeNight, partySize),
         })
 
-        for _, beat in self._townNightSchedule.beats(self._nightSeconds, activeNight) do
+        for _, beat in self._townNightSchedule.beats(self._nightSeconds, activeNight, partySize) do
             waitUntilTime(nightStartedAt + beat.at)
             if beat.kind == "spawn" then
                 self._worldService:signalNightWave(beat.enemyId, beat.wave, theme)
