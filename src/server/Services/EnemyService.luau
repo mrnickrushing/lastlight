@@ -789,10 +789,18 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
             enemy.definition.statusMultiplier or 1
         )
     elseif result.applied and enemy.definition.statusEffect == "spark_theft" then
+        -- Ambient spark theft scales with how many hands can answer it. At
+        -- full rate a lone player watched the light fall 100 -> its floor in
+        -- under a minute while physically unable to be everywhere; a full
+        -- party keeps the authored pressure. Incident failures and direct
+        -- lantern impacts stay unscaled -- those are outcomes, not weather.
+        local defenders = #Players:GetPlayers()
+        local partyScale = if defenders <= 1 then 0.55 elseif defenders == 2 then 0.8 else 1
         lanternPressure, lanternAbsorbed = self:_absorbLanternPressure(
             math.ceil(
                 (enemy.definition.statusLanternDamage or 0)
                     * self._nightModifiers.lanternDamageMultiplier
+                    * partyScale
             ),
             enemyId .. "_spark_theft",
             now

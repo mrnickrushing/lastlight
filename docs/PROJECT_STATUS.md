@@ -28,6 +28,19 @@ Studio pathfinding pass.
 
 Verified against `git log`, newest first:
 
+- **(in flight: `agent/wave4-meta-balance`)** Audit wave 4, the last of the
+  audit's fix waves. **Solo night pressure:** hollow-crow spark theft now
+  scales with defender count (×0.55 solo, ×0.8 duo, full at 3+) — a lone
+  player watched the light fall 100 → its 18 floor in under a minute while
+  unable to be everywhere; incident failures and direct lantern impacts stay
+  unscaled. **Field Book reads like a book:** RichText amber section
+  headers with rules, muted secondary detail, human empty states ("Nothing
+  learned yet — find a workbench."), archive entries with bold titles and
+  muted body text — still one label, presentation only. Remaining from the
+  audit: two live-device verifications for the owner (night-enemy
+  visibility post-#188/#191 lighting, interaction-prompt card reliability)
+  and the deferred taste items already listed under open threads.
+
 - **(in flight: `agent/wave3-guidance`)** Audit wave 3, guidance and
   fiction. The lobby no longer leaks the story: the objective card, guide
   line, and objective markers hide until `departed` — "FREE MARA" was
