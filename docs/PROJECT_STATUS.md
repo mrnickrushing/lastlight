@@ -27,15 +27,16 @@ there, not a copy here. Note the gate's own caveat: the layout validator only
 guards footprint clearance from source — the gate itself still needs a live
 Studio pathfinding pass.
 
-**Milestone 6 (complete systemic foundation) is two waves in.** Wave A
-(#206) landed all seven professions; wave B (#208) landed the six weapon
-families with benches, held visuals, and recipes. Still open on the M6
-deliverable: the eight tool families (today: axe/hammer/torch starter
-tools), loadouts, repair, equipment traits, the status/reaction system,
-companions, the enemy director, and defense plots. Per-family live strike
-verification (sling snare, edge refund) needs the crafting economy driven
-end to end — banked materials → craft → equip — recorded as open in
-[MILESTONE_6_WEAPON_FAMILIES.md](MILESTONE_6_WEAPON_FAMILIES.md).
+**Milestone 6 (complete systemic foundation) is three waves in.** Wave A
+(#206) landed all seven professions, wave B (#208) the six weapon
+families, and wave C the eight tool families (`ToolCatalog`, all eight
+displays in the yard, post-tutorial swapping, live-verified endurance
+identities — see [MILESTONE_6_TOOL_FAMILIES.md](MILESTONE_6_TOOL_FAMILIES.md)).
+Still open: loadouts, repair, equipment traits, the status/reaction
+system, companions, the enemy director, and defense plots. Open live
+checks: weapon per-family strikes (needs the crafting economy loop —
+[MILESTONE_6_WEAPON_FAMILIES.md](MILESTONE_6_WEAPON_FAMILIES.md)) and
+pick/sickle harvest timing + the survey marker on a real trail.
 
 ## Recently landed (PRs ~#151–#208)
 

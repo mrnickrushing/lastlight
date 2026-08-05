@@ -11,6 +11,7 @@ TestRunner.run({
     require("./specs/ExpeditionContracts.spec"),
     require("./specs/ExpeditionSampling.spec"),
     require("./specs/Crafting.spec"),
+    require("./specs/ToolCatalog.spec"),
     require("./specs/Environment.spec"),
     require("./specs/MemoryFragments.spec"),
     require("./specs/MeshAssetRegistry.spec"),

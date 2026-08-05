@@ -1,5 +1,6 @@
 --!strict
 
+local ToolCatalog = require("./ToolCatalog")
 local TutorialFlow = require("./TutorialFlow")
 local ExpeditionInventory = require("./ExpeditionInventory")
 local ProfessionCatalog = require("./ProfessionCatalog")
@@ -140,14 +141,10 @@ function SaveSchema.normalize(value: any, now: number): Profile
             profile.tutorial.complete = true
             profile.tutorial.stage = "complete"
         end
-        if
-            type(tutorial.selectedTool) == "string"
-            and (
-                tutorial.selectedTool == "axe"
-                or tutorial.selectedTool == "hammer"
-                or tutorial.selectedTool == "torch"
-            )
-        then
+        -- Validated against the tool catalog rather than three literals:
+        -- the roster is eight families now, and the catalog is where a
+        -- tool's very existence is decided.
+        if ToolCatalog.isValid(tutorial.selectedTool) then
             profile.tutorial.selectedTool = tutorial.selectedTool
         end
         if

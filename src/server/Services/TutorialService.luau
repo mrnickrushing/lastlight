@@ -60,6 +60,7 @@ export type TutorialService = typeof(setmetatable(
         _equipmentCatalog: any,
         _residentDialogue: any,
         _actionProgress: any,
+        _toolCatalog: any,
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -95,7 +96,8 @@ function TutorialService.new(
     craftingCatalog: any,
     equipmentCatalog: any,
     residentDialogue: any,
-    actionProgress: any
+    actionProgress: any,
+    toolCatalog: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -125,6 +127,7 @@ function TutorialService.new(
         _equipmentCatalog = equipmentCatalog,
         _residentDialogue = residentDialogue,
         _actionProgress = actionProgress,
+        _toolCatalog = toolCatalog,
         _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -413,6 +416,7 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
             else "FOLLOW THE LANTERN TRAIL",
         toastRevision = 1,
     }
+    self:_applyToolAttributes(player, session.selectedTool)
     -- A guest is told they are one, at the door. The permission model has
     -- always protected the host's town; the visit only becomes deliberate
     -- when the visitor knows whose lanterns they are standing under.
@@ -540,12 +544,32 @@ function TutorialService._beginTimedAction(
     end
     local now = workspace:GetServerTimeNow()
     local session = self._sessions[player]
-    -- The hammer is the worker's tool: gather and build run a quarter faster
-    -- with it in hand. Combat identity lives in _strikeContext; this is the
-    -- hammer's half of "the three tools actually differ".
-    local durationMultiplier = if session ~= nil and session.selectedTool == "hammer"
-        then 0.75
-        else 1
+    --[[
+        Work identity: the hammer hurries every timed action, while the
+        pick and sickle hurry only harvests of their own materials -- the
+        node's reward decides, so a pick at a brightcap is just a pick.
+        Combat identity lives in _strikeContext; this is the other half of
+        "the tools actually differ".
+    ]]
+    local tool = self._toolCatalog.get(if session ~= nil then session.selectedTool else nil)
+    local durationMultiplier = 1
+    if tool ~= nil then
+        if tool.actionDurationMultiplier ~= nil then
+            durationMultiplier = tool.actionDurationMultiplier
+        elseif
+            tool.gatherDurationMultiplier ~= nil
+            and actionId == self._runtimeIds.Actions.Gather
+            and tool.gatherMaterials ~= nil
+        then
+            local node = self._worldService:resourceNode(interactionId)
+            local materialId = if node ~= nil and type(node.reward) == "table"
+                then node.reward.materialId
+                else nil
+            if materialId ~= nil and tool.gatherMaterials[materialId] == true then
+                durationMultiplier = tool.gatherDurationMultiplier
+            end
+        end
+    end
     local nextState, result = self._actionProgress.begin(
         self._actions[player],
         actionId,
@@ -622,15 +646,61 @@ end
     is what the client's arrow visual keys off. All numbers live here and in
     Equipment; a client never submits any of them.
 ]]
+--[[
+    The endurance families work through per-player attributes, the same
+    channel survival already syncs health through: the combat service reads
+    them without a service edge existing in either direction, and they
+    follow the tool wherever it is set -- selection at the yard, or a
+    profile load restoring last session's choice.
+]]
+--[[
+    The survey glass's exploration identity: while it is the held tool and
+    the player walks Bramblewake, the objective markers include the nearest
+    unharvested resource node, labeled with what it pays. One marker, the
+    nearest only -- a surveyor's bearing, not a maphack.
+]]
+function TutorialService._addSurveyTarget(
+    self: TutorialService,
+    player: Player,
+    add: (BasePart?, string) -> ()
+)
+    local session = self._sessions[player]
+    local tool = self._toolCatalog.get(if session ~= nil then session.selectedTool else nil)
+    if tool == nil or tool.surveyRevealsNodes ~= true then
+        return
+    end
+    local character = player.Character
+    local root = if character == nil then nil else character:FindFirstChild("HumanoidRootPart")
+    if root == nil or not root:IsA("BasePart") then
+        return
+    end
+    local node = self._worldService:nearestResourceNode(root.Position)
+    if node ~= nil and node.target ~= nil then
+        add(node.target, "SURVEY · " .. string.upper(tostring(node.objectText)))
+    end
+end
+
+function TutorialService._applyToolAttributes(self: TutorialService, player: Player, toolId: any)
+    local definition = self._toolCatalog.get(toolId)
+    player:SetAttribute(
+        "LastLightToolStaminaRegen",
+        if definition ~= nil then definition.staminaRegenMultiplier else nil
+    )
+    player:SetAttribute(
+        "LastLightToolSprintSpeed",
+        if definition ~= nil then definition.sprintSpeedMultiplier else nil
+    )
+end
+
 function TutorialService._strikeContext(self: TutorialService, player: Player): any
     local session = self._sessions[player]
     local context = { rangeBonus = 0, damageMultiplier = 1 }
-    local tool = if session ~= nil then session.selectedTool else nil
-    if tool == "axe" then
-        context.damageMultiplier = 1.25
-    elseif tool == "torch" then
-        context.rangeBonus = 4
-        context.damageMultiplier = 0.9
+    -- Tool identity comes from the catalog now that there are eight
+    -- families, not a literal per starter tool.
+    local tool = self._toolCatalog.get(if session ~= nil then session.selectedTool else nil)
+    if tool ~= nil then
+        context.rangeBonus = tool.strikeRangeBonus or 0
+        context.damageMultiplier = tool.strikeDamageMultiplier or 1
     end
     local weapon = self._profileService:weaponStrikeProfile(player)
     if weapon ~= nil then
@@ -1046,6 +1116,31 @@ function TutorialService._interact(
         end
     end
 
+    --[[
+        Tools stay swappable after First Light, the same freedom professions
+        have: eight families are situational -- a pick for a sap run, the
+        survey glass for an unfamiliar trail -- and locking the tutorial's
+        one-shot choice forever would make seven of them dead content. The
+        swap is town-only: not while downed, and not out in Bramblewake
+        where the supply crates are a lodge away.
+    ]]
+    if
+        actionId == self._runtimeIds.Actions.ChooseTool
+        and session.stage == "complete"
+        and self._survivalService:canAct(player)
+        and player:GetAttribute("LastLightInExpedition") ~= true
+    then
+        local selectedTool = prompt:GetAttribute("Payload")
+        if self._toolCatalog.isValid(selectedTool) then
+            session.selectedTool = selectedTool
+            self:_applyToolAttributes(player, selectedTool)
+            self._profileService:setTutorial(player, session.stage, selectedTool)
+            self:_setToast(player, self._toolCatalog.get(selectedTool).displayName .. " SELECTED")
+            self:_publish(player)
+            return
+        end
+    end
+
     local ok, reason = self:_advance(player, actionId)
     if not ok then
         local expected = self._tutorialFlow.definition(session.stage).objective
@@ -1071,10 +1166,12 @@ function TutorialService._interact(
         self:_setToast(player, "+3 HEARTWOOD")
     elseif actionId == self._runtimeIds.Actions.ChooseTool then
         local selectedTool = prompt:GetAttribute("Payload")
-        if type(selectedTool) == "string" then
+        if self._toolCatalog.isValid(selectedTool) then
             session.selectedTool = selectedTool
+            self:_applyToolAttributes(player, selectedTool)
             self._profileService:setTutorial(player, session.stage, selectedTool)
-            self:_setToast(player, string.upper(selectedTool) .. " SELECTED")
+            local definition = self._toolCatalog.get(selectedTool)
+            self:_setToast(player, definition.displayName .. " SELECTED")
         end
     elseif actionId == self._runtimeIds.Actions.Build then
         session.resources -= 3
@@ -1330,6 +1427,7 @@ function TutorialService._objectiveTargets(
         local arena = self._worldService:blackoutArena()
         if blackout ~= nil and arena ~= nil then
             if blackout.status == "relay" then
+                self:_addSurveyTarget(player, add)
                 if blackout.carryingFire and blackout.nextNodeId ~= nil then
                     add(arena.relayNodes[blackout.nextNodeId], "DELIVER ROOTFIRE")
                 else
@@ -1368,6 +1466,7 @@ function TutorialService._objectiveTargets(
         if holder ~= nil and holder:IsA("BasePart") then
             add(holder, "WAYHOME GATE")
         end
+        self:_addSurveyTarget(player, add)
         return resolved
     end
     local definition = self._tutorialFlow.definition(session.stage)
