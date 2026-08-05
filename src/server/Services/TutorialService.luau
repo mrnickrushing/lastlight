@@ -562,9 +562,9 @@ function TutorialService._beginTimedAction(
             and tool.gatherMaterials ~= nil
         then
             local node = self._worldService:resourceNode(interactionId)
-            local materialId = if node ~= nil and type(node.reward) == "table"
-                then node.reward.materialId
-                else nil
+            -- The node record carries materialId directly -- the same shape
+            -- the grant site reads -- not nested under a reward table.
+            local materialId = if node ~= nil then node.materialId else nil
             if materialId ~= nil and tool.gatherMaterials[materialId] == true then
                 durationMultiplier = tool.gatherDurationMultiplier
             end
@@ -720,10 +720,23 @@ end
 
 function TutorialService.strike(self: TutorialService, player: Player)
     local session = self._sessions[player]
+    --[[
+        isCombatEligibleStage, not stage == "survive": the literal meant a
+        player who finished the tutorial could never strike a town-night
+        enemy again -- swings and taps silently did nothing from the
+        "complete" stage onward, in the very nights the repeating cycle
+        keeps sending creatures at the lantern. The helper at the top of
+        this file has always named the right set; the gate just did not
+        use it. Found live: a crafted Amber Edge, a Night 1 Rootling, and
+        a strike that refused to land.
+    ]]
     if
         session ~= nil
         and self._survivalService:canAct(player)
-        and (session.stage == "survive" or player:GetAttribute("LastLightInExpedition") == true)
+        and (
+            isCombatEligibleStage(session.stage)
+            or player:GetAttribute("LastLightInExpedition") == true
+        )
     then
         local context = self:_strikeContext(player)
         local _, message = self._enemyService:damageNearest(player, context)
@@ -848,10 +861,16 @@ function TutorialService._interact(
         then
             return
         end
+        -- { materialId = ..., amount = ... }, the ledger's contract -- not a
+        -- materials map. The map shape threw "reward contract is invalid" on
+        -- every single node harvest, which means no node on any route has
+        -- ever actually paid out: the timer ran, the assert fired, the node
+        -- survived to be clicked again. Found the first time the full
+        -- harvest -> bank -> craft loop was driven end to end.
         local granted = self._expeditionService:grantNodeReward(
             player.UserId,
             interactionId,
-            { [node.materialId] = 1 }
+            { materialId = node.materialId, amount = 1 }
         )
         if granted then
             self._worldService:markResourceNodeHarvested(interactionId)
