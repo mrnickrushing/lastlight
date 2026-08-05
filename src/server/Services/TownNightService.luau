@@ -481,6 +481,35 @@ end
     benches use. The client sends the generic interaction ID and never names a
     building, so a forged payload cannot repair something that was not there.
 ]]
+--[[
+    Tomas's dawn boon: one free repair point on the worst-hit standing
+    building. Reuses the same condition transaction as a player repair, so
+    it can never restore more than a hammer swing would.
+]]
+function TownNightService.residentRepair(self: TownNightService): any?
+    local snapshot = self:conditionSnapshot()
+    local worst = nil
+    for _, entry in snapshot.damaged or {} do
+        if worst == nil or entry.integrity < worst.integrity then
+            worst = entry
+        end
+    end
+    if worst == nil then
+        return nil
+    end
+    local nextCondition, result = self._townCondition.repair(self._condition, worst.buildingId)
+    if not result.applied then
+        return nil
+    end
+    self._condition = nextCondition
+    self._worldService:setTownCondition(self:conditionSnapshot())
+    return { buildingId = worst.buildingId, restored = result.restored }
+end
+
+function TownNightService.themeForNight(self: TownNightService, nightNumber: number): string
+    return tostring(self._townNightSchedule.theme(nightNumber))
+end
+
 function TownNightService.repairTown(self: TownNightService, buildingId: any): any
     if self._phase ~= "day" then
         return { accepted = false, message = "TOWN REPAIRS WAIT FOR DAYLIGHT", reason = "not_day" }

@@ -6921,6 +6921,33 @@ function WorldService.setClickHandler(self: WorldService, handler: (Player, stri
     self._clickHandler = handler
 end
 
+--[[
+    An injured resident wears it: attribute for systems, a RESTING suffix on
+    the nameplate for players. Presentation only -- the truth lives in the
+    profile's resident state.
+]]
+function WorldService.setResidentInjured(self: WorldService, residentId: string, injured: boolean)
+    local residents = self._townResidents
+    if residents == nil then
+        return
+    end
+    local resident = residents[residentId]
+    if resident == nil or resident.model == nil or resident.model.Parent == nil then
+        return
+    end
+    resident.model:SetAttribute("Injured", injured)
+    local head = resident.interactionTarget
+    if head ~= nil then
+        local label = head:FindFirstChild("WorldLabel")
+        local text = if label ~= nil then label:FindFirstChildOfClass("TextLabel") else nil
+        if text ~= nil then
+            text.Text = if injured
+                then resident.displayName .. " · RESTING"
+                else resident.displayName
+        end
+    end
+end
+
 function WorldService.freeMara(self: WorldService)
     local trap = self._maraTrap
     if trap == nil then

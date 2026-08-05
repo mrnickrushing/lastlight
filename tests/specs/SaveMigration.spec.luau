@@ -199,6 +199,41 @@ local ERA_PROFILES: { [number]: any } = {
         gear = { gear_meadow_satchel = 1 },
         quests = { claimed = { quest_first_craft = true } },
     },
+
+    -- Schema 14 shipped the memory archive (story.fragments); 15 adds
+    -- resident life (town.residents + town.crisis). A 14-era save carries
+    -- recovered fragments that must survive, and must arrive in 15 with
+    -- every resident healthy, unbonded, and no crisis standing -- the
+    -- systems did not exist, so nothing about them can be owed or held.
+    [14] = {
+        schemaVersion = 14,
+        createdAt = 12,
+        updatedAt = 30,
+        revision = 51,
+        tutorial = { stage = "complete", complete = true },
+        town = {
+            nightNumber = 18,
+            condition = {
+                buildings = { building_inn = 40, building_watchtower = 75 },
+                lastNightNumber = 17,
+                repairsCompleted = 9,
+            },
+            construction = { building_archive = 3, building_inn = 2 },
+        },
+        story = {
+            chapterOne = {
+                status = "complete",
+                decision = "restore_farmland",
+                wardenOutcome = "preserved",
+                transactionId = "chapter_1:era14:hash:1",
+                completedAt = 22,
+            },
+            fragments = { fragment_last_harvest = true },
+        },
+        profession = { selectedId = "profession_scout" },
+        gear = { gear_bramble_boots = 1 },
+        quests = { claimed = { quest_first_craft = true } },
+    },
 }
 
 -- Every field SaveSchema.default produces. A migrated profile that is missing

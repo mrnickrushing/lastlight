@@ -175,13 +175,75 @@ function TutorialService.Init(self: TutorialService, context: any)
     end)
     self._townNightService:setNightCompletedHandler(
         function(nightNumber: number, endingLanternHealth: number, condition: any)
+            -- Resident life resolves on the night that just ran. The context
+            -- is identical for every profile on the server, so every player's
+            -- town remembers the same night.
+            local buildingIntegrity: { [string]: number } = {}
+            for _, entry in condition.damaged or {} do
+                buildingIntegrity[entry.buildingId] = entry.integrity / 100
+            end
+            local residentContext = {
+                nightNumber = nightNumber - 1,
+                buildingIntegrity = buildingIntegrity,
+                lanternHitFloor = endingLanternHealth <= 18,
+            }
+            local sharedReport: any = nil
             for player in self._sessions do
                 self._profileService:setNightNumber(player, nightNumber)
                 self._profileService:setTownCondition(player, condition)
+                local report = self._profileService:applyResidentNight(player, residentContext)
+                if sharedReport == nil and report ~= nil then
+                    sharedReport = report
+                end
                 local questSuffix = self:_questToastSuffix(player)
                 if questSuffix ~= nil then
                     self:_setToast(player, questSuffix)
                 end
+            end
+            if sharedReport ~= nil then
+                for _, residentId in sharedReport.injuries do
+                    self._worldService:setResidentInjured(residentId, true)
+                    self:_toastAll(
+                        string.format(
+                            "%s WAS HURT IN THE NIGHT — CHECK ON THEM",
+                            string.upper(string.gsub(string.gsub(residentId, "npc_", ""), "_", " "))
+                        )
+                    )
+                end
+                for _, residentId in sharedReport.recoveries do
+                    self._worldService:setResidentInjured(residentId, false)
+                end
+                if sharedReport.crisis ~= nil then
+                    self:_toastAll(
+                        sharedReport.crisis.title .. " — " .. sharedReport.crisis.detail
+                    )
+                end
+            end
+            -- Dawn boons from whoever is present; the effects are town-wide
+            -- and deterministic, so the first profile speaks for the server.
+            for player in self._sessions do
+                local boons = self._profileService:residentDawnBoons(player)
+                for _, boon in boons do
+                    if boon.boon == "dawn_repair" then
+                        local repaired = self._townNightService:residentRepair()
+                        if repaired ~= nil then
+                            self:_toastAll(boon.label)
+                        end
+                    elseif boon.boon == "night_forewarning" then
+                        self:_toastAll(
+                            string.format(
+                                "%s — NIGHT %d: %s",
+                                boon.label,
+                                nightNumber,
+                                self._townNightService:themeForNight(nightNumber)
+                            )
+                        )
+                    elseif boon.boon == "lantern_reserve" then
+                        self._enemyService:grantLanternReserve(6)
+                        self:_toastAll(boon.label)
+                    end
+                end
+                break
             end
             self._analyticsService:townNightConsequence(
                 nightNumber - 1,
@@ -384,6 +446,13 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     local definition = self._tutorialFlow.definition(currentStage)
     self._analyticsService:stage(player, definition.index, currentStage)
     self:_publish(player)
+end
+
+function TutorialService._toastAll(self: TutorialService, message: string)
+    for _, session in self._sessions do
+        session.toast = message
+        session.toastRevision += 1
+    end
 end
 
 function TutorialService._setToast(self: TutorialService, player: Player, message: string)
@@ -826,6 +895,25 @@ function TutorialService._interact(
     end
     if actionId == self._runtimeIds.Actions.TalkResident then
         local residentId = prompt:GetAttribute("Payload")
+        -- Talking IS checking on someone. Care shortens an injury and builds
+        -- the bond; a healthy visit bonds once per night. The dialogue line
+        -- still plays underneath, so the moment stays a conversation.
+        local care = self._profileService:checkOnResident(player, tostring(residentId))
+        if care.accepted and care.healed then
+            self:_setToast(
+                player,
+                string.format(
+                    "%s IS BACK ON THEIR FEET — BOND · %d",
+                    string.upper(
+                        string.gsub(string.gsub(tostring(residentId), "npc_", ""), "_", " ")
+                    ),
+                    care.bond
+                )
+            )
+            self._worldService:setResidentInjured(tostring(residentId), false)
+            self:_publish(player)
+            return
+        end
         local response = self._residentDialogue.respond(
             residentId,
             self._profileService:questSnapshot(player),
@@ -1487,6 +1575,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         recipes = self._craftingCatalog:list(),
         equipmentCatalog = self._equipmentCatalog.list(),
         objectiveTargets = self:_objectiveTargets(player, session),
+        residentLife = self._profileService:residentLifeSnapshot(player),
         guideSpeaker = guideSpeaker,
         quests = self._profileService:questSnapshot(player),
         memoryArchive = self._profileService:memoryFragments(player),

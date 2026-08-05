@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-04, at `main` = `ae0ad4b` (PR #184), build `0.51.0`,
-save schema 14, 20 services.
+Last updated: 2026-08-05, at `main` = `ae0ad4b`+ (audit waves #191–#194 merged),
+build `0.52.0`, save schema 15, 20 services.
 
 ---
 
@@ -27,6 +27,20 @@ Studio pathfinding pass.
 ## Recently landed (PRs ~#151–#181)
 
 Verified against `git log`, newest first:
+
+- **(in flight: `agent/m4-resident-life`)** Milestone 4's resident-life
+  deliverable: jobs, injury, bonds, and the crisis framework. New pure
+  `ResidentLife.luau` (save schema 15, era-14 migration fixture added):
+  each resident holds a job at a real building (Tomas/inn, Pip/town board,
+  Ena/workbench); a workplace falling below half integrity in a night
+  injures its keeper for two nights (deterministic — no dice); two
+  simultaneous injuries (or an injury on a lantern-floor night) is a CARE
+  crisis persisted on the profile; players CHECK ON residents — care
+  shortens recovery and builds per-profile bonds (NEWCOMER→ACQUAINTED→
+  TRUSTED→KINDRED), healthy visits bond once per night; healthy employed
+  residents grant dawn boons that touch town systems only (Tomas patches
+  the worst-hit building, Pip forewarns the night theme, Ena banks a spark
+  reserve) — never player power. Build 0.52.0.
 
 - **(in flight: `agent/wave4-meta-balance`)** Audit wave 4, the last of the
   audit's fix waves. **Solo night pressure:** hollow-crow spark theft now

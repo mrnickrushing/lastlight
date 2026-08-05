@@ -679,6 +679,46 @@ function ProfileService.equipmentStats(self: ProfileService, player: Player): an
     return self._saveSchema.equipmentStats(profile)
 end
 
+function ProfileService.applyResidentNight(self: ProfileService, player: Player, context: any): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return nil
+    end
+    local nextProfile, report = self._saveSchema.withResidentNight(profile, context, os.time())
+    self._profiles[player] = nextProfile
+    return report
+end
+
+function ProfileService.checkOnResident(
+    self: ProfileService,
+    player: Player,
+    residentId: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { accepted = false, reason = "profile_unavailable", healed = false, bond = 0 }
+    end
+    local nextProfile, result = self._saveSchema.withResidentCheck(profile, residentId, os.time())
+    self._profiles[player] = nextProfile
+    return result
+end
+
+function ProfileService.residentLifeSnapshot(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return self._saveSchema.residentLifeSnapshot(profile)
+end
+
+function ProfileService.residentDawnBoons(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {}
+    end
+    return self._saveSchema.residentDawnBoons(profile)
+end
+
 function ProfileService.townConsequence(self: ProfileService, player: Player): any
     local profile = self._profiles[player]
     if profile == nil then

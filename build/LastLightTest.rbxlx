@@ -2445,14 +2445,14 @@ return table.freeze(CombatState)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.51.0",
+    BuildVersion = "0.52.0",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 14,
+    SaveSchemaVersion = 15,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -9516,6 +9516,343 @@ return table.freeze(ResidentDialogue)
       </Item>
       <Item class="ModuleScript" referent="51">
         <Properties>
+          <string name="Name">ResidentLife</string>
+          <string name="Source"><![CDATA[--!strict
+--[[
+    Resident life: jobs, injury, bonds, and town crises.
+
+    Milestone 4 asks for residents who are part of the town's systems rather
+    than scenery on a schedule. This module is the whole of that judgement,
+    kept pure — night outcomes in, next resident state out — so the specs can
+    hold every rule still and the services stay wiring.
+
+    Design rules this module enforces:
+    - Everything here is deterministic. An injury is caused by a workplace
+      falling, never by a dice roll, so a player can always answer "why".
+    - Effects touch town systems only (repairs, warnings, the lantern's
+      floor). No resident boon ever changes player damage, speed, or drops —
+      that keeps the no-paid-power line easy to hold forever.
+    - Bonds are per-profile: they are the town remembering *you*.
+]]
+
+local ResidentLife = {}
+
+export type ResidentState = {
+    injuredUntilNight: number,
+    bond: number,
+    lastVisitNight: number,
+}
+
+export type State = { [string]: ResidentState }
+
+export type Job = {
+    residentId: string,
+    buildingId: string,
+    title: string,
+    boon: string,
+    boonLabel: string,
+}
+
+export type NightContext = {
+    nightNumber: number,
+    buildingIntegrity: { [string]: number },
+    lanternHitFloor: boolean,
+}
+
+export type Crisis = {
+    id: string,
+    kind: string,
+    title: string,
+    detail: string,
+    startedNight: number,
+}
+
+export type NightReport = {
+    injuries: { string },
+    recoveries: { string },
+    crisis: Crisis?,
+}
+
+local RESIDENT_IDS = table.freeze({ "npc_tomas_reed", "npc_pip_wren", "npc_ena_moss" })
+
+local JOBS: { [string]: Job } = table.freeze({
+    npc_tomas_reed = table.freeze({
+        residentId = "npc_tomas_reed",
+        buildingId = "building_inn",
+        title = "QUARTERMASTER",
+        boon = "dawn_repair",
+        boonLabel = "TOMAS PATCHES THE WORST-HIT BUILDING",
+    }),
+    npc_pip_wren = table.freeze({
+        residentId = "npc_pip_wren",
+        buildingId = "building_town_board",
+        title = "COURIER",
+        boon = "night_forewarning",
+        boonLabel = "PIP POSTS WORD OF THE COMING NIGHT",
+    }),
+    npc_ena_moss = table.freeze({
+        residentId = "npc_ena_moss",
+        buildingId = "building_workbench",
+        title = "SEEDKEEPER",
+        boon = "lantern_reserve",
+        boonLabel = "ENA BANKS A SPARK RESERVE FOR THE LANTERN",
+    }),
+})
+
+-- A workplace this damaged injures its keeper during the night's chaos.
+local INJURY_INTEGRITY_THRESHOLD = 0.5
+-- Nights of rest an injury costs, before anyone checks on them.
+local INJURY_REST_NIGHTS = 2
+local BOND_MAX = 100
+local BOND_VISIT = 1
+local BOND_CARE = 5
+
+ResidentLife.Ids = RESIDENT_IDS
+ResidentLife.Jobs = JOBS
+ResidentLife.BondTiers = table.freeze({
+    { threshold = 75, title = "KINDRED" },
+    { threshold = 50, title = "TRUSTED" },
+    { threshold = 25, title = "ACQUAINTED" },
+    { threshold = 0, title = "NEWCOMER" },
+})
+
+local function defaultResident(): ResidentState
+    return {
+        injuredUntilNight = 0,
+        bond = 0,
+        lastVisitNight = 0,
+    }
+end
+
+function ResidentLife.default(): State
+    local state: State = {}
+    for _, residentId in RESIDENT_IDS do
+        state[residentId] = defaultResident()
+    end
+    return state
+end
+
+function ResidentLife.normalize(value: any): State
+    local state = ResidentLife.default()
+    if type(value) ~= "table" then
+        return state
+    end
+    for _, residentId in RESIDENT_IDS do
+        local stored = value[residentId]
+        if type(stored) == "table" then
+            local resident = state[residentId]
+            resident.injuredUntilNight =
+                math.max(0, math.floor(tonumber(stored.injuredUntilNight) or 0))
+            resident.bond = math.clamp(math.floor(tonumber(stored.bond) or 0), 0, BOND_MAX)
+            resident.lastVisitNight = math.max(0, math.floor(tonumber(stored.lastVisitNight) or 0))
+        end
+    end
+    return state
+end
+
+function ResidentLife.isInjured(state: State, residentId: string, nightNumber: number): boolean
+    local resident = state[residentId]
+    return resident ~= nil and resident.injuredUntilNight >= nightNumber
+end
+
+function ResidentLife.bondTitle(bond: number): string
+    for _, tier in ResidentLife.BondTiers do
+        if bond >= tier.threshold then
+            return tier.title
+        end
+    end
+    return "NEWCOMER"
+end
+
+local function clone(state: State): State
+    local next: State = {}
+    for residentId, resident in state do
+        next[residentId] = {
+            injuredUntilNight = resident.injuredUntilNight,
+            bond = resident.bond,
+            lastVisitNight = resident.lastVisitNight,
+        }
+    end
+    return next
+end
+
+--[[
+    A night has ended; decide who it hurt and whether the town tips into
+    crisis. Injuries come only from a resident's own workplace falling below
+    half integrity while they were out defending it. Two or more injuries at
+    once is a crisis: the clinic story writes itself, and the town needs its
+    players to go check on people.
+]]
+function ResidentLife.resolveNight(state: State, context: NightContext): (State, NightReport)
+    local nextState = clone(state)
+    local report: NightReport = { injuries = {}, recoveries = {}, crisis = nil }
+    for _, residentId in RESIDENT_IDS do
+        local resident = nextState[residentId]
+        local job = JOBS[residentId]
+        local wasInjured = resident.injuredUntilNight >= context.nightNumber
+        if not wasInjured and resident.injuredUntilNight > 0 then
+            resident.injuredUntilNight = 0
+            table.insert(report.recoveries, residentId)
+        end
+        local integrity = context.buildingIntegrity[job.buildingId]
+        if not wasInjured and integrity ~= nil and integrity < INJURY_INTEGRITY_THRESHOLD then
+            resident.injuredUntilNight = context.nightNumber + INJURY_REST_NIGHTS
+            table.insert(report.injuries, residentId)
+        end
+    end
+
+    local injuredNow = 0
+    for _, residentId in RESIDENT_IDS do
+        if ResidentLife.isInjured(nextState, residentId, context.nightNumber + 1) then
+            injuredNow += 1
+        end
+    end
+    if injuredNow >= 2 then
+        report.crisis = {
+            id = string.format("crisis_clinic_%d", context.nightNumber),
+            kind = "care",
+            title = "THE CLINIC IS FULL",
+            detail = "Check on the injured residents to help them back on their feet.",
+            startedNight = context.nightNumber,
+        }
+    elseif context.lanternHitFloor and injuredNow >= 1 then
+        report.crisis = {
+            id = string.format("crisis_darkwatch_%d", context.nightNumber),
+            kind = "care",
+            title = "A HARD NIGHT'S TOLL",
+            detail = "The light nearly failed and someone was hurt. Check on them.",
+            startedNight = context.nightNumber,
+        }
+    end
+    return nextState, report
+end
+
+export type CheckResult = {
+    accepted: boolean,
+    reason: string?,
+    healed: boolean,
+    bond: number,
+}
+
+--[[
+    A player checks on a resident. Injured: recovery accelerates by one night
+    and the bond grows properly — care is how people become close. Healthy:
+    a small bond nudge, once per night, so the loop is worth doing without
+    being a tapping exercise.
+]]
+function ResidentLife.checkOn(
+    state: State,
+    residentId: string,
+    nightNumber: number
+): (State, CheckResult)
+    local resident = state[residentId]
+    if resident == nil then
+        return state, { accepted = false, reason = "unknown_resident", healed = false, bond = 0 }
+    end
+    local nextState = clone(state)
+    local target = nextState[residentId]
+    if target.injuredUntilNight >= nightNumber then
+        target.injuredUntilNight = math.max(0, target.injuredUntilNight - 1)
+        target.bond = math.min(BOND_MAX, target.bond + BOND_CARE)
+        target.lastVisitNight = nightNumber
+        return nextState,
+            {
+                accepted = true,
+                reason = nil,
+                healed = target.injuredUntilNight < nightNumber,
+                bond = target.bond,
+            }
+    end
+    if target.lastVisitNight >= nightNumber then
+        return state,
+            {
+                accepted = false,
+                reason = "already_visited",
+                healed = false,
+                bond = target.bond,
+            }
+    end
+    target.bond = math.min(BOND_MAX, target.bond + BOND_VISIT)
+    target.lastVisitNight = nightNumber
+    return nextState, { accepted = true, reason = nil, healed = false, bond = target.bond }
+end
+
+export type Boon = {
+    residentId: string,
+    boon: string,
+    label: string,
+}
+
+--[[
+    What the healthy, employed residents contribute at dawn. A resident sits
+    a boon out while injured or while their workplace is an unbuilt site —
+    which is exactly the pressure that makes repairs and rescues matter.
+]]
+function ResidentLife.dawnBoons(
+    state: State,
+    nightNumber: number,
+    buildingStages: { [string]: number },
+    activeResidentIds: { string }
+): { Boon }
+    local active: { [string]: boolean } = {}
+    for _, residentId in activeResidentIds do
+        active[residentId] = true
+    end
+    local boons: { Boon } = {}
+    for _, residentId in RESIDENT_IDS do
+        local job = JOBS[residentId]
+        if
+            active[residentId]
+            and not ResidentLife.isInjured(state, residentId, nightNumber)
+            and (buildingStages[job.buildingId] or 0) > 0
+        then
+            table.insert(boons, { residentId = residentId, boon = job.boon, label = job.boonLabel })
+        end
+    end
+    return boons
+end
+
+--[[
+    Snapshot for the client: status, job, and bond per resident, plus the
+    crisis if one is standing. Pure formatting; the client renders it in the
+    Field Book and never decides anything from it.
+]]
+function ResidentLife.snapshot(
+    state: State,
+    nightNumber: number,
+    activeResidentIds: { string },
+    crisis: Crisis?
+): { [string]: any }
+    local residents = {}
+    local active: { [string]: boolean } = {}
+    for _, residentId in activeResidentIds do
+        active[residentId] = true
+    end
+    for _, residentId in RESIDENT_IDS do
+        local resident = state[residentId]
+        local job = JOBS[residentId]
+        table.insert(residents, {
+            residentId = residentId,
+            title = job.title,
+            buildingId = job.buildingId,
+            present = active[residentId] == true,
+            injured = ResidentLife.isInjured(state, residentId, nightNumber),
+            bond = resident.bond,
+            bondTitle = ResidentLife.bondTitle(resident.bond),
+        })
+    end
+    return {
+        residents = residents,
+        crisis = crisis,
+    }
+end
+
+return table.freeze(ResidentLife)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="52">
+        <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -9629,7 +9966,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -9758,7 +10095,7 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -9904,7 +10241,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -9917,6 +10254,7 @@ local MemoryFragments = require("./MemoryFragments")
 local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
+local ResidentLife = require("./ResidentLife")
 local TownProgression = require("./TownProgression")
 local TownCondition = require("./TownCondition")
 local TownConstruction = require("./TownConstruction")
@@ -9955,6 +10293,8 @@ export type Profile = {
         nightNumber: number,
         condition: TownCondition.State,
         construction: { [string]: number },
+        residents: ResidentLife.State,
+        crisis: ResidentLife.Crisis?,
     },
     gear: { [string]: number },
     equipped: Equipment.Equipped,
@@ -9978,7 +10318,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 14,
+        schemaVersion = 15,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -10007,6 +10347,8 @@ function SaveSchema.default(now: number): Profile
             nightNumber = 1,
             condition = TownCondition.default(),
             construction = TownConstruction.default(),
+            residents = ResidentLife.default(),
+            crisis = nil,
         },
         gear = Crafting.default(),
         equipped = Equipment.default(),
@@ -10136,13 +10478,38 @@ function SaveSchema.normalize(value: any, now: number): Profile
             TownConstruction.normalize(TownProgression.resolve(profile).buildingStages)
     end
 
+    -- Resident life (schema 15). A pre-15 profile arrives with everyone
+    -- healthy, no bonds, and no crisis -- the truthful migration: none of it
+    -- existed before the system did.
+    profile.town.residents =
+        ResidentLife.normalize(if type(town) == "table" then town.residents else nil)
+    local crisis = if type(town) == "table" then town.crisis else nil
+    if
+        type(crisis) == "table"
+        and type(crisis.id) == "string"
+        and type(crisis.kind) == "string"
+        and type(crisis.title) == "string"
+        and type(crisis.detail) == "string"
+        and type(crisis.startedNight) == "number"
+    then
+        profile.town.crisis = {
+            id = crisis.id,
+            kind = crisis.kind,
+            title = crisis.title,
+            detail = crisis.detail,
+            startedNight = math.max(1, math.floor(crisis.startedNight)),
+        }
+    else
+        profile.town.crisis = nil
+    end
+
     profile.gear = Crafting.normalizeGear(value.gear)
     profile.equipped = Equipment.normalize(value.equipped)
     local quests = value.quests
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 14
+    profile.schemaVersion = 15
     return profile
 end
 
@@ -10453,6 +10820,91 @@ function SaveSchema.townCondition(profile: Profile): any
     return TownCondition.snapshot(profile.town.condition)
 end
 
+function SaveSchema.residentLifeSnapshot(profile: Profile): any
+    local resolved = TownProgression.resolve(profile)
+    return ResidentLife.snapshot(
+        profile.town.residents,
+        profile.town.nightNumber,
+        resolved.residentIds,
+        profile.town.crisis
+    )
+end
+
+function SaveSchema.residentDawnBoons(profile: Profile): { ResidentLife.Boon }
+    local resolved = TownProgression.resolve(profile)
+    return ResidentLife.dawnBoons(
+        profile.town.residents,
+        profile.town.nightNumber,
+        resolved.buildingStages,
+        resolved.residentIds
+    )
+end
+
+--[[
+    A night's resident outcome: injuries, recoveries, and whatever crisis the
+    night earned. One revision bump for the whole settlement, and clearing a
+    crisis is part of the same write so the two can never disagree.
+]]
+function SaveSchema.withResidentNight(
+    profile: Profile,
+    context: ResidentLife.NightContext,
+    now: number
+): (Profile, ResidentLife.NightReport)
+    local nextResidents, report = ResidentLife.resolveNight(profile.town.residents, context)
+    local nextProfile = table.clone(profile)
+    nextProfile.town = table.clone(profile.town)
+    nextProfile.town.residents = nextResidents
+    if report.crisis ~= nil then
+        nextProfile.town.crisis = report.crisis
+    elseif profile.town.crisis ~= nil then
+        local anyInjured = false
+        for _, residentId in ResidentLife.Ids do
+            if ResidentLife.isInjured(nextResidents, residentId, context.nightNumber + 1) then
+                anyInjured = true
+                break
+            end
+        end
+        if not anyInjured then
+            nextProfile.town.crisis = nil
+        end
+    end
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, report
+end
+
+function SaveSchema.withResidentCheck(
+    profile: Profile,
+    residentId: string,
+    now: number
+): (Profile, ResidentLife.CheckResult)
+    local nextResidents, result =
+        ResidentLife.checkOn(profile.town.residents, residentId, profile.town.nightNumber)
+    if not result.accepted then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.town = table.clone(profile.town)
+    nextProfile.town.residents = nextResidents
+    -- Care can end a crisis: when the last injury is tended, the town
+    -- exhales in the same write.
+    if nextProfile.town.crisis ~= nil then
+        local anyInjured = false
+        for _, id in ResidentLife.Ids do
+            if ResidentLife.isInjured(nextResidents, id, profile.town.nightNumber) then
+                anyInjured = true
+                break
+            end
+        end
+        if not anyInjured then
+            nextProfile.town.crisis = nil
+        end
+    end
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
+end
+
 function SaveSchema.withCraftedItem(profile: Profile, recipeId: string, now: number): (Profile, any)
     local nextMaterials, nextGear, result =
         Crafting.craft(profile.inventory.materials, profile.gear, recipeId)
@@ -10647,7 +11099,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">SfxCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -10814,7 +11266,7 @@ return table.freeze(SfxCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -10933,7 +11385,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -11190,7 +11642,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -11600,7 +12052,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -11781,7 +12233,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -11845,7 +12297,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -11937,7 +12389,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -12149,7 +12601,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -12302,7 +12754,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -12455,7 +12907,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -12678,7 +13130,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -12840,7 +13292,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -12876,7 +13328,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="68">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -13258,7 +13710,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="69">
+      <Item class="ModuleScript" referent="70">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -13291,11 +13743,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="70">
+  <Item class="ServerScriptService" referent="71">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="71">
+    <Item class="Script" referent="72">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -13694,7 +14146,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="72">
+      <Item class="ModuleScript" referent="73">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -13792,11 +14244,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="73">
+      <Item class="Folder" referent="74">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="74">
+        <Item class="ModuleScript" referent="75">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -14325,7 +14777,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="75">
+        <Item class="ModuleScript" referent="76">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15196,7 +15648,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="76">
+        <Item class="ModuleScript" referent="77">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15697,7 +16149,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="77">
+        <Item class="ModuleScript" referent="78">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -15763,6 +16215,7 @@ export type EnemyService = typeof(setmetatable(
         _nightActive: boolean,
         _strikeHandler: ((Player) -> ())?,
         _lanternHealth: number,
+        _lanternFloor: number,
         _breachMultiplier: number,
         _nightModifiers: any,
         _engineerBraceState: any,
@@ -15815,6 +16268,7 @@ function EnemyService.new(
         _nightActive = false,
         _strikeHandler = nil,
         _lanternHealth = 100,
+        _lanternFloor = 18,
         _breachMultiplier = 1,
         _nightModifiers = {
             healthMultiplier = 1,
@@ -16115,7 +16569,17 @@ function EnemyService.startNight(self: EnemyService, modifiers: any?)
     self:_notify(nil)
 end
 
+--[[
+    Ena's dawn boon: the lantern's floor holds a little higher through the
+    next night. Reset when that night ends -- a reserve is banked each dawn
+    by a healthy seedkeeper, not owned forever.
+]]
+function EnemyService.grantLanternReserve(self: EnemyService, amount: number)
+    self._lanternFloor = 18 + math.clamp(amount, 0, 12)
+end
+
 function EnemyService.stopNight(self: EnemyService)
+    self._lanternFloor = 18
     self._nightActive = false
     self:_destroyActive()
     table.clear(self._queue)
@@ -16508,7 +16972,7 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
             now
         )
         local previousLanternHealth = self._lanternHealth
-        self._lanternHealth = math.max(18, self._lanternHealth - lanternPressure)
+        self._lanternHealth = math.max(self._lanternFloor, self._lanternHealth - lanternPressure)
         self._worldService:setLanternHealth(self._lanternHealth)
         -- Every other path that moves _lanternHealth (incident failure via
         -- applyLanternPressure, a direct lantern impact, a Last Stand spend)
@@ -16845,7 +17309,7 @@ function EnemyService.applyLanternPressure(self: EnemyService, amount: number, s
     local now = workspace:GetServerTimeNow()
     local remaining, absorbed = self:_absorbLanternPressure(bounded, source, now)
     local previous = self._lanternHealth
-    self._lanternHealth = math.max(18, self._lanternHealth - remaining)
+    self._lanternHealth = math.max(self._lanternFloor, self._lanternHealth - remaining)
     local damage = previous - self._lanternHealth
     self._worldService:setLanternHealth(self._lanternHealth)
     self._logger:info("lantern_pressure_applied", {
@@ -16884,7 +17348,8 @@ function EnemyService.spendLanternStrength(self: EnemyService, amount: number, s
         }
     end
     local previous = self._lanternHealth
-    self._lanternHealth = math.max(18, self._lanternHealth - math.clamp(amount, 1, 25))
+    self._lanternHealth =
+        math.max(self._lanternFloor, self._lanternHealth - math.clamp(amount, 1, 25))
     local spent = previous - self._lanternHealth
     self._worldService:setLanternHealth(self._lanternHealth)
     self._logger:info("lantern_strength_spent", {
@@ -17050,7 +17515,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="78">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17694,7 +18159,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="80">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17798,7 +18263,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="80">
+        <Item class="ModuleScript" referent="81">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18083,7 +18548,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="81">
+        <Item class="ModuleScript" referent="82">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18476,7 +18941,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -18570,7 +19035,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18788,7 +19253,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19632,7 +20097,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="85">
+        <Item class="ModuleScript" referent="86">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19887,7 +20352,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="86">
+        <Item class="ModuleScript" referent="87">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20066,7 +20531,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="87">
+        <Item class="ModuleScript" referent="88">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20637,7 +21102,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="88">
+        <Item class="ModuleScript" referent="89">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21736,7 +22201,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="89">
+        <Item class="ModuleScript" referent="90">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22261,7 +22726,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="90">
+        <Item class="ModuleScript" referent="91">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22943,6 +23408,46 @@ function ProfileService.equipmentStats(self: ProfileService, player: Player): an
         return { damageReduction = 0, staminaRegenMultiplier = 1 }
     end
     return self._saveSchema.equipmentStats(profile)
+end
+
+function ProfileService.applyResidentNight(self: ProfileService, player: Player, context: any): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return nil
+    end
+    local nextProfile, report = self._saveSchema.withResidentNight(profile, context, os.time())
+    self._profiles[player] = nextProfile
+    return report
+end
+
+function ProfileService.checkOnResident(
+    self: ProfileService,
+    player: Player,
+    residentId: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return { accepted = false, reason = "profile_unavailable", healed = false, bond = 0 }
+    end
+    local nextProfile, result = self._saveSchema.withResidentCheck(profile, residentId, os.time())
+    self._profiles[player] = nextProfile
+    return result
+end
+
+function ProfileService.residentLifeSnapshot(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return self._saveSchema.residentLifeSnapshot(profile)
+end
+
+function ProfileService.residentDawnBoons(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {}
+    end
+    return self._saveSchema.residentDawnBoons(profile)
 end
 
 function ProfileService.townConsequence(self: ProfileService, player: Player): any
@@ -23760,7 +24265,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="91">
+        <Item class="ModuleScript" referent="92">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24246,6 +24751,35 @@ end
     benches use. The client sends the generic interaction ID and never names a
     building, so a forged payload cannot repair something that was not there.
 ]]
+--[[
+    Tomas's dawn boon: one free repair point on the worst-hit standing
+    building. Reuses the same condition transaction as a player repair, so
+    it can never restore more than a hammer swing would.
+]]
+function TownNightService.residentRepair(self: TownNightService): any?
+    local snapshot = self:conditionSnapshot()
+    local worst = nil
+    for _, entry in snapshot.damaged or {} do
+        if worst == nil or entry.integrity < worst.integrity then
+            worst = entry
+        end
+    end
+    if worst == nil then
+        return nil
+    end
+    local nextCondition, result = self._townCondition.repair(self._condition, worst.buildingId)
+    if not result.applied then
+        return nil
+    end
+    self._condition = nextCondition
+    self._worldService:setTownCondition(self:conditionSnapshot())
+    return { buildingId = worst.buildingId, restored = result.restored }
+end
+
+function TownNightService.themeForNight(self: TownNightService, nightNumber: number): string
+    return tostring(self._townNightSchedule.theme(nightNumber))
+end
+
 function TownNightService.repairTown(self: TownNightService, buildingId: any): any
     if self._phase ~= "day" then
         return { accepted = false, message = "TOWN REPAIRS WAIT FOR DAYLIGHT", reason = "not_day" }
@@ -24301,7 +24835,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="92">
+        <Item class="ModuleScript" referent="93">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24481,13 +25015,75 @@ function TutorialService.Init(self: TutorialService, context: any)
     end)
     self._townNightService:setNightCompletedHandler(
         function(nightNumber: number, endingLanternHealth: number, condition: any)
+            -- Resident life resolves on the night that just ran. The context
+            -- is identical for every profile on the server, so every player's
+            -- town remembers the same night.
+            local buildingIntegrity: { [string]: number } = {}
+            for _, entry in condition.damaged or {} do
+                buildingIntegrity[entry.buildingId] = entry.integrity / 100
+            end
+            local residentContext = {
+                nightNumber = nightNumber - 1,
+                buildingIntegrity = buildingIntegrity,
+                lanternHitFloor = endingLanternHealth <= 18,
+            }
+            local sharedReport: any = nil
             for player in self._sessions do
                 self._profileService:setNightNumber(player, nightNumber)
                 self._profileService:setTownCondition(player, condition)
+                local report = self._profileService:applyResidentNight(player, residentContext)
+                if sharedReport == nil and report ~= nil then
+                    sharedReport = report
+                end
                 local questSuffix = self:_questToastSuffix(player)
                 if questSuffix ~= nil then
                     self:_setToast(player, questSuffix)
                 end
+            end
+            if sharedReport ~= nil then
+                for _, residentId in sharedReport.injuries do
+                    self._worldService:setResidentInjured(residentId, true)
+                    self:_toastAll(
+                        string.format(
+                            "%s WAS HURT IN THE NIGHT — CHECK ON THEM",
+                            string.upper(string.gsub(string.gsub(residentId, "npc_", ""), "_", " "))
+                        )
+                    )
+                end
+                for _, residentId in sharedReport.recoveries do
+                    self._worldService:setResidentInjured(residentId, false)
+                end
+                if sharedReport.crisis ~= nil then
+                    self:_toastAll(
+                        sharedReport.crisis.title .. " — " .. sharedReport.crisis.detail
+                    )
+                end
+            end
+            -- Dawn boons from whoever is present; the effects are town-wide
+            -- and deterministic, so the first profile speaks for the server.
+            for player in self._sessions do
+                local boons = self._profileService:residentDawnBoons(player)
+                for _, boon in boons do
+                    if boon.boon == "dawn_repair" then
+                        local repaired = self._townNightService:residentRepair()
+                        if repaired ~= nil then
+                            self:_toastAll(boon.label)
+                        end
+                    elseif boon.boon == "night_forewarning" then
+                        self:_toastAll(
+                            string.format(
+                                "%s — NIGHT %d: %s",
+                                boon.label,
+                                nightNumber,
+                                self._townNightService:themeForNight(nightNumber)
+                            )
+                        )
+                    elseif boon.boon == "lantern_reserve" then
+                        self._enemyService:grantLanternReserve(6)
+                        self:_toastAll(boon.label)
+                    end
+                end
+                break
             end
             self._analyticsService:townNightConsequence(
                 nightNumber - 1,
@@ -24690,6 +25286,13 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     local definition = self._tutorialFlow.definition(currentStage)
     self._analyticsService:stage(player, definition.index, currentStage)
     self:_publish(player)
+end
+
+function TutorialService._toastAll(self: TutorialService, message: string)
+    for _, session in self._sessions do
+        session.toast = message
+        session.toastRevision += 1
+    end
 end
 
 function TutorialService._setToast(self: TutorialService, player: Player, message: string)
@@ -25132,6 +25735,25 @@ function TutorialService._interact(
     end
     if actionId == self._runtimeIds.Actions.TalkResident then
         local residentId = prompt:GetAttribute("Payload")
+        -- Talking IS checking on someone. Care shortens an injury and builds
+        -- the bond; a healthy visit bonds once per night. The dialogue line
+        -- still plays underneath, so the moment stays a conversation.
+        local care = self._profileService:checkOnResident(player, tostring(residentId))
+        if care.accepted and care.healed then
+            self:_setToast(
+                player,
+                string.format(
+                    "%s IS BACK ON THEIR FEET — BOND · %d",
+                    string.upper(
+                        string.gsub(string.gsub(tostring(residentId), "npc_", ""), "_", " ")
+                    ),
+                    care.bond
+                )
+            )
+            self._worldService:setResidentInjured(tostring(residentId), false)
+            self:_publish(player)
+            return
+        end
         local response = self._residentDialogue.respond(
             residentId,
             self._profileService:questSnapshot(player),
@@ -25793,6 +26415,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         recipes = self._craftingCatalog:list(),
         equipmentCatalog = self._equipmentCatalog.list(),
         objectiveTargets = self:_objectiveTargets(player, session),
+        residentLife = self._profileService:residentLifeSnapshot(player),
         guideSpeaker = guideSpeaker,
         quests = self._profileService:questSnapshot(player),
         memoryArchive = self._profileService:memoryFragments(player),
@@ -25820,7 +26443,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="93">
+        <Item class="ModuleScript" referent="94">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -26670,7 +27293,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="94">
+        <Item class="ModuleScript" referent="95">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -33596,6 +34219,33 @@ function WorldService.setClickHandler(self: WorldService, handler: (Player, stri
     self._clickHandler = handler
 end
 
+--[[
+    An injured resident wears it: attribute for systems, a RESTING suffix on
+    the nameplate for players. Presentation only -- the truth lives in the
+    profile's resident state.
+]]
+function WorldService.setResidentInjured(self: WorldService, residentId: string, injured: boolean)
+    local residents = self._townResidents
+    if residents == nil then
+        return
+    end
+    local resident = residents[residentId]
+    if resident == nil or resident.model == nil or resident.model.Parent == nil then
+        return
+    end
+    resident.model:SetAttribute("Injured", injured)
+    local head = resident.interactionTarget
+    if head ~= nil then
+        local label = head:FindFirstChild("WorldLabel")
+        local text = if label ~= nil then label:FindFirstChildOfClass("TextLabel") else nil
+        if text ~= nil then
+            text.Text = if injured
+                then resident.displayName .. " · RESTING"
+                else resident.displayName
+        end
+    end
+end
+
 function WorldService.freeMara(self: WorldService)
     local trap = self._maraTrap
     if trap == nil then
@@ -38290,11 +38940,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="95">
+      <Item class="Folder" referent="96">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="96">
+        <Item class="ModuleScript" referent="97">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -42074,7 +42724,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="97">
+        <Item class="ModuleScript" referent="98">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -42571,7 +43221,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="98">
+        <Item class="ModuleScript" referent="99">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -43266,7 +43916,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="99">
+        <Item class="ModuleScript" referent="100">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -44125,7 +44775,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="100">
+        <Item class="ModuleScript" referent="101">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -44211,7 +44861,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="101">
+        <Item class="ModuleScript" referent="102">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -44585,7 +45235,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="102">
+        <Item class="ModuleScript" referent="103">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -44765,7 +45415,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="103">
+        <Item class="ModuleScript" referent="104">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -45361,7 +46011,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="104">
+        <Item class="ModuleScript" referent="105">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -45598,7 +46248,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="105">
+        <Item class="ModuleScript" referent="106">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -45687,7 +46337,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="106">
+        <Item class="ModuleScript" referent="107">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -46023,11 +46673,11 @@ return table.freeze(WorldSignBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="107">
+    <Item class="Folder" referent="108">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="108">
+      <Item class="Script" referent="109">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -46077,8 +46727,8 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 local TerrainBuilder = require(serverRoot.World.TerrainBuilder)
 
 local content = Registry.new(Regions)
-assert(Config.SaveSchemaVersion == 14, "unexpected save schema version")
-assert(Config.BuildVersion == "0.51.0", "unexpected build version")
+assert(Config.SaveSchemaVersion == 15, "unexpected save schema version")
+assert(Config.BuildVersion == "0.52.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#MusicCatalog.regionIds() == 8, "every playable world needs an adaptive score")
@@ -47748,15 +48398,15 @@ print("[Last Light] PASS FoundationIntegration")
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="109">
+  <Item class="StarterPlayer" referent="110">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="110">
+    <Item class="StarterPlayerScripts" referent="111">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="111">
+      <Item class="LocalScript" referent="112">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -48032,11 +48682,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="112">
+        <Item class="Folder" referent="113">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="113">
+          <Item class="ModuleScript" referent="114">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -48167,7 +48817,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="114">
+          <Item class="ModuleScript" referent="115">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -50036,6 +50686,41 @@ function HUDController._updateProgress(self: HUDController)
             end
         end
     end
+    local residentLife = state.residentLife
+    if type(residentLife) == "table" and type(residentLife.residents) == "table" then
+        table.insert(lines, "")
+        table.insert(lines, header("RESIDENTS"))
+        if type(residentLife.crisis) == "table" then
+            table.insert(
+                lines,
+                string.format(
+                    '<font color="#FF8A5C"><b>%s</b></font>  ·  %s',
+                    escape(tostring(residentLife.crisis.title)),
+                    muted(tostring(residentLife.crisis.detail))
+                )
+            )
+        end
+        for _, resident in residentLife.residents do
+            if resident.present then
+                local name = string.upper(
+                    (string.gsub(string.gsub(tostring(resident.residentId), "npc_", ""), "_", " "))
+                )
+                local status = if resident.injured then "RESTING — check on them" else "working"
+                table.insert(
+                    lines,
+                    string.format(
+                        "• %s  ·  %s  ·  %s  ·  %s",
+                        escape(name),
+                        escape(tostring(resident.title)),
+                        muted(status),
+                        muted(
+                            string.format("%s · %d", tostring(resident.bondTitle), resident.bond)
+                        )
+                    )
+                )
+            end
+        end
+    end
     table.insert(lines, "")
     table.insert(lines, header("PROFESSION MASTERY"))
     for professionId, mastery in state.mastery or {} do
@@ -50713,7 +51398,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="115">
+          <Item class="ModuleScript" referent="116">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51012,7 +51697,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="116">
+          <Item class="ModuleScript" referent="117">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51120,7 +51805,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="117">
+          <Item class="ModuleScript" referent="118">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51239,7 +51924,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="118">
+          <Item class="ModuleScript" referent="119">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51513,7 +52198,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="119">
+          <Item class="ModuleScript" referent="120">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51613,7 +52298,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="120">
+          <Item class="ModuleScript" referent="121">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51725,7 +52410,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="121">
+          <Item class="ModuleScript" referent="122">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51885,7 +52570,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="122">
+          <Item class="ModuleScript" referent="123">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -52094,7 +52779,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="123">
+          <Item class="ModuleScript" referent="124">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -52226,7 +52911,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="124">
+          <Item class="ModuleScript" referent="125">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -52526,13 +53211,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="125">
+  <Item class="TextChatService" referent="126">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="126">
+  <Item class="Workspace" referent="127">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

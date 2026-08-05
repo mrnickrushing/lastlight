@@ -61,6 +61,7 @@ export type EnemyService = typeof(setmetatable(
         _nightActive: boolean,
         _strikeHandler: ((Player) -> ())?,
         _lanternHealth: number,
+        _lanternFloor: number,
         _breachMultiplier: number,
         _nightModifiers: any,
         _engineerBraceState: any,
@@ -113,6 +114,7 @@ function EnemyService.new(
         _nightActive = false,
         _strikeHandler = nil,
         _lanternHealth = 100,
+        _lanternFloor = 18,
         _breachMultiplier = 1,
         _nightModifiers = {
             healthMultiplier = 1,
@@ -413,7 +415,17 @@ function EnemyService.startNight(self: EnemyService, modifiers: any?)
     self:_notify(nil)
 end
 
+--[[
+    Ena's dawn boon: the lantern's floor holds a little higher through the
+    next night. Reset when that night ends -- a reserve is banked each dawn
+    by a healthy seedkeeper, not owned forever.
+]]
+function EnemyService.grantLanternReserve(self: EnemyService, amount: number)
+    self._lanternFloor = 18 + math.clamp(amount, 0, 12)
+end
+
 function EnemyService.stopNight(self: EnemyService)
+    self._lanternFloor = 18
     self._nightActive = false
     self:_destroyActive()
     table.clear(self._queue)
@@ -806,7 +818,7 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
             now
         )
         local previousLanternHealth = self._lanternHealth
-        self._lanternHealth = math.max(18, self._lanternHealth - lanternPressure)
+        self._lanternHealth = math.max(self._lanternFloor, self._lanternHealth - lanternPressure)
         self._worldService:setLanternHealth(self._lanternHealth)
         -- Every other path that moves _lanternHealth (incident failure via
         -- applyLanternPressure, a direct lantern impact, a Last Stand spend)
@@ -1143,7 +1155,7 @@ function EnemyService.applyLanternPressure(self: EnemyService, amount: number, s
     local now = workspace:GetServerTimeNow()
     local remaining, absorbed = self:_absorbLanternPressure(bounded, source, now)
     local previous = self._lanternHealth
-    self._lanternHealth = math.max(18, self._lanternHealth - remaining)
+    self._lanternHealth = math.max(self._lanternFloor, self._lanternHealth - remaining)
     local damage = previous - self._lanternHealth
     self._worldService:setLanternHealth(self._lanternHealth)
     self._logger:info("lantern_pressure_applied", {
@@ -1182,7 +1194,8 @@ function EnemyService.spendLanternStrength(self: EnemyService, amount: number, s
         }
     end
     local previous = self._lanternHealth
-    self._lanternHealth = math.max(18, self._lanternHealth - math.clamp(amount, 1, 25))
+    self._lanternHealth =
+        math.max(self._lanternFloor, self._lanternHealth - math.clamp(amount, 1, 25))
     local spent = previous - self._lanternHealth
     self._worldService:setLanternHealth(self._lanternHealth)
     self._logger:info("lantern_strength_spent", {

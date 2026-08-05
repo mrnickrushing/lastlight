@@ -8,6 +8,7 @@ local MemoryFragments = require("./MemoryFragments")
 local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
+local ResidentLife = require("./ResidentLife")
 local TownProgression = require("./TownProgression")
 local TownCondition = require("./TownCondition")
 local TownConstruction = require("./TownConstruction")
@@ -46,6 +47,8 @@ export type Profile = {
         nightNumber: number,
         condition: TownCondition.State,
         construction: { [string]: number },
+        residents: ResidentLife.State,
+        crisis: ResidentLife.Crisis?,
     },
     gear: { [string]: number },
     equipped: Equipment.Equipped,
@@ -69,7 +72,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 14,
+        schemaVersion = 15,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -98,6 +101,8 @@ function SaveSchema.default(now: number): Profile
             nightNumber = 1,
             condition = TownCondition.default(),
             construction = TownConstruction.default(),
+            residents = ResidentLife.default(),
+            crisis = nil,
         },
         gear = Crafting.default(),
         equipped = Equipment.default(),
@@ -227,13 +232,38 @@ function SaveSchema.normalize(value: any, now: number): Profile
             TownConstruction.normalize(TownProgression.resolve(profile).buildingStages)
     end
 
+    -- Resident life (schema 15). A pre-15 profile arrives with everyone
+    -- healthy, no bonds, and no crisis -- the truthful migration: none of it
+    -- existed before the system did.
+    profile.town.residents =
+        ResidentLife.normalize(if type(town) == "table" then town.residents else nil)
+    local crisis = if type(town) == "table" then town.crisis else nil
+    if
+        type(crisis) == "table"
+        and type(crisis.id) == "string"
+        and type(crisis.kind) == "string"
+        and type(crisis.title) == "string"
+        and type(crisis.detail) == "string"
+        and type(crisis.startedNight) == "number"
+    then
+        profile.town.crisis = {
+            id = crisis.id,
+            kind = crisis.kind,
+            title = crisis.title,
+            detail = crisis.detail,
+            startedNight = math.max(1, math.floor(crisis.startedNight)),
+        }
+    else
+        profile.town.crisis = nil
+    end
+
     profile.gear = Crafting.normalizeGear(value.gear)
     profile.equipped = Equipment.normalize(value.equipped)
     local quests = value.quests
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 14
+    profile.schemaVersion = 15
     return profile
 end
 
@@ -542,6 +572,91 @@ end
 
 function SaveSchema.townCondition(profile: Profile): any
     return TownCondition.snapshot(profile.town.condition)
+end
+
+function SaveSchema.residentLifeSnapshot(profile: Profile): any
+    local resolved = TownProgression.resolve(profile)
+    return ResidentLife.snapshot(
+        profile.town.residents,
+        profile.town.nightNumber,
+        resolved.residentIds,
+        profile.town.crisis
+    )
+end
+
+function SaveSchema.residentDawnBoons(profile: Profile): { ResidentLife.Boon }
+    local resolved = TownProgression.resolve(profile)
+    return ResidentLife.dawnBoons(
+        profile.town.residents,
+        profile.town.nightNumber,
+        resolved.buildingStages,
+        resolved.residentIds
+    )
+end
+
+--[[
+    A night's resident outcome: injuries, recoveries, and whatever crisis the
+    night earned. One revision bump for the whole settlement, and clearing a
+    crisis is part of the same write so the two can never disagree.
+]]
+function SaveSchema.withResidentNight(
+    profile: Profile,
+    context: ResidentLife.NightContext,
+    now: number
+): (Profile, ResidentLife.NightReport)
+    local nextResidents, report = ResidentLife.resolveNight(profile.town.residents, context)
+    local nextProfile = table.clone(profile)
+    nextProfile.town = table.clone(profile.town)
+    nextProfile.town.residents = nextResidents
+    if report.crisis ~= nil then
+        nextProfile.town.crisis = report.crisis
+    elseif profile.town.crisis ~= nil then
+        local anyInjured = false
+        for _, residentId in ResidentLife.Ids do
+            if ResidentLife.isInjured(nextResidents, residentId, context.nightNumber + 1) then
+                anyInjured = true
+                break
+            end
+        end
+        if not anyInjured then
+            nextProfile.town.crisis = nil
+        end
+    end
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, report
+end
+
+function SaveSchema.withResidentCheck(
+    profile: Profile,
+    residentId: string,
+    now: number
+): (Profile, ResidentLife.CheckResult)
+    local nextResidents, result =
+        ResidentLife.checkOn(profile.town.residents, residentId, profile.town.nightNumber)
+    if not result.accepted then
+        return profile, result
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.town = table.clone(profile.town)
+    nextProfile.town.residents = nextResidents
+    -- Care can end a crisis: when the last injury is tended, the town
+    -- exhales in the same write.
+    if nextProfile.town.crisis ~= nil then
+        local anyInjured = false
+        for _, id in ResidentLife.Ids do
+            if ResidentLife.isInjured(nextResidents, id, profile.town.nightNumber) then
+                anyInjured = true
+                break
+            end
+        end
+        if not anyInjured then
+            nextProfile.town.crisis = nil
+        end
+    end
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, result
 end
 
 function SaveSchema.withCraftedItem(profile: Profile, recipeId: string, now: number): (Profile, any)
