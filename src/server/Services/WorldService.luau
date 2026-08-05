@@ -4894,6 +4894,53 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             assetId = "mesh_creator_handheld_torch_a",
             seed = 9897,
         },
+        --[[
+            The other five families, racked in a second row west of the
+            first three. No reviewed meshes exist for these yet, so each
+            crate carries a procedural silhouette below instead of a mesh
+            placement -- same crate, cushion, and open lid as its siblings,
+            with the tool readable on the cushion.
+        ]]
+        {
+            id = self._runtimeIds.InteractionIds.ToolPick,
+            tool = "pick",
+            position = TOOL_YARD_CENTER + Vector3.new(-8, 0, 8),
+            color = Color3.fromRGB(151, 116, 74),
+            assetId = nil,
+            seed = 9890,
+        },
+        {
+            id = self._runtimeIds.InteractionIds.ToolSickle,
+            tool = "sickle",
+            position = TOOL_YARD_CENTER + Vector3.new(-8, 0, 0),
+            color = Color3.fromRGB(133, 176, 108),
+            assetId = nil,
+            seed = 9891,
+        },
+        {
+            id = self._runtimeIds.InteractionIds.ToolFishingKit,
+            tool = "fishing_kit",
+            position = TOOL_YARD_CENTER + Vector3.new(-8, 0, -8),
+            color = Color3.fromRGB(98, 148, 176),
+            assetId = nil,
+            seed = 9892,
+        },
+        {
+            id = self._runtimeIds.InteractionIds.ToolClimbingKit,
+            tool = "climbing_kit",
+            position = TOOL_YARD_CENTER + Vector3.new(-16, 0, 4),
+            color = Color3.fromRGB(176, 134, 84),
+            assetId = nil,
+            seed = 9893,
+        },
+        {
+            id = self._runtimeIds.InteractionIds.ToolSurveyKit,
+            tool = "survey_kit",
+            position = TOOL_YARD_CENTER + Vector3.new(-16, 0, -4),
+            color = Color3.fromRGB(186, 168, 112),
+            assetId = nil,
+            seed = 9894,
+        },
     }
     for _, definition in tools do
         local displayFrame = CFrame.new(definition.position) * CFrame.Angles(0, math.rad(90), 0)
@@ -5022,6 +5069,104 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 false
             )
             head.Shape = Enum.PartType.Cylinder
+        elseif definition.tool == "pick" then
+            for pointSide = -1, 1, 2 do
+                local point = part(
+                    toolFallback,
+                    "PickPoint",
+                    Vector3.new(1.35, 0.5, 0.4),
+                    displayFrame
+                        * CFrame.new(pointSide * 0.75 - 0.28, 5.86, 0)
+                        * CFrame.Angles(0, 0, math.rad(28 + pointSide * 16)),
+                    Color3.fromRGB(146, 152, 158),
+                    Enum.Material.Metal,
+                    false
+                )
+                point.Shape = Enum.PartType.Wedge
+            end
+        elseif definition.tool == "sickle" then
+            local blade = part(
+                toolFallback,
+                "SickleBlade",
+                Vector3.new(2, 0.34, 0.7),
+                displayFrame * CFrame.new(-0.6, 5.9, 0) * CFrame.Angles(0, 0, math.rad(62)),
+                Color3.fromRGB(158, 168, 158),
+                Enum.Material.Metal,
+                false
+            )
+            blade.Shape = Enum.PartType.Wedge
+            local hook = part(
+                toolFallback,
+                "SickleHook",
+                Vector3.new(1.15, 0.34, 0.55),
+                displayFrame * CFrame.new(-1.35, 6.5, 0) * CFrame.Angles(0, 0, math.rad(118)),
+                Color3.fromRGB(158, 168, 158),
+                Enum.Material.Metal,
+                false
+            )
+            hook.Shape = Enum.PartType.Wedge
+        elseif definition.tool == "fishing_kit" then
+            part(
+                toolFallback,
+                "FishingLine",
+                Vector3.new(0.08, 2.4, 0.08),
+                displayFrame * CFrame.new(-1.05, 5.15, 0),
+                Color3.fromRGB(214, 205, 186),
+                Enum.Material.Fabric,
+                false
+            )
+            local bobber = part(
+                toolFallback,
+                "FishingBobber",
+                Vector3.new(0.55, 0.55, 0.55),
+                displayFrame * CFrame.new(-1.05, 3.85, 0),
+                Color3.fromRGB(196, 84, 60),
+                Enum.Material.SmoothPlastic,
+                false
+            )
+            bobber.Shape = Enum.PartType.Ball
+        elseif definition.tool == "climbing_kit" then
+            local coil = part(
+                toolFallback,
+                "ClimbingCoil",
+                Vector3.new(0.5, 1.7, 1.7),
+                displayFrame * CFrame.new(0.2, 5.5, 0) * CFrame.Angles(0, math.rad(90), 0),
+                Color3.fromRGB(156, 122, 82),
+                Enum.Material.Fabric,
+                false
+            )
+            coil.Shape = Enum.PartType.Cylinder
+            local hook = part(
+                toolFallback,
+                "ClimbingHook",
+                Vector3.new(0.85, 0.5, 0.35),
+                displayFrame * CFrame.new(0.2, 6.6, 0) * CFrame.Angles(0, 0, math.rad(38)),
+                Color3.fromRGB(123, 132, 137),
+                Enum.Material.Metal,
+                false
+            )
+            hook.Shape = Enum.PartType.Wedge
+        elseif definition.tool == "survey_kit" then
+            local scope = part(
+                toolFallback,
+                "SurveyScope",
+                Vector3.new(1.9, 0.55, 0.55),
+                displayFrame * CFrame.new(-0.2, 6.15, 0) * CFrame.Angles(0, 0, math.rad(74)),
+                Color3.fromRGB(126, 112, 74),
+                Enum.Material.Metal,
+                false
+            )
+            scope.Shape = Enum.PartType.Cylinder
+            local lens = part(
+                toolFallback,
+                "SurveyLens",
+                Vector3.new(0.3, 0.62, 0.62),
+                displayFrame * CFrame.new(0.05, 7.05, 0) * CFrame.Angles(0, 0, math.rad(74)),
+                Color3.fromRGB(186, 214, 214),
+                Enum.Material.Glass,
+                false
+            )
+            lens.Shape = Enum.PartType.Cylinder
         else
             --[[
                 A torch, built as a torch.
@@ -5121,7 +5266,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             object, so for the torch the "fallback" is the finished art and
             nothing is allowed to replace it.
         ]]
-        if definition.tool ~= "torch" then
+        if definition.assetId ~= nil and definition.tool ~= "torch" then
             table.insert(self._meshPlacements, {
                 assetId = definition.assetId,
                 fallbackKind = "asset_replacement",
@@ -7092,6 +7237,28 @@ end
 
 function WorldService.resourceNode(self: WorldService, interactionId: string): any
     return self._resourceNodes[interactionId]
+end
+
+--[[
+    The survey glass's question: of the nodes still standing, which is
+    closest to this position? Harvested nodes leave the registry, so the
+    scan is over live nodes only, and the registry is small (twenty-two on
+    the preview route) -- a linear pass at objective-publish frequency.
+]]
+function WorldService.nearestResourceNode(self: WorldService, position: Vector3): any
+    local closest = nil
+    local closestDistance = math.huge
+    for _, node in self._resourceNodes do
+        local target = node.target
+        if target ~= nil and target:IsA("BasePart") and target.Parent ~= nil then
+            local distance = (target.Position - position).Magnitude
+            if distance < closestDistance then
+                closestDistance = distance
+                closest = node
+            end
+        end
+    end
+    return closest
 end
 
 -- Harvested nodes stay in the world but stop glowing and stop offering the

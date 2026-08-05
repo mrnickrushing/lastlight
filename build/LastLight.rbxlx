@@ -11127,6 +11127,11 @@ local RuntimeIds = {
         ToolAxe = "tool_axe",
         ToolHammer = "tool_hammer",
         ToolTorch = "tool_torch",
+        ToolPick = "tool_pick",
+        ToolSickle = "tool_sickle",
+        ToolFishingKit = "tool_fishing_kit",
+        ToolClimbingKit = "tool_climbing_kit",
+        ToolSurveyKit = "tool_survey_kit",
         Barricade = "barricade_build",
         Lantern = "first_lantern_prepare",
         Beacon = "bramblewake_reveal",
@@ -11180,6 +11185,7 @@ return table.freeze(RuntimeIds)
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
 
+local ToolCatalog = require("./ToolCatalog")
 local TutorialFlow = require("./TutorialFlow")
 local ExpeditionInventory = require("./ExpeditionInventory")
 local ProfessionCatalog = require("./ProfessionCatalog")
@@ -11320,14 +11326,10 @@ function SaveSchema.normalize(value: any, now: number): Profile
             profile.tutorial.complete = true
             profile.tutorial.stage = "complete"
         end
-        if
-            type(tutorial.selectedTool) == "string"
-            and (
-                tutorial.selectedTool == "axe"
-                or tutorial.selectedTool == "hammer"
-                or tutorial.selectedTool == "torch"
-            )
-        then
+        -- Validated against the tool catalog rather than three literals:
+        -- the roster is eight families now, and the catalog is where a
+        -- tool's very existence is decided.
+        if ToolCatalog.isValid(tutorial.selectedTool) then
             profile.tutorial.selectedTool = tutorial.selectedTool
         end
         if
@@ -12624,6 +12626,150 @@ return table.freeze(SurvivalState)
       </Item>
       <Item class="ModuleScript" referent="61">
         <Properties>
+          <string name="Name">ToolCatalog</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    The eight tool families -- axes, hammers, lanterns (the torch), picks,
+    sickles, fishing kits, climbing kits, and survey instruments -- one held
+    tool per family for now, each with a bounded identity expressed through
+    hooks the game already has. Combat identity flows through the strike
+    context, work identity through timed-action durations, endurance
+    identities through the per-player stamina and sprint paths, and the
+    survey's exploration identity through the objective-marker resolver.
+
+    Every number is a small trade rather than a power ramp: the axe hits a
+    quarter harder but reaches like a hand, the torch reaches four studs
+    further at a small cost, the pick and sickle each hurry only their own
+    kind of harvest, and nothing here can exceed the clamps combat and
+    stamina already enforce. A client never submits any of these -- the
+    server reads the catalog by the tool id it stored.
+
+    The fishing and climbing kits carry their stat identities now; their
+    full mechanics (a pond catch loop, real traversal) are recorded as open
+    work in the Milestone 6 runbook rather than pretended at here.
+]]
+
+local ToolCatalog = {}
+
+export type Definition = {
+    id: string,
+    family: string,
+    displayName: string,
+    description: string,
+    strikeDamageMultiplier: number?,
+    strikeRangeBonus: number?,
+    actionDurationMultiplier: number?,
+    gatherDurationMultiplier: number?,
+    gatherMaterials: { [string]: boolean }?,
+    staminaRegenMultiplier: number?,
+    sprintSpeedMultiplier: number?,
+    surveyRevealsNodes: boolean?,
+}
+
+local ORDER = table.freeze({
+    "axe",
+    "hammer",
+    "torch",
+    "pick",
+    "sickle",
+    "fishing_kit",
+    "climbing_kit",
+    "survey_kit",
+})
+
+local DEFINITIONS: { [string]: Definition } = {
+    axe = table.freeze({
+        id = "axe",
+        family = "axe",
+        displayName = "HAND AXE",
+        description = "Strikes land a quarter harder.",
+        strikeDamageMultiplier = 1.25,
+    }),
+    hammer = table.freeze({
+        id = "hammer",
+        family = "hammer",
+        displayName = "BUILDER'S HAMMER",
+        description = "Gather and build work runs a quarter faster.",
+        actionDurationMultiplier = 0.75,
+    }),
+    torch = table.freeze({
+        id = "torch",
+        family = "lantern",
+        displayName = "HAND TORCH",
+        description = "Swung fire reaches four studs further at a small cost.",
+        strikeDamageMultiplier = 0.9,
+        strikeRangeBonus = 4,
+    }),
+    pick = table.freeze({
+        id = "pick",
+        family = "pick",
+        displayName = "IRONROOT PICK",
+        description = "Sap and clay come loose a quarter faster; a heavy point.",
+        strikeDamageMultiplier = 1.05,
+        gatherDurationMultiplier = 0.75,
+        gatherMaterials = table.freeze({
+            material_amber_sap = true,
+            material_spring_clay = true,
+        }),
+    }),
+    sickle = table.freeze({
+        id = "sickle",
+        family = "sickle",
+        displayName = "MEADOW SICKLE",
+        description = "Fiber and brightcap fall a quarter faster; a sweeping arc.",
+        strikeRangeBonus = 2,
+        gatherDurationMultiplier = 0.75,
+        gatherMaterials = table.freeze({
+            material_meadow_fiber = true,
+            material_brightcap = true,
+        }),
+    }),
+    fishing_kit = table.freeze({
+        id = "fishing_kit",
+        family = "fishing_kit",
+        displayName = "FISHING KIT",
+        description = "An angler's patience: stamina returns 10% faster.",
+        staminaRegenMultiplier = 1.1,
+    }),
+    climbing_kit = table.freeze({
+        id = "climbing_kit",
+        family = "climbing_kit",
+        displayName = "CLIMBING KIT",
+        description = "Sure-footed: running carries you 8% faster.",
+        sprintSpeedMultiplier = 1.08,
+    }),
+    survey_kit = table.freeze({
+        id = "survey_kit",
+        family = "survey_kit",
+        displayName = "SURVEY GLASS",
+        description = "Marks the nearest unharvested node on your trail.",
+        surveyRevealsNodes = true,
+    }),
+}
+
+function ToolCatalog.isValid(id: any): boolean
+    return type(id) == "string" and DEFINITIONS[id] ~= nil
+end
+
+function ToolCatalog.get(id: any): Definition?
+    return if type(id) == "string" then DEFINITIONS[id] else nil
+end
+
+function ToolCatalog.list(): { Definition }
+    local result = {}
+    for _, id in ORDER do
+        table.insert(result, DEFINITIONS[id])
+    end
+    return result
+end
+
+return table.freeze(ToolCatalog)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="62">
+        <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -13032,7 +13178,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -13213,7 +13359,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -13277,7 +13423,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -13451,7 +13597,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -13543,7 +13689,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -13755,7 +13901,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -13908,7 +14054,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="68">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -14061,7 +14207,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="69">
+      <Item class="ModuleScript" referent="70">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -14294,7 +14440,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="70">
+      <Item class="ModuleScript" referent="71">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -14456,7 +14602,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="71">
+      <Item class="ModuleScript" referent="72">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -14492,7 +14638,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="72">
+      <Item class="ModuleScript" referent="73">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -14874,7 +15020,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="73">
+      <Item class="ModuleScript" referent="74">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -14946,11 +15092,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="74">
+  <Item class="ServerScriptService" referent="75">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="75">
+    <Item class="Script" referent="76">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -15001,6 +15147,7 @@ local TownCondition = require(root.TownCondition)
 local TownGuardLastStand = require(root.TownGuardLastStand)
 local LobbyDeparture = require(root.LobbyDeparture)
 local ActionProgress = require(root.ActionProgress)
+local ToolCatalog = require(root.ToolCatalog)
 local ActionPayloadContract = require(root.ActionPayloadContract)
 local AdminInspectionReport = require(root.AdminInspectionReport)
 local PerformanceBudget = require(root.PerformanceBudget)
@@ -15283,7 +15430,8 @@ local tutorialService = TutorialService.new(
     CraftingCatalog,
     Equipment,
     ResidentDialogue,
-    ActionProgress
+    ActionProgress,
+    ToolCatalog
 )
 
 local services = ServiceRegistry.new({
@@ -15355,7 +15503,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="76">
+      <Item class="ModuleScript" referent="77">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -15453,11 +15601,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="77">
+      <Item class="Folder" referent="78">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="78">
+        <Item class="ModuleScript" referent="79">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16072,7 +16220,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="79">
+        <Item class="ModuleScript" referent="80">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16943,7 +17091,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="80">
+        <Item class="ModuleScript" referent="81">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17444,7 +17592,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="81">
+        <Item class="ModuleScript" referent="82">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19002,7 +19150,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19695,7 +19843,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19799,7 +19947,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20084,7 +20232,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="85">
+        <Item class="ModuleScript" referent="86">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20490,7 +20638,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="86">
+        <Item class="ModuleScript" referent="87">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -20584,7 +20732,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="87">
+        <Item class="ModuleScript" referent="88">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20802,7 +20950,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="88">
+        <Item class="ModuleScript" referent="89">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21646,7 +21794,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="89">
+        <Item class="ModuleScript" referent="90">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21901,7 +22049,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="90">
+        <Item class="ModuleScript" referent="91">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22080,7 +22228,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="91">
+        <Item class="ModuleScript" referent="92">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22179,10 +22327,16 @@ function PlayerCombatService._staminaRegenMultiplier(
         return 1
     end
     local stats = provider(player)
+    -- The held tool's endurance identity rides the attribute channel the
+    -- tool selector maintains (the fishing kit's patience), multiplied
+    -- into the same clamp equipment already lives inside.
+    local toolRegen = tonumber(player:GetAttribute("LastLightToolStaminaRegen")) or 1
     return math.clamp(
-        if type(stats) == "table" and type(stats.staminaRegenMultiplier) == "number"
-            then stats.staminaRegenMultiplier
-            else 1,
+        (
+            if type(stats) == "table" and type(stats.staminaRegenMultiplier) == "number"
+                then stats.staminaRegenMultiplier
+                else 1
+        ) * math.clamp(toolRegen, 0.75, 1.25),
         0.75,
         1.5
     )
@@ -22231,9 +22385,15 @@ function PlayerCombatService._syncPlayer(self: PlayerCombatService, player: Play
 
     local activeHumanoid = humanoid(player)
     if activeHumanoid ~= nil then
+        -- The climbing kit's sure-footedness applies only while actually
+        -- sprinting: walking pace and the downed crawl stay everyone's.
+        local toolSprint =
+            math.clamp(tonumber(player:GetAttribute("LastLightToolSprintSpeed")) or 1, 1, 1.15)
         activeHumanoid.WalkSpeed = if not self._survivalService:canAct(player)
             then self._config.DownedWalkSpeed
-            elseif snapshot.sprinting then self._config.SprintWalkSpeed * status.movementMultiplier
+            elseif snapshot.sprinting then self._config.SprintWalkSpeed
+                * status.movementMultiplier
+                * toolSprint
             else self._config.BaseWalkSpeed * status.movementMultiplier
     end
 end
@@ -22651,7 +22811,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="92">
+        <Item class="ModuleScript" referent="93">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23750,7 +23910,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="93">
+        <Item class="ModuleScript" referent="94">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24375,7 +24535,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="94">
+        <Item class="ModuleScript" referent="95">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -25986,7 +26146,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="95">
+        <Item class="ModuleScript" referent="96">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -26572,7 +26732,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="96">
+        <Item class="ModuleScript" referent="97">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -26637,6 +26797,7 @@ export type TutorialService = typeof(setmetatable(
         _equipmentCatalog: any,
         _residentDialogue: any,
         _actionProgress: any,
+        _toolCatalog: any,
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -26672,7 +26833,8 @@ function TutorialService.new(
     craftingCatalog: any,
     equipmentCatalog: any,
     residentDialogue: any,
-    actionProgress: any
+    actionProgress: any,
+    toolCatalog: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -26702,6 +26864,7 @@ function TutorialService.new(
         _equipmentCatalog = equipmentCatalog,
         _residentDialogue = residentDialogue,
         _actionProgress = actionProgress,
+        _toolCatalog = toolCatalog,
         _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -26990,6 +27153,7 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
             else "FOLLOW THE LANTERN TRAIL",
         toastRevision = 1,
     }
+    self:_applyToolAttributes(player, session.selectedTool)
     -- A guest is told they are one, at the door. The permission model has
     -- always protected the host's town; the visit only becomes deliberate
     -- when the visitor knows whose lanterns they are standing under.
@@ -27117,12 +27281,32 @@ function TutorialService._beginTimedAction(
     end
     local now = workspace:GetServerTimeNow()
     local session = self._sessions[player]
-    -- The hammer is the worker's tool: gather and build run a quarter faster
-    -- with it in hand. Combat identity lives in _strikeContext; this is the
-    -- hammer's half of "the three tools actually differ".
-    local durationMultiplier = if session ~= nil and session.selectedTool == "hammer"
-        then 0.75
-        else 1
+    --[[
+        Work identity: the hammer hurries every timed action, while the
+        pick and sickle hurry only harvests of their own materials -- the
+        node's reward decides, so a pick at a brightcap is just a pick.
+        Combat identity lives in _strikeContext; this is the other half of
+        "the tools actually differ".
+    ]]
+    local tool = self._toolCatalog.get(if session ~= nil then session.selectedTool else nil)
+    local durationMultiplier = 1
+    if tool ~= nil then
+        if tool.actionDurationMultiplier ~= nil then
+            durationMultiplier = tool.actionDurationMultiplier
+        elseif
+            tool.gatherDurationMultiplier ~= nil
+            and actionId == self._runtimeIds.Actions.Gather
+            and tool.gatherMaterials ~= nil
+        then
+            local node = self._worldService:resourceNode(interactionId)
+            local materialId = if node ~= nil and type(node.reward) == "table"
+                then node.reward.materialId
+                else nil
+            if materialId ~= nil and tool.gatherMaterials[materialId] == true then
+                durationMultiplier = tool.gatherDurationMultiplier
+            end
+        end
+    end
     local nextState, result = self._actionProgress.begin(
         self._actions[player],
         actionId,
@@ -27199,15 +27383,61 @@ end
     is what the client's arrow visual keys off. All numbers live here and in
     Equipment; a client never submits any of them.
 ]]
+--[[
+    The endurance families work through per-player attributes, the same
+    channel survival already syncs health through: the combat service reads
+    them without a service edge existing in either direction, and they
+    follow the tool wherever it is set -- selection at the yard, or a
+    profile load restoring last session's choice.
+]]
+--[[
+    The survey glass's exploration identity: while it is the held tool and
+    the player walks Bramblewake, the objective markers include the nearest
+    unharvested resource node, labeled with what it pays. One marker, the
+    nearest only -- a surveyor's bearing, not a maphack.
+]]
+function TutorialService._addSurveyTarget(
+    self: TutorialService,
+    player: Player,
+    add: (BasePart?, string) -> ()
+)
+    local session = self._sessions[player]
+    local tool = self._toolCatalog.get(if session ~= nil then session.selectedTool else nil)
+    if tool == nil or tool.surveyRevealsNodes ~= true then
+        return
+    end
+    local character = player.Character
+    local root = if character == nil then nil else character:FindFirstChild("HumanoidRootPart")
+    if root == nil or not root:IsA("BasePart") then
+        return
+    end
+    local node = self._worldService:nearestResourceNode(root.Position)
+    if node ~= nil and node.target ~= nil then
+        add(node.target, "SURVEY · " .. string.upper(tostring(node.objectText)))
+    end
+end
+
+function TutorialService._applyToolAttributes(self: TutorialService, player: Player, toolId: any)
+    local definition = self._toolCatalog.get(toolId)
+    player:SetAttribute(
+        "LastLightToolStaminaRegen",
+        if definition ~= nil then definition.staminaRegenMultiplier else nil
+    )
+    player:SetAttribute(
+        "LastLightToolSprintSpeed",
+        if definition ~= nil then definition.sprintSpeedMultiplier else nil
+    )
+end
+
 function TutorialService._strikeContext(self: TutorialService, player: Player): any
     local session = self._sessions[player]
     local context = { rangeBonus = 0, damageMultiplier = 1 }
-    local tool = if session ~= nil then session.selectedTool else nil
-    if tool == "axe" then
-        context.damageMultiplier = 1.25
-    elseif tool == "torch" then
-        context.rangeBonus = 4
-        context.damageMultiplier = 0.9
+    -- Tool identity comes from the catalog now that there are eight
+    -- families, not a literal per starter tool.
+    local tool = self._toolCatalog.get(if session ~= nil then session.selectedTool else nil)
+    if tool ~= nil then
+        context.rangeBonus = tool.strikeRangeBonus or 0
+        context.damageMultiplier = tool.strikeDamageMultiplier or 1
     end
     local weapon = self._profileService:weaponStrikeProfile(player)
     if weapon ~= nil then
@@ -27623,6 +27853,31 @@ function TutorialService._interact(
         end
     end
 
+    --[[
+        Tools stay swappable after First Light, the same freedom professions
+        have: eight families are situational -- a pick for a sap run, the
+        survey glass for an unfamiliar trail -- and locking the tutorial's
+        one-shot choice forever would make seven of them dead content. The
+        swap is town-only: not while downed, and not out in Bramblewake
+        where the supply crates are a lodge away.
+    ]]
+    if
+        actionId == self._runtimeIds.Actions.ChooseTool
+        and session.stage == "complete"
+        and self._survivalService:canAct(player)
+        and player:GetAttribute("LastLightInExpedition") ~= true
+    then
+        local selectedTool = prompt:GetAttribute("Payload")
+        if self._toolCatalog.isValid(selectedTool) then
+            session.selectedTool = selectedTool
+            self:_applyToolAttributes(player, selectedTool)
+            self._profileService:setTutorial(player, session.stage, selectedTool)
+            self:_setToast(player, self._toolCatalog.get(selectedTool).displayName .. " SELECTED")
+            self:_publish(player)
+            return
+        end
+    end
+
     local ok, reason = self:_advance(player, actionId)
     if not ok then
         local expected = self._tutorialFlow.definition(session.stage).objective
@@ -27648,10 +27903,12 @@ function TutorialService._interact(
         self:_setToast(player, "+3 HEARTWOOD")
     elseif actionId == self._runtimeIds.Actions.ChooseTool then
         local selectedTool = prompt:GetAttribute("Payload")
-        if type(selectedTool) == "string" then
+        if self._toolCatalog.isValid(selectedTool) then
             session.selectedTool = selectedTool
+            self:_applyToolAttributes(player, selectedTool)
             self._profileService:setTutorial(player, session.stage, selectedTool)
-            self:_setToast(player, string.upper(selectedTool) .. " SELECTED")
+            local definition = self._toolCatalog.get(selectedTool)
+            self:_setToast(player, definition.displayName .. " SELECTED")
         end
     elseif actionId == self._runtimeIds.Actions.Build then
         session.resources -= 3
@@ -27907,6 +28164,7 @@ function TutorialService._objectiveTargets(
         local arena = self._worldService:blackoutArena()
         if blackout ~= nil and arena ~= nil then
             if blackout.status == "relay" then
+                self:_addSurveyTarget(player, add)
                 if blackout.carryingFire and blackout.nextNodeId ~= nil then
                     add(arena.relayNodes[blackout.nextNodeId], "DELIVER ROOTFIRE")
                 else
@@ -27945,6 +28203,7 @@ function TutorialService._objectiveTargets(
         if holder ~= nil and holder:IsA("BasePart") then
             add(holder, "WAYHOME GATE")
         end
+        self:_addSurveyTarget(player, add)
         return resolved
     end
     local definition = self._tutorialFlow.definition(session.stage)
@@ -28243,7 +28502,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="97">
+        <Item class="ModuleScript" referent="98">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -29093,7 +29352,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="98">
+        <Item class="ModuleScript" referent="99">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -33992,6 +34251,53 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             assetId = "mesh_creator_handheld_torch_a",
             seed = 9897,
         },
+        --[[
+            The other five families, racked in a second row west of the
+            first three. No reviewed meshes exist for these yet, so each
+            crate carries a procedural silhouette below instead of a mesh
+            placement -- same crate, cushion, and open lid as its siblings,
+            with the tool readable on the cushion.
+        ]]
+        {
+            id = self._runtimeIds.InteractionIds.ToolPick,
+            tool = "pick",
+            position = TOOL_YARD_CENTER + Vector3.new(-8, 0, 8),
+            color = Color3.fromRGB(151, 116, 74),
+            assetId = nil,
+            seed = 9890,
+        },
+        {
+            id = self._runtimeIds.InteractionIds.ToolSickle,
+            tool = "sickle",
+            position = TOOL_YARD_CENTER + Vector3.new(-8, 0, 0),
+            color = Color3.fromRGB(133, 176, 108),
+            assetId = nil,
+            seed = 9891,
+        },
+        {
+            id = self._runtimeIds.InteractionIds.ToolFishingKit,
+            tool = "fishing_kit",
+            position = TOOL_YARD_CENTER + Vector3.new(-8, 0, -8),
+            color = Color3.fromRGB(98, 148, 176),
+            assetId = nil,
+            seed = 9892,
+        },
+        {
+            id = self._runtimeIds.InteractionIds.ToolClimbingKit,
+            tool = "climbing_kit",
+            position = TOOL_YARD_CENTER + Vector3.new(-16, 0, 4),
+            color = Color3.fromRGB(176, 134, 84),
+            assetId = nil,
+            seed = 9893,
+        },
+        {
+            id = self._runtimeIds.InteractionIds.ToolSurveyKit,
+            tool = "survey_kit",
+            position = TOOL_YARD_CENTER + Vector3.new(-16, 0, -4),
+            color = Color3.fromRGB(186, 168, 112),
+            assetId = nil,
+            seed = 9894,
+        },
     }
     for _, definition in tools do
         local displayFrame = CFrame.new(definition.position) * CFrame.Angles(0, math.rad(90), 0)
@@ -34120,6 +34426,104 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 false
             )
             head.Shape = Enum.PartType.Cylinder
+        elseif definition.tool == "pick" then
+            for pointSide = -1, 1, 2 do
+                local point = part(
+                    toolFallback,
+                    "PickPoint",
+                    Vector3.new(1.35, 0.5, 0.4),
+                    displayFrame
+                        * CFrame.new(pointSide * 0.75 - 0.28, 5.86, 0)
+                        * CFrame.Angles(0, 0, math.rad(28 + pointSide * 16)),
+                    Color3.fromRGB(146, 152, 158),
+                    Enum.Material.Metal,
+                    false
+                )
+                point.Shape = Enum.PartType.Wedge
+            end
+        elseif definition.tool == "sickle" then
+            local blade = part(
+                toolFallback,
+                "SickleBlade",
+                Vector3.new(2, 0.34, 0.7),
+                displayFrame * CFrame.new(-0.6, 5.9, 0) * CFrame.Angles(0, 0, math.rad(62)),
+                Color3.fromRGB(158, 168, 158),
+                Enum.Material.Metal,
+                false
+            )
+            blade.Shape = Enum.PartType.Wedge
+            local hook = part(
+                toolFallback,
+                "SickleHook",
+                Vector3.new(1.15, 0.34, 0.55),
+                displayFrame * CFrame.new(-1.35, 6.5, 0) * CFrame.Angles(0, 0, math.rad(118)),
+                Color3.fromRGB(158, 168, 158),
+                Enum.Material.Metal,
+                false
+            )
+            hook.Shape = Enum.PartType.Wedge
+        elseif definition.tool == "fishing_kit" then
+            part(
+                toolFallback,
+                "FishingLine",
+                Vector3.new(0.08, 2.4, 0.08),
+                displayFrame * CFrame.new(-1.05, 5.15, 0),
+                Color3.fromRGB(214, 205, 186),
+                Enum.Material.Fabric,
+                false
+            )
+            local bobber = part(
+                toolFallback,
+                "FishingBobber",
+                Vector3.new(0.55, 0.55, 0.55),
+                displayFrame * CFrame.new(-1.05, 3.85, 0),
+                Color3.fromRGB(196, 84, 60),
+                Enum.Material.SmoothPlastic,
+                false
+            )
+            bobber.Shape = Enum.PartType.Ball
+        elseif definition.tool == "climbing_kit" then
+            local coil = part(
+                toolFallback,
+                "ClimbingCoil",
+                Vector3.new(0.5, 1.7, 1.7),
+                displayFrame * CFrame.new(0.2, 5.5, 0) * CFrame.Angles(0, math.rad(90), 0),
+                Color3.fromRGB(156, 122, 82),
+                Enum.Material.Fabric,
+                false
+            )
+            coil.Shape = Enum.PartType.Cylinder
+            local hook = part(
+                toolFallback,
+                "ClimbingHook",
+                Vector3.new(0.85, 0.5, 0.35),
+                displayFrame * CFrame.new(0.2, 6.6, 0) * CFrame.Angles(0, 0, math.rad(38)),
+                Color3.fromRGB(123, 132, 137),
+                Enum.Material.Metal,
+                false
+            )
+            hook.Shape = Enum.PartType.Wedge
+        elseif definition.tool == "survey_kit" then
+            local scope = part(
+                toolFallback,
+                "SurveyScope",
+                Vector3.new(1.9, 0.55, 0.55),
+                displayFrame * CFrame.new(-0.2, 6.15, 0) * CFrame.Angles(0, 0, math.rad(74)),
+                Color3.fromRGB(126, 112, 74),
+                Enum.Material.Metal,
+                false
+            )
+            scope.Shape = Enum.PartType.Cylinder
+            local lens = part(
+                toolFallback,
+                "SurveyLens",
+                Vector3.new(0.3, 0.62, 0.62),
+                displayFrame * CFrame.new(0.05, 7.05, 0) * CFrame.Angles(0, 0, math.rad(74)),
+                Color3.fromRGB(186, 214, 214),
+                Enum.Material.Glass,
+                false
+            )
+            lens.Shape = Enum.PartType.Cylinder
         else
             --[[
                 A torch, built as a torch.
@@ -34219,7 +34623,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             object, so for the torch the "fallback" is the finished art and
             nothing is allowed to replace it.
         ]]
-        if definition.tool ~= "torch" then
+        if definition.assetId ~= nil and definition.tool ~= "torch" then
             table.insert(self._meshPlacements, {
                 assetId = definition.assetId,
                 fallbackKind = "asset_replacement",
@@ -36190,6 +36594,28 @@ end
 
 function WorldService.resourceNode(self: WorldService, interactionId: string): any
     return self._resourceNodes[interactionId]
+end
+
+--[[
+    The survey glass's question: of the nodes still standing, which is
+    closest to this position? Harvested nodes leave the registry, so the
+    scan is over live nodes only, and the registry is small (twenty-two on
+    the preview route) -- a linear pass at objective-publish frequency.
+]]
+function WorldService.nearestResourceNode(self: WorldService, position: Vector3): any
+    local closest = nil
+    local closestDistance = math.huge
+    for _, node in self._resourceNodes do
+        local target = node.target
+        if target ~= nil and target:IsA("BasePart") and target.Parent ~= nil then
+            local distance = (target.Position - position).Magnitude
+            if distance < closestDistance then
+                closestDistance = distance
+                closest = node
+            end
+        end
+    end
+    return closest
 end
 
 -- Harvested nodes stay in the world but stop glowing and stop offering the
@@ -41212,11 +41638,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="99">
+      <Item class="Folder" referent="100">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="100">
+        <Item class="ModuleScript" referent="101">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -44996,7 +45422,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="101">
+        <Item class="ModuleScript" referent="102">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -45493,7 +45919,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="102">
+        <Item class="ModuleScript" referent="103">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -46188,7 +46614,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="103">
+        <Item class="ModuleScript" referent="104">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -47047,7 +47473,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="104">
+        <Item class="ModuleScript" referent="105">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -47133,7 +47559,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="105">
+        <Item class="ModuleScript" referent="106">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -47507,7 +47933,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="106">
+        <Item class="ModuleScript" referent="107">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -47687,7 +48113,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="107">
+        <Item class="ModuleScript" referent="108">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -48283,7 +48709,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="108">
+        <Item class="ModuleScript" referent="109">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -48520,7 +48946,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="109">
+        <Item class="ModuleScript" referent="110">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -48609,7 +49035,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="110">
+        <Item class="ModuleScript" referent="111">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -48946,15 +49372,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="111">
+  <Item class="StarterPlayer" referent="112">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="112">
+    <Item class="StarterPlayerScripts" referent="113">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="113">
+      <Item class="LocalScript" referent="114">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -49239,11 +49665,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="114">
+        <Item class="Folder" referent="115">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="115">
+          <Item class="ModuleScript" referent="116">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -49374,7 +49800,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="116">
+          <Item class="ModuleScript" referent="117">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -52138,7 +52564,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="117">
+          <Item class="ModuleScript" referent="118">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -52437,7 +52863,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="118">
+          <Item class="ModuleScript" referent="119">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -52545,7 +52971,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="119">
+          <Item class="ModuleScript" referent="120">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -52664,7 +53090,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="120">
+          <Item class="ModuleScript" referent="121">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -52938,7 +53364,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="121">
+          <Item class="ModuleScript" referent="122">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -53038,7 +53464,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="122">
+          <Item class="ModuleScript" referent="123">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -53150,7 +53576,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="123">
+          <Item class="ModuleScript" referent="124">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -53310,7 +53736,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="124">
+          <Item class="ModuleScript" referent="125">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -53519,7 +53945,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="125">
+          <Item class="ModuleScript" referent="126">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -53664,7 +54090,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="126">
+          <Item class="ModuleScript" referent="127">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -53964,13 +54390,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="127">
+  <Item class="TextChatService" referent="128">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="128">
+  <Item class="Workspace" referent="129">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

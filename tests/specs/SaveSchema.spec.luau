@@ -48,11 +48,11 @@ return {
                     tutorial = {
                         stage = "build",
                         complete = false,
-                        selectedTool = "hammer",
+                        selectedTool = "pick",
                     },
                 }, 300)
                 TestRunner.equal(profile.tutorial.stage, "build")
-                TestRunner.equal(profile.tutorial.selectedTool, "hammer")
+                TestRunner.equal(profile.tutorial.selectedTool, "pick")
                 TestRunner.equal(profile.revision, 4)
                 TestRunner.equal(profile.schemaVersion, Config.SaveSchemaVersion)
             end,

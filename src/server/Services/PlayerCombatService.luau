@@ -94,10 +94,16 @@ function PlayerCombatService._staminaRegenMultiplier(
         return 1
     end
     local stats = provider(player)
+    -- The held tool's endurance identity rides the attribute channel the
+    -- tool selector maintains (the fishing kit's patience), multiplied
+    -- into the same clamp equipment already lives inside.
+    local toolRegen = tonumber(player:GetAttribute("LastLightToolStaminaRegen")) or 1
     return math.clamp(
-        if type(stats) == "table" and type(stats.staminaRegenMultiplier) == "number"
-            then stats.staminaRegenMultiplier
-            else 1,
+        (
+            if type(stats) == "table" and type(stats.staminaRegenMultiplier) == "number"
+                then stats.staminaRegenMultiplier
+                else 1
+        ) * math.clamp(toolRegen, 0.75, 1.25),
         0.75,
         1.5
     )
@@ -146,9 +152,15 @@ function PlayerCombatService._syncPlayer(self: PlayerCombatService, player: Play
 
     local activeHumanoid = humanoid(player)
     if activeHumanoid ~= nil then
+        -- The climbing kit's sure-footedness applies only while actually
+        -- sprinting: walking pace and the downed crawl stay everyone's.
+        local toolSprint =
+            math.clamp(tonumber(player:GetAttribute("LastLightToolSprintSpeed")) or 1, 1, 1.15)
         activeHumanoid.WalkSpeed = if not self._survivalService:canAct(player)
             then self._config.DownedWalkSpeed
-            elseif snapshot.sprinting then self._config.SprintWalkSpeed * status.movementMultiplier
+            elseif snapshot.sprinting then self._config.SprintWalkSpeed
+                * status.movementMultiplier
+                * toolSprint
             else self._config.BaseWalkSpeed * status.movementMultiplier
     end
 end

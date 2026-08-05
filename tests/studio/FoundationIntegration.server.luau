@@ -16,6 +16,7 @@ local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedi
 local BramblewakeEnemies = require(root.BramblewakeEnemies)
 local CombatState = require(root.CombatState)
 local CraftingCatalog = require(root.CraftingCatalog)
+local ToolCatalog = require(root.ToolCatalog)
 local EnemyAttackFlow = require(root.EnemyAttackFlow)
 local EnemyCombatRules = require(root.EnemyCombatRules)
 local EngineerBrace = require(root.EngineerBrace)
@@ -789,7 +790,10 @@ for _, descendant in world:GetDescendants() do
         )
     end
 end
-assert(toolDisplays == 3, "all three starter tools need physical displays")
+assert(
+    toolDisplays == #ToolCatalog.list(),
+    "every tool family needs its physical display in the yard"
+)
 --[[
     Derived, not a literal: this line sat unreachable behind two earlier
     failures long enough for the Thornwood Bow bench to make it stale -- the
@@ -1515,7 +1519,8 @@ assert(wardenLivingRoots == 12, "Warden nodes need three living roots each")
     (only stage>0 buildings carry a prompt on a fresh save), crafting
     benches 10 (75 as of the six weapon families), decorations 8, first
     lantern 1, heartwood 1, mara 1, memory fragments 8, resource nodes 22,
-    old growth 2, quest board 1, starter tools 3, warden stag 6. The two derived terms beside it stay derived:
+    old growth 2, quest board 1, tools 8 (80 as of the eight tool
+    families), warden stag 6. The two derived terms beside it stay derived:
     event interactions come from the catalog and specializations from
     RuntimeIds, so only genuinely new fixtures move this number, and moving
     it should be a deliberate edit.
@@ -1523,13 +1528,13 @@ assert(wardenLivingRoots == 12, "Warden nodes need three living roots each")
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
     #tagged
-        == 75
+        == 80
             + BramblewakeExpedition.EventInteractionCount
             + #RuntimeIds.ProfessionSpecializationInteractionIds,
     string.format(
         "expected tutorial, event, elite, boss, extraction, crafting, decoration, and mastery prompts (found %d, expected %d)",
         #tagged,
-        75
+        80
             + BramblewakeExpedition.EventInteractionCount
             + #RuntimeIds.ProfessionSpecializationInteractionIds
     )
