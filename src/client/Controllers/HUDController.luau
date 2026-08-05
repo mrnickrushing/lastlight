@@ -1937,7 +1937,17 @@ function HUDController._layout(self: HUDController)
         self._resource.Position = UDim2.fromOffset(18, if self._compactEnabled then 158 else 218)
         self._compact.Size = UDim2.fromOffset(44, 38)
         self._compact.Text = if self._compactEnabled then "+" else "−"
-        self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 212)
+        --[[
+            Keep the middle of a phone screen clear.
+
+            These rails used to start at 212 and chain down to 434, which on a
+            ~640-point phone viewport is the exact band the creature you are
+            trying to tap stands in -- the owner's report was that the fight
+            UI hid the monsters. They now begin just under the objective card
+            and stay in the top third, so the play area below them belongs to
+            the world.
+        ]]
+        self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 150)
         -- Tucked under the objective panel on the left rather than spanning
         -- the screen at eye level. At full width it sat straight across the
         -- middle of the view for the whole nine minutes of a Blackout.
@@ -1945,31 +1955,31 @@ function HUDController._layout(self: HUDController)
         self._blackoutFrame.Size = UDim2.fromOffset(470, 70)
         self._blackoutFrame.AnchorPoint = Vector2.new(0, 0)
         self._eliteFrame.Position =
-            UDim2.new(0.5, 0, 0, if self._blackoutFrame.Visible then 284 else 212)
-        self._eliteFrame.Size = UDim2.new(1, -36, 0, 70)
+            UDim2.new(0.5, 0, 0, if self._blackoutFrame.Visible then 222 else 150)
+        self._eliteFrame.Size = UDim2.new(1, -36, 0, 64)
         self._allyFrame.Position = UDim2.new(
             0.5,
             0,
             0,
             if self._eliteFrame.Visible
-                then (if self._blackoutFrame.Visible then 362 else 290)
-                elseif self._blackoutFrame.Visible then 284
-                elseif self._lanternFrame.Visible then 254
-                else 212
+                then (if self._blackoutFrame.Visible then 292 else 220)
+                elseif self._blackoutFrame.Visible then 222
+                elseif self._lanternFrame.Visible then 192
+                else 150
         )
-        self._allyFrame.Size = UDim2.new(1, -36, 0, 64)
+        self._allyFrame.Size = UDim2.new(1, -36, 0, 58)
         self._threatFrame.Position = UDim2.new(
             0.5,
             0,
             0,
             if self._allyFrame.Visible
-                then (if self._blackoutFrame.Visible and self._eliteFrame.Visible then 434 else 362)
-                elseif self._blackoutFrame.Visible and self._eliteFrame.Visible then 362
-                elseif self._blackoutFrame.Visible then 284
-                elseif self._eliteFrame.Visible then 290
-                else 254
+                then (if self._blackoutFrame.Visible and self._eliteFrame.Visible then 356 else 284)
+                elseif self._blackoutFrame.Visible and self._eliteFrame.Visible then 292
+                elseif self._blackoutFrame.Visible then 222
+                elseif self._eliteFrame.Visible then 220
+                else 192
         )
-        self._threatFrame.Size = UDim2.new(1, -36, 0, 66)
+        self._threatFrame.Size = UDim2.new(1, -36, 0, 60)
         self._downedFrame.Size = UDim2.new(1, -36, 0, 90)
         local professionY = if self._compactEnabled then 158 else 218
         self._professionButton.Position = UDim2.new(1, -18, 0, professionY)
@@ -2004,11 +2014,14 @@ function HUDController._layout(self: HUDController)
         -- points. The canvas is scaled by 0.78, so these offsets shrink by
         -- that much on screen -- -170 looked clear here and landed on top of
         -- jump on the device.
-        self._sprint.Position = UDim2.new(1, -300, 1, -34)
-        self._ability.Position = UDim2.new(1, -410, 1, -34)
-        self._primary.Position = UDim2.new(1, -520, 1, -34)
-        self._tool.Position = UDim2.new(1, -630, 1, -34)
-        self._dodge.Position = UDim2.new(1, -740, 1, -34)
+        -- Run sits hard against Roblox's jump button on the right, where the
+        -- owner asked for it: the thumb that jumps is the thumb that sprints.
+        -- Everything else steps further inboard from there.
+        self._sprint.Position = UDim2.new(1, -212, 1, -150)
+        self._ability.Position = UDim2.new(1, -300, 1, -34)
+        self._primary.Position = UDim2.new(1, -410, 1, -34)
+        self._tool.Position = UDim2.new(1, -520, 1, -34)
+        self._dodge.Position = UDim2.new(1, -630, 1, -34)
     else
         self._objectiveFrame.Position = UDim2.fromOffset(18, 18)
         self._objectiveFrame.Size = if self._compactEnabled

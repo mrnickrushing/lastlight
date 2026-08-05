@@ -154,10 +154,12 @@ function VignetteController.play(self: VignetteController, shot: Shot)
     local toPlayer = root.Position - focus
     local flat = Vector3.new(toPlayer.X, 0, toPlayer.Z)
     local direction = if flat.Magnitude > 1 then flat.Unit else Vector3.new(0, 0, 1)
+    -- A wider start and a longer travel, so a five-second shot is still
+    -- moving when it ends rather than arriving in two and sitting there.
     local startFrame =
-        CFrame.lookAt(focus + direction * 34 + Vector3.new(0, 14, 0), focus + Vector3.new(0, 3, 0))
+        CFrame.lookAt(focus + direction * 46 + Vector3.new(0, 19, 0), focus + Vector3.new(0, 3, 0))
     local endFrame =
-        CFrame.lookAt(focus + direction * 22 + Vector3.new(0, 9, 0), focus + Vector3.new(0, 3, 0))
+        CFrame.lookAt(focus + direction * 19 + Vector3.new(0, 8, 0), focus + Vector3.new(0, 3, 0))
 
     camera.CameraType = Enum.CameraType.Scriptable
     camera.CFrame = startFrame

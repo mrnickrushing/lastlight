@@ -29392,6 +29392,13 @@ function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKe
         fallbackPart.CastShadow = false
         local isCore = fallbackPart == core
         fallbackPart:SetAttribute("AuthoritativeEnemyHitbox", isCore)
+        -- The strike volume is the tap target and must keep answering
+        -- raycasts, or the creature becomes unhittable the moment its
+        -- authored mesh loads -- which is exactly the bug this volume
+        -- exists to fix.
+        if fallbackPart:GetAttribute("EnemyStrikeVolume") == true then
+            continue
+        end
         -- Only the authoritative hitbox may answer raycasts once the
         -- authored mesh is up. Left true, the wing/beak/eye fallback parts
         -- stayed queryable with no ClickDetector of their own and silently
@@ -29399,6 +29406,25 @@ function WorldService.placeEnemyVisual(self: WorldService, model: Model, modelKe
         if not isCore then
             fallbackPart.CanQuery = false
         end
+    end
+    --[[
+        Grow the tap target to the creature the player can actually see.
+
+        The volume is authored from the core, but every species' authored mesh
+        has its own silhouette -- the bark ram and the crow both read wider
+        than the box their hitbox lives in. Fitting the volume to the real
+        rendered bounds, plus a thumb's margin, is what makes "tap any part of
+        the monster" true rather than approximately true.
+    ]]
+    local strikeVolume = model:FindFirstChild("StrikeVolume")
+    if strikeVolume ~= nil and strikeVolume:IsA("BasePart") then
+        local authoredCFrame, authoredSize = authored:GetBoundingBox()
+        strikeVolume.Size = Vector3.new(
+            math.max(strikeVolume.Size.X, authoredSize.X + 4),
+            math.max(strikeVolume.Size.Y, authoredSize.Y + 3),
+            math.max(strikeVolume.Size.Z, authoredSize.Z + 4)
+        )
+        strikeVolume.CFrame = CFrame.new(authoredCFrame.Position)
     end
     model:SetAttribute("EnemyVisualAssetId", profile.assetId)
     model:SetAttribute("EnemyVisualReady", true)
@@ -35521,7 +35547,49 @@ function WorldService.buildBramblewake(
             shard.Name = "MemoryFragment_" .. fragment.id
             shard:SetAttribute("MemoryFragmentId", fragment.id)
             shard.Parent = result.model
-            local base = anchorPart.Position + Vector3.new(2.6, 0, 2.6)
+            --[[
+                Seat the shard on the ground, not on its anchor's height.
+
+                The anchors are whatever object holds the memory -- a harvest
+                table top, a well rim, the Wayhome gate's light. Their Y
+                values have nothing in common, so inheriting one put the
+                bell fragment 7.5 studs in the air above the extraction gate
+                and sank the Mothwell one into the rim stone. Measure the
+                surface instead, the same way foliage and enemy placement
+                already do; fall back to the anchor only if nothing is under
+                it at all.
+            ]]
+            local shardX = anchorPart.Position.X + 2.6
+            local shardZ = anchorPart.Position.Z + 2.6
+            local groundParams = RaycastParams.new()
+            groundParams.FilterType = Enum.RaycastFilterType.Exclude
+            local ignored: { Instance } = { shard }
+            groundParams.FilterDescendantsInstances = ignored
+            --[[
+                Ground is what a player can stand on, so anything that does
+                not collide is not ground. Without this the ray stopped on the
+                Wayhome Gate's own invisible interaction volume and seated the
+                bell fragment sixteen studs in the air -- click volumes are
+                deliberately queryable (that is what makes tap-to-interact
+                work), so they answer a raycast while being nothing anyone
+                could stand on.
+            ]]
+            local groundY = anchorPart.Position.Y
+            local origin = Vector3.new(shardX, anchorPart.Position.Y + 14, shardZ)
+            for _ = 1, 8 do
+                local groundHit = workspace:Raycast(origin, Vector3.new(0, -90, 0), groundParams)
+                if groundHit == nil then
+                    break
+                end
+                if groundHit.Instance:IsA("Terrain") or groundHit.Instance.CanCollide then
+                    groundY = groundHit.Position.Y
+                    break
+                end
+                table.insert(ignored, groundHit.Instance)
+                groundParams.FilterDescendantsInstances = ignored
+                origin = groundHit.Position - Vector3.new(0, 0.05, 0)
+            end
+            local base = Vector3.new(shardX, groundY, shardZ)
             local cradle = part(
                 shard,
                 "MemoryShardCradle",
@@ -41301,9 +41369,46 @@ function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target:
     -- moving) core. A fast flier like the crow reads several studs wider
     -- than its core across wings and beak; without this, every one of those
     -- taps silently missed.
+    --[[
+        A tap target big enough to actually hit on a phone.
+
+        A ClickDetector only fires when the tap ray lands on a part that
+        answers raycasts, and once the authored mesh loads there is almost
+        nothing left that does: MeshTemplateLoader.sanitize clears CanQuery on
+        every part of a loaded model (measured: 0 of 1 queryable on the
+        rootling), and placeEnemyVisual clears it on every fallback part but
+        the core. So the creature a player can SEE answers no taps at all, and
+        the only thing that does is one invisible box roughly the size of the
+        body -- which on a phone sits behind the threat banner and the lantern
+        rail. The result was a night defense that could not be fought.
+
+        This is the same generous invisible volume every other interaction in
+        the game already uses, sized past the silhouette so a thumb aimed at
+        the creature lands. It is CanCollide = false so it never changes
+        movement or the fight's geometry, and the server still resolves range,
+        facing, cover, and damage -- a tap only says which creature was meant.
+    ]]
+    local strikeVolume = Instance.new("Part")
+    strikeVolume.Name = "StrikeVolume"
+    strikeVolume.Size = Vector3.new(
+        math.max(9, core.Size.X + 5),
+        math.max(10, core.Size.Y + 4),
+        math.max(9, core.Size.Z + 5)
+    )
+    strikeVolume.CFrame = CFrame.new(core.Position)
+    strikeVolume.Anchored = true
+    strikeVolume.CanCollide = false
+    strikeVolume.CanTouch = false
+    strikeVolume.CanQuery = true
+    strikeVolume.CastShadow = false
+    strikeVolume.Transparency = 1
+    strikeVolume.Massless = true
+    strikeVolume:SetAttribute("EnemyStrikeVolume", true)
+    strikeVolume.Parent = model
+
     local click = Instance.new("ClickDetector")
     click.Name = "StrikeClick"
-    click.MaxActivationDistance = 26
+    click.MaxActivationDistance = 42
     click.CursorIcon = ""
     click.Parent = model
 
@@ -46633,7 +46738,7 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
                 title = title,
                 subtitle = subtitle,
                 focus = focus,
-                duration = 3.0,
+                duration = 5.5,
             })
         end
     end
@@ -46648,7 +46753,7 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
                 title = "THE BLACKOUT",
                 subtitle = "CARRY THE ROOTFIRE",
                 focus = focus,
-                duration = 3.0,
+                duration = 5.5,
             })
         end
     end
@@ -46663,7 +46768,7 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
                 title = "OLD GROWTH",
                 subtitle = "STRIKE THE AMBER HEART",
                 focus = focus,
-                duration = 2.4,
+                duration = 4.5,
             })
         end
     end
@@ -46678,7 +46783,7 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
                 title = "THE WARDEN STAG",
                 subtitle = "CLEANSE THE LIVING ROOTS",
                 focus = focus,
-                duration = 2.4,
+                duration = 4.5,
             })
         end
     end
@@ -48788,7 +48893,17 @@ function HUDController._layout(self: HUDController)
         self._resource.Position = UDim2.fromOffset(18, if self._compactEnabled then 158 else 218)
         self._compact.Size = UDim2.fromOffset(44, 38)
         self._compact.Text = if self._compactEnabled then "+" else "−"
-        self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 212)
+        --[[
+            Keep the middle of a phone screen clear.
+
+            These rails used to start at 212 and chain down to 434, which on a
+            ~640-point phone viewport is the exact band the creature you are
+            trying to tap stands in -- the owner's report was that the fight
+            UI hid the monsters. They now begin just under the objective card
+            and stay in the top third, so the play area below them belongs to
+            the world.
+        ]]
+        self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 150)
         -- Tucked under the objective panel on the left rather than spanning
         -- the screen at eye level. At full width it sat straight across the
         -- middle of the view for the whole nine minutes of a Blackout.
@@ -48796,31 +48911,31 @@ function HUDController._layout(self: HUDController)
         self._blackoutFrame.Size = UDim2.fromOffset(470, 70)
         self._blackoutFrame.AnchorPoint = Vector2.new(0, 0)
         self._eliteFrame.Position =
-            UDim2.new(0.5, 0, 0, if self._blackoutFrame.Visible then 284 else 212)
-        self._eliteFrame.Size = UDim2.new(1, -36, 0, 70)
+            UDim2.new(0.5, 0, 0, if self._blackoutFrame.Visible then 222 else 150)
+        self._eliteFrame.Size = UDim2.new(1, -36, 0, 64)
         self._allyFrame.Position = UDim2.new(
             0.5,
             0,
             0,
             if self._eliteFrame.Visible
-                then (if self._blackoutFrame.Visible then 362 else 290)
-                elseif self._blackoutFrame.Visible then 284
-                elseif self._lanternFrame.Visible then 254
-                else 212
+                then (if self._blackoutFrame.Visible then 292 else 220)
+                elseif self._blackoutFrame.Visible then 222
+                elseif self._lanternFrame.Visible then 192
+                else 150
         )
-        self._allyFrame.Size = UDim2.new(1, -36, 0, 64)
+        self._allyFrame.Size = UDim2.new(1, -36, 0, 58)
         self._threatFrame.Position = UDim2.new(
             0.5,
             0,
             0,
             if self._allyFrame.Visible
-                then (if self._blackoutFrame.Visible and self._eliteFrame.Visible then 434 else 362)
-                elseif self._blackoutFrame.Visible and self._eliteFrame.Visible then 362
-                elseif self._blackoutFrame.Visible then 284
-                elseif self._eliteFrame.Visible then 290
-                else 254
+                then (if self._blackoutFrame.Visible and self._eliteFrame.Visible then 356 else 284)
+                elseif self._blackoutFrame.Visible and self._eliteFrame.Visible then 292
+                elseif self._blackoutFrame.Visible then 222
+                elseif self._eliteFrame.Visible then 220
+                else 192
         )
-        self._threatFrame.Size = UDim2.new(1, -36, 0, 66)
+        self._threatFrame.Size = UDim2.new(1, -36, 0, 60)
         self._downedFrame.Size = UDim2.new(1, -36, 0, 90)
         local professionY = if self._compactEnabled then 158 else 218
         self._professionButton.Position = UDim2.new(1, -18, 0, professionY)
@@ -48855,11 +48970,14 @@ function HUDController._layout(self: HUDController)
         -- points. The canvas is scaled by 0.78, so these offsets shrink by
         -- that much on screen -- -170 looked clear here and landed on top of
         -- jump on the device.
-        self._sprint.Position = UDim2.new(1, -300, 1, -34)
-        self._ability.Position = UDim2.new(1, -410, 1, -34)
-        self._primary.Position = UDim2.new(1, -520, 1, -34)
-        self._tool.Position = UDim2.new(1, -630, 1, -34)
-        self._dodge.Position = UDim2.new(1, -740, 1, -34)
+        -- Run sits hard against Roblox's jump button on the right, where the
+        -- owner asked for it: the thumb that jumps is the thumb that sprints.
+        -- Everything else steps further inboard from there.
+        self._sprint.Position = UDim2.new(1, -212, 1, -150)
+        self._ability.Position = UDim2.new(1, -300, 1, -34)
+        self._primary.Position = UDim2.new(1, -410, 1, -34)
+        self._tool.Position = UDim2.new(1, -520, 1, -34)
+        self._dodge.Position = UDim2.new(1, -630, 1, -34)
     else
         self._objectiveFrame.Position = UDim2.fromOffset(18, 18)
         self._objectiveFrame.Size = if self._compactEnabled
@@ -50086,10 +50204,12 @@ function VignetteController.play(self: VignetteController, shot: Shot)
     local toPlayer = root.Position - focus
     local flat = Vector3.new(toPlayer.X, 0, toPlayer.Z)
     local direction = if flat.Magnitude > 1 then flat.Unit else Vector3.new(0, 0, 1)
+    -- A wider start and a longer travel, so a five-second shot is still
+    -- moving when it ends rather than arriving in two and sitting there.
     local startFrame =
-        CFrame.lookAt(focus + direction * 34 + Vector3.new(0, 14, 0), focus + Vector3.new(0, 3, 0))
+        CFrame.lookAt(focus + direction * 46 + Vector3.new(0, 19, 0), focus + Vector3.new(0, 3, 0))
     local endFrame =
-        CFrame.lookAt(focus + direction * 22 + Vector3.new(0, 9, 0), focus + Vector3.new(0, 3, 0))
+        CFrame.lookAt(focus + direction * 19 + Vector3.new(0, 8, 0), focus + Vector3.new(0, 3, 0))
 
     camera.CameraType = Enum.CameraType.Scriptable
     camera.CFrame = startFrame
