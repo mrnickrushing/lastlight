@@ -12454,6 +12454,11 @@ export type Definition = {
     objective: string,
     detail: string,
     mara: string,
+    -- World interactions that satisfy this stage. The client raises a marker
+    -- over each one, because an objective a player cannot find is the same as
+    -- an objective that does not exist: "choose a starter tool" said nothing
+    -- about where the tools were.
+    targets: { string }?,
 }
 
 local ORDER: { Stage } = {
@@ -12469,6 +12474,7 @@ local ORDER: { Stage } = {
 
 local DEFINITIONS: { [Stage]: Definition } = {
     arrive = {
+        targets = { "mara_rescue" },
         index = 1,
         action = "rescue",
         next = "gather",
@@ -12477,6 +12483,7 @@ local DEFINITIONS: { [Stage]: Definition } = {
         mara = "Over here! The roots tighten when the light fades.",
     },
     gather = {
+        targets = { "heartwood_gather" },
         index = 2,
         action = "gather",
         next = "choose_tool",
@@ -12485,6 +12492,7 @@ local DEFINITIONS: { [Stage]: Definition } = {
         mara = "Heartwood remembers sunlight. We can build with it.",
     },
     choose_tool = {
+        targets = { "tool_axe", "tool_hammer", "tool_torch" },
         index = 3,
         action = "choose_tool",
         next = "build",
@@ -12493,6 +12501,7 @@ local DEFINITIONS: { [Stage]: Definition } = {
         mara = "Choose what feels right. Emberhollow needs every kind of helper.",
     },
     build = {
+        targets = { "barricade_build" },
         index = 4,
         action = "build",
         next = "prepare",
@@ -12501,6 +12510,7 @@ local DEFINITIONS: { [Stage]: Definition } = {
         mara = "Place the braces toward the dark trail.",
     },
     prepare = {
+        targets = { "first_lantern_prepare" },
         index = 5,
         action = "prepare",
         next = "survive",
@@ -12509,6 +12519,7 @@ local DEFINITIONS: { [Stage]: Definition } = {
         mara = "Night is close. Light the lantern when you are ready.",
     },
     survive = {
+        targets = { "first_lantern_prepare" },
         index = 6,
         action = nil,
         next = "reveal",
@@ -12517,6 +12528,7 @@ local DEFINITIONS: { [Stage]: Definition } = {
         mara = "Stay in the light. Rootlings hate a steady flame.",
     },
     reveal = {
+        targets = { "bramblewake_reveal" },
         index = 7,
         action = "reveal",
         next = "complete",
@@ -24994,6 +25006,38 @@ function TutorialService.broadcastLobby(self: TutorialService, toast: string?)
     self:_publishAll()
 end
 
+--[[
+    Where the current objective physically is.
+
+    The objective card names what to do; nothing ever said where. "Choose a
+    starter tool" and "gather heartwood" both sent a new player wandering,
+    which is the owner's report. Positions are resolved from the live
+    interaction registry rather than a coordinate table, so a marker cannot
+    drift from the thing it points at when a lot moves.
+]]
+function TutorialService._objectiveTargets(self: TutorialService, session: Session): { any }
+    local definition = self._tutorialFlow.definition(session.stage)
+    local targets = definition.targets
+    if targets == nil then
+        return {}
+    end
+    local resolved = {}
+    for _, interactionId in targets do
+        local prompt = self._worldService:interaction(interactionId)
+        local holder = if prompt ~= nil then prompt.Parent else nil
+        if holder ~= nil and holder:IsA("BasePart") then
+            table.insert(resolved, {
+                interactionId = interactionId,
+                x = holder.Position.X,
+                y = holder.Position.Y,
+                z = holder.Position.Z,
+                label = definition.objective,
+            })
+        end
+    end
+    return resolved
+end
+
 function TutorialService.snapshot(self: TutorialService, player: Player): any
     local session = self._sessions[player]
     if session == nil then
@@ -25215,6 +25259,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         townCondition = self._townNightService:conditionSnapshot(),
         recipes = self._craftingCatalog:list(),
         equipmentCatalog = self._equipmentCatalog.list(),
+        objectiveTargets = self:_objectiveTargets(session),
         quests = self._profileService:questSnapshot(player),
         memoryArchive = self._profileService:memoryFragments(player),
         combat = self._combatService:snapshot(player),
@@ -30923,45 +30968,117 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             )
             head.Shape = Enum.PartType.Cylinder
         else
+            --[[
+                A torch, built as a torch.
+
+                This was a bare stick with a Neon ball stuck on the end, tinted
+                the display's plaque colour -- pale blue-white, which is not a
+                colour fire is. At gameplay distance it read as a lollipop, and
+                the owner said so. A torch is legible from four things: a
+                tapered handle, a wrapped cloth head, a charred cup, and a
+                flame with a silhouette. Wedges give the flame a shape that
+                narrows toward the tip; three of them at different angles and
+                warmths read as fire rather than as a lamp.
+            ]]
+            local wrap = part(
+                toolFallback,
+                "TorchWrap",
+                Vector3.new(0.62, 1.35, 0.62),
+                displayFrame * CFrame.new(0, 5.6, 0),
+                Color3.fromRGB(74, 58, 42),
+                Enum.Material.Fabric,
+                false
+            )
+            wrap.CanQuery = false
             local cup = part(
                 toolFallback,
                 "TorchCup",
                 -- Cylinder axis is local X: (height, diameter, diameter).
-                Vector3.new(0.72, 1.2, 1.2),
-                displayFrame * CFrame.new(0, 6.05, 0) * CFrame.Angles(0, 0, math.rad(90)),
-                Color3.fromRGB(92, 71, 48),
+                Vector3.new(0.66, 1.05, 1.05),
+                displayFrame * CFrame.new(0, 6.28, 0) * CFrame.Angles(0, 0, math.rad(90)),
+                Color3.fromRGB(48, 40, 36),
                 Enum.Material.Metal,
                 false
             )
             cup.Shape = Enum.PartType.Cylinder
-            local flame = part(
+            local embers = part(
                 toolFallback,
-                "TorchFlame",
-                Vector3.new(1.15, 1.55, 1.15),
-                displayFrame * CFrame.new(0, 6.95, 0),
-                definition.color,
+                "TorchEmbers",
+                Vector3.new(0.78, 0.34, 0.78),
+                displayFrame * CFrame.new(0, 6.62, 0),
+                Color3.fromRGB(196, 84, 30),
                 Enum.Material.Neon,
                 false
             )
-            flame.Shape = Enum.PartType.Ball
+            embers.CanQuery = false
+            local flameShapes = {
+                {
+                    size = Vector3.new(1.05, 1.5, 1.05),
+                    y = 7.05,
+                    yaw = 0,
+                    color = Color3.fromRGB(224, 104, 34),
+                },
+                {
+                    size = Vector3.new(0.78, 1.9, 0.78),
+                    y = 7.35,
+                    yaw = 128,
+                    color = Color3.fromRGB(255, 158, 54),
+                },
+                {
+                    size = Vector3.new(0.46, 1.35, 0.46),
+                    y = 7.85,
+                    yaw = 246,
+                    color = Color3.fromRGB(255, 214, 128),
+                },
+            }
+            local flame
+            for index, shape in flameShapes do
+                local piece = part(
+                    toolFallback,
+                    if index == 1 then "TorchFlame" else "TorchFlameTip",
+                    shape.size,
+                    displayFrame
+                        * CFrame.new(0, shape.y, 0)
+                        * CFrame.Angles(0, math.rad(shape.yaw), math.rad(index * 4 - 6)),
+                    shape.color,
+                    Enum.Material.Neon,
+                    false
+                )
+                piece.Shape = Enum.PartType.Wedge
+                piece.CanQuery = false
+                piece.CastShadow = false
+                if index == 1 then
+                    flame = piece
+                end
+                CollectionService:AddTag(piece, self._runtimeIds.AmbientLightTag)
+            end
             local flameLight = Instance.new("PointLight")
-            flameLight.Color = definition.color
-            flameLight.Brightness = 2.0
-            flameLight.Range = 18
+            flameLight.Color = Color3.fromRGB(255, 168, 82)
+            flameLight.Brightness = 2.2
+            flameLight.Range = 19
             flameLight.Parent = flame
-            CollectionService:AddTag(flame, self._runtimeIds.AmbientLightTag)
         end
-        table.insert(self._meshPlacements, {
-            assetId = definition.assetId,
-            fallbackKind = "asset_replacement",
-            position = (toolAnchor * CFrame.new(0, -0.3, 0)).Position,
-            scale = 1,
-            yaw = math.rad(90),
-            seed = definition.seed,
-            swayTag = nil,
-            parent = display,
-            fallbackInstance = toolFallback,
-        })
+        --[[
+            The axe and hammer use their reviewed meshes. The torch does not:
+            the sourced handheld torch renders as a pale stick whose own glow
+            reads blue-white, which is what made this display look like a
+            lollipop on a phone. The layered flame built above is the better
+            object, so for the torch the "fallback" is the finished art and
+            nothing is allowed to replace it.
+        ]]
+        if definition.tool ~= "torch" then
+            table.insert(self._meshPlacements, {
+                assetId = definition.assetId,
+                fallbackKind = "asset_replacement",
+                position = (toolAnchor * CFrame.new(0, -0.3, 0)).Position,
+                scale = 1,
+                yaw = math.rad(90),
+                seed = definition.seed,
+                swayTag = nil,
+                parent = display,
+                fallbackInstance = toolFallback,
+            })
+        end
         -- A dedicated, always-visible anchor for the name label, since the
         -- tool shape it used to hang from gets hidden once the reviewed
         -- mesh replaces it.
@@ -30991,23 +31108,17 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             Vector3.new(7, 9, 7)
         )
     end
-    -- toolDisplayFallback is not scratch geometry for this workbench prop --
-    -- it holds the three real, interactive axe/hammer/torch displays players
-    -- choose their starting tool from. Wiring it as this placement's
-    -- fallbackInstance meant hideProceduralPlaceholder wiped all three
-    -- displays the moment the (unrelated) workbench mesh finished loading,
-    -- leaving the building with nothing visible to select.
-    table.insert(self._meshPlacements, {
-        assetId = "mesh_creator_workbench_a",
-        fallbackKind = "asset_replacement",
-        position = TOOL_YARD_CENTER + Vector3.new(0, 0, -1.5),
-        scale = 1,
-        yaw = math.rad(90),
-        seed = 9890,
-        swayTag = nil,
-        parent = toolYard,
-        fallbackInstance = nil,
-    })
+    --[[
+        No workbench behind the middle stand.
+
+        A 10-stud-tall workbench mesh used to sit at the yard centre, directly
+        behind the hammer. The three stands are built from one loop and are
+        otherwise identical, so that single prop made the middle choice look
+        deliberately different from its neighbours -- the owner read it as "a
+        wall holding up the hammer" and asked why that one was special. It is
+        not, and nothing should imply it is: the yard's whole job is to
+        present three equal choices.
+    ]]
     -- No extra tool rack here. The yard exists to present exactly three
     -- choices -- axe, hammer, torch -- and a spare set of tools floating
     -- alongside them just read as clutter the player had to visually discard
@@ -44876,6 +44987,8 @@ local TownNightSchedule = require(root.TownNightSchedule)
 local WeatherProfile = require(root.WeatherProfile)
 local AmbientController = require(script.Controllers.AmbientController)
 local HUDController = require(script.Controllers.HUDController)
+local ObjectiveMarkerController = require(script.Controllers.ObjectiveMarkerController)
+local TapController = require(script.Controllers.TapController)
 local VignetteController = require(script.Controllers.VignetteController)
 local InputController = require(script.Controllers.InputController)
 local InteractionController = require(script.Controllers.InteractionController)
@@ -44909,6 +45022,7 @@ assert(playerGui ~= nil and playerGui:IsA("PlayerGui"), "PlayerGui unavailable")
 
 local hud = HUDController.new(playerGui, ProfessionCatalog.list())
 local vignette = VignetteController.new(playerGui)
+local objectiveMarkers = ObjectiveMarkerController.new(playerGui)
 local ambient = AmbientController.new(RuntimeIds.AmbientMoteTag)
 local worldMotion = WorldMotionController.new(
     RuntimeIds.AmbientMotionTag,
@@ -44947,6 +45061,19 @@ end, function()
     send(RuntimeIds.Actions.UseGear, { itemId = "gear_amber_charm" })
 end, function()
     send(RuntimeIds.Actions.UseGear, { itemId = "gear_meadow_satchel" })
+end)
+
+--[[
+    Tapping the world is the interaction model, and it has to work on a
+    finger. The server ClickDetectors stay -- they are what a mouse uses and
+    they carry the server-side validation -- but touch resolves its own tap
+    here and sends the same requests, because Roblox will not reliably turn a
+    tap in the camera-drag region of a phone screen into a click.
+]]
+TapController.new(function()
+    send(RuntimeIds.Actions.UseTool)
+end, function(interactionId: string)
+    send(RuntimeIds.Actions.Interact, { interactionId = interactionId })
 end)
 
 hud:setCompactHandler(function(enabled: boolean)
@@ -45078,6 +45205,7 @@ stateChanged.OnClientEvent:Connect(function(snapshot: any)
     worldMotion:setPhase(tostring(snapshot.phase or "day"))
     weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
     music:setSnapshot(snapshot)
+    objectiveMarkers:setTargets(snapshot.objectiveTargets)
     updateVignettes(snapshot)
 end)
 
@@ -45091,6 +45219,7 @@ task.spawn(function()
         worldMotion:setPhase(tostring(snapshot.phase or "day"))
         weather:setContext(snapshot.expeditionActive == true, tostring(snapshot.phase or "day"))
         music:setSnapshot(snapshot)
+        objectiveMarkers:setTargets(snapshot.objectiveTargets)
         updateVignettes(snapshot, true)
     end
 end)
@@ -48229,6 +48358,280 @@ return MusicController
           </Item>
           <Item class="ModuleScript" referent="116">
             <Properties>
+              <string name="Name">ObjectiveMarkerController</string>
+              <string name="Source"><![CDATA[--!strict
+--[[
+    Show the player where the current objective is.
+
+    The objective card has always named the task and never the place. "Choose
+    a starter tool" says nothing about where the tools are; "gather heartwood"
+    says nothing about where the stump is. A new player reads it, looks up at
+    a dark valley, and wanders.
+
+    Two things fix that, and this controller owns both:
+
+      - A marker standing over the objective itself, visible through terrain,
+        with the distance on it. That is the "something above the objective"
+        half.
+      - A pointer at the screen edge when the objective is behind or beside
+        the player, so there is always a direction to walk. That is the half
+        that works when the marker is off-screen entirely, which for an
+        objective in a forest is most of the time.
+
+    Both are presentation, driven entirely by the server snapshot: the client
+    is told where the objective is, never what counts as done.
+]]
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+
+local ObjectiveMarkerController = {}
+ObjectiveMarkerController.__index = ObjectiveMarkerController
+
+export type ObjectiveMarkerController = typeof(setmetatable(
+    {} :: {
+        _folder: Folder,
+        _gui: ScreenGui,
+        _pointer: Frame,
+        _pointerLabel: TextLabel,
+        _markers: { [string]: BillboardGui },
+        _anchors: { [string]: Part },
+        _targets: { any },
+        _connection: RBXScriptConnection?,
+    },
+    ObjectiveMarkerController
+))
+
+local AMBER = Color3.fromRGB(255, 186, 92)
+local INK = Color3.fromRGB(18, 14, 11)
+
+function ObjectiveMarkerController.new(playerGui: PlayerGui): ObjectiveMarkerController
+    local folder = Instance.new("Folder")
+    folder.Name = "LastLightObjectiveMarkers"
+    folder.Parent = workspace
+
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "LastLightObjectivePointer"
+    gui.ResetOnSpawn = false
+    gui.IgnoreGuiInset = false
+    gui.DisplayOrder = 12
+    gui.Parent = playerGui
+
+    local pointer = Instance.new("Frame")
+    pointer.Name = "EdgePointer"
+    pointer.AnchorPoint = Vector2.new(0.5, 0.5)
+    pointer.Size = UDim2.fromOffset(168, 40)
+    pointer.BackgroundColor3 = INK
+    pointer.BackgroundTransparency = 0.12
+    pointer.BorderSizePixel = 0
+    pointer.Visible = false
+    pointer.Parent = gui
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = pointer
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = AMBER
+    stroke.Transparency = 0.35
+    stroke.Thickness = 1.5
+    stroke.Parent = pointer
+
+    local label = Instance.new("TextLabel")
+    label.Name = "PointerLabel"
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Font = Enum.Font.GothamBold
+    label.TextSize = 15
+    label.TextColor3 = AMBER
+    label.Text = ""
+    label.Parent = pointer
+
+    local self = setmetatable({
+        _folder = folder,
+        _gui = gui,
+        _pointer = pointer,
+        _pointerLabel = label,
+        _markers = {},
+        _anchors = {},
+        _targets = {},
+        _connection = nil,
+    }, ObjectiveMarkerController)
+
+    self._connection = RunService.RenderStepped:Connect(function()
+        self:_step()
+    end)
+    return self
+end
+
+function ObjectiveMarkerController._clear(self: ObjectiveMarkerController)
+    for _, anchor in self._anchors do
+        anchor:Destroy()
+    end
+    self._anchors = {}
+    self._markers = {}
+end
+
+--[[
+    Take the server's list of objective positions.
+
+    Rebuilt only when the set of interaction IDs actually changes, so the
+    markers do not flicker on every snapshot -- the snapshot arrives on any
+    state change, several times a second during a night.
+]]
+function ObjectiveMarkerController.setTargets(self: ObjectiveMarkerController, targets: { any }?)
+    local incoming = if type(targets) == "table" then targets else {}
+    local changed = #incoming ~= #self._targets
+    if not changed then
+        for index, target in incoming do
+            if
+                self._targets[index] == nil
+                or self._targets[index].interactionId ~= target.interactionId
+            then
+                changed = true
+                break
+            end
+        end
+    end
+    self._targets = incoming
+    if not changed then
+        -- Positions can still move (Mara walks), so keep anchors in sync.
+        for _, target in incoming do
+            local anchor = self._anchors[target.interactionId]
+            if anchor ~= nil then
+                anchor.Position = Vector3.new(target.x, target.y, target.z)
+            end
+        end
+        return
+    end
+
+    self:_clear()
+    for _, target in incoming do
+        local anchor = Instance.new("Part")
+        anchor.Name = "ObjectiveAnchor_" .. tostring(target.interactionId)
+        anchor.Size = Vector3.new(0.2, 0.2, 0.2)
+        anchor.Transparency = 1
+        anchor.Anchored = true
+        anchor.CanCollide = false
+        anchor.CanQuery = false
+        anchor.CanTouch = false
+        anchor.CastShadow = false
+        anchor.Position = Vector3.new(target.x, target.y, target.z)
+        anchor.Parent = self._folder
+
+        local billboard = Instance.new("BillboardGui")
+        billboard.Name = "ObjectiveMarker"
+        billboard.Adornee = anchor
+        billboard.AlwaysOnTop = true
+        billboard.LightInfluence = 0
+        billboard.Size = UDim2.fromOffset(184, 46)
+        billboard.StudsOffsetWorldSpace = Vector3.new(0, 7.5, 0)
+        billboard.MaxDistance = 600
+        billboard.Parent = anchor
+
+        local card = Instance.new("Frame")
+        card.BackgroundColor3 = INK
+        card.BackgroundTransparency = 0.14
+        card.BorderSizePixel = 0
+        card.Size = UDim2.fromScale(1, 1)
+        card.Parent = billboard
+        local cardCorner = Instance.new("UICorner")
+        cardCorner.CornerRadius = UDim.new(0, 10)
+        cardCorner.Parent = card
+        local cardStroke = Instance.new("UIStroke")
+        cardStroke.Color = AMBER
+        cardStroke.Transparency = 0.3
+        cardStroke.Thickness = 1.5
+        cardStroke.Parent = card
+
+        local text = Instance.new("TextLabel")
+        text.Name = "MarkerText"
+        text.BackgroundTransparency = 1
+        text.Size = UDim2.fromScale(1, 1)
+        text.Font = Enum.Font.GothamBold
+        text.TextSize = 15
+        text.TextColor3 = AMBER
+        text.Text = "▼ " .. tostring(target.label or "OBJECTIVE")
+        text.Parent = card
+
+        self._anchors[target.interactionId] = anchor
+        self._markers[target.interactionId] = billboard
+    end
+end
+
+function ObjectiveMarkerController._step(self: ObjectiveMarkerController)
+    local camera = workspace.CurrentCamera
+    local character = Players.LocalPlayer.Character
+    local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+    if camera == nil or root == nil or not root:IsA("BasePart") or #self._targets == 0 then
+        self._pointer.Visible = false
+        return
+    end
+
+    -- Point at the nearest objective: with three tool pedestals the useful
+    -- direction is the closest one, not an average of them.
+    local nearest, nearestDistance = nil, math.huge
+    for _, target in self._targets do
+        local position = Vector3.new(target.x, target.y, target.z)
+        local distance = (position - root.Position).Magnitude
+        if distance < nearestDistance then
+            nearest = position
+            nearestDistance = distance
+        end
+        local billboard = self._markers[target.interactionId]
+        if billboard ~= nil then
+            local label = billboard:FindFirstChild("MarkerText", true)
+            if label ~= nil and label:IsA("TextLabel") then
+                label.Text = string.format(
+                    "▼ %s · %dm",
+                    tostring(target.label or "OBJECTIVE"),
+                    math.floor(distance + 0.5)
+                )
+            end
+        end
+    end
+    if nearest == nil then
+        self._pointer.Visible = false
+        return
+    end
+
+    local screenPoint, onScreen = camera:WorldToViewportPoint(nearest)
+    local viewport = camera.ViewportSize
+    if onScreen and screenPoint.Z > 0 then
+        -- The world marker is doing the job; an edge pointer as well would be
+        -- two things saying the same thing.
+        self._pointer.Visible = false
+        return
+    end
+
+    -- Behind or off to the side: pin a pointer to the screen edge in the
+    -- objective's direction, so there is always a way to face.
+    local centre = Vector2.new(viewport.X * 0.5, viewport.Y * 0.5)
+    local direction = Vector2.new(screenPoint.X, screenPoint.Y) - centre
+    if screenPoint.Z <= 0 then
+        direction = -direction
+    end
+    if direction.Magnitude < 0.001 then
+        direction = Vector2.new(0, -1)
+    end
+    direction = direction.Unit
+    local margin = 74
+    local halfX = math.max(1, viewport.X * 0.5 - margin)
+    local halfY = math.max(1, viewport.Y * 0.5 - margin)
+    local scale = math.min(
+        halfX / math.abs(direction.X == 0 and 0.0001 or direction.X),
+        halfY / math.abs(direction.Y == 0 and 0.0001 or direction.Y)
+    )
+    local edge = centre + direction * scale
+    self._pointer.Position = UDim2.fromOffset(edge.X, edge.Y)
+    self._pointerLabel.Text = string.format("◄ %dm", math.floor(nearestDistance + 0.5))
+    self._pointer.Visible = true
+end
+
+return table.freeze(ObjectiveMarkerController)
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="117">
+            <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
 
@@ -48327,7 +48730,167 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="117">
+          <Item class="ModuleScript" referent="118">
+            <Properties>
+              <string name="Name">TapController</string>
+              <string name="Source"><![CDATA[--!strict
+--[[
+    Tapping the world, handled on the client so it works on a phone.
+
+    Tapping objects is this game's interaction model, and it was implemented
+    entirely with server-side ClickDetectors. That is reliable for a mouse and
+    unreliable for a finger: on touch, Roblox only turns a press into a click
+    when its own heuristics decide the gesture was a tap rather than the start
+    of a camera drag, and the right-hand side of a phone screen -- where the
+    creature you are trying to hit usually is -- is exactly the camera-drag
+    region. The owner's report was precise about it: hitting monsters worked
+    on a laptop and never on mobile or tablet.
+
+    So the tap is resolved here instead. A press that ends near where it began
+    is a tap; anything else was a camera drag and is ignored. The tap is
+    raycast into the world, and what it lands on decides which request to
+    send. That is all a tap ever does -- the server still decides range,
+    damage, validity, and every outcome, exactly as before.
+]]
+
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+
+local TapController = {}
+TapController.__index = TapController
+
+export type TapController = typeof(setmetatable(
+    {} :: {
+        _onStrike: () -> (),
+        _onInteract: (string) -> (),
+        _origins: { [number]: Vector2 },
+        _connections: { RBXScriptConnection },
+    },
+    TapController
+))
+
+-- A finger moves a little even on a deliberate tap; a camera drag moves a
+-- lot. 14 points separates them without demanding a perfectly still thumb.
+local TAP_SLOP_PIXELS = 14
+local MAX_TAP_DISTANCE = 220
+
+local function inputKey(input: InputObject): number
+    return if input.UserInputType == Enum.UserInputType.Touch then input.KeyCode.Value + 1 else 0
+end
+
+--[[
+    What did this tap mean?
+
+    Walks up from whatever the ray hit, because the thing under a finger is
+    usually a click volume or a mesh part rather than the model that owns the
+    meaning. An enemy answers with a strike; anything carrying an interaction
+    ID answers with that interaction.
+]]
+local function resolveTarget(instance: Instance): (string?, string?)
+    local node: Instance? = instance
+    while node ~= nil and node ~= workspace do
+        if node:IsA("Model") and node:FindFirstChild("StrikeClick") ~= nil then
+            return "strike", nil
+        end
+        local name = node.Name
+        local interactionId = string.match(name, "^(.+)_ClickVolume$")
+        if interactionId ~= nil then
+            return "interact", interactionId
+        end
+        local attribute = node:GetAttribute("InteractionId")
+        if type(attribute) == "string" then
+            return "interact", attribute
+        end
+        node = node.Parent
+    end
+    return nil, nil
+end
+
+function TapController.new(onStrike: () -> (), onInteract: (string) -> ()): TapController
+    local self = setmetatable({
+        _onStrike = onStrike,
+        _onInteract = onInteract,
+        _origins = {},
+        _connections = {},
+    }, TapController)
+
+    table.insert(
+        self._connections,
+        UserInputService.InputBegan:Connect(function(input: InputObject, processed: boolean)
+            if processed then
+                return
+            end
+            if
+                input.UserInputType == Enum.UserInputType.Touch
+                or input.UserInputType == Enum.UserInputType.MouseButton1
+            then
+                self._origins[inputKey(input)] = Vector2.new(input.Position.X, input.Position.Y)
+            end
+        end)
+    )
+
+    table.insert(
+        self._connections,
+        UserInputService.InputEnded:Connect(function(input: InputObject, processed: boolean)
+            if
+                input.UserInputType ~= Enum.UserInputType.Touch
+                and input.UserInputType ~= Enum.UserInputType.MouseButton1
+            then
+                return
+            end
+            local key = inputKey(input)
+            local origin = self._origins[key]
+            self._origins[key] = nil
+            -- A press that started on a HUD button belongs to that button.
+            if processed or origin == nil then
+                return
+            end
+            local ended = Vector2.new(input.Position.X, input.Position.Y)
+            if (ended - origin).Magnitude > TAP_SLOP_PIXELS then
+                return
+            end
+            self:_resolve(ended)
+        end)
+    )
+    return self
+end
+
+function TapController._resolve(self: TapController, position: Vector2)
+    local camera = workspace.CurrentCamera
+    local player = Players.LocalPlayer
+    local character = player.Character
+    if camera == nil or character == nil then
+        return
+    end
+    local ray = camera:ViewportPointToRay(position.X, position.Y)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = { character }
+    local hit = workspace:Raycast(ray.Origin, ray.Direction * MAX_TAP_DISTANCE, params)
+    if hit == nil then
+        return
+    end
+    local kind, interactionId = resolveTarget(hit.Instance)
+    if kind == "strike" then
+        self._onStrike()
+    elseif kind == "interact" and interactionId ~= nil then
+        self._onInteract(interactionId)
+    end
+end
+
+function TapController.destroy(self: TapController)
+    for _, connection in self._connections do
+        connection:Disconnect()
+    end
+    self._connections = {}
+    self._origins = {}
+end
+
+return table.freeze(TapController)
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="119">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -48536,7 +49099,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="118">
+          <Item class="ModuleScript" referent="120">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -48668,7 +49231,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="119">
+          <Item class="ModuleScript" referent="121">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -48968,13 +49531,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="120">
+  <Item class="TextChatService" referent="122">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="121">
+  <Item class="Workspace" referent="123">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

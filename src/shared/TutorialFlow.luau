@@ -19,6 +19,11 @@ export type Definition = {
     objective: string,
     detail: string,
     mara: string,
+    -- World interactions that satisfy this stage. The client raises a marker
+    -- over each one, because an objective a player cannot find is the same as
+    -- an objective that does not exist: "choose a starter tool" said nothing
+    -- about where the tools were.
+    targets: { string }?,
 }
 
 local ORDER: { Stage } = {
@@ -34,6 +39,7 @@ local ORDER: { Stage } = {
 
 local DEFINITIONS: { [Stage]: Definition } = {
     arrive = {
+        targets = { "mara_rescue" },
         index = 1,
         action = "rescue",
         next = "gather",
@@ -42,6 +48,7 @@ local DEFINITIONS: { [Stage]: Definition } = {
         mara = "Over here! The roots tighten when the light fades.",
     },
     gather = {
+        targets = { "heartwood_gather" },
         index = 2,
         action = "gather",
         next = "choose_tool",
@@ -50,6 +57,7 @@ local DEFINITIONS: { [Stage]: Definition } = {
         mara = "Heartwood remembers sunlight. We can build with it.",
     },
     choose_tool = {
+        targets = { "tool_axe", "tool_hammer", "tool_torch" },
         index = 3,
         action = "choose_tool",
         next = "build",
@@ -58,6 +66,7 @@ local DEFINITIONS: { [Stage]: Definition } = {
         mara = "Choose what feels right. Emberhollow needs every kind of helper.",
     },
     build = {
+        targets = { "barricade_build" },
         index = 4,
         action = "build",
         next = "prepare",
@@ -66,6 +75,7 @@ local DEFINITIONS: { [Stage]: Definition } = {
         mara = "Place the braces toward the dark trail.",
     },
     prepare = {
+        targets = { "first_lantern_prepare" },
         index = 5,
         action = "prepare",
         next = "survive",
@@ -74,6 +84,7 @@ local DEFINITIONS: { [Stage]: Definition } = {
         mara = "Night is close. Light the lantern when you are ready.",
     },
     survive = {
+        targets = { "first_lantern_prepare" },
         index = 6,
         action = nil,
         next = "reveal",
@@ -82,6 +93,7 @@ local DEFINITIONS: { [Stage]: Definition } = {
         mara = "Stay in the light. Rootlings hate a steady flame.",
     },
     reveal = {
+        targets = { "bramblewake_reveal" },
         index = 7,
         action = "reveal",
         next = "complete",
