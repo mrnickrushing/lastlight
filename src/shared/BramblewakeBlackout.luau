@@ -438,6 +438,11 @@ function BramblewakeBlackout.snapshot(state: State, userId: number, now: number)
         chapterComplete = state.status == "complete",
         decision = state.decision,
         deliveredNodes = delivered,
+        -- The count above and this map answer different questions -- "how
+        -- many are lit" for the HUD's N/3 rail, and "which ones" for the
+        -- objective-marker resolver. TutorialService used to iterate the
+        -- count and threw on every publish for the whole relay stage.
+        deliveredNodeMap = table.clone(state.deliveredNodes),
         duration = state.duration,
         elapsed = elapsed,
         enabled = state.status ~= "disabled",

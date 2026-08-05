@@ -1328,7 +1328,11 @@ function TutorialService._objectiveTargets(
                     add(arena.relayNodes[blackout.nextNodeId], "DELIVER ROOTFIRE")
                 else
                     add(arena.fireSource, "TAKE ROOTFIRE")
-                    for nodeId, delivered in blackout.deliveredNodes or {} do
+                    -- deliveredNodeMap, not deliveredNodes: the latter is the
+                    -- HUD's lit-count (a number), and iterating it threw
+                    -- "attempt to iterate over a number value" on every
+                    -- snapshot publish for the whole relay stage.
+                    for nodeId, delivered in blackout.deliveredNodeMap or {} do
                         if delivered == true then
                             add(arena.relayNodes[nodeId], "TAKE ROOTFIRE")
                         end
