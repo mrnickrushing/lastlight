@@ -7,9 +7,12 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-05, at `main` = `3b153df` (PR #212), build `0.53.0`,
-save schema 16, 20 services. Published to Roblox as place version 69,
-matching this revision exactly. **#212 matters beyond its size**: driving
+Last updated: 2026-08-05, at `main` = `65a916c` (PR #214), build `0.53.0`,
+save schema 16, 20 services. Published to Roblox as place version 70,
+matching this revision exactly. #214 added the enemy director: town-night
+wave counts scale with the defenders standing in town (solo nights pinned
+bit-identical by spec; +1 wave per extra eligible defender to a ceiling of
+twelve, census taken once at nightfall and logged). **#212 matters beyond its size**: driving
 the harvest → bank → craft → equip → strike loop end to end for the first
 time revealed that no resource node had ever paid out (wrong reward shape
 at the grant call site) and that a completed save could not strike
