@@ -1005,7 +1005,8 @@ function HUDController.new(playerGui: PlayerGui, professions: { any }): HUDContr
         13,
         COLORS.cream
     )
-    progressText.TextWrapped = false
+    progressText.TextWrapped = true
+    progressText.RichText = true
     progressText.TextYAlignment = Enum.TextYAlignment.Top
     progressText.ZIndex = 52
     local equipmentButtons: { [string]: TextButton } = {}
@@ -1778,7 +1779,29 @@ function HUDController._updateProgress(self: HUDController)
     end
     local complete = state.tutorialComplete == true
     self._progressButton.Visible = complete and not self._playerDowned
-    local lines = { "RECIPES" }
+    --[[
+        The Field Book reads like a book now, not a debug dump: amber section
+        headers with rules under them, muted secondary detail, and empty
+        sections that say something human. Everything stays one RichText
+        label, so the change is presentation only. escape() guards the angle
+        brackets because entry text flows into markup.
+    ]]
+    local function escape(text: string): string
+        return (text:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
+    end
+    local function header(title: string): string
+        return string.format(
+            '<font color="#FFBA5C"><b>%s</b></font>\n<font color="#8A7A62">━━━━━━━━━━━━━━━━━━</font>',
+            escape(title)
+        )
+    end
+    local function muted(text: string): string
+        return string.format('<font color="#B8A88F">%s</font>', escape(text))
+    end
+    local lines = { header("RECIPES") }
+    if #(state.recipes or {}) == 0 then
+        table.insert(lines, muted("Nothing learned yet — find a workbench."))
+    end
     for _, recipe in state.recipes or {} do
         local materials = {}
         for materialId, amount in recipe.materials do
@@ -1789,16 +1812,23 @@ function HUDController._updateProgress(self: HUDController)
         end
         table.insert(
             lines,
-            string.format("• %s  [%s]", recipe.displayName, table.concat(materials, ", "))
+            string.format(
+                "• %s  %s",
+                escape(recipe.displayName),
+                muted(table.concat(materials, ", "))
+            )
         )
     end
     table.insert(lines, "")
-    table.insert(lines, "QUESTS")
+    table.insert(lines, header("QUESTS"))
+    if #(state.quests or {}) == 0 then
+        table.insert(lines, muted("No open quests."))
+    end
     for _, quest in state.quests or {} do
         local status = if quest.claimed
             then "CLAIMED"
             else string.format("%d/%d", quest.progress, quest.threshold)
-        table.insert(lines, string.format("• %s  ·  %s", quest.displayName, status))
+        table.insert(lines, string.format("• %s  ·  %s", escape(quest.displayName), status))
     end
     --[[
         The Memory Archive.
@@ -1814,47 +1844,54 @@ function HUDController._updateProgress(self: HUDController)
         table.insert(lines, "")
         table.insert(
             lines,
-            string.format(
-                "MEMORY ARCHIVE  ·  %d / %d RECOVERED",
-                tonumber(archive.found) or 0,
-                tonumber(archive.total) or 0
+            header(
+                string.format(
+                    "MEMORY ARCHIVE · %d / %d RECOVERED",
+                    tonumber(archive.found) or 0,
+                    tonumber(archive.total) or 0
+                )
             )
         )
         for _, entry in archive.entries or {} do
             if entry.recovered then
-                table.insert(lines, string.format("• %s", tostring(entry.title)))
-                table.insert(lines, string.format("    %s", tostring(entry.body)))
+                table.insert(lines, string.format("• <b>%s</b>", escape(tostring(entry.title))))
+                table.insert(lines, muted("    " .. tostring(entry.body)))
             else
                 table.insert(
                     lines,
-                    string.format("• UNRECOVERED  ·  %s", string.upper(tostring(entry.foundAt)))
+                    muted(string.format("• unfound · %s", string.upper(tostring(entry.foundAt))))
                 )
             end
         end
     end
     table.insert(lines, "")
-    table.insert(lines, "PROFESSION MASTERY")
+    table.insert(lines, header("PROFESSION MASTERY"))
     for professionId, mastery in state.mastery or {} do
         table.insert(
             lines,
             string.format(
-                "• %s  ·  RANK %d  ·  %d XP",
-                string.gsub(professionId, "profession_", ""),
+                "• %s  ·  RANK %d  ·  %s",
+                string.upper(string.gsub(professionId, "profession_", "")),
                 mastery.level,
-                mastery.xp
+                muted(string.format("%d XP", mastery.xp))
             )
         )
     end
     local equipped = state.equipped or {}
     table.insert(lines, "")
-    table.insert(
-        lines,
-        string.format(
-            "LOADOUT  ·  HEAD %s  ·  FEET %s",
-            tostring(equipped.head or "EMPTY"),
-            tostring(equipped.feet or "EMPTY")
+    table.insert(lines, header("LOADOUT"))
+    if equipped.head == nil and equipped.feet == nil then
+        table.insert(lines, muted("Nothing equipped yet — craft gear at the workbenches."))
+    else
+        table.insert(
+            lines,
+            string.format(
+                "• HEAD  ·  %s\n• FEET  ·  %s",
+                escape(tostring(equipped.head or "empty")),
+                escape(tostring(equipped.feet or "empty"))
+            )
         )
-    )
+    end
     self._progressText.Text = table.concat(lines, "\n")
     local gear = state.gear or {}
     for itemId, button in self._equipmentButtons do
