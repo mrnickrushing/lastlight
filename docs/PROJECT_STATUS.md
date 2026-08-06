@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-06, at `main` = `a3aad31` (PR #243), build `0.53.0`,
-save schema 20, 22 services. Published to Roblox as place version 87,
+Last updated: 2026-08-06, at `main` = `c46162c` (PR #245), build `0.53.0`,
+save schema 20, 22 services. Published to Roblox as place version 88,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,14 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#245** (v88) **M7 wave I**: RegionAccess — the departure's region
+  seam. Enabled-flag + dependency + chapter gates compose in one place;
+  everything not open resolves to Bramblewake; ExpeditionService boots
+  through it (LastLightExpeditionRegion attribute pins it in Studio)
+  with a load-bearing assert against enabling a region that has no
+  builder. Chapter gates spec-pinned ready: when a region builder lands,
+  flipping its `enabled` flag in Regions.luau is the whole switch. No
+  player-visible change.
 - **#243** (v87) **M7 wave H**: town tiers 2–4, story-gated. Nights
   alone still cap at tier 3 (bit-identical, pinned); resolving the Maw
   raises the ceiling to 4 and floors the tier at 2, the Witch floors it
@@ -155,13 +163,13 @@ Earlier waves in this stretch:
 M7 waves A–F are merged and published: **both regions exist as rules and
 data** (catalogs, rosters, elites, bosses) and **the eight residents
 exist as people** (roster, jobs, quests, dialogue), all spec-pinned.
-**Every source-side M7 deliverable is now merged and published.** What
-remains for M7 is the geometry/runtime half, which most wants Studio:
-builders for both regions' module visuals, region selection in
-ExpeditionService, elite/boss services and arenas for the four new
-elites and two new bosses, and physical placement for the eight new
-residents. These are large blind-build waves; live checks recorded per
-wave as with defense plots and companions. M6 remaining: only the
+**Every source-side M7 deliverable is now merged and published**, and
+the region-selection runtime seam is in (#245). What remains for M7 is
+geometry, which most wants Studio: builders for both regions' 60 module
+visuals, elite/boss services and arenas for the four new elites and two
+new bosses, and physical placement for the eight new residents. These
+are large waves best driven with a live Studio session; the switch for
+each region is one `enabled` flag once its builder exists. M6 remaining: only the
 recorded live checks, all blocked on Studio availability (kit apply, gear dulling arc, hound visuals/follow feel,
 defense plot placement/arm-by-tap, WHET press on device, Blackout drive
 to the Old Growth on a touch path). Every source-side deliverable is
