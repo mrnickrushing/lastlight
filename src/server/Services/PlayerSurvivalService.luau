@@ -40,6 +40,7 @@ export type PlayerSurvivalService = typeof(setmetatable(
         _worldService: any,
         _analyticsService: any,
         _equipmentStatsProvider: ((Player) -> any)?,
+        _gearWearAccruer: ((Player) -> ())?,
         _reviveTuningProvider: ((Player) -> any)?,
         _expeditionFailureHandler: ((Player) -> any)?,
         _partyRecoveryProvider: ((number, number) -> any)?,
@@ -94,6 +95,7 @@ function PlayerSurvivalService.new(
         _worldService = worldService,
         _analyticsService = analyticsService,
         _equipmentStatsProvider = nil,
+        _gearWearAccruer = nil,
         _reviveTuningProvider = nil,
         _expeditionFailureHandler = nil,
         _partyRecoveryProvider = nil,
@@ -120,6 +122,13 @@ function PlayerSurvivalService.setEquipmentStatsProvider(
     provider: (Player) -> any
 )
     self._equipmentStatsProvider = provider
+end
+
+function PlayerSurvivalService.setGearWearAccruer(
+    self: PlayerSurvivalService,
+    accruer: (Player) -> ()
+)
+    self._gearWearAccruer = accruer
 end
 
 function PlayerSurvivalService.setReviveTuningProvider(
@@ -497,6 +506,11 @@ function PlayerSurvivalService.damage(
     self._states[player] = nextState
     result.rawDamage = amount
     result.equipmentReduction = equipmentReduction
+    -- Gear that softened a blow wears from it; spawned so profile work
+    -- can never stall or fail the damage path itself.
+    if equipmentReduction > 0 and self._gearWearAccruer ~= nil then
+        task.spawn(self._gearWearAccruer :: (Player) -> (), player)
+    end
     self:_syncPlayer(player)
     if result.downed then
         self:_createVisual(player)

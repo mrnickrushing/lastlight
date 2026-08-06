@@ -861,17 +861,39 @@ function SaveSchema.equippedSnapshot(profile: Profile): Equipment.Equipped
 end
 
 function SaveSchema.equipmentStats(profile: Profile): any
-    local stats = Equipment.stats(profile.equipped)
+    --[[
+        Wear reaches passive gear the same way it reaches weapons: worn
+        halves what the piece adds, failing removes it entirely. The trait
+        nudge rides the same per-item factor, so a worn STURDY hood fades
+        as one thing, not two.
+    ]]
+    local wear = (profile :: any).gearWear or {}
+    local effectiveness: { [string]: number } = {}
+    for _, itemId in profile.equipped do
+        if type(itemId) == "string" then
+            effectiveness[itemId] = GearWear.effectiveness(wear, itemId)
+        end
+    end
+    local stats = Equipment.stats(profile.equipped, effectiveness)
     -- Passive trait nudges fold in under the same clamps Equipment.stats
     -- already enforces, so a trait can shade a build but never escape it.
     local traits = (profile :: any).gearTraits or {}
     for _, itemId in profile.equipped do
         local trait = GearTraits.get(traits[itemId])
         if trait ~= nil then
-            stats.damageReduction =
-                math.clamp(stats.damageReduction + (trait.damageReductionBonus or 0), 0, 0.25)
-            stats.staminaRegenMultiplier =
-                math.clamp(stats.staminaRegenMultiplier + (trait.staminaRegenBonus or 0), 0.75, 1.5)
+            local itemEffectiveness = if type(itemId) == "string"
+                then effectiveness[itemId] or 1
+                else 1
+            stats.damageReduction = math.clamp(
+                stats.damageReduction + (trait.damageReductionBonus or 0) * itemEffectiveness,
+                0,
+                0.25
+            )
+            stats.staminaRegenMultiplier = math.clamp(
+                stats.staminaRegenMultiplier + (trait.staminaRegenBonus or 0) * itemEffectiveness,
+                0.75,
+                1.5
+            )
         end
     end
     return stats
