@@ -4350,14 +4350,64 @@ function EnemyCombatRules.contains(
     return false
 end
 
-function EnemyCombatRules.strikeDamage(definition: any, facingDot: number): (number, string)
+--[[
+    The status/reaction layer rides the same resolution: statuses that are
+    already in the game interact when a strike lands, instead of living in
+    parallel. A STILLED enemy is bound open -- the strike counts as a clean
+    flank whatever the real facing, which is what finally beats a
+    front-shielded Briarback without circling it. A SNARED enemy cannot
+    slip the blow (x1.2). A DROWSY striker swings soft (x0.85) -- the
+    counterplay the Alchemist's tonic exists for. Multipliers stack and
+    clamp to 0.6..1.6 so no combination silences an enemy or a player.
+]]
+export type StrikeReactions = {
+    stilled: boolean?,
+    snared: boolean?,
+    drowsyStriker: boolean?,
+}
+
+function EnemyCombatRules.strikeDamage(
+    definition: any,
+    facingDot: number,
+    reactions: StrikeReactions?
+): (number, string, string?)
+    local stilled = reactions ~= nil and reactions.stilled == true
+    local snared = reactions ~= nil and reactions.snared == true
+    local drowsy = reactions ~= nil and reactions.drowsyStriker == true
+
+    local damage: number
+    local result: string
     if definition.frontShield == true then
-        if facingDot >= 0.25 then
-            return math.max(0, definition.frontalStrikeDamage or 0), "shielded"
+        if facingDot >= 0.25 and not stilled then
+            damage, result = math.max(0, definition.frontalStrikeDamage or 0), "shielded"
+        else
+            damage, result =
+                math.max(0, definition.flankStrikeDamage or definition.strikeDamage), "flanked"
         end
-        return math.max(0, definition.flankStrikeDamage or definition.strikeDamage), "flanked"
+    else
+        damage, result = math.max(0, definition.strikeDamage or 0), "hit"
+        if stilled then
+            result = "flanked"
+        end
     end
-    return math.max(0, definition.strikeDamage or 0), "hit"
+
+    local multiplier = 1
+    local label: string? = nil
+    if stilled then
+        multiplier *= 1.25
+        label = "BOUND OPEN — A CLEAN FLANK"
+    elseif snared then
+        multiplier *= 1.2
+        label = "EXPOSED — THE SNARE HELD IT"
+    end
+    if drowsy then
+        multiplier *= 0.85
+        if label == nil then
+            label = "DROWSY SWING"
+        end
+    end
+    damage = math.floor(damage * math.clamp(multiplier, 0.6, 1.6) + 0.5)
+    return damage, result, label
 end
 
 return table.freeze(EnemyCombatRules)
@@ -19339,7 +19389,14 @@ function EnemyService.damageNearest(
     -- presentation, so WorldService draws it; it needs the target to aim the
     -- shot, and this is the one place both ends of the strike are known.
     self._worldService:showStrikeFeedback(player, context, primary.Position)
-    local damage, strikeResult = self._enemyCombatRules.strikeDamage(enemy.definition, facingDot)
+    local reactionNow = workspace:GetServerTimeNow()
+    local strikerStatus = self._combatService:snapshot(player)
+    local damage, strikeResult, reactionLabel =
+        self._enemyCombatRules.strikeDamage(enemy.definition, facingDot, {
+            stilled = reactionNow < enemy.stilledUntil,
+            snared = reactionNow < enemy.snaredUntil,
+            drowsyStriker = strikerStatus ~= nil and strikerStatus.drowsy == true,
+        })
     if context ~= nil and type(context.damageMultiplier) == "number" then
         -- Tool identity, bounded: the axe's edge and the bow's reach trade
         -- against each other, and neither can silence an enemy's mechanics.
@@ -19385,6 +19442,10 @@ function EnemyService.damageNearest(
     elseif strikeResult == "flanked" then
         self:_notify("FLANK HIT — " .. string.upper(displayName) .. " " .. remaining)
         return true, "Clean flank hit."
+    end
+    if reactionLabel ~= nil then
+        self:_notify(reactionLabel .. " — " .. string.upper(displayName) .. " " .. remaining)
+        return true, reactionLabel
     end
     self:_notify("HIT — " .. string.upper(displayName) .. " " .. remaining)
     return true, "Your tool strikes the " .. displayName .. "."
