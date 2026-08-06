@@ -31,8 +31,14 @@ function ExpeditionEventFlow.validateDefinition(definition: any): (boolean, { st
     if type(definition) ~= "table" then
         return false, { "event definition must be a table" }
     end
-    if type(definition.id) ~= "string" or string.sub(definition.id, 1, 9) ~= "event_bw_" then
-        issue("event ID must use the Bramblewake event namespace")
+    --[[
+        Every region owns a two-letter event namespace (bw, ir, ...). The
+        rule is still that an event id names its region -- it just no
+        longer names one region in particular, now that the generator
+        composes more than one.
+    ]]
+    if type(definition.id) ~= "string" or string.match(definition.id, "^event_%l%l_%l") == nil then
+        issue("event ID must use a regional event namespace")
     end
     if type(definition.displayName) ~= "string" or definition.displayName == "" then
         issue("event must have a display name")

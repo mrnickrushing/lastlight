@@ -3699,6 +3699,25 @@ return table.freeze({
     RequiredModuleIds = table.freeze({
         "module_bw_old_growth_approach",
     }),
+    --[[
+        The known-good fallback's middle, in its original authored order.
+        This is the exact twelve-module walk that shipped before the catalog
+        grew to thirty, so the fallback stays the manifest every prior test
+        proved. It lived in ExpeditionGenerator until the generator became
+        region-agnostic; the list itself is unchanged.
+    ]]
+    FixedMiddleIds = table.freeze({
+        "module_bw_root_arch",
+        "module_bw_sunken_orchard",
+        "module_bw_foxglove_run",
+        "module_bw_hollow_farm",
+        "module_bw_briar_ring",
+        "module_bw_sapfall_gully",
+        "module_bw_windmill_copse",
+        "module_bw_tangle_bridge",
+        "module_bw_moth_meadow",
+        "module_bw_old_growth_approach",
+    }),
     Modules = table.freeze(modules),
     PointsOfInterest = table.freeze(pointsOfInterest),
     Events = table.freeze(events),
@@ -3707,6 +3726,1000 @@ return table.freeze({
             </Properties>
           </Item>
           <Item class="ModuleScript" referent="20">
+            <Properties>
+              <string name="Name">IronrootExpedition</string>
+              <string name="Source"><![CDATA[--!strict
+
+--[[
+    Ironroot Delve -- chapter II's region, and the first proof that a
+    region is a catalog, not a rebuild. Same definition shapes as
+    Bramblewake, consumed by the same generator through its region seam.
+
+    The Delve is a worked mine the forest grew back into: shored tunnels,
+    rail spurs, breathing shafts, and machinery that never got the order
+    to stop. Where Bramblewake's traversal is thicket and root, the
+    Delve's is grade and dark -- inclines, laddered scaffolds, rail walks,
+    and stretches where the glow fungus is the only light. No module here
+    is a reskin of a forest one: the hazards are slag, gas, and falling
+    ground, and the resources are pulled from seams, not tapped from
+    trees.
+]]
+
+local function frozenDefinition(definition: any): any
+    local copy = table.clone(definition)
+    if copy.enabled == nil then
+        copy.enabled = true
+    end
+    if string.sub(copy.id, 1, 7) == "module_" and copy.defaultTraversal == nil then
+        copy.defaultTraversal = true
+    end
+    if copy.tags ~= nil then
+        copy.tags = table.freeze(table.clone(copy.tags))
+    end
+    for _, key in { "startConditions", "incompatibleEvents" } do
+        if copy[key] ~= nil then
+            copy[key] = table.freeze(table.clone(copy[key]))
+        end
+    end
+    if copy.reward ~= nil then
+        copy.reward = table.freeze(table.clone(copy.reward))
+    end
+    if copy.soloVariant ~= nil then
+        copy.soloVariant = table.freeze(table.clone(copy.soloVariant))
+    end
+    if copy.storyOffset ~= nil then
+        copy.storyOffset = table.freeze(table.clone(copy.storyOffset))
+    end
+    if copy.groupVariant ~= nil then
+        copy.groupVariant = table.freeze(table.clone(copy.groupVariant))
+    end
+    if copy.steps ~= nil then
+        local steps: { any } = {}
+        for _, step in copy.steps do
+            local stepCopy: any = table.clone(step :: any)
+            if stepCopy.offset ~= nil then
+                stepCopy.offset = table.freeze(table.clone(stepCopy.offset))
+            end
+            table.insert(steps, table.freeze(stepCopy))
+        end
+        copy.steps = table.freeze(steps)
+    end
+    return table.freeze(copy)
+end
+
+--[[
+    Thirty modules: one arrival, one extraction, twenty-eight middle in
+    the same role distribution Bramblewake proved (7 resource, 6
+    traversal, 5 combat, 4 connector, 3 story, 2 puzzle, 1 landmark).
+    Budgets stay inside the regional ceilings for any twelve-module walk:
+    parts <= 52 each, and no more than four modules carry 3 lights or 3
+    effects so the worst selection still clears 32.
+]]
+local modules = {
+    frozenDefinition({
+        id = "module_ir_delve_gate",
+        displayName = "Delve Gate",
+        role = "arrival",
+        visual = "delve_gate",
+        tags = { "safe", "connector", "arrival" },
+        poiSocket = false,
+        eventSocket = false,
+        partBudget = 24,
+        lightBudget = 2,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_ir_daylight_shaft",
+        displayName = "Daylight Shaft",
+        role = "extraction",
+        visual = "daylight_shaft",
+        tags = { "safe", "extraction" },
+        poiSocket = false,
+        eventSocket = false,
+        partBudget = 26,
+        lightBudget = 2,
+        effectBudget = 1,
+    }),
+    -- Resource seams: what the Delve is for.
+    frozenDefinition({
+        id = "module_ir_ore_gallery",
+        displayName = "Ore Gallery",
+        role = "resource",
+        visual = "ore_gallery",
+        tags = { "resource", "mine" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 46,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_ir_coalglass_seam",
+        displayName = "Coalglass Seam",
+        role = "resource",
+        visual = "coalglass_seam",
+        tags = { "resource", "risk" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 44,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_ir_fungus_terrace",
+        displayName = "Fungus Terrace",
+        role = "resource",
+        visual = "fungus_terrace",
+        tags = { "resource", "safe" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 42,
+        lightBudget = 3,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_ir_oil_works",
+        displayName = "Oil Works",
+        role = "resource",
+        visual = "oil_works",
+        tags = { "resource", "machine" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 48,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_ir_echo_vault",
+        displayName = "Echo Vault",
+        role = "resource",
+        visual = "echo_vault",
+        tags = { "resource", "mystery" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 2,
+        effectBudget = 3,
+    }),
+    frozenDefinition({
+        id = "module_ir_flooded_stope",
+        displayName = "Flooded Stope",
+        role = "resource",
+        visual = "flooded_stope",
+        tags = { "resource", "risk" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 44,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_ir_abandoned_face",
+        displayName = "Abandoned Face",
+        role = "resource",
+        visual = "abandoned_face",
+        tags = { "resource", "story" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 42,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    -- Traversal: grade and dark, not thicket and root.
+    frozenDefinition({
+        id = "module_ir_main_incline",
+        displayName = "Main Incline",
+        role = "traversal",
+        visual = "main_incline",
+        tags = { "traversal", "mine" },
+        poiSocket = false,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_ir_scaffold_climb",
+        displayName = "Scaffold Climb",
+        role = "traversal",
+        visual = "scaffold_climb",
+        tags = { "traversal", "risk" },
+        poiSocket = false,
+        eventSocket = true,
+        partBudget = 46,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_ir_rail_walk",
+        displayName = "Rail Walk",
+        role = "traversal",
+        visual = "rail_walk",
+        tags = { "traversal", "machine" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 44,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_ir_dark_stretch",
+        displayName = "Dark Stretch",
+        role = "traversal",
+        visual = "dark_stretch",
+        tags = { "traversal", "dark" },
+        poiSocket = false,
+        eventSocket = true,
+        partBudget = 36,
+        lightBudget = 1,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_ir_collapse_scramble",
+        displayName = "Collapse Scramble",
+        role = "traversal",
+        visual = "collapse_scramble",
+        tags = { "traversal", "risk" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 46,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_ir_winch_crossing",
+        displayName = "Winch Crossing",
+        role = "traversal",
+        visual = "winch_crossing",
+        tags = { "traversal", "machine" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 48,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    -- Combat chambers.
+    frozenDefinition({
+        id = "module_ir_mite_nest",
+        displayName = "Mite Nest",
+        role = "combat",
+        visual = "mite_nest",
+        tags = { "combat", "risk" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 44,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_ir_slag_channel",
+        displayName = "Slag Channel",
+        role = "combat",
+        visual = "slag_channel",
+        tags = { "combat", "hazard" },
+        poiSocket = false,
+        eventSocket = true,
+        partBudget = 46,
+        lightBudget = 3,
+        effectBudget = 3,
+    }),
+    frozenDefinition({
+        id = "module_ir_guard_round",
+        displayName = "Guard Round",
+        role = "combat",
+        visual = "guard_round",
+        tags = { "combat", "machine" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 44,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_ir_gas_pocket",
+        displayName = "Gas Pocket",
+        role = "combat",
+        visual = "gas_pocket",
+        tags = { "combat", "hazard" },
+        poiSocket = false,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 2,
+        effectBudget = 3,
+    }),
+    frozenDefinition({
+        id = "module_ir_echo_gallery",
+        displayName = "Echo Gallery",
+        role = "combat",
+        visual = "echo_gallery",
+        tags = { "combat", "mystery" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 42,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    -- Connectors: the worked arteries between chambers.
+    frozenDefinition({
+        id = "module_ir_shored_drift",
+        displayName = "Shored Drift",
+        role = "connector",
+        visual = "shored_drift",
+        tags = { "connector", "safe" },
+        poiSocket = false,
+        eventSocket = true,
+        partBudget = 30,
+        lightBudget = 2,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_ir_junction_round",
+        displayName = "Junction Round",
+        role = "connector",
+        visual = "junction_round",
+        tags = { "connector", "safe" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 32,
+        lightBudget = 2,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_ir_rail_siding",
+        displayName = "Rail Siding",
+        role = "connector",
+        visual = "rail_siding",
+        tags = { "connector", "machine" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 34,
+        lightBudget = 2,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_ir_air_door",
+        displayName = "Air Door",
+        role = "connector",
+        visual = "air_door",
+        tags = { "connector", "safe" },
+        poiSocket = false,
+        eventSocket = true,
+        partBudget = 28,
+        lightBudget = 2,
+        effectBudget = 1,
+    }),
+    -- Story rooms.
+    frozenDefinition({
+        id = "module_ir_foreman_office",
+        displayName = "Foreman's Office",
+        role = "story",
+        visual = "foreman_office",
+        tags = { "story", "resident" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 2,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_ir_miners_rest",
+        displayName = "Miners' Rest",
+        role = "story",
+        visual = "miners_rest",
+        tags = { "story", "safe" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 38,
+        lightBudget = 3,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_ir_memorial_drift",
+        displayName = "Memorial Drift",
+        role = "story",
+        visual = "memorial_drift",
+        tags = { "story", "sanctuary" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 36,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    -- Puzzle rooms.
+    frozenDefinition({
+        id = "module_ir_signal_room",
+        displayName = "Signal Room",
+        role = "puzzle",
+        visual = "signal_room",
+        tags = { "puzzle", "machine" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_ir_flood_locks",
+        displayName = "Flood Locks",
+        role = "puzzle",
+        visual = "flood_locks",
+        tags = { "puzzle", "risk" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 44,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    -- The landmark and required approach: where the Bellows Maw waits.
+    frozenDefinition({
+        id = "module_ir_bellows_approach",
+        displayName = "Bellows Approach",
+        role = "landmark",
+        visual = "bellows_approach",
+        tags = { "landmark", "boss", "story" },
+        poiSocket = false,
+        eventSocket = false,
+        partBudget = 50,
+        lightBudget = 3,
+        effectBudget = 3,
+    }),
+}
+
+local pointsOfInterest = {
+    frozenDefinition({
+        id = "poi_ir_crushed_cage",
+        displayName = "Crushed Cage",
+        visual = "crushed_cage",
+        tags = { "story", "warning" },
+        detail = "The lift cage came down with the brake handle still tied "
+            .. "open. Nobody untied it afterward.",
+    }),
+    frozenDefinition({
+        id = "poi_ir_seam_of_light",
+        displayName = "Seam of Light",
+        visual = "seam_of_light",
+        tags = { "resource", "mystery" },
+        detail = "A vein of coalglass runs the full height of the wall, "
+            .. "glowing faintly without any flame near it.",
+    }),
+    frozenDefinition({
+        id = "poi_ir_tally_wall",
+        displayName = "Tally Wall",
+        visual = "tally_wall",
+        tags = { "story", "resident" },
+        detail = "Shift marks in chalk, one column per name. Every column "
+            .. "stops on the same day except one, which stops a week later.",
+    }),
+    frozenDefinition({
+        id = "poi_ir_sleeping_engine",
+        displayName = "Sleeping Engine",
+        visual = "sleeping_engine",
+        tags = { "machine", "risk" },
+        detail = "The pump engine is warm. It has been warm for years. "
+            .. "Nothing feeds it that anyone can find.",
+    }),
+    frozenDefinition({
+        id = "poi_ir_bell_rope",
+        displayName = "Bell Rope",
+        visual = "bell_rope",
+        tags = { "warning", "mystery" },
+        detail = "The signal bell rings up-shaft when the rope is pulled. "
+            .. "Sometimes it rings without the rope moving at all.",
+    }),
+    frozenDefinition({
+        id = "poi_ir_glow_garden",
+        displayName = "Glow Garden",
+        visual = "glow_garden",
+        tags = { "resource", "sanctuary" },
+        detail = "A miner planted fungus in neat rows and tended them. The "
+            .. "rows have kept themselves neat since.",
+    }),
+    frozenDefinition({
+        id = "poi_ir_lunch_alcove",
+        displayName = "Lunch Alcove",
+        visual = "lunch_alcove",
+        tags = { "story", "resident" },
+        detail = "Six lunch pails on a plank, five opened and finished. "
+            .. "The sixth is still wrapped, still waiting.",
+    }),
+    frozenDefinition({
+        id = "poi_ir_flooded_office",
+        displayName = "Flooded Office",
+        visual = "flooded_office",
+        tags = { "story", "risk" },
+        detail = "The pay ledger floats face-down. The safe under the desk "
+            .. "is open, and it was not forced.",
+    }),
+    frozenDefinition({
+        id = "poi_ir_widow_web",
+        displayName = "Widow's Web",
+        visual = "widow_web",
+        tags = { "warning", "risk" },
+        detail = "Rail cable strung wall to wall in patterns no rigger "
+            .. "would choose. Something rides these lines at night.",
+    }),
+    frozenDefinition({
+        id = "poi_ir_ore_cart_train",
+        displayName = "Ore Cart Train",
+        visual = "ore_cart_train",
+        tags = { "machine", "resource" },
+        detail = "Nine carts coupled and loaded, brakes set, pointed at "
+            .. "the surface. The tenth coupling hangs open.",
+    }),
+    frozenDefinition({
+        id = "poi_ir_echo_shrine",
+        displayName = "Echo Shrine",
+        visual = "echo_shrine",
+        tags = { "mystery", "sanctuary" },
+        detail = "Crystals arranged in a ring that hums your own footsteps "
+            .. "back to you, a half-second late and a half-tone low.",
+    }),
+    frozenDefinition({
+        id = "poi_ir_break_room_mural",
+        displayName = "Break Room Mural",
+        visual = "break_room_mural",
+        tags = { "story", "sanctuary" },
+        detail = "Someone painted the surface on the break room wall: sky, "
+            .. "meadow, the town. The proportions are from memory, and wrong.",
+    }),
+}
+
+--[[
+    The eight events carry the ids the content catalog reserved for the
+    Delve. Rewards pay in the Delve's own materials -- ore, coalglass,
+    fungus, oil, crystal -- which join the expedition inventory allow-list
+    in the same change that adds this file.
+]]
+local events = {
+    frozenDefinition({
+        id = "event_ir_runaway_cart",
+        displayName = "Runaway Cart",
+        visual = "runaway_cart",
+        tags = { "machine", "hazard" },
+        objective = "SET THE THREE RAIL BRAKES",
+        detail = "A loaded cart walks the grade on its own. Brake the rails before it finds speed.",
+        completionMessage = "THE CART GRINDS STILL — +3 IRONROOT ORE",
+        failureMessage = "THE CART TAKES THE GRADE",
+        durationSeconds = 90,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 18,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The cart wrecks in a side drift; the marked critical path stays open.",
+        localizationKey = "events.ironroot.runaway_cart",
+        analyticsId = "IronrootRunawayCart",
+        killSwitchFlag = "ironroot_events_enabled",
+        soloVariant = {
+            guidance = "Set each brake as the cart passes; it circles the loop.",
+        },
+        groupVariant = {
+            guidance = "Take a brake each and call the cart's position.",
+        },
+        reward = {
+            materialId = "material_ironroot_ore",
+            amount = 3,
+        },
+        steps = {
+            {
+                id = "brake_upper",
+                actionText = "SET",
+                objectText = "Upper Rail Brake",
+                offset = { x = -7, y = 1.2, z = -3 },
+            },
+            {
+                id = "brake_middle",
+                actionText = "SET",
+                objectText = "Middle Rail Brake",
+                offset = { x = 0, y = 1.2, z = 2 },
+            },
+            {
+                id = "brake_lower",
+                actionText = "SET",
+                objectText = "Lower Rail Brake",
+                offset = { x = 7, y = 1.2, z = -3 },
+            },
+        },
+    }),
+    frozenDefinition({
+        id = "event_ir_gas_leak",
+        displayName = "Gas Leak",
+        visual = "gas_leak",
+        tags = { "hazard", "urgent" },
+        objective = "CLOSE BOTH VALVES, THEN VENT THE POCKET",
+        detail = "Whitedamp seeps from a cracked main. The valves first; a spark later would be worse.",
+        completionMessage = "THE AIR CLEARS — +2 MACHINE OIL",
+        failureMessage = "THE POCKET FILLS AND SEALS ITSELF",
+        durationSeconds = 100,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 18,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The drift seals behind an air door; no route or resident is lost.",
+        localizationKey = "events.ironroot.gas_leak",
+        analyticsId = "IronrootGasLeak",
+        killSwitchFlag = "ironroot_events_enabled",
+        soloVariant = {
+            guidance = "Valves in either order, then the vent wheel.",
+        },
+        groupVariant = {
+            guidance = "Split the valves; whoever is spare stands ready at the vent.",
+        },
+        reward = {
+            materialId = "material_machine_oil",
+            amount = 2,
+        },
+        steps = {
+            {
+                id = "valve_north",
+                actionText = "CLOSE",
+                objectText = "North Main Valve",
+                offset = { x = -6, y = 1.4, z = 0 },
+            },
+            {
+                id = "valve_south",
+                actionText = "CLOSE",
+                objectText = "South Main Valve",
+                offset = { x = 6, y = 1.4, z = 0 },
+            },
+            {
+                id = "vent_wheel",
+                actionText = "VENT",
+                objectText = "Pocket Vent Wheel",
+                offset = { x = 0, y = 2, z = 4 },
+            },
+        },
+    }),
+    frozenDefinition({
+        id = "event_ir_shift_change",
+        displayName = "Shift Change",
+        visual = "shift_change",
+        tags = { "mystery", "story" },
+        objective = "RING THE THREE SHIFT BELLS IN ORDER",
+        detail = "The mine still keeps its hours. Ring the change and whatever walks the old "
+            .. "shift will walk it somewhere else.",
+        completionMessage = "THE SHIFT CHANGES — +2 ECHO CRYSTAL",
+        failureMessage = "THE OLD SHIFT KEEPS WORKING",
+        durationSeconds = 90,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 16,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "Echo activity thickens nearby; the critical path stays open.",
+        localizationKey = "events.ironroot.shift_change",
+        analyticsId = "IronrootShiftChange",
+        killSwitchFlag = "ironroot_events_enabled",
+        soloVariant = {
+            guidance = "First bell, second bell, third bell — the order is painted on the posts.",
+        },
+        groupVariant = {
+            guidance = "One bell each; ring on the count.",
+        },
+        reward = {
+            materialId = "material_echo_crystal",
+            amount = 2,
+        },
+        steps = {
+            {
+                id = "bell_first",
+                actionText = "RING",
+                objectText = "First Shift Bell",
+                offset = { x = -6, y = 1.8, z = 2 },
+            },
+            {
+                id = "bell_second",
+                actionText = "RING",
+                objectText = "Second Shift Bell",
+                offset = { x = 0, y = 1.8, z = -3 },
+            },
+            {
+                id = "bell_third",
+                actionText = "RING",
+                objectText = "Third Shift Bell",
+                offset = { x = 6, y = 1.8, z = 2 },
+            },
+        },
+    }),
+    frozenDefinition({
+        id = "event_ir_cave_rescue",
+        displayName = "Cave Rescue",
+        visual = "cave_rescue",
+        tags = { "rescue", "urgent" },
+        objective = "SHORE THE FALL AND DIG THE MINER OUT",
+        detail = "A voice behind the rockfall, faint but counting steadily. Shore first; dig second.",
+        completionMessage = "THE MINER IS FREE — +3 GLOW FUNGUS",
+        failureMessage = "THE VOICE STOPS COUNTING",
+        durationSeconds = 120,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 20,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = { "event_ir_bell_warning" },
+        failureResolution = "The voice is gone when the stones move; nothing is found behind them.",
+        localizationKey = "events.ironroot.cave_rescue",
+        analyticsId = "IronrootCaveRescue",
+        killSwitchFlag = "ironroot_events_enabled",
+        soloVariant = {
+            guidance = "Both props, then dig — unshored digging brings the roof down.",
+        },
+        groupVariant = {
+            guidance = "Shore both sides at once, then dig together.",
+        },
+        reward = {
+            materialId = "material_glow_fungus",
+            amount = 3,
+        },
+        steps = {
+            {
+                id = "prop_left",
+                actionText = "SHORE",
+                objectText = "Left Roof Prop",
+                offset = { x = -5, y = 1.6, z = 0 },
+            },
+            {
+                id = "prop_right",
+                actionText = "SHORE",
+                objectText = "Right Roof Prop",
+                offset = { x = 5, y = 1.6, z = 0 },
+            },
+            {
+                id = "dig_face",
+                actionText = "DIG",
+                objectText = "Rockfall Face",
+                offset = { x = 0, y = 1.2, z = 3 },
+            },
+        },
+    }),
+    frozenDefinition({
+        id = "event_ir_machine_vote",
+        displayName = "Machine Vote",
+        visual = "machine_vote",
+        tags = { "choice", "machine" },
+        objective = "DECIDE THE OLD ENGINE'S FATE",
+        detail = "The pump engine still runs, and still drains the lower drifts. Feed it oil to "
+            .. "keep them dry, or pull its flywheel and let the water have what it wants.",
+        completionMessage = "THE DELVE REMEMBERS THE CHOICE — +2 COALGLASS",
+        failureMessage = "THE ENGINE DECIDES FOR ITSELF",
+        durationSeconds = 90,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 16,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The engine sputters on unchanged; the choice returns another run.",
+        localizationKey = "events.ironroot.machine_vote",
+        analyticsId = "IronrootMachineVote",
+        killSwitchFlag = "ironroot_events_enabled",
+        soloVariant = {
+            guidance = "Read the gauge, then commit — feed it or still it.",
+        },
+        groupVariant = {
+            guidance = "Talk it over; the lever moves once.",
+        },
+        reward = {
+            materialId = "material_coalglass",
+            amount = 2,
+        },
+        steps = {
+            {
+                id = "read_gauge",
+                actionText = "READ",
+                objectText = "Boiler Gauge",
+                offset = { x = -4, y = 1.6, z = 0 },
+            },
+            {
+                id = "commit_lever",
+                actionText = "PULL",
+                objectText = "Commitment Lever",
+                offset = { x = 4, y = 1.4, z = 0 },
+            },
+        },
+    }),
+    frozenDefinition({
+        id = "event_ir_lost_lunchbox",
+        displayName = "Lost Lunchbox",
+        visual = "lost_lunchbox",
+        tags = { "story", "gentle" },
+        objective = "CARRY THE LUNCHBOX TO THE TALLY WALL",
+        detail = "A wrapped lunch pail, still heavy, with a name scratched on the lid. Someone's "
+            .. "column on the tally wall never got its last mark.",
+        completionMessage = "THE COLUMN IS COMPLETE — +2 GLOW FUNGUS",
+        failureMessage = "THE PAIL STAYS WHERE IT WAS LEFT",
+        durationSeconds = 90,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 16,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The pail waits; grief keeps.",
+        localizationKey = "events.ironroot.lost_lunchbox",
+        analyticsId = "IronrootLostLunchbox",
+        killSwitchFlag = "ironroot_events_enabled",
+        soloVariant = {
+            guidance = "Pick it up, walk it there, set it down gently.",
+        },
+        groupVariant = {
+            guidance = "One carries; the others keep the way lit.",
+        },
+        reward = {
+            materialId = "material_glow_fungus",
+            amount = 2,
+        },
+        steps = {
+            {
+                id = "take_pail",
+                actionText = "CARRY",
+                objectText = "Wrapped Lunch Pail",
+                offset = { x = -5, y = 1.2, z = 0 },
+            },
+            {
+                id = "set_pail",
+                actionText = "PLACE",
+                objectText = "Tally Wall Ledge",
+                offset = { x = 5, y = 1.4, z = 2 },
+            },
+        },
+    }),
+    frozenDefinition({
+        id = "event_ir_fungus_bloom",
+        displayName = "Fungus Bloom",
+        visual = "fungus_bloom",
+        tags = { "resource", "timed" },
+        objective = "HARVEST THE BLOOM BEFORE IT CLOSES",
+        detail = "Once a season the glow fungus fruits all at once and the dark goes soft. "
+            .. "It does not wait for stragglers.",
+        completionMessage = "THE BLOOM IS GATHERED — +4 GLOW FUNGUS",
+        failureMessage = "THE BLOOM FOLDS BACK INTO THE DARK",
+        durationSeconds = 75,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 16,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The caps close; the colony keeps its light another season.",
+        localizationKey = "events.ironroot.fungus_bloom",
+        analyticsId = "IronrootFungusBloom",
+        killSwitchFlag = "ironroot_events_enabled",
+        soloVariant = {
+            guidance = "Cut the three brightest caps; leave the rest to seed.",
+        },
+        groupVariant = {
+            guidance = "Spread out — a cap each before the fold.",
+        },
+        reward = {
+            materialId = "material_glow_fungus",
+            amount = 4,
+        },
+        steps = {
+            {
+                id = "cap_east",
+                actionText = "CUT",
+                objectText = "East Bright Cap",
+                offset = { x = 6, y = 1, z = -2 },
+            },
+            {
+                id = "cap_center",
+                actionText = "CUT",
+                objectText = "Center Bright Cap",
+                offset = { x = 0, y = 1, z = 3 },
+            },
+            {
+                id = "cap_west",
+                actionText = "CUT",
+                objectText = "West Bright Cap",
+                offset = { x = -6, y = 1, z = -2 },
+            },
+        },
+    }),
+    frozenDefinition({
+        id = "event_ir_bell_warning",
+        displayName = "Bell Warning",
+        visual = "bell_warning",
+        tags = { "warning", "urgent" },
+        objective = "ANSWER THE UP-SHAFT BELL",
+        detail = "Three rings from above: the old signal for GET OUT. The bell has been right "
+            .. "before. Answer it, and brace what it warned about.",
+        completionMessage = "THE WARNING IS ANSWERED — +2 IRONROOT ORE",
+        failureMessage = "THE BELL GOES QUIET MID-RING",
+        durationSeconds = 80,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 16,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = { "event_ir_cave_rescue" },
+        failureResolution = "Loose ground settles harmlessly this time; the bell remembers.",
+        localizationKey = "events.ironroot.bell_warning",
+        analyticsId = "IronrootBellWarning",
+        killSwitchFlag = "ironroot_events_enabled",
+        soloVariant = {
+            guidance = "Answer on the rope, then brace the nearest prop line.",
+        },
+        groupVariant = {
+            guidance = "One answers; the rest brace the props before the count ends.",
+        },
+        reward = {
+            materialId = "material_ironroot_ore",
+            amount = 2,
+        },
+        steps = {
+            {
+                id = "answer_rope",
+                actionText = "PULL",
+                objectText = "Signal Bell Rope",
+                offset = { x = 0, y = 2, z = -3 },
+            },
+            {
+                id = "brace_props",
+                actionText = "BRACE",
+                objectText = "Drift Prop Line",
+                offset = { x = 4, y = 1.5, z = 3 },
+            },
+        },
+    }),
+}
+
+local eventInteractionCount = 0
+for _, definition in events do
+    eventInteractionCount += #definition.steps
+end
+
+return table.freeze({
+    RegionId = "region_ironroot",
+    Version = 1,
+    CellSize = 72,
+    ModuleCount = 12,
+    PointOfInterestCount = 4,
+    EventCount = 8,
+    EventInteractionCount = eventInteractionCount,
+    -- Same planning-budget semantics as Bramblewake: PartBudget bounds the
+    -- MANIFEST (sum of chosen modules' allowances), not built parts. The
+    -- Delve has no built-part measurement yet -- that number arrives with
+    -- its builder, from a Studio capture, not from here.
+    PartBudget = 640,
+    BossArenaPartBudget = 40,
+    BlackoutPartBudget = 20,
+    LightBudget = 32,
+    EffectBudget = 32,
+    RequiredTags = table.freeze({
+        safe = 2,
+        traversal = 2,
+        resource = 2,
+        combat = 2,
+        story = 2,
+        puzzle = 1,
+        landmark = 1,
+    }),
+    RequiredModuleIds = table.freeze({
+        "module_ir_bellows_approach",
+    }),
+    --[[
+        The known-good fallback's middle, in authored order: a walk that
+        touches every required tag, keeps the puzzle and landmark stops,
+        and stays well inside every budget. Until a live session proves
+        generated Delve walks, this is also the manifest specs replay.
+    ]]
+    FixedMiddleIds = table.freeze({
+        "module_ir_shored_drift",
+        "module_ir_ore_gallery",
+        "module_ir_main_incline",
+        "module_ir_mite_nest",
+        "module_ir_fungus_terrace",
+        "module_ir_signal_room",
+        "module_ir_scaffold_climb",
+        "module_ir_miners_rest",
+        "module_ir_guard_round",
+        "module_ir_bellows_approach",
+    }),
+    Modules = table.freeze(modules),
+    PointsOfInterest = table.freeze(pointsOfInterest),
+    Events = table.freeze(events),
+})
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="21">
             <Properties>
               <string name="Name">Regions</string>
               <string name="Source"><![CDATA[--!strict
@@ -3803,7 +4816,7 @@ return table.freeze(regions)
             </Properties>
           </Item>
         </Item>
-        <Item class="ModuleScript" referent="21">
+        <Item class="ModuleScript" referent="22">
           <Properties>
             <string name="Name">Registry</string>
             <string name="Source"><![CDATA[--!strict
@@ -4032,7 +5045,7 @@ return table.freeze(Registry)
           </Properties>
         </Item>
       </Item>
-      <Item class="ModuleScript" referent="22">
+      <Item class="ModuleScript" referent="23">
         <Properties>
           <string name="Name">Crafting</string>
           <string name="Source"><![CDATA[--!strict
@@ -4144,7 +5157,7 @@ return table.freeze(Crafting)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="23">
+      <Item class="ModuleScript" referent="24">
         <Properties>
           <string name="Name">CraftingCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -4320,7 +5333,7 @@ return table.freeze(CraftingCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="24">
+      <Item class="ModuleScript" referent="25">
         <Properties>
           <string name="Name">DefenseLanes</string>
           <string name="Source"><![CDATA[--!strict
@@ -4445,7 +5458,7 @@ return table.freeze(DefenseLanes)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">EnemyAttackFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -4530,7 +5543,7 @@ return table.freeze(EnemyAttackFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">EnemyCombatRules</string>
           <string name="Source"><![CDATA[--!strict
@@ -4621,7 +5634,7 @@ return table.freeze(EnemyCombatRules)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">EnemyMotion</string>
           <string name="Source"><![CDATA[--!strict
@@ -4691,7 +5704,7 @@ return table.freeze(EnemyMotion)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">EngineerBrace</string>
           <string name="Source"><![CDATA[--!strict
@@ -4850,7 +5863,7 @@ return table.freeze(EngineerBrace)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">Environment</string>
           <string name="Source"><![CDATA[--!strict
@@ -4929,7 +5942,7 @@ return table.freeze(Environment)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">Equipment</string>
           <string name="Source"><![CDATA[--!strict
@@ -5186,7 +6199,7 @@ return table.freeze(Equipment)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">ExpeditionContracts</string>
           <string name="Source"><![CDATA[--!strict
@@ -5287,7 +6300,7 @@ return table.freeze(ExpeditionContracts)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">ExpeditionEventFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -5323,8 +6336,14 @@ function ExpeditionEventFlow.validateDefinition(definition: any): (boolean, { st
     if type(definition) ~= "table" then
         return false, { "event definition must be a table" }
     end
-    if type(definition.id) ~= "string" or string.sub(definition.id, 1, 9) ~= "event_bw_" then
-        issue("event ID must use the Bramblewake event namespace")
+    --[[
+        Every region owns a two-letter event namespace (bw, ir, ...). The
+        rule is still that an event id names its region -- it just no
+        longer names one region in particular, now that the generator
+        composes more than one.
+    ]]
+    if type(definition.id) ~= "string" or string.match(definition.id, "^event_%l%l_%l") == nil then
+        issue("event ID must use a regional event namespace")
     end
     if type(definition.displayName) ~= "string" or definition.displayName == "" then
         issue("event must have a display name")
@@ -5630,14 +6649,25 @@ return table.freeze(ExpeditionEventFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">ExpeditionGenerator</string>
           <string name="Source"><![CDATA[--!strict
 
-local Catalog = require("./Content/Definitions/BramblewakeExpedition")
+local Bramblewake = require("./Content/Definitions/BramblewakeExpedition")
+local Ironroot = require("./Content/Definitions/IronrootExpedition")
 local ExpeditionEventFlow = require("./ExpeditionEventFlow")
 
+--[[
+    The generator is region-agnostic: everything it needs about a region --
+    module pool, socket counts, budgets, required tags, the known-good
+    fallback walk -- arrives from that region's catalog, which all declare
+    the same shape. Adding a region is adding a catalog and a line in
+    CATALOGS; no rule below knows a region by name.
+
+    Bramblewake remains the default so every existing caller and every
+    prior manifest hash is untouched, and the specs pin that.
+]]
 local ExpeditionGenerator = {}
 
 local RANDOM_MODULUS = 2147483647
@@ -5684,9 +6714,48 @@ local function indexDefinitions(definitions: { any }): { [string]: any }
     return byId
 end
 
-local MODULES_BY_ID = indexDefinitions(Catalog.Modules)
-local POIS_BY_ID = indexDefinitions(Catalog.PointsOfInterest)
-local EVENTS_BY_ID = indexDefinitions(Catalog.Events)
+-- Catalogs are structurally alike but not identical (Bramblewake carries a
+-- measured BuiltPartBudget the Delve cannot have until its builder ships),
+-- so the list is typed by what the generator actually reads from it.
+local CATALOGS: { any } = table.freeze({ Bramblewake :: any, Ironroot :: any })
+local DEFAULT_REGION_ID = Bramblewake.RegionId
+
+type Region = {
+    catalog: any,
+    modulesById: { [string]: any },
+    poisById: { [string]: any },
+    eventsById: { [string]: any },
+}
+
+local REGIONS: { [string]: Region } = {}
+for _, catalog in CATALOGS do
+    REGIONS[catalog.RegionId] = {
+        catalog = catalog,
+        modulesById = indexDefinitions(catalog.Modules),
+        poisById = indexDefinitions(catalog.PointsOfInterest),
+        eventsById = indexDefinitions(catalog.Events),
+    }
+end
+
+local function regionFor(regionId: any): Region
+    local region = REGIONS[if type(regionId) == "string" then regionId else DEFAULT_REGION_ID]
+    return region or REGIONS[DEFAULT_REGION_ID]
+end
+
+-- Definition lookups are region-wide: content ids carry their region's
+-- prefix, so a single id never means two things.
+local function findDefinition(field: string, id: any): any
+    if type(id) ~= "string" then
+        return nil
+    end
+    for _, region in REGIONS do
+        local found = (region :: any)[field][id]
+        if found ~= nil then
+            return found
+        end
+    end
+    return nil
+end
 
 local function hashText(hash: number, value: string): number
     local result = hash
@@ -5714,20 +6783,30 @@ function ExpeditionGenerator.computeHash(manifest: any): string
     return string.format("%08x", hash)
 end
 
-local function placeContent(manifest: any, random: (number) -> number)
-    local poiDefinitions = shuffled(Catalog.PointsOfInterest, random)
-    local eventDefinitions = shuffled(Catalog.Events, random)
+local function placeContent(manifest: any, random: (number) -> number, region: Region)
+    local poiDefinitions = shuffled(region.catalog.PointsOfInterest, random)
+    local eventDefinitions = shuffled(region.catalog.Events, random)
     local occupied: { [number]: boolean } = {}
+
+    --[[
+        A region's catalog holds more content than any one run shows: the
+        Delve declares twelve points of interest and shows four. Placement
+        therefore stops at the run's count, not at the pool's end. For
+        Bramblewake, whose pool is exactly its run count, this is the same
+        walk it always took.
+    ]]
+    local poiLimit = math.min(#poiDefinitions, region.catalog.PointOfInterestCount)
+    local eventLimit = math.min(#eventDefinitions, region.catalog.EventCount)
 
     local poiPlacements = shuffled(manifest.modules, random)
     local poiIndex = 1
     for _, placement in poiPlacements do
-        local moduleDefinition = MODULES_BY_ID[placement.moduleId]
+        local moduleDefinition = region.modulesById[placement.moduleId]
         if moduleDefinition.poiSocket and not occupied[placement.index] then
             placement.poiId = poiDefinitions[poiIndex].id
             occupied[placement.index] = true
             poiIndex += 1
-            if poiIndex > #poiDefinitions then
+            if poiIndex > poiLimit then
                 break
             end
         end
@@ -5736,7 +6815,7 @@ local function placeContent(manifest: any, random: (number) -> number)
     local eventPlacements = shuffled(manifest.modules, random)
     local eventIndex = 1
     for _, placement in eventPlacements do
-        local moduleDefinition = MODULES_BY_ID[placement.moduleId]
+        local moduleDefinition = region.modulesById[placement.moduleId]
         -- POI and event sockets occupy opposite authored corners of a module,
         -- so representative modules can host both without overlapping the
         -- critical path or each other. This is required to place all eight
@@ -5744,36 +6823,20 @@ local function placeContent(manifest: any, random: (number) -> number)
         if moduleDefinition.eventSocket then
             placement.eventId = eventDefinitions[eventIndex].id
             eventIndex += 1
-            if eventIndex > #eventDefinitions then
+            if eventIndex > eventLimit then
                 break
             end
         end
     end
 end
 
--- The known-good fallback's middle, in its original authored order. This is
--- the exact twelve-module walk that shipped before the catalog grew to
--- thirty, so the fallback stays the manifest every prior test proved.
-local FIXED_MIDDLE_IDS = table.freeze({
-    "module_bw_root_arch",
-    "module_bw_sunken_orchard",
-    "module_bw_foxglove_run",
-    "module_bw_hollow_farm",
-    "module_bw_briar_ring",
-    "module_bw_sapfall_gully",
-    "module_bw_windmill_copse",
-    "module_bw_tangle_bridge",
-    "module_bw_moth_meadow",
-    "module_bw_old_growth_approach",
-})
-
-local function moduleByRole(role: string): any
-    for _, definition in Catalog.Modules do
+local function moduleByRole(region: Region, role: string): any
+    for _, definition in region.catalog.Modules do
         if definition.role == role then
             return definition
         end
     end
-    error("Bramblewake catalog has no module with role " .. role)
+    error(region.catalog.RegionId .. " catalog has no module with role " .. role)
 end
 
 --[[
@@ -5785,10 +6848,15 @@ end
     the remaining slots take whatever the shuffle offers. Attempts and the
     validator catch the rare shuffle this greedy pass cannot rescue.
 ]]
-local function selectMiddle(arrival: any, extraction: any, random: (number) -> number): { any }
-    local target = Catalog.ModuleCount - 2
+local function selectMiddle(
+    region: Region,
+    arrival: any,
+    extraction: any,
+    random: (number) -> number
+): { any }
+    local target = region.catalog.ModuleCount - 2
     local pool = {}
-    for _, definition in Catalog.Modules do
+    for _, definition in region.catalog.Modules do
         if definition.role ~= "arrival" and definition.role ~= "extraction" then
             table.insert(pool, definition)
         end
@@ -5814,7 +6882,7 @@ local function selectMiddle(arrival: any, extraction: any, random: (number) -> n
         countTags(definition)
     end
 
-    for _, moduleId in Catalog.RequiredModuleIds do
+    for _, moduleId in region.catalog.RequiredModuleIds do
         for _, definition in pool do
             if definition.id == moduleId then
                 take(definition)
@@ -5822,7 +6890,7 @@ local function selectMiddle(arrival: any, extraction: any, random: (number) -> n
             end
         end
     end
-    for tag, minimum in Catalog.RequiredTags :: { [string]: number } do
+    for tag, minimum in region.catalog.RequiredTags :: { [string]: number } do
         while (tagCounts[tag] or 0) < minimum and #chosen < target do
             local found = false
             for _, definition in pool do
@@ -5855,18 +6923,24 @@ local function selectMiddle(arrival: any, extraction: any, random: (number) -> n
     return shuffled(chosen, random)
 end
 
-local function assemble(seed: number, attempt: number, source: string, fixed: boolean): any
+local function assemble(
+    seed: number,
+    attempt: number,
+    source: string,
+    fixed: boolean,
+    region: Region
+): any
     local random = randomSource(seed + attempt * 7919)
-    local arrival = moduleByRole("arrival")
-    local extraction = moduleByRole("extraction")
+    local arrival = moduleByRole(region, "arrival")
+    local extraction = moduleByRole(region, "extraction")
     local middle
     if fixed then
         middle = {}
-        for _, moduleId in FIXED_MIDDLE_IDS do
-            table.insert(middle, MODULES_BY_ID[moduleId])
+        for _, moduleId in region.catalog.FixedMiddleIds do
+            table.insert(middle, region.modulesById[moduleId])
         end
     else
-        middle = selectMiddle(arrival, extraction, random)
+        middle = selectMiddle(region, arrival, extraction, random)
     end
 
     local sequence = { arrival }
@@ -5895,14 +6969,14 @@ local function assemble(seed: number, attempt: number, source: string, fixed: bo
     end
 
     local manifest = {
-        version = Catalog.Version,
-        regionId = Catalog.RegionId,
+        version = region.catalog.Version,
+        regionId = region.catalog.RegionId,
         seed = normalizeSeed(seed),
         source = source,
         attempts = attempt,
         modules = modules,
     }
-    placeContent(manifest, random)
+    placeContent(manifest, random, region)
     manifest.hash = ExpeditionGenerator.computeHash(manifest)
     return manifest
 end
@@ -5916,14 +6990,16 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
     if type(manifest) ~= "table" then
         return false, { "manifest must be a table" }
     end
-    if manifest.version ~= Catalog.Version then
-        issue("manifest version does not match the Bramblewake catalog")
+    if REGIONS[manifest.regionId] == nil then
+        return false, { "manifest names no known region" }
     end
-    if manifest.regionId ~= Catalog.RegionId then
-        issue("manifest region is not Bramblewake")
+    local region = regionFor(manifest.regionId)
+    local catalog = region.catalog
+    if manifest.version ~= catalog.Version then
+        issue("manifest version does not match the " .. catalog.RegionId .. " catalog")
     end
-    if type(manifest.modules) ~= "table" or #manifest.modules ~= Catalog.ModuleCount then
-        issue(string.format("manifest must contain %d modules", Catalog.ModuleCount))
+    if type(manifest.modules) ~= "table" or #manifest.modules ~= catalog.ModuleCount then
+        issue(string.format("manifest must contain %d modules", catalog.ModuleCount))
         return false, issues
     end
 
@@ -5940,7 +7016,7 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
         if placement.index ~= index then
             issue(string.format("module %d has an invalid sequence index", index))
         end
-        local definition = MODULES_BY_ID[placement.moduleId]
+        local definition = region.modulesById[placement.moduleId]
         if definition == nil then
             issue(string.format("module %d references unknown content", index))
         else
@@ -5981,9 +7057,9 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
         end
 
         if placement.poiId ~= nil then
-            if POIS_BY_ID[placement.poiId] == nil then
+            if region.poisById[placement.poiId] == nil then
                 issue("manifest references an unknown point of interest")
-            elseif POIS_BY_ID[placement.poiId].enabled ~= true then
+            elseif region.poisById[placement.poiId].enabled ~= true then
                 issue("manifest contains a disabled point of interest")
             elseif seenPois[placement.poiId] then
                 issue("point of interest repeats in one expedition")
@@ -5993,7 +7069,7 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
             seenPois[placement.poiId] = true
         end
         if placement.eventId ~= nil then
-            local eventDefinition = EVENTS_BY_ID[placement.eventId]
+            local eventDefinition = region.eventsById[placement.eventId]
             if eventDefinition == nil then
                 issue("manifest references an unknown event")
             elseif eventDefinition.enabled ~= true then
@@ -6008,7 +7084,7 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
                 if not contractValid then
                     issue("event contract is invalid: " .. table.concat(contractIssues, ", "))
                 end
-                if eventDefinition.minimumRouteSpace > Catalog.CellSize - 24 then
+                if eventDefinition.minimumRouteSpace > catalog.CellSize - 24 then
                     issue("event route-space requirement exceeds its module clearing")
                 end
             end
@@ -6016,8 +7092,8 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
         end
     end
 
-    local firstDefinition = MODULES_BY_ID[manifest.modules[1].moduleId]
-    local lastDefinition = MODULES_BY_ID[manifest.modules[#manifest.modules].moduleId]
+    local firstDefinition = region.modulesById[manifest.modules[1].moduleId]
+    local lastDefinition = region.modulesById[manifest.modules[#manifest.modules].moduleId]
     if firstDefinition == nil or firstDefinition.role ~= "arrival" then
         issue("critical path does not begin at an arrival module")
     end
@@ -6033,33 +7109,33 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
     for _ in seenEvents do
         eventCount += 1
     end
-    if poiCount ~= Catalog.PointOfInterestCount then
+    if poiCount ~= catalog.PointOfInterestCount then
         issue(
-            string.format("manifest must place %d points of interest", Catalog.PointOfInterestCount)
+            string.format("manifest must place %d points of interest", catalog.PointOfInterestCount)
         )
     end
-    if eventCount ~= Catalog.EventCount then
-        issue(string.format("manifest must place %d events", Catalog.EventCount))
+    if eventCount ~= catalog.EventCount then
+        issue(string.format("manifest must place %d events", catalog.EventCount))
     end
 
-    local requiredTags = Catalog.RequiredTags :: { [string]: number }
+    local requiredTags = catalog.RequiredTags :: { [string]: number }
     for tag, minimum in requiredTags do
         if (tagCounts[tag] or 0) < minimum then
             issue(string.format("manifest does not meet the %s module minimum", tag))
         end
     end
-    for _, moduleId in Catalog.RequiredModuleIds do
+    for _, moduleId in catalog.RequiredModuleIds do
         if not seenModules[moduleId] then
             issue("manifest is missing required module " .. moduleId)
         end
     end
-    if totalParts > Catalog.PartBudget then
+    if totalParts > catalog.PartBudget then
         issue("manifest exceeds the regional part budget")
     end
-    if totalLights > Catalog.LightBudget then
+    if totalLights > catalog.LightBudget then
         issue("manifest exceeds the regional light budget")
     end
-    if totalEffects > Catalog.EffectBudget then
+    if totalEffects > catalog.EffectBudget then
         issue("manifest exceeds the regional effect budget")
     end
     if manifest.hash ~= ExpeditionGenerator.computeHash(manifest) then
@@ -6072,8 +7148,10 @@ end
 function ExpeditionGenerator.generate(
     seed: number,
     forceFallback: boolean?,
-    avoidHashes: { [string]: boolean }?
+    avoidHashes: { [string]: boolean }?,
+    regionId: string?
 ): any
+    local region = regionFor(regionId)
     local normalizedSeed = normalizeSeed(seed)
     if not forceFallback then
         -- Repetition control: a caller that remembers recent manifests can
@@ -6082,7 +7160,7 @@ function ExpeditionGenerator.generate(
         -- an avoided hash, the last valid manifest wins anyway.
         local lastValid = nil
         for attempt = 1, if avoidHashes ~= nil then 5 else 3 do
-            local manifest = assemble(normalizedSeed, attempt, "generated", false)
+            local manifest = assemble(normalizedSeed, attempt, "generated", false, region)
             local valid = ExpeditionGenerator.validate(manifest)
             if valid then
                 if avoidHashes == nil or avoidHashes[manifest.hash] ~= true then
@@ -6096,29 +7174,48 @@ function ExpeditionGenerator.generate(
         end
     end
 
-    local fallback = assemble(normalizedSeed, 3, "known_good_fallback", true)
+    local fallback = assemble(normalizedSeed, 3, "known_good_fallback", true, region)
     local valid, issues = ExpeditionGenerator.validate(fallback)
-    assert(valid, "known-good Bramblewake fallback is invalid: " .. table.concat(issues, "; "))
+    assert(
+        valid,
+        "known-good "
+            .. region.catalog.RegionId
+            .. " fallback is invalid: "
+            .. table.concat(issues, "; ")
+    )
     return fallback
 end
 
 function ExpeditionGenerator.moduleDefinition(moduleId: string): any
-    return MODULES_BY_ID[moduleId]
+    return findDefinition("modulesById", moduleId)
 end
 
 function ExpeditionGenerator.pointOfInterestDefinition(poiId: string): any
-    return POIS_BY_ID[poiId]
+    return findDefinition("poisById", poiId)
 end
 
 function ExpeditionGenerator.eventDefinition(eventId: string): any
-    return EVENTS_BY_ID[eventId]
+    return findDefinition("eventsById", eventId)
+end
+
+-- The region catalogs the generator can compose, in declaration order.
+function ExpeditionGenerator.regionIds(): { string }
+    local ids: { string } = {}
+    for _, catalog in CATALOGS do
+        table.insert(ids, catalog.RegionId)
+    end
+    return ids
+end
+
+function ExpeditionGenerator.catalogFor(regionId: string?): any
+    return regionFor(regionId).catalog
 end
 
 return table.freeze(ExpeditionGenerator)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">ExpeditionInventory</string>
           <string name="Source"><![CDATA[--!strict
@@ -6133,12 +7230,24 @@ local MAX_RECOVERY_CACHES = 16
 local HASH_MODULUS = 2147483647
 local HASH_MULTIPLIER = 33
 
+--[[
+    Every material the ledger will accept, by region. A material outside
+    this list is refused at the grant call, which is what keeps a bad
+    reward shape from quietly inventing currency -- the lesson of #212.
+]]
 local KNOWN_MATERIALS = table.freeze({
+    -- Bramblewake
     material_amber_sap = true,
     material_brightcap = true,
     material_heartwood = true,
     material_meadow_fiber = true,
     material_spring_clay = true,
+    -- Ironroot Delve
+    material_ironroot_ore = true,
+    material_coalglass = true,
+    material_glow_fungus = true,
+    material_machine_oil = true,
+    material_echo_crystal = true,
 })
 
 local function hashText(hash: number, value: string): number
@@ -6742,7 +7851,7 @@ return table.freeze(ExpeditionInventory)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">ExpeditionRewardLedger</string>
           <string name="Source"><![CDATA[--!strict
@@ -6881,7 +7990,7 @@ return table.freeze(ExpeditionRewardLedger)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">ExtractionPayoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -6889,11 +7998,18 @@ return table.freeze(ExpeditionRewardLedger)
 local ExtractionPayoff = {}
 
 local PRESENTATION = table.freeze({
+    -- Bramblewake
     material_amber_sap = table.freeze({ kind = "amber", label = "AMBER SAP" }),
     material_brightcap = table.freeze({ kind = "brightcap", label = "BRIGHTCAP" }),
     material_heartwood = table.freeze({ kind = "heartwood", label = "HEARTWOOD" }),
     material_meadow_fiber = table.freeze({ kind = "fiber", label = "MEADOW FIBER" }),
     material_spring_clay = table.freeze({ kind = "clay", label = "SPRING CLAY" }),
+    -- Ironroot Delve
+    material_ironroot_ore = table.freeze({ kind = "ore", label = "IRONROOT ORE" }),
+    material_coalglass = table.freeze({ kind = "coalglass", label = "COALGLASS" }),
+    material_glow_fungus = table.freeze({ kind = "fungus", label = "GLOW FUNGUS" }),
+    material_machine_oil = table.freeze({ kind = "oil", label = "MACHINE OIL" }),
+    material_echo_crystal = table.freeze({ kind = "crystal", label = "ECHO CRYSTAL" }),
 })
 
 export type Entry = {
@@ -6953,7 +8069,7 @@ return table.freeze(ExtractionPayoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">GearTraits</string>
           <string name="Source"><![CDATA[--!strict
@@ -7095,7 +8211,7 @@ return table.freeze(GearTraits)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">GearVisualPlan</string>
           <string name="Source"><![CDATA[--!strict
@@ -7488,7 +8604,7 @@ return table.freeze(GearVisualPlan)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">GearWear</string>
           <string name="Source"><![CDATA[--!strict
@@ -7635,7 +8751,7 @@ return table.freeze(GearWear)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">LobbyDeparture</string>
           <string name="Source"><![CDATA[--!strict
@@ -7811,7 +8927,7 @@ return table.freeze(LobbyDeparture)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">MemoryFragments</string>
           <string name="Source"><![CDATA[--!strict
@@ -8124,7 +9240,7 @@ return table.freeze(MemoryFragments)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">MusicCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -8485,7 +9601,7 @@ return table.freeze(MusicCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">NightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -8533,7 +9649,7 @@ return table.freeze(NightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">OldGrowthEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -8818,7 +9934,7 @@ return table.freeze(OldGrowthEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">PerformanceBudget</string>
           <string name="Source"><![CDATA[--!strict
@@ -9207,7 +10323,7 @@ return table.freeze(PerformanceBudget)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">ProfessionAbilityVisuals</string>
           <string name="Source"><![CDATA[--!strict
@@ -9301,7 +10417,7 @@ return table.freeze(ProfessionAbilityVisuals)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">ProfessionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -9467,7 +10583,7 @@ return table.freeze(ProfessionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">ProfessionMastery</string>
           <string name="Source"><![CDATA[--!strict
@@ -9908,7 +11024,7 @@ return table.freeze(ProfessionMastery)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">ProfessionRescue</string>
           <string name="Source"><![CDATA[--!strict
@@ -9987,7 +11103,7 @@ return table.freeze(ProfessionRescue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">ProfessionState</string>
           <string name="Source"><![CDATA[--!strict
@@ -10154,7 +11270,7 @@ return table.freeze(ProfessionState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">ProfileBackup</string>
           <string name="Source"><![CDATA[--!strict
@@ -10468,7 +11584,7 @@ return table.freeze(ProfileBackup)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">ProfilePersistence</string>
           <string name="Source"><![CDATA[--!strict
@@ -10642,7 +11758,7 @@ return table.freeze(ProfilePersistence)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">QuestCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -10713,7 +11829,7 @@ return table.freeze(QuestCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">Quests</string>
           <string name="Source"><![CDATA[--!strict
@@ -10830,7 +11946,7 @@ return table.freeze(Quests)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
@@ -10889,7 +12005,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
@@ -11006,7 +12122,7 @@ return table.freeze(ResidentDialogue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">ResidentLife</string>
           <string name="Source"><![CDATA[--!strict
@@ -11343,7 +12459,7 @@ return table.freeze(ResidentLife)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -11458,7 +12574,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -11587,7 +12703,7 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -11748,7 +12864,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -12833,7 +13949,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">SfxCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -13000,7 +14116,7 @@ return table.freeze(SfxCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -13119,7 +14235,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -13376,7 +14492,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -13520,7 +14636,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -13930,7 +15046,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -14111,7 +15227,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="68">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -14175,7 +15291,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="69">
+      <Item class="ModuleScript" referent="70">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -14349,7 +15465,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="70">
+      <Item class="ModuleScript" referent="71">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -14441,7 +15557,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="71">
+      <Item class="ModuleScript" referent="72">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -14653,7 +15769,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="72">
+      <Item class="ModuleScript" referent="73">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -14831,7 +15947,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="73">
+      <Item class="ModuleScript" referent="74">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -14984,7 +16100,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="74">
+      <Item class="ModuleScript" referent="75">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -15217,7 +16333,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="75">
+      <Item class="ModuleScript" referent="76">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -15379,7 +16495,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="76">
+      <Item class="ModuleScript" referent="77">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -15415,7 +16531,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="77">
+      <Item class="ModuleScript" referent="78">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -15797,7 +16913,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="78">
+      <Item class="ModuleScript" referent="79">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -15869,11 +16985,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="79">
+  <Item class="ServerScriptService" referent="80">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="80">
+    <Item class="Script" referent="81">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -16336,7 +17452,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="81">
+      <Item class="ModuleScript" referent="82">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -16434,11 +17550,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="82">
+      <Item class="Folder" referent="83">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17053,7 +18169,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17924,7 +19040,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="85">
+        <Item class="ModuleScript" referent="86">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18425,7 +19541,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="86">
+        <Item class="ModuleScript" referent="87">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18682,7 +19798,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="87">
+        <Item class="ModuleScript" referent="88">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -19089,7 +20205,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="88">
+        <Item class="ModuleScript" referent="89">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20725,7 +21841,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="89">
+        <Item class="ModuleScript" referent="90">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21418,7 +22534,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="90">
+        <Item class="ModuleScript" referent="91">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21522,7 +22638,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="91">
+        <Item class="ModuleScript" referent="92">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21807,7 +22923,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="92">
+        <Item class="ModuleScript" referent="93">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22213,7 +23329,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="93">
+        <Item class="ModuleScript" referent="94">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -22307,7 +23423,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="94">
+        <Item class="ModuleScript" referent="95">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22525,7 +23641,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="95">
+        <Item class="ModuleScript" referent="96">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23395,7 +24511,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="96">
+        <Item class="ModuleScript" referent="97">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23650,7 +24766,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="97">
+        <Item class="ModuleScript" referent="98">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23829,7 +24945,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="98">
+        <Item class="ModuleScript" referent="99">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24412,7 +25528,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="99">
+        <Item class="ModuleScript" referent="100">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -25525,7 +26641,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="100">
+        <Item class="ModuleScript" referent="101">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -26150,7 +27266,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="101">
+        <Item class="ModuleScript" referent="102">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -27857,7 +28973,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="102">
+        <Item class="ModuleScript" referent="103">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -28482,7 +29598,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="103">
+        <Item class="ModuleScript" referent="104">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -30488,7 +31604,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="104">
+        <Item class="ModuleScript" referent="105">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -31357,7 +32473,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="105">
+        <Item class="ModuleScript" referent="106">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43643,11 +44759,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="106">
+      <Item class="Folder" referent="107">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="107">
+        <Item class="ModuleScript" referent="108">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -47427,7 +48543,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="108">
+        <Item class="ModuleScript" referent="109">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -47924,7 +49040,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="109">
+        <Item class="ModuleScript" referent="110">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -48619,7 +49735,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="110">
+        <Item class="ModuleScript" referent="111">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -49478,7 +50594,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="111">
+        <Item class="ModuleScript" referent="112">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -49564,7 +50680,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="112">
+        <Item class="ModuleScript" referent="113">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -49938,7 +51054,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="113">
+        <Item class="ModuleScript" referent="114">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -50118,7 +51234,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="114">
+        <Item class="ModuleScript" referent="115">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -50714,7 +51830,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="115">
+        <Item class="ModuleScript" referent="116">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -50951,7 +52067,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="116">
+        <Item class="ModuleScript" referent="117">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -51040,7 +52156,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="117">
+        <Item class="ModuleScript" referent="118">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -51377,15 +52493,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="118">
+  <Item class="StarterPlayer" referent="119">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="119">
+    <Item class="StarterPlayerScripts" referent="120">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="120">
+      <Item class="LocalScript" referent="121">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -51680,11 +52796,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="121">
+        <Item class="Folder" referent="122">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="122">
+          <Item class="ModuleScript" referent="123">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -51815,7 +52931,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="123">
+          <Item class="ModuleScript" referent="124">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -54677,7 +55793,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="124">
+          <Item class="ModuleScript" referent="125">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -54976,7 +56092,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="125">
+          <Item class="ModuleScript" referent="126">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55084,7 +56200,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="126">
+          <Item class="ModuleScript" referent="127">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55203,7 +56319,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="127">
+          <Item class="ModuleScript" referent="128">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55477,7 +56593,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="128">
+          <Item class="ModuleScript" referent="129">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55577,7 +56693,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="129">
+          <Item class="ModuleScript" referent="130">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55689,7 +56805,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="130">
+          <Item class="ModuleScript" referent="131">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55849,7 +56965,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="131">
+          <Item class="ModuleScript" referent="132">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -56058,7 +57174,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="132">
+          <Item class="ModuleScript" referent="133">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -56203,7 +57319,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="133">
+          <Item class="ModuleScript" referent="134">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -56503,13 +57619,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="134">
+  <Item class="TextChatService" referent="135">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="135">
+  <Item class="Workspace" referent="136">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

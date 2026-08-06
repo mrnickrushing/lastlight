@@ -10,12 +10,24 @@ local MAX_RECOVERY_CACHES = 16
 local HASH_MODULUS = 2147483647
 local HASH_MULTIPLIER = 33
 
+--[[
+    Every material the ledger will accept, by region. A material outside
+    this list is refused at the grant call, which is what keeps a bad
+    reward shape from quietly inventing currency -- the lesson of #212.
+]]
 local KNOWN_MATERIALS = table.freeze({
+    -- Bramblewake
     material_amber_sap = true,
     material_brightcap = true,
     material_heartwood = true,
     material_meadow_fiber = true,
     material_spring_clay = true,
+    -- Ironroot Delve
+    material_ironroot_ore = true,
+    material_coalglass = true,
+    material_glow_fungus = true,
+    material_machine_oil = true,
+    material_echo_crystal = true,
 })
 
 local function hashText(hash: number, value: string): number
