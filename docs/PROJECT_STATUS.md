@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-06, at `main` = `ffc54b6` (PR #255), build `0.53.0`,
-save schema 20, 22 services. Published to Roblox as place version 93,
+Last updated: 2026-08-06, at `main` = `1b955b7` (PR #257), build `0.53.0`,
+save schema 20, 22 services. Published to Roblox as place version 94,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,14 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#257** (v94) toasts were reading raw item ids to the player
+  ("EQUIPPED GEAR_AMBER_EDGE"); equip and whet now use the catalog's
+  display name. Closed live in the same run: the **Watch defender**
+  posts at the Meadow Gate plot on a solo town night and stands down at
+  dawn, and the **gear-care chain** carries a crafted blade's rolled
+  trait and condition to the client (KEEN, sound) with the whet target
+  correctly absent. Only the WHET *press* remains, and it needs a weapon
+  that has actually dulled (~30 landed strikes).
 - **#255** (v93) **an armed snare could never bite on the tutorial's
   night** — the trap gated on the service's own night flag, which only
   TownNightService raises, so three plots sat lit while a rootling, a
