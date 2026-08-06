@@ -62,6 +62,7 @@ export type TutorialService = typeof(setmetatable(
         _actionProgress: any,
         _toolCatalog: any,
         _gearWear: any,
+        _gearTraits: any,
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -99,7 +100,8 @@ function TutorialService.new(
     residentDialogue: any,
     actionProgress: any,
     toolCatalog: any,
-    gearWear: any
+    gearWear: any,
+    gearTraits: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -131,6 +133,7 @@ function TutorialService.new(
         _actionProgress = actionProgress,
         _toolCatalog = toolCatalog,
         _gearWear = gearWear,
+        _gearTraits = gearTraits,
         _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -725,6 +728,24 @@ function TutorialService._strikeContext(self: TutorialService, player: Player): 
         -- The family decides the moveset: ranged families carry strikeRange
         -- and a projectile visual, the lance carries reach without one, and
         -- the rider fields pass through untouched for the strike to apply.
+        -- The item's rolled trait shades it: KEEN adds to the damage bonus,
+        -- BALANCED to the reach, both before the wear scaling.
+        local trait = self._gearTraits.get(self._profileService:gearTraitOf(player, weapon.itemId))
+        if trait ~= nil then
+            if trait.strikeDamageBonus ~= nil then
+                weapon = table.clone(weapon)
+                weapon.strikeDamageMultiplier = (weapon.strikeDamageMultiplier or 1)
+                    + trait.strikeDamageBonus
+            end
+            if trait.reachBonus ~= nil then
+                weapon = table.clone(weapon)
+                if weapon.strikeRange ~= nil then
+                    weapon.strikeRange += trait.reachBonus
+                else
+                    weapon.meleeReach = (weapon.meleeReach or 0) + trait.reachBonus
+                end
+            end
+        end
         context.weaponRange = weapon.strikeRange or weapon.meleeReach
         -- 1 + (bonus * effectiveness): a worn 1.45x maul swings at 1.225x.
         context.damageMultiplier = 1
@@ -763,7 +784,13 @@ function TutorialService.strike(self: TutorialService, player: Player)
         local context = self:_strikeContext(player)
         local landed, message = self._enemyService:damageNearest(player, context)
         if landed and context.weaponId ~= nil then
-            local wearResult = self._profileService:accrueGearWear(player, context.weaponId)
+            local wearTrait =
+                self._gearTraits.get(self._profileService:gearTraitOf(player, context.weaponId))
+            local wearResult = self._profileService:accrueGearWear(
+                player,
+                context.weaponId,
+                if wearTrait ~= nil then wearTrait.wearPointsOverride else nil
+            )
             if
                 wearResult.applied
                 and wearResult.conditionAfter ~= wearResult.conditionBefore

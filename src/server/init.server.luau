@@ -47,6 +47,7 @@ local LobbyDeparture = require(root.LobbyDeparture)
 local ActionProgress = require(root.ActionProgress)
 local ToolCatalog = require(root.ToolCatalog)
 local GearWear = require(root.GearWear)
+local GearTraits = require(root.GearTraits)
 local ActionPayloadContract = require(root.ActionPayloadContract)
 local AdminInspectionReport = require(root.AdminInspectionReport)
 local PerformanceBudget = require(root.PerformanceBudget)
@@ -331,7 +332,8 @@ local tutorialService = TutorialService.new(
     ResidentDialogue,
     ActionProgress,
     ToolCatalog,
-    GearWear
+    GearWear,
+    GearTraits
 )
 
 local services = ServiceRegistry.new({
