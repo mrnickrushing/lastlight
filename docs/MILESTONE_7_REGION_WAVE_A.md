@@ -69,6 +69,17 @@ test could see, because every part of them a test can read was correct.
 
 **Closed:**
 
+- **The Watch defender (#227)** — posted at the Meadow Gate plot on a solo
+  town night, three studs off the ring as designed, and stood down at
+  dawn. Confirmed on night two, after the tutorial completed.
+- **Gear care labels (#229)** — a freshly crafted Amber Edge carries its
+  rolled trait and condition through to the client (`KEEN`, `sound`), and
+  the whet target stays absent until something is worn. **Defect found
+  and fixed while equipping it**: the equip and whet toasts read the raw
+  item id out loud ("EQUIPPED GEAR_AMBER_EDGE"), which is how an
+  underscore in a database row ends up in a player's face. Both now use
+  the catalog's display name.
+
 - **Companions (#225)** — hound builds (15 parts), stands at its keeper's
   flank 4.0 studs off and 0.17 above the floor, closes a 30-stud gap in
   under 2.5 seconds and settles at 3.5 without jitter. FOLLOW/STAY
@@ -120,8 +131,11 @@ completion (free Mara, gather, choose a tool, raise the barricade, hold
 the first night). Materials are no longer the obstacle -- see the
 stocking hook below.
 
-- Defense plots: the Watch defender on a solo *town* night (it needs the
-  party census, so the tutorial night cannot show it).
+- Gear care: the WHET press itself, which needs a weapon that has
+  actually dulled -- roughly thirty landed strikes across a night. The
+  rest of the chain is verified: a crafted Amber Edge reports its rolled
+  trait (KEEN) and condition (sound) in the session payload, and the
+  whet target is correctly absent while nothing is worn.
 - Gear care: the WHET press and the worn equip-label read on a profile
   that has actually dulled a weapon.
 - Delve/Fen enemies: telegraph read at night (the silhouettes are done).

@@ -479,6 +479,24 @@ local function gearShortName(itemId: string): string
 end
 
 --[[
+    What a player should see an item called. Equipment and the crafting
+    catalog both carry display names; the id is the last resort, and it
+    should never actually be reached for real gear.
+
+    Two toasts were reading the raw id out loud -- "EQUIPPED
+    GEAR_AMBER_EDGE", which is how the underscore in a database row ends
+    up in a player's face. Seen while equipping a freshly crafted edge in
+    Studio.
+]]
+local function gearDisplayName(equipmentCatalog: any, itemId: string): string
+    local definition = if equipmentCatalog ~= nil then equipmentCatalog.get(itemId) else nil
+    if type(definition) == "table" and type(definition.displayName) == "string" then
+        return string.upper(definition.displayName)
+    end
+    return gearShortName(itemId)
+end
+
+--[[
     What the Field Book says about each owned piece of gear: its rolled
     trait and its wear condition, plus which single item most deserves the
     whetstone. Composed server-side so the client stays a renderer -- it
@@ -1577,7 +1595,9 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             self:_setToast(
                 player,
                 if result.applied
-                    then "WHETTED — " .. string.upper(itemId) .. " IS SOUND AGAIN"
+                    then "WHETTED — "
+                        .. gearDisplayName(self._equipmentCatalog, itemId)
+                        .. " IS SOUND AGAIN"
                     elseif
                         result.reason == "insufficient_materials"
                     then "WHETTING TAKES HALF THE RECIPE'S MATERIALS"
@@ -1592,7 +1612,9 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             local result = self._profileService:equipItem(player, itemId)
             self:_setToast(
                 player,
-                if result.accepted then "EQUIPPED " .. string.upper(itemId) else "CANNOT EQUIP ITEM"
+                if result.accepted
+                    then "EQUIPPED " .. gearDisplayName(self._equipmentCatalog, itemId)
+                    else "CANNOT EQUIP ITEM"
             )
             self:_publish(player)
         end
