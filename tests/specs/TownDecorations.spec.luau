@@ -1,5 +1,6 @@
 --!strict
 
+local Config = require("../../src/shared/Config")
 local SaveSchema = require("../../src/shared/SaveSchema")
 local TownDecorations = require("../../src/shared/TownDecorations")
 local TestRunner = require("../TestRunner")
@@ -103,7 +104,7 @@ return {
             name = "the profile transaction persists and reloads",
             run = function()
                 local profile = SaveSchema.normalize(nil, 100)
-                TestRunner.equal(profile.schemaVersion, 19)
+                TestRunner.equal(profile.schemaVersion, Config.SaveSchemaVersion)
                 profile.inventory.materials.material_meadow_fiber = 6
                 profile.inventory.materials.material_heartwood = 4
                 local placed, result =

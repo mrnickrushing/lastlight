@@ -4,6 +4,7 @@ local ToolCatalog = require("./ToolCatalog")
 local TutorialFlow = require("./TutorialFlow")
 local ExpeditionInventory = require("./ExpeditionInventory")
 local ProfessionCatalog = require("./ProfessionCatalog")
+local ChapterCatalog = require("./ChapterCatalog")
 local Crafting = require("./Crafting")
 local MemoryFragments = require("./MemoryFragments")
 local Quests = require("./Quests")
@@ -48,6 +49,13 @@ export type Profile = {
             transactionId: string?,
             wardenOutcome: string?,
         },
+        --[[
+            Chapters II onward. Chapter I keeps its original home above --
+            too many systems read story.chapterOne to move it for tidiness
+            -- but every chapter after it is stored uniformly here, keyed
+            by chapter id, and validated against ChapterCatalog.
+        ]]
+        chapters: { [string]: any },
         fragments: { [string]: boolean },
     },
     town: {
@@ -80,7 +88,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 19,
+        schemaVersion = 20,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -106,6 +114,7 @@ function SaveSchema.default(now: number): Profile
                 transactionId = nil,
                 wardenOutcome = nil,
             },
+            chapters = {},
             fragments = MemoryFragments.normalize(nil),
         },
         town = {
@@ -225,6 +234,38 @@ function SaveSchema.normalize(value: any, now: number): Profile
             wardenOutcome = chapterOne.wardenOutcome,
         }
     end
+    --[[
+        Chapters II onward. A record survives only if it names a chapter
+        the catalog knows, with a decision and an outcome that chapter
+        actually offers, and a real transaction id -- the same bar chapter
+        one's record has always had to clear.
+    ]]
+    local chapters = if type(story) == "table" then story.chapters else nil
+    if type(chapters) == "table" then
+        for chapterId, record in chapters do
+            if
+                type(record) == "table"
+                and record.status == "complete"
+                and ChapterCatalog.get(chapterId) ~= nil
+                and chapterId ~= "chapter_one"
+                and ChapterCatalog.isDecision(chapterId, record.decision)
+                and ChapterCatalog.isOutcome(chapterId, record.outcome)
+                and type(record.transactionId) == "string"
+                and record.transactionId ~= ""
+                and #record.transactionId <= 160
+                and type(record.completedAt) == "number"
+                and record.completedAt > 0
+            then
+                profile.story.chapters[chapterId] = {
+                    completedAt = record.completedAt,
+                    decision = record.decision,
+                    outcome = record.outcome,
+                    status = "complete",
+                    transactionId = record.transactionId,
+                }
+            end
+        end
+    end
     -- Recovered memory fragments. Unknown IDs are dropped the same way gear
     -- and quest claims drop theirs, so a retired fragment cannot keep
     -- occupying an archive count. A schema-13 profile simply arrives with
@@ -307,7 +348,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 19
+    profile.schemaVersion = 20
     return profile
 end
 
@@ -551,6 +592,105 @@ end
 
 function SaveSchema.chapterOne(profile: Profile): any
     return table.clone(profile.story.chapterOne)
+end
+
+--[[
+    Resolve chapter II or later. Same idempotency contract as chapter
+    one's: a repeat of the same transaction is a duplicate rather than an
+    error, a different transaction against a resolved chapter is refused,
+    and a chapter cannot be resolved before the one it requires.
+]]
+function SaveSchema.withChapterResolution(
+    profile: Profile,
+    chapterId: string,
+    transactionId: string,
+    decision: string,
+    outcome: string,
+    now: number
+): (Profile, any)
+    assert(transactionId ~= "" and #transactionId <= 160, "chapter transaction ID is invalid")
+    local definition = ChapterCatalog.get(chapterId)
+    assert(definition ~= nil, "chapter is unknown")
+    assert(chapterId ~= "chapter_one", "chapter one resolves through its own path")
+    assert(ChapterCatalog.isDecision(chapterId, decision), "chapter decision is invalid")
+    assert(ChapterCatalog.isOutcome(chapterId, outcome), "chapter outcome is invalid")
+
+    local current = profile.story.chapters[chapterId]
+    if type(current) == "table" and current.status == "complete" then
+        return profile,
+            {
+                applied = false,
+                duplicate = current.transactionId == transactionId,
+                reason = if current.transactionId == transactionId
+                    then "duplicate"
+                    else "chapter_already_resolved",
+                record = table.clone(current),
+            }
+    end
+    if not SaveSchema.isChapterComplete(profile, (definition :: any).requires) then
+        return profile,
+            {
+                applied = false,
+                duplicate = false,
+                reason = "chapter_locked",
+                record = nil,
+            }
+    end
+
+    local nextProfile: any = table.clone(profile)
+    nextProfile.story = table.clone(profile.story)
+    nextProfile.story.chapters = table.clone(profile.story.chapters)
+    nextProfile.story.chapters[chapterId] = {
+        completedAt = now,
+        decision = decision,
+        outcome = outcome,
+        status = "complete",
+        transactionId = transactionId,
+    }
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile,
+        {
+            applied = true,
+            duplicate = false,
+            reason = "resolved",
+            record = table.clone(nextProfile.story.chapters[chapterId]),
+        }
+end
+
+function SaveSchema.isChapterComplete(profile: Profile, chapterId: any): boolean
+    if chapterId == nil then
+        return true
+    end
+    if chapterId == "chapter_one" then
+        return profile.story.chapterOne.status == "complete"
+    end
+    local record = profile.story.chapters[chapterId]
+    return type(record) == "table" and record.status == "complete"
+end
+
+function SaveSchema.chapterRecord(profile: Profile, chapterId: any): any
+    if chapterId == "chapter_one" then
+        return table.clone(profile.story.chapterOne)
+    end
+    local record = profile.story.chapters[chapterId]
+    return if type(record) == "table" then table.clone(record) else nil
+end
+
+--[[
+    How far the story has come, as a chapter number: the highest chapter
+    whose own prerequisites are all satisfied and which is itself
+    complete, plus one -- i.e. the chapter now being played. Residents use
+    this to know whether they have arrived yet.
+]]
+function SaveSchema.chapterProgress(profile: Profile): number
+    local reached = 1
+    for _, definition in ChapterCatalog.list() do
+        if SaveSchema.isChapterComplete(profile, definition.id) then
+            reached = math.max(reached, definition.number + 1)
+        end
+    end
+    return math.min(reached, #ChapterCatalog.Order)
 end
 
 -- The town's night count is server-session state (see TownNightService) that
