@@ -15,6 +15,7 @@ TestRunner.run({
     require("./specs/GearWear.spec"),
     require("./specs/GearTraits.spec"),
     require("./specs/CompanionMotion.spec"),
+    require("./specs/DefenseLanes.spec"),
     require("./specs/Environment.spec"),
     require("./specs/MemoryFragments.spec"),
     require("./specs/MeshAssetRegistry.spec"),

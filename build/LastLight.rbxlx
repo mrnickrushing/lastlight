@@ -4322,6 +4322,131 @@ return table.freeze(CraftingCatalog)
       </Item>
       <Item class="ModuleScript" referent="24">
         <Properties>
+          <string name="Name">DefenseLanes</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    The town's authored approach lanes and the snare plots that guard them.
+    Pure numbers only, like everything in the shared layer: lanes are yaw
+    rotations of the night spawn point around the First Lantern, plots are
+    fixed points along each lane, and the trap's rules are constants -- so
+    the Lune suite pins lane selection, geometry, and trigger boundaries
+    without a world.
+
+    The GDD's defense loop asks for three to five authored lanes per town
+    layout. This town gets three. The first wave of every night always
+    walks the Meadow Gate -- the straight approach players have faced since
+    the first night, bit-identical to the pre-lane behavior -- and later
+    waves rotate through the flanks deterministically, so a night's layout
+    is knowable at nightfall and two runs of the same night match.
+]]
+
+local DefenseLanes = {}
+
+export type Lane = {
+    id: string,
+    displayName: string,
+    yaw: number,
+}
+
+local LANES: { Lane } = table.freeze({
+    table.freeze({ id = "lane_meadow_gate", displayName = "MEADOW GATE", yaw = 0 }),
+    table.freeze({ id = "lane_east_hollow", displayName = "EAST HOLLOW", yaw = math.rad(52) }),
+    table.freeze({ id = "lane_west_break", displayName = "WEST BREAK", yaw = math.rad(-52) }),
+}) :: { Lane }
+
+-- How far from the lantern a lane's snare plot sits: inside the enemy's
+-- walk, outside the commons, close enough to reach during dusk.
+local PLOT_DISTANCE = 46
+
+DefenseLanes.Trap = table.freeze({
+    armCost = table.freeze({ material_meadow_fiber = 2, material_heartwood = 1 }),
+    charges = 2,
+    triggerRadius = 9,
+    snareSeconds = 3.5,
+})
+
+function DefenseLanes.list(): { Lane }
+    return LANES
+end
+
+function DefenseLanes.get(laneId: any): Lane?
+    for _, lane in LANES do
+        if lane.id == laneId then
+            return lane
+        end
+    end
+    return nil
+end
+
+--[[
+    Which lane a wave walks. Wave 1 is always the Meadow Gate; later waves
+    step through the lanes from a night-dependent start, so consecutive
+    waves change direction and different nights lead with different flanks.
+]]
+function DefenseLanes.laneForWave(night: number, wave: number): Lane
+    if wave <= 1 then
+        return LANES[1]
+    end
+    return LANES[(night + wave) % #LANES + 1]
+end
+
+-- Rotate (x, z) about (cx, cz) by a lane's yaw. Yaw 0 is the identity, so
+-- the Meadow Gate reproduces the authored spawn point exactly.
+function DefenseLanes.rotatedPoint(
+    lane: Lane,
+    x: number,
+    z: number,
+    cx: number,
+    cz: number
+): (number, number)
+    if lane.yaw == 0 then
+        return x, z
+    end
+    local dx = x - cx
+    local dz = z - cz
+    local cos = math.cos(lane.yaw)
+    local sin = math.sin(lane.yaw)
+    return cx + dx * cos - dz * sin, cz + dx * sin + dz * cos
+end
+
+-- Where a lane's snare plot sits: PLOT_DISTANCE from the lantern along the
+-- lane's rotated spawn direction.
+function DefenseLanes.plotPoint(
+    lane: Lane,
+    spawnX: number,
+    spawnZ: number,
+    cx: number,
+    cz: number
+): (number, number)
+    local rx, rz = DefenseLanes.rotatedPoint(lane, spawnX, spawnZ, cx, cz)
+    local dx = rx - cx
+    local dz = rz - cz
+    local distance = math.sqrt(dx * dx + dz * dz)
+    if distance < 1 then
+        return cx, cz + PLOT_DISTANCE
+    end
+    local scale = PLOT_DISTANCE / distance
+    return cx + dx * scale, cz + dz * scale
+end
+
+function DefenseLanes.trapTriggers(
+    enemyX: number,
+    enemyZ: number,
+    plotX: number,
+    plotZ: number
+): boolean
+    local dx = enemyX - plotX
+    local dz = enemyZ - plotZ
+    return dx * dx + dz * dz <= DefenseLanes.Trap.triggerRadius ^ 2
+end
+
+return table.freeze(DefenseLanes)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="25">
+        <Properties>
           <string name="Name">EnemyAttackFlow</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -4405,7 +4530,7 @@ return table.freeze(EnemyAttackFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="25">
+      <Item class="ModuleScript" referent="26">
         <Properties>
           <string name="Name">EnemyCombatRules</string>
           <string name="Source"><![CDATA[--!strict
@@ -4496,7 +4621,7 @@ return table.freeze(EnemyCombatRules)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">EnemyMotion</string>
           <string name="Source"><![CDATA[--!strict
@@ -4566,7 +4691,7 @@ return table.freeze(EnemyMotion)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">EngineerBrace</string>
           <string name="Source"><![CDATA[--!strict
@@ -4725,7 +4850,7 @@ return table.freeze(EngineerBrace)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">Environment</string>
           <string name="Source"><![CDATA[--!strict
@@ -4804,7 +4929,7 @@ return table.freeze(Environment)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">Equipment</string>
           <string name="Source"><![CDATA[--!strict
@@ -5052,7 +5177,7 @@ return table.freeze(Equipment)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">ExpeditionContracts</string>
           <string name="Source"><![CDATA[--!strict
@@ -5153,7 +5278,7 @@ return table.freeze(ExpeditionContracts)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">ExpeditionEventFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -5496,7 +5621,7 @@ return table.freeze(ExpeditionEventFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">ExpeditionGenerator</string>
           <string name="Source"><![CDATA[--!strict
@@ -5984,7 +6109,7 @@ return table.freeze(ExpeditionGenerator)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">ExpeditionInventory</string>
           <string name="Source"><![CDATA[--!strict
@@ -6608,7 +6733,7 @@ return table.freeze(ExpeditionInventory)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">ExpeditionRewardLedger</string>
           <string name="Source"><![CDATA[--!strict
@@ -6747,7 +6872,7 @@ return table.freeze(ExpeditionRewardLedger)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">ExtractionPayoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -6819,7 +6944,7 @@ return table.freeze(ExtractionPayoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">GearTraits</string>
           <string name="Source"><![CDATA[--!strict
@@ -6961,7 +7086,7 @@ return table.freeze(GearTraits)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">GearVisualPlan</string>
           <string name="Source"><![CDATA[--!strict
@@ -7354,7 +7479,7 @@ return table.freeze(GearVisualPlan)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">GearWear</string>
           <string name="Source"><![CDATA[--!strict
@@ -7501,7 +7626,7 @@ return table.freeze(GearWear)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">LobbyDeparture</string>
           <string name="Source"><![CDATA[--!strict
@@ -7677,7 +7802,7 @@ return table.freeze(LobbyDeparture)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">MemoryFragments</string>
           <string name="Source"><![CDATA[--!strict
@@ -7990,7 +8115,7 @@ return table.freeze(MemoryFragments)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">MusicCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -8351,7 +8476,7 @@ return table.freeze(MusicCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">NightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -8399,7 +8524,7 @@ return table.freeze(NightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">OldGrowthEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -8684,7 +8809,7 @@ return table.freeze(OldGrowthEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">PerformanceBudget</string>
           <string name="Source"><![CDATA[--!strict
@@ -9073,7 +9198,7 @@ return table.freeze(PerformanceBudget)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">ProfessionAbilityVisuals</string>
           <string name="Source"><![CDATA[--!strict
@@ -9167,7 +9292,7 @@ return table.freeze(ProfessionAbilityVisuals)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">ProfessionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -9333,7 +9458,7 @@ return table.freeze(ProfessionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">ProfessionMastery</string>
           <string name="Source"><![CDATA[--!strict
@@ -9774,7 +9899,7 @@ return table.freeze(ProfessionMastery)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">ProfessionRescue</string>
           <string name="Source"><![CDATA[--!strict
@@ -9853,7 +9978,7 @@ return table.freeze(ProfessionRescue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">ProfessionState</string>
           <string name="Source"><![CDATA[--!strict
@@ -10020,7 +10145,7 @@ return table.freeze(ProfessionState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">ProfileBackup</string>
           <string name="Source"><![CDATA[--!strict
@@ -10334,7 +10459,7 @@ return table.freeze(ProfileBackup)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">ProfilePersistence</string>
           <string name="Source"><![CDATA[--!strict
@@ -10508,7 +10633,7 @@ return table.freeze(ProfilePersistence)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">QuestCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -10579,7 +10704,7 @@ return table.freeze(QuestCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">Quests</string>
           <string name="Source"><![CDATA[--!strict
@@ -10696,7 +10821,7 @@ return table.freeze(Quests)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
@@ -10755,7 +10880,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
@@ -10872,7 +10997,7 @@ return table.freeze(ResidentDialogue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">ResidentLife</string>
           <string name="Source"><![CDATA[--!strict
@@ -11209,7 +11334,7 @@ return table.freeze(ResidentLife)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -11324,7 +11449,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -11453,7 +11578,7 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -11614,7 +11739,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -12621,6 +12746,42 @@ function SaveSchema.withGearWear(profile: Profile, itemId: any, points: number):
     return nextProfile, result
 end
 
+--[[
+    Spend a flat table of materials ({ materialId = amount }) atomically:
+    either every line is affordable and all are deducted, or nothing
+    changes. Defense trap arming pays through this; it adds no profile
+    field, so no schema bump rides along with it.
+]]
+function SaveSchema.withSpentMaterials(profile: Profile, cost: any, now: number): (Profile, any)
+    local materials = (profile :: any).inventory.materials or {}
+    if type(cost) ~= "table" then
+        return profile, { applied = false, reason = "invalid_cost" }
+    end
+    for materialId, amount in cost do
+        if type(amount) ~= "number" or amount <= 0 then
+            return profile, { applied = false, reason = "invalid_cost" }
+        end
+        if (tonumber(materials[materialId]) or 0) < amount then
+            return profile, { applied = false, reason = "insufficient_materials" }
+        end
+    end
+    local nextMaterials: { [string]: number } = table.clone(materials)
+    for materialId, amount in cost do
+        local remaining = (nextMaterials[materialId] or 0) - amount
+        if remaining <= 0 then
+            nextMaterials[materialId] = nil
+        else
+            nextMaterials[materialId] = remaining
+        end
+    end
+    local nextProfile: any = table.clone(profile)
+    nextProfile.inventory = table.clone((profile :: any).inventory)
+    nextProfile.inventory.materials = nextMaterials
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, { applied = true }
+end
+
 function SaveSchema.withRepairedGear(profile: Profile, itemId: any, now: number): (Profile, any)
     local materials = (profile :: any).inventory.materials or {}
     local nextWear, nextMaterials, result =
@@ -12641,7 +12802,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">SfxCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -12808,7 +12969,7 @@ return table.freeze(SfxCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -12927,7 +13088,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -13184,7 +13345,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -13328,7 +13489,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -13738,7 +13899,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -13919,7 +14080,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -13983,7 +14144,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="68">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -14157,7 +14318,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="69">
+      <Item class="ModuleScript" referent="70">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -14249,7 +14410,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="70">
+      <Item class="ModuleScript" referent="71">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -14461,7 +14622,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="71">
+      <Item class="ModuleScript" referent="72">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -14639,7 +14800,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="72">
+      <Item class="ModuleScript" referent="73">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -14792,7 +14953,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="73">
+      <Item class="ModuleScript" referent="74">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -15025,7 +15186,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="74">
+      <Item class="ModuleScript" referent="75">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -15187,7 +15348,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="75">
+      <Item class="ModuleScript" referent="76">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -15223,7 +15384,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="76">
+      <Item class="ModuleScript" referent="77">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -15605,7 +15766,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="77">
+      <Item class="ModuleScript" referent="78">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -15677,11 +15838,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="78">
+  <Item class="ServerScriptService" referent="79">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="79">
+    <Item class="Script" referent="80">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -15696,6 +15857,7 @@ assert(root ~= nil, "Last Light shared root did not replicate before bootstrap t
 local Config = require(root.Config)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
 local CraftingCatalog = require(root.CraftingCatalog)
+local DefenseLanes = require(root.DefenseLanes)
 local Equipment = require(root.Equipment)
 local GearVisualPlan = require(root.GearVisualPlan)
 local BramblewakeEnemies = require(root.BramblewakeEnemies)
@@ -15769,6 +15931,7 @@ local TownNightService = require(script.Services.TownNightService)
 local LobbyService = require(script.Services.LobbyService)
 local AdminService = require(script.Services.AdminService)
 local CompanionService = require(script.Services.CompanionService)
+local DefenseService = require(script.Services.DefenseService)
 local PlayerSurvivalService = require(script.Services.PlayerSurvivalService)
 local PlayerCombatService = require(script.Services.PlayerCombatService)
 local ProfessionService = require(script.Services.ProfessionService)
@@ -15885,6 +16048,9 @@ professionService:setCombatService(combatService)
 expeditionService:bindEnemyService(enemyService)
 enemyService:setProfessionService(professionService)
 local companionService = CompanionService.new(logger, CompanionMotion)
+local defenseService =
+    DefenseService.new(logger, DefenseLanes, worldService, enemyService, profileService)
+enemyService:setDefenseLanes(DefenseLanes)
 local oldGrowthService = OldGrowthService.new(
     logger,
     worldService,
@@ -15977,6 +16143,7 @@ local townNightService = TownNightService.new(
     analyticsService,
     featureFlags
 )
+townNightService:setDefense(defenseService, DefenseLanes)
 survivalService:setPartyRecoveryProvider(
     function(eligiblePlayers: number, downedPlayers: number): any
         return townNightService:attemptLastStand(eligiblePlayers, downedPlayers)
@@ -16058,6 +16225,7 @@ services:register(phaseService)
 services:register(lobbyService)
 services:register(townNightService)
 services:register(companionService)
+services:register(defenseService)
 -- Without this the departure countdown never reached a client: LobbyService
 -- published every whole second into a handler nobody had set, so the panel
 -- froze at "DEPARTING IN 10" while the server counted down and launched.
@@ -16068,6 +16236,13 @@ worldService:setClickHandler(function(clicker: Player, interactionId: string)
     tutorialService:interactFromClick(clicker, interactionId)
 end)
 tutorialService:setCompanionService(companionService)
+defenseService:setToastHandler(function(player: Player?, message: string)
+    if player ~= nil then
+        tutorialService:toastPlayer(player, message)
+    else
+        tutorialService:toastEveryone(message)
+    end
+end)
 enemyService:setStrikeHandler(function(clicker: Player)
     tutorialService:strikeFromClick(clicker)
 end)
@@ -16103,7 +16278,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="80">
+      <Item class="ModuleScript" referent="81">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -16201,11 +16376,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="81">
+      <Item class="Folder" referent="82">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="82">
+        <Item class="ModuleScript" referent="83">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -16820,7 +16995,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="83">
+        <Item class="ModuleScript" referent="84">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -17691,7 +17866,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="84">
+        <Item class="ModuleScript" referent="85">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18192,7 +18367,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="85">
+        <Item class="ModuleScript" referent="86">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18449,7 +18624,414 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="86">
+        <Item class="ModuleScript" referent="87">
+          <Properties>
+            <string name="Name">DefenseService</string>
+            <string name="Source"><![CDATA[--!strict
+
+--[[
+    Defense plots -- the M6 deliverable that turns "place defenses" from a
+    dusk-phase promise in the GDD into something a player can actually do.
+
+    Three snare plots stand in town, one per approach lane, always visible
+    so dusk preparation is legible. Arming one is a tap on the plot's stake
+    (a ClickDetector -- the same server-authoritative touch pattern strikes
+    use, so no new client payload exists to get past ActionPayloadContract)
+    and costs materials, spent atomically through the profile. An armed
+    plot holds two bites; when a night enemy walks into the trigger ring,
+    the snare takes a charge and holds the enemy with the same snaredUntil
+    timer the Foxfire Sling uses -- which also means the "exposed" x1.2
+    strike reaction from the status system applies. The systems already
+    knew each other; the trap just introduces them at a place of the
+    player's choosing.
+
+    Resident defenders, v1: on solo nights only (the GDD's "solo players
+    receive stronger resident support"), a Watch resident stands at the
+    Meadow Gate plot and chips the active enemy when it passes -- softening,
+    never finishing, so every defeat still belongs to the player.
+]]
+
+local RunService = game:GetService("RunService")
+
+local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
+
+local DefenseService = {}
+DefenseService.__index = DefenseService
+DefenseService.Name = "DefenseService"
+
+export type Logger = {
+    info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+}
+
+type Plot = {
+    laneId: string,
+    displayName: string,
+    position: Vector3,
+    model: Model,
+    ember: Part,
+    charges: number,
+    quietUntil: number,
+}
+
+export type DefenseService = typeof(setmetatable(
+    {} :: {
+        Name: string,
+        _logger: Logger,
+        _defenseLanes: any,
+        _worldService: any,
+        _enemyService: any,
+        _profileService: any,
+        _plots: { [string]: Plot },
+        _toastHandler: ((Player?, string) -> ())?,
+        _nightActive: boolean,
+        _watchDefender: Model?,
+        _watchPosition: Vector3?,
+        _nextChipAt: number,
+        _heartbeat: RBXScriptConnection?,
+    },
+    DefenseService
+))
+
+local EMBER_ARMED = Color3.fromRGB(255, 170, 66)
+local EMBER_COLD = Color3.fromRGB(64, 52, 40)
+local STONE = Color3.fromRGB(112, 108, 100)
+local STAKE_WOOD = Color3.fromRGB(94, 66, 40)
+local WATCH_COAT = Color3.fromRGB(52, 74, 92)
+
+local WATCH_CHIP_DAMAGE = 3
+local WATCH_CHIP_EVERY = 7
+local WATCH_CHIP_RANGE = 26
+
+function DefenseService.new(
+    logger: Logger,
+    defenseLanes: any,
+    worldService: any,
+    enemyService: any,
+    profileService: any
+): DefenseService
+    return setmetatable({
+        Name = DefenseService.Name,
+        _logger = logger,
+        _defenseLanes = defenseLanes,
+        _worldService = worldService,
+        _enemyService = enemyService,
+        _profileService = profileService,
+        _plots = {},
+        _toastHandler = nil,
+        _nightActive = false,
+        _watchDefender = nil,
+        _watchPosition = nil,
+        _nextChipAt = 0,
+        _heartbeat = nil,
+    }, DefenseService)
+end
+
+function DefenseService.Init(_self: DefenseService, _context: any) end
+
+function DefenseService.setToastHandler(self: DefenseService, handler: (Player?, string) -> ())
+    self._toastHandler = handler
+end
+
+function DefenseService._toast(self: DefenseService, player: Player?, message: string)
+    local handler = self._toastHandler
+    if handler ~= nil then
+        handler(player, message)
+    end
+end
+
+local function makePart(
+    name: string,
+    size: Vector3,
+    cframe: CFrame,
+    color: Color3,
+    material: Enum.Material,
+    parent: Model
+): Part
+    local part = Instance.new("Part")
+    part.Name = name
+    part.Size = size
+    part.CFrame = cframe
+    part.Color = color
+    part.Material = material
+    part.Anchored = true
+    part.CanCollide = false
+    part.CanTouch = false
+    part.Parent = parent
+    return part
+end
+
+--[[
+    A snare plot readable at a glance: a low ring of stones around a
+    leaning stake, with an ember lamp that is cold until armed. The stake
+    carries the ArmClick detector; on touch, tapping the stake IS the
+    arming gesture, same as tapping a night creature is the strike.
+]]
+function DefenseService._buildPlot(self: DefenseService, lane: any, position: Vector3): Plot
+    local model = Instance.new("Model")
+    model.Name = "DefensePlot_" .. lane.id
+
+    for index = 0, 5 do
+        local angle = index * math.pi / 3
+        local offset = Vector3.new(math.cos(angle) * 4.4, 0.35, math.sin(angle) * 4.4)
+        makePart(
+            "RingStone",
+            Vector3.new(1.4, 0.8, 1.1),
+            CFrame.new(position + offset) * CFrame.Angles(0, angle, 0),
+            STONE,
+            Enum.Material.Slate,
+            model
+        )
+    end
+    local stake = makePart(
+        "Stake",
+        Vector3.new(0.7, 4.6, 0.7),
+        CFrame.new(position + Vector3.new(0, 2.3, 0)) * CFrame.Angles(0, 0, math.rad(6)),
+        STAKE_WOOD,
+        Enum.Material.Wood,
+        model
+    )
+    stake.CanQuery = true
+    local ember = makePart(
+        "Ember",
+        Vector3.new(0.9, 0.9, 0.9),
+        CFrame.new(position + Vector3.new(0, 4.9, 0)),
+        EMBER_COLD,
+        Enum.Material.Neon,
+        model
+    )
+    model.PrimaryPart = stake
+
+    local click = Instance.new("ClickDetector")
+    click.Name = "ArmClick"
+    click.MaxActivationDistance = 42
+    click.CursorIcon = ""
+    click.Parent = stake
+    click.MouseClick:Connect(function(clicker: Player)
+        self:_armAttempt(clicker, lane.id)
+    end)
+
+    model.Parent = workspace
+    return {
+        laneId = lane.id,
+        displayName = lane.displayName,
+        position = position,
+        model = model,
+        ember = ember,
+        charges = 0,
+        quietUntil = 0,
+    }
+end
+
+function DefenseService._buildPlots(self: DefenseService)
+    local lantern = self._worldService:lanternPosition()
+    local spawn = self._worldService:enemySpawnPosition()
+    for _, lane in self._defenseLanes.list() do
+        local px, pz = self._defenseLanes.plotPoint(lane, spawn.X, spawn.Z, lantern.X, lantern.Z)
+        local position = Vector3.new(px, TerrainBuilder.surfaceHeight(px, pz), pz)
+        self._plots[lane.id] = self:_buildPlot(lane, position)
+    end
+    self._logger:info("defense_plots_built", { lanes = #self._defenseLanes.list() })
+end
+
+local function costLine(cost: { [string]: number }): string
+    local parts = {}
+    for materialId, amount in cost do
+        local label = string.upper((string.gsub(materialId, "^material_", "")))
+        table.insert(parts, string.format("%d %s", amount, (string.gsub(label, "_", " "))))
+    end
+    table.sort(parts)
+    return table.concat(parts, " AND ")
+end
+
+function DefenseService._armAttempt(self: DefenseService, player: Player, laneId: string)
+    local plot = self._plots[laneId]
+    if plot == nil then
+        return
+    end
+    if player:GetAttribute("LastLightInExpedition") == true then
+        return
+    end
+    if player:GetAttribute("LastLightDowned") == true then
+        return
+    end
+    if plot.charges > 0 then
+        self:_toast(player, "THE " .. plot.displayName .. " SNARE IS ALREADY SET")
+        return
+    end
+    local trap = self._defenseLanes.Trap
+    local result = self._profileService:spendMaterials(player, trap.armCost)
+    if result.applied ~= true then
+        self:_toast(player, "SETTING THE SNARE TAKES " .. costLine(trap.armCost))
+        return
+    end
+    plot.charges = trap.charges
+    plot.ember.Color = EMBER_ARMED
+    self._logger:info("defense_trap_armed", {
+        lane = laneId,
+        player = player.UserId,
+    })
+    self:_toast(
+        player,
+        string.format("THE %s SNARE IS SET — %d BITES IN IT", plot.displayName, trap.charges)
+    )
+end
+
+function DefenseService.plotSnapshot(self: DefenseService): { [string]: number }
+    local charges = {}
+    for laneId, plot in self._plots do
+        charges[laneId] = plot.charges
+    end
+    return charges
+end
+
+local function buildWatchDefender(position: Vector3): Model
+    local model = Instance.new("Model")
+    model.Name = "WatchDefender"
+    local body = makePart(
+        "Body",
+        Vector3.new(1.6, 2.4, 1),
+        CFrame.new(position + Vector3.new(0, 2.2, 0)),
+        WATCH_COAT,
+        Enum.Material.Fabric,
+        model
+    )
+    makePart(
+        "Head",
+        Vector3.new(0.9, 0.9, 0.9),
+        CFrame.new(position + Vector3.new(0, 3.85, 0)),
+        Color3.fromRGB(214, 178, 148),
+        Enum.Material.SmoothPlastic,
+        model
+    )
+    makePart(
+        "Pike",
+        Vector3.new(0.25, 6.4, 0.25),
+        CFrame.new(position + Vector3.new(1.1, 3.2, 0)) * CFrame.Angles(0, 0, math.rad(-8)),
+        STAKE_WOOD,
+        Enum.Material.Wood,
+        model
+    )
+    local lamp = makePart(
+        "Lamp",
+        Vector3.new(0.5, 0.5, 0.5),
+        CFrame.new(position + Vector3.new(1.55, 5.9, 0)),
+        EMBER_ARMED,
+        Enum.Material.Neon,
+        model
+    )
+    lamp.CanQuery = false
+    model.PrimaryPart = body
+    return model
+end
+
+function DefenseService.onNightStarted(self: DefenseService, partySize: number)
+    self._nightActive = true
+    self._nextChipAt = 0
+    if partySize ~= 1 then
+        return
+    end
+    local plot = self._plots["lane_meadow_gate"]
+    if plot == nil then
+        return
+    end
+    local position = plot.position + Vector3.new(3.4, 0, 3.4)
+    self._watchDefender = buildWatchDefender(position)
+    self._watchPosition = position
+    if self._watchDefender ~= nil then
+        self._watchDefender.Parent = workspace
+    end
+    self._logger:info("defense_watch_posted", { lane = plot.laneId })
+    self:_toast(nil, "THE WATCH STANDS WITH YOU AT THE MEADOW GATE")
+end
+
+function DefenseService.onNightEnded(self: DefenseService)
+    self._nightActive = false
+    if self._watchDefender ~= nil then
+        self._watchDefender:Destroy()
+        self._watchDefender = nil
+        self._watchPosition = nil
+    end
+end
+
+function DefenseService._step(self: DefenseService, now: number)
+    if not self._nightActive then
+        return
+    end
+    local ex, ez = self._enemyService:activeFlatPosition()
+    if ex == nil or ez == nil then
+        return
+    end
+    for _, plot in self._plots do
+        if
+            plot.charges > 0
+            and now >= plot.quietUntil
+            and self._defenseLanes.trapTriggers(ex, ez, plot.position.X, plot.position.Z)
+        then
+            local trap = self._defenseLanes.Trap
+            local held = self._enemyService:applyTrapSnare(trap.snareSeconds)
+            if held ~= nil then
+                plot.charges -= 1
+                -- One bite per victim: stay quiet until this snare has
+                -- fully released before the ring can trigger again.
+                plot.quietUntil = now + trap.snareSeconds + 2
+                if plot.charges <= 0 then
+                    plot.ember.Color = EMBER_COLD
+                end
+                self._logger:info("defense_trap_bit", {
+                    charges = plot.charges,
+                    enemy = held,
+                    lane = plot.laneId,
+                })
+                self:_toast(
+                    nil,
+                    string.format("THE SNARE BITES — %s IS HELD", string.upper(held))
+                )
+            end
+        end
+    end
+    local watchPosition = self._watchPosition
+    if watchPosition ~= nil and now >= self._nextChipAt then
+        local dx = ex - watchPosition.X
+        local dz = ez - watchPosition.Z
+        if dx * dx + dz * dz <= WATCH_CHIP_RANGE ^ 2 then
+            if self._enemyService:residentChip(WATCH_CHIP_DAMAGE) then
+                self._nextChipAt = now + WATCH_CHIP_EVERY
+            end
+        end
+    end
+end
+
+function DefenseService.Start(self: DefenseService)
+    -- The plots need the lantern, which the world raises during its own
+    -- startup; wait for it rather than racing it.
+    task.spawn(function()
+        for _ = 1, 120 do
+            local ready = pcall(function()
+                return self._worldService:lanternPosition()
+            end)
+            if ready then
+                self:_buildPlots()
+                break
+            end
+            task.wait(0.5)
+        end
+    end)
+    local accumulator = 0
+    self._heartbeat = RunService.Heartbeat:Connect(function(deltaTime: number)
+        accumulator += deltaTime
+        if accumulator < 0.25 then
+            return
+        end
+        accumulator = 0
+        self:_step(workspace:GetServerTimeNow())
+    end)
+end
+
+return table.freeze(DefenseService)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="88">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -18457,6 +19039,8 @@ return table.freeze(CompanionService)
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
+
+local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
 
 local EnemyService = {}
 EnemyService.__index = EnemyService
@@ -18509,11 +19093,12 @@ export type EnemyService = typeof(setmetatable(
         _engineerBrace: any,
         _enemyBuilder: any,
         _analyticsService: any,
+        _defenseLanes: any,
         _professionService: any,
         _eliteService: any,
         _bossService: any,
         _active: Enemy?,
-        _queue: { string },
+        _queue: { { enemyId: string, laneId: string? } },
         _nextSpawnAt: number,
         _nightActive: boolean,
         _lurePlayer: Player?,
@@ -18565,6 +19150,7 @@ function EnemyService.new(
         _engineerBrace = engineerBrace,
         _enemyBuilder = enemyBuilder,
         _analyticsService = analyticsService,
+        _defenseLanes = nil,
         _professionService = nil,
         _eliteService = nil,
         _bossService = nil,
@@ -18608,6 +19194,10 @@ end
 
 function EnemyService.setChangedHandler(self: EnemyService, callback: (string?) -> ())
     self._onChanged = callback
+end
+
+function EnemyService.setDefenseLanes(self: EnemyService, defenseLanes: any)
+    self._defenseLanes = defenseLanes
 end
 
 function EnemyService.setProfessionService(self: EnemyService, professionService: any)
@@ -18915,8 +19505,21 @@ function EnemyService.stopNight(self: EnemyService)
     self:_notify(nil)
 end
 
-function EnemyService._spawnPosition(self: EnemyService, definition: any): Vector3
+function EnemyService._spawnPosition(self: EnemyService, definition: any, laneId: string?): Vector3
     local origin = self._worldService:enemySpawnPosition()
+    --[[
+        Approach lanes: the authored spawn rotated about the lantern. The
+        Meadow Gate's yaw is zero, so the default lane reproduces the
+        pre-lane spawn point exactly; the flanks re-sample terrain height
+        at their rotated ground.
+    ]]
+    local lane = if self._defenseLanes ~= nil then self._defenseLanes.get(laneId) else nil
+    if lane ~= nil and lane.yaw ~= 0 then
+        local center = self._worldService:lanternPosition()
+        local rx, rz = self._defenseLanes.rotatedPoint(lane, origin.X, origin.Z, center.X, center.Z)
+        local authoredRise = origin.Y - TerrainBuilder.surfaceHeight(origin.X, origin.Z)
+        origin = Vector3.new(rx, TerrainBuilder.surfaceHeight(rx, rz) + authoredRise, rz)
+    end
     if definition.stationary ~= true then
         return origin
     end
@@ -18928,7 +19531,7 @@ function EnemyService._spawnPosition(self: EnemyService, definition: any): Vecto
     return origin + flatDelta.Unit * math.min(34, flatDelta.Magnitude * 0.45)
 end
 
-function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
+function EnemyService._spawnNow(self: EnemyService, enemyId: string, laneId: string?): boolean
     if not self._nightActive or self._active ~= nil then
         return false
     end
@@ -18938,7 +19541,7 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
         return false
     end
 
-    local origin = self:_spawnPosition(definition)
+    local origin = self:_spawnPosition(definition, laneId)
     self:_showSpawnPulse(
         origin,
         if definition.statusEffect == "spark_theft"
@@ -18985,13 +19588,14 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
     }
     self._logger:info("bramblewake_enemy_spawned", {
         enemy = definition.id,
+        lane = laneId,
         queued = #self._queue,
     })
     self:_notify(string.upper(definition.displayName) .. " ENTERS THE TRAIL")
     return true
 end
 
-function EnemyService.spawn(self: EnemyService, enemyId: string?): boolean
+function EnemyService.spawn(self: EnemyService, enemyId: string?, laneId: string?): boolean
     if not self._nightActive then
         return false
     end
@@ -19004,14 +19608,15 @@ function EnemyService.spawn(self: EnemyService, enemyId: string?): boolean
         return false
     end
     if self._active ~= nil or workspace:GetServerTimeNow() < self._nextSpawnAt then
-        table.insert(self._queue, resolvedId)
+        table.insert(self._queue, { enemyId = resolvedId, laneId = laneId })
         self._logger:info("bramblewake_enemy_queued", {
             enemy = resolvedId,
+            lane = laneId,
             position = #self._queue,
         })
         return true
     end
-    return self:_spawnNow(resolvedId)
+    return self:_spawnNow(resolvedId, laneId)
 end
 
 function EnemyService._spawnNext(self: EnemyService, now: number)
@@ -19023,10 +19628,54 @@ function EnemyService._spawnNext(self: EnemyService, now: number)
     then
         return
     end
-    local enemyId = table.remove(self._queue, 1)
-    if enemyId ~= nil then
-        self:_spawnNow(enemyId)
+    local entry = table.remove(self._queue, 1)
+    if entry ~= nil then
+        self:_spawnNow(entry.enemyId, entry.laneId)
     end
+end
+
+-- The active enemy's flat ground position, for the defense plots' trigger
+-- checks. Nil when nothing walks the lanes.
+function EnemyService.activeFlatPosition(self: EnemyService): (number?, number?)
+    local enemy = self._active
+    if enemy == nil or not self._nightActive then
+        return nil, nil
+    end
+    return enemy.basePosition.X, enemy.basePosition.Z
+end
+
+--[[
+    A snare plot bites the active enemy: the same snaredUntil timer the
+    sling's stone uses (0.75x speed, the x1.2 exposed reaction), held a
+    little longer than any on-hit source can manage. Returns the enemy's
+    display name for the toast, or nil if nothing was there to bite.
+]]
+function EnemyService.applyTrapSnare(self: EnemyService, seconds: number): string?
+    local enemy = self._active
+    if enemy == nil or not self._nightActive then
+        return nil
+    end
+    enemy.snaredUntil = workspace:GetServerTimeNow() + math.clamp(seconds, 0.5, 6)
+    return enemy.definition.displayName
+end
+
+--[[
+    The Watch's chip damage: a resident defender softens the active enemy
+    but never finishes it -- health floors at 1, so every defeat still
+    belongs to a player and the defeat-attribution paths stay untouched.
+]]
+function EnemyService.residentChip(self: EnemyService, damage: number): boolean
+    local enemy = self._active
+    if enemy == nil or not self._nightActive then
+        return false
+    end
+    local chip = math.min(math.max(1, math.floor(damage)), enemy.health - 1)
+    if chip <= 0 then
+        return false
+    end
+    enemy.health -= chip
+    enemy.model:SetAttribute("EnemyHealth", math.max(0, enemy.health))
+    return true
 end
 
 function EnemyService._attackGroundPosition(
@@ -20018,7 +20667,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="87">
+        <Item class="ModuleScript" referent="89">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20711,7 +21360,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="88">
+        <Item class="ModuleScript" referent="90">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -20815,7 +21464,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="89">
+        <Item class="ModuleScript" referent="91">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21100,7 +21749,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="90">
+        <Item class="ModuleScript" referent="92">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21506,7 +22155,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="91">
+        <Item class="ModuleScript" referent="93">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -21600,7 +22249,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="92">
+        <Item class="ModuleScript" referent="94">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21818,7 +22467,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="93">
+        <Item class="ModuleScript" referent="95">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22688,7 +23337,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="94">
+        <Item class="ModuleScript" referent="96">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22943,7 +23592,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="95">
+        <Item class="ModuleScript" referent="97">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23122,7 +23771,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="96">
+        <Item class="ModuleScript" referent="98">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23705,7 +24354,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="97">
+        <Item class="ModuleScript" referent="99">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24804,7 +25453,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="98">
+        <Item class="ModuleScript" referent="100">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -25429,7 +26078,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="99">
+        <Item class="ModuleScript" referent="101">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -25862,6 +26511,24 @@ function ProfileService.repairGear(self: ProfileService, player: Player, itemId:
         return { applied = false, reason = "profile_read_only" }
     end
     local nextProfile, result = self._saveSchema.withRepairedGear(profile, itemId, os.time())
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent and self._writable[player] == true then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
+function ProfileService.spendMaterials(self: ProfileService, player: Player, cost: any): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { applied = false, reason = "profile_loading" }
+    end
+    if not self:isWritable(player) then
+        return { applied = false, reason = "profile_read_only" }
+    end
+    local nextProfile, result = self._saveSchema.withSpentMaterials(profile, cost, os.time())
     if result.applied then
         self._profiles[player] = nextProfile
         if self._persistent and self._writable[player] == true then
@@ -27118,7 +27785,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="100">
+        <Item class="ModuleScript" referent="102">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -27139,6 +27806,8 @@ export type TownNightService = typeof(setmetatable(
         _logger: Logger,
         _worldService: any,
         _enemyService: any,
+        _defenseService: any,
+        _defenseLanes: any,
         _townNightSchedule: any,
         _townNightIncident: any,
         _townCondition: any,
@@ -27183,6 +27852,8 @@ function TownNightService.new(
         _logger = logger,
         _worldService = worldService,
         _enemyService = enemyService,
+        _defenseService = nil,
+        _defenseLanes = nil,
         _townNightSchedule = townNightSchedule,
         _townNightIncident = townNightIncident,
         _townCondition = townCondition,
@@ -27211,6 +27882,11 @@ end
 function TownNightService.Init(_self: TownNightService, _context: any) end
 
 function TownNightService.Start(_self: TownNightService) end
+
+function TownNightService.setDefense(self: TownNightService, defenseService: any, defenseLanes: any)
+    self._defenseService = defenseService
+    self._defenseLanes = defenseLanes
+end
 
 function TownNightService.setChangedHandler(self: TownNightService, callback: (string?) -> ())
     self._onChanged = callback
@@ -27487,12 +28163,18 @@ function TownNightService._runCycle(self: TownNightService)
             partySize = partySize,
             waves = self._townNightSchedule.waveCount(activeNight, partySize),
         })
+        if self._defenseService ~= nil then
+            self._defenseService:onNightStarted(partySize)
+        end
 
         for _, beat in self._townNightSchedule.beats(self._nightSeconds, activeNight, partySize) do
             waitUntilTime(nightStartedAt + beat.at)
             if beat.kind == "spawn" then
                 self._worldService:signalNightWave(beat.enemyId, beat.wave, theme)
-                self._enemyService:spawn(beat.enemyId)
+                local laneId = if self._defenseLanes ~= nil
+                    then self._defenseLanes.laneForWave(activeNight, beat.wave).id
+                    else nil
+                self._enemyService:spawn(beat.enemyId, laneId)
             elseif beat.kind == "breach" then
                 self._worldService:setTownBreach(true, theme)
                 self._enemyService:setBreach()
@@ -27527,6 +28209,9 @@ function TownNightService._runCycle(self: TownNightService)
         )
         self._condition = nextCondition
         self._enemyService:stopNight()
+        if self._defenseService ~= nil then
+            self._defenseService:onNightEnded()
+        end
         self._activeNightNumber = 0
         self._worldService:setTownBreach(false, theme)
         self._worldService:setNight(false)
@@ -27725,7 +28410,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="101">
+        <Item class="ModuleScript" referent="103">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -28202,6 +28887,16 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     local definition = self._tutorialFlow.definition(currentStage)
     self._analyticsService:stage(player, definition.index, currentStage)
     self:_publish(player)
+end
+
+-- Public toast entry points for services that live outside the session
+-- pipeline (the defense plots' arming and bite feedback arrives here).
+function TutorialService.toastEveryone(self: TutorialService, message: string)
+    self:_toastAll(message)
+end
+
+function TutorialService.toastPlayer(self: TutorialService, player: Player, message: string)
+    self:_setToast(player, message)
 end
 
 function TutorialService._toastAll(self: TutorialService, message: string)
@@ -29668,7 +30363,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="102">
+        <Item class="ModuleScript" referent="104">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -30537,7 +31232,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="103">
+        <Item class="ModuleScript" referent="105">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42823,11 +43518,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="104">
+      <Item class="Folder" referent="106">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="105">
+        <Item class="ModuleScript" referent="107">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -46607,7 +47302,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="106">
+        <Item class="ModuleScript" referent="108">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -47104,7 +47799,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="107">
+        <Item class="ModuleScript" referent="109">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -47799,7 +48494,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="108">
+        <Item class="ModuleScript" referent="110">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -48658,7 +49353,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="109">
+        <Item class="ModuleScript" referent="111">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -48744,7 +49439,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="110">
+        <Item class="ModuleScript" referent="112">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -49118,7 +49813,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="111">
+        <Item class="ModuleScript" referent="113">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -49298,7 +49993,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="112">
+        <Item class="ModuleScript" referent="114">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -49894,7 +50589,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="113">
+        <Item class="ModuleScript" referent="115">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -50131,7 +50826,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="114">
+        <Item class="ModuleScript" referent="116">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -50220,7 +50915,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="115">
+        <Item class="ModuleScript" referent="117">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -50557,15 +51252,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="116">
+  <Item class="StarterPlayer" referent="118">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="117">
+    <Item class="StarterPlayerScripts" referent="119">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="118">
+      <Item class="LocalScript" referent="120">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -50856,11 +51551,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="119">
+        <Item class="Folder" referent="121">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="120">
+          <Item class="ModuleScript" referent="122">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -50991,7 +51686,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="121">
+          <Item class="ModuleScript" referent="123">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -53797,7 +54492,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="122">
+          <Item class="ModuleScript" referent="124">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -54096,7 +54791,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="123">
+          <Item class="ModuleScript" referent="125">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -54204,7 +54899,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="124">
+          <Item class="ModuleScript" referent="126">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -54323,7 +55018,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="125">
+          <Item class="ModuleScript" referent="127">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -54597,7 +55292,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="126">
+          <Item class="ModuleScript" referent="128">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -54697,7 +55392,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="127">
+          <Item class="ModuleScript" referent="129">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -54809,7 +55504,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="128">
+          <Item class="ModuleScript" referent="130">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -54969,7 +55664,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="129">
+          <Item class="ModuleScript" referent="131">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55178,7 +55873,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="130">
+          <Item class="ModuleScript" referent="132">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55323,7 +56018,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="131">
+          <Item class="ModuleScript" referent="133">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -55623,13 +56318,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="132">
+  <Item class="TextChatService" referent="134">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="133">
+  <Item class="Workspace" referent="135">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>
