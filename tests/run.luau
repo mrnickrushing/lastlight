@@ -19,6 +19,7 @@ TestRunner.run({
     require("./specs/IronrootExpedition.spec"),
     require("./specs/IronrootEnemies.spec"),
     require("./specs/IronrootElites.spec"),
+    require("./specs/BellowsMawEncounter.spec"),
     require("./specs/Environment.spec"),
     require("./specs/MemoryFragments.spec"),
     require("./specs/MeshAssetRegistry.spec"),
