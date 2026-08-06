@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-06, at `main` = `c46162c` (PR #245), build `0.53.0`,
-save schema 20, 22 services. Published to Roblox as place version 88,
+Last updated: 2026-08-06, at `main` = `e6a9d9a` (PR #249), build `0.53.0`,
+save schema 20, 22 services. Published to Roblox as place version 90,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,27 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#248 / #249** (v89, v90) **the first live session of this stretch,
+  and it found three defects no test could see** — every part of each
+  one that a test can read was correct:
+  1. The **party-size button still showed nothing**. #219 fixed the
+     payload half; the selection half was never implemented, so a press
+     made off the platform (correctly refused by the server) left the
+     panel pixel-for-pixel unchanged. That is the owner's "no number is
+     selected", finally whole. Chosen size now highlights and the panel
+     reads PARTY OF n.
+  2. The **hound's FOLLOW/STAY order had no button**. CompanionCommand
+     existed server-side complete with contract, handler and toasts, and
+     nothing on the client ever sent it — half of companions was
+     unreachable in the shipped game.
+  3. **FoundationIntegration asserted fixtures the seed never placed**
+     (memory-fragment census, rotor motion), so it failed on most seeds.
+     Both terms now derive from the placed manifest.
+  Also confirmed live: defense plots stand on their three lanes at 46
+  studs with working detectors; the hound follows at the flank and
+  settles; PASS FoundationIntegration on a fresh boot. Ledger of what
+  closed and what remains open:
+  [MILESTONE_7_REGION_WAVE_A.md](MILESTONE_7_REGION_WAVE_A.md).
 - **#245** (v88) **M7 wave I**: RegionAccess — the departure's region
   seam. Enabled-flag + dependency + chapter gates compose in one place;
   everything not open resolves to Bramblewake; ExpeditionService boots
