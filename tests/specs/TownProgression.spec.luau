@@ -26,7 +26,11 @@ return {
                 TestRunner.equal(consequence.growthStage, 2)
                 TestRunner.equal(consequence.buildingStages.building_archive, 2)
                 TestRunner.equal(consequence.buildingStages.building_inn, 1)
-                TestRunner.equal(#consequence.residentIds, 3)
+                -- Chapter one resolved means chapter two is being played,
+                -- and a chapter's residents are present while it is played
+                -- (the semantic ChapterProgress.spec pinned): the Delve's
+                -- four have come home alongside the original three.
+                TestRunner.equal(#consequence.residentIds, 7)
                 TestRunner.equal(consequence.residentIds[1], "npc_tomas_reed")
             end,
         },
@@ -185,7 +189,9 @@ return {
                 TestRunner.equal(merged.tier, 2)
                 TestRunner.equal(merged.decision, "shared_agroforest")
                 TestRunner.equal(merged.buildingStages.building_archive, 2)
-                TestRunner.equal(#merged.residentIds, 3)
+                -- chapter one resolved = chapter two being played = the
+                -- Delve's four are home (the ChapterProgress.spec semantic)
+                TestRunner.equal(#merged.residentIds, 7)
             end,
         },
         {
@@ -225,6 +231,101 @@ return {
                 local merged = TownProgression.merge(unresolved, wild)
                 TestRunner.equal(merged.decision, "wild_regrowth")
                 TestRunner.equal(merged.memorialKind, "broken_antlers")
+            end,
+        },
+        {
+            -- Milestone 7: the town grows to tier 4, but only the story can
+            -- take it there — nights alone still cap at 3, spec-pinned above.
+            name = "the story, not the calendar, opens tier four",
+            run = function()
+                local chapterOne = {
+                    status = "complete",
+                    decision = "shared_agroforest",
+                    wardenOutcome = "preserved",
+                }
+                -- chapter II floors the tier at 2 and raises the ceiling
+                local afterMaw = TownProgression.resolve({
+                    story = {
+                        chapterOne = chapterOne,
+                        chapters = {
+                            chapter_two = { status = "complete", outcome = "cleared" },
+                        },
+                    },
+                    town = { nightNumber = 1 },
+                })
+                TestRunner.equal(afterMaw.tier, 2)
+                local matured = TownProgression.resolve({
+                    story = {
+                        chapterOne = chapterOne,
+                        chapters = {
+                            chapter_two = { status = "complete", outcome = "cleared" },
+                        },
+                    },
+                    town = { nightNumber = 100 },
+                })
+                TestRunner.equal(matured.tier, 4)
+                -- tier 4 matures the late buildings one more stage
+                TestRunner.equal(matured.buildingStages.building_celebration_stage, 2)
+                TestRunner.equal(matured.buildingStages.building_sawmill, 3)
+                -- chapter III floors the tier at 3 even on a young calendar
+                local afterWitch = TownProgression.resolve({
+                    story = {
+                        chapterOne = chapterOne,
+                        chapters = {
+                            chapter_two = { status = "complete", outcome = "cleared" },
+                            chapter_three = { status = "complete", outcome = "sealed" },
+                        },
+                    },
+                    town = { nightNumber = 1 },
+                })
+                TestRunner.equal(afterWitch.tier, 3)
+            end,
+        },
+        {
+            -- The cast is the story's: three residents through chapter I,
+            -- seven once the Delve is resolved, eleven once the Fen is.
+            name = "residents come home with their chapters",
+            run = function()
+                local chapterOne = {
+                    status = "complete",
+                    decision = "wild_regrowth",
+                    wardenOutcome = "scarred",
+                }
+                -- a pre-chapter town holds only the original three
+                local fresh = TownProgression.resolve({
+                    town = { nightNumber = 10 },
+                })
+                TestRunner.equal(#fresh.residentIds, 3)
+                -- chapter one resolved: the Delve's four arrive with the
+                -- chapter now being played
+                local early = TownProgression.resolve({
+                    story = { chapterOne = chapterOne },
+                    town = { nightNumber = 10 },
+                })
+                TestRunner.equal(#early.residentIds, 7)
+                local afterMaw = TownProgression.resolve({
+                    story = {
+                        chapterOne = chapterOne,
+                        chapters = {
+                            chapter_two = { status = "complete", outcome = "fouled" },
+                        },
+                    },
+                    town = { nightNumber = 10 },
+                })
+                TestRunner.equal(#afterMaw.residentIds, 11)
+                -- a merged shared town keeps the larger cast and can hold 4
+                local merged = TownProgression.merge(afterMaw, fresh)
+                TestRunner.equal(#merged.residentIds, 11)
+                local four = TownProgression.resolve({
+                    story = {
+                        chapterOne = chapterOne,
+                        chapters = {
+                            chapter_two = { status = "complete", outcome = "cleared" },
+                        },
+                    },
+                    town = { nightNumber = 100 },
+                })
+                TestRunner.equal(TownProgression.merge(early, four).tier, 4)
             end,
         },
     },
