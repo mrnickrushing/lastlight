@@ -4,6 +4,7 @@ local BramblewakeEnemies = require("../../src/shared/BramblewakeEnemies")
 local EnemyCatalog = require("../../src/shared/EnemyCatalog")
 local EnemyCombatRules = require("../../src/shared/EnemyCombatRules")
 local IronrootEnemies = require("../../src/shared/IronrootEnemies")
+local MireglassEnemies = require("../../src/shared/MireglassEnemies")
 local TestRunner = require("../TestRunner")
 
 return {
@@ -90,11 +91,12 @@ return {
             end,
         },
         {
-            name = "the merged catalog serves both regions without collision",
+            name = "the merged catalog serves every region without collision",
             run = function()
-                TestRunner.equal(#EnemyCatalog.order(), 12)
+                TestRunner.equal(#EnemyCatalog.order(), 18)
                 TestRunner.equal(#EnemyCatalog.orderFor("region_bramblewake"), 6)
                 TestRunner.equal(#EnemyCatalog.orderFor("region_ironroot"), 6)
+                TestRunner.equal(#EnemyCatalog.orderFor("region_mireglass"), 6)
                 TestRunner.equal(#EnemyCatalog.orderFor("region_nowhere"), 0)
                 -- Bramblewake's sequence is preserved exactly, so every night
                 -- schedule that names an enemy keeps meaning what it meant
@@ -109,6 +111,52 @@ return {
                     EnemyCatalog.require("enemy_crank_guard").displayName,
                     "Crank Guard"
                 )
+            end,
+        },
+        {
+            -- The Fen is the third distinct answer: patient and deceptive
+            -- where the Delve is fast and the forest is heavy.
+            name = "the Fen waits where the Delve charges",
+            run = function()
+                local delveFastest = 0
+                for _, definition in IronrootEnemies.all() do
+                    delveFastest = math.max(delveFastest, definition.speed)
+                end
+                local fenFastest = 0
+                local longestWindup = 0
+                local seenIds: { [string]: boolean } = {}
+                local seenModels: { [string]: boolean } = {}
+                for _, definition in BramblewakeEnemies.all() do
+                    seenIds[definition.id] = true
+                    seenModels[definition.modelKey] = true
+                end
+                for _, definition in IronrootEnemies.all() do
+                    seenIds[definition.id] = true
+                    seenModels[definition.modelKey] = true
+                end
+                for _, definition in MireglassEnemies.all() do
+                    TestRunner.equal(seenIds[definition.id], nil)
+                    TestRunner.equal(
+                        seenModels[definition.modelKey],
+                        nil,
+                        "reskinned model: " .. definition.id
+                    )
+                    fenFastest = math.max(fenFastest, definition.speed)
+                    longestWindup = math.max(longestWindup, definition.windup)
+                end
+                -- nothing in the Fen runs you down the way the Delve does,
+                -- and it telegraphs longer because its danger is committing
+                TestRunner.truthy(fenFastest < delveFastest)
+                TestRunner.truthy(longestWindup >= 2)
+                -- its pressure is resource cost: over half the roster either
+                -- drains the player or steals from the lantern
+                local costly = 0
+                for _, definition in MireglassEnemies.all() do
+                    if definition.statusEffect ~= nil or definition.lanternDamage >= 10 then
+                        costly += 1
+                    end
+                end
+                TestRunner.truthy(costly >= 3)
             end,
         },
     },

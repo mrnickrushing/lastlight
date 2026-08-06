@@ -28,6 +28,12 @@ local KNOWN_MATERIALS = table.freeze({
     material_glow_fungus = true,
     material_machine_oil = true,
     material_echo_crystal = true,
+    -- Mireglass Fen
+    material_mirror_reed = true,
+    material_bog_iron = true,
+    material_witchlight_pollen = true,
+    material_eel_oil = true,
+    material_blackwater_herb = true,
 })
 
 local function hashText(hash: number, value: string): number

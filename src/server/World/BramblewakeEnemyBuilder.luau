@@ -667,6 +667,270 @@ local function gasBloomer(model: Model, origin: Vector3): Part
     return core
 end
 
+--[[
+    The Fen's six. Where the Delve reads by heat, the Fen reads by water:
+    pale glass, wet reed, and cold witchlight. Several of them are
+    deliberately half-hidden shapes -- a heron that is mostly stillness, a
+    lurker that is mostly reeds -- so the outline highlight is doing more
+    work here than the geometry, which is the point of the place.
+]]
+local REED_GREEN = Color3.fromRGB(74, 96, 66)
+local BOG_DARK = Color3.fromRGB(46, 54, 48)
+local MIRROR_PALE = Color3.fromRGB(186, 206, 210)
+local WITCHLIGHT = Color3.fromRGB(146, 214, 226)
+local LEECH_RED = Color3.fromRGB(120, 52, 58)
+
+local function reedLurker(model: Model, origin: Vector3): Part
+    local core = part(
+        model,
+        "LurkerBody",
+        Vector3.new(3.6, 2.4, 6),
+        origin,
+        BOG_DARK,
+        Enum.Material.Slate,
+        nil,
+        nil
+    )
+    for index = -2, 2 do
+        part(
+            model,
+            "ReedFrond",
+            Vector3.new(0.24, 5.5, 0.24),
+            origin + Vector3.new(index * 0.9, 2.4, index * 0.5),
+            REED_GREEN,
+            Enum.Material.Grass,
+            nil,
+            CFrame.Angles(math.rad(index * 7), 0, math.rad(index * 9))
+        )
+    end
+    for side = -1, 1, 2 do
+        addEye(model, origin + Vector3.new(side * 0.7, 1.3, -2.7), WITCHLIGHT)
+    end
+    return core
+end
+
+local function mirrorling(model: Model, origin: Vector3): Part
+    local core = part(
+        model,
+        "MirrorTorso",
+        Vector3.new(2.6, 4, 1.4),
+        origin + Vector3.new(0, 0.8, 0),
+        MIRROR_PALE,
+        Enum.Material.Glass,
+        nil,
+        nil
+    )
+    core.Reflectance = 0.55
+    local head = part(
+        model,
+        "MirrorHead",
+        Vector3.new(1.4, 1.5, 1.4),
+        origin + Vector3.new(0, 3.5, 0),
+        MIRROR_PALE,
+        Enum.Material.Glass,
+        Enum.PartType.Ball,
+        nil
+    )
+    head.Reflectance = 0.55
+    for side = -1, 1, 2 do
+        local arm = part(
+            model,
+            "MirrorArm",
+            Vector3.new(0.6, 3, 0.6),
+            origin + Vector3.new(side * 1.7, 0.9, 0),
+            MIRROR_PALE,
+            Enum.Material.Glass,
+            nil,
+            CFrame.Angles(0, 0, math.rad(side * 10))
+        )
+        arm.Reflectance = 0.4
+        addEye(model, origin + Vector3.new(side * 0.36, 3.6, -0.76), WITCHLIGHT)
+    end
+    return core
+end
+
+local function mireLeech(model: Model, origin: Vector3): Part
+    local core = part(
+        model,
+        "LeechBody",
+        Vector3.new(1.8, 1.6, 5.2),
+        origin,
+        LEECH_RED,
+        Enum.Material.Neon,
+        Enum.PartType.Ball,
+        nil
+    )
+    core.Transparency = 0.25
+    for index = -1, 1 do
+        part(
+            model,
+            "LeechSegment",
+            Vector3.new(1.5, 1.4, 1.4),
+            origin + Vector3.new(0, 0.1, index * 1.5),
+            BOG_DARK,
+            Enum.Material.Slate,
+            Enum.PartType.Ball,
+            nil
+        )
+    end
+    part(
+        model,
+        "LeechMouth",
+        Vector3.new(1.1, 1.1, 0.7),
+        origin + Vector3.new(0, 0, -2.7),
+        LEECH_RED,
+        Enum.Material.Neon,
+        Enum.PartType.Cylinder,
+        CFrame.Angles(0, math.rad(90), 0)
+    )
+    return core
+end
+
+local function falseFriend(model: Model, origin: Vector3): Part
+    local core = part(
+        model,
+        "FriendTorso",
+        Vector3.new(2.4, 3.6, 1.5),
+        origin + Vector3.new(0, 0.8, 0),
+        Color3.fromRGB(96, 84, 72),
+        Enum.Material.Fabric,
+        nil,
+        nil
+    )
+    part(
+        model,
+        "FriendHead",
+        Vector3.new(1.3, 1.4, 1.3),
+        origin + Vector3.new(0, 3.2, 0),
+        Color3.fromRGB(150, 148, 132),
+        Enum.Material.SmoothPlastic,
+        nil,
+        nil
+    )
+    -- The tell: it carries a lantern that gives no light, and its hands
+    -- are on backwards. Readability by wrongness, not by glow.
+    local lantern = part(
+        model,
+        "DeadLantern",
+        Vector3.new(0.8, 1, 0.8),
+        origin + Vector3.new(1.6, 1.8, -0.6),
+        Color3.fromRGB(58, 62, 56),
+        Enum.Material.Metal,
+        nil,
+        nil
+    )
+    lantern.Reflectance = 0.1
+    for side = -1, 1, 2 do
+        part(
+            model,
+            "BackwardHand",
+            Vector3.new(0.6, 0.6, 0.9),
+            origin + Vector3.new(side * 1.5, 0.7, 0.5),
+            Color3.fromRGB(150, 148, 132),
+            Enum.Material.SmoothPlastic,
+            nil,
+            CFrame.Angles(0, math.rad(180), 0)
+        )
+        addEye(model, origin + Vector3.new(side * 0.34, 3.3, -0.72), WITCHLIGHT)
+    end
+    return core
+end
+
+local function glassHeron(model: Model, origin: Vector3): Part
+    local core = part(
+        model,
+        "HeronBody",
+        Vector3.new(1.8, 2.2, 3.4),
+        origin + Vector3.new(0, 3.2, 0),
+        MIRROR_PALE,
+        Enum.Material.Glass,
+        Enum.PartType.Ball,
+        nil
+    )
+    core.Reflectance = 0.4
+    part(
+        model,
+        "HeronNeck",
+        Vector3.new(0.5, 3.4, 0.5),
+        origin + Vector3.new(0, 5.2, -0.8),
+        MIRROR_PALE,
+        Enum.Material.Glass,
+        nil,
+        CFrame.Angles(math.rad(14), 0, 0)
+    )
+    part(
+        model,
+        "HeronBeak",
+        Vector3.new(0.32, 0.32, 3.4),
+        origin + Vector3.new(0, 6.6, -2.6),
+        WITCHLIGHT,
+        Enum.Material.Neon,
+        nil,
+        CFrame.Angles(math.rad(-8), 0, 0)
+    )
+    for side = -1, 1, 2 do
+        part(
+            model,
+            "HeronLeg",
+            Vector3.new(0.3, 4.4, 0.3),
+            origin + Vector3.new(side * 0.5, 0.9, 0.2),
+            BOG_DARK,
+            Enum.Material.Slate,
+            nil,
+            nil
+        )
+        addEye(model, origin + Vector3.new(side * 0.32, 6.5, -1.6), WITCHLIGHT)
+    end
+    return core
+end
+
+local function bogBell(model: Model, origin: Vector3): Part
+    local core = part(
+        model,
+        "BellBody",
+        Vector3.new(4.4, 4.4, 4.4),
+        origin + Vector3.new(0, 3.4, 0),
+        Color3.fromRGB(104, 96, 74),
+        Enum.Material.Metal,
+        Enum.PartType.Ball,
+        nil
+    )
+    part(
+        model,
+        "BellPost",
+        Vector3.new(0.7, 6.4, 0.7),
+        origin + Vector3.new(0, 3.2, 1.6),
+        BOG_DARK,
+        Enum.Material.Wood,
+        nil,
+        nil
+    )
+    part(
+        model,
+        "BellClapper",
+        Vector3.new(0.9, 1.6, 0.9),
+        origin + Vector3.new(0, 1.4, 0),
+        WITCHLIGHT,
+        Enum.Material.Neon,
+        Enum.PartType.Ball,
+        nil
+    )
+    for index = 0, 3 do
+        local angle = index * math.pi * 0.5
+        part(
+            model,
+            "SummonMark",
+            Vector3.new(1.6, 0.2, 1.6),
+            origin + Vector3.new(math.cos(angle) * 4, 0.1, math.sin(angle) * 4),
+            WITCHLIGHT,
+            Enum.Material.Neon,
+            Enum.PartType.Cylinder,
+            CFrame.Angles(0, 0, math.rad(90))
+        )
+    end
+    return core
+end
+
 function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target: Vector3): Model
     local model = Instance.new("Model")
     model.Name = definition.displayName:gsub("%s+", "")
@@ -698,6 +962,18 @@ function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target:
         core = crankGuard(model, origin)
     elseif definition.modelKey == "gas_bloomer" then
         core = gasBloomer(model, origin)
+    elseif definition.modelKey == "reed_lurker" then
+        core = reedLurker(model, origin)
+    elseif definition.modelKey == "mirrorling" then
+        core = mirrorling(model, origin)
+    elseif definition.modelKey == "mire_leech" then
+        core = mireLeech(model, origin)
+    elseif definition.modelKey == "false_friend" then
+        core = falseFriend(model, origin)
+    elseif definition.modelKey == "glass_heron" then
+        core = glassHeron(model, origin)
+    elseif definition.modelKey == "bog_bell" then
+        core = bogBell(model, origin)
     else
         core = rootling(model, origin)
     end
