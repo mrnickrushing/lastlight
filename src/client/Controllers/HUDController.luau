@@ -2281,17 +2281,17 @@ function HUDController._layout(self: HUDController)
                 else 150
         )
         self._allyFrame.Size = UDim2.new(1, -36, 0, 58)
-        self._threatFrame.Position = UDim2.new(
-            0.5,
-            0,
-            0,
-            if self._allyFrame.Visible
-                then (if self._blackoutFrame.Visible and self._eliteFrame.Visible then 356 else 284)
-                elseif self._blackoutFrame.Visible and self._eliteFrame.Visible then 292
-                elseif self._blackoutFrame.Visible then 222
-                elseif self._eliteFrame.Visible then 220
-                else 192
-        )
+        --[[
+            Bottom-anchored on touch, not stacked under the objective rails:
+            with the Blackout and elite rails both up, the old chain pushed
+            the red telegraph banner to y=292+, which on a tablet is the
+            middle of the fight -- the owner's screenshot had it lying
+            across the Old Growth's trunk. The band above the action row is
+            dead space on touch, and a warning about your feet belongs near
+            them.
+        ]]
+        self._threatFrame.AnchorPoint = Vector2.new(0.5, 1)
+        self._threatFrame.Position = UDim2.new(0.5, 0, 1, -206)
         self._threatFrame.Size = UDim2.new(1, -36, 0, 60)
         self._downedFrame.Size = UDim2.new(1, -36, 0, 90)
         local professionY = if self._compactEnabled then 158 else 218
@@ -2360,6 +2360,7 @@ function HUDController._layout(self: HUDController)
                 else 66
         )
         self._allyFrame.Size = UDim2.fromOffset(330, 64)
+        self._threatFrame.AnchorPoint = Vector2.new(0.5, 0)
         self._threatFrame.Position = UDim2.fromScale(0.5, 0.32)
         self._threatFrame.Size = UDim2.fromOffset(330, 66)
         self._downedFrame.Size = UDim2.fromOffset(540, 90)

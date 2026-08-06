@@ -43,6 +43,7 @@ export type OldGrowthService = typeof(setmetatable(
         _state: any,
         _arena: any,
         _model: Model?,
+        _strikeHandler: ((Player) -> ())?,
         _attack: Attack?,
         _attackIndex: number,
         _lastAttackAt: number,
@@ -104,6 +105,7 @@ function OldGrowthService.new(
         _state = nil,
         _arena = nil,
         _model = nil,
+        _strikeHandler = nil,
         _attack = nil,
         _attackIndex = 0,
         _lastAttackAt = 0,
@@ -182,7 +184,31 @@ function OldGrowthService._spawnModel(self: OldGrowthService, target: Player)
         end
     end)
     self._model = model
+    --[[
+        Tappable like every night creature: on touch there is no STRIKE
+        button by design -- the tap IS the strike -- and this model never
+        carried the StrikeClick the enemies got when every monster was made
+        tappable. On a tablet the amber heart was therefore unhittable: the
+        owner stood on the telegraph, tapped the heart, and nothing
+        happened. Same recipe as BramblewakeEnemyBuilder: one detector on
+        the model so any visible part answers the tap.
+    ]]
+    local click = Instance.new("ClickDetector")
+    click.Name = "StrikeClick"
+    click.MaxActivationDistance = 42
+    click.CursorIcon = ""
+    click.Parent = model
+    click.MouseClick:Connect(function(clicker: Player)
+        local handler = self._strikeHandler
+        if handler ~= nil then
+            handler(clicker)
+        end
+    end)
     self._builder.setState(model, self._state.health, false, false)
+end
+
+function OldGrowthService.setStrikeHandler(self: OldGrowthService, handler: (Player) -> ())
+    self._strikeHandler = handler
 end
 
 function OldGrowthService._clearAttack(self: OldGrowthService)

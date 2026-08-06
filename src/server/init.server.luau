@@ -377,6 +377,12 @@ end)
 enemyService:setStrikeHandler(function(clicker: Player)
     tutorialService:strikeFromClick(clicker)
 end)
+oldGrowthService:setStrikeHandler(function(clicker: Player)
+    tutorialService:strikeFromClick(clicker)
+end)
+wardenStagService:setStrikeHandler(function(clicker: Player)
+    tutorialService:strikeFromClick(clicker)
+end)
 -- The three sample sources the server owns. Join time is measured to the
 -- moment a profile is loaded, which is the first moment a player can actually
 -- do anything, rather than to the moment their character appeared.
