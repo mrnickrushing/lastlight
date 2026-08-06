@@ -200,9 +200,24 @@ the sky is still technically there — it cuts the horizon down to head
 height and throws the module into its own shadow, so the Delve's light
 comes from lamps and coalglass rather than from the sun.
 
-`buildModuleVisual` returns false for a key it does not know, which is
-how the region stays honest about being half-built: the remaining
-combat, connector, story and puzzle rooms are the next wave, and the
-region stays disabled in `Regions.luau` until every catalog key has a
-case. `RegionAccess` refuses a disabled region, and `ExpeditionService`'s
-boot assert refuses it louder.
+The second wave completed the set: oil works, echo vault, flooded stope,
+abandoned face, scaffold climb, collapse scramble, winch crossing, mite
+nest, slag channel, guard round, gas pocket, echo gallery, shored drift,
+junction round, rail siding, air door, foreman's office, miners' rest,
+memorial drift, signal room and flood locks — with the primitives they
+needed (pipe runs, flood pools, scaffolds, machinery, collapses, air
+doors, notice boards). **All thirty of the Delve's module visuals now
+have geometry.**
+
+`IronrootBuilderCoverage.spec` is what keeps that true. It reads the
+builder's source and fails if any visual the catalog can place has no
+case, because a module drawn into a manifest with no geometry behind it
+is an empty cell a player walks into — and no other test in the suite
+can see that (the builder is full of `Instance.new`, so Lune cannot run
+it). The same spec pins `enabled = false` on the region, so the flag and
+the coverage move together.
+
+`buildModuleVisual` still returns false for a key it does not know, and
+the region stays disabled until its runtime lands: `RegionAccess` refuses
+a disabled region, and `ExpeditionService`'s boot assert refuses it
+louder.

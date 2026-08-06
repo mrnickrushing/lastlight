@@ -55380,6 +55380,196 @@ local function coalglassSeam(parent: Instance, center: Vector3, height: number)
     end
 end
 
+-- A pipe run: the Delve's plumbing, and the Maw's feed lines in miniature.
+local function pipeRun(parent: Instance, center: Vector3, length: number, height: number)
+    local pipe = part(
+        parent,
+        "Pipe",
+        Vector3.new(length, 1.4, 1.4),
+        CFrame.new(center + Vector3.new(0, height, 0)),
+        IRON,
+        Enum.Material.Metal,
+        false
+    )
+    pipe.Shape = Enum.PartType.Cylinder
+    for side = -1, 1, 2 do
+        part(
+            parent,
+            "PipeBracket",
+            Vector3.new(0.8, height, 0.8),
+            CFrame.new(center + Vector3.new(side * length * 0.4, height * 0.5, 0)),
+            IRON,
+            Enum.Material.Metal,
+            false
+        )
+    end
+end
+
+-- Standing water, which the Delve has wherever the pumps stopped.
+local function floodPool(parent: Instance, center: Vector3, size: number)
+    local water = part(
+        parent,
+        "FloodPool",
+        Vector3.new(size, 0.6, size * 0.8),
+        CFrame.new(center + Vector3.new(0, 0.5, 0)),
+        Color3.fromRGB(46, 62, 66),
+        Enum.Material.Glass,
+        false
+    )
+    water.Transparency = 0.45
+    water.Reflectance = 0.35
+    water.CanQuery = false
+end
+
+-- Scaffolding: a laddered climb, the Delve's vertical traversal.
+local function scaffold(parent: Instance, center: Vector3, levels: number)
+    for level = 0, levels - 1 do
+        part(
+            parent,
+            "ScaffoldDeck",
+            Vector3.new(10, 0.6, 5),
+            CFrame.new(center + Vector3.new(0, 4 + level * 5, level % 2 * 4 - 2)),
+            TIMBER,
+            Enum.Material.Wood
+        )
+        for side = -1, 1, 2 do
+            part(
+                parent,
+                "ScaffoldLeg",
+                Vector3.new(0.7, 5, 0.7),
+                CFrame.new(center + Vector3.new(side * 4.6, 1.7 + level * 5, level % 2 * 4 - 2)),
+                DARK_TIMBER,
+                Enum.Material.Wood
+            )
+        end
+        for rung = 0, 3 do
+            part(
+                parent,
+                "LadderRung",
+                Vector3.new(2.4, 0.3, 0.3),
+                CFrame.new(
+                    center + Vector3.new(0, 4.8 + level * 5 + rung * 1.1, level % 2 * 4 + 0.8)
+                ),
+                DARK_TIMBER,
+                Enum.Material.Wood,
+                false
+            )
+        end
+    end
+end
+
+-- Machinery: the thing that is still running when nobody asked it to.
+local function machine(parent: Instance, center: Vector3, scale: number)
+    part(
+        parent,
+        "MachineBed",
+        Vector3.new(7 * scale, 3 * scale, 5 * scale),
+        CFrame.new(center + Vector3.new(0, 1.6 * scale, 0)),
+        IRON,
+        Enum.Material.DiamondPlate
+    )
+    local flywheel = part(
+        parent,
+        "MachineFlywheel",
+        Vector3.new(1.1, 5.4 * scale, 5.4 * scale),
+        CFrame.new(center + Vector3.new(3.6 * scale, 3.4 * scale, 0)),
+        DARK_ROCK,
+        Enum.Material.Metal,
+        false
+    )
+    flywheel.Shape = Enum.PartType.Cylinder
+    glow(
+        parent,
+        "MachineFirebox",
+        center + Vector3.new(-2.4 * scale, 1.8 * scale, 0),
+        1.5,
+        COALGLASS,
+        1.8
+    )
+    pipeRun(parent, center + Vector3.new(0, 0, -3.4 * scale), 12 * scale, 5 * scale)
+end
+
+-- A collapse: fallen roof rock with light finding its way through.
+local function collapse(parent: Instance, center: Vector3, seed: number)
+    for index = 0, 4 do
+        local drift = (seed + index * 23) % 9 - 4
+        part(
+            parent,
+            "FallenRock",
+            Vector3.new(5 - index * 0.5, 4 - index * 0.4, 5 - index * 0.6),
+            CFrame.new(center + Vector3.new(drift * 1.6, 1.6 + index * 1.4, drift * 0.9))
+                * CFrame.Angles(math.rad(drift * 6), math.rad(drift * 9), math.rad(drift * 5)),
+            if index % 2 == 0 then ROCK else DARK_ROCK,
+            Enum.Material.Rock
+        )
+    end
+end
+
+-- A worked doorway with an air door hung in it.
+local function airDoor(parent: Instance, center: Vector3)
+    for side = -1, 1, 2 do
+        part(
+            parent,
+            "DoorJamb",
+            Vector3.new(1.4, 11, 2),
+            CFrame.new(center + Vector3.new(side * 5, 5.5, 0)),
+            TIMBER,
+            Enum.Material.Wood
+        )
+    end
+    part(
+        parent,
+        "DoorHead",
+        Vector3.new(11, 1.4, 2),
+        CFrame.new(center + Vector3.new(0, 11.4, 0)),
+        DARK_TIMBER,
+        Enum.Material.Wood,
+        false
+    )
+    local leaf = part(
+        parent,
+        "AirDoorLeaf",
+        Vector3.new(8.6, 9.6, 0.5),
+        CFrame.new(center + Vector3.new(-1.4, 5.2, 0.4)) * CFrame.Angles(0, math.rad(28), 0),
+        Color3.fromRGB(112, 96, 76),
+        Enum.Material.Fabric,
+        false
+    )
+    leaf.Transparency = 0.15
+end
+
+-- A tally or notice board: where the Delve wrote things down.
+local function noticeBoard(parent: Instance, center: Vector3)
+    part(
+        parent,
+        "BoardPost",
+        Vector3.new(0.6, 5, 0.6),
+        CFrame.new(center + Vector3.new(0, 2.5, 0)),
+        DARK_TIMBER,
+        Enum.Material.Wood
+    )
+    local board = part(
+        parent,
+        "BoardFace",
+        Vector3.new(5.4, 3.4, 0.4),
+        CFrame.new(center + Vector3.new(0, 5.4, 0)) * CFrame.Angles(math.rad(-8), 0, 0),
+        TIMBER,
+        Enum.Material.Wood,
+        false
+    )
+    for index = 0, 3 do
+        part(
+            parent,
+            "TallyMark",
+            Vector3.new(0.9, 0.2, 0.1),
+            board.CFrame * CFrame.new(-1.6 + index * 1.1, 0.6, 0.25),
+            Color3.fromRGB(224, 214, 196),
+            Enum.Material.SmoothPlastic,
+            false
+        )
+    end
+end
+
 --[[
     Every module's floor: worked rock rather than grass, with a spoil edge
     so the ground reads as cut rather than grown.
@@ -55527,6 +55717,373 @@ function IronrootBuilder.buildModuleVisual(
             oreCart(parent, center + Vector3.new(side * 9, 0, 12), 0)
         end
         glow(parent, "BellowsHeat", center + Vector3.new(0, 3, -18), 5.5, COALGLASS, 3.5)
+        return true
+    elseif visual == "oil_works" then
+        delveFloor(parent, center)
+        shoring(parent, center, 26, 20)
+        machine(parent, center + Vector3.new(-6, 0, -4), 1.1)
+        pipeRun(parent, center + Vector3.new(4, 0, 6), 22, 6)
+        for index = -1, 1 do
+            part(
+                parent,
+                "OilDrum",
+                Vector3.new(2.6, 3.4, 2.6),
+                CFrame.new(center + Vector3.new(9 + index * 3, 1.9, -8)),
+                Color3.fromRGB(74, 66, 52),
+                Enum.Material.Metal
+            )
+        end
+        return true
+    elseif visual == "echo_vault" then
+        delveFloor(parent, center)
+        shoring(parent, center, 24, 24)
+        -- A ring of crystal that hums a half-second late; the vault is
+        -- lit by its own answer rather than by any lamp.
+        for index = 0, 7 do
+            local angle = index * math.pi * 0.25
+            local at = center + Vector3.new(math.cos(angle) * 9, 0, math.sin(angle) * 9)
+            part(
+                parent,
+                "EchoCrystal",
+                Vector3.new(1.2, 5.5 - (index % 3), 1.2),
+                CFrame.new(at + Vector3.new(0, 2.8, 0))
+                    * CFrame.Angles(math.rad(index * 5), angle, 0),
+                Color3.fromRGB(126, 176, 214),
+                Enum.Material.Glass
+            )
+            glow(
+                parent,
+                "EchoLight",
+                at + Vector3.new(0, 5.6, 0),
+                0.9,
+                Color3.fromRGB(126, 176, 214),
+                1.1
+            )
+        end
+        return true
+    elseif visual == "flooded_stope" then
+        delveFloor(parent, center)
+        shoring(parent, center, 28, 22)
+        floodPool(parent, center + Vector3.new(0, 0, 2), 30)
+        spoilHeap(parent, center + Vector3.new(-12, 0, -9), 1)
+        rockFace(parent, center + Vector3.new(12, 0, -10), Vector3.new(7, 10, 8), 29)
+        lampPost(parent, center + Vector3.new(-11, 0, 11))
+        return true
+    elseif visual == "abandoned_face" then
+        delveFloor(parent, center)
+        shoring(parent, center, 22, 18)
+        rockFace(parent, center + Vector3.new(0, 0, -12), Vector3.new(16, 12, 6), 53)
+        -- Tools left where the shift stopped.
+        for index = -1, 1 do
+            part(
+                parent,
+                "AbandonedPick",
+                Vector3.new(0.4, 0.4, 4),
+                CFrame.new(center + Vector3.new(index * 3, 0.6, 2))
+                    * CFrame.Angles(0, math.rad(index * 34), math.rad(78)),
+                DARK_TIMBER,
+                Enum.Material.Wood,
+                false
+            )
+        end
+        oreCart(parent, center + Vector3.new(8, 0, 8), math.rad(20))
+        return true
+    elseif visual == "scaffold_climb" then
+        delveFloor(parent, center)
+        shoring(parent, center, 24, 22)
+        scaffold(parent, center + Vector3.new(-4, 0, 0), 3)
+        scaffold(parent, center + Vector3.new(9, 0, -6), 2)
+        lampPost(parent, center + Vector3.new(10, 0, 9))
+        return true
+    elseif visual == "collapse_scramble" then
+        delveFloor(parent, center)
+        shoring(parent, center, 26, 20)
+        collapse(parent, center + Vector3.new(-3, 0, -3), 61)
+        collapse(parent, center + Vector3.new(8, 0, 7), 17)
+        glow(parent, "CollapseChink", center + Vector3.new(-3, 12, -3), 2.2, LAMP, 1.6)
+        return true
+    elseif visual == "winch_crossing" then
+        delveFloor(parent, center)
+        shoring(parent, center, 24, 26)
+        machine(parent, center + Vector3.new(-9, 0, 8), 0.8)
+        -- The cable itself, strung across the gap it carries carts over.
+        part(
+            parent,
+            "WinchCable",
+            Vector3.new(0.3, 0.3, 34),
+            CFrame.new(center + Vector3.new(0, 9.5, 0)),
+            RAIL,
+            Enum.Material.Metal,
+            false
+        )
+        oreCart(parent, center + Vector3.new(0, 5.5, 2), 0)
+        return true
+    elseif visual == "mite_nest" then
+        delveFloor(parent, center)
+        shoring(parent, center, 24, 22)
+        spoilHeap(parent, center + Vector3.new(-6, 0, -4), 1.3)
+        spoilHeap(parent, center + Vector3.new(7, 0, 5), 1)
+        for index = 0, 5 do
+            local angle = index * math.pi / 3
+            glow(
+                parent,
+                "MiteEmber",
+                center + Vector3.new(math.cos(angle) * 7, 0.9, math.sin(angle) * 7),
+                0.7,
+                COALGLASS,
+                0.9
+            )
+        end
+        return true
+    elseif visual == "slag_channel" then
+        delveFloor(parent, center)
+        shoring(parent, center, 22, 26)
+        -- The channel: a molten line the fight has to be fought across.
+        local channel = part(
+            parent,
+            "SlagChannel",
+            Vector3.new(6, 0.8, 40),
+            CFrame.new(center + Vector3.new(0, 0.7, 0)),
+            COALGLASS,
+            Enum.Material.Neon,
+            false
+        )
+        channel.CanQuery = false
+        for side = -1, 1, 2 do
+            part(
+                parent,
+                "ChannelLip",
+                Vector3.new(2.4, 1.6, 40),
+                CFrame.new(center + Vector3.new(side * 4.2, 1, 0)),
+                DARK_ROCK,
+                Enum.Material.Rock
+            )
+        end
+        glow(parent, "SlagHeat", center + Vector3.new(0, 3, 0), 4, COALGLASS, 2.6)
+        return true
+    elseif visual == "guard_round" then
+        delveFloor(parent, center)
+        shoring(parent, center, 26, 26)
+        machine(parent, center + Vector3.new(0, 0, -9), 1)
+        railLine(parent, center, 40)
+        for side = -1, 1, 2 do
+            part(
+                parent,
+                "GuardPlate",
+                Vector3.new(1.2, 8, 9),
+                CFrame.new(center + Vector3.new(side * 11, 4, 4)),
+                IRON,
+                Enum.Material.DiamondPlate
+            )
+        end
+        return true
+    elseif visual == "gas_pocket" then
+        delveFloor(parent, center)
+        shoring(parent, center, 22, 20)
+        local haze = part(
+            parent,
+            "Whitedamp",
+            Vector3.new(24, 7, 20),
+            CFrame.new(center + Vector3.new(0, 3.6, 0)),
+            FUNGUS,
+            Enum.Material.Neon,
+            false
+        )
+        haze.Transparency = 0.86
+        haze.CanQuery = false
+        fungusPatch(parent, center + Vector3.new(-7, 0, 5), 9)
+        fungusPatch(parent, center + Vector3.new(8, 0, -6), 4)
+        return true
+    elseif visual == "echo_gallery" then
+        delveFloor(parent, center)
+        shoring(parent, center, 28, 22)
+        for index = -1, 1 do
+            part(
+                parent,
+                "GalleryPillar",
+                Vector3.new(3.4, 12, 3.4),
+                CFrame.new(center + Vector3.new(index * 9, 6, -4)),
+                ROCK,
+                Enum.Material.Rock
+            )
+            glow(
+                parent,
+                "EchoLight",
+                center + Vector3.new(index * 9, 11, -4),
+                1,
+                Color3.fromRGB(126, 176, 214),
+                1.2
+            )
+        end
+        railLine(parent, center + Vector3.new(0, 0, 8), 30)
+        return true
+    elseif visual == "shored_drift" then
+        delveFloor(parent, center)
+        shoring(parent, center, 16, 30)
+        railLine(parent, center, 44)
+        lampPost(parent, center + Vector3.new(-6, 0, 0))
+        return true
+    elseif visual == "junction_round" then
+        delveFloor(parent, center)
+        shoring(parent, center, 26, 26)
+        railLine(parent, center, 40)
+        railLine(parent, center + Vector3.new(0, 0, 0), 6)
+        -- The switch stand that gives a junction its name.
+        part(
+            parent,
+            "SwitchStand",
+            Vector3.new(0.6, 4, 0.6),
+            CFrame.new(center + Vector3.new(5, 2, 0)),
+            IRON,
+            Enum.Material.Metal
+        )
+        glow(parent, "SwitchLamp", center + Vector3.new(5, 4.4, 0), 0.9, LAMP, 1.4)
+        lampPost(parent, center + Vector3.new(-9, 0, 9))
+        return true
+    elseif visual == "rail_siding" then
+        delveFloor(parent, center)
+        shoring(parent, center, 24, 24)
+        railLine(parent, center + Vector3.new(-5, 0, 0), 38)
+        railLine(parent, center + Vector3.new(6, 0, 0), 26)
+        oreCart(parent, center + Vector3.new(6, 0, -6), 0)
+        oreCart(parent, center + Vector3.new(6, 0, 3), 0)
+        return true
+    elseif visual == "air_door" then
+        delveFloor(parent, center)
+        shoring(parent, center, 18, 22)
+        airDoor(parent, center)
+        railLine(parent, center, 36)
+        return true
+    elseif visual == "foreman_office" then
+        delveFloor(parent, center)
+        shoring(parent, center, 22, 20)
+        -- A room inside the rock: three walls, a desk, and the board that
+        -- ran the shift.
+        for side = -1, 1, 2 do
+            part(
+                parent,
+                "OfficeWall",
+                Vector3.new(0.8, 9, 14),
+                CFrame.new(center + Vector3.new(side * 7, 4.5, 0)),
+                TIMBER,
+                Enum.Material.Wood
+            )
+        end
+        part(
+            parent,
+            "OfficeBack",
+            Vector3.new(14, 9, 0.8),
+            CFrame.new(center + Vector3.new(0, 4.5, -7)),
+            TIMBER,
+            Enum.Material.Wood
+        )
+        part(
+            parent,
+            "OfficeDesk",
+            Vector3.new(6, 0.6, 3),
+            CFrame.new(center + Vector3.new(0, 3, -4)),
+            DARK_TIMBER,
+            Enum.Material.Wood
+        )
+        noticeBoard(parent, center + Vector3.new(4, 0, 4))
+        lampPost(parent, center + Vector3.new(-5, 0, 5))
+        return true
+    elseif visual == "miners_rest" then
+        delveFloor(parent, center)
+        shoring(parent, center, 24, 20)
+        for index = -1, 1 do
+            part(
+                parent,
+                "RestBench",
+                Vector3.new(7, 0.6, 2),
+                CFrame.new(center + Vector3.new(index * 8, 1.6, -5)),
+                TIMBER,
+                Enum.Material.Wood
+            )
+            part(
+                parent,
+                "LunchPail",
+                Vector3.new(1.1, 1.2, 1.1),
+                CFrame.new(center + Vector3.new(index * 8 + 1.4, 2.5, -5)),
+                IRON,
+                Enum.Material.Metal,
+                false
+            )
+        end
+        glow(parent, "RestFire", center + Vector3.new(0, 1.4, 4), 2.4, COALGLASS, 2.4)
+        lampPost(parent, center + Vector3.new(9, 0, 7))
+        return true
+    elseif visual == "memorial_drift" then
+        delveFloor(parent, center)
+        shoring(parent, center, 20, 22)
+        -- Lamps set in a row for the ones who did not come up, and the
+        -- names cut into the rock behind them.
+        rockFace(parent, center + Vector3.new(0, 0, -9), Vector3.new(16, 10, 4), 7)
+        for index = -2, 2 do
+            glow(parent, "MemorialLamp", center + Vector3.new(index * 3.4, 1.6, -5), 1.1, LAMP, 1.5)
+            part(
+                parent,
+                "MemorialStone",
+                Vector3.new(1.6, 2.4, 0.8),
+                CFrame.new(center + Vector3.new(index * 3.4, 1.2, -6.4)),
+                ROCK,
+                Enum.Material.Slate
+            )
+        end
+        return true
+    elseif visual == "signal_room" then
+        delveFloor(parent, center)
+        shoring(parent, center, 22, 20)
+        machine(parent, center + Vector3.new(-7, 0, -5), 0.7)
+        noticeBoard(parent, center + Vector3.new(6, 0, -5))
+        -- The signal board itself: three levers, which is what the
+        -- Foreman Echo's fight is fought with.
+        for index = -1, 1 do
+            part(
+                parent,
+                "SignalLever",
+                Vector3.new(0.5, 3.4, 0.5),
+                CFrame.new(center + Vector3.new(index * 2.6, 2.6, 4))
+                    * CFrame.Angles(math.rad(index * 18), 0, 0),
+                IRON,
+                Enum.Material.Metal
+            )
+            glow(
+                parent,
+                "SignalLamp",
+                center + Vector3.new(index * 2.6, 4.6, 4),
+                0.7,
+                COALGLASS,
+                1.1
+            )
+        end
+        return true
+    elseif visual == "flood_locks" then
+        delveFloor(parent, center)
+        shoring(parent, center, 26, 22)
+        floodPool(parent, center + Vector3.new(0, 0, 7), 24)
+        -- Two lock gates and their wheels, which is the puzzle's shape.
+        for side = -1, 1, 2 do
+            part(
+                parent,
+                "LockGate",
+                Vector3.new(9, 7, 1),
+                CFrame.new(center + Vector3.new(side * 7, 3.5, -3)),
+                IRON,
+                Enum.Material.DiamondPlate
+            )
+            local wheel = part(
+                parent,
+                "LockWheel",
+                Vector3.new(0.8, 3, 3),
+                CFrame.new(center + Vector3.new(side * 7, 8, -3)),
+                RAIL,
+                Enum.Material.Metal,
+                false
+            )
+            wheel.Shape = Enum.PartType.Cylinder
+        end
+        pipeRun(parent, center + Vector3.new(0, 0, -8), 20, 7)
         return true
     end
     return false
