@@ -31913,6 +31913,7 @@ return table.freeze(ProfessionService)
 
 local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local ProfileService = {}
 ProfileService.__index = ProfileService
@@ -31948,6 +31949,16 @@ export type ProfileService = typeof(setmetatable(
     },
     ProfileService
 ))
+
+-- The materials the launch region actually uses. Kept explicit rather than
+-- derived so a future region's currency cannot be granted by an old hook.
+local LAUNCH_MATERIAL_IDS = table.freeze({
+    "material_heartwood",
+    "material_meadow_fiber",
+    "material_amber_sap",
+    "material_brightcap",
+    "material_spring_clay",
+})
 
 function ProfileService.new(logger: Logger, persistent: boolean): ProfileService
     return setmetatable({
@@ -32157,6 +32168,7 @@ function ProfileService._load(self: ProfileService, player: Player)
         return
     end
 
+    profile = self:_applyStudioStock(profile, now)
     self._profiles[player] = profile
     self._writable[player] = writable
     self._loading[player] = nil
@@ -32168,7 +32180,76 @@ function ProfileService._load(self: ProfileService, player: Player)
     })
 end
 
+--[[
+    A stocked profile for live verification, and nothing else.
+
+    Several systems can only be judged by playing them -- arming a snare
+    costs materials, whetting a blade needs one that has dulled -- and
+    reaching that state honestly means a full playthrough every time
+    somebody wants to look at a two-second interaction. A live session on
+    2026-08-06 spent itself discovering exactly that, and closed with the
+    checks still open.
+
+    So: set `LastLightStockProfile` on the DataModel to a number and a
+    joining profile arrives with that many of each launch material. Three
+    guards, all of which must hold:
+
+      * Studio only. RunService:IsStudio() is false on every Roblox server.
+      * Non-persistent environments only. Production runs with persistence
+        on; this is refused there even if someone sets the attribute.
+      * Logged loudly, every time, with the amount.
+
+    It grants materials, which are earned in play and spent in play. It
+    cannot grant progress, chapters, professions or gear, because those
+    are the things a verification run is supposed to actually perform.
+
+    The attribute is read at join and again whenever it changes, because a
+    Play session starts from a fresh DataModel: a value set while editing
+    does not survive into the run, and a driver who has already pressed
+    play should not have to restart to stock a purse.
+]]
+function ProfileService._applyStudioStock(self: ProfileService, profile: any, now: number): any
+    if self._persistent or not RunService:IsStudio() then
+        return profile
+    end
+    local requested = tonumber(game:GetAttribute("LastLightStockProfile"))
+    if requested == nil then
+        return profile
+    end
+    local amount = math.clamp(math.floor(requested), 1, 200)
+    local nextProfile = table.clone(profile)
+    nextProfile.inventory = table.clone(profile.inventory)
+    local materials = table.clone(profile.inventory.materials)
+    for _, materialId in LAUNCH_MATERIAL_IDS do
+        materials[materialId] = (tonumber(materials[materialId]) or 0) + amount
+    end
+    nextProfile.inventory.materials = materials
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    self._logger:warn("studio_profile_stocked", {
+        amount = amount,
+        materials = #LAUNCH_MATERIAL_IDS,
+    })
+    return nextProfile
+end
+
+function ProfileService._watchStudioStock(self: ProfileService)
+    if self._persistent or not RunService:IsStudio() then
+        return
+    end
+    game:GetAttributeChangedSignal("LastLightStockProfile"):Connect(function()
+        for player, profile in self._profiles do
+            local stocked = self:_applyStudioStock(profile, os.time())
+            if stocked ~= profile then
+                self._profiles[player] = stocked
+                self._loadedEvent:Fire(player, stocked)
+            end
+        end
+    end)
+end
+
 function ProfileService.Start(self: ProfileService)
+    self:_watchStudioStock()
     Players.PlayerAdded:Connect(function(player: Player)
         task.spawn(function()
             self:_load(player)
