@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-06, at `main` = `02ae046` (PR #261), build `0.53.0`,
-save schema 20, 22 services. Published to Roblox as place version 96,
+Last updated: 2026-08-06, at `main` = `cb68431` (PR #264), build `0.53.0`,
+save schema 20, 22 services. Published to Roblox as place version 97,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,16 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#264** (v97) **M7 wave L: Mireglass Fen's geometry** — all thirty
+  visuals, built as the Delve's opposite. The Delve reads as underground
+  because every module carries a roof; the Fen reads as drowned because
+  every module carries water you cannot trust, glassy enough to mirror
+  the sky. Verified live: the pools carry clouds. Three modules exist
+  because encounters need them (the mirror court is the Many-Face's, the
+  bell marsh's four pools are the Drowned Caller's doors, the witchlight
+  ring is where the Lantern Witch stands). **Both new regions now have
+  complete module geometry**; RegionBuilderCoverage checks both catalogs
+  against both builders and pins both enabled flags false.
 - **#261** (v96) **M7 wave K: all thirty Delve module visuals now have
   geometry** — the remaining twenty-one rooms (oil works, echo vault,
   flooded stope, abandoned face, scaffold climb, collapse scramble, winch
