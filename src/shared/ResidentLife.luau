@@ -16,6 +16,8 @@
     - Bonds are per-profile: they are the town remembering *you*.
 ]]
 
+local ResidentRoster = require("./ResidentRoster")
+
 local ResidentLife = {}
 
 export type ResidentState = {
@@ -54,31 +56,15 @@ export type NightReport = {
     crisis: Crisis?,
 }
 
-local RESIDENT_IDS = table.freeze({ "npc_tomas_reed", "npc_pip_wren", "npc_ena_moss" })
+--[[
+    Who exists, and what job each holds, now comes from ResidentRoster --
+    one list instead of the several that used to drift apart. Chapter I's
+    three still come first, in their original order, with their original
+    jobs, so nothing about an existing town changes.
+]]
+local RESIDENT_IDS = ResidentRoster.Order
 
-local JOBS: { [string]: Job } = table.freeze({
-    npc_tomas_reed = table.freeze({
-        residentId = "npc_tomas_reed",
-        buildingId = "building_inn",
-        title = "QUARTERMASTER",
-        boon = "dawn_repair",
-        boonLabel = "TOMAS PATCHES THE WORST-HIT BUILDING",
-    }),
-    npc_pip_wren = table.freeze({
-        residentId = "npc_pip_wren",
-        buildingId = "building_town_board",
-        title = "COURIER",
-        boon = "night_forewarning",
-        boonLabel = "PIP POSTS WORD OF THE COMING NIGHT",
-    }),
-    npc_ena_moss = table.freeze({
-        residentId = "npc_ena_moss",
-        buildingId = "building_workbench",
-        title = "SEEDKEEPER",
-        boon = "lantern_reserve",
-        boonLabel = "ENA BANKS A SPARK RESERVE FOR THE LANTERN",
-    }),
-})
+local JOBS: { [string]: Job } = table.freeze(ResidentRoster.jobs())
 
 -- A workplace this damaged injures its keeper during the night's chaos.
 local INJURY_INTEGRITY_THRESHOLD = 0.5

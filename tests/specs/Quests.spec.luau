@@ -6,8 +6,13 @@ local TestRunner = require("../TestRunner")
 local function signals(overrides: any): Quests.Signals
     return {
         bramblewakeSettlements = overrides.bramblewakeSettlements or 0,
+        buildingsRaised = overrides.buildingsRaised or 0,
         craftedItems = overrides.craftedItems or 0,
+        decorationsPlaced = overrides.decorationsPlaced or 0,
+        gearTraits = overrides.gearTraits or 0,
+        materialsBanked = overrides.materialsBanked or 0,
         nightsSurvived = overrides.nightsSurvived or 0,
+        residentsBonded = overrides.residentsBonded or 0,
     }
 end
 
@@ -90,8 +95,11 @@ return {
         {
             name = "snapshot reports every catalog quest even when nothing is complete",
             run = function()
+                local QuestCatalog = require("../../src/shared/QuestCatalog")
                 local snapshot = Quests.snapshot(Quests.default(), signals({}))
-                TestRunner.equal(#snapshot, 3)
+                -- the snapshot follows the catalog, so adding a resident's
+                -- quest never silently drops it from the Field Book
+                TestRunner.equal(#snapshot, #QuestCatalog.list())
                 for _, quest in snapshot do
                     TestRunner.equal(quest.claimed, false)
                     TestRunner.equal(quest.complete, false)

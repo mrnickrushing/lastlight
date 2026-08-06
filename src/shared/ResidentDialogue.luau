@@ -1,5 +1,7 @@
 --!strict
 
+local ResidentRoster = require("./ResidentRoster")
+
 local ResidentDialogue = {}
 
 export type Response = {
@@ -8,16 +10,50 @@ export type Response = {
     state: string,
 }
 
-local RESIDENT_QUESTS = table.freeze({
-    npc_tomas_reed = "quest_first_craft",
-    npc_pip_wren = "quest_survive_three_nights",
-    npc_ena_moss = "quest_bramblewake_veteran",
+--[[
+    Names and quests come from the roster now; the two tables that used to
+    hold them here were the first place the roster drifted, which is why
+    it exists.
+]]
+local RESIDENT_QUESTS: { [string]: string } = {}
+local RESIDENT_NAMES: { [string]: string } = {}
+for _, definition in ResidentRoster.list() do
+    RESIDENT_QUESTS[definition.id] = definition.questId
+    RESIDENT_NAMES[definition.id] = definition.displayName
+end
+table.freeze(RESIDENT_QUESTS)
+table.freeze(RESIDENT_NAMES)
+
+--[[
+    What the residents brought back from their own regions say once their
+    work is done. Chapter I's three answer to the town's decisions, which
+    is handled below; these four-and-four answer to the places they came
+    from, and each one is a person rather than a job title.
+]]
+-- What each resident asks for, in their own words.
+local GUIDANCE = table.freeze({
+    npc_tomas_reed = "CRAFT ONE USEFUL ITEM AT THE WORKBENCH",
+    npc_pip_wren = "HELP THE LANTERN ROAD SURVIVE THREE NIGHTS",
+    npc_ena_moss = "RETURN SAFELY FROM BRAMBLEWAKE THREE TIMES",
+    npc_hesper_vane = "BRING ME GEAR THAT HAS FOUND ITS OWN CHARACTER",
+    npc_odell_crane = "FILL THE STORES — SIXTY OF ANYTHING WILL DO",
+    npc_junie_falk = "KEEP THE LIGHT LIT FOR SEVEN NIGHTS",
+    npc_bartram_hoke = "RAISE FOUR BUILDINGS SO THERE IS SOMEWHERE TO COOK",
+    npc_saoirse_quill = "COME BACK FROM BRAMBLEWAKE EIGHT TIMES, AND I WILL RULE THE COLUMN",
+    npc_wren_dabbler = "PUT UP THREE DECORATIONS — THIS TOWN SHOULD LOOK LIVED IN",
+    npc_marek_still = "CRAFT SIX THINGS AND LOOK TWICE AT EACH",
+    npc_lissen_ford = "BE TRUSTED BY THREE RESIDENTS — CHECK ON THEM",
 })
 
-local RESIDENT_NAMES = table.freeze({
-    npc_tomas_reed = "TOMAS",
-    npc_pip_wren = "PIP",
-    npc_ena_moss = "ENA",
+local ARRIVAL_LINES = table.freeze({
+    npc_hesper_vane = "A TOOL YOU KEPT SHARP IS A DAY YOU MEANT TO SURVIVE. BRING ME THE DULL ONES.",
+    npc_odell_crane = "FULL STORES AND A QUIET BELL. I COULD ALMOST SIT DOWN.",
+    npc_junie_falk = "SEVEN NIGHTS LIT IN A ROW. DOWN BELOW WE NEVER MANAGED THREE.",
+    npc_bartram_hoke = "A REAL KITCHEN. I HAVE BEEN COOKING OUT OF A HELMET SINCE I WAS TWENTY.",
+    npc_saoirse_quill = "NAMES OUT AND NAMES BACK, AND THE COLUMNS AGREE. I HAVE NOT WRITTEN THAT IN YEARS.",
+    npc_wren_dabbler = "I WOVE ONE FOR EVERY HOUSE THE WATER TOOK. NOW I WEAVE THEM FOR DOORS THAT STAND.",
+    npc_marek_still = "LOOK TWICE AT WHAT YOU CARRY. THE FEN TAUGHT ME THAT AND IT COST IT NOTHING.",
+    npc_lissen_ford = "EVERY HEAD COUNTED AT DUSK, AND EVERY ONE OF THEM KNOWS YOUR NAME. THAT IS THE WORK.",
 })
 
 local function questById(quests: any, questId: string): any
@@ -33,6 +69,10 @@ local function questById(quests: any, questId: string): any
 end
 
 local function completedStory(residentId: string, consequence: any): string
+    local arrival = ARRIVAL_LINES[residentId]
+    if arrival ~= nil then
+        return arrival
+    end
     local decision = if type(consequence) == "table" then consequence.decision else nil
     local wardenOutcome = if type(consequence) == "table" then consequence.wardenOutcome else nil
     if residentId == "npc_tomas_reed" then
@@ -91,10 +131,7 @@ function ResidentDialogue.respond(residentId: any, quests: any, consequence: any
 
     local current = math.max(0, math.floor(tonumber(quest.progress) or 0))
     local threshold = math.max(1, math.floor(tonumber(quest.threshold) or 1))
-    local guidance = if residentId == "npc_tomas_reed"
-        then "CRAFT ONE USEFUL ITEM AT THE WORKBENCH"
-        elseif residentId == "npc_pip_wren" then "HELP THE LANTERN ROAD SURVIVE THREE NIGHTS"
-        else "RETURN SAFELY FROM BRAMBLEWAKE THREE TIMES"
+    local guidance = GUIDANCE[residentId] or "RETURN SAFELY FROM BRAMBLEWAKE THREE TIMES"
     return {
         message = string.format(
             "%s: %s — %d/%d. I WILL MARK IT WHEN IT IS DONE.",

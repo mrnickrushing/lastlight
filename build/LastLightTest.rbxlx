@@ -15405,10 +15405,27 @@ export type Quest = {
     reward: Reward,
 }
 
+--[[
+    Chapter I's three come first and keep their exact ids, thresholds and
+    rewards. The eight that follow belong to the residents Milestone 7
+    brings back from the Delve and the Fen -- each one asks for something
+    that resident would actually care about, and every objective is
+    computed from facts the profile already records.
+]]
 local ORDER = table.freeze({
     "quest_survive_three_nights",
     "quest_first_craft",
     "quest_bramblewake_veteran",
+    -- Ironroot Delve residents
+    "quest_delve_smith",
+    "quest_rail_keeper",
+    "quest_lamp_trimmer",
+    "quest_deep_cook",
+    -- Mireglass Fen residents
+    "quest_ferry_ledger",
+    "quest_reed_weaver",
+    "quest_glass_reader",
+    "quest_fen_healer",
 })
 
 local DEFINITIONS: { [string]: Quest } = {
@@ -15429,6 +15446,70 @@ local DEFINITIONS: { [string]: Quest } = {
         displayName = "BRAMBLEWAKE VETERAN",
         objective = table.freeze({ kind = "bramblewake_settlements", threshold = 3 }),
         reward = table.freeze({ materialId = "material_brightcap", amount = 3 }),
+    }),
+
+    -- Hesper kept her tools when she lost everything else, and measures
+    -- people by whether they keep theirs.
+    quest_delve_smith = table.freeze({
+        id = "quest_delve_smith",
+        displayName = "A SMITH'S MEASURE",
+        objective = table.freeze({ kind = "gear_traits", threshold = 3 }),
+        reward = table.freeze({ materialId = "material_heartwood", amount = 6 }),
+    }),
+    -- Odell hauled for a mine that stopped paying; a full store is the
+    -- only thing that makes him sit down.
+    quest_rail_keeper = table.freeze({
+        id = "quest_rail_keeper",
+        displayName = "THE STORES ARE FULL",
+        objective = table.freeze({ kind = "materials_banked", threshold = 60 }),
+        reward = table.freeze({ materialId = "material_spring_clay", amount = 4 }),
+    }),
+    -- Junie counts nights the way other people count money.
+    quest_lamp_trimmer = table.freeze({
+        id = "quest_lamp_trimmer",
+        displayName = "SEVEN LIT NIGHTS",
+        objective = table.freeze({ kind = "survive_nights", threshold = 7 }),
+        reward = table.freeze({ materialId = "material_amber_sap", amount = 5 }),
+    }),
+    -- Bartram fed a hundred people on nothing and still thinks the pantry
+    -- is short; he is satisfied by a town that builds its own kitchen.
+    quest_deep_cook = table.freeze({
+        id = "quest_deep_cook",
+        displayName = "SOMEWHERE TO COOK",
+        objective = table.freeze({ kind = "buildings_raised", threshold = 4 }),
+        reward = table.freeze({ materialId = "material_brightcap", amount = 4 }),
+    }),
+
+    -- Saoirse's ledger recorded names out and names back. She wants to
+    -- see a column that balances.
+    quest_ferry_ledger = table.freeze({
+        id = "quest_ferry_ledger",
+        displayName = "NAMES OUT, NAMES BACK",
+        objective = table.freeze({ kind = "bramblewake_settlements", threshold = 8 }),
+        reward = table.freeze({ materialId = "material_heartwood", amount = 8 }),
+    }),
+    -- Dabbler left a woven figure for every house the water took, and
+    -- would rather this town be decorated than remembered.
+    quest_reed_weaver = table.freeze({
+        id = "quest_reed_weaver",
+        displayName = "SOMETHING WOVEN",
+        objective = table.freeze({ kind = "decorations_placed", threshold = 3 }),
+        reward = table.freeze({ materialId = "material_meadow_fiber", amount = 6 }),
+    }),
+    -- Marek read glass for a living and knows most people never look
+    -- twice at what they carry.
+    quest_glass_reader = table.freeze({
+        id = "quest_glass_reader",
+        displayName = "LOOK TWICE",
+        objective = table.freeze({ kind = "craft_items", threshold = 6 }),
+        reward = table.freeze({ materialId = "material_amber_sap", amount = 6 }),
+    }),
+    -- Lissen still counts heads at dusk. Bonds are how she counts.
+    quest_fen_healer = table.freeze({
+        id = "quest_fen_healer",
+        displayName = "COUNT EVERY HEAD",
+        objective = table.freeze({ kind = "residents_bonded", threshold = 3 }),
+        reward = table.freeze({ materialId = "material_brightcap", amount = 6 }),
     }),
 }
 
@@ -15465,6 +15546,14 @@ export type Signals = {
     nightsSurvived: number,
     craftedItems: number,
     bramblewakeSettlements: number,
+    -- Milestone 7's resident quests. Every one of these is derived from
+    -- something the profile already stores, so no new tracking rides
+    -- along with the new residents.
+    buildingsRaised: number,
+    decorationsPlaced: number,
+    gearTraits: number,
+    materialsBanked: number,
+    residentsBonded: number,
 }
 
 local function currentValue(kind: string, signals: Signals): number
@@ -15474,6 +15563,16 @@ local function currentValue(kind: string, signals: Signals): number
         return signals.craftedItems
     elseif kind == "bramblewake_settlements" then
         return signals.bramblewakeSettlements
+    elseif kind == "buildings_raised" then
+        return signals.buildingsRaised
+    elseif kind == "decorations_placed" then
+        return signals.decorationsPlaced
+    elseif kind == "gear_traits" then
+        return signals.gearTraits
+    elseif kind == "materials_banked" then
+        return signals.materialsBanked
+    elseif kind == "residents_bonded" then
+        return signals.residentsBonded
     end
     return 0
 end
@@ -15633,6 +15732,8 @@ return table.freeze(RateLimiter)
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
 
+local ResidentRoster = require("./ResidentRoster")
+
 local ResidentDialogue = {}
 
 export type Response = {
@@ -15641,16 +15742,50 @@ export type Response = {
     state: string,
 }
 
-local RESIDENT_QUESTS = table.freeze({
-    npc_tomas_reed = "quest_first_craft",
-    npc_pip_wren = "quest_survive_three_nights",
-    npc_ena_moss = "quest_bramblewake_veteran",
+--[[
+    Names and quests come from the roster now; the two tables that used to
+    hold them here were the first place the roster drifted, which is why
+    it exists.
+]]
+local RESIDENT_QUESTS: { [string]: string } = {}
+local RESIDENT_NAMES: { [string]: string } = {}
+for _, definition in ResidentRoster.list() do
+    RESIDENT_QUESTS[definition.id] = definition.questId
+    RESIDENT_NAMES[definition.id] = definition.displayName
+end
+table.freeze(RESIDENT_QUESTS)
+table.freeze(RESIDENT_NAMES)
+
+--[[
+    What the residents brought back from their own regions say once their
+    work is done. Chapter I's three answer to the town's decisions, which
+    is handled below; these four-and-four answer to the places they came
+    from, and each one is a person rather than a job title.
+]]
+-- What each resident asks for, in their own words.
+local GUIDANCE = table.freeze({
+    npc_tomas_reed = "CRAFT ONE USEFUL ITEM AT THE WORKBENCH",
+    npc_pip_wren = "HELP THE LANTERN ROAD SURVIVE THREE NIGHTS",
+    npc_ena_moss = "RETURN SAFELY FROM BRAMBLEWAKE THREE TIMES",
+    npc_hesper_vane = "BRING ME GEAR THAT HAS FOUND ITS OWN CHARACTER",
+    npc_odell_crane = "FILL THE STORES — SIXTY OF ANYTHING WILL DO",
+    npc_junie_falk = "KEEP THE LIGHT LIT FOR SEVEN NIGHTS",
+    npc_bartram_hoke = "RAISE FOUR BUILDINGS SO THERE IS SOMEWHERE TO COOK",
+    npc_saoirse_quill = "COME BACK FROM BRAMBLEWAKE EIGHT TIMES, AND I WILL RULE THE COLUMN",
+    npc_wren_dabbler = "PUT UP THREE DECORATIONS — THIS TOWN SHOULD LOOK LIVED IN",
+    npc_marek_still = "CRAFT SIX THINGS AND LOOK TWICE AT EACH",
+    npc_lissen_ford = "BE TRUSTED BY THREE RESIDENTS — CHECK ON THEM",
 })
 
-local RESIDENT_NAMES = table.freeze({
-    npc_tomas_reed = "TOMAS",
-    npc_pip_wren = "PIP",
-    npc_ena_moss = "ENA",
+local ARRIVAL_LINES = table.freeze({
+    npc_hesper_vane = "A TOOL YOU KEPT SHARP IS A DAY YOU MEANT TO SURVIVE. BRING ME THE DULL ONES.",
+    npc_odell_crane = "FULL STORES AND A QUIET BELL. I COULD ALMOST SIT DOWN.",
+    npc_junie_falk = "SEVEN NIGHTS LIT IN A ROW. DOWN BELOW WE NEVER MANAGED THREE.",
+    npc_bartram_hoke = "A REAL KITCHEN. I HAVE BEEN COOKING OUT OF A HELMET SINCE I WAS TWENTY.",
+    npc_saoirse_quill = "NAMES OUT AND NAMES BACK, AND THE COLUMNS AGREE. I HAVE NOT WRITTEN THAT IN YEARS.",
+    npc_wren_dabbler = "I WOVE ONE FOR EVERY HOUSE THE WATER TOOK. NOW I WEAVE THEM FOR DOORS THAT STAND.",
+    npc_marek_still = "LOOK TWICE AT WHAT YOU CARRY. THE FEN TAUGHT ME THAT AND IT COST IT NOTHING.",
+    npc_lissen_ford = "EVERY HEAD COUNTED AT DUSK, AND EVERY ONE OF THEM KNOWS YOUR NAME. THAT IS THE WORK.",
 })
 
 local function questById(quests: any, questId: string): any
@@ -15666,6 +15801,10 @@ local function questById(quests: any, questId: string): any
 end
 
 local function completedStory(residentId: string, consequence: any): string
+    local arrival = ARRIVAL_LINES[residentId]
+    if arrival ~= nil then
+        return arrival
+    end
     local decision = if type(consequence) == "table" then consequence.decision else nil
     local wardenOutcome = if type(consequence) == "table" then consequence.wardenOutcome else nil
     if residentId == "npc_tomas_reed" then
@@ -15724,10 +15863,7 @@ function ResidentDialogue.respond(residentId: any, quests: any, consequence: any
 
     local current = math.max(0, math.floor(tonumber(quest.progress) or 0))
     local threshold = math.max(1, math.floor(tonumber(quest.threshold) or 1))
-    local guidance = if residentId == "npc_tomas_reed"
-        then "CRAFT ONE USEFUL ITEM AT THE WORKBENCH"
-        elseif residentId == "npc_pip_wren" then "HELP THE LANTERN ROAD SURVIVE THREE NIGHTS"
-        else "RETURN SAFELY FROM BRAMBLEWAKE THREE TIMES"
+    local guidance = GUIDANCE[residentId] or "RETURN SAFELY FROM BRAMBLEWAKE THREE TIMES"
     return {
         message = string.format(
             "%s: %s — %d/%d. I WILL MARK IT WHEN IT IS DONE.",
@@ -15765,6 +15901,8 @@ return table.freeze(ResidentDialogue)
       that keeps the no-paid-power line easy to hold forever.
     - Bonds are per-profile: they are the town remembering *you*.
 ]]
+
+local ResidentRoster = require("./ResidentRoster")
 
 local ResidentLife = {}
 
@@ -15804,31 +15942,15 @@ export type NightReport = {
     crisis: Crisis?,
 }
 
-local RESIDENT_IDS = table.freeze({ "npc_tomas_reed", "npc_pip_wren", "npc_ena_moss" })
+--[[
+    Who exists, and what job each holds, now comes from ResidentRoster --
+    one list instead of the several that used to drift apart. Chapter I's
+    three still come first, in their original order, with their original
+    jobs, so nothing about an existing town changes.
+]]
+local RESIDENT_IDS = ResidentRoster.Order
 
-local JOBS: { [string]: Job } = table.freeze({
-    npc_tomas_reed = table.freeze({
-        residentId = "npc_tomas_reed",
-        buildingId = "building_inn",
-        title = "QUARTERMASTER",
-        boon = "dawn_repair",
-        boonLabel = "TOMAS PATCHES THE WORST-HIT BUILDING",
-    }),
-    npc_pip_wren = table.freeze({
-        residentId = "npc_pip_wren",
-        buildingId = "building_town_board",
-        title = "COURIER",
-        boon = "night_forewarning",
-        boonLabel = "PIP POSTS WORD OF THE COMING NIGHT",
-    }),
-    npc_ena_moss = table.freeze({
-        residentId = "npc_ena_moss",
-        buildingId = "building_workbench",
-        title = "SEEDKEEPER",
-        boon = "lantern_reserve",
-        boonLabel = "ENA BANKS A SPARK RESERVE FOR THE LANTERN",
-    }),
-})
+local JOBS: { [string]: Job } = table.freeze(ResidentRoster.jobs())
 
 -- A workplace this damaged injures its keeper during the night's chaos.
 local INJURY_INTEGRITY_THRESHOLD = 0.5
@@ -16084,6 +16206,328 @@ return table.freeze(ResidentLife)
       </Item>
       <Item class="ModuleScript" referent="68">
         <Properties>
+          <string name="Name">ResidentRoster</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    Who lives in Emberhollow, and who is going to.
+
+    Three residents shipped with chapter I and have been named in half a
+    dozen places since -- ResidentLife's job table, the dialogue module,
+    the world's placement code. Milestone 7 adds eight more, drawn from
+    the two new regions, and eight more hand-maintained lists is how a
+    roster drifts out of agreement with itself. So the roster lives here
+    once: identity, home region, when they arrive, the job they take, and
+    the quest they carry.
+
+    Arrival is the important field. A resident is not in town because a
+    module exists; they arrive when their chapter does. Chapter I's three
+    are present from the first dawn, the Delve's four arrive with chapter
+    II, and the Fen's four with chapter III -- so a fresh save still meets
+    exactly the three people it always met, and the town fills as the
+    story does.
+
+    Nobody here is a job title with a name attached. Each one wanted
+    something in their own region, failed or half-succeeded at it, and
+    brought that with them.
+]]
+
+local ResidentRoster = {}
+
+export type Job = {
+    residentId: string,
+    buildingId: string,
+    title: string,
+    boon: string,
+    boonLabel: string,
+}
+
+export type Resident = {
+    id: string,
+    displayName: string,
+    fullName: string,
+    homeRegion: string,
+    arrivesInChapter: number,
+    questId: string,
+    job: Job,
+    -- One line about who they are, for the world sign and the Field Book.
+    introduction: string,
+}
+
+local function resident(definition: Resident): Resident
+    return table.freeze({
+        id = definition.id,
+        displayName = definition.displayName,
+        fullName = definition.fullName,
+        homeRegion = definition.homeRegion,
+        arrivesInChapter = definition.arrivesInChapter,
+        questId = definition.questId,
+        introduction = definition.introduction,
+        job = table.freeze(definition.job),
+    })
+end
+
+--[[
+    Chapter I's three keep their exact ids, jobs, titles and boons -- this
+    module inherits those definitions rather than restating them, so
+    nothing about the town that exists today changes.
+]]
+local ORDER = table.freeze({
+    "npc_tomas_reed",
+    "npc_pip_wren",
+    "npc_ena_moss",
+    -- Ironroot Delve, chapter II
+    "npc_hesper_vane",
+    "npc_odell_crane",
+    "npc_junie_falk",
+    "npc_bartram_hoke",
+    -- Mireglass Fen, chapter III
+    "npc_saoirse_quill",
+    "npc_wren_dabbler",
+    "npc_marek_still",
+    "npc_lissen_ford",
+})
+
+local DEFINITIONS: { [string]: Resident } = {
+    npc_tomas_reed = resident({
+        id = "npc_tomas_reed",
+        displayName = "TOMAS",
+        fullName = "Tomas Reed",
+        homeRegion = "region_bramblewake",
+        arrivesInChapter = 1,
+        questId = "quest_first_craft",
+        introduction = "Keeps the inn and the tool bench, and patches what the night breaks.",
+        job = {
+            residentId = "npc_tomas_reed",
+            buildingId = "building_inn",
+            title = "QUARTERMASTER",
+            boon = "dawn_repair",
+            boonLabel = "TOMAS PATCHES THE WORST-HIT BUILDING",
+        },
+    }),
+    npc_pip_wren = resident({
+        id = "npc_pip_wren",
+        displayName = "PIP",
+        fullName = "Pip Wren",
+        homeRegion = "region_bramblewake",
+        arrivesInChapter = 1,
+        questId = "quest_survive_three_nights",
+        introduction = "Runs the roads and posts what is coming before it arrives.",
+        job = {
+            residentId = "npc_pip_wren",
+            buildingId = "building_town_board",
+            title = "COURIER",
+            boon = "night_forewarning",
+            boonLabel = "PIP POSTS WORD OF THE COMING NIGHT",
+        },
+    }),
+    npc_ena_moss = resident({
+        id = "npc_ena_moss",
+        displayName = "ENA",
+        fullName = "Ena Moss",
+        homeRegion = "region_bramblewake",
+        arrivesInChapter = 1,
+        questId = "quest_bramblewake_veteran",
+        introduction = "Keeps seed and spark, and decides what the town plants next.",
+        job = {
+            residentId = "npc_ena_moss",
+            buildingId = "building_workbench",
+            title = "SEEDKEEPER",
+            boon = "lantern_reserve",
+            boonLabel = "ENA BANKS A SPARK RESERVE FOR THE LANTERN",
+        },
+    }),
+
+    -- Ironroot Delve. Four people who worked a mine that stopped being a
+    -- mine, and who each kept a different piece of it.
+    npc_hesper_vane = resident({
+        id = "npc_hesper_vane",
+        displayName = "HESPER",
+        fullName = "Hesper Vane",
+        homeRegion = "region_ironroot",
+        arrivesInChapter = 2,
+        questId = "quest_delve_smith",
+        introduction = "Shift smith. Came up with her tools and somebody else's tally book.",
+        job = {
+            residentId = "npc_hesper_vane",
+            buildingId = "building_forge",
+            title = "SHIFT SMITH",
+            boon = "dawn_whetstone",
+            boonLabel = "HESPER WHETS THE WORST-WORN GEAR IN TOWN",
+        },
+    }),
+    npc_odell_crane = resident({
+        id = "npc_odell_crane",
+        displayName = "ODELL",
+        fullName = "Odell Crane",
+        homeRegion = "region_ironroot",
+        arrivesInChapter = 2,
+        questId = "quest_rail_keeper",
+        introduction = "Ran the cart lines. Still flinches when a bell rings twice.",
+        job = {
+            residentId = "npc_odell_crane",
+            buildingId = "building_market",
+            title = "RAIL KEEPER",
+            boon = "dawn_haulage",
+            boonLabel = "ODELL HAULS AN EXTRA BUNDLE IN BEFORE DAWN",
+        },
+    }),
+    npc_junie_falk = resident({
+        id = "npc_junie_falk",
+        displayName = "JUNIE",
+        fullName = "Junie Falk",
+        homeRegion = "region_ironroot",
+        arrivesInChapter = 2,
+        questId = "quest_lamp_trimmer",
+        introduction = "Trimmed lamps below. Will not sit with her back to a dark doorway.",
+        job = {
+            residentId = "npc_junie_falk",
+            buildingId = "building_first_lantern",
+            title = "LAMP TRIMMER",
+            boon = "lantern_trim",
+            boonLabel = "JUNIE TRIMS THE FIRST LANTERN BEFORE NIGHTFALL",
+        },
+    }),
+    npc_bartram_hoke = resident({
+        id = "npc_bartram_hoke",
+        displayName = "BARTRAM",
+        fullName = "Bartram Hoke",
+        homeRegion = "region_ironroot",
+        arrivesInChapter = 2,
+        questId = "quest_deep_cook",
+        introduction = "Fed a hundred miners on nothing. Cooks like the pantry is still short.",
+        job = {
+            residentId = "npc_bartram_hoke",
+            buildingId = "building_kitchen",
+            title = "PIT COOK",
+            boon = "dawn_ration",
+            boonLabel = "BARTRAM SETS OUT A HOT RATION AT DAWN",
+        },
+    }),
+
+    -- Mireglass Fen. Four people from a country that drowned slowly
+    -- enough for everyone to argue about whether it was drowning.
+    npc_saoirse_quill = resident({
+        id = "npc_saoirse_quill",
+        displayName = "SAOIRSE",
+        fullName = "Saoirse Quill",
+        homeRegion = "region_mireglass",
+        arrivesInChapter = 3,
+        questId = "quest_ferry_ledger",
+        introduction = "Kept the ferry ledger. Knows exactly how many did not come back.",
+        job = {
+            residentId = "npc_saoirse_quill",
+            buildingId = "building_archive",
+            title = "LEDGER KEEPER",
+            boon = "dawn_accounting",
+            boonLabel = "SAOIRSE FINDS A MISFILED BUNDLE IN THE STORES",
+        },
+    }),
+    npc_wren_dabbler = resident({
+        id = "npc_wren_dabbler",
+        displayName = "DABBLER",
+        fullName = "Wren Dabbler",
+        homeRegion = "region_mireglass",
+        arrivesInChapter = 3,
+        questId = "quest_reed_weaver",
+        introduction = "Weaves reed into everything. Left a figure for every house the water took.",
+        job = {
+            residentId = "npc_wren_dabbler",
+            buildingId = "building_celebration_stage",
+            title = "REED WEAVER",
+            boon = "dawn_decoration",
+            boonLabel = "DABBLER LEAVES A WOVEN CHARM ON A TOWN DOOR",
+        },
+    }),
+    npc_marek_still = resident({
+        id = "npc_marek_still",
+        displayName = "MAREK",
+        fullName = "Marek Still",
+        homeRegion = "region_mireglass",
+        arrivesInChapter = 3,
+        questId = "quest_glass_reader",
+        introduction = "Read mireglass for a living. Warns people about their own reflections.",
+        job = {
+            residentId = "npc_marek_still",
+            buildingId = "building_watchtower",
+            title = "GLASS READER",
+            boon = "night_tell",
+            boonLabel = "MAREK NAMES A TELL BEFORE THE NIGHT USES IT",
+        },
+    }),
+    npc_lissen_ford = resident({
+        id = "npc_lissen_ford",
+        displayName = "LISSEN",
+        fullName = "Lissen Ford",
+        homeRegion = "region_mireglass",
+        arrivesInChapter = 3,
+        questId = "quest_fen_healer",
+        introduction = "Pulled people out of the water for years. Still counts heads at dusk.",
+        job = {
+            residentId = "npc_lissen_ford",
+            buildingId = "building_guardhouse",
+            title = "FEN HEALER",
+            boon = "dawn_recovery",
+            boonLabel = "LISSEN GETS ONE INJURED RESIDENT BACK ON THEIR FEET",
+        },
+    }),
+}
+
+ResidentRoster.Order = ORDER
+
+function ResidentRoster.get(residentId: any): Resident?
+    return if type(residentId) == "string" then DEFINITIONS[residentId] else nil
+end
+
+function ResidentRoster.require(residentId: string): Resident
+    local definition = DEFINITIONS[residentId]
+    assert(definition ~= nil, string.format("unknown resident ID %q", residentId))
+    return definition
+end
+
+function ResidentRoster.list(): { Resident }
+    local result: { Resident } = {}
+    for _, residentId in ORDER do
+        table.insert(result, DEFINITIONS[residentId])
+    end
+    return result
+end
+
+--[[
+    Who is in town at a given chapter. Chapter defaults to one, which is
+    what every caller that predates the roster means, so nothing changes
+    for a save that has not left Bramblewake.
+]]
+function ResidentRoster.idsForChapter(chapter: number?): { string }
+    local reached = math.max(1, math.floor(tonumber(chapter) or 1))
+    local ids: { string } = {}
+    for _, residentId in ORDER do
+        if DEFINITIONS[residentId].arrivesInChapter <= reached then
+            table.insert(ids, residentId)
+        end
+    end
+    return ids
+end
+
+function ResidentRoster.jobs(): { [string]: Job }
+    local jobs: { [string]: Job } = {}
+    for _, residentId in ORDER do
+        jobs[residentId] = DEFINITIONS[residentId].job
+    end
+    return jobs
+end
+
+function ResidentRoster.questIdFor(residentId: any): string?
+    local definition = ResidentRoster.get(residentId)
+    return if definition == nil then nil else definition.questId
+end
+
+return table.freeze(ResidentRoster)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="69">
+        <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -16197,7 +16641,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="69">
+      <Item class="ModuleScript" referent="70">
         <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -16326,7 +16770,7 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="70">
+      <Item class="ModuleScript" referent="71">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -16487,7 +16931,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="71">
+      <Item class="ModuleScript" referent="72">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -17433,10 +17877,47 @@ local function questSignals(profile: Profile): Quests.Signals
     for _, count in profile.gear do
         craftedItems += count
     end
+    --[[
+        The Milestone 7 resident quests read facts the profile already
+        keeps: how much is banked, how far construction has come, how many
+        decorations stand, how many pieces of gear have rolled a trait,
+        and how many residents count you as more than a stranger.
+    ]]
+    local materialsBanked = 0
+    for _, count in profile.inventory.materials do
+        materialsBanked += math.max(0, math.floor(tonumber(count) or 0))
+    end
+    local buildingsRaised = 0
+    for _, stage in (profile :: any).town.construction do
+        if (tonumber(stage) or 0) >= 1 then
+            buildingsRaised += 1
+        end
+    end
+    local decorationsPlaced = 0
+    for _, placed in (profile :: any).town.decorations do
+        if placed == true then
+            decorationsPlaced += 1
+        end
+    end
+    local gearTraits = 0
+    for _ in (profile :: any).gearTraits or {} do
+        gearTraits += 1
+    end
+    local residentsBonded = 0
+    for _, resident in (profile :: any).town.residents do
+        if type(resident) == "table" and (tonumber(resident.bond) or 0) >= 50 then
+            residentsBonded += 1
+        end
+    end
     return {
         bramblewakeSettlements = #profile.inventory.settlementOrder,
+        buildingsRaised = buildingsRaised,
         craftedItems = craftedItems,
+        decorationsPlaced = decorationsPlaced,
+        gearTraits = gearTraits,
+        materialsBanked = materialsBanked,
         nightsSurvived = math.max(0, profile.town.nightNumber - 1),
+        residentsBonded = residentsBonded,
     }
 end
 
@@ -17572,7 +18053,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="72">
+      <Item class="ModuleScript" referent="73">
         <Properties>
           <string name="Name">SfxCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -17739,7 +18220,7 @@ return table.freeze(SfxCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="73">
+      <Item class="ModuleScript" referent="74">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -17858,7 +18339,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="74">
+      <Item class="ModuleScript" referent="75">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -18115,7 +18596,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="75">
+      <Item class="ModuleScript" referent="76">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -18259,7 +18740,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="76">
+      <Item class="ModuleScript" referent="77">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -18669,7 +19150,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="77">
+      <Item class="ModuleScript" referent="78">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -18850,7 +19331,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="78">
+      <Item class="ModuleScript" referent="79">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -18914,7 +19395,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="79">
+      <Item class="ModuleScript" referent="80">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -19088,7 +19569,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="80">
+      <Item class="ModuleScript" referent="81">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -19180,7 +19661,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="81">
+      <Item class="ModuleScript" referent="82">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -19392,7 +19873,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="82">
+      <Item class="ModuleScript" referent="83">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -19570,7 +20051,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="83">
+      <Item class="ModuleScript" referent="84">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -19723,7 +20204,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="84">
+      <Item class="ModuleScript" referent="85">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -19956,7 +20437,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="85">
+      <Item class="ModuleScript" referent="86">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -20118,7 +20599,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="86">
+      <Item class="ModuleScript" referent="87">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -20154,7 +20635,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="87">
+      <Item class="ModuleScript" referent="88">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -20536,7 +21017,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="88">
+      <Item class="ModuleScript" referent="89">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -20608,11 +21089,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="89">
+  <Item class="ServerScriptService" referent="90">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="90">
+    <Item class="Script" referent="91">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -21075,7 +21556,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="91">
+      <Item class="ModuleScript" referent="92">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -21173,11 +21654,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="92">
+      <Item class="Folder" referent="93">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="93">
+        <Item class="ModuleScript" referent="94">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -21792,7 +22273,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="94">
+        <Item class="ModuleScript" referent="95">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22663,7 +23144,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="95">
+        <Item class="ModuleScript" referent="96">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23164,7 +23645,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="96">
+        <Item class="ModuleScript" referent="97">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23421,7 +23902,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="97">
+        <Item class="ModuleScript" referent="98">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23828,7 +24309,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="98">
+        <Item class="ModuleScript" referent="99">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -25464,7 +25945,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="99">
+        <Item class="ModuleScript" referent="100">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -26157,7 +26638,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="100">
+        <Item class="ModuleScript" referent="101">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -26261,7 +26742,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="101">
+        <Item class="ModuleScript" referent="102">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -26546,7 +27027,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="102">
+        <Item class="ModuleScript" referent="103">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -26952,7 +27433,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="103">
+        <Item class="ModuleScript" referent="104">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -27046,7 +27527,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="104">
+        <Item class="ModuleScript" referent="105">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -27264,7 +27745,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="105">
+        <Item class="ModuleScript" referent="106">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -28134,7 +28615,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="106">
+        <Item class="ModuleScript" referent="107">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -28389,7 +28870,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="107">
+        <Item class="ModuleScript" referent="108">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -28568,7 +29049,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="108">
+        <Item class="ModuleScript" referent="109">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -29151,7 +29632,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="109">
+        <Item class="ModuleScript" referent="110">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -30264,7 +30745,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="110">
+        <Item class="ModuleScript" referent="111">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -30889,7 +31370,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="111">
+        <Item class="ModuleScript" referent="112">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -32596,7 +33077,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="112">
+        <Item class="ModuleScript" referent="113">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -33221,7 +33702,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="113">
+        <Item class="ModuleScript" referent="114">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -35227,7 +35708,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="114">
+        <Item class="ModuleScript" referent="115">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -36096,7 +36577,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="115">
+        <Item class="ModuleScript" referent="116">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48382,11 +48863,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="116">
+      <Item class="Folder" referent="117">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="117">
+        <Item class="ModuleScript" referent="118">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -52166,7 +52647,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="118">
+        <Item class="ModuleScript" referent="119">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -53236,7 +53717,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="119">
+        <Item class="ModuleScript" referent="120">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -53931,7 +54412,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="120">
+        <Item class="ModuleScript" referent="121">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -54790,7 +55271,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="121">
+        <Item class="ModuleScript" referent="122">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -54876,7 +55357,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="122">
+        <Item class="ModuleScript" referent="123">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -55250,7 +55731,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="123">
+        <Item class="ModuleScript" referent="124">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -55430,7 +55911,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="124">
+        <Item class="ModuleScript" referent="125">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -56026,7 +56507,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="125">
+        <Item class="ModuleScript" referent="126">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -56263,7 +56744,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="126">
+        <Item class="ModuleScript" referent="127">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -56352,7 +56833,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="127">
+        <Item class="ModuleScript" referent="128">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -56688,11 +57169,11 @@ return table.freeze(WorldSignBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="128">
+    <Item class="Folder" referent="129">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="129">
+      <Item class="Script" referent="130">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -58472,7 +58953,7 @@ print("[Last Light] PASS FoundationIntegration")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Script" referent="130">
+      <Item class="Script" referent="131">
         <Properties>
           <string name="Name">ModuleGallery</string>
           <token name="RunContext">0</token>
@@ -58563,15 +59044,15 @@ end
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="131">
+  <Item class="StarterPlayer" referent="132">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="132">
+    <Item class="StarterPlayerScripts" referent="133">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="133">
+      <Item class="LocalScript" referent="134">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -58866,11 +59347,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="134">
+        <Item class="Folder" referent="135">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="135">
+          <Item class="ModuleScript" referent="136">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -59001,7 +59482,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="136">
+          <Item class="ModuleScript" referent="137">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -61863,7 +62344,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="137">
+          <Item class="ModuleScript" referent="138">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -62162,7 +62643,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="138">
+          <Item class="ModuleScript" referent="139">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -62270,7 +62751,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="139">
+          <Item class="ModuleScript" referent="140">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -62389,7 +62870,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="140">
+          <Item class="ModuleScript" referent="141">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -62663,7 +63144,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="141">
+          <Item class="ModuleScript" referent="142">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -62763,7 +63244,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="142">
+          <Item class="ModuleScript" referent="143">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -62875,7 +63356,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="143">
+          <Item class="ModuleScript" referent="144">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -63035,7 +63516,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="144">
+          <Item class="ModuleScript" referent="145">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -63244,7 +63725,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="145">
+          <Item class="ModuleScript" referent="146">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -63389,7 +63870,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="146">
+          <Item class="ModuleScript" referent="147">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -63689,13 +64170,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="147">
+  <Item class="TextChatService" referent="148">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="148">
+  <Item class="Workspace" referent="149">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>
