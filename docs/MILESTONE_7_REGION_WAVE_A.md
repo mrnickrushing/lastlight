@@ -80,11 +80,13 @@ test could see, because every part of them a test can read was correct.
 - **Defense plots (#227)** — three plots stand on their three lanes at
   exactly 46 studs from the lantern, each with six ring stones, stake,
   ember, and a 42-stud ArmClick; `defense_plots_built lanes=3` at boot.
-  **Arming by tap verified end to end**: clicking the real stake in the
-  world reaches the server and answers "SETTING THE SNARE TAKES 1
-  HEARTWOOD AND 2 MEADOW FIBER" on an empty purse. The tap path is the
-  half that could have been silently dead (it was, for the Old Growth
-  heart, in #221); the successful arm and the bite still want materials.
+  **Arming verified end to end, both ways**: on an empty purse the real
+  stake answers "SETTING THE SNARE TAKES 1 HEARTWOOD AND 2 MEADOW FIBER";
+  with materials banked it answers "THE MEADOW GATE SNARE IS SET — 2
+  BITES IN IT", spends exactly 2 meadow fiber and 1 heartwood and nothing
+  else, and the ember lamp goes from cold to lit. The tap path was the
+  half that could have been silently dead -- it was, for the Old Growth
+  heart, in #221.
 - **Delve and Fen enemy silhouettes (#233, #237)** — all twelve built and
   photographed. **Six were wrong** and are fixed in #251: four parts sized
   on the wrong cylinder axis (the Slag Spitter's pool standing as a bar
@@ -109,13 +111,13 @@ test could see, because every part of them a test can read was correct.
 
 **Still open, and what each one needs:**
 
-Everything left here needs a *stocked profile* — materials banked from a
-real expedition — which the session did not run. They are one economy
-loop away, not one fix away:
+Everything left here needs a **town night**, which sits behind tutorial
+completion (free Mara, gather, choose a tool, raise the barricade, hold
+the first night). Materials are no longer the obstacle -- see the
+stocking hook below.
 
-- Defense plots: the successful arm (2 fiber + 1 heartwood), the bite
-  toast when a night creature walks the ring, and the Watch defender on a
-  solo night.
+- Defense plots: the bite toast when a night creature walks an armed
+  ring, and the Watch defender on a solo night.
 - Gear care: the WHET press and the worn equip-label read on a profile
   that has actually dulled a weapon.
 - Delve/Fen enemies: telegraph read at night (the silhouettes are done).
@@ -124,6 +126,26 @@ loop away, not one fix away:
 - Every device-hardware item (baseline phone performance, touch reach,
   safe areas) — Studio's emulator cannot close these, per
   STUDIO_MCP_SETUP's own honest split.
+
+## Stocking a profile for a verification run
+
+`ProfileService` honors a `LastLightStockProfile` attribute on the
+DataModel: set it to a number and every loaded profile is granted that
+many of each launch material, immediately. It exists because the session
+above spent itself discovering that a two-second interaction was gated
+behind a full playthrough, every time.
+
+```lua
+-- in the running server, mid-session
+game:SetAttribute("LastLightStockProfile", 12)
+```
+
+Three guards, all of which must hold: Studio only (`RunService:IsStudio`),
+non-persistent environments only (production runs with persistence on and
+refuses it), and a loud log line every time. It grants materials, which
+are earned and spent in play; it cannot grant progress, chapters,
+professions or gear, because those are what a verification run is
+supposed to actually perform.
 
 ## A note for whoever drives Studio next
 
