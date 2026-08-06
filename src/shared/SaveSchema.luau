@@ -941,10 +941,47 @@ local function questSignals(profile: Profile): Quests.Signals
     for _, count in profile.gear do
         craftedItems += count
     end
+    --[[
+        The Milestone 7 resident quests read facts the profile already
+        keeps: how much is banked, how far construction has come, how many
+        decorations stand, how many pieces of gear have rolled a trait,
+        and how many residents count you as more than a stranger.
+    ]]
+    local materialsBanked = 0
+    for _, count in profile.inventory.materials do
+        materialsBanked += math.max(0, math.floor(tonumber(count) or 0))
+    end
+    local buildingsRaised = 0
+    for _, stage in (profile :: any).town.construction do
+        if (tonumber(stage) or 0) >= 1 then
+            buildingsRaised += 1
+        end
+    end
+    local decorationsPlaced = 0
+    for _, placed in (profile :: any).town.decorations do
+        if placed == true then
+            decorationsPlaced += 1
+        end
+    end
+    local gearTraits = 0
+    for _ in (profile :: any).gearTraits or {} do
+        gearTraits += 1
+    end
+    local residentsBonded = 0
+    for _, resident in (profile :: any).town.residents do
+        if type(resident) == "table" and (tonumber(resident.bond) or 0) >= 50 then
+            residentsBonded += 1
+        end
+    end
     return {
         bramblewakeSettlements = #profile.inventory.settlementOrder,
+        buildingsRaised = buildingsRaised,
         craftedItems = craftedItems,
+        decorationsPlaced = decorationsPlaced,
+        gearTraits = gearTraits,
+        materialsBanked = materialsBanked,
         nightsSurvived = math.max(0, profile.town.nightNumber - 1),
+        residentsBonded = residentsBonded,
     }
 end
 

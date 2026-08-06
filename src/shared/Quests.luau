@@ -8,6 +8,14 @@ export type Signals = {
     nightsSurvived: number,
     craftedItems: number,
     bramblewakeSettlements: number,
+    -- Milestone 7's resident quests. Every one of these is derived from
+    -- something the profile already stores, so no new tracking rides
+    -- along with the new residents.
+    buildingsRaised: number,
+    decorationsPlaced: number,
+    gearTraits: number,
+    materialsBanked: number,
+    residentsBonded: number,
 }
 
 local function currentValue(kind: string, signals: Signals): number
@@ -17,6 +25,16 @@ local function currentValue(kind: string, signals: Signals): number
         return signals.craftedItems
     elseif kind == "bramblewake_settlements" then
         return signals.bramblewakeSettlements
+    elseif kind == "buildings_raised" then
+        return signals.buildingsRaised
+    elseif kind == "decorations_placed" then
+        return signals.decorationsPlaced
+    elseif kind == "gear_traits" then
+        return signals.gearTraits
+    elseif kind == "materials_banked" then
+        return signals.materialsBanked
+    elseif kind == "residents_bonded" then
+        return signals.residentsBonded
     end
     return 0
 end
