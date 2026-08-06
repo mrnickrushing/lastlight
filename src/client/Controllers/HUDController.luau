@@ -320,6 +320,7 @@ export type HUDController = typeof(setmetatable(
         _contractButtons: { [string]: TextButton },
         _selectedContractId: string,
         _onLobbyDepart: ((number) -> ())?,
+        _selectedPartySize: number?,
         _progressButton: TextButton,
         _useCharm: TextButton,
         _useSatchel: TextButton,
@@ -1426,6 +1427,7 @@ function HUDController.new(
         _departurePlatformPart = nil,
         _departurePlatformPosition = nil,
         _onLobbyDepart = nil,
+        _selectedPartySize = nil,
         _canvas = canvas,
         _scale = scale,
         _phaseFrame = phaseFrame,
@@ -1653,10 +1655,32 @@ function HUDController.setCompactHandler(self: HUDController, callback: (boolean
     self._onCompact = callback
 end
 
+function HUDController._setSelectedPartySize(self: HUDController, size: number?)
+    self._selectedPartySize = size
+    for index, button in self._lobbySizeButtons do
+        local chosen = index == size
+        button.BackgroundColor3 = if chosen
+            then Color3.fromRGB(37, 68, 55)
+            else Color3.fromRGB(31, 40, 44)
+        button.TextColor3 = if chosen then COLORS.amber else COLORS.cream
+    end
+end
+
 function HUDController.setLobbyDepartHandler(self: HUDController, callback: (number, string) -> ())
     self._onLobbyDepart = callback
     for size, button in self._lobbySizeButtons do
         button.Activated:Connect(function()
+            --[[
+                The press is two things at once, and it used to be only one.
+                Sending the departure request was always here; showing that a
+                number was chosen was not, so a press made off the platform --
+                which the server correctly refuses -- left the panel looking
+                exactly as it had before it. That is the "nothing happens, no
+                number is selected" the owner reported twice. The contract row
+                one line below has always marked its choice; the size row now
+                speaks the same language.
+            ]]
+            self:_setSelectedPartySize(size)
             local handler = self._onLobbyDepart
             if handler ~= nil then
                 handler(size, self._selectedContractId)
@@ -1747,8 +1771,18 @@ function HUDController._updateLobby(self: HUDController, state: any)
         self._lobbySizes.Visible = false
     else
         self._lobbyTitle.Text = "DEPARTURE"
-        self._lobbyDetail.Text = if lobby.readyCount > 0
-            then string.format("%d ON THE PLATFORM * CHOOSE PARTY SIZE", lobby.readyCount)
+        local chosen = self._selectedPartySize
+        self._lobbyDetail.Text = if chosen ~= nil and lobby.readyCount <= 0
+            then string.format("PARTY OF %d * STAND ON THE PLATFORM", chosen)
+            elseif chosen ~= nil then string.format(
+                "%d ON THE PLATFORM * PARTY OF %d",
+                lobby.readyCount,
+                chosen
+            )
+            elseif lobby.readyCount > 0 then string.format(
+                "%d ON THE PLATFORM * CHOOSE PARTY SIZE",
+                lobby.readyCount
+            )
             else "STAND ON THE PLATFORM TO DEPART"
         self._lobbySizes.Visible = true
         local maximum = if type(lobby.maxPartySize) == "number" then lobby.maxPartySize else 8
