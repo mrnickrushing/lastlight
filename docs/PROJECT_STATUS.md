@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-06, at `main` = `5c3230d` (PR #239), build `0.53.0`,
-save schema 20, 22 services. Published to Roblox as place version 85,
+Last updated: 2026-08-06, at `main` = `67d2be3` (PR #241), build `0.53.0`,
+save schema 20, 22 services. Published to Roblox as place version 86,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,14 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#241** (v86) **M7 wave G**: chapters II and III. ChapterCatalog
+  describes all three chapters (region, closing boss, decision, outcomes
+  — the Maw's and Witch's own outcome words, spec-pinned against drift);
+  chapters II+ store uniformly under story.chapters with chapter one's
+  idempotency contract (duplicate / rival / locked / forged-drop);
+  SaveSchema.chapterProgress drives resident arrival. Schema 19 → 20
+  with an era-19 fixture; the two specs that asserted the literal 19 now
+  read Config.SaveSchemaVersion.
 - **#239** (v85) **M7 wave F**: the eight named residents (four from the
   Delve, four from the Fen) and **ResidentRoster**, which now holds
   identity, home region, arrival chapter, job and quest in one place —
@@ -136,11 +144,10 @@ Earlier waves in this stretch:
 M7 waves A–F are merged and published: **both regions exist as rules and
 data** (catalogs, rosters, elites, bosses) and **the eight residents
 exist as people** (roster, jobs, quests, dialogue), all spec-pinned.
-What remains for M7: builder geometry and runtime wiring for both regions
-(region selection in ExpeditionService, elite/boss services and arenas,
-resident placement in town — the parts that most want Studio), chapters
-II–III's story structure, remaining basic profession kits, and town tiers
-2–4. M6 remaining: only the
+What remains for M7: builder geometry and runtime wiring for both
+regions (region selection in ExpeditionService, elite/boss services and
+arenas, resident placement in town — the parts that most want Studio),
+remaining basic profession kits, and town tiers 2–4. M6 remaining: only the
 recorded live checks, all blocked on Studio availability (kit apply, gear dulling arc, hound visuals/follow feel,
 defense plot placement/arm-by-tap, WHET press on device, Blackout drive
 to the Old Growth on a touch path). Every source-side deliverable is
