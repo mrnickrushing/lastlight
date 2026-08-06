@@ -169,7 +169,9 @@ geometry, which most wants Studio: builders for both regions' 60 module
 visuals, elite/boss services and arenas for the four new elites and two
 new bosses, and physical placement for the eight new residents. These
 are large waves best driven with a live Studio session; the switch for
-each region is one `enabled` flag once its builder exists. M6 remaining: only the
+each region is one `enabled` flag once its builder exists. The full
+state of the milestone and every deferred live check:
+[MILESTONE_7_REGION_WAVE_A.md](MILESTONE_7_REGION_WAVE_A.md). M6 remaining: only the
 recorded live checks, all blocked on Studio availability (kit apply, gear dulling arc, hound visuals/follow feel,
 defense plot placement/arm-by-tap, WHET press on device, Blackout drive
 to the Old Growth on a touch path). Every source-side deliverable is
