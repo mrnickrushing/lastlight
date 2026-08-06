@@ -85,6 +85,7 @@ local RuntimeIds = {
         LobbyDepart = "lobby_depart",
         SaveLoadout = "save_loadout",
         RepairGear = "repair_gear",
+        CompanionCommand = "companion_command",
         ApplyLoadout = "apply_loadout",
         GatherResource = "gather_resource",
         OpenFieldBook = "open_field_book",

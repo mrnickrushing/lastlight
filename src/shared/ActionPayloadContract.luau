@@ -72,6 +72,8 @@ function ActionPayloadContract.extraField(runtimeIds: any, kind: string): string
         return "partySize"
     elseif kind == actions.SaveLoadout or kind == actions.ApplyLoadout then
         return "slot"
+    elseif kind == actions.CompanionCommand then
+        return "mode"
     end
     return nil
 end
