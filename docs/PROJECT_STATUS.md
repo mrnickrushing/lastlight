@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-05, at `main` = `cc82b6a` (PR #229), build `0.53.0`,
-save schema 19, 22 services. Published to Roblox as place version 79,
+Last updated: 2026-08-06, at `main` = `3e9414b` (PR #231), build `0.53.0`,
+save schema 19, 22 services. Published to Roblox as place version 80,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,18 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#231** (v80) **Milestone 7 wave A**: the Ironroot Delve catalog (30
+  modules, 12 POIs, the 8 reserved event_ir_* events with contracts and
+  Delve-material rewards) and a region-agnostic ExpeditionGenerator —
+  pool, counts, budgets, required tags and the fallback walk all arrive
+  from a catalog, so adding a region is adding a catalog plus a line in
+  CATALOGS. Content placement now stops at the run's count rather than
+  the pool's end, and the event namespace rule reads "a regional
+  namespace". **Bramblewake is bit-identical**: 400 seeds plus the
+  fallback compared old-vs-new, zero mismatches, fallback still
+  2b08c29f. The five Delve materials joined the ledger allow-lists in
+  the same change (the #212 lesson: an unlisted reward pays nothing,
+  silently).
 - **#229** (v79) gear care — **Milestone 6 is source-complete with this
   wave.** Passive gear wears from mitigated hits (1 point/hit vs the
   weapon's 2/strike) through a new per-item effectiveness seam in
@@ -84,8 +96,10 @@ Earlier waves in this stretch:
   mid-screen to above the touch action row.
 - **#216/#217** (v71) loadouts (schema 16 → 17): three saved kits.
 
-M6 remaining: only the recorded live checks, all blocked on Studio
-availability (kit apply, gear dulling arc, hound visuals/follow feel,
+M7 wave A is merged and published; next waves are the Delve's enemies,
+its two elites (Foreman Echo, Iron Widow), the Bellows Maw, its builder
+geometry, then Mireglass Fen and chapters II–III. M6 remaining: only the
+recorded live checks, all blocked on Studio availability (kit apply, gear dulling arc, hound visuals/follow feel,
 defense plot placement/arm-by-tap, WHET press on device, Blackout drive
 to the Old Growth on a touch path). Every source-side deliverable is
 merged and published. **Milestone 7 is next**: Ironroot Delve +
