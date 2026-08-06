@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-05, at `main` = `7aa84f6` (PR #225), build `0.53.0`,
-save schema 19, 22 services. Published to Roblox as place version 77,
+Last updated: 2026-08-05, at `main` = `bc1aa28` (PR #227), build `0.53.0`,
+save schema 19, 22 services. Published to Roblox as place version 78,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,18 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#227** (v78) defense plots — three authored approach lanes (Meadow
+  Gate = the pre-lane straight approach, yaw 0, spec-pinned
+  bit-identical; East Hollow and West Break as rotations about the
+  lantern; wave 1 always the gate, later waves rotate
+  deterministically), a permanent armable snare plot per lane (ArmClick
+  ClickDetector — no new client payload; 2 fiber + 1 heartwood spent
+  atomically via the new SaveSchema.withSpentMaterials, no schema bump;
+  two bites per arm, a bite = the sling's snare timer so the "exposed"
+  ×1.2 reaction applies), and the solo-night Watch defender (chips 3
+  every 7s, health floors at 1 so defeats stay player-owned). Open live:
+  plot placement on real terrain, arm-by-tap, bite toast, Watch
+  silhouette.
 - **#225** (v77) companions v1 — the Beastkeeper's briar hound: while the
   profession is worn in town (not on expedition, not downed), a
   procedural hound is summoned at the keeper's flank and follows with
@@ -61,11 +73,10 @@ Earlier waves in this stretch:
   mid-screen to above the touch action row.
 - **#216/#217** (v71) loadouts (schema 16 → 17): three saved kits.
 
-M6 remaining: defense plots (lanes, traps, resident defenders — blind-
-buildable with recorded live checks), the HUD whet affordance,
-passive-gear wear, a trait inspection surface, and the recorded live
-checks (kit apply, gear dulling arc, hound visuals/follow feel, Blackout
-drive to the Old Growth on a touch path). M7 (regions wave A) has not started. #214 added the enemy director: town-night
+M6 remaining: the HUD whet affordance, passive-gear wear, a trait
+inspection surface, and the recorded live checks (kit apply, gear
+dulling arc, hound visuals/follow feel, defense plot placement/arm-by-
+tap, Blackout drive to the Old Growth on a touch path). M7 (regions wave A) has not started. #214 added the enemy director: town-night
 wave counts scale with the defenders standing in town (solo nights pinned
 bit-identical by spec; +1 wave per extra eligible defender to a ceiling of
 twelve, census taken once at nightfall and logged). **#212 matters beyond its size**: driving
