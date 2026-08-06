@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-06, at `main` = `ff5f7e9` (PR #259), build `0.53.0`,
-save schema 20, 22 services. Published to Roblox as place version 95,
+Last updated: 2026-08-06, at `main` = `02ae046` (PR #261), build `0.53.0`,
+save schema 20, 22 services. Published to Roblox as place version 96,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,18 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#261** (v96) **M7 wave K: all thirty Delve module visuals now have
+  geometry** — the remaining twenty-one rooms (oil works, echo vault,
+  flooded stope, abandoned face, scaffold climb, collapse scramble, winch
+  crossing, mite nest, slag channel, guard round, gas pocket, echo
+  gallery, shored drift, junction round, rail siding, air door,
+  foreman's office, miners' rest, memorial drift, signal room, flood
+  locks) plus seven primitives. The wave's real deliverable is
+  **IronrootBuilderCoverage.spec**: it reads the builder's source and
+  fails if any visual the catalog can place has no case, because a module
+  drawn into a manifest with no geometry is an empty cell a player walks
+  into and nothing else in the suite can see it. The same spec pins the
+  region's enabled flag false, so coverage and the flag move together.
 - **#259** (v95) **M7 wave J: the Delve's geometry begins.**
   IronrootBuilder holds the region's own vocabulary — shoring timber,
   rail, ore carts, cut rock, spoil, coalglass, glow fungus, lamp posts —
