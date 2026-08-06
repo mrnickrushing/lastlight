@@ -189,6 +189,20 @@ function CompanionService.command(self: CompanionService, player: Player, mode: 
     }
 end
 
+--[[
+    What the HUD needs to know: whether this player has a hound at all, and
+    what it was last told. The client renders the order button from this
+    rather than guessing from the profession, so a keeper whose hound has
+    not been summoned yet sees no button.
+]]
+function CompanionService.snapshot(self: CompanionService, player: Player): any
+    local companion = self._companions[player]
+    if companion == nil then
+        return { present = false, mode = "follow" }
+    end
+    return { present = true, mode = companion.mode }
+end
+
 function CompanionService._step(self: CompanionService, deltaTime: number)
     for _, player in Players:GetPlayers() do
         local companion = self._companions[player]

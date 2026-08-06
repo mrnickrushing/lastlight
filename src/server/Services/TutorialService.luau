@@ -1950,6 +1950,9 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         unbankedExpeditionRewards = expedition.unbankedRewards,
         bankedMaterials = expedition.bankedMaterials,
         gear = self._profileService:gearSnapshot(player),
+        companion = if self._companionService ~= nil
+            then self._companionService:snapshot(player)
+            else nil,
         gearCare = gearCare,
         whetTarget = whetTarget,
         equipped = self._profileService:equippedSnapshot(player),

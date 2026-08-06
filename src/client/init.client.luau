@@ -140,6 +140,10 @@ hud:setWhetHandler(function(itemId: string)
     send(RuntimeIds.Actions.RepairGear, { itemId = itemId })
 end)
 
+hud:setCompanionHandler(function(mode: string)
+    send(RuntimeIds.Actions.CompanionCommand, { mode = mode })
+end)
+
 --[[
     Arrival vignettes ride the same state stream the HUD already consumes:
     each one fires on a specific transition, locally, at most once per

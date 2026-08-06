@@ -310,6 +310,9 @@ export type HUDController = typeof(setmetatable(
         _sprint: TextButton,
         _dodge: TextButton,
         _ability: TextButton,
+        _companion: TextButton,
+        _companionMode: string,
+        _onCompanionCommand: ((string) -> ())?,
         _compact: TextButton,
         _professionButton: TextButton,
         _lobbyFrame: Frame,
@@ -889,6 +892,23 @@ function HUDController.new(
     )
     ability.Visible = false
     stroke(ability, COLORS.green, 0.12)
+    --[[
+        The hound's order button. CompanionCommand has existed server-side
+        with a full payload contract since companions shipped, and nothing
+        on the client ever sent it -- the hound could be summoned but never
+        told to stay, which made half that feature unreachable in the
+        shipped game. Found by playing it.
+    ]]
+    local companion = actionButton(
+        canvas,
+        "CompanionCommand",
+        "HOUND",
+        84,
+        UDim2.new(1, -440, 1, -40),
+        Vector2.new(1, 1)
+    )
+    companion.Visible = false
+    stroke(companion, COLORS.amber, 0.12)
 
     local compact = Instance.new("TextButton")
     compact.Name = "CompactToggle"
@@ -1470,6 +1490,9 @@ function HUDController.new(
         _sprint = sprint,
         _dodge = dodge,
         _ability = ability,
+        _companion = companion,
+        _companionMode = "follow",
+        _onCompanionCommand = nil,
         _compact = compact,
         _professionButton = professionButton,
         _progressButton = progressButton,
@@ -1615,6 +1638,19 @@ end
 
 function HUDController.dodgeButton(self: HUDController): TextButton
     return self._dodge
+end
+
+function HUDController.setCompanionHandler(self: HUDController, callback: (string) -> ())
+    self._onCompanionCommand = callback
+    self._companion.Activated:Connect(function()
+        local handler = self._onCompanionCommand
+        if handler == nil then
+            return
+        end
+        -- The button names what it will do next, so the press is the answer
+        -- to the word on it.
+        handler(if self._companionMode == "follow" then "stay" else "follow")
+    end)
 end
 
 function HUDController.abilityButton(self: HUDController): TextButton
@@ -1943,6 +1979,20 @@ function HUDController._updateProfessionClock(self: HUDController)
     if state == nil then
         return
     end
+    --[[
+        The hound's order button follows the hound, not the profession: a
+        keeper standing in town has one, a keeper mid-expedition does not,
+        and the server is the one that knows which.
+    ]]
+    local companion = state.companion
+    local hasCompanion = type(companion) == "table" and companion.present == true
+    self._companion.Visible = hasCompanion
+    if hasCompanion then
+        self._companionMode = if companion.mode == "stay" then "stay" else "follow"
+        -- the button names the order it will give, not the state it is in
+        self._companion.Text = if self._companionMode == "follow" then "STAY" else "FOLLOW"
+    end
+
     local profession = state.profession
     if type(profession) ~= "table" or profession.enabled == false then
         self._professionButton.Visible = false
