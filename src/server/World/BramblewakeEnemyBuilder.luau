@@ -465,17 +465,35 @@ local function railHound(model: Model, origin: Vector3): Part
         nil,
         nil
     )
+    --[[
+        A cylinder's axis runs along its Size.X, and Y/Z are its diameters.
+        These wheels were sized as though the axis were Y and then turned
+        a quarter turn on top of it, which buried them inside the chassis:
+        seen in Studio the hound was a floating plank with an ember streak.
+        The axle now runs left to right, which is the only way a wheel on
+        a rail can run, and four short legs put a creature under it.
+    ]]
     for side = -1, 1, 2 do
         for pair = -1, 1, 2 do
             part(
                 model,
                 "HoundWheel",
-                Vector3.new(1.5, 1.5, 0.5),
-                origin + Vector3.new(side * 1.4, -1.3, pair * 2),
+                Vector3.new(0.5, 1.6, 1.6),
+                origin + Vector3.new(side * 1.5, -1.3, pair * 2),
                 IRON_DARK,
                 Enum.Material.Metal,
                 Enum.PartType.Cylinder,
-                CFrame.Angles(0, math.rad(90), 0)
+                nil
+            )
+            part(
+                model,
+                "HoundLeg",
+                Vector3.new(0.4, 1.6, 0.4),
+                origin + Vector3.new(side * 1.05, -1, pair * 2),
+                IRON_PLATE,
+                Enum.Material.Metal,
+                nil,
+                CFrame.Angles(0, 0, math.rad(side * 14))
             )
         end
         addEye(model, origin + Vector3.new(side * 0.5, 0.7, -4.9), EMBER)
@@ -516,10 +534,13 @@ local function slagSpitter(model: Model, origin: Vector3): Part
             CFrame.Angles(math.rad(12), 0, math.rad(side * -10))
         )
     end
+    -- Same cylinder-axis error as the hound's wheels, and far louder: in
+    -- Studio this pool stood as a glowing bar straight up through the
+    -- spitter. Thickness belongs on the axis (X), width on the diameters.
     part(
         model,
         "SlagPool",
-        Vector3.new(5.6, 0.4, 5.6),
+        Vector3.new(0.4, 5.6, 5.6),
         origin + Vector3.new(0, -1.9, 0),
         SLAG,
         Enum.Material.Neon,
@@ -605,7 +626,7 @@ local function crankGuard(model: Model, origin: Vector3): Part
     part(
         model,
         "ExposedMechanism",
-        Vector3.new(2.6, 2.6, 1),
+        Vector3.new(1, 2.6, 2.6),
         origin + Vector3.new(0, 1, 2.1),
         EMBER,
         Enum.Material.Neon,
@@ -639,17 +660,23 @@ local function gasBloomer(model: Model, origin: Vector3): Part
         Enum.PartType.Ball,
         nil
     )
+    --[[
+        Petals lean up and out from the bulb. Pitching each one before its
+        yaw made all five settle into the same plane, so in Studio the
+        bloom read as a flat saucer hanging over a shrub. Yaw first, then
+        pitch, and the flower opens.
+    ]]
     for index = 0, 4 do
         local angle = index * math.pi * 0.4
         part(
             model,
             "BloomPetal",
-            Vector3.new(2.4, 0.5, 3.6),
-            origin + Vector3.new(math.cos(angle) * 2, 2.4, math.sin(angle) * 2),
+            Vector3.new(1.6, 0.4, 2.8),
+            origin + Vector3.new(math.cos(angle) * 1.5, 3.1, math.sin(angle) * 1.5),
             WHITEDAMP,
             Enum.Material.Neon,
             nil,
-            CFrame.Angles(math.rad(-28), angle, 0)
+            CFrame.Angles(0, -angle, 0) * CFrame.Angles(math.rad(-52), 0, 0)
         )
     end
     local haze = part(
@@ -776,7 +803,7 @@ local function mireLeech(model: Model, origin: Vector3): Part
     part(
         model,
         "LeechMouth",
-        Vector3.new(1.1, 1.1, 0.7),
+        Vector3.new(0.7, 1.1, 1.1),
         origin + Vector3.new(0, 0, -2.7),
         LEECH_RED,
         Enum.Material.Neon,
@@ -915,12 +942,14 @@ local function bogBell(model: Model, origin: Vector3): Part
         Enum.PartType.Ball,
         nil
     )
+    -- Marks burned into the ground the bell summons through. Sized on the
+    -- wrong cylinder axis they stood up as four floating bars around it.
     for index = 0, 3 do
         local angle = index * math.pi * 0.5
         part(
             model,
             "SummonMark",
-            Vector3.new(1.6, 0.2, 1.6),
+            Vector3.new(0.2, 1.6, 1.6),
             origin + Vector3.new(math.cos(angle) * 4, 0.1, math.sin(angle) * 4),
             WITCHLIGHT,
             Enum.Material.Neon,
