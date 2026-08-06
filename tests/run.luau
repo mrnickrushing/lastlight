@@ -25,6 +25,7 @@ TestRunner.run({
     require("./specs/ResidentRoster.spec"),
     require("./specs/ChapterProgress.spec"),
     require("./specs/RegionAccess.spec"),
+    require("./specs/IronrootBuilderCoverage.spec"),
     require("./specs/Environment.spec"),
     require("./specs/MemoryFragments.spec"),
     require("./specs/MeshAssetRegistry.spec"),
