@@ -221,3 +221,10 @@ the coverage move together.
 the region stays disabled until its runtime lands: `RegionAccess` refuses
 a disabled region, and `ExpeditionService`'s boot assert refuses it
 louder.
+
+All twenty-one were built in Studio and looked at before shipping (618
+parts across them). The signal room is the one worth naming: its three
+lever lamps, pump machine and tally board read under the shored roof at
+gameplay distance, and those levers are the physical form of the Foreman
+Echo's fight, so they had to be legible before the encounter could ever
+be wired to them.
