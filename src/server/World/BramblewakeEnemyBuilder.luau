@@ -382,6 +382,291 @@ local function barkRam(model: Model, origin: Vector3): Part
     return core
 end
 
+--[[
+    The Delve's six. Their silhouettes are deliberately unlike the
+    forest's rounded, mossy masses: plated, angular, rail-borne and
+    lit from inside. Readability at night comes from a hot interior
+    color -- ember, slag, whitedamp green -- rather than from bulk.
+]]
+local IRON_PLATE = Color3.fromRGB(88, 84, 82)
+local IRON_DARK = Color3.fromRGB(54, 50, 49)
+local EMBER = Color3.fromRGB(255, 126, 48)
+local SLAG = Color3.fromRGB(255, 168, 66)
+local WHITEDAMP = Color3.fromRGB(158, 226, 138)
+local ECHO_BLUE = Color3.fromRGB(126, 176, 214)
+
+local function cinderMite(model: Model, origin: Vector3): Part
+    local core = part(
+        model,
+        "MiteShell",
+        Vector3.new(3.2, 2.2, 3.8),
+        origin,
+        IRON_DARK,
+        Enum.Material.Metal,
+        Enum.PartType.Ball,
+        nil
+    )
+    part(
+        model,
+        "EmberVent",
+        Vector3.new(1.9, 0.9, 2.4),
+        origin + Vector3.new(0, 1.2, 0.3),
+        EMBER,
+        Enum.Material.Neon,
+        Enum.PartType.Ball,
+        nil
+    )
+    for side = -1, 1, 2 do
+        for pair = -1, 1, 2 do
+            part(
+                model,
+                "MiteLeg",
+                Vector3.new(0.32, 2.2, 0.32),
+                origin + Vector3.new(side * 1.5, -1, pair * 1.1),
+                IRON_PLATE,
+                Enum.Material.Metal,
+                nil,
+                CFrame.Angles(0, 0, math.rad(side * 24))
+            )
+        end
+        addEye(model, origin + Vector3.new(side * 0.6, 0.5, -1.85), EMBER)
+    end
+    return core
+end
+
+local function railHound(model: Model, origin: Vector3): Part
+    local core = part(
+        model,
+        "HoundChassis",
+        Vector3.new(2.6, 2.4, 6.4),
+        origin,
+        IRON_PLATE,
+        Enum.Material.DiamondPlate,
+        nil,
+        nil
+    )
+    part(
+        model,
+        "HoundSnout",
+        Vector3.new(1.8, 1.6, 2.2),
+        origin + Vector3.new(0, 0.2, -4),
+        IRON_DARK,
+        Enum.Material.Metal,
+        nil,
+        nil
+    )
+    part(
+        model,
+        "SparkTrail",
+        Vector3.new(1.2, 0.5, 3.4),
+        origin + Vector3.new(0, -1.2, 2.6),
+        EMBER,
+        Enum.Material.Neon,
+        nil,
+        nil
+    )
+    for side = -1, 1, 2 do
+        for pair = -1, 1, 2 do
+            part(
+                model,
+                "HoundWheel",
+                Vector3.new(1.5, 1.5, 0.5),
+                origin + Vector3.new(side * 1.4, -1.3, pair * 2),
+                IRON_DARK,
+                Enum.Material.Metal,
+                Enum.PartType.Cylinder,
+                CFrame.Angles(0, math.rad(90), 0)
+            )
+        end
+        addEye(model, origin + Vector3.new(side * 0.5, 0.7, -4.9), EMBER)
+    end
+    return core
+end
+
+local function slagSpitter(model: Model, origin: Vector3): Part
+    local core = part(
+        model,
+        "SpitterBase",
+        Vector3.new(4.4, 3.6, 4.4),
+        origin,
+        IRON_DARK,
+        Enum.Material.Slate,
+        nil,
+        nil
+    )
+    part(
+        model,
+        "SpitterMouth",
+        Vector3.new(2.4, 2.4, 2.4),
+        origin + Vector3.new(0, 2.4, -1.6),
+        SLAG,
+        Enum.Material.Neon,
+        Enum.PartType.Ball,
+        nil
+    )
+    for side = -1, 1, 2 do
+        part(
+            model,
+            "SpitterRib",
+            Vector3.new(0.7, 4.6, 0.7),
+            origin + Vector3.new(side * 2.2, 0.8, 0.6),
+            IRON_PLATE,
+            Enum.Material.Metal,
+            nil,
+            CFrame.Angles(math.rad(12), 0, math.rad(side * -10))
+        )
+    end
+    part(
+        model,
+        "SlagPool",
+        Vector3.new(5.6, 0.4, 5.6),
+        origin + Vector3.new(0, -1.9, 0),
+        SLAG,
+        Enum.Material.Neon,
+        Enum.PartType.Cylinder,
+        CFrame.Angles(0, 0, math.rad(90))
+    )
+    return core
+end
+
+local function shiftEcho(model: Model, origin: Vector3): Part
+    local core = part(
+        model,
+        "EchoTorso",
+        Vector3.new(2.4, 3.4, 1.6),
+        origin + Vector3.new(0, 0.6, 0),
+        ECHO_BLUE,
+        Enum.Material.Glass,
+        nil,
+        nil
+    )
+    core.Transparency = 0.35
+    local head = part(
+        model,
+        "EchoHead",
+        Vector3.new(1.3, 1.4, 1.3),
+        origin + Vector3.new(0, 3, 0),
+        ECHO_BLUE,
+        Enum.Material.Glass,
+        nil,
+        nil
+    )
+    head.Transparency = 0.35
+    part(
+        model,
+        "EchoLamp",
+        Vector3.new(0.7, 0.9, 0.7),
+        origin + Vector3.new(1.4, 1.6, -0.6),
+        WHITEDAMP,
+        Enum.Material.Neon,
+        nil,
+        nil
+    )
+    for side = -1, 1, 2 do
+        local arm = part(
+            model,
+            "EchoArm",
+            Vector3.new(0.6, 2.8, 0.6),
+            origin + Vector3.new(side * 1.5, 0.8, -0.4),
+            ECHO_BLUE,
+            Enum.Material.Glass,
+            nil,
+            CFrame.Angles(math.rad(side * 34), 0, 0)
+        )
+        arm.Transparency = 0.45
+        addEye(model, origin + Vector3.new(side * 0.35, 3.1, -0.72), WHITEDAMP)
+    end
+    return core
+end
+
+local function crankGuard(model: Model, origin: Vector3): Part
+    local core = part(
+        model,
+        "GuardFrame",
+        Vector3.new(5.2, 4.6, 3.6),
+        origin + Vector3.new(0, 0.6, 0),
+        IRON_PLATE,
+        Enum.Material.DiamondPlate,
+        nil,
+        nil
+    )
+    part(
+        model,
+        "FrontPlate",
+        Vector3.new(6.4, 5.2, 0.9),
+        origin + Vector3.new(0, 0.9, -2.4),
+        IRON_DARK,
+        Enum.Material.Metal,
+        nil,
+        CFrame.Angles(math.rad(-6), 0, 0)
+    )
+    -- The exposed mechanism: the reason a flank strike lands for five
+    -- times what the plate allows, and it must read from behind.
+    part(
+        model,
+        "ExposedMechanism",
+        Vector3.new(2.6, 2.6, 1),
+        origin + Vector3.new(0, 1, 2.1),
+        EMBER,
+        Enum.Material.Neon,
+        Enum.PartType.Cylinder,
+        CFrame.Angles(0, math.rad(90), 0)
+    )
+    for side = -1, 1, 2 do
+        part(
+            model,
+            "GuardLeg",
+            Vector3.new(1.3, 3.2, 1.3),
+            origin + Vector3.new(side * 2, -2.2, 0.4),
+            IRON_DARK,
+            Enum.Material.Metal,
+            nil,
+            nil
+        )
+        addEye(model, origin + Vector3.new(side * 1, 2.2, -2.9), EMBER)
+    end
+    return core
+end
+
+local function gasBloomer(model: Model, origin: Vector3): Part
+    local core = part(
+        model,
+        "BloomerBulb",
+        Vector3.new(4.2, 4.2, 4.2),
+        origin + Vector3.new(0, 0.8, 0),
+        Color3.fromRGB(72, 88, 64),
+        Enum.Material.Slate,
+        Enum.PartType.Ball,
+        nil
+    )
+    for index = 0, 4 do
+        local angle = index * math.pi * 0.4
+        part(
+            model,
+            "BloomPetal",
+            Vector3.new(2.4, 0.5, 3.6),
+            origin + Vector3.new(math.cos(angle) * 2, 2.4, math.sin(angle) * 2),
+            WHITEDAMP,
+            Enum.Material.Neon,
+            nil,
+            CFrame.Angles(math.rad(-28), angle, 0)
+        )
+    end
+    local haze = part(
+        model,
+        "Whitedamp",
+        Vector3.new(7.5, 2.6, 7.5),
+        origin + Vector3.new(0, -0.6, 0),
+        WHITEDAMP,
+        Enum.Material.Neon,
+        Enum.PartType.Ball,
+        nil
+    )
+    haze.Transparency = 0.72
+    addEye(model, origin + Vector3.new(0, 1.4, -2.1), EMBER)
+    return core
+end
+
 function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target: Vector3): Model
     local model = Instance.new("Model")
     model.Name = definition.displayName:gsub("%s+", "")
@@ -401,6 +686,18 @@ function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target:
         core = snapvine(model, origin)
     elseif definition.modelKey == "bark_ram" then
         core = barkRam(model, origin)
+    elseif definition.modelKey == "cinder_mite" then
+        core = cinderMite(model, origin)
+    elseif definition.modelKey == "rail_hound" then
+        core = railHound(model, origin)
+    elseif definition.modelKey == "slag_spitter" then
+        core = slagSpitter(model, origin)
+    elseif definition.modelKey == "shift_echo" then
+        core = shiftEcho(model, origin)
+    elseif definition.modelKey == "crank_guard" then
+        core = crankGuard(model, origin)
+    elseif definition.modelKey == "gas_bloomer" then
+        core = gasBloomer(model, origin)
     else
         core = rootling(model, origin)
     end

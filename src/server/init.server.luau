@@ -12,7 +12,7 @@ local CraftingCatalog = require(root.CraftingCatalog)
 local DefenseLanes = require(root.DefenseLanes)
 local Equipment = require(root.Equipment)
 local GearVisualPlan = require(root.GearVisualPlan)
-local BramblewakeEnemies = require(root.BramblewakeEnemies)
+local EnemyCatalog = require(root.EnemyCatalog)
 local CombatState = require(root.CombatState)
 local EnemyAttackFlow = require(root.EnemyAttackFlow)
 local EnemyCombatRules = require(root.EnemyCombatRules)
@@ -188,7 +188,7 @@ local enemyService = EnemyService.new(
     survivalService,
     combatService,
     EnemyAttackFlow,
-    BramblewakeEnemies,
+    EnemyCatalog,
     EnemyCombatRules,
     EnemyMotion,
     EngineerBrace,
