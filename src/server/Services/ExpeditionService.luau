@@ -17,6 +17,7 @@ export type ExpeditionService = typeof(setmetatable(
         _logger: Logger,
         _worldService: any,
         _generator: any,
+        _regionAccess: any,
         _catalog: any,
         _featureFlags: any,
         _eventFlow: any,
@@ -40,6 +41,7 @@ function ExpeditionService.new(
     logger: Logger,
     worldService: any,
     generator: any,
+    regionAccess: any,
     catalog: any,
     featureFlags: any,
     eventFlow: any,
@@ -58,6 +60,7 @@ function ExpeditionService.new(
         _contract = contracts.default(),
         _worldService = worldService,
         _generator = generator,
+        _regionAccess = regionAccess,
         _catalog = catalog,
         _featureFlags = featureFlags,
         _eventFlow = eventFlow,
@@ -90,9 +93,27 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
     -- (Studio tests and repro sessions depend on that).
     local daySalt = (tonumber(os.date("!%j")) or 0) * 131 + (tonumber(os.date("!%Y")) or 0)
     local seed = if type(requestedSeed) == "number" then requestedSeed else self._seed + daySalt
-    local manifest = self._generator.generate(seed)
+    --[[
+        Which region this server walks. RegionAccess resolves the request
+        (a Studio attribute for tests; a departure choice once more than
+        one region is buildable) against the region registry's enabled
+        flags and the story's chapters, and everything that is not an
+        open region resolves to Bramblewake. The builder below is still
+        Bramblewake's own, so the assert is load-bearing: if a region is
+        ever enabled before its builder exists, this fails at boot in
+        plain words instead of building a forest where a mine should be.
+    ]]
+    local requestedRegion = game:GetAttribute("LastLightExpeditionRegion")
+    local regionId = self._regionAccess.destinationFor(requestedRegion, nil)
+    local catalog = self._generator.catalogFor(regionId)
+    assert(
+        regionId == "region_bramblewake",
+        "region " .. tostring(regionId) .. " is enabled but has no builder wired"
+    )
+    self._catalog = catalog
+    local manifest = self._generator.generate(seed, false, nil, regionId)
     local valid, issues = self._generator.validate(manifest)
-    assert(valid, "Bramblewake expedition manifest is invalid: " .. table.concat(issues, "; "))
+    assert(valid, "expedition manifest is invalid: " .. table.concat(issues, "; "))
 
     local result = self._worldService:buildBramblewake(manifest, self._generator, self._catalog)
     self._manifest = manifest
