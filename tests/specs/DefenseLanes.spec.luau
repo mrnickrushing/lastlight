@@ -103,5 +103,32 @@ return {
                 TestRunner.equal(unchanged.revision, short.revision)
             end,
         },
+        {
+            -- Watched in Studio: three armed plots sat through the tutorial's
+            -- first night with creatures walking their rings and nothing
+            -- happened, because the service counted only nights that
+            -- TownNightService starts. A lit snare bites on any night, so the
+            -- trigger geometry must not care which night it is -- this case
+            -- pins the boundary the service now asks about instead.
+            name = "a ring bites by where the walker is, not by whose night it is",
+            run = function()
+                local radius = DefenseLanes.Trap.triggerRadius
+                -- a creature crossing the ring on the meadow gate lane
+                local plotX, plotZ =
+                    DefenseLanes.plotPoint(DefenseLanes.laneForWave(1, 1), 0, -153, 0, -80)
+                TestRunner.equal(DefenseLanes.trapTriggers(plotX, plotZ, plotX, plotZ), true)
+                TestRunner.equal(
+                    DefenseLanes.trapTriggers(plotX, plotZ + radius - 0.5, plotX, plotZ),
+                    true
+                )
+                TestRunner.equal(
+                    DefenseLanes.trapTriggers(plotX, plotZ + radius + 0.5, plotX, plotZ),
+                    false
+                )
+                -- and the first wave of the very first night walks that lane,
+                -- which is why an armed gate plot has to be live for it
+                TestRunner.equal(DefenseLanes.laneForWave(1, 1).id, "lane_meadow_gate")
+            end,
+        },
     },
 }

@@ -24747,9 +24747,22 @@ function DefenseService.onNightEnded(self: DefenseService)
 end
 
 function DefenseService._step(self: DefenseService, now: number)
-    if not self._nightActive then
-        return
-    end
+    --[[
+        A lit snare bites whatever walks its ring, on any night.
+
+        This used to gate on the service's own night flag, which only
+        TownNightService raises -- so through the tutorial's first night
+        the three plots stood there armed, with creatures walking straight
+        through their rings, and nothing could ever happen. Watched it
+        happen in Studio: the ember stayed lit, both charges intact, while
+        a rootling, a briarback and a hollow zombie walked the Meadow Gate.
+
+        The enemy service's own answer is the better source of truth: it
+        returns a position only while a night is running and something is
+        actually on the field, which is exactly the condition a trap cares
+        about. The night flag stays for the Watch defender below, which
+        genuinely is a town-night affair (it needs the party census).
+    ]]
     local ex, ez = self._enemyService:activeFlatPosition()
     if ex == nil or ez == nil then
         return
