@@ -3,11 +3,18 @@
 local ExtractionPayoff = {}
 
 local PRESENTATION = table.freeze({
+    -- Bramblewake
     material_amber_sap = table.freeze({ kind = "amber", label = "AMBER SAP" }),
     material_brightcap = table.freeze({ kind = "brightcap", label = "BRIGHTCAP" }),
     material_heartwood = table.freeze({ kind = "heartwood", label = "HEARTWOOD" }),
     material_meadow_fiber = table.freeze({ kind = "fiber", label = "MEADOW FIBER" }),
     material_spring_clay = table.freeze({ kind = "clay", label = "SPRING CLAY" }),
+    -- Ironroot Delve
+    material_ironroot_ore = table.freeze({ kind = "ore", label = "IRONROOT ORE" }),
+    material_coalglass = table.freeze({ kind = "coalglass", label = "COALGLASS" }),
+    material_glow_fungus = table.freeze({ kind = "fungus", label = "GLOW FUNGUS" }),
+    material_machine_oil = table.freeze({ kind = "oil", label = "MACHINE OIL" }),
+    material_echo_crystal = table.freeze({ kind = "crystal", label = "ECHO CRYSTAL" }),
 })
 
 export type Entry = {

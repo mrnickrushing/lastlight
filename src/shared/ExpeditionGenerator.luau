@@ -1,8 +1,19 @@
 --!strict
 
-local Catalog = require("./Content/Definitions/BramblewakeExpedition")
+local Bramblewake = require("./Content/Definitions/BramblewakeExpedition")
+local Ironroot = require("./Content/Definitions/IronrootExpedition")
 local ExpeditionEventFlow = require("./ExpeditionEventFlow")
 
+--[[
+    The generator is region-agnostic: everything it needs about a region --
+    module pool, socket counts, budgets, required tags, the known-good
+    fallback walk -- arrives from that region's catalog, which all declare
+    the same shape. Adding a region is adding a catalog and a line in
+    CATALOGS; no rule below knows a region by name.
+
+    Bramblewake remains the default so every existing caller and every
+    prior manifest hash is untouched, and the specs pin that.
+]]
 local ExpeditionGenerator = {}
 
 local RANDOM_MODULUS = 2147483647
@@ -49,9 +60,48 @@ local function indexDefinitions(definitions: { any }): { [string]: any }
     return byId
 end
 
-local MODULES_BY_ID = indexDefinitions(Catalog.Modules)
-local POIS_BY_ID = indexDefinitions(Catalog.PointsOfInterest)
-local EVENTS_BY_ID = indexDefinitions(Catalog.Events)
+-- Catalogs are structurally alike but not identical (Bramblewake carries a
+-- measured BuiltPartBudget the Delve cannot have until its builder ships),
+-- so the list is typed by what the generator actually reads from it.
+local CATALOGS: { any } = table.freeze({ Bramblewake :: any, Ironroot :: any })
+local DEFAULT_REGION_ID = Bramblewake.RegionId
+
+type Region = {
+    catalog: any,
+    modulesById: { [string]: any },
+    poisById: { [string]: any },
+    eventsById: { [string]: any },
+}
+
+local REGIONS: { [string]: Region } = {}
+for _, catalog in CATALOGS do
+    REGIONS[catalog.RegionId] = {
+        catalog = catalog,
+        modulesById = indexDefinitions(catalog.Modules),
+        poisById = indexDefinitions(catalog.PointsOfInterest),
+        eventsById = indexDefinitions(catalog.Events),
+    }
+end
+
+local function regionFor(regionId: any): Region
+    local region = REGIONS[if type(regionId) == "string" then regionId else DEFAULT_REGION_ID]
+    return region or REGIONS[DEFAULT_REGION_ID]
+end
+
+-- Definition lookups are region-wide: content ids carry their region's
+-- prefix, so a single id never means two things.
+local function findDefinition(field: string, id: any): any
+    if type(id) ~= "string" then
+        return nil
+    end
+    for _, region in REGIONS do
+        local found = (region :: any)[field][id]
+        if found ~= nil then
+            return found
+        end
+    end
+    return nil
+end
 
 local function hashText(hash: number, value: string): number
     local result = hash
@@ -79,20 +129,30 @@ function ExpeditionGenerator.computeHash(manifest: any): string
     return string.format("%08x", hash)
 end
 
-local function placeContent(manifest: any, random: (number) -> number)
-    local poiDefinitions = shuffled(Catalog.PointsOfInterest, random)
-    local eventDefinitions = shuffled(Catalog.Events, random)
+local function placeContent(manifest: any, random: (number) -> number, region: Region)
+    local poiDefinitions = shuffled(region.catalog.PointsOfInterest, random)
+    local eventDefinitions = shuffled(region.catalog.Events, random)
     local occupied: { [number]: boolean } = {}
+
+    --[[
+        A region's catalog holds more content than any one run shows: the
+        Delve declares twelve points of interest and shows four. Placement
+        therefore stops at the run's count, not at the pool's end. For
+        Bramblewake, whose pool is exactly its run count, this is the same
+        walk it always took.
+    ]]
+    local poiLimit = math.min(#poiDefinitions, region.catalog.PointOfInterestCount)
+    local eventLimit = math.min(#eventDefinitions, region.catalog.EventCount)
 
     local poiPlacements = shuffled(manifest.modules, random)
     local poiIndex = 1
     for _, placement in poiPlacements do
-        local moduleDefinition = MODULES_BY_ID[placement.moduleId]
+        local moduleDefinition = region.modulesById[placement.moduleId]
         if moduleDefinition.poiSocket and not occupied[placement.index] then
             placement.poiId = poiDefinitions[poiIndex].id
             occupied[placement.index] = true
             poiIndex += 1
-            if poiIndex > #poiDefinitions then
+            if poiIndex > poiLimit then
                 break
             end
         end
@@ -101,7 +161,7 @@ local function placeContent(manifest: any, random: (number) -> number)
     local eventPlacements = shuffled(manifest.modules, random)
     local eventIndex = 1
     for _, placement in eventPlacements do
-        local moduleDefinition = MODULES_BY_ID[placement.moduleId]
+        local moduleDefinition = region.modulesById[placement.moduleId]
         -- POI and event sockets occupy opposite authored corners of a module,
         -- so representative modules can host both without overlapping the
         -- critical path or each other. This is required to place all eight
@@ -109,36 +169,20 @@ local function placeContent(manifest: any, random: (number) -> number)
         if moduleDefinition.eventSocket then
             placement.eventId = eventDefinitions[eventIndex].id
             eventIndex += 1
-            if eventIndex > #eventDefinitions then
+            if eventIndex > eventLimit then
                 break
             end
         end
     end
 end
 
--- The known-good fallback's middle, in its original authored order. This is
--- the exact twelve-module walk that shipped before the catalog grew to
--- thirty, so the fallback stays the manifest every prior test proved.
-local FIXED_MIDDLE_IDS = table.freeze({
-    "module_bw_root_arch",
-    "module_bw_sunken_orchard",
-    "module_bw_foxglove_run",
-    "module_bw_hollow_farm",
-    "module_bw_briar_ring",
-    "module_bw_sapfall_gully",
-    "module_bw_windmill_copse",
-    "module_bw_tangle_bridge",
-    "module_bw_moth_meadow",
-    "module_bw_old_growth_approach",
-})
-
-local function moduleByRole(role: string): any
-    for _, definition in Catalog.Modules do
+local function moduleByRole(region: Region, role: string): any
+    for _, definition in region.catalog.Modules do
         if definition.role == role then
             return definition
         end
     end
-    error("Bramblewake catalog has no module with role " .. role)
+    error(region.catalog.RegionId .. " catalog has no module with role " .. role)
 end
 
 --[[
@@ -150,10 +194,15 @@ end
     the remaining slots take whatever the shuffle offers. Attempts and the
     validator catch the rare shuffle this greedy pass cannot rescue.
 ]]
-local function selectMiddle(arrival: any, extraction: any, random: (number) -> number): { any }
-    local target = Catalog.ModuleCount - 2
+local function selectMiddle(
+    region: Region,
+    arrival: any,
+    extraction: any,
+    random: (number) -> number
+): { any }
+    local target = region.catalog.ModuleCount - 2
     local pool = {}
-    for _, definition in Catalog.Modules do
+    for _, definition in region.catalog.Modules do
         if definition.role ~= "arrival" and definition.role ~= "extraction" then
             table.insert(pool, definition)
         end
@@ -179,7 +228,7 @@ local function selectMiddle(arrival: any, extraction: any, random: (number) -> n
         countTags(definition)
     end
 
-    for _, moduleId in Catalog.RequiredModuleIds do
+    for _, moduleId in region.catalog.RequiredModuleIds do
         for _, definition in pool do
             if definition.id == moduleId then
                 take(definition)
@@ -187,7 +236,7 @@ local function selectMiddle(arrival: any, extraction: any, random: (number) -> n
             end
         end
     end
-    for tag, minimum in Catalog.RequiredTags :: { [string]: number } do
+    for tag, minimum in region.catalog.RequiredTags :: { [string]: number } do
         while (tagCounts[tag] or 0) < minimum and #chosen < target do
             local found = false
             for _, definition in pool do
@@ -220,18 +269,24 @@ local function selectMiddle(arrival: any, extraction: any, random: (number) -> n
     return shuffled(chosen, random)
 end
 
-local function assemble(seed: number, attempt: number, source: string, fixed: boolean): any
+local function assemble(
+    seed: number,
+    attempt: number,
+    source: string,
+    fixed: boolean,
+    region: Region
+): any
     local random = randomSource(seed + attempt * 7919)
-    local arrival = moduleByRole("arrival")
-    local extraction = moduleByRole("extraction")
+    local arrival = moduleByRole(region, "arrival")
+    local extraction = moduleByRole(region, "extraction")
     local middle
     if fixed then
         middle = {}
-        for _, moduleId in FIXED_MIDDLE_IDS do
-            table.insert(middle, MODULES_BY_ID[moduleId])
+        for _, moduleId in region.catalog.FixedMiddleIds do
+            table.insert(middle, region.modulesById[moduleId])
         end
     else
-        middle = selectMiddle(arrival, extraction, random)
+        middle = selectMiddle(region, arrival, extraction, random)
     end
 
     local sequence = { arrival }
@@ -260,14 +315,14 @@ local function assemble(seed: number, attempt: number, source: string, fixed: bo
     end
 
     local manifest = {
-        version = Catalog.Version,
-        regionId = Catalog.RegionId,
+        version = region.catalog.Version,
+        regionId = region.catalog.RegionId,
         seed = normalizeSeed(seed),
         source = source,
         attempts = attempt,
         modules = modules,
     }
-    placeContent(manifest, random)
+    placeContent(manifest, random, region)
     manifest.hash = ExpeditionGenerator.computeHash(manifest)
     return manifest
 end
@@ -281,14 +336,16 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
     if type(manifest) ~= "table" then
         return false, { "manifest must be a table" }
     end
-    if manifest.version ~= Catalog.Version then
-        issue("manifest version does not match the Bramblewake catalog")
+    if REGIONS[manifest.regionId] == nil then
+        return false, { "manifest names no known region" }
     end
-    if manifest.regionId ~= Catalog.RegionId then
-        issue("manifest region is not Bramblewake")
+    local region = regionFor(manifest.regionId)
+    local catalog = region.catalog
+    if manifest.version ~= catalog.Version then
+        issue("manifest version does not match the " .. catalog.RegionId .. " catalog")
     end
-    if type(manifest.modules) ~= "table" or #manifest.modules ~= Catalog.ModuleCount then
-        issue(string.format("manifest must contain %d modules", Catalog.ModuleCount))
+    if type(manifest.modules) ~= "table" or #manifest.modules ~= catalog.ModuleCount then
+        issue(string.format("manifest must contain %d modules", catalog.ModuleCount))
         return false, issues
     end
 
@@ -305,7 +362,7 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
         if placement.index ~= index then
             issue(string.format("module %d has an invalid sequence index", index))
         end
-        local definition = MODULES_BY_ID[placement.moduleId]
+        local definition = region.modulesById[placement.moduleId]
         if definition == nil then
             issue(string.format("module %d references unknown content", index))
         else
@@ -346,9 +403,9 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
         end
 
         if placement.poiId ~= nil then
-            if POIS_BY_ID[placement.poiId] == nil then
+            if region.poisById[placement.poiId] == nil then
                 issue("manifest references an unknown point of interest")
-            elseif POIS_BY_ID[placement.poiId].enabled ~= true then
+            elseif region.poisById[placement.poiId].enabled ~= true then
                 issue("manifest contains a disabled point of interest")
             elseif seenPois[placement.poiId] then
                 issue("point of interest repeats in one expedition")
@@ -358,7 +415,7 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
             seenPois[placement.poiId] = true
         end
         if placement.eventId ~= nil then
-            local eventDefinition = EVENTS_BY_ID[placement.eventId]
+            local eventDefinition = region.eventsById[placement.eventId]
             if eventDefinition == nil then
                 issue("manifest references an unknown event")
             elseif eventDefinition.enabled ~= true then
@@ -373,7 +430,7 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
                 if not contractValid then
                     issue("event contract is invalid: " .. table.concat(contractIssues, ", "))
                 end
-                if eventDefinition.minimumRouteSpace > Catalog.CellSize - 24 then
+                if eventDefinition.minimumRouteSpace > catalog.CellSize - 24 then
                     issue("event route-space requirement exceeds its module clearing")
                 end
             end
@@ -381,8 +438,8 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
         end
     end
 
-    local firstDefinition = MODULES_BY_ID[manifest.modules[1].moduleId]
-    local lastDefinition = MODULES_BY_ID[manifest.modules[#manifest.modules].moduleId]
+    local firstDefinition = region.modulesById[manifest.modules[1].moduleId]
+    local lastDefinition = region.modulesById[manifest.modules[#manifest.modules].moduleId]
     if firstDefinition == nil or firstDefinition.role ~= "arrival" then
         issue("critical path does not begin at an arrival module")
     end
@@ -398,33 +455,33 @@ function ExpeditionGenerator.validate(manifest: any): (boolean, { string })
     for _ in seenEvents do
         eventCount += 1
     end
-    if poiCount ~= Catalog.PointOfInterestCount then
+    if poiCount ~= catalog.PointOfInterestCount then
         issue(
-            string.format("manifest must place %d points of interest", Catalog.PointOfInterestCount)
+            string.format("manifest must place %d points of interest", catalog.PointOfInterestCount)
         )
     end
-    if eventCount ~= Catalog.EventCount then
-        issue(string.format("manifest must place %d events", Catalog.EventCount))
+    if eventCount ~= catalog.EventCount then
+        issue(string.format("manifest must place %d events", catalog.EventCount))
     end
 
-    local requiredTags = Catalog.RequiredTags :: { [string]: number }
+    local requiredTags = catalog.RequiredTags :: { [string]: number }
     for tag, minimum in requiredTags do
         if (tagCounts[tag] or 0) < minimum then
             issue(string.format("manifest does not meet the %s module minimum", tag))
         end
     end
-    for _, moduleId in Catalog.RequiredModuleIds do
+    for _, moduleId in catalog.RequiredModuleIds do
         if not seenModules[moduleId] then
             issue("manifest is missing required module " .. moduleId)
         end
     end
-    if totalParts > Catalog.PartBudget then
+    if totalParts > catalog.PartBudget then
         issue("manifest exceeds the regional part budget")
     end
-    if totalLights > Catalog.LightBudget then
+    if totalLights > catalog.LightBudget then
         issue("manifest exceeds the regional light budget")
     end
-    if totalEffects > Catalog.EffectBudget then
+    if totalEffects > catalog.EffectBudget then
         issue("manifest exceeds the regional effect budget")
     end
     if manifest.hash ~= ExpeditionGenerator.computeHash(manifest) then
@@ -437,8 +494,10 @@ end
 function ExpeditionGenerator.generate(
     seed: number,
     forceFallback: boolean?,
-    avoidHashes: { [string]: boolean }?
+    avoidHashes: { [string]: boolean }?,
+    regionId: string?
 ): any
+    local region = regionFor(regionId)
     local normalizedSeed = normalizeSeed(seed)
     if not forceFallback then
         -- Repetition control: a caller that remembers recent manifests can
@@ -447,7 +506,7 @@ function ExpeditionGenerator.generate(
         -- an avoided hash, the last valid manifest wins anyway.
         local lastValid = nil
         for attempt = 1, if avoidHashes ~= nil then 5 else 3 do
-            local manifest = assemble(normalizedSeed, attempt, "generated", false)
+            local manifest = assemble(normalizedSeed, attempt, "generated", false, region)
             local valid = ExpeditionGenerator.validate(manifest)
             if valid then
                 if avoidHashes == nil or avoidHashes[manifest.hash] ~= true then
@@ -461,22 +520,41 @@ function ExpeditionGenerator.generate(
         end
     end
 
-    local fallback = assemble(normalizedSeed, 3, "known_good_fallback", true)
+    local fallback = assemble(normalizedSeed, 3, "known_good_fallback", true, region)
     local valid, issues = ExpeditionGenerator.validate(fallback)
-    assert(valid, "known-good Bramblewake fallback is invalid: " .. table.concat(issues, "; "))
+    assert(
+        valid,
+        "known-good "
+            .. region.catalog.RegionId
+            .. " fallback is invalid: "
+            .. table.concat(issues, "; ")
+    )
     return fallback
 end
 
 function ExpeditionGenerator.moduleDefinition(moduleId: string): any
-    return MODULES_BY_ID[moduleId]
+    return findDefinition("modulesById", moduleId)
 end
 
 function ExpeditionGenerator.pointOfInterestDefinition(poiId: string): any
-    return POIS_BY_ID[poiId]
+    return findDefinition("poisById", poiId)
 end
 
 function ExpeditionGenerator.eventDefinition(eventId: string): any
-    return EVENTS_BY_ID[eventId]
+    return findDefinition("eventsById", eventId)
+end
+
+-- The region catalogs the generator can compose, in declaration order.
+function ExpeditionGenerator.regionIds(): { string }
+    local ids: { string } = {}
+    for _, catalog in CATALOGS do
+        table.insert(ids, catalog.RegionId)
+    end
+    return ids
+end
+
+function ExpeditionGenerator.catalogFor(regionId: string?): any
+    return regionFor(regionId).catalog
 end
 
 return table.freeze(ExpeditionGenerator)

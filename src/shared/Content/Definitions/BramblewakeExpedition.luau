@@ -915,6 +915,25 @@ return table.freeze({
     RequiredModuleIds = table.freeze({
         "module_bw_old_growth_approach",
     }),
+    --[[
+        The known-good fallback's middle, in its original authored order.
+        This is the exact twelve-module walk that shipped before the catalog
+        grew to thirty, so the fallback stays the manifest every prior test
+        proved. It lived in ExpeditionGenerator until the generator became
+        region-agnostic; the list itself is unchanged.
+    ]]
+    FixedMiddleIds = table.freeze({
+        "module_bw_root_arch",
+        "module_bw_sunken_orchard",
+        "module_bw_foxglove_run",
+        "module_bw_hollow_farm",
+        "module_bw_briar_ring",
+        "module_bw_sapfall_gully",
+        "module_bw_windmill_copse",
+        "module_bw_tangle_bridge",
+        "module_bw_moth_meadow",
+        "module_bw_old_growth_approach",
+    }),
     Modules = table.freeze(modules),
     PointsOfInterest = table.freeze(pointsOfInterest),
     Events = table.freeze(events),
