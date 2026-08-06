@@ -184,3 +184,25 @@ The roadmap's "remaining basic profession kits" line was satisfied by
 M6 wave A (#206): all seven professions carry an ability, ability
 visuals, and mastery specializations. Nothing was owed here beyond
 verification, which wave H performed.
+
+## The Delve's geometry, wave one
+
+`IronrootBuilder` holds the region's own visual vocabulary — shoring
+timber, rail and sleepers, ore carts, cut rock, spoil, coalglass seams,
+glow fungus, lamp posts — and nine module visuals assembled from it:
+the gate, the daylight shaft, the ore gallery, the coalglass seam, the
+fungus terrace, the main incline, the rail walk, the dark stretch, and
+the Bellows approach.
+
+The shape that does the most work is `shoring`: every module carries a
+low roof on posts. That is what makes a place read as underground while
+the sky is still technically there — it cuts the horizon down to head
+height and throws the module into its own shadow, so the Delve's light
+comes from lamps and coalglass rather than from the sun.
+
+`buildModuleVisual` returns false for a key it does not know, which is
+how the region stays honest about being half-built: the remaining
+combat, connector, story and puzzle rooms are the next wave, and the
+region stays disabled in `Regions.luau` until every catalog key has a
+case. `RegionAccess` refuses a disabled region, and `ExpeditionService`'s
+boot assert refuses it louder.
