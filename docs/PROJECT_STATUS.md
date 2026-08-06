@@ -7,12 +7,35 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-05, at `main` = `3c8c8d7` (PR #221), build `0.53.0`,
-save schema 19, 21 services. Published to Roblox as place version 75,
+Last updated: 2026-08-05, at `main` = `7aa84f6` (PR #225), build `0.53.0`,
+save schema 19, 21 services. Published to Roblox as place version 77,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
+Studio is unavailable this stretch ("do what you can without using
+studio"), so waves ship terminal-only and every Studio-facing check is
+recorded open rather than performed.
 
-Since the last full entry, five waves shipped in quick succession:
+Newest first since the last header:
+- **#225** (v77) companions v1 — the Beastkeeper's briar hound: while the
+  profession is worn in town (not on expedition, not downed), a
+  procedural hound is summoned at the keeper's flank and follows with
+  anchored PivotTo stepping (no Humanoid, no pathfinding); FOLLOW/STAY
+  rides CompanionCommand with a "mode" field, allow-listed in the same
+  commit. Pure motion math in CompanionMotion (number pairs — the shared
+  layer stays free of Roblox datatypes; a first draft using Vector3 in
+  shared failed typecheck, which is the enforcement working). Open for
+  the next live session: hound visual read, follow feel, command toasts
+  via a real button press.
+- **#224** trading risk review — **trading does not ship for launch**;
+  decision and reasons in docs/MILESTONE_6_TRADING_RISK_REVIEW.md so it
+  is not re-litigated. Narrowest post-launch shape recorded there.
+- **#223** (v76) equipment traits — every craftable rolls one trait at
+  first craft, deterministically from hash(itemId, save createdAt): keen
+  / balanced / tempered for weapons, sturdy / light for passives, folded
+  inside the existing stat clamps; re-crafting keeps the first roll.
+  Schema 18 → 19, era-18 fixture.
+
+Earlier waves in this stretch:
 - **#218** (v72) equipment wear/repair — weapons dull with landed strikes
   (sound/worn/failing thirds; worn halves the damage bonus and drops the
   riders, failing falls back to bare hands), whetting costs half the
@@ -38,10 +61,11 @@ Since the last full entry, five waves shipped in quick succession:
   mid-screen to above the touch action row.
 - **#216/#217** (v71) loadouts (schema 16 → 17): three saved kits.
 
-M6 remaining: companions, defense plots, equipment traits, trading
-review, HUD whet affordance, passive-gear wear, and the recorded live
-checks (kit apply, gear dulling arc, Blackout drive to the Old Growth on
-a touch path). M7 (regions wave A) has not started. #214 added the enemy director: town-night
+M6 remaining: defense plots (lanes, traps, resident defenders — blind-
+buildable with recorded live checks), the HUD whet affordance,
+passive-gear wear, a trait inspection surface, and the recorded live
+checks (kit apply, gear dulling arc, hound visuals/follow feel, Blackout
+drive to the Old Growth on a touch path). M7 (regions wave A) has not started. #214 added the enemy director: town-night
 wave counts scale with the defenders standing in town (solo nights pinned
 bit-identical by spec; +1 wave per extra eligible defender to a ceiling of
 twelve, census taken once at nightfall and logged). **#212 matters beyond its size**: driving
