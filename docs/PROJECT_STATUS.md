@@ -8,7 +8,7 @@ hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
 Last updated: 2026-08-05, at `main` = `7aa84f6` (PR #225), build `0.53.0`,
-save schema 19, 21 services. Published to Roblox as place version 77,
+save schema 19, 22 services. Published to Roblox as place version 77,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using

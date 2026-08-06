@@ -437,6 +437,24 @@ function ProfileService.repairGear(self: ProfileService, player: Player, itemId:
     return result
 end
 
+function ProfileService.spendMaterials(self: ProfileService, player: Player, cost: any): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { applied = false, reason = "profile_loading" }
+    end
+    if not self:isWritable(player) then
+        return { applied = false, reason = "profile_read_only" }
+    end
+    local nextProfile, result = self._saveSchema.withSpentMaterials(profile, cost, os.time())
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent and self._writable[player] == true then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
 function ProfileService.gearWearOf(self: ProfileService, player: Player): any
     local profile = self._profiles[player]
     return if profile ~= nil then (profile :: any).gearWear or {} else {}

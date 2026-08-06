@@ -4,6 +4,8 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
+
 local EnemyService = {}
 EnemyService.__index = EnemyService
 EnemyService.Name = "EnemyService"
@@ -55,11 +57,12 @@ export type EnemyService = typeof(setmetatable(
         _engineerBrace: any,
         _enemyBuilder: any,
         _analyticsService: any,
+        _defenseLanes: any,
         _professionService: any,
         _eliteService: any,
         _bossService: any,
         _active: Enemy?,
-        _queue: { string },
+        _queue: { { enemyId: string, laneId: string? } },
         _nextSpawnAt: number,
         _nightActive: boolean,
         _lurePlayer: Player?,
@@ -111,6 +114,7 @@ function EnemyService.new(
         _engineerBrace = engineerBrace,
         _enemyBuilder = enemyBuilder,
         _analyticsService = analyticsService,
+        _defenseLanes = nil,
         _professionService = nil,
         _eliteService = nil,
         _bossService = nil,
@@ -154,6 +158,10 @@ end
 
 function EnemyService.setChangedHandler(self: EnemyService, callback: (string?) -> ())
     self._onChanged = callback
+end
+
+function EnemyService.setDefenseLanes(self: EnemyService, defenseLanes: any)
+    self._defenseLanes = defenseLanes
 end
 
 function EnemyService.setProfessionService(self: EnemyService, professionService: any)
@@ -461,8 +469,21 @@ function EnemyService.stopNight(self: EnemyService)
     self:_notify(nil)
 end
 
-function EnemyService._spawnPosition(self: EnemyService, definition: any): Vector3
+function EnemyService._spawnPosition(self: EnemyService, definition: any, laneId: string?): Vector3
     local origin = self._worldService:enemySpawnPosition()
+    --[[
+        Approach lanes: the authored spawn rotated about the lantern. The
+        Meadow Gate's yaw is zero, so the default lane reproduces the
+        pre-lane spawn point exactly; the flanks re-sample terrain height
+        at their rotated ground.
+    ]]
+    local lane = if self._defenseLanes ~= nil then self._defenseLanes.get(laneId) else nil
+    if lane ~= nil and lane.yaw ~= 0 then
+        local center = self._worldService:lanternPosition()
+        local rx, rz = self._defenseLanes.rotatedPoint(lane, origin.X, origin.Z, center.X, center.Z)
+        local authoredRise = origin.Y - TerrainBuilder.surfaceHeight(origin.X, origin.Z)
+        origin = Vector3.new(rx, TerrainBuilder.surfaceHeight(rx, rz) + authoredRise, rz)
+    end
     if definition.stationary ~= true then
         return origin
     end
@@ -474,7 +495,7 @@ function EnemyService._spawnPosition(self: EnemyService, definition: any): Vecto
     return origin + flatDelta.Unit * math.min(34, flatDelta.Magnitude * 0.45)
 end
 
-function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
+function EnemyService._spawnNow(self: EnemyService, enemyId: string, laneId: string?): boolean
     if not self._nightActive or self._active ~= nil then
         return false
     end
@@ -484,7 +505,7 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
         return false
     end
 
-    local origin = self:_spawnPosition(definition)
+    local origin = self:_spawnPosition(definition, laneId)
     self:_showSpawnPulse(
         origin,
         if definition.statusEffect == "spark_theft"
@@ -531,13 +552,14 @@ function EnemyService._spawnNow(self: EnemyService, enemyId: string): boolean
     }
     self._logger:info("bramblewake_enemy_spawned", {
         enemy = definition.id,
+        lane = laneId,
         queued = #self._queue,
     })
     self:_notify(string.upper(definition.displayName) .. " ENTERS THE TRAIL")
     return true
 end
 
-function EnemyService.spawn(self: EnemyService, enemyId: string?): boolean
+function EnemyService.spawn(self: EnemyService, enemyId: string?, laneId: string?): boolean
     if not self._nightActive then
         return false
     end
@@ -550,14 +572,15 @@ function EnemyService.spawn(self: EnemyService, enemyId: string?): boolean
         return false
     end
     if self._active ~= nil or workspace:GetServerTimeNow() < self._nextSpawnAt then
-        table.insert(self._queue, resolvedId)
+        table.insert(self._queue, { enemyId = resolvedId, laneId = laneId })
         self._logger:info("bramblewake_enemy_queued", {
             enemy = resolvedId,
+            lane = laneId,
             position = #self._queue,
         })
         return true
     end
-    return self:_spawnNow(resolvedId)
+    return self:_spawnNow(resolvedId, laneId)
 end
 
 function EnemyService._spawnNext(self: EnemyService, now: number)
@@ -569,10 +592,54 @@ function EnemyService._spawnNext(self: EnemyService, now: number)
     then
         return
     end
-    local enemyId = table.remove(self._queue, 1)
-    if enemyId ~= nil then
-        self:_spawnNow(enemyId)
+    local entry = table.remove(self._queue, 1)
+    if entry ~= nil then
+        self:_spawnNow(entry.enemyId, entry.laneId)
     end
+end
+
+-- The active enemy's flat ground position, for the defense plots' trigger
+-- checks. Nil when nothing walks the lanes.
+function EnemyService.activeFlatPosition(self: EnemyService): (number?, number?)
+    local enemy = self._active
+    if enemy == nil or not self._nightActive then
+        return nil, nil
+    end
+    return enemy.basePosition.X, enemy.basePosition.Z
+end
+
+--[[
+    A snare plot bites the active enemy: the same snaredUntil timer the
+    sling's stone uses (0.75x speed, the x1.2 exposed reaction), held a
+    little longer than any on-hit source can manage. Returns the enemy's
+    display name for the toast, or nil if nothing was there to bite.
+]]
+function EnemyService.applyTrapSnare(self: EnemyService, seconds: number): string?
+    local enemy = self._active
+    if enemy == nil or not self._nightActive then
+        return nil
+    end
+    enemy.snaredUntil = workspace:GetServerTimeNow() + math.clamp(seconds, 0.5, 6)
+    return enemy.definition.displayName
+end
+
+--[[
+    The Watch's chip damage: a resident defender softens the active enemy
+    but never finishes it -- health floors at 1, so every defeat still
+    belongs to a player and the defeat-attribution paths stay untouched.
+]]
+function EnemyService.residentChip(self: EnemyService, damage: number): boolean
+    local enemy = self._active
+    if enemy == nil or not self._nightActive then
+        return false
+    end
+    local chip = math.min(math.max(1, math.floor(damage)), enemy.health - 1)
+    if chip <= 0 then
+        return false
+    end
+    enemy.health -= chip
+    enemy.model:SetAttribute("EnemyHealth", math.max(0, enemy.health))
+    return true
 end
 
 function EnemyService._attackGroundPosition(

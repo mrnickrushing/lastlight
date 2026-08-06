@@ -9,6 +9,7 @@ assert(root ~= nil, "Last Light shared root did not replicate before bootstrap t
 local Config = require(root.Config)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
 local CraftingCatalog = require(root.CraftingCatalog)
+local DefenseLanes = require(root.DefenseLanes)
 local Equipment = require(root.Equipment)
 local GearVisualPlan = require(root.GearVisualPlan)
 local BramblewakeEnemies = require(root.BramblewakeEnemies)
@@ -82,6 +83,7 @@ local TownNightService = require(script.Services.TownNightService)
 local LobbyService = require(script.Services.LobbyService)
 local AdminService = require(script.Services.AdminService)
 local CompanionService = require(script.Services.CompanionService)
+local DefenseService = require(script.Services.DefenseService)
 local PlayerSurvivalService = require(script.Services.PlayerSurvivalService)
 local PlayerCombatService = require(script.Services.PlayerCombatService)
 local ProfessionService = require(script.Services.ProfessionService)
@@ -198,6 +200,9 @@ professionService:setCombatService(combatService)
 expeditionService:bindEnemyService(enemyService)
 enemyService:setProfessionService(professionService)
 local companionService = CompanionService.new(logger, CompanionMotion)
+local defenseService =
+    DefenseService.new(logger, DefenseLanes, worldService, enemyService, profileService)
+enemyService:setDefenseLanes(DefenseLanes)
 local oldGrowthService = OldGrowthService.new(
     logger,
     worldService,
@@ -290,6 +295,7 @@ local townNightService = TownNightService.new(
     analyticsService,
     featureFlags
 )
+townNightService:setDefense(defenseService, DefenseLanes)
 survivalService:setPartyRecoveryProvider(
     function(eligiblePlayers: number, downedPlayers: number): any
         return townNightService:attemptLastStand(eligiblePlayers, downedPlayers)
@@ -371,6 +377,7 @@ services:register(phaseService)
 services:register(lobbyService)
 services:register(townNightService)
 services:register(companionService)
+services:register(defenseService)
 -- Without this the departure countdown never reached a client: LobbyService
 -- published every whole second into a handler nobody had set, so the panel
 -- froze at "DEPARTING IN 10" while the server counted down and launched.
@@ -381,6 +388,13 @@ worldService:setClickHandler(function(clicker: Player, interactionId: string)
     tutorialService:interactFromClick(clicker, interactionId)
 end)
 tutorialService:setCompanionService(companionService)
+defenseService:setToastHandler(function(player: Player?, message: string)
+    if player ~= nil then
+        tutorialService:toastPlayer(player, message)
+    else
+        tutorialService:toastEveryone(message)
+    end
+end)
 enemyService:setStrikeHandler(function(clicker: Player)
     tutorialService:strikeFromClick(clicker)
 end)

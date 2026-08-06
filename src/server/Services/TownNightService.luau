@@ -16,6 +16,8 @@ export type TownNightService = typeof(setmetatable(
         _logger: Logger,
         _worldService: any,
         _enemyService: any,
+        _defenseService: any,
+        _defenseLanes: any,
         _townNightSchedule: any,
         _townNightIncident: any,
         _townCondition: any,
@@ -60,6 +62,8 @@ function TownNightService.new(
         _logger = logger,
         _worldService = worldService,
         _enemyService = enemyService,
+        _defenseService = nil,
+        _defenseLanes = nil,
         _townNightSchedule = townNightSchedule,
         _townNightIncident = townNightIncident,
         _townCondition = townCondition,
@@ -88,6 +92,11 @@ end
 function TownNightService.Init(_self: TownNightService, _context: any) end
 
 function TownNightService.Start(_self: TownNightService) end
+
+function TownNightService.setDefense(self: TownNightService, defenseService: any, defenseLanes: any)
+    self._defenseService = defenseService
+    self._defenseLanes = defenseLanes
+end
 
 function TownNightService.setChangedHandler(self: TownNightService, callback: (string?) -> ())
     self._onChanged = callback
@@ -364,12 +373,18 @@ function TownNightService._runCycle(self: TownNightService)
             partySize = partySize,
             waves = self._townNightSchedule.waveCount(activeNight, partySize),
         })
+        if self._defenseService ~= nil then
+            self._defenseService:onNightStarted(partySize)
+        end
 
         for _, beat in self._townNightSchedule.beats(self._nightSeconds, activeNight, partySize) do
             waitUntilTime(nightStartedAt + beat.at)
             if beat.kind == "spawn" then
                 self._worldService:signalNightWave(beat.enemyId, beat.wave, theme)
-                self._enemyService:spawn(beat.enemyId)
+                local laneId = if self._defenseLanes ~= nil
+                    then self._defenseLanes.laneForWave(activeNight, beat.wave).id
+                    else nil
+                self._enemyService:spawn(beat.enemyId, laneId)
             elseif beat.kind == "breach" then
                 self._worldService:setTownBreach(true, theme)
                 self._enemyService:setBreach()
@@ -404,6 +419,9 @@ function TownNightService._runCycle(self: TownNightService)
         )
         self._condition = nextCondition
         self._enemyService:stopNight()
+        if self._defenseService ~= nil then
+            self._defenseService:onNightEnded()
+        end
         self._activeNightNumber = 0
         self._worldService:setTownBreach(false, theme)
         self._worldService:setNight(false)

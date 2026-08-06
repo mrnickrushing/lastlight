@@ -1002,6 +1002,42 @@ function SaveSchema.withGearWear(profile: Profile, itemId: any, points: number):
     return nextProfile, result
 end
 
+--[[
+    Spend a flat table of materials ({ materialId = amount }) atomically:
+    either every line is affordable and all are deducted, or nothing
+    changes. Defense trap arming pays through this; it adds no profile
+    field, so no schema bump rides along with it.
+]]
+function SaveSchema.withSpentMaterials(profile: Profile, cost: any, now: number): (Profile, any)
+    local materials = (profile :: any).inventory.materials or {}
+    if type(cost) ~= "table" then
+        return profile, { applied = false, reason = "invalid_cost" }
+    end
+    for materialId, amount in cost do
+        if type(amount) ~= "number" or amount <= 0 then
+            return profile, { applied = false, reason = "invalid_cost" }
+        end
+        if (tonumber(materials[materialId]) or 0) < amount then
+            return profile, { applied = false, reason = "insufficient_materials" }
+        end
+    end
+    local nextMaterials: { [string]: number } = table.clone(materials)
+    for materialId, amount in cost do
+        local remaining = (nextMaterials[materialId] or 0) - amount
+        if remaining <= 0 then
+            nextMaterials[materialId] = nil
+        else
+            nextMaterials[materialId] = remaining
+        end
+    end
+    local nextProfile: any = table.clone(profile)
+    nextProfile.inventory = table.clone((profile :: any).inventory)
+    nextProfile.inventory.materials = nextMaterials
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile, { applied = true }
+end
+
 function SaveSchema.withRepairedGear(profile: Profile, itemId: any, now: number): (Profile, any)
     local materials = (profile :: any).inventory.materials or {}
     local nextWear, nextMaterials, result =

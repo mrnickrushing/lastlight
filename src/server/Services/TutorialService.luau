@@ -474,6 +474,16 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     self:_publish(player)
 end
 
+-- Public toast entry points for services that live outside the session
+-- pipeline (the defense plots' arming and bite feedback arrives here).
+function TutorialService.toastEveryone(self: TutorialService, message: string)
+    self:_toastAll(message)
+end
+
+function TutorialService.toastPlayer(self: TutorialService, player: Player, message: string)
+    self:_setToast(player, message)
+end
+
 function TutorialService._toastAll(self: TutorialService, message: string)
     for _, session in self._sessions do
         session.toast = message
