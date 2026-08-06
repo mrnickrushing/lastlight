@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-05, at `main` = `bc1aa28` (PR #227), build `0.53.0`,
-save schema 19, 22 services. Published to Roblox as place version 78,
+Last updated: 2026-08-05, at `main` = `cc82b6a` (PR #229), build `0.53.0`,
+save schema 19, 22 services. Published to Roblox as place version 79,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,17 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#229** (v79) gear care — **Milestone 6 is source-complete with this
+  wave.** Passive gear wears from mitigated hits (1 point/hit vs the
+  weapon's 2/strike) through a new per-item effectiveness seam in
+  Equipment.stats (worn halves a piece's contribution, failing removes
+  it, traits fade with the same factor; no-wear path spec-pinned
+  bit-identical, and no schema change). The Field Book gains the WHET
+  button (server-composed gearCare/whetTarget payload; fires the
+  existing RepairGear action) and trait/condition annotations on equip
+  buttons ("EQUIP EDGE ×1 · KEEN · WORN"). Drive-by: the equip-button
+  refresh still hardcoded hood/boots labels, so all six weapon buttons
+  read "EQUIP BOOTS ×N" — labels now come from BaseLabel attributes.
 - **#227** (v78) defense plots — three authored approach lanes (Meadow
   Gate = the pre-lane straight approach, yaw 0, spec-pinned
   bit-identical; East Hollow and West Break as rotations about the
@@ -73,10 +84,13 @@ Earlier waves in this stretch:
   mid-screen to above the touch action row.
 - **#216/#217** (v71) loadouts (schema 16 → 17): three saved kits.
 
-M6 remaining: the HUD whet affordance, passive-gear wear, a trait
-inspection surface, and the recorded live checks (kit apply, gear
-dulling arc, hound visuals/follow feel, defense plot placement/arm-by-
-tap, Blackout drive to the Old Growth on a touch path). M7 (regions wave A) has not started. #214 added the enemy director: town-night
+M6 remaining: only the recorded live checks, all blocked on Studio
+availability (kit apply, gear dulling arc, hound visuals/follow feel,
+defense plot placement/arm-by-tap, WHET press on device, Blackout drive
+to the Old Growth on a touch path). Every source-side deliverable is
+merged and published. **Milestone 7 is next**: Ironroot Delve +
+Mireglass Fen, chapters II–III, the content counts in the roadmap,
+town tiers 2–4. M7 (regions wave A) has not started. #214 added the enemy director: town-night
 wave counts scale with the defenders standing in town (solo nights pinned
 bit-identical by spec; +1 wave per extra eligible defender to a ceiling of
 twelve, census taken once at nightfall and logged). **#212 matters beyond its size**: driving
