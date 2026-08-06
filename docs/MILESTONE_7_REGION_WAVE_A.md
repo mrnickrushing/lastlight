@@ -80,6 +80,19 @@ test could see, because every part of them a test can read was correct.
 - **Defense plots (#227)** — three plots stand on their three lanes at
   exactly 46 studs from the lantern, each with six ring stones, stake,
   ember, and a 42-stud ArmClick; `defense_plots_built lanes=3` at boot.
+  **Arming by tap verified end to end**: clicking the real stake in the
+  world reaches the server and answers "SETTING THE SNARE TAKES 1
+  HEARTWOOD AND 2 MEADOW FIBER" on an empty purse. The tap path is the
+  half that could have been silently dead (it was, for the Old Growth
+  heart, in #221); the successful arm and the bite still want materials.
+- **Delve and Fen enemy silhouettes (#233, #237)** — all twelve built and
+  photographed. **Six were wrong** and are fixed in #251: four parts sized
+  on the wrong cylinder axis (the Slag Spitter's pool standing as a bar
+  through its body, the Bog Bell's ground marks floating as bars, the
+  Rail Hound's wheels buried inside its chassis so it read as a plank,
+  the Crank Guard's mechanism a squashed tube), the Gas Bloomer's petals
+  pitched before yaw so the bloom read as a saucer, and the Mire Leech's
+  mouth. Re-photographed after the fix.
 - **Departure panel** — **defect found:** pressing a party size still
   showed nothing. #219 had fixed the payload half; the selection half was
   never implemented, so a press made off the platform (which the server
@@ -94,18 +107,36 @@ test could see, because every part of them a test can read was correct.
   72 points reports `worn` and halves effectiveness, repair costs half
   the recipe, the trait roll resolves to KEEN with its label.
 
-**Still open:**
+**Still open, and what each one needs:**
 
-- Defense plots: arming by tap with real materials, the bite toast
-  mid-fight, and the Watch defender's silhouette on a solo night.
-- Gear care: the WHET button press and worn equip-label read on a
-  profile that has actually dulled a weapon.
-- Delve/Fen enemies (#233, #237): silhouette and telegraph read at night.
-- Everything in "What remains" above, end to end, including the M7 exit
-  gate's continuous fresh-save path through chapter III.
+Everything left here needs a *stocked profile* — materials banked from a
+real expedition — which the session did not run. They are one economy
+loop away, not one fix away:
+
+- Defense plots: the successful arm (2 fiber + 1 heartwood), the bite
+  toast when a night creature walks the ring, and the Watch defender on a
+  solo night.
+- Gear care: the WHET press and the worn equip-label read on a profile
+  that has actually dulled a weapon.
+- Delve/Fen enemies: telegraph read at night (the silhouettes are done).
+- The M7 exit gate's continuous fresh-save path through chapter III,
+  which needs the geometry half of the milestone first.
 - Every device-hardware item (baseline phone performance, touch reach,
   safe areas) — Studio's emulator cannot close these, per
   STUDIO_MCP_SETUP's own honest split.
+
+## A note for whoever drives Studio next
+
+Two things cost this session real time and are worth knowing:
+
+1. **Mouse coordinates are screen space, not viewport space.**
+   `Camera:WorldToViewportPoint` returns a point ~36px above where the
+   mouse must actually go (the GUI inset). Use `ScreenPointToRay` to
+   confirm a target before clicking, or check `Mouse.Target` after
+   hovering — a click that lands on terrain looks exactly like a dead
+   ClickDetector, and that is how an hour disappears.
+2. **GUI buttons are best clicked by `instance_path`**, which resolves
+   the coordinates itself and sidesteps the above entirely.
 
 ## Basic profession kits: verified complete
 
