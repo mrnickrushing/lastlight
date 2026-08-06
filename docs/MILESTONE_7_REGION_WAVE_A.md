@@ -60,20 +60,52 @@ navigation, performance review) are literally live checks:
    departure lodge once it is buildable (RegionAccess.available is the
    menu's data source).
 
-## Live checks deferred by the no-Studio constraint
+## Live checks: closed 2026-08-06, and what is still open
 
-Recorded across waves; every item is open until a live session:
+A Studio session on 2026-08-06 (place versions 89–90) closed the first
+block of these. What it found is the argument for driving every blind
+wave as soon as a session is available: three defects, none of which any
+test could see, because every part of them a test can read was correct.
 
-- Companions (#225): hound visual read, follow feel, FOLLOW/STAY toasts
-  via real button press.
-- Defense plots (#227): plot placement on real terrain, arm-by-tap on
-  device, bite toast mid-fight, Watch silhouette.
-- Gear care (#229): WHET press on device, worn-label read, a real
-  mitigated-hit wear arc.
-- Delve/Fen enemies (#233, #237): silhouette and telegraph read at
-  night, on device.
+**Closed:**
+
+- **Companions (#225)** — hound builds (15 parts), stands at its keeper's
+  flank 4.0 studs off and 0.17 above the floor, closes a 30-stud gap in
+  under 2.5 seconds and settles at 3.5 without jitter. FOLLOW/STAY
+  verified end to end by pressing the real button.
+  **Defect found:** the order had no button at all. CompanionCommand
+  existed server-side complete with contract, handler and toasts, and
+  nothing on the client ever sent it — half the feature was unreachable
+  in the shipped game (fixed, #249).
+- **Defense plots (#227)** — three plots stand on their three lanes at
+  exactly 46 studs from the lantern, each with six ring stones, stake,
+  ember, and a 42-stud ArmClick; `defense_plots_built lanes=3` at boot.
+- **Departure panel** — **defect found:** pressing a party size still
+  showed nothing. #219 had fixed the payload half; the selection half was
+  never implemented, so a press made off the platform (which the server
+  correctly refuses) left the panel pixel-for-pixel unchanged. That is
+  the owner's "no number is selected", finally whole (fixed, #248).
+- **FoundationIntegration** — **two defects found:** the interaction
+  census and the rotor-motion check both asserted fixtures the generator
+  had not selected for this seed, so the suite failed on most seeds.
+  Both terms are now derived from the placed manifest (fixed, #248).
+  `PASS FoundationIntegration` live on a fresh boot.
+- **Gear care rules (#229)** — verified live at the module level: worn at
+  72 points reports `worn` and halves effectiveness, repair costs half
+  the recipe, the trait roll resolves to KEEN with its label.
+
+**Still open:**
+
+- Defense plots: arming by tap with real materials, the bite toast
+  mid-fight, and the Watch defender's silhouette on a solo night.
+- Gear care: the WHET button press and worn equip-label read on a
+  profile that has actually dulled a weapon.
+- Delve/Fen enemies (#233, #237): silhouette and telegraph read at night.
 - Everything in "What remains" above, end to end, including the M7 exit
   gate's continuous fresh-save path through chapter III.
+- Every device-hardware item (baseline phone performance, touch reach,
+  safe areas) — Studio's emulator cannot close these, per
+  STUDIO_MCP_SETUP's own honest split.
 
 ## Basic profession kits: verified complete
 
