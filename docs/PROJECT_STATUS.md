@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-06, at `main` = `b570887` (PR #253), build `0.53.0`,
-save schema 20, 22 services. Published to Roblox as place version 92,
+Last updated: 2026-08-06, at `main` = `ffc54b6` (PR #255), build `0.53.0`,
+save schema 20, 22 services. Published to Roblox as place version 93,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,13 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#255** (v93) **an armed snare could never bite on the tutorial's
+  night** — the trap gated on the service's own night flag, which only
+  TownNightService raises, so three plots sat lit while a rootling, a
+  briarback and a hollow zombie walked their rings. It now asks the enemy
+  service where the walker is. Verified on the fix: "THE SNARE BITES —
+  BRIARBACK IS HELD", ember cold on the second charge. **The defense-plot
+  wave now has no open checks.**
 - **#251 / #253** (v91, v92) **the live session kept paying out**:
   building all twelve Delve/Fen creatures in Studio and photographing
   them found **six wrong shapes** — four parts sized on the wrong
