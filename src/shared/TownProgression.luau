@@ -1,5 +1,8 @@
 --!strict
 
+local ChapterCatalog = require("./ChapterCatalog")
+local ResidentRoster = require("./ResidentRoster")
+
 local TownProgression = {}
 
 export type Consequence = {
@@ -90,18 +93,48 @@ function TownProgression.buildingIds(): { string }
     return ids
 end
 
-local function residentIds(tier: number): { string }
+--[[
+    Reads a chapter's completion straight off the profile's story table.
+    TownProgression cannot ask SaveSchema (SaveSchema requires this
+    module), so it applies the same test SaveSchema.normalize already
+    guarantees holds for anything stored there.
+]]
+local function chapterComplete(story: any, chapterId: string): boolean
+    if type(story) ~= "table" then
+        return false
+    end
+    if chapterId == "chapter_one" then
+        return type(story.chapterOne) == "table" and story.chapterOne.status == "complete"
+    end
+    local chapters = story.chapters
+    if type(chapters) ~= "table" then
+        return false
+    end
+    local record = chapters[chapterId]
+    return type(record) == "table" and record.status == "complete"
+end
+
+local function reachedChapter(story: any): number
+    local reached = 1
+    for _, definition in ChapterCatalog.list() do
+        if chapterComplete(story, definition.id) then
+            reached = math.max(reached, definition.number + 1)
+        end
+    end
+    return math.min(reached, #ChapterCatalog.Order)
+end
+
+--[[
+    Who stands in town. Tier 0 is the pre-chapter tutorial town, empty of
+    named residents; after that the cast is the story's, via the roster --
+    chapter I's three, then the Delve's four, then the Fen's four. Mara is
+    present from the tutorial and is built separately.
+]]
+local function residentIds(tier: number, story: any): { string }
     if tier < 1 then
         return {}
     end
-    -- Mara is present from the tutorial and is built separately. Chapter one
-    -- brings the remaining Bramblewake residents home together, completing
-    -- the vertical slice's four-person town cast.
-    return {
-        "npc_tomas_reed",
-        "npc_pip_wren",
-        "npc_ena_moss",
-    }
+    return ResidentRoster.idsForChapter(reachedChapter(story))
 end
 
 function TownProgression.resolve(profile: any): Consequence
@@ -114,11 +147,26 @@ function TownProgression.resolve(profile: any): Consequence
     local nights = if town ~= nil and type(town.nightNumber) == "number"
         then town.nightNumber
         else 1
-    local tier = math.clamp(math.floor(math.max(0, nights - 1) / 3), 0, 3)
+    local story = if type(profile) == "table" then profile.story else nil
+    --[[
+        Milestone 7 extends the town to tier 4, but the road there is the
+        story's: nights alone still cap at 3, exactly as they always have
+        (spec-pinned), and only a town whose crew has stilled the Bellows
+        Maw can grow past it. Each resolved chapter also floors the tier,
+        so coming home from a chapter always shows something changed.
+    ]]
+    local ceiling = if chapterComplete(story, "chapter_two") then 4 else 3
+    local tier = math.clamp(math.floor(math.max(0, nights - 1) / 3), 0, ceiling)
     local decision = if type(chapter) == "table" then chapter.decision else nil
     local outcome = if type(chapter) == "table" then chapter.wardenOutcome else nil
     if type(chapter) == "table" and chapter.status == "complete" then
         tier = math.max(1, tier)
+    end
+    if chapterComplete(story, "chapter_two") then
+        tier = math.max(2, tier)
+    end
+    if chapterComplete(story, "chapter_three") then
+        tier = math.max(3, tier)
     end
     local title = if decision == "restore_farmland"
         then "FARMLAND RENEWED"
@@ -148,9 +196,9 @@ function TownProgression.resolve(profile: any): Consequence
         wardenOutcome = outcome,
         landscapeKind = landscapeKind,
         memorialKind = memorialKind,
-        growthStage = tier,
+        growthStage = math.min(tier, 3),
         buildingStages = buildingStages(tier),
-        residentIds = residentIds(tier),
+        residentIds = residentIds(tier, story),
     }
 end
 
@@ -165,8 +213,8 @@ function TownProgression.merge(current: any, incoming: Consequence): Consequence
         return incoming
     end
 
-    local currentTier = math.clamp(math.floor(tonumber(current.tier) or 0), 0, 3)
-    local incomingTier = math.clamp(math.floor(tonumber(incoming.tier) or 0), 0, 3)
+    local currentTier = math.clamp(math.floor(tonumber(current.tier) or 0), 0, 4)
+    local incomingTier = math.clamp(math.floor(tonumber(incoming.tier) or 0), 0, 4)
     local base = if incomingTier > currentTier then incoming else current
     local result = table.clone(base)
     result.tier = math.max(currentTier, incomingTier)
@@ -203,8 +251,11 @@ function TownProgression.merge(current: any, incoming: Consequence): Consequence
             end
         end
     end
+    -- Rebuilt in roster order so every joiner sees the same cast in the
+    -- same order. This list used to hardcode chapter I's three, which
+    -- silently evicted later arrivals from a merged town.
     local mergedResidents = {}
-    for _, residentId in { "npc_tomas_reed", "npc_pip_wren", "npc_ena_moss" } do
+    for _, residentId in ResidentRoster.Order do
         if residentSet[residentId] == true then
             table.insert(mergedResidents, residentId)
         end
