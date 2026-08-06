@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-06, at `main` = `e8bb802` (PR #235), build `0.53.0`,
-save schema 19, 22 services. Published to Roblox as place version 83,
+Last updated: 2026-08-06, at `main` = `a54f7cb` (PR #237), build `0.53.0`,
+save schema 19, 22 services. Published to Roblox as place version 84,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,15 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#237** (v84) **M7 wave E**: Mireglass Fen entire — catalog (30
+  modules, 12 POIs, 8 event_mg_* events, five materials), six enemies
+  that wait rather than charge, the Many-Face (read-and-time: an open
+  profession guard stripped by the answering mirror for a short window),
+  the Drowned Caller (arithmetic: silting its four reflected pools wounds
+  it and calms the marsh; leaving them compounds the summons), and the
+  Lantern Witch closing chapter III with identify → use copies → consent
+  seal and three outcomes decided by play. EnemyCatalog now spans three
+  regions with Bramblewake's order still pinned.
 - **#235** (v83) **M7 wave D**: the Bellows Maw, chapter II's boss. Three
   phases that read the catalog's non-profession solution literally —
   reroute feed lines (2 → 3 → 4 as phases ratchet), vent the pressure,
@@ -115,12 +124,13 @@ Earlier waves in this stretch:
   mid-screen to above the touch action row.
 - **#216/#217** (v71) loadouts (schema 16 → 17): three saved kits.
 
-M7 waves A–D are merged and published: the Delve's content catalog,
-enemies, elites and boss all exist as rules and data with specs. What
-remains for M7: the Delve's builder geometry and runtime wiring (region
-selection in ExpeditionService, elite/boss services and arenas), then
-Mireglass Fen the same way, chapters II–III, eight named residents,
-remaining basic profession kits, and town tiers 2–4. M6 remaining: only the
+M7 waves A–E are merged and published: **both regions now exist as
+rules and data** — catalogs, rosters, elites and bosses for Ironroot
+Delve and Mireglass Fen, all spec-pinned. What remains for M7: builder
+geometry and runtime wiring for both regions (region selection in
+ExpeditionService, elite/boss services and arenas — the parts that most
+want Studio), chapters II–III's story/quest structure, eight named
+residents, remaining basic profession kits, and town tiers 2–4. M6 remaining: only the
 recorded live checks, all blocked on Studio availability (kit apply, gear dulling arc, hound visuals/follow feel,
 defense plot placement/arm-by-tap, WHET press on device, Blackout drive
 to the Old Growth on a touch path). Every source-side deliverable is
