@@ -1,5 +1,6 @@
 --!strict
 
+local Config = require("../../src/shared/Config")
 local MemoryFragments = require("../../src/shared/MemoryFragments")
 local SaveSchema = require("../../src/shared/SaveSchema")
 local TestRunner = require("../TestRunner")
@@ -129,7 +130,7 @@ return {
                     story = { chapterOne = { status = "unresolved" } },
                 }
                 local profile = SaveSchema.normalize(legacy, 1000)
-                TestRunner.equal(profile.schemaVersion, 19)
+                TestRunner.equal(profile.schemaVersion, Config.SaveSchemaVersion)
                 TestRunner.equal(next(profile.story.fragments), nil)
             end,
         },

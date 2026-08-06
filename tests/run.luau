@@ -23,6 +23,7 @@ TestRunner.run({
     require("./specs/BellowsMawEncounter.spec"),
     require("./specs/MireglassEncounters.spec"),
     require("./specs/ResidentRoster.spec"),
+    require("./specs/ChapterProgress.spec"),
     require("./specs/Environment.spec"),
     require("./specs/MemoryFragments.spec"),
     require("./specs/MeshAssetRegistry.spec"),

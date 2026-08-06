@@ -247,6 +247,21 @@ local ERA_PROFILES: { [number]: any } = {
     -- Schema 18 shipped equipment wear; 19 adds rolled traits. An 18-era
     -- save carries wear that must survive, and must arrive in 19 traitless
     -- -- its items roll at their next craft, not retroactively.
+    -- Schema 19 shipped rolled traits; 20 adds chapters II and III. A
+    -- 19-era save carries traits that must survive, and must arrive in 20
+    -- with no chapters beyond the first -- those regions did not exist.
+    [19] = {
+        schemaVersion = 19,
+        createdAt = 34,
+        updatedAt = 90,
+        revision = 140,
+        tutorial = { stage = "complete", complete = true, selectedTool = "axe" },
+        profession = { selectedId = "profession_engineer" },
+        gear = { gear_amber_edge = 1 },
+        equipped = { weapon = "gear_amber_edge" },
+        gearWear = { gear_amber_edge = 62 },
+        gearTraits = { gear_amber_edge = "trait_keen" },
+    },
     [18] = {
         schemaVersion = 18,
         createdAt = 30,
