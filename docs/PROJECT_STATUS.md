@@ -7,15 +7,41 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-05, at `main` = `9317535` (PR #216), build `0.53.0`,
-save schema 18, 20 services. Published to Roblox as place version 71,
-matching this revision exactly. #216 added loadouts (schema 16 → 17,
-era-16 fixture): three saved kits binding profession, weapon, and tool,
-applied through the same gates manual taps hit. **The owner's standing
-directive: finish Milestones 6 and 7 entirely, wave by wave, each merged
-and published.** M6 remaining: repair, equipment traits, status/reaction
-system, companions, defense plots, trading review, and the recorded live
-checks. M7 (regions wave A) has not started. #214 added the enemy director: town-night
+Last updated: 2026-08-05, at `main` = `3c8c8d7` (PR #221), build `0.53.0`,
+save schema 18, 20 services. Published to Roblox as place version 75,
+matching this revision exactly. **The owner's standing directive: finish
+Milestones 6 and 7 entirely, wave by wave, each merged and published.**
+
+Since the last full entry, five waves shipped in quick succession:
+- **#218** (v72) equipment wear/repair — weapons dull with landed strikes
+  (sound/worn/failing thirds; worn halves the damage bonus and drops the
+  riders, failing falls back to bare hands), whetting costs half the
+  item's recipe via a RepairGear action; schema 17 → 18, era-17 fixture.
+- **#219** (v73) **the owner's twice-reported departure bug, finally
+  root-caused**: since contracts shipped, the real party-size button sent
+  partySize plus contractId, and ActionPayloadContract's one-extra-field
+  allow-list silently dropped every real press before any handler ran.
+  Synthetic remote tests sent partySize alone, which is why they passed
+  while every human press failed. Verified with a REAL mouse click this
+  time. Lesson recorded at the fix: any client payload gaining a field
+  must update the allow-list in the same commit, and flow verification
+  must press the real button.
+- **#220** (v74) the status/reaction system — stilled = bound open
+  (forced flank, ×1.25, beats the Briarback's shield head-on), snared =
+  exposed (×1.2), drowsy striker swings soft (×0.85); clamped 0.6–1.6;
+  reactions name themselves in the toast; no-reactions path bit-identical
+  by spec.
+- **#221** (v75) from the owner's tablet screenshot: the Old Growth heart
+  (and Warden Stag) had no StrikeClick — on touch, where the tap IS the
+  strike, the encounter was undefeatable; both now carry the night
+  creatures' detector recipe. The red telegraph banner also moved from
+  mid-screen to above the touch action row.
+- **#216/#217** (v71) loadouts (schema 16 → 17): three saved kits.
+
+M6 remaining: companions, defense plots, equipment traits, trading
+review, HUD whet affordance, passive-gear wear, and the recorded live
+checks (kit apply, gear dulling arc, Blackout drive to the Old Growth on
+a touch path). M7 (regions wave A) has not started. #214 added the enemy director: town-night
 wave counts scale with the defenders standing in town (solo nights pinned
 bit-identical by spec; +1 wave per extra eligible defender to a ceiling of
 twelve, census taken once at nightfall and logged). **#212 matters beyond its size**: driving
