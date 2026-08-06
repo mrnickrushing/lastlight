@@ -63,6 +63,7 @@ export type TutorialService = typeof(setmetatable(
         _toolCatalog: any,
         _gearWear: any,
         _gearTraits: any,
+        _companionService: any,
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -134,6 +135,7 @@ function TutorialService.new(
         _toolCatalog = toolCatalog,
         _gearWear = gearWear,
         _gearTraits = gearTraits,
+        _companionService = nil,
         _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -759,6 +761,10 @@ function TutorialService._strikeContext(self: TutorialService, player: Player): 
         end
     end
     return context
+end
+
+function TutorialService.setCompanionService(self: TutorialService, companionService: any)
+    self._companionService = companionService
 end
 
 function TutorialService.strike(self: TutorialService, player: Player)
@@ -1495,6 +1501,13 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
                     then string.format("KIT %d — %s READY", slot, table.concat(applied, " · "))
                     else "KIT COULD NOT BE APPLIED"
             )
+            self:_publish(player)
+        end
+    elseif kind == self._runtimeIds.Actions.CompanionCommand then
+        local mode = payload.mode
+        if self._companionService ~= nil and type(mode) == "string" and #mode <= 12 then
+            local result = self._companionService:command(player, mode)
+            self:_setToast(player, result.message)
             self:_publish(player)
         end
     elseif kind == self._runtimeIds.Actions.RepairGear then
