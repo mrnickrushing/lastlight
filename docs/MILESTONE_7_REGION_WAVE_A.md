@@ -228,3 +228,29 @@ lever lamps, pump machine and tally board read under the shored roof at
 gameplay distance, and those levers are the physical form of the Foreman
 Echo's fight, so they had to be legible before the encounter could ever
 be wired to them.
+
+## The Fen's geometry
+
+`MireglassBuilder` is the Delve's opposite by construction. The Delve
+reads as underground because every module carries a roof; the Fen reads
+as drowned because every module carries water, and the water is the
+thing you cannot trust — glassy enough to mirror the sky, so a player
+looking at the ground is often looking at a reflection of what is above
+it. That is the region's whole idea, and it is built rather than
+described: reed mats that float, boardwalks that stop, stilts that have
+walked in the mud, mirror flats reflecting a path which is not there.
+
+Ten primitives (fen water with its reflectance, reed stands, boardwalks,
+stilt houses, mireglass sheets, witchlight lanterns, punts, reed mats,
+bog iron pits, fen ground) carry all thirty module visuals.
+
+Three of them exist because encounters will need them: the mirror court's
+three mirrors are the Many-Face's fight, the bell marsh's four reflected
+pools are the Drowned Caller's doors, and the Witchlight approach's ring
+of lanterns at head height is where the Lantern Witch stands among her
+copies.
+
+`RegionBuilderCoverage.spec` now checks both regions' catalogs against
+both builders, and pins both `enabled` flags false — geometry is
+necessary but not sufficient, and the regions stay shut until their
+services and arenas exist too.
