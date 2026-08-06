@@ -57707,6 +57707,7 @@ assert(serverRoot ~= nil, "server root unavailable in Studio integration test")
 
 local Config = require(root.Config)
 local MusicCatalog = require(root.MusicCatalog)
+local MemoryFragments = require(root.MemoryFragments)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
 local BramblewakeEnemies = require(root.BramblewakeEnemies)
 local CombatState = require(root.CombatState)
@@ -59219,11 +59220,41 @@ assert(wardenLivingRoots == 12, "Warden nodes need three living roots each")
     event interactions come from the catalog and specializations from
     RuntimeIds, so only genuinely new fixtures move this number, and moving
     it should be a deliberate edit.
+
+    Memory fragments left the literal on 2026-08-06, measured live. Four of
+    the ten fragments are anchored to story landmarks ("story:<landmark>"),
+    and story landmarks only exist when the module hosting them is in this
+    run's manifest -- which the generator picks twelve-from-thirty. The
+    literal had assumed eight fragment prompts, which held for the fixed
+    fallback manifest and stopped holding once the day-salted seed fielded
+    other woods: this boot placed six (four POI-anchored, two site-anchored)
+    and the census failed at 124 against an expected 126. The fragment term
+    is now derived the same way the story landmark count above already is,
+    from the modules actually placed, so the remaining literal covers only
+    fixtures that genuinely do not vary by seed.
 ]]
+local expectedFragments = 0
+for _, fragment in MemoryFragments.List do
+    local landmark = string.match(fragment.anchorKey, "^story:(.+)$")
+    if landmark == nil then
+        -- POI and named-site anchors are placed on every manifest: the
+        -- generator's validator guarantees all four POIs, and the seal and
+        -- wayhome sites are built unconditionally.
+        expectedFragments += 1
+    else
+        for _, definition in BramblewakeExpedition.Modules do
+            if definition.storyLandmark == landmark and placedModuleIds[definition.id] then
+                expectedFragments += 1
+                break
+            end
+        end
+    end
+end
 local tagged = CollectionService:GetTagged(RuntimeIds.InteractionTag)
 assert(
     #tagged
-        == 80
+        == 72
+            + expectedFragments
             + BramblewakeExpedition.EventInteractionCount
             + #RuntimeIds.ProfessionSpecializationInteractionIds,
     string.format(
@@ -59297,7 +59328,33 @@ for _, target in ambientMotionTargets do
     )
 end
 assert(foundResidentMotion, "Mara is missing resident motion")
-assert(foundRotorMotion, "Windmill Copse is missing rotor motion")
+--[[
+    Rotor motion belongs to the windmill modules, and the generator picks
+    twelve from thirty -- a run that fields none of them has nothing to
+    turn, which is a manifest, not a fault. Measured live on 2026-08-06:
+    a day-salted seed with no mill module failed this line, the same way
+    the mill's procedural shell check above already learned to ask first.
+]]
+local expectsRotor = false
+--[[
+    Derived from the catalog rather than named by hand: any module whose
+    visual is a windmill builds a rotor.
+]]
+local millModuleIds = {}
+for _, definition in BramblewakeExpedition.Modules do
+    if definition.visual == "windmill" then
+        table.insert(millModuleIds, definition.id)
+    end
+end
+for _, moduleId in millModuleIds do
+    if placedModuleIds[moduleId] then
+        expectsRotor = true
+        break
+    end
+end
+if expectsRotor then
+    assert(foundRotorMotion, "a placed mill module is missing its rotor motion")
+end
 local ambientLightTargets = CollectionService:GetTagged(RuntimeIds.AmbientLightTag)
 assert(#ambientLightTargets >= 6, "expected practical town and expedition lights to animate")
 for _, target in ambientLightTargets do
@@ -60323,6 +60380,7 @@ export type HUDController = typeof(setmetatable(
         _contractButtons: { [string]: TextButton },
         _selectedContractId: string,
         _onLobbyDepart: ((number) -> ())?,
+        _selectedPartySize: number?,
         _progressButton: TextButton,
         _useCharm: TextButton,
         _useSatchel: TextButton,
@@ -61429,6 +61487,7 @@ function HUDController.new(
         _departurePlatformPart = nil,
         _departurePlatformPosition = nil,
         _onLobbyDepart = nil,
+        _selectedPartySize = nil,
         _canvas = canvas,
         _scale = scale,
         _phaseFrame = phaseFrame,
@@ -61656,10 +61715,32 @@ function HUDController.setCompactHandler(self: HUDController, callback: (boolean
     self._onCompact = callback
 end
 
+function HUDController._setSelectedPartySize(self: HUDController, size: number?)
+    self._selectedPartySize = size
+    for index, button in self._lobbySizeButtons do
+        local chosen = index == size
+        button.BackgroundColor3 = if chosen
+            then Color3.fromRGB(37, 68, 55)
+            else Color3.fromRGB(31, 40, 44)
+        button.TextColor3 = if chosen then COLORS.amber else COLORS.cream
+    end
+end
+
 function HUDController.setLobbyDepartHandler(self: HUDController, callback: (number, string) -> ())
     self._onLobbyDepart = callback
     for size, button in self._lobbySizeButtons do
         button.Activated:Connect(function()
+            --[[
+                The press is two things at once, and it used to be only one.
+                Sending the departure request was always here; showing that a
+                number was chosen was not, so a press made off the platform --
+                which the server correctly refuses -- left the panel looking
+                exactly as it had before it. That is the "nothing happens, no
+                number is selected" the owner reported twice. The contract row
+                one line below has always marked its choice; the size row now
+                speaks the same language.
+            ]]
+            self:_setSelectedPartySize(size)
             local handler = self._onLobbyDepart
             if handler ~= nil then
                 handler(size, self._selectedContractId)
@@ -61750,8 +61831,18 @@ function HUDController._updateLobby(self: HUDController, state: any)
         self._lobbySizes.Visible = false
     else
         self._lobbyTitle.Text = "DEPARTURE"
-        self._lobbyDetail.Text = if lobby.readyCount > 0
-            then string.format("%d ON THE PLATFORM * CHOOSE PARTY SIZE", lobby.readyCount)
+        local chosen = self._selectedPartySize
+        self._lobbyDetail.Text = if chosen ~= nil and lobby.readyCount <= 0
+            then string.format("PARTY OF %d * STAND ON THE PLATFORM", chosen)
+            elseif chosen ~= nil then string.format(
+                "%d ON THE PLATFORM * PARTY OF %d",
+                lobby.readyCount,
+                chosen
+            )
+            elseif lobby.readyCount > 0 then string.format(
+                "%d ON THE PLATFORM * CHOOSE PARTY SIZE",
+                lobby.readyCount
+            )
             else "STAND ON THE PLATFORM TO DEPART"
         self._lobbySizes.Visible = true
         local maximum = if type(lobby.maxPartySize) == "number" then lobby.maxPartySize else 8
