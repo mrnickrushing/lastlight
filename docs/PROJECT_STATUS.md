@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-06, at `main` = `e6a9d9a` (PR #249), build `0.53.0`,
-save schema 20, 22 services. Published to Roblox as place version 90,
+Last updated: 2026-08-06, at `main` = `b570887` (PR #253), build `0.53.0`,
+save schema 20, 22 services. Published to Roblox as place version 92,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,21 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#251 / #253** (v91, v92) **the live session kept paying out**:
+  building all twelve Delve/Fen creatures in Studio and photographing
+  them found **six wrong shapes** — four parts sized on the wrong
+  cylinder axis (the Slag Spitter's pool standing as a bar through its
+  body, the Bog Bell's ground marks floating as bars, the Rail Hound's
+  wheels buried inside its own chassis so it read as a floating plank,
+  the Crank Guard's mechanism a squashed tube), the Gas Bloomer's petals
+  pitched before yaw so the bloom read as a saucer, and the Mire Leech's
+  mouth. All six passed 608 tests and a build verification; nothing but
+  a camera could have caught them. Then **#253**: a Studio-only
+  `LastLightStockProfile` hook (three guards: Studio, non-persistent,
+  logged) so a verification run stops costing a full playthrough — used
+  immediately to close the snare-arming check that had been open since
+  the plots shipped ("THE MEADOW GATE SNARE IS SET — 2 BITES IN IT", 2
+  fiber and 1 heartwood spent exactly, ember lit).
 - **#248 / #249** (v89, v90) **the first live session of this stretch,
   and it found three defects no test could see** — every part of each
   one that a test can read was correct:
