@@ -474,6 +474,56 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     self:_publish(player)
 end
 
+local function gearShortName(itemId: string): string
+    return string.upper((string.gsub((string.gsub(itemId, "^gear_", "")), "_", " ")))
+end
+
+--[[
+    What the Field Book says about each owned piece of gear: its rolled
+    trait and its wear condition, plus which single item most deserves the
+    whetstone. Composed server-side so the client stays a renderer -- it
+    never learns the wear thresholds, only the words.
+]]
+function TutorialService._gearCare(self: TutorialService, player: Player): (any, any)
+    local wear = self._profileService:gearWearOf(player)
+    local care: { [string]: any } = {}
+    local seen: { [string]: boolean } = {}
+    local worstId: string? = nil
+    local worstPoints = -1
+    local function consider(itemId: any)
+        if type(itemId) ~= "string" or seen[itemId] then
+            return
+        end
+        seen[itemId] = true
+        local traitDefinition =
+            self._gearTraits.get(self._profileService:gearTraitOf(player, itemId))
+        local condition = self._gearWear.condition(wear, itemId)
+        if traitDefinition ~= nil or condition ~= "sound" then
+            care[itemId] = {
+                condition = condition,
+                trait = if traitDefinition ~= nil then traitDefinition.displayName else nil,
+            }
+        end
+        if condition ~= "sound" then
+            local points = tonumber(wear[itemId]) or 0
+            if points > worstPoints then
+                worstPoints = points
+                worstId = itemId
+            end
+        end
+    end
+    for itemId in self._profileService:gearSnapshot(player) do
+        consider(itemId)
+    end
+    for _, itemId in self._profileService:equippedSnapshot(player) do
+        consider(itemId)
+    end
+    local whetTarget = if worstId ~= nil
+        then { itemId = worstId, label = "WHET " .. gearShortName(worstId) }
+        else nil
+    return care, whetTarget
+end
+
 -- Public toast entry points for services that live outside the session
 -- pipeline (the defense plots' arming and bite feedback arrives here).
 function TutorialService.toastEveryone(self: TutorialService, message: string)
@@ -1855,6 +1905,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             mara = "The oldest growth guards the way to the Warden."
         end
     end
+    local gearCare, whetTarget = self:_gearCare(player)
     return {
         schemaVersion = 1,
         status = "ready",
@@ -1899,6 +1950,8 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         unbankedExpeditionRewards = expedition.unbankedRewards,
         bankedMaterials = expedition.bankedMaterials,
         gear = self._profileService:gearSnapshot(player),
+        gearCare = gearCare,
+        whetTarget = whetTarget,
         equipped = self._profileService:equippedSnapshot(player),
         equipmentStats = self._profileService:equipmentStats(player),
         mastery = self._profileService:masterySnapshot(player),

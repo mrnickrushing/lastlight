@@ -331,6 +331,9 @@ export type HUDController = typeof(setmetatable(
         _progressOverlay: Frame,
         _progressText: TextLabel,
         _equipmentButtons: { [string]: TextButton },
+        _whetButton: TextButton,
+        _whetItemId: string?,
+        _onWhet: ((string) -> ())?,
         _currentState: any,
         _interactionLabel: string?,
         _interactionAvailable: boolean,
@@ -1111,6 +1114,7 @@ function HUDController.new(
         stroke(button, COLORS.amber, 0.45)
         createItemIcon(button, item.id, 28)
         button.TextXAlignment = Enum.TextXAlignment.Right
+        button:SetAttribute("BaseLabel", item.label)
         equipmentButtons[item.id] = button
     end
     -- Kit rows: three saved loadouts, save on the left, apply on the right,
@@ -1137,6 +1141,23 @@ function HUDController.new(
             loadoutButtons[kind .. "_" .. slot] = button
         end
     end
+
+    -- The whetstone: one button, aimed by the server at whichever piece
+    -- most needs it. Hidden while everything is sound.
+    local whetButton = Instance.new("TextButton")
+    whetButton.Name = "Whet"
+    whetButton.Position = UDim2.fromOffset(20, 140)
+    whetButton.Size = UDim2.fromOffset(220, 30)
+    whetButton.BackgroundColor3 = COLORS.panelSoft
+    whetButton.Font = Enum.Font.GothamBold
+    whetButton.Text = "WHET"
+    whetButton.TextColor3 = COLORS.amber
+    whetButton.TextSize = 11
+    whetButton.Visible = false
+    whetButton.ZIndex = 52
+    whetButton.Parent = progressPanel
+    corner(whetButton, 8)
+    stroke(whetButton, COLORS.amber, 0.45)
 
     local progressClose = Instance.new("TextButton")
     progressClose.Name = "Close"
@@ -1460,6 +1481,9 @@ function HUDController.new(
         _progressOverlay = progressOverlay,
         _progressText = progressText,
         _equipmentButtons = equipmentButtons,
+        _whetButton = whetButton,
+        _whetItemId = nil,
+        _onWhet = nil,
         _loadoutButtons = loadoutButtons,
         _currentState = nil,
         _interactionLabel = nil,
@@ -1504,6 +1528,13 @@ function HUDController.new(
             end
         end)
     end
+    whetButton.Activated:Connect(function()
+        local callback = self._onWhet
+        local itemId = self._whetItemId
+        if callback ~= nil and itemId ~= nil then
+            callback(itemId)
+        end
+    end)
     local function bindProfessionCard(professionId: string, card: TextButton)
         card.Activated:Connect(function()
             if not self._professionSwitchable then
@@ -1600,6 +1631,10 @@ end
 
 function HUDController.setEquipHandler(self: HUDController, callback: (string) -> ())
     self._onEquip = callback
+end
+
+function HUDController.setWhetHandler(self: HUDController, callback: (string) -> ())
+    self._onWhet = callback
 end
 
 function HUDController.progressButton(self: HUDController): TextButton
@@ -2153,12 +2188,33 @@ function HUDController._updateProgress(self: HUDController)
     end
     self._progressText.Text = table.concat(lines, "\n")
     local gear = state.gear or {}
+    local care = if type(state.gearCare) == "table" then state.gearCare else {}
     for itemId, button in self._equipmentButtons do
         local count = tonumber(gear[itemId]) or 0
         button.Visible = self._progressOverlay.Visible and count > 0
-        button.Text = if itemId == "gear_ironroot_hood"
-            then string.format("EQUIP HOOD ×%d", count)
-            else string.format("EQUIP BOOTS ×%d", count)
+        local label =
+            string.format("%s ×%d", tostring(button:GetAttribute("BaseLabel") or "EQUIP"), count)
+        local note = care[itemId]
+        if type(note) == "table" then
+            if type(note.trait) == "string" then
+                label ..= " · " .. note.trait
+            end
+            if note.condition == "worn" then
+                label ..= " · WORN"
+            elseif note.condition == "failing" then
+                label ..= " · FAILING"
+            end
+        end
+        button.Text = label
+    end
+    local whetTarget = state.whetTarget
+    if type(whetTarget) == "table" and type(whetTarget.itemId) == "string" then
+        self._whetItemId = whetTarget.itemId
+        self._whetButton.Text = tostring(whetTarget.label or "WHET")
+        self._whetButton.Visible = self._progressOverlay.Visible
+    else
+        self._whetItemId = nil
+        self._whetButton.Visible = false
     end
 end
 

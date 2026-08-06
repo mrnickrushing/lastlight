@@ -5133,15 +5133,24 @@ function Equipment.weaponStrikeProfile(equipped: Equipped): any
     }
 end
 
-function Equipment.stats(equipped: Equipped): any
+--[[
+    effectivenessByItem is the wear system's seam: 1 (or absent) leaves an
+    item's contribution bit-identical to the pre-wear math, 0.5 halves the
+    part of it that differs from "wearing nothing", and 0 contributes
+    nothing at all -- failing gear hangs on the body but shields nobody.
+]]
+function Equipment.stats(equipped: Equipped, effectivenessByItem: { [string]: number }?): any
     local damageReduction = 0
     local staminaRegenMultiplier = 1
     for _, itemId in Equipment.normalize(equipped) do
         if type(itemId) == "string" then
             local definition = DEFINITIONS[itemId]
             if definition ~= nil then
-                damageReduction += definition.damageReduction
-                staminaRegenMultiplier *= definition.staminaRegenMultiplier
+                local effectiveness = if effectivenessByItem ~= nil
+                    then effectivenessByItem[itemId] or 1
+                    else 1
+                damageReduction += definition.damageReduction * effectiveness
+                staminaRegenMultiplier *= 1 + (definition.staminaRegenMultiplier - 1) * effectiveness
             end
         end
     end
@@ -12599,17 +12608,39 @@ function SaveSchema.equippedSnapshot(profile: Profile): Equipment.Equipped
 end
 
 function SaveSchema.equipmentStats(profile: Profile): any
-    local stats = Equipment.stats(profile.equipped)
+    --[[
+        Wear reaches passive gear the same way it reaches weapons: worn
+        halves what the piece adds, failing removes it entirely. The trait
+        nudge rides the same per-item factor, so a worn STURDY hood fades
+        as one thing, not two.
+    ]]
+    local wear = (profile :: any).gearWear or {}
+    local effectiveness: { [string]: number } = {}
+    for _, itemId in profile.equipped do
+        if type(itemId) == "string" then
+            effectiveness[itemId] = GearWear.effectiveness(wear, itemId)
+        end
+    end
+    local stats = Equipment.stats(profile.equipped, effectiveness)
     -- Passive trait nudges fold in under the same clamps Equipment.stats
     -- already enforces, so a trait can shade a build but never escape it.
     local traits = (profile :: any).gearTraits or {}
     for _, itemId in profile.equipped do
         local trait = GearTraits.get(traits[itemId])
         if trait ~= nil then
-            stats.damageReduction =
-                math.clamp(stats.damageReduction + (trait.damageReductionBonus or 0), 0, 0.25)
-            stats.staminaRegenMultiplier =
-                math.clamp(stats.staminaRegenMultiplier + (trait.staminaRegenBonus or 0), 0.75, 1.5)
+            local itemEffectiveness = if type(itemId) == "string"
+                then effectiveness[itemId] or 1
+                else 1
+            stats.damageReduction = math.clamp(
+                stats.damageReduction + (trait.damageReductionBonus or 0) * itemEffectiveness,
+                0,
+                0.25
+            )
+            stats.staminaRegenMultiplier = math.clamp(
+                stats.staminaRegenMultiplier + (trait.staminaRegenBonus or 0) * itemEffectiveness,
+                0.75,
+                1.5
+            )
         end
     end
     return stats
@@ -16230,6 +16261,33 @@ worldService:setClickHandler(function(clicker: Player, interactionId: string)
     tutorialService:interactFromClick(clicker, interactionId)
 end)
 tutorialService:setCompanionService(companionService)
+--[[
+    Passive gear wears from the blows it softens: one point per mitigated
+    hit, against the weapon's two per landed strike -- you strike more
+    often than you are struck. Toasts only on a condition change, so the
+    Field Book nags exactly twice per piece: once worn, once failing.
+]]
+survivalService:setGearWearAccruer(function(player: Player)
+    for slot, itemId in profileService:equippedSnapshot(player) do
+        if slot ~= "weapon" and type(itemId) == "string" then
+            local wearResult = profileService:accrueGearWear(player, itemId, 1)
+            if
+                wearResult.applied
+                and wearResult.conditionAfter ~= wearResult.conditionBefore
+                and wearResult.conditionAfter ~= "sound"
+            then
+                local name =
+                    string.upper((string.gsub((string.gsub(itemId, "^gear_", "")), "_", " ")))
+                tutorialService:toastPlayer(
+                    player,
+                    if wearResult.conditionAfter == "failing"
+                        then "YOUR " .. name .. " HAS FAILED — IT SHIELDS NOTHING NOW"
+                        else "YOUR " .. name .. " IS WORN — IT PROTECTS LESS"
+                )
+            end
+        end
+    end
+end)
 defenseService:setToastHandler(function(player: Player?, message: string)
     if player ~= nil then
         tutorialService:toastPlayer(player, message)
@@ -24393,6 +24451,7 @@ export type PlayerSurvivalService = typeof(setmetatable(
         _worldService: any,
         _analyticsService: any,
         _equipmentStatsProvider: ((Player) -> any)?,
+        _gearWearAccruer: ((Player) -> ())?,
         _reviveTuningProvider: ((Player) -> any)?,
         _expeditionFailureHandler: ((Player) -> any)?,
         _partyRecoveryProvider: ((number, number) -> any)?,
@@ -24447,6 +24506,7 @@ function PlayerSurvivalService.new(
         _worldService = worldService,
         _analyticsService = analyticsService,
         _equipmentStatsProvider = nil,
+        _gearWearAccruer = nil,
         _reviveTuningProvider = nil,
         _expeditionFailureHandler = nil,
         _partyRecoveryProvider = nil,
@@ -24473,6 +24533,13 @@ function PlayerSurvivalService.setEquipmentStatsProvider(
     provider: (Player) -> any
 )
     self._equipmentStatsProvider = provider
+end
+
+function PlayerSurvivalService.setGearWearAccruer(
+    self: PlayerSurvivalService,
+    accruer: (Player) -> ()
+)
+    self._gearWearAccruer = accruer
 end
 
 function PlayerSurvivalService.setReviveTuningProvider(
@@ -24850,6 +24917,11 @@ function PlayerSurvivalService.damage(
     self._states[player] = nextState
     result.rawDamage = amount
     result.equipmentReduction = equipmentReduction
+    -- Gear that softened a blow wears from it; spawned so profile work
+    -- can never stall or fail the damage path itself.
+    if equipmentReduction > 0 and self._gearWearAccruer ~= nil then
+        task.spawn(self._gearWearAccruer :: (Player) -> (), player)
+    end
     self:_syncPlayer(player)
     if result.downed then
         self:_createVisual(player)
@@ -28883,6 +28955,56 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     self:_publish(player)
 end
 
+local function gearShortName(itemId: string): string
+    return string.upper((string.gsub((string.gsub(itemId, "^gear_", "")), "_", " ")))
+end
+
+--[[
+    What the Field Book says about each owned piece of gear: its rolled
+    trait and its wear condition, plus which single item most deserves the
+    whetstone. Composed server-side so the client stays a renderer -- it
+    never learns the wear thresholds, only the words.
+]]
+function TutorialService._gearCare(self: TutorialService, player: Player): (any, any)
+    local wear = self._profileService:gearWearOf(player)
+    local care: { [string]: any } = {}
+    local seen: { [string]: boolean } = {}
+    local worstId: string? = nil
+    local worstPoints = -1
+    local function consider(itemId: any)
+        if type(itemId) ~= "string" or seen[itemId] then
+            return
+        end
+        seen[itemId] = true
+        local traitDefinition =
+            self._gearTraits.get(self._profileService:gearTraitOf(player, itemId))
+        local condition = self._gearWear.condition(wear, itemId)
+        if traitDefinition ~= nil or condition ~= "sound" then
+            care[itemId] = {
+                condition = condition,
+                trait = if traitDefinition ~= nil then traitDefinition.displayName else nil,
+            }
+        end
+        if condition ~= "sound" then
+            local points = tonumber(wear[itemId]) or 0
+            if points > worstPoints then
+                worstPoints = points
+                worstId = itemId
+            end
+        end
+    end
+    for itemId in self._profileService:gearSnapshot(player) do
+        consider(itemId)
+    end
+    for _, itemId in self._profileService:equippedSnapshot(player) do
+        consider(itemId)
+    end
+    local whetTarget = if worstId ~= nil
+        then { itemId = worstId, label = "WHET " .. gearShortName(worstId) }
+        else nil
+    return care, whetTarget
+end
+
 -- Public toast entry points for services that live outside the session
 -- pipeline (the defense plots' arming and bite feedback arrives here).
 function TutorialService.toastEveryone(self: TutorialService, message: string)
@@ -30264,6 +30386,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             mara = "The oldest growth guards the way to the Warden."
         end
     end
+    local gearCare, whetTarget = self:_gearCare(player)
     return {
         schemaVersion = 1,
         status = "ready",
@@ -30308,6 +30431,8 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         unbankedExpeditionRewards = expedition.unbankedRewards,
         bankedMaterials = expedition.bankedMaterials,
         gear = self._profileService:gearSnapshot(player),
+        gearCare = gearCare,
+        whetTarget = whetTarget,
         equipped = self._profileService:equippedSnapshot(player),
         equipmentStats = self._profileService:equipmentStats(player),
         mastery = self._profileService:masterySnapshot(player),
@@ -53269,6 +53394,10 @@ hud:setEquipHandler(function(itemId: string)
     send(RuntimeIds.Actions.EquipGear, { itemId = itemId })
 end)
 
+hud:setWhetHandler(function(itemId: string)
+    send(RuntimeIds.Actions.RepairGear, { itemId = itemId })
+end)
+
 --[[
     Arrival vignettes ride the same state stream the HUD already consumes:
     each one fires on a specific transition, locally, at most once per
@@ -53890,6 +54019,9 @@ export type HUDController = typeof(setmetatable(
         _progressOverlay: Frame,
         _progressText: TextLabel,
         _equipmentButtons: { [string]: TextButton },
+        _whetButton: TextButton,
+        _whetItemId: string?,
+        _onWhet: ((string) -> ())?,
         _currentState: any,
         _interactionLabel: string?,
         _interactionAvailable: boolean,
@@ -54670,6 +54802,7 @@ function HUDController.new(
         stroke(button, COLORS.amber, 0.45)
         createItemIcon(button, item.id, 28)
         button.TextXAlignment = Enum.TextXAlignment.Right
+        button:SetAttribute("BaseLabel", item.label)
         equipmentButtons[item.id] = button
     end
     -- Kit rows: three saved loadouts, save on the left, apply on the right,
@@ -54696,6 +54829,23 @@ function HUDController.new(
             loadoutButtons[kind .. "_" .. slot] = button
         end
     end
+
+    -- The whetstone: one button, aimed by the server at whichever piece
+    -- most needs it. Hidden while everything is sound.
+    local whetButton = Instance.new("TextButton")
+    whetButton.Name = "Whet"
+    whetButton.Position = UDim2.fromOffset(20, 140)
+    whetButton.Size = UDim2.fromOffset(220, 30)
+    whetButton.BackgroundColor3 = COLORS.panelSoft
+    whetButton.Font = Enum.Font.GothamBold
+    whetButton.Text = "WHET"
+    whetButton.TextColor3 = COLORS.amber
+    whetButton.TextSize = 11
+    whetButton.Visible = false
+    whetButton.ZIndex = 52
+    whetButton.Parent = progressPanel
+    corner(whetButton, 8)
+    stroke(whetButton, COLORS.amber, 0.45)
 
     local progressClose = Instance.new("TextButton")
     progressClose.Name = "Close"
@@ -55019,6 +55169,9 @@ function HUDController.new(
         _progressOverlay = progressOverlay,
         _progressText = progressText,
         _equipmentButtons = equipmentButtons,
+        _whetButton = whetButton,
+        _whetItemId = nil,
+        _onWhet = nil,
         _loadoutButtons = loadoutButtons,
         _currentState = nil,
         _interactionLabel = nil,
@@ -55063,6 +55216,13 @@ function HUDController.new(
             end
         end)
     end
+    whetButton.Activated:Connect(function()
+        local callback = self._onWhet
+        local itemId = self._whetItemId
+        if callback ~= nil and itemId ~= nil then
+            callback(itemId)
+        end
+    end)
     local function bindProfessionCard(professionId: string, card: TextButton)
         card.Activated:Connect(function()
             if not self._professionSwitchable then
@@ -55159,6 +55319,10 @@ end
 
 function HUDController.setEquipHandler(self: HUDController, callback: (string) -> ())
     self._onEquip = callback
+end
+
+function HUDController.setWhetHandler(self: HUDController, callback: (string) -> ())
+    self._onWhet = callback
 end
 
 function HUDController.progressButton(self: HUDController): TextButton
@@ -55712,12 +55876,33 @@ function HUDController._updateProgress(self: HUDController)
     end
     self._progressText.Text = table.concat(lines, "\n")
     local gear = state.gear or {}
+    local care = if type(state.gearCare) == "table" then state.gearCare else {}
     for itemId, button in self._equipmentButtons do
         local count = tonumber(gear[itemId]) or 0
         button.Visible = self._progressOverlay.Visible and count > 0
-        button.Text = if itemId == "gear_ironroot_hood"
-            then string.format("EQUIP HOOD ×%d", count)
-            else string.format("EQUIP BOOTS ×%d", count)
+        local label =
+            string.format("%s ×%d", tostring(button:GetAttribute("BaseLabel") or "EQUIP"), count)
+        local note = care[itemId]
+        if type(note) == "table" then
+            if type(note.trait) == "string" then
+                label ..= " · " .. note.trait
+            end
+            if note.condition == "worn" then
+                label ..= " · WORN"
+            elseif note.condition == "failing" then
+                label ..= " · FAILING"
+            end
+        end
+        button.Text = label
+    end
+    local whetTarget = state.whetTarget
+    if type(whetTarget) == "table" and type(whetTarget.itemId) == "string" then
+        self._whetItemId = whetTarget.itemId
+        self._whetButton.Text = tostring(whetTarget.label or "WHET")
+        self._whetButton.Visible = self._progressOverlay.Visible
+    else
+        self._whetItemId = nil
+        self._whetButton.Visible = false
     end
 end
 

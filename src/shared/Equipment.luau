@@ -205,15 +205,24 @@ function Equipment.weaponStrikeProfile(equipped: Equipped): any
     }
 end
 
-function Equipment.stats(equipped: Equipped): any
+--[[
+    effectivenessByItem is the wear system's seam: 1 (or absent) leaves an
+    item's contribution bit-identical to the pre-wear math, 0.5 halves the
+    part of it that differs from "wearing nothing", and 0 contributes
+    nothing at all -- failing gear hangs on the body but shields nobody.
+]]
+function Equipment.stats(equipped: Equipped, effectivenessByItem: { [string]: number }?): any
     local damageReduction = 0
     local staminaRegenMultiplier = 1
     for _, itemId in Equipment.normalize(equipped) do
         if type(itemId) == "string" then
             local definition = DEFINITIONS[itemId]
             if definition ~= nil then
-                damageReduction += definition.damageReduction
-                staminaRegenMultiplier *= definition.staminaRegenMultiplier
+                local effectiveness = if effectivenessByItem ~= nil
+                    then effectivenessByItem[itemId] or 1
+                    else 1
+                damageReduction += definition.damageReduction * effectiveness
+                staminaRegenMultiplier *= 1 + (definition.staminaRegenMultiplier - 1) * effectiveness
             end
         end
     end

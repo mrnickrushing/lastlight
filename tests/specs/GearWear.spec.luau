@@ -64,5 +64,33 @@ return {
                 TestRunner.equal(wear.gear_thornwood_bow, nil)
             end,
         },
+        {
+            name = "worn passive gear protects less and failing gear not at all",
+            run = function()
+                local SaveSchema = require("../../src/shared/SaveSchema")
+                local profile = SaveSchema.default(1234)
+                profile.equipped = { head = "gear_ironroot_hood" }
+                profile.gearWear = {}
+                local sound = SaveSchema.equipmentStats(profile).damageReduction
+                profile.gearWear = { gear_ironroot_hood = 60 }
+                local worn = SaveSchema.equipmentStats(profile).damageReduction
+                profile.gearWear = { gear_ironroot_hood = 100 }
+                local failing = SaveSchema.equipmentStats(profile).damageReduction
+                TestRunner.truthy(sound > worn)
+                TestRunner.truthy(math.abs(worn - sound * 0.5) < 0.0001)
+                TestRunner.equal(failing, 0)
+            end,
+        },
+        {
+            name = "the effectiveness seam is bit-identical when nothing is worn",
+            run = function()
+                local Equipment = require("../../src/shared/Equipment")
+                local equipped = { head = "gear_ironroot_hood", feet = "gear_bramble_boots" }
+                local plain = Equipment.stats(equipped)
+                local seamed = Equipment.stats(equipped, {})
+                TestRunner.equal(plain.damageReduction, seamed.damageReduction)
+                TestRunner.equal(plain.staminaRegenMultiplier, seamed.staminaRegenMultiplier)
+            end,
+        },
     },
 }

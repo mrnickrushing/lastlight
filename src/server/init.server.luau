@@ -388,6 +388,33 @@ worldService:setClickHandler(function(clicker: Player, interactionId: string)
     tutorialService:interactFromClick(clicker, interactionId)
 end)
 tutorialService:setCompanionService(companionService)
+--[[
+    Passive gear wears from the blows it softens: one point per mitigated
+    hit, against the weapon's two per landed strike -- you strike more
+    often than you are struck. Toasts only on a condition change, so the
+    Field Book nags exactly twice per piece: once worn, once failing.
+]]
+survivalService:setGearWearAccruer(function(player: Player)
+    for slot, itemId in profileService:equippedSnapshot(player) do
+        if slot ~= "weapon" and type(itemId) == "string" then
+            local wearResult = profileService:accrueGearWear(player, itemId, 1)
+            if
+                wearResult.applied
+                and wearResult.conditionAfter ~= wearResult.conditionBefore
+                and wearResult.conditionAfter ~= "sound"
+            then
+                local name =
+                    string.upper((string.gsub((string.gsub(itemId, "^gear_", "")), "_", " ")))
+                tutorialService:toastPlayer(
+                    player,
+                    if wearResult.conditionAfter == "failing"
+                        then "YOUR " .. name .. " HAS FAILED — IT SHIELDS NOTHING NOW"
+                        else "YOUR " .. name .. " IS WORN — IT PROTECTS LESS"
+                )
+            end
+        end
+    end
+end)
 defenseService:setToastHandler(function(player: Player?, message: string)
     if player ~= nil then
         tutorialService:toastPlayer(player, message)
