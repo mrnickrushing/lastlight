@@ -80,13 +80,17 @@ test could see, because every part of them a test can read was correct.
 - **Defense plots (#227)** — three plots stand on their three lanes at
   exactly 46 studs from the lantern, each with six ring stones, stake,
   ember, and a 42-stud ArmClick; `defense_plots_built lanes=3` at boot.
-  **Arming verified end to end, both ways**: on an empty purse the real
+  **The whole plot loop is verified live.** On an empty purse the real
   stake answers "SETTING THE SNARE TAKES 1 HEARTWOOD AND 2 MEADOW FIBER";
   with materials banked it answers "THE MEADOW GATE SNARE IS SET — 2
-  BITES IN IT", spends exactly 2 meadow fiber and 1 heartwood and nothing
-  else, and the ember lamp goes from cold to lit. The tap path was the
-  half that could have been silently dead -- it was, for the Old Growth
-  heart, in #221.
+  BITES IN IT", spending exactly 2 fiber and 1 heartwood and lighting the
+  ember; and at nightfall the first wave answers "THE SNARE BITES —
+  BRIARBACK IS HELD" with the ember going cold on the second charge.
+  **A defect fell out of that last step** (#255): the trap gated on the
+  service's own night flag, which only TownNightService raises, so an
+  armed snare could never bite during the tutorial's first night -- three
+  plots sat lit while creatures walked their rings. It now asks the enemy
+  service where the walker is, which is true on any night.
 - **Delve and Fen enemy silhouettes (#233, #237)** — all twelve built and
   photographed. **Six were wrong** and are fixed in #251: four parts sized
   on the wrong cylinder axis (the Slag Spitter's pool standing as a bar
@@ -116,8 +120,8 @@ completion (free Mara, gather, choose a tool, raise the barricade, hold
 the first night). Materials are no longer the obstacle -- see the
 stocking hook below.
 
-- Defense plots: the bite toast when a night creature walks an armed
-  ring, and the Watch defender on a solo night.
+- Defense plots: the Watch defender on a solo *town* night (it needs the
+  party census, so the tutorial night cannot show it).
 - Gear care: the WHET press and the worn equip-label read on a profile
   that has actually dulled a weapon.
 - Delve/Fen enemies: telegraph read at night (the silhouettes are done).
