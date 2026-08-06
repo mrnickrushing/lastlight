@@ -10,6 +10,7 @@ local Config = require(root.Config)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
 local CraftingCatalog = require(root.CraftingCatalog)
 local DefenseLanes = require(root.DefenseLanes)
+local RegionAccess = require(root.RegionAccess)
 local Equipment = require(root.Equipment)
 local GearVisualPlan = require(root.GearVisualPlan)
 local EnemyCatalog = require(root.EnemyCatalog)
@@ -124,6 +125,7 @@ local expeditionService = ExpeditionService.new(
     logger,
     worldService,
     ExpeditionGenerator,
+    RegionAccess,
     BramblewakeExpedition,
     featureFlags,
     ExpeditionEventFlow,
