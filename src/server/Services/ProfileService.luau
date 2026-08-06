@@ -390,12 +390,26 @@ function ProfileService.setTutorial(
     return true
 end
 
-function ProfileService.accrueGearWear(self: ProfileService, player: Player, itemId: any): any
+function ProfileService.gearTraitOf(self: ProfileService, player: Player, itemId: any): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    local traits = (profile :: any).gearTraits
+    return if type(traits) == "table" and type(itemId) == "string" then traits[itemId] else nil
+end
+
+function ProfileService.accrueGearWear(
+    self: ProfileService,
+    player: Player,
+    itemId: any,
+    pointsOverride: number?
+): any
     local profile = self._profiles[player]
     if profile == nil or not self:isWritable(player) then
         return { applied = false }
     end
-    local nextProfile, result = self._saveSchema.withGearWear(profile, itemId, 2)
+    local nextProfile, result = self._saveSchema.withGearWear(profile, itemId, pointsOverride or 2)
     if result.applied then
         self._profiles[player] = nextProfile
         if self._persistent and self._writable[player] == true then

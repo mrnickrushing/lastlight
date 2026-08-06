@@ -244,6 +244,20 @@ local ERA_PROFILES: { [number]: any } = {
     -- Schema 17 shipped loadouts; 18 adds equipment wear. A 17-era save
     -- carries kits that must survive, and must arrive in 18 with nothing
     -- worn -- no blade had dulled yet.
+    -- Schema 18 shipped equipment wear; 19 adds rolled traits. An 18-era
+    -- save carries wear that must survive, and must arrive in 19 traitless
+    -- -- its items roll at their next craft, not retroactively.
+    [18] = {
+        schemaVersion = 18,
+        createdAt = 30,
+        updatedAt = 80,
+        revision = 120,
+        tutorial = { stage = "complete", complete = true, selectedTool = "axe" },
+        profession = { selectedId = "profession_scout" },
+        gear = { gear_thornwood_bow = 1 },
+        equipped = { weapon = "gear_thornwood_bow" },
+        gearWear = { gear_thornwood_bow = 45 },
+    },
     [17] = {
         schemaVersion = 17,
         createdAt = 22,
@@ -333,6 +347,7 @@ local REQUIRED_FIELDS: { string } = {
     "equipped",
     "loadouts",
     "gearWear",
+    "gearTraits",
     "quests",
 }
 

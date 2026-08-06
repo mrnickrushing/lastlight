@@ -9,6 +9,7 @@ local MemoryFragments = require("./MemoryFragments")
 local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
+local GearTraits = require("./GearTraits")
 local GearWear = require("./GearWear")
 local ResidentLife = require("./ResidentLife")
 local TownDecorations = require("./TownDecorations")
@@ -34,6 +35,7 @@ export type Profile = {
     inventory: any,
     loadouts: { any },
     gearWear: { [string]: number },
+    gearTraits: { [string]: string },
     profession: {
         selectedId: string?,
         mastery: ProfessionMastery.State,
@@ -78,7 +80,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 18,
+        schemaVersion = 19,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -91,6 +93,7 @@ function SaveSchema.default(now: number): Profile
         inventory = ExpeditionInventory.default(),
         loadouts = {},
         gearWear = {},
+        gearTraits = {},
         profession = {
             selectedId = nil,
             mastery = ProfessionMastery.default(),
@@ -165,6 +168,9 @@ function SaveSchema.normalize(value: any, now: number): Profile
     -- Schema 18: equipment wear. Absent on any pre-18 save (nothing had
     -- dulled yet); junk and retired items are stripped by GearWear itself.
     profile.gearWear = GearWear.normalize(value.gearWear)
+    -- Schema 19: rolled equipment traits. Revalidated per item against the
+    -- trait pools; a pre-19 save arrives traitless and rolls at next craft.
+    profile.gearTraits = GearTraits.normalize(value.gearTraits)
 
     local tutorial = value.tutorial
     if type(tutorial) == "table" then
@@ -301,7 +307,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 18
+    profile.schemaVersion = 19
     return profile
 end
 
@@ -713,6 +719,20 @@ function SaveSchema.withCraftedItem(profile: Profile, recipeId: string, now: num
     nextProfile.inventory = table.clone(profile.inventory)
     nextProfile.inventory.materials = nextMaterials
     nextProfile.gear = nextGear
+    --[[
+        The trait rolls here, at the first craft of this item type, from
+        the profile's own creation time -- deterministic per save, distinct
+        across saves, and never re-rolled: crafting a second bow keeps the
+        first roll, because the trait belongs to YOUR bows, not to a copy.
+    ]]
+    nextProfile.gearTraits = table.clone((profile :: any).gearTraits or {})
+    if result.itemId ~= nil and nextProfile.gearTraits[result.itemId] == nil then
+        local rolled = GearTraits.rollFor(result.itemId, profile.createdAt)
+        if rolled ~= nil then
+            nextProfile.gearTraits[result.itemId] = rolled
+            result.traitId = rolled
+        end
+    end
     nextProfile.updatedAt = now
     nextProfile.revision += 1
     return nextProfile, result
@@ -841,7 +861,20 @@ function SaveSchema.equippedSnapshot(profile: Profile): Equipment.Equipped
 end
 
 function SaveSchema.equipmentStats(profile: Profile): any
-    return Equipment.stats(profile.equipped)
+    local stats = Equipment.stats(profile.equipped)
+    -- Passive trait nudges fold in under the same clamps Equipment.stats
+    -- already enforces, so a trait can shade a build but never escape it.
+    local traits = (profile :: any).gearTraits or {}
+    for _, itemId in profile.equipped do
+        local trait = GearTraits.get(traits[itemId])
+        if trait ~= nil then
+            stats.damageReduction =
+                math.clamp(stats.damageReduction + (trait.damageReductionBonus or 0), 0, 0.25)
+            stats.staminaRegenMultiplier =
+                math.clamp(stats.staminaRegenMultiplier + (trait.staminaRegenBonus or 0), 0.75, 1.5)
+        end
+    end
+    return stats
 end
 
 function SaveSchema.withEquippedItem(profile: Profile, itemId: string, now: number): (Profile, any)
