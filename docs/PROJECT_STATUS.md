@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-06, at `main` = `3e9414b` (PR #231), build `0.53.0`,
-save schema 19, 22 services. Published to Roblox as place version 80,
+Last updated: 2026-08-06, at `main` = `e8bb802` (PR #235), build `0.53.0`,
+save schema 19, 22 services. Published to Roblox as place version 83,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,25 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#235** (v83) **M7 wave D**: the Bellows Maw, chapter II's boss. Three
+  phases that read the catalog's non-profession solution literally —
+  reroute feed lines (2 → 3 → 4 as phases ratchet), vent the pressure,
+  strike the open core — gated in that order. The vent wheel chosen is
+  the chapter decision (cleared / fouled / mixed), remembered the way the
+  Warden's antlers are. Chamber locked until the Delve's elites are done.
+- **#234** (v82) **M7 wave C**: the Delve's two elites. Foreman Echo is
+  authority (untouchable while it holds the signal board; three levers
+  strip it; two board-seizes reset them), the Iron Widow is tempo (each
+  web anchor cut buys a strike window that closes on its own, progress
+  never unwinds, the ambush cadence eases as the fight closes, the last
+  cut keeps her down). Same contract as the Old Growth: solo-passable,
+  profession-independent, one reward per participant per run.
+- **#233** (v81) **M7 wave B**: the Delve's six enemies and EnemyCatalog,
+  one roster over all regions injected into EnemyService in place of the
+  direct Bramblewake catalog (Bramblewake's order preserved exactly and
+  asserted). The Delve hunts the player more than the forest does and
+  outruns it; the Crank Guard proves the existing combat rules already
+  carry its flanking lesson (8 to the face, 44 to the flank).
 - **#231** (v80) **Milestone 7 wave A**: the Ironroot Delve catalog (30
   modules, 12 POIs, the 8 reserved event_ir_* events with contracts and
   Delve-material rewards) and a region-agnostic ExpeditionGenerator —
@@ -96,9 +115,12 @@ Earlier waves in this stretch:
   mid-screen to above the touch action row.
 - **#216/#217** (v71) loadouts (schema 16 → 17): three saved kits.
 
-M7 wave A is merged and published; next waves are the Delve's enemies,
-its two elites (Foreman Echo, Iron Widow), the Bellows Maw, its builder
-geometry, then Mireglass Fen and chapters II–III. M6 remaining: only the
+M7 waves A–D are merged and published: the Delve's content catalog,
+enemies, elites and boss all exist as rules and data with specs. What
+remains for M7: the Delve's builder geometry and runtime wiring (region
+selection in ExpeditionService, elite/boss services and arenas), then
+Mireglass Fen the same way, chapters II–III, eight named residents,
+remaining basic profession kits, and town tiers 2–4. M6 remaining: only the
 recorded live checks, all blocked on Studio availability (kit apply, gear dulling arc, hound visuals/follow feel,
 defense plot placement/arm-by-tap, WHET press on device, Blackout drive
 to the Old Growth on a touch path). Every source-side deliverable is
