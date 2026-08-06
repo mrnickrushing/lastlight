@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-06, at `main` = `1b955b7` (PR #257), build `0.53.0`,
-save schema 20, 22 services. Published to Roblox as place version 94,
+Last updated: 2026-08-06, at `main` = `ff5f7e9` (PR #259), build `0.53.0`,
+save schema 20, 22 services. Published to Roblox as place version 95,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,17 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#259** (v95) **M7 wave J: the Delve's geometry begins.**
+  IronrootBuilder holds the region's own vocabulary — shoring timber,
+  rail, ore carts, cut rock, spoil, coalglass, glow fungus, lamp posts —
+  and nine module visuals built from it. The shape doing the most work
+  is the shoring bay: a low roof on posts cuts the horizon to head
+  height and makes the place read as underground while the sky is still
+  technically there. **All nine were built in Studio and photographed
+  before the commit**, which is the difference between this wave and the
+  blind ones that cost six enemy shapes. buildModuleVisual returns false
+  for an unknown key, so the region stays honest about being half-built;
+  Ironroot stays disabled until every catalog key has a case.
 - **#257** (v94) toasts were reading raw item ids to the player
   ("EQUIPPED GEAR_AMBER_EDGE"); equip and whet now use the catalog's
   display name. Closed live in the same run: the **Watch defender**
