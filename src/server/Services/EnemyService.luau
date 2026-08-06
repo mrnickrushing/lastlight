@@ -1463,7 +1463,14 @@ function EnemyService.damageNearest(
     -- presentation, so WorldService draws it; it needs the target to aim the
     -- shot, and this is the one place both ends of the strike are known.
     self._worldService:showStrikeFeedback(player, context, primary.Position)
-    local damage, strikeResult = self._enemyCombatRules.strikeDamage(enemy.definition, facingDot)
+    local reactionNow = workspace:GetServerTimeNow()
+    local strikerStatus = self._combatService:snapshot(player)
+    local damage, strikeResult, reactionLabel =
+        self._enemyCombatRules.strikeDamage(enemy.definition, facingDot, {
+            stilled = reactionNow < enemy.stilledUntil,
+            snared = reactionNow < enemy.snaredUntil,
+            drowsyStriker = strikerStatus ~= nil and strikerStatus.drowsy == true,
+        })
     if context ~= nil and type(context.damageMultiplier) == "number" then
         -- Tool identity, bounded: the axe's edge and the bow's reach trade
         -- against each other, and neither can silence an enemy's mechanics.
@@ -1509,6 +1516,10 @@ function EnemyService.damageNearest(
     elseif strikeResult == "flanked" then
         self:_notify("FLANK HIT — " .. string.upper(displayName) .. " " .. remaining)
         return true, "Clean flank hit."
+    end
+    if reactionLabel ~= nil then
+        self:_notify(reactionLabel .. " — " .. string.upper(displayName) .. " " .. remaining)
+        return true, reactionLabel
     end
     self:_notify("HIT — " .. string.upper(displayName) .. " " .. remaining)
     return true, "Your tool strikes the " .. displayName .. "."
