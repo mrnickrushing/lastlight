@@ -26,6 +26,7 @@ TestRunner.run({
     require("./specs/ChapterProgress.spec"),
     require("./specs/RegionAccess.spec"),
     require("./specs/RegionBuilderCoverage.spec"),
+    require("./specs/ActionWiring.spec"),
     require("./specs/Environment.spec"),
     require("./specs/MemoryFragments.spec"),
     require("./specs/MeshAssetRegistry.spec"),
