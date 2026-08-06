@@ -43,6 +43,7 @@ export type WardenStagService = typeof(setmetatable(
         _state: any,
         _arena: any,
         _model: Model?,
+        _strikeHandler: ((Player) -> ())?,
         _attack: Attack?,
         _attackIndex: number,
         _lastAttackAt: number,
@@ -106,6 +107,7 @@ function WardenStagService.new(
         _state = nil,
         _arena = nil,
         _model = nil,
+        _strikeHandler = nil,
         _attack = nil,
         _attackIndex = 0,
         _lastAttackAt = 0,
@@ -187,7 +189,24 @@ function WardenStagService._spawnModel(self: WardenStagService, target: Player)
         end
     end)
     self._model = model
+    -- Tappable like every night creature -- see OldGrowthService for the
+    -- full account; the boss had the same touch gap as the elite.
+    local click = Instance.new("ClickDetector")
+    click.Name = "StrikeClick"
+    click.MaxActivationDistance = 42
+    click.CursorIcon = ""
+    click.Parent = model
+    click.MouseClick:Connect(function(clicker: Player)
+        local handler = self._strikeHandler
+        if handler ~= nil then
+            handler(clicker)
+        end
+    end)
     self:_syncModel()
+end
+
+function WardenStagService.setStrikeHandler(self: WardenStagService, handler: (Player) -> ())
+    self._strikeHandler = handler
 end
 
 function WardenStagService._syncModel(self: WardenStagService)
