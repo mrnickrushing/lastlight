@@ -15,6 +15,12 @@ local PRESENTATION = table.freeze({
     material_glow_fungus = table.freeze({ kind = "fungus", label = "GLOW FUNGUS" }),
     material_machine_oil = table.freeze({ kind = "oil", label = "MACHINE OIL" }),
     material_echo_crystal = table.freeze({ kind = "crystal", label = "ECHO CRYSTAL" }),
+    -- Mireglass Fen
+    material_mirror_reed = table.freeze({ kind = "reed", label = "MIRROR REED" }),
+    material_bog_iron = table.freeze({ kind = "bog_iron", label = "BOG IRON" }),
+    material_witchlight_pollen = table.freeze({ kind = "pollen", label = "WITCHLIGHT POLLEN" }),
+    material_eel_oil = table.freeze({ kind = "eel_oil", label = "EEL OIL" }),
+    material_blackwater_herb = table.freeze({ kind = "herb", label = "BLACKWATER HERB" }),
 })
 
 export type Entry = {
