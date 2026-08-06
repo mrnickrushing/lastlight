@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-06, at `main` = `a54f7cb` (PR #237), build `0.53.0`,
-save schema 19, 22 services. Published to Roblox as place version 84,
+Last updated: 2026-08-06, at `main` = `5c3230d` (PR #239), build `0.53.0`,
+save schema 19, 22 services. Published to Roblox as place version 85,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,15 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#239** (v85) **M7 wave F**: the eight named residents (four from the
+  Delve, four from the Fen) and **ResidentRoster**, which now holds
+  identity, home region, arrival chapter, job and quest in one place —
+  ResidentLife and ResidentDialogue read from it, and chapter I's three
+  keep their exact ids, order, jobs, titles and boons (spec-pinned).
+  Arrival is chapter-gated, so a fresh save still meets exactly three
+  people. Eight new quests with five new signals, all derived from facts
+  the profile already stores (materials, construction stages,
+  decorations, rolled traits, bonds) — no new tracking.
 - **#237** (v84) **M7 wave E**: Mireglass Fen entire — catalog (30
   modules, 12 POIs, 8 event_mg_* events, five materials), six enemies
   that wait rather than charge, the Many-Face (read-and-time: an open
@@ -124,13 +133,14 @@ Earlier waves in this stretch:
   mid-screen to above the touch action row.
 - **#216/#217** (v71) loadouts (schema 16 → 17): three saved kits.
 
-M7 waves A–E are merged and published: **both regions now exist as
-rules and data** — catalogs, rosters, elites and bosses for Ironroot
-Delve and Mireglass Fen, all spec-pinned. What remains for M7: builder
-geometry and runtime wiring for both regions (region selection in
-ExpeditionService, elite/boss services and arenas — the parts that most
-want Studio), chapters II–III's story/quest structure, eight named
-residents, remaining basic profession kits, and town tiers 2–4. M6 remaining: only the
+M7 waves A–F are merged and published: **both regions exist as rules and
+data** (catalogs, rosters, elites, bosses) and **the eight residents
+exist as people** (roster, jobs, quests, dialogue), all spec-pinned.
+What remains for M7: builder geometry and runtime wiring for both regions
+(region selection in ExpeditionService, elite/boss services and arenas,
+resident placement in town — the parts that most want Studio), chapters
+II–III's story structure, remaining basic profession kits, and town tiers
+2–4. M6 remaining: only the
 recorded live checks, all blocked on Studio availability (kit apply, gear dulling arc, hound visuals/follow feel,
 defense plot placement/arm-by-tap, WHET press on device, Blackout drive
 to the Old Growth on a touch path). Every source-side deliverable is
