@@ -18,6 +18,7 @@ TestRunner.run({
     require("./specs/DefenseLanes.spec"),
     require("./specs/IronrootExpedition.spec"),
     require("./specs/IronrootEnemies.spec"),
+    require("./specs/IronrootElites.spec"),
     require("./specs/Environment.spec"),
     require("./specs/MemoryFragments.spec"),
     require("./specs/MeshAssetRegistry.spec"),
