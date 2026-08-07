@@ -10,7 +10,7 @@ Milestones 7, 8 and 9 are complete. Milestone 7's runbook is
 shipped as #274–#282 (v105–v113) and milestone 9 as #284–#290
 (v114–v120).
 
-**Next up: Bramblewake's two gaps, then M10 B and C.**
+**Next up: M10 B (quests), then C (codex/fragments).**
 
 ## The rhythm
 
@@ -109,14 +109,10 @@ player could not answer, plus eighteen consumables using them. 122
 recipes, and `CONTENT_CATALOG.md` and `validate-plan.mjs` both now say
 122 with the reasoning attached.
 
-**What is left, and it is the best content work available:** the census
-found Bramblewake carrying four points of interest where every later
-region has twelve, and two armour pieces where every later region has
-ten. The starting region is the thinnest in the game. Filling the POIs is
-eight authored entries plus eight cases in `BramblewakeBuilder` -- note
-that Bramblewake has its own builder and is not covered by
-`RegionBuilderCoverage`, so a POI added without a builder case would be
-invisible rather than failing a test.
+Both Bramblewake gaps shipped (#298, #299), each closing traps found on
+the way: the POI dispatch's catch-all `else`, the uncovered
+`BramblewakeBuilder`, and the equip panel's hardcoded eight-item list
+that had left ninety craftable items unwearable with nothing failing.
 | B | **Quest completion** — resident arcs to the catalog's counts, every quest a real signal | Quest spec: every quest's objective kind has a signal |
 | C | **Codex/archive completion** — memory fragments to full count across regions | Fragment spec: one per region minimum, anchors resolvable |
 | D ✅ | **Content census** (shipped #296) — a single spec asserting the roadmap's launch inventory: 180 modules, 79 POIs, 48 events, 180 recipes, region counts | Census spec green |

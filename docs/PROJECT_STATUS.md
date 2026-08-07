@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-07, at `main` = `HEAD` (PR #296), build `0.53.0`,
-save schema 21, 23 services. Published to Roblox as place version 123,
+Last updated: 2026-08-07, at `main` = `HEAD` (PR #299), build `0.53.0`,
+save schema 21, 23 services. Published to Roblox as place version 125,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 7 through 10 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** Studio is
@@ -18,28 +18,29 @@ Studio-facing checks not performed are recorded open rather than assumed.
 **Milestones 7, 8 and 9 are complete.** The story runs end to end: seven
 chapters, seven regions, an authored finale with three endings, an
 epilogue that reads the whole save, 27 residents and all 28 buildings.
-M10 waves A-1, A-2, A-3 and D are done: **122 recipes**, six consumable
-effect kinds, and a content census that asserts the whole inventory.
-**The 180-recipe gate was moved to 122** with the owner's decision and
-the reasoning written into CONTENT_CATALOG.md — the original allocation
-assumed categories this game does not have.
-
-**The next work is M10 B (quest completion) and C (codex/fragments), and
-before either of them, the two gaps the census found.** Both are in
-Bramblewake and both are the same shape — the starting region predates
-the systems the later regions were built into:
-
-- **Four points of interest where every later region has twelve.** Eight
-  authored POIs plus eight cases in `BramblewakeBuilder`. This is the
-  highest-value content work left: the game is thinnest in the region
-  every player sees and the only region some players ever see.
-- **Two armour pieces where every later region has ten.** Eight recipes,
-  and it touches the tutorial's first-gear flow, so it wants care.
-
-`ContentCensus.spec` asserts both at their real size and fails if anyone
-rounds them up.
+M10 waves A-1 through A-3 and D are done, and **both census gaps are
+closed**: 130 recipes, 79 points of interest built, Bramblewake brought
+up to every later region's shape. **The remaining M10 work is wave B
+(quest completion — every resident quest is real, so this is checking
+the catalog's quest-group table against what exists and deciding what
+"completion" still asks) and wave C (codex/fragment completion — the ten
+fragments are all Bramblewake's; the other regions have none, and
+`MemoryFragments` plus the anchor resolver in WorldService are the shape
+to extend).**
 
 Newest first since the last header:
+- **#298–#299** (v124–v125) **Bramblewake stops being the thinnest
+  region.** Eight new points of interest across the region's three acts,
+  with a new generator rule — a catalog can pin POIs into every run — so
+  the four fragment anchors stay guaranteed while the eight new ones
+  rotate two per run; the other five regions generate byte-identically,
+  verified against a stashed baseline. Then eight armour pieces with the
+  gentlest numbers in the game, closing the last census gap at 130
+  recipes. Each wave also closed a trap it found: the root chapel had
+  been the POI dispatch's `else` (any unknown visual silently drew a
+  chapel), Bramblewake's builder was in no coverage spec, and the equip
+  panel was a hardcoded list of eight items — which after A-1 meant
+  ninety craftable items nobody could ever wear, failing nothing.
 - **#296** (v123) **M10 A-3 and D: the counters, and an honest census.**
   Built by asking which threats this game creates that a player cannot
   answer, rather than which categories would reach 180. The spark thieves
