@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-07, at `main` = `HEAD` (PR #313), build `0.53.0`,
-save schema 21, 23 services. Published to Roblox as place version 129,
+Last updated: 2026-08-07, at `main` = `HEAD` (PR #316), build `0.53.0`,
+save schema 21, 23 services. Published to Roblox as place version 130,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 7 through 10 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** Studio is
@@ -46,6 +46,35 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#316** (v130) **eleven residents are authored now, not three.** The
+  derivation from #313 is a floor and stays one; what moved is how far
+  above it the authoring reaches. Chapters II and III's eight — the
+  Delve's four and the Fen's four, which is the whole cast a player meets
+  next after the three they start with — have their own colours, their
+  own prop and their own day, dusk and night. Day puts each of them at
+  the building the roster gives them the job at. Night puts all eleven on
+  the lantern road between the square and the south gate, spread out,
+  because DEFENDING THE LANTERN ROAD is what the routine's night duty has
+  always said and eleven people saying it from one spot is a crowd rather
+  than a watch. Every position was checked against every other in the
+  same phase, against the sixteen derived spots, against Mara and against
+  every building footprint; the closest pair in town is 9.2 studs.
+
+  **The wave's real lesson is the second commit.** The props started as
+  one part each with a size, a colour and a material — which is what the
+  three that already existed were — and that breaks
+  VISUAL_QUALITY_STANDARD's rule that a recoloured cube is not
+  construction. Rebuilt as assemblies, then **built in Studio and
+  photographed, which found five of the eleven were still boxes**: the
+  cookpot and the seed basket had to be round (a Roblox cylinder lies on
+  its side, so a vessel is tipped a quarter turn), the basket needed its
+  base narrower than its rim, the bell had to widen on the way down, the
+  shears' blades were five degrees apart and read as a single needle, and
+  the mireglass shard was a white smear until it was tinted and set in an
+  iron holder. Same lesson as the six wrong creature shapes in #251:
+  **nothing but a camera catches a shape.** The sixteen residents of
+  chapters IV–VII still derive, and the census now asserts eleven
+  authored bodies so that number can only move deliberately.
 - **#306–#313** (v129) **the reachability sweep, which is the most
   important thing in this header.** A live Studio pass — possible at all
   because #307 finally made the tutorial skippable in Studio, where it
