@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-07, at `main` = `HEAD` (PR #294), build `0.53.0`,
-save schema 21, 23 services. Published to Roblox as place version 122,
+Last updated: 2026-08-07, at `main` = `HEAD` (PR #296), build `0.53.0`,
+save schema 21, 23 services. Published to Roblox as place version 123,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 7 through 10 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** Studio is
@@ -18,19 +18,42 @@ Studio-facing checks not performed are recorded open rather than assumed.
 **Milestones 7, 8 and 9 are complete.** The story runs end to end: seven
 chapters, seven regions, an authored finale with three endings, an
 epilogue that reads the whole save, 27 residents and all 28 buildings.
-M10 waves A-1 and A-2 are done: **104 recipes**, and consumables are data
-rather than three hardcoded branches per item.
+M10 waves A-1, A-2, A-3 and D are done: **122 recipes**, six consumable
+effect kinds, and a content census that asserts the whole inventory.
+**The 180-recipe gate was moved to 122** with the owner's decision and
+the reasoning written into CONTENT_CATALOG.md — the original allocation
+assumed categories this game does not have.
 
-**A-3 is where a judgement call is waiting, and it should be the owner's
-rather than a session's.** The roadmap's launch gate is 180 recipes;
-104 of them now exist and every one has a reason to. Getting to 180
-inside the categories this game actually has means a second armour line
-per region, or more consumables that differ only in a number — padding
-that the gate (`no unknown material, no orphan output`) cannot detect but
-a player would feel within an hour. The options are written up in the
-wave plan under A-3. Waves B, C and D are unaffected and are real work.
+**The next work is M10 B (quest completion) and C (codex/fragments), and
+before either of them, the two gaps the census found.** Both are in
+Bramblewake and both are the same shape — the starting region predates
+the systems the later regions were built into:
+
+- **Four points of interest where every later region has twelve.** Eight
+  authored POIs plus eight cases in `BramblewakeBuilder`. This is the
+  highest-value content work left: the game is thinnest in the region
+  every player sees and the only region some players ever see.
+- **Two armour pieces where every later region has ten.** Eight recipes,
+  and it touches the tutorial's first-gear flow, so it wants care.
+
+`ContentCensus.spec` asserts both at their real size and fails if anyone
+rounds them up.
 
 Newest first since the last header:
+- **#296** (v123) **M10 A-3 and D: the counters, and an honest census.**
+  Built by asking which threats this game creates that a player cannot
+  answer, rather than which categories would reach 180. The spark thieves
+  took the lantern and nothing a player carried put any back; the drowsy
+  strikers took your footing with no response but fighting better; gear
+  wore out a long way from the only bench that could fix it. So three new
+  effect kinds, each a real service change: lantern restoration capped at
+  the hundred a night starts at, an affliction cure that deliberately
+  leaves the player's own shield alone, and a field repair with no
+  material cost because the item was already paid for when it was
+  crafted. Eighteen consumables on those, 122 recipes, and the gate moved
+  from 180 with the reasoning recorded. `ContentCensus.spec` now asserts
+  the whole inventory against the document — and records two gaps in
+  Bramblewake rather than filling them with content nobody designed.
 - **#294** (v122) **M10 wave A-2: consumables became data.** Each usable
   item was three hardcoded branches — one deciding its effect, one
   drawing its button, one deciding which id a keypress sends — which
