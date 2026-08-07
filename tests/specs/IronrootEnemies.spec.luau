@@ -93,10 +93,11 @@ return {
         {
             name = "the merged catalog serves every region without collision",
             run = function()
-                TestRunner.equal(#EnemyCatalog.order(), 18)
+                TestRunner.equal(#EnemyCatalog.order(), 24)
                 TestRunner.equal(#EnemyCatalog.orderFor("region_bramblewake"), 6)
                 TestRunner.equal(#EnemyCatalog.orderFor("region_ironroot"), 6)
                 TestRunner.equal(#EnemyCatalog.orderFor("region_mireglass"), 6)
+                TestRunner.equal(#EnemyCatalog.orderFor("region_tempest"), 6)
                 TestRunner.equal(#EnemyCatalog.orderFor("region_nowhere"), 0)
                 -- Bramblewake's sequence is preserved exactly, so every night
                 -- schedule that names an enemy keeps meaning what it meant
