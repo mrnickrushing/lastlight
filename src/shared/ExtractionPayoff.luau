@@ -27,6 +27,12 @@ local PRESENTATION = table.freeze({
     material_ships_iron = table.freeze({ kind = "ships_iron", label = "SHIP'S IRON" }),
     material_rope_fiber = table.freeze({ kind = "rope", label = "ROPE FIBER" }),
     material_amberglass = table.freeze({ kind = "amberglass", label = "AMBERGLASS" }),
+    -- Frostmere Vale
+    material_frostmere_ice = table.freeze({ kind = "ice", label = "FROSTMERE ICE" }),
+    material_thawed_iron = table.freeze({ kind = "thawed_iron", label = "THAWED IRON" }),
+    material_ember_moss = table.freeze({ kind = "ember_moss", label = "EMBER MOSS" }),
+    material_frostmere_wool = table.freeze({ kind = "wool", label = "FROSTMERE WOOL" }),
+    material_aurora_salt = table.freeze({ kind = "aurora_salt", label = "AURORA SALT" }),
 })
 
 export type Entry = {

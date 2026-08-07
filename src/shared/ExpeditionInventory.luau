@@ -40,6 +40,12 @@ local KNOWN_MATERIALS = table.freeze({
     material_ships_iron = true,
     material_rope_fiber = true,
     material_amberglass = true,
+    -- Frostmere Vale
+    material_frostmere_ice = true,
+    material_thawed_iron = true,
+    material_ember_moss = true,
+    material_frostmere_wool = true,
+    material_aurora_salt = true,
 })
 
 local function hashText(hash: number, value: string): number
