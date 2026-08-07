@@ -6,7 +6,7 @@ constraint. This runbook records what exists, what remains, and every
 live check the constraint deferred — so the next Studio session opens
 with a checklist instead of an excavation.
 
-## The Studio verification gap (found 2026-08-07, still open)
+## The Studio verification gap (found and half-closed 2026-08-07)
 
 A live pass to check two rewritten HUD surfaces — the consumable column
 and the equip panel — got as far as proving both **build** correctly
@@ -30,21 +30,44 @@ populated, and the reason is structural rather than a missing step:
   `TutorialService` has already built `_sessions[player]` and gates on
   `session.stage`.
 
-An attempt to add a `LastLightSkipTutorial` attribute to `ProfileService`
-was written, tested green, and then **reverted**: it would have set the
-profile flag and changed nothing a player could see, which is worse than
-no hook at all.
+An attempt to add `LastLightSkipTutorial` to `ProfileService` was written,
+tested green, and then **reverted**: it would have set the profile flag
+and changed nothing a player could see, which is worse than no hook.
 
-**The fix, for whoever takes it:** `TutorialService` has to honour the
-flag where it builds or evaluates a session, not `ProfileService` where
-it loads a profile. Either rebuild the session when a profile arrives
-with `tutorial.complete`, or check the attribute in the session's stage
-gate. One of those, plus the same three guards the stock hook carries
-(Studio only, non-persistent only, logged loudly), turns every
-post-tutorial check from a full playthrough into two seconds.
+**It now lives in `TutorialService`**, where the stage is actually
+decided — applied at session build and again whenever the attribute
+changes, since a Play session starts from a fresh DataModel. Verified
+live: `tutorialComplete=true`, `studio_tutorial_skipped` in the log, the
+session's toast changing mid-run. Same guard as the stock hook: Studio
+only, logged loudly.
 
-Until then, treat any post-tutorial UI as **unverified live**, including
-the consumable column and the equip panel shipped in #294 and #299.
+### How to use it
+
+Press Play, then from the **Server** context:
+
+```lua
+game:SetAttribute("LastLightSkipTutorial", true)
+game:SetAttribute("LastLightStockProfile", 60)
+```
+
+Both are read at session build and again on change, so ordering does not
+matter. Setting them while *editing* does nothing — that value never
+reaches the run.
+
+### What is still unverified
+
+The consumable column and equip panel (#294, #299) are confirmed to
+**build** correctly — four consumable slots, ninety-six equip buttons,
+right labels, correctly hidden at zero owned — and are still unverified
+**populated**, because crafting is a world interaction at the bench
+rather than an action payload: `RuntimeIds.Actions.CraftItem` exists but
+nothing sends or handles it, so a driver has to walk to the workbench.
+That is the next thing to do with these hooks, and it is now a short walk
+rather than a playthrough.
+
+Also confirmed live in the same session: a real expedition reports
+`pois=6`, so Bramblewake's point-of-interest wave (#298) is placing four
+pinned anchors plus two rotating, as designed.
 
 
 ## What exists (merged, published, spec-pinned)
