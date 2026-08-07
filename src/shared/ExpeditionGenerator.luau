@@ -4,6 +4,7 @@ local Bramblewake = require("./Content/Definitions/BramblewakeExpedition")
 local Ironroot = require("./Content/Definitions/IronrootExpedition")
 local Mireglass = require("./Content/Definitions/MireglassExpedition")
 local Tempest = require("./Content/Definitions/TempestExpedition")
+local Cinderfall = require("./Content/Definitions/CinderfallExpedition")
 local Frostmere = require("./Content/Definitions/FrostmereExpedition")
 local ExpeditionEventFlow = require("./ExpeditionEventFlow")
 
@@ -72,6 +73,7 @@ local CATALOGS: { any } = table.freeze({
     Mireglass :: any,
     Tempest :: any,
     Frostmere :: any,
+    Cinderfall :: any,
 })
 local DEFAULT_REGION_ID = Bramblewake.RegionId
 
