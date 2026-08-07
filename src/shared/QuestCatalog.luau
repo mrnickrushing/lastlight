@@ -40,6 +40,16 @@ local ORDER = table.freeze({
     "quest_reed_weaver",
     "quest_glass_reader",
     "quest_fen_healer",
+    -- Tempest Reach residents
+    "quest_signal_watch",
+    "quest_ropewalk_hands",
+    "quest_harbour_ledger",
+    "quest_salvage_runs",
+    -- Frostmere Vale residents
+    "quest_bell_keeping",
+    "quest_vale_nursing",
+    "quest_cold_stores",
+    "quest_almshouse_doors",
 })
 
 local DEFINITIONS: { [string]: Quest } = {
@@ -124,6 +134,69 @@ local DEFINITIONS: { [string]: Quest } = {
         displayName = "COUNT EVERY HEAD",
         objective = table.freeze({ kind = "residents_bonded", threshold = 3 }),
         reward = table.freeze({ materialId = "material_brightcap", amount = 6 }),
+    }),
+    -- Isolde kept a light for ships that had already sunk. Nights lit is
+    -- the only number she has ever trusted.
+    quest_signal_watch = table.freeze({
+        id = "quest_signal_watch",
+        displayName = "KEEP THE LIGHT",
+        objective = table.freeze({ kind = "survive_nights", threshold = 14 }),
+        reward = table.freeze({ materialId = "material_storm_glass", amount = 6 }),
+    }),
+    -- Cass makes rope, and rope is made by making a great deal of it.
+    quest_ropewalk_hands = table.freeze({
+        id = "quest_ropewalk_hands",
+        displayName = "TWENTY GOOD LENGTHS",
+        objective = table.freeze({ kind = "craft_items", threshold = 20 }),
+        reward = table.freeze({ materialId = "material_salt_kelp", amount = 8 }),
+    }),
+    -- Alder ran a harbour's books until there was no harbour. He would
+    -- like to see full stores once before he stops.
+    quest_harbour_ledger = table.freeze({
+        id = "quest_harbour_ledger",
+        displayName = "THE STORES IN BLACK",
+        objective = table.freeze({ kind = "materials_banked", threshold = 200 }),
+        reward = table.freeze({ materialId = "material_ships_iron", amount = 6 }),
+    }),
+    -- Nell dives wrecks. She counts trips out and trips back, and only
+    -- the second number goes in the book.
+    quest_salvage_runs = table.freeze({
+        id = "quest_salvage_runs",
+        displayName = "FOURTEEN TRIPS BACK",
+        objective = table.freeze({ kind = "bramblewake_settlements", threshold = 14 }),
+        reward = table.freeze({ materialId = "material_storm_glass", amount = 8 }),
+    }),
+    -- Brother Anselm rang for a valley that had stopped answering. What
+    -- he wants now is the record of what happened kept.
+    quest_bell_keeping = table.freeze({
+        id = "quest_bell_keeping",
+        displayName = "WHAT THE BELLS REMEMBER",
+        objective = table.freeze({ kind = "fragments_recovered", threshold = 4 }),
+        reward = table.freeze({ materialId = "material_aurora_salt", amount = 6 }),
+    }),
+    -- Sister Ivy counted heads in a place where the count kept falling.
+    -- Eight people who trust you is the number she stopped at.
+    quest_vale_nursing = table.freeze({
+        id = "quest_vale_nursing",
+        displayName = "EIGHT WHO TRUST YOU",
+        objective = table.freeze({ kind = "residents_bonded", threshold = 8 }),
+        reward = table.freeze({ materialId = "material_ember_moss", amount = 8 }),
+    }),
+    -- Halvard kept a cold store through five winters of people asking him
+    -- to open it early. He measures a town by what it has finished.
+    quest_cold_stores = table.freeze({
+        id = "quest_cold_stores",
+        displayName = "EVERY CHAPTER CLOSED",
+        objective = table.freeze({ kind = "chapters_resolved", threshold = 5 }),
+        reward = table.freeze({ materialId = "material_thawed_iron", amount = 6 }),
+    }),
+    -- Maud gave her door away for years. She would like a town with
+    -- twelve of them standing.
+    quest_almshouse_doors = table.freeze({
+        id = "quest_almshouse_doors",
+        displayName = "TWELVE DOORS STANDING",
+        objective = table.freeze({ kind = "buildings_raised", threshold = 12 }),
+        reward = table.freeze({ materialId = "material_frostmere_wool", amount = 8 }),
     }),
 }
 
