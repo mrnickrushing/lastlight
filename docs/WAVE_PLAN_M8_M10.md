@@ -10,7 +10,7 @@ Milestones 7, 8 and 9 are complete. Milestone 7's runbook is
 shipped as #274–#282 (v105–v113) and milestone 9 as #284–#290
 (v114–v120).
 
-**Next up: M10 wave A-2 — a code wave before a content wave.**
+**Next up: M10 wave B, and an owner call on A-3 (see below).**
 
 ## The rhythm
 
@@ -75,8 +75,36 @@ reach has to have something standing in it the day it opens.
 | Wave | Scope | Done when |
 |---|---|---|
 | A-1 ✅ | **Weapons and armour to 90** (shipped #292) — six weapon families × six regions, then five armour slots × six regions × two lines (a light line that returns stamina, a heavy line that reduces damage). `Equipment` is already fully data-driven (slot, `damageReduction`, `staminaRegenMultiplier`, `kind`, `strikeRange`/`meleeReach`/multiplier/riders), so these are data, not code | Every output has an `Equipment` definition; every stat inside the bounds combat clamps |
-| A-2 | **Tools, light and defence** — the outputs that are used rather than worn. Needs a small data-driven consumable contract first: today `gear_meadow_satchel` and `gear_amber_charm` are hardcoded branches in `TutorialService`, `HUDController` and the client, which does not scale past two | Consumable spec: every usable output resolves through one table, no bespoke branch |
-| A-3 | **Comfort and medicine to 180** — the remainder, plus the recipe spec's full gate | Recipe spec: 180 recipes, no unknown material, no orphan output |
+| A-2 ✅ | **Consumables became data** (shipped #294) — the outputs that are used rather than worn. Needs a small data-driven consumable contract first: today `gear_meadow_satchel` and `gear_amber_charm` are hardcoded branches in `TutorialService`, `HUDController` and the client, which does not scale past two | Consumable spec: every usable output resolves through one table, no bespoke branch |
+| A-3 ⚠️ | **104 → 180 recipes** — needs an owner decision first, see below | Recipe spec: 180 recipes, no unknown material, no orphan output |
+
+### A-3 is a design decision, not a wiring task
+
+104 recipes exist and each one has a reason to: 36 weapons (six families
+bent along a different axis per region), 54 armour pieces (five slots,
+two lines, every slot offering both), and 16 consumables (three effect
+kinds the services can actually apply). The gate asks for 180.
+
+The remaining 76 cannot come from anywhere honest inside the categories
+this game has. What they could come from, in descending order of how
+defensible each is:
+
+1. **New effect kinds** — each one is a service change (cure a status,
+   restore lantern fuel, a timed speed effect), and each unlocks six
+   consumables that genuinely differ. Three new kinds is ~18 recipes and
+   real work in `PlayerCombatService` / `PlayerSurvivalService`.
+2. **A tool tier per region** — tools are currently a fixed starting kit
+   rather than craftable. Making them craftable is a real system and
+   about 20 recipes, but it touches the tutorial's first-tool flow.
+3. **A second armour line** (a third stat axis, e.g. carry capacity or
+   lantern radius) — ~30 recipes, and only honest if the stat is real.
+4. **Padding**: a second version of each existing item with different
+   numbers. This clears the gate and nothing in the suite can tell.
+   Recommended against.
+
+Options 1–3 total roughly the 76 needed and are all genuine. They are
+also three separate systems, which is why this is a milestone decision
+rather than a wave a session should quietly make on its own.
 | B | **Quest completion** — resident arcs to the catalog's counts, every quest a real signal | Quest spec: every quest's objective kind has a signal |
 | C | **Codex/archive completion** — memory fragments to full count across regions | Fragment spec: one per region minimum, anchors resolvable |
 | D | **Content census** — a single spec asserting the roadmap's launch inventory: 180 modules, 79 POIs, 48 events, 180 recipes, region counts | Census spec green |
