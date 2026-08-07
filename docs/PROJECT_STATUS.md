@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-07, at `main` = `HEAD` (PR #292), build `0.53.0`,
-save schema 21, 23 services. Published to Roblox as place version 121,
+Last updated: 2026-08-07, at `main` = `HEAD` (PR #294), build `0.53.0`,
+save schema 21, 23 services. Published to Roblox as place version 122,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 7 through 10 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** Studio is
@@ -18,14 +18,30 @@ Studio-facing checks not performed are recorded open rather than assumed.
 **Milestones 7, 8 and 9 are complete.** The story runs end to end: seven
 chapters, seven regions, an authored finale with three endings, an
 epilogue that reads the whole save, 27 residents and all 28 buildings.
-M10 wave A-1 is done (90 recipes). **The next wave is M10 A-2, and it is
-a code wave before it is a content wave**: the two consumables this game
-has are hardcoded branches in `TutorialService`, `HUDController` and the
-client, so a data-driven consumable contract has to land before any more
-"used" outputs can. The queue lives in
-[WAVE_PLAN_M8_M10.md](WAVE_PLAN_M8_M10.md).
+M10 waves A-1 and A-2 are done: **104 recipes**, and consumables are data
+rather than three hardcoded branches per item.
+
+**A-3 is where a judgement call is waiting, and it should be the owner's
+rather than a session's.** The roadmap's launch gate is 180 recipes;
+104 of them now exist and every one has a reason to. Getting to 180
+inside the categories this game actually has means a second armour line
+per region, or more consumables that differ only in a number — padding
+that the gate (`no unknown material, no orphan output`) cannot detect but
+a player would feel within an hour. The options are written up in the
+wave plan under A-3. Waves B, C and D are unaffected and are real work.
 
 Newest first since the last header:
+- **#294** (v122) **M10 wave A-2: consumables became data.** Each usable
+  item was three hardcoded branches — one deciding its effect, one
+  drawing its button, one deciding which id a keypress sends — which
+  survives at two items and not at sixteen. Now an entry names an effect,
+  an amount, the precondition that must hold before the item is spent,
+  and what the toast says either way. The HUD draws a short column and
+  fills it with whatever a player is carrying, stamping each button with
+  its current item, so C and V ask the button rather than a constant.
+  Fourteen new consumables needed no input or HUD code at all. A spec
+  reads the three files that used to hold item names and fails if any
+  still does.
 - **#292** (v121) **M10 wave A-1: 10 recipes became 90.** Six weapon
   families in every region and five armour slots in two lines each, with
   the rule that a region is an axis rather than a tier — the Delve makes
