@@ -1285,15 +1285,31 @@ local function questSignals(profile: Profile): Quests.Signals
         end
     end
     local fragmentsRecovered = 0
-    for _, found in (profile :: any).story.fragments do
+    local fragmentsByRegion: { [string]: number } = {}
+    for fragmentId, found in (profile :: any).story.fragments do
         if found == true then
             fragmentsRecovered += 1
+            local definition = MemoryFragments.byId(fragmentId)
+            local regionId = if definition ~= nil
+                then (definition :: any).regionId or "region_bramblewake"
+                else nil
+            if regionId ~= nil then
+                fragmentsByRegion[regionId] = (fragmentsByRegion[regionId] or 0) + 1
+            end
+        end
+    end
+    local masteryByProfession: { [string]: number } = {}
+    for professionId, entry in (profile :: any).profession.mastery do
+        if type(entry) == "table" then
+            masteryByProfession[professionId] = math.max(0, tonumber(entry.level) or 0)
         end
     end
     return {
         bramblewakeSettlements = #profile.inventory.settlementOrder,
         chaptersResolved = chaptersResolved,
+        fragmentsByRegion = fragmentsByRegion,
         fragmentsRecovered = fragmentsRecovered,
+        masteryByProfession = masteryByProfession,
         buildingsRaised = buildingsRaised,
         craftedItems = craftedItems,
         decorationsPlaced = decorationsPlaced,

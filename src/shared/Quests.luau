@@ -26,10 +26,24 @@ export type Signals = {
     ]]
     chaptersResolved: number,
     fragmentsRecovered: number,
+    --[[
+        Keyed signals. The counts above answer "how many"; these answer
+        "how many of that one", which is the difference between a quest
+        that any activity satisfies and a quest that sends a player
+        somewhere specific. An objective using one names its key, so the
+        catalog stays the only place that decides what a quest is about.
+    ]]
+    fragmentsByRegion: { [string]: number },
+    masteryByProfession: { [string]: number },
 }
 
-local function currentValue(kind: string, signals: Signals): number
-    if kind == "survive_nights" then
+local function currentValue(objective: any, signals: Signals): number
+    local kind = objective.kind
+    if kind == "fragments_in_region" then
+        return signals.fragmentsByRegion[tostring(objective.regionId)] or 0
+    elseif kind == "profession_mastery" then
+        return signals.masteryByProfession[tostring(objective.professionId)] or 0
+    elseif kind == "survive_nights" then
         return signals.nightsSurvived
     elseif kind == "craft_items" then
         return signals.craftedItems
@@ -96,7 +110,7 @@ function Quests.progress(questId: string, signals: Signals): (number, number, bo
         return 0, 0, false
     end
     local quest = QuestCatalog.get(questId) :: QuestCatalog.Quest
-    local current = currentValue(quest.objective.kind, signals)
+    local current = currentValue(quest.objective, signals)
     local threshold = quest.objective.threshold
     return current, threshold, current >= threshold
 end

@@ -447,10 +447,18 @@ missing quests would have meant building a second, worse copy of each.
 | quest_group_prologue | Prologue arc | n/a | delivered as `TutorialFlow`, not as quests |
 | quest_group_chapter | Chapter arcs | n/a | delivered as `ChapterCatalog` and the boss encounters |
 | quest_group_postgame | Postgame | n/a | delivered as the three endings and `requiresEnding` |
-| quest_group_mastery | Profession mastery tracks | 0 | needs a mastery signal in `Quests.currentValue`; the data exists in `ProfessionMastery` |
-| quest_group_mystery | Region mystery groups | 0 | the fragments now exist in every region; this needs an objective kind that reads *which* fragments, not how many |
+| quest_group_mastery | Profession mastery tracks | 7 | one trial per profession, at mastery level 4 — deep in one rather than wide across seven |
+| quest_group_mystery | Region mystery groups | 6 | one per surface region: recover that place's memories specifically |
 | quest_group_contract | Contract templates | 0 | needs a contract generator; no system today |
 | quest_group_crisis | Crisis templates | 0 | `ResidentLife.crisis` is the seed of this and is not yet quest-shaped |
+
+Objectives come in two shapes. Most are counts -- how many nights, how
+many crafts -- and any activity moves them. The mastery trials and region
+mysteries are *keyed*: an objective names a profession or a region, and
+only progress in that one counts. That is the difference between a quest
+any play satisfies and a quest that sends a player somewhere specific,
+and it is why those two families waited for the signal rather than being
+faked with a count.
 
 Every quest declares an objective kind that `Quests.currentValue` routes
 and `SaveSchema.questSignals` feeds -- a kind nothing feeds reads zero
