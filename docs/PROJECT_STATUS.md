@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-07, at `main` = `HEAD` (PR #302), build `0.53.0`,
-save schema 21, 23 services. Published to Roblox as place version 127,
+Last updated: 2026-08-07, at `main` = `HEAD` (PR #304), build `0.53.0`,
+save schema 21, 23 services. Published to Roblox as place version 128,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 7 through 10 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** Studio is
@@ -33,15 +33,29 @@ companion utilities, none of which are recipe categories here), and the
 quest table from eight families to what exists (three of the eight were
 other systems wearing the word "quest").
 
-**What is left is written in the catalog's own tables**, each with the
-dependency it waits on: profession mastery quests need a mastery signal
-in `Quests.currentValue` (the data is already in `ProfessionMastery`),
-region mystery quests need an objective kind that reads *which* fragments
-rather than how many, and contracts and crises need systems that do not
-exist yet. Resident arcs past chapter one's three are catalog-only work
-now that sequencing exists.
+Since then the two quest families that were waiting on a *dependency*
+rather than a design decision have shipped: seven mastery trials and six
+region mysteries, on keyed objectives (an objective can name a profession
+or a region, and only that one's progress counts). 46 quests.
+
+**What is left is written in the catalog's own tables**, and the two
+remaining quest families are the honest kind of missing: contracts need a
+generator and crises need `ResidentLife.crisis` to become quest-shaped,
+and neither system exists. Resident arcs past chapter one's three are
+catalog-only work now that sequencing exists — an entry with `residentId`
+and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#304** (v128) **Mastery trials and region mysteries** — the two quest
+  families that had a dependency rather than a design problem. Objectives
+  can now be *keyed*: one names a profession, another names a region, and
+  only that one's progress counts. Without the key both would have been
+  fakeable with a plain count, and badly — a mastery trial reading total
+  levels would let a player who dabbled in seven professions clear the
+  scout's trial without ever scouting. Seven trials at mastery four, six
+  mysteries asking for exactly what each region holds, and a spec that
+  refuses a mystery asking for more memories than its region has, because
+  an unfinishable quest only ever shows up in a player's log.
 - **#301–#302** (v126–v127) **M10 waves B and C: arcs, and an archive
   bigger than one region.** Quests can be sequenced — a stage whose
   predecessor is unclaimed does not progress, is not offered and cannot
