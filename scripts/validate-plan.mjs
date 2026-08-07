@@ -328,8 +328,8 @@ if (existsSync(catalogPath)) {
   )];
   const recipeTotal = recipeRows.reduce((sum, row) => sum + Number(row[2]), 0);
   const recipeIds = recipeRows.map((row) => row[1]);
-  if (recipeRows.length !== 3 || recipeTotal !== 122) {
-    failures.push(`recipe allocation: expected 3 groups totaling 122, found ${recipeRows.length} groups totaling ${recipeTotal}`);
+  if (recipeRows.length !== 3 || recipeTotal !== 130) {
+    failures.push(`recipe allocation: expected 3 groups totaling 130, found ${recipeRows.length} groups totaling ${recipeTotal}`);
   }
   if (new Set(recipeIds).size !== recipeIds.length) {
     failures.push("recipe group IDs in docs/CONTENT_CATALOG.md are not unique");

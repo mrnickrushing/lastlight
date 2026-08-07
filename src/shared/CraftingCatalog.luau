@@ -21,6 +21,15 @@ local ORDER = table.freeze({
     "recipe_foxfire_sling",
     "recipe_amber_edge",
     "recipe_warden_cudgel",
+    -- Bramblewake's other eight armour pieces
+    "recipe_meadow_cowl",
+    "recipe_bramble_treads",
+    "recipe_meadow_coat",
+    "recipe_bark_plate",
+    "recipe_meadow_wraps",
+    "recipe_bramble_gauntlets",
+    "recipe_foxfire_token",
+    "recipe_heartwood_seal",
     -- The things that are used rather than worn
     "recipe_delve_ration",
     "recipe_coalglass_ward",
@@ -1355,6 +1364,86 @@ local DEFINITIONS: { [string]: Recipe } = {
         materials = table.freeze({
             material_cindersteel = 4,
             material_kiln_pearl = 3,
+        }),
+    }),
+    recipe_meadow_cowl = table.freeze({
+        id = "recipe_meadow_cowl",
+        displayName = "MEADOW COWL",
+        outputItemId = "gear_meadow_cowl",
+        outputDisplayName = "Meadow Cowl",
+        materials = table.freeze({
+            material_brightcap = 2,
+            material_meadow_fiber = 4,
+        }),
+    }),
+    recipe_bramble_treads = table.freeze({
+        id = "recipe_bramble_treads",
+        displayName = "BRAMBLE TREADS",
+        outputItemId = "gear_bramble_treads",
+        outputDisplayName = "Bramble Treads",
+        materials = table.freeze({
+            material_heartwood = 4,
+            material_spring_clay = 2,
+        }),
+    }),
+    recipe_meadow_coat = table.freeze({
+        id = "recipe_meadow_coat",
+        displayName = "MEADOW COAT",
+        outputItemId = "gear_meadow_coat",
+        outputDisplayName = "Meadow Coat",
+        materials = table.freeze({
+            material_amber_sap = 2,
+            material_meadow_fiber = 5,
+        }),
+    }),
+    recipe_bark_plate = table.freeze({
+        id = "recipe_bark_plate",
+        displayName = "BARK PLATE",
+        outputItemId = "gear_bark_plate",
+        outputDisplayName = "Bark Plate",
+        materials = table.freeze({
+            material_heartwood = 5,
+            material_spring_clay = 3,
+        }),
+    }),
+    recipe_meadow_wraps = table.freeze({
+        id = "recipe_meadow_wraps",
+        displayName = "MEADOW WRAPS",
+        outputItemId = "gear_meadow_wraps",
+        outputDisplayName = "Meadow Wraps",
+        materials = table.freeze({
+            material_brightcap = 2,
+            material_meadow_fiber = 3,
+        }),
+    }),
+    recipe_bramble_gauntlets = table.freeze({
+        id = "recipe_bramble_gauntlets",
+        displayName = "BRAMBLE GAUNTLETS",
+        outputItemId = "gear_bramble_gauntlets",
+        outputDisplayName = "Bramble Gauntlets",
+        materials = table.freeze({
+            material_amber_sap = 2,
+            material_heartwood = 3,
+        }),
+    }),
+    recipe_foxfire_token = table.freeze({
+        id = "recipe_foxfire_token",
+        displayName = "FOXFIRE TOKEN",
+        outputItemId = "gear_foxfire_token",
+        outputDisplayName = "Foxfire Token",
+        materials = table.freeze({
+            material_amber_sap = 2,
+            material_brightcap = 4,
+        }),
+    }),
+    recipe_heartwood_seal = table.freeze({
+        id = "recipe_heartwood_seal",
+        displayName = "HEARTWOOD SEAL",
+        outputItemId = "gear_heartwood_seal",
+        outputDisplayName = "Heartwood Seal",
+        materials = table.freeze({
+            material_amber_sap = 3,
+            material_heartwood = 4,
         }),
     }),
 }

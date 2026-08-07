@@ -6,7 +6,9 @@ local GuiService = game:GetService("GuiService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local Consumables = require(ReplicatedStorage:WaitForChild("LastLight").Consumables)
+local sharedRoot = ReplicatedStorage:WaitForChild("LastLight")
+local Consumables = require(sharedRoot.Consumables)
+local Equipment = require(sharedRoot.Equipment)
 
 -- How many consumables the column shows at once. There are more than a
 -- phone screen has room for, so the HUD shows what a player is actually
@@ -1124,41 +1126,37 @@ function HUDController.new(
     progressText.TextYAlignment = Enum.TextYAlignment.Top
     progressText.ZIndex = 52
     local equipmentButtons: { [string]: TextButton } = {}
-    -- Three per row, newest row stacking upward: eight equippables no longer
-    -- fit the single strip the first three shipped on. Buttons stay hidden
-    -- until owned, so a fresh save still sees an empty margin, not a wall.
-    for index, item in
-        {
-            { id = "gear_ironroot_hood", label = "EQUIP HOOD" },
-            { id = "gear_bramble_boots", label = "EQUIP BOOTS" },
-            { id = "gear_thornwood_bow", label = "EQUIP BOW" },
-            { id = "gear_heartwood_maul", label = "EQUIP MAUL" },
-            { id = "gear_briar_lance", label = "EQUIP LANCE" },
-            { id = "gear_foxfire_sling", label = "EQUIP SLING" },
-            { id = "gear_amber_edge", label = "EQUIP EDGE" },
-            { id = "gear_warden_cudgel", label = "EQUIP CUDGEL" },
-        }
-    do
+    --[[
+        One equip button per equipment definition, from the catalog rather
+        than a list kept here. The original list named eight items, which
+        was every equippable in the game when it was written and less than
+        a tenth of them by the time anyone noticed -- ninety items could
+        be crafted and never worn, and nothing failed, because a missing
+        button is not an error anywhere.
+
+        Buttons are created hidden and positioned at update time from the
+        set a player actually owns, so a fresh save still sees an empty
+        margin rather than a wall.
+    ]]
+    for _, entry in Equipment.list() do
+        local definition = Equipment.get(entry.itemId) :: any
         local button = Instance.new("TextButton")
-        button.Name = item.id
-        local buttonRow = math.floor((index - 1) / 3)
-        local buttonColumn = (index - 1) % 3
-        button.Position = UDim2.new(0, 20 + buttonColumn * 190, 1, -58 - buttonRow * 46)
+        button.Name = entry.itemId
+        button.Position = UDim2.new(0, 20, 1, -58)
         button.Size = UDim2.fromOffset(176, 38)
         button.BackgroundColor3 = COLORS.panelSoft
         button.Font = Enum.Font.GothamBold
-        button.Text = item.label
+        button.Text = definition.displayName
+        button:SetAttribute("BaseLabel", definition.displayName)
         button.TextColor3 = COLORS.cream
         button.TextSize = 11
+        button.TextWrapped = true
         button.Visible = false
-        button.ZIndex = 52
-        button.Parent = progressPanel
+        button.ZIndex = 53
+        button.Parent = progressOverlay
         corner(button, 10)
-        stroke(button, COLORS.amber, 0.45)
-        createItemIcon(button, item.id, 28)
-        button.TextXAlignment = Enum.TextXAlignment.Right
-        button:SetAttribute("BaseLabel", item.label)
-        equipmentButtons[item.id] = button
+        stroke(button, COLORS.amber, 0.5)
+        equipmentButtons[entry.itemId] = button
     end
     -- Kit rows: three saved loadouts, save on the left, apply on the right,
     -- stacked above the equipment buttons' rows.
@@ -2326,9 +2324,22 @@ function HUDController._updateProgress(self: HUDController)
     self._progressText.Text = table.concat(lines, "\n")
     local gear = state.gear or {}
     local care = if type(state.gearCare) == "table" then state.gearCare else {}
-    for itemId, button in self._equipmentButtons do
+    -- Position from the owned set, in catalog order, three per row
+    -- stacking upward -- so the panel holds however many a player has
+    -- actually made rather than reserving space for the whole catalog.
+    local visibleIndex = 0
+    for _, entry in Equipment.list() do
+        local itemId = entry.itemId
+        local button = self._equipmentButtons[itemId]
         local count = tonumber(gear[itemId]) or 0
-        button.Visible = self._progressOverlay.Visible and count > 0
+        local visible = self._progressOverlay.Visible and count > 0
+        button.Visible = visible
+        if visible then
+            local buttonRow = math.floor(visibleIndex / 3)
+            local buttonColumn = visibleIndex % 3
+            button.Position = UDim2.new(0, 20 + buttonColumn * 190, 1, -58 - buttonRow * 46)
+            visibleIndex += 1
+        end
         local label =
             string.format("%s ×%d", tostring(button:GetAttribute("BaseLabel") or "EQUIP"), count)
         local note = care[itemId]

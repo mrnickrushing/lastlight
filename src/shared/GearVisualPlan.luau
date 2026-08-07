@@ -537,6 +537,7 @@ local FAMILY_TEMPLATES: { [string]: string } = {
 }
 
 local REGION_PALETTES: { [string]: { number } } = {
+    bramblewake = { 78, 95, 48 },
     ironroot = { 112, 85, 49 },
     mireglass = { 76, 96, 88 },
     tempest = { 92, 96, 100 },
@@ -545,6 +546,11 @@ local REGION_PALETTES: { [string]: { number } } = {
 }
 
 local REGION_PREFIXES = table.freeze({
+    { prefix = "meadow", region = "bramblewake" },
+    { prefix = "bramble", region = "bramblewake" },
+    { prefix = "bark", region = "bramblewake" },
+    { prefix = "foxfire", region = "bramblewake" },
+    { prefix = "heartwood", region = "bramblewake" },
     { prefix = "ironroot", region = "ironroot" },
     { prefix = "mireglass", region = "mireglass" },
     { prefix = "tempest", region = "tempest" },
