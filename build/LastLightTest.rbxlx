@@ -18996,6 +18996,16 @@ local ORDER = table.freeze({
     "quest_reed_weaver",
     "quest_glass_reader",
     "quest_fen_healer",
+    -- Tempest Reach residents
+    "quest_signal_watch",
+    "quest_ropewalk_hands",
+    "quest_harbour_ledger",
+    "quest_salvage_runs",
+    -- Frostmere Vale residents
+    "quest_bell_keeping",
+    "quest_vale_nursing",
+    "quest_cold_stores",
+    "quest_almshouse_doors",
 })
 
 local DEFINITIONS: { [string]: Quest } = {
@@ -19081,6 +19091,69 @@ local DEFINITIONS: { [string]: Quest } = {
         objective = table.freeze({ kind = "residents_bonded", threshold = 3 }),
         reward = table.freeze({ materialId = "material_brightcap", amount = 6 }),
     }),
+    -- Isolde kept a light for ships that had already sunk. Nights lit is
+    -- the only number she has ever trusted.
+    quest_signal_watch = table.freeze({
+        id = "quest_signal_watch",
+        displayName = "KEEP THE LIGHT",
+        objective = table.freeze({ kind = "survive_nights", threshold = 14 }),
+        reward = table.freeze({ materialId = "material_storm_glass", amount = 6 }),
+    }),
+    -- Cass makes rope, and rope is made by making a great deal of it.
+    quest_ropewalk_hands = table.freeze({
+        id = "quest_ropewalk_hands",
+        displayName = "TWENTY GOOD LENGTHS",
+        objective = table.freeze({ kind = "craft_items", threshold = 20 }),
+        reward = table.freeze({ materialId = "material_salt_kelp", amount = 8 }),
+    }),
+    -- Alder ran a harbour's books until there was no harbour. He would
+    -- like to see full stores once before he stops.
+    quest_harbour_ledger = table.freeze({
+        id = "quest_harbour_ledger",
+        displayName = "THE STORES IN BLACK",
+        objective = table.freeze({ kind = "materials_banked", threshold = 200 }),
+        reward = table.freeze({ materialId = "material_ships_iron", amount = 6 }),
+    }),
+    -- Nell dives wrecks. She counts trips out and trips back, and only
+    -- the second number goes in the book.
+    quest_salvage_runs = table.freeze({
+        id = "quest_salvage_runs",
+        displayName = "FOURTEEN TRIPS BACK",
+        objective = table.freeze({ kind = "bramblewake_settlements", threshold = 14 }),
+        reward = table.freeze({ materialId = "material_storm_glass", amount = 8 }),
+    }),
+    -- Brother Anselm rang for a valley that had stopped answering. What
+    -- he wants now is the record of what happened kept.
+    quest_bell_keeping = table.freeze({
+        id = "quest_bell_keeping",
+        displayName = "WHAT THE BELLS REMEMBER",
+        objective = table.freeze({ kind = "fragments_recovered", threshold = 4 }),
+        reward = table.freeze({ materialId = "material_aurora_salt", amount = 6 }),
+    }),
+    -- Sister Ivy counted heads in a place where the count kept falling.
+    -- Eight people who trust you is the number she stopped at.
+    quest_vale_nursing = table.freeze({
+        id = "quest_vale_nursing",
+        displayName = "EIGHT WHO TRUST YOU",
+        objective = table.freeze({ kind = "residents_bonded", threshold = 8 }),
+        reward = table.freeze({ materialId = "material_ember_moss", amount = 8 }),
+    }),
+    -- Halvard kept a cold store through five winters of people asking him
+    -- to open it early. He measures a town by what it has finished.
+    quest_cold_stores = table.freeze({
+        id = "quest_cold_stores",
+        displayName = "EVERY CHAPTER CLOSED",
+        objective = table.freeze({ kind = "chapters_resolved", threshold = 5 }),
+        reward = table.freeze({ materialId = "material_thawed_iron", amount = 6 }),
+    }),
+    -- Maud gave her door away for years. She would like a town with
+    -- twelve of them standing.
+    quest_almshouse_doors = table.freeze({
+        id = "quest_almshouse_doors",
+        displayName = "TWELVE DOORS STANDING",
+        objective = table.freeze({ kind = "buildings_raised", threshold = 12 }),
+        reward = table.freeze({ materialId = "material_frostmere_wool", amount = 8 }),
+    }),
 }
 
 function QuestCatalog.isValid(id: any): boolean
@@ -19124,6 +19197,16 @@ export type Signals = {
     gearTraits: number,
     materialsBanked: number,
     residentsBonded: number,
+    --[[
+        The Reach's and the Vale's residents. Both of these are counts of
+        things the profile already stores -- resolved chapters and
+        recovered fragments -- for the same reason the milestone-7 group
+        was: a resident quest must not be the thing that introduces a new
+        piece of tracking, because then the quest owns a system and the
+        system cannot be changed without the quest noticing.
+    ]]
+    chaptersResolved: number,
+    fragmentsRecovered: number,
 }
 
 local function currentValue(kind: string, signals: Signals): number
@@ -19143,6 +19226,10 @@ local function currentValue(kind: string, signals: Signals): number
         return signals.materialsBanked
     elseif kind == "residents_bonded" then
         return signals.residentsBonded
+    elseif kind == "chapters_resolved" then
+        return signals.chaptersResolved
+    elseif kind == "fragments_recovered" then
+        return signals.fragmentsRecovered
     end
     return 0
 end
@@ -19489,6 +19576,14 @@ local GUIDANCE = table.freeze({
     npc_wren_dabbler = "PUT UP THREE DECORATIONS — THIS TOWN SHOULD LOOK LIVED IN",
     npc_marek_still = "CRAFT SIX THINGS AND LOOK TWICE AT EACH",
     npc_lissen_ford = "BE TRUSTED BY THREE RESIDENTS — CHECK ON THEM",
+    npc_isolde_maren = "KEEP THE LIGHT LIT FOURTEEN NIGHTS. I HAVE DONE LONGER FOR LESS",
+    npc_cass_pell = "MAKE TWENTY THINGS WITH YOUR HANDS AND I WILL TEACH YOU ROPE",
+    npc_alder_kine = "TWO HUNDRED IN THE STORES. I WANT TO SEE THE COLUMN IN BLACK ONCE",
+    npc_nell_barrow = "FOURTEEN TRIPS BACK FROM BRAMBLEWAKE — BACK IS THE PART THAT COUNTS",
+    npc_anselm_rill = "FIND FOUR OF WHAT THIS PLACE REMEMBERS. SOMEBODY SHOULD KEEP IT",
+    npc_ivy_thorn = "BE TRUSTED BY EIGHT OF US. I COUNT BY NAME, NOT BY HEAD",
+    npc_halvard_sunn = "CLOSE EVERY CHAPTER. A STORE IS ONLY FULL WHEN NOTHING IS STILL OPEN",
+    npc_maud_ferrow = "RAISE TWELVE BUILDINGS. TWELVE DOORS IS A TOWN, NOT A CAMP",
 })
 
 local ARRIVAL_LINES = table.freeze({
@@ -19500,6 +19595,14 @@ local ARRIVAL_LINES = table.freeze({
     npc_wren_dabbler = "I WOVE ONE FOR EVERY HOUSE THE WATER TOOK. NOW I WEAVE THEM FOR DOORS THAT STAND.",
     npc_marek_still = "LOOK TWICE AT WHAT YOU CARRY. THE FEN TAUGHT ME THAT AND IT COST IT NOTHING.",
     npc_lissen_ford = "EVERY HEAD COUNTED AT DUSK, AND EVERY ONE OF THEM KNOWS YOUR NAME. THAT IS THE WORK.",
+    npc_isolde_maren = "FOURTEEN NIGHTS AND THE LIGHT NEVER WENT OUT. NOBODY DROWNED LOOKING FOR IT.",
+    npc_cass_pell = "GOOD ROPE IS A PROMISE YOU CAN PULL ON. THIS TOWN HAS ENOUGH OF IT NOW.",
+    npc_alder_kine = "THE COLUMN IS IN BLACK. I HAVE NOT WRITTEN THAT SINCE THE HARBOUR WENT.",
+    npc_nell_barrow = "EVERY TRIP OUT CAME BACK. THAT IS THE ONLY LEDGER I HAVE EVER KEPT.",
+    npc_anselm_rill = "FOUR THINGS THIS PLACE REMEMBERS, AND SOMEONE ALIVE TO REMEMBER THEM.",
+    npc_ivy_thorn = "EIGHT NAMES, ALL OF THEM ANSWERING. THE ABBEY NEVER MANAGED THAT.",
+    npc_halvard_sunn = "NOTHING LEFT OPEN AND THE STORE STILL SHUT. THAT IS A WINTER SURVIVED.",
+    npc_maud_ferrow = "TWELVE DOORS, AND NOT ONE OF THEM MINE TO GIVE AWAY. GOOD.",
 })
 
 local function questById(quests: any, questId: string): any
@@ -20000,6 +20103,16 @@ local ORDER = table.freeze({
     "npc_wren_dabbler",
     "npc_marek_still",
     "npc_lissen_ford",
+    -- Tempest Reach, chapter IV
+    "npc_isolde_maren",
+    "npc_cass_pell",
+    "npc_alder_kine",
+    "npc_nell_barrow",
+    -- Frostmere Vale, chapter V
+    "npc_anselm_rill",
+    "npc_ivy_thorn",
+    "npc_halvard_sunn",
+    "npc_maud_ferrow",
 })
 
 local DEFINITIONS: { [string]: Resident } = {
@@ -20183,6 +20296,134 @@ local DEFINITIONS: { [string]: Resident } = {
             title = "FEN HEALER",
             boon = "dawn_recovery",
             boonLabel = "LISSEN GETS ONE INJURED RESIDENT BACK ON THEIR FEET",
+        },
+    }),
+    npc_isolde_maren = resident({
+        id = "npc_isolde_maren",
+        displayName = "ISOLDE",
+        fullName = "Isolde Maren",
+        homeRegion = "region_tempest",
+        arrivesInChapter = 4,
+        questId = "quest_signal_watch",
+        introduction = "Kept a light burning for ships that had already gone down. Keeps this one anyway.",
+        job = {
+            residentId = "npc_isolde_maren",
+            buildingId = "building_signal_house",
+            title = "SIGNAL KEEPER",
+            boon = "night_signal",
+            boonLabel = "ISOLDE SIGNALS THE HOUR BEFORE THE NIGHT TURNS",
+        },
+    }),
+    npc_cass_pell = resident({
+        id = "npc_cass_pell",
+        displayName = "CASS",
+        fullName = "Cass Pell",
+        homeRegion = "region_tempest",
+        arrivesInChapter = 4,
+        questId = "quest_ropewalk_hands",
+        introduction = "Laid rope for a fleet that never came back. Still says good rope is a promise.",
+        job = {
+            residentId = "npc_cass_pell",
+            buildingId = "building_ropewalk",
+            title = "ROPEMAKER",
+            boon = "dawn_rigging",
+            boonLabel = "CASS RE-RIGS WHAT THE NIGHT PULLED DOWN",
+        },
+    }),
+    npc_alder_kine = resident({
+        id = "npc_alder_kine",
+        displayName = "ALDER",
+        fullName = "Alder Kine",
+        homeRegion = "region_tempest",
+        arrivesInChapter = 4,
+        questId = "quest_harbour_ledger",
+        introduction = "Ran a harbour's books until there was no harbour. Would like to see full stores once.",
+        job = {
+            residentId = "npc_alder_kine",
+            buildingId = "building_trade_post",
+            title = "HARBOURMASTER",
+            boon = "dawn_tally",
+            boonLabel = "ALDER FINDS ONE MORE OF SOMETHING IN THE STORES",
+        },
+    }),
+    npc_nell_barrow = resident({
+        id = "npc_nell_barrow",
+        displayName = "NELL",
+        fullName = "Nell Barrow",
+        homeRegion = "region_tempest",
+        arrivesInChapter = 4,
+        questId = "quest_salvage_runs",
+        introduction = "Dives wrecks. Counts trips out and trips back, and only writes down the second.",
+        job = {
+            residentId = "npc_nell_barrow",
+            buildingId = "building_waterworks",
+            title = "SALVAGE DIVER",
+            boon = "dawn_salvage",
+            boonLabel = "NELL BRINGS UP SOMETHING THE NIGHT DROPPED",
+        },
+    }),
+    npc_anselm_rill = resident({
+        id = "npc_anselm_rill",
+        displayName = "ANSELM",
+        fullName = "Anselm Rill",
+        homeRegion = "region_frostmere",
+        arrivesInChapter = 5,
+        questId = "quest_bell_keeping",
+        introduction = "Rang for a valley that had stopped answering. Wants what happened written down.",
+        job = {
+            residentId = "npc_anselm_rill",
+            buildingId = "building_bell_tower",
+            title = "BELLKEEPER",
+            boon = "night_warning_bell",
+            boonLabel = "ANSELM RINGS THE HOUR AND NOTHING ARRIVES UNANNOUNCED",
+        },
+    }),
+    npc_ivy_thorn = resident({
+        id = "npc_ivy_thorn",
+        displayName = "IVY",
+        fullName = "Ivy Thorn",
+        homeRegion = "region_frostmere",
+        arrivesInChapter = 5,
+        questId = "quest_vale_nursing",
+        introduction = "Nursed an abbey through a winter that took most of it. Still counts by name.",
+        job = {
+            residentId = "npc_ivy_thorn",
+            buildingId = "building_infirmary",
+            title = "INFIRMARIAN",
+            boon = "dawn_convalescence",
+            boonLabel = "IVY GETS TWO INJURED RESIDENTS BACK ON THEIR FEET",
+        },
+    }),
+    npc_halvard_sunn = resident({
+        id = "npc_halvard_sunn",
+        displayName = "HALVARD",
+        fullName = "Halvard Sunn",
+        homeRegion = "region_frostmere",
+        arrivesInChapter = 5,
+        questId = "quest_cold_stores",
+        introduction = "Held a cold store shut through five winters of being asked to open it early.",
+        job = {
+            residentId = "npc_halvard_sunn",
+            buildingId = "building_cold_store",
+            title = "STOREKEEPER",
+            boon = "storage_headroom",
+            boonLabel = "HALVARD FINDS ROOM FOR WHAT WOULD HAVE SPOILED",
+        },
+    }),
+    npc_maud_ferrow = resident({
+        id = "npc_maud_ferrow",
+        displayName = "MAUD",
+        fullName = "Maud Ferrow",
+        homeRegion = "region_frostmere",
+        arrivesInChapter = 5,
+        questId = "quest_almshouse_doors",
+        introduction = "Gave her own door away for years. Would like a town with twelve of them standing.",
+        job = {
+            residentId = "npc_maud_ferrow",
+            buildingId = "building_almshouse",
+            title = "ALMONER",
+            boon = "dawn_shelter",
+            boonLabel = "MAUD FINDS A BED FOR WHOEVER CAME BACK WITH NOTHING",
         },
     }),
 }
@@ -21763,8 +22004,25 @@ local function questSignals(profile: Profile): Quests.Signals
             residentsBonded += 1
         end
     end
+    local chaptersResolved = 0
+    if (profile :: any).story.chapterOne.status == "complete" then
+        chaptersResolved += 1
+    end
+    for _, record in (profile :: any).story.chapters do
+        if type(record) == "table" and record.status == "complete" then
+            chaptersResolved += 1
+        end
+    end
+    local fragmentsRecovered = 0
+    for _, found in (profile :: any).story.fragments do
+        if found == true then
+            fragmentsRecovered += 1
+        end
+    end
     return {
         bramblewakeSettlements = #profile.inventory.settlementOrder,
+        chaptersResolved = chaptersResolved,
+        fragmentsRecovered = fragmentsRecovered,
         buildingsRaised = buildingsRaised,
         craftedItems = craftedItems,
         decorationsPlaced = decorationsPlaced,

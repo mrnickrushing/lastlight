@@ -16,6 +16,16 @@ export type Signals = {
     gearTraits: number,
     materialsBanked: number,
     residentsBonded: number,
+    --[[
+        The Reach's and the Vale's residents. Both of these are counts of
+        things the profile already stores -- resolved chapters and
+        recovered fragments -- for the same reason the milestone-7 group
+        was: a resident quest must not be the thing that introduces a new
+        piece of tracking, because then the quest owns a system and the
+        system cannot be changed without the quest noticing.
+    ]]
+    chaptersResolved: number,
+    fragmentsRecovered: number,
 }
 
 local function currentValue(kind: string, signals: Signals): number
@@ -35,6 +45,10 @@ local function currentValue(kind: string, signals: Signals): number
         return signals.materialsBanked
     elseif kind == "residents_bonded" then
         return signals.residentsBonded
+    elseif kind == "chapters_resolved" then
+        return signals.chaptersResolved
+    elseif kind == "fragments_recovered" then
+        return signals.fragmentsRecovered
     end
     return 0
 end

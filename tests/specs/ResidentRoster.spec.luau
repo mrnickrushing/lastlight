@@ -13,10 +13,10 @@ return {
     name = "ResidentRoster",
     cases = {
         {
-            name = "eleven residents, eight of them earned in the new regions",
+            name = "nineteen residents, sixteen of them earned in the new regions",
             run = function()
                 local roster = ResidentRoster.list()
-                TestRunner.equal(#roster, 11)
+                TestRunner.equal(#roster, 19)
                 local byRegion: { [string]: number } = {}
                 for _, definition in roster do
                     byRegion[definition.homeRegion] = (byRegion[definition.homeRegion] or 0) + 1
@@ -28,6 +28,8 @@ return {
                 TestRunner.equal(byRegion.region_bramblewake, 3)
                 TestRunner.equal(byRegion.region_ironroot, 4)
                 TestRunner.equal(byRegion.region_mireglass, 4)
+                TestRunner.equal(byRegion.region_tempest, 4)
+                TestRunner.equal(byRegion.region_frostmere, 4)
             end,
         },
         {
@@ -45,7 +47,9 @@ return {
                 TestRunner.equal(#ResidentRoster.idsForChapter(0), 3)
                 TestRunner.equal(#ResidentRoster.idsForChapter(2), 7)
                 TestRunner.equal(#ResidentRoster.idsForChapter(3), 11)
-                TestRunner.equal(#ResidentRoster.idsForChapter(9), 11)
+                TestRunner.equal(#ResidentRoster.idsForChapter(4), 15)
+                TestRunner.equal(#ResidentRoster.idsForChapter(5), 19)
+                TestRunner.equal(#ResidentRoster.idsForChapter(9), 19)
             end,
         },
         {

@@ -1,14 +1,17 @@
 --!strict
 
+local QuestCatalog = require("../../src/shared/QuestCatalog")
 local Quests = require("../../src/shared/Quests")
 local TestRunner = require("../TestRunner")
 
 local function signals(overrides: any): Quests.Signals
     return {
         bramblewakeSettlements = overrides.bramblewakeSettlements or 0,
+        chaptersResolved = overrides.chaptersResolved or 0,
         buildingsRaised = overrides.buildingsRaised or 0,
         craftedItems = overrides.craftedItems or 0,
         decorationsPlaced = overrides.decorationsPlaced or 0,
+        fragmentsRecovered = overrides.fragmentsRecovered or 0,
         gearTraits = overrides.gearTraits or 0,
         materialsBanked = overrides.materialsBanked or 0,
         nightsSurvived = overrides.nightsSurvived or 0,
@@ -19,6 +22,51 @@ end
 return {
     name = "Quests",
     cases = {
+        {
+            --[[
+                A quest whose objective kind nothing routes reads zero
+                forever: it shows in the log, never completes, and nothing
+                fails. That is how a resident ends up carrying a promise
+                the game cannot keep, so every kind in the catalog is
+                walked here rather than only the ones a case remembered.
+
+                Every signal is raised at once, so a kind with no case in
+                currentValue is the only way this can fail.
+            ]]
+            name = "every quest in the catalog names a signal the game actually feeds",
+            run = function()
+                local raised = signals({
+                    bramblewakeSettlements = 999,
+                    buildingsRaised = 999,
+                    chaptersResolved = 999,
+                    craftedItems = 999,
+                    decorationsPlaced = 999,
+                    fragmentsRecovered = 999,
+                    gearTraits = 999,
+                    materialsBanked = 999,
+                    nightsSurvived = 999,
+                    residentsBonded = 999,
+                })
+                local empty = signals({})
+                for _, quest in QuestCatalog.list() do
+                    local current, threshold, complete = Quests.progress(quest.id, raised)
+                    TestRunner.truthy(
+                        complete,
+                        quest.id
+                            .. " never completes: nothing feeds "
+                            .. tostring(quest.objective.kind)
+                    )
+                    TestRunner.truthy(current >= threshold)
+                    TestRunner.truthy(threshold > 0, quest.id .. " asks for nothing")
+                    local _, _, freshly = Quests.progress(quest.id, empty)
+                    TestRunner.equal(
+                        freshly,
+                        false,
+                        quest.id .. " is already complete on a fresh save"
+                    )
+                end
+            end,
+        },
         {
             name = "progress reports current value, threshold, and completion for each objective kind",
             run = function()
@@ -95,7 +143,6 @@ return {
         {
             name = "snapshot reports every catalog quest even when nothing is complete",
             run = function()
-                local QuestCatalog = require("../../src/shared/QuestCatalog")
                 local snapshot = Quests.snapshot(Quests.default(), signals({}))
                 -- the snapshot follows the catalog, so adding a resident's
                 -- quest never silently drops it from the Field Book

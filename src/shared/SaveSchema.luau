@@ -1113,8 +1113,25 @@ local function questSignals(profile: Profile): Quests.Signals
             residentsBonded += 1
         end
     end
+    local chaptersResolved = 0
+    if (profile :: any).story.chapterOne.status == "complete" then
+        chaptersResolved += 1
+    end
+    for _, record in (profile :: any).story.chapters do
+        if type(record) == "table" and record.status == "complete" then
+            chaptersResolved += 1
+        end
+    end
+    local fragmentsRecovered = 0
+    for _, found in (profile :: any).story.fragments do
+        if found == true then
+            fragmentsRecovered += 1
+        end
+    end
     return {
         bramblewakeSettlements = #profile.inventory.settlementOrder,
+        chaptersResolved = chaptersResolved,
+        fragmentsRecovered = fragmentsRecovered,
         buildingsRaised = buildingsRaised,
         craftedItems = craftedItems,
         decorationsPlaced = decorationsPlaced,
