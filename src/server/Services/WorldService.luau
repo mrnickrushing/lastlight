@@ -9600,6 +9600,74 @@ local function buildTownProgressionBuildings(
     )
     noteConstructionTarget("building_infirmary", "INFIRMARY", signAnchor(infirmary))
 
+    --[[
+        Tiers six and seven: the last six, and the only ones a town builds
+        after its story rather than during it. Same procedural shells as
+        the tier four and five group, same reason -- a reachable tier
+        needs something standing in it the day it opens, and swapping any
+        of them for an authored model later is one call each.
+    ]]
+    local glassworks = buildingShell(
+        "building_glassworks",
+        "GLASSWORKS",
+        Vector3.new(150, 0, -60),
+        Vector3.new(18, 0, 14),
+        stageFor("building_glassworks"),
+        Color3.fromRGB(180, 196, 206),
+        yawToward(Vector3.new(150, 0, -60), PLAZA)
+    )
+    noteConstructionTarget("building_glassworks", "GLASSWORKS", signAnchor(glassworks))
+    local memorialHall = buildingShell(
+        "building_memorial_hall",
+        "MEMORIAL HALL",
+        Vector3.new(-150, 0, -120),
+        Vector3.new(18, 0, 14),
+        stageFor("building_memorial_hall"),
+        Color3.fromRGB(148, 142, 134),
+        yawToward(Vector3.new(-150, 0, -120), PLAZA)
+    )
+    noteConstructionTarget("building_memorial_hall", "MEMORIAL HALL", signAnchor(memorialHall))
+    local recordsOffice = buildingShell(
+        "building_records_office",
+        "RECORDS OFFICE",
+        Vector3.new(92, 0, -166),
+        Vector3.new(16, 0, 12),
+        stageFor("building_records_office"),
+        Color3.fromRGB(160, 138, 100),
+        yawToward(Vector3.new(92, 0, -166), PLAZA)
+    )
+    noteConstructionTarget("building_records_office", "RECORDS OFFICE", signAnchor(recordsOffice))
+    local lampHouse = buildingShell(
+        "building_lamp_house",
+        "LAMP HOUSE",
+        Vector3.new(-70, 0, -226),
+        Vector3.new(16, 0, 12),
+        stageFor("building_lamp_house"),
+        Color3.fromRGB(255, 216, 150),
+        yawToward(Vector3.new(-70, 0, -226), PLAZA)
+    )
+    noteConstructionTarget("building_lamp_house", "LAMP HOUSE", signAnchor(lampHouse))
+    local deepWell = buildingShell(
+        "building_deep_well",
+        "DEEP WELL",
+        Vector3.new(-30, 0, -190),
+        Vector3.new(12, 0, 12),
+        stageFor("building_deep_well"),
+        Color3.fromRGB(96, 118, 128),
+        yawToward(Vector3.new(-30, 0, -190), PLAZA)
+    )
+    noteConstructionTarget("building_deep_well", "DEEP WELL", signAnchor(deepWell))
+    local meetingHall = buildingShell(
+        "building_meeting_hall",
+        "MEETING HALL",
+        Vector3.new(110, 0, -258),
+        Vector3.new(18, 0, 14),
+        stageFor("building_meeting_hall"),
+        Color3.fromRGB(196, 140, 79),
+        yawToward(Vector3.new(110, 0, -258), PLAZA)
+    )
+    noteConstructionTarget("building_meeting_hall", "MEETING HALL", signAnchor(meetingHall))
+
     local residentDefinitions = {
         npc_tomas_reed = {
             displayName = "TOMAS REED",
