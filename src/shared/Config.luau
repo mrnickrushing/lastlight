@@ -117,6 +117,13 @@ return table.freeze({
         -- message rather than cached, so turning this off stops them
         -- mid-session for everyone, roster included.
         admin_commands_enabled = true,
+        --[[
+            The six encounters the Delve and the Fen brought, behind one
+            switch. They cannot run at all until a region opens, so this
+            starts on: the flag is here to turn them off in a hurry if one
+            of them misbehaves in front of players, not to stage them in.
+        ]]
+        region_encounters_enabled = true,
         region_bramblewake_enabled = true,
         region_ironroot_enabled = false,
         region_mireglass_enabled = false,

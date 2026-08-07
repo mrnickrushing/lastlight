@@ -3263,6 +3263,13 @@ return table.freeze({
         -- message rather than cached, so turning this off stops them
         -- mid-session for everyone, roster included.
         admin_commands_enabled = true,
+        --[[
+            The six encounters the Delve and the Fen brought, behind one
+            switch. They cannot run at all until a region opens, so this
+            starts on: the flag is here to turn them off in a hurry if one
+            of them misbehaves in front of players, not to stage them in.
+        ]]
+        region_encounters_enabled = true,
         region_bramblewake_enabled = true,
         region_ironroot_enabled = false,
         region_mireglass_enabled = false,
@@ -33739,6 +33746,304 @@ return table.freeze(ProfileService)
         </Item>
         <Item class="ModuleScript" referent="116">
           <Properties>
+            <string name="Name">RegionEncounterService</string>
+            <string name="Source"><![CDATA[--!strict
+
+--[[
+    One service for the six encounters the new regions brought.
+
+    OldGrowthService and WardenStagService are each ~800 lines, and most
+    of those lines are the same lines: hold a state table, spawn a model,
+    watch who is in the arena, run a telegraph, route a strike, settle a
+    reward once. Writing that four more times for the elites and twice
+    more for the bosses would be five thousand lines of copy with five
+    thousand chances to diverge, and the divergences are exactly where
+    the bugs would live.
+
+    So the encounters describe themselves and this drives them. Each one
+    already exposes the same shape -- create, activate, join, strike,
+    snapshot, rewardTransactionId, Tuning, Reward -- because they were
+    written to the Old Growth's contract on purpose. What differs between
+    them is the verb in the middle: the Echo's levers, the Widow's
+    anchors, the Maw's lines and vents, the Many-Face's mirrors, the
+    Caller's pools, the Witch's copies. Those arrive as an interaction
+    table, so a fight's own rules stay in its own module and this file
+    stays the thing that makes any of them happen in a world.
+
+    Deliberately not here: model geometry (the arena builder owns that),
+    telegraph visuals (the enemy attack flow owns those), and anything
+    that would let a client assert progress. Every mutation below is
+    called by the server in answer to an interaction the world raised.
+]]
+
+local RunService = game:GetService("RunService")
+
+local RegionEncounterService = {}
+RegionEncounterService.__index = RegionEncounterService
+RegionEncounterService.Name = "RegionEncounterService"
+
+export type Logger = {
+    info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+    warn: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+}
+
+--[[
+    What an encounter has to tell this service about itself. The verbs
+    are optional because no two of these fights ask the same thing: the
+    Echo has levers and no windows, the Widow has windows and no levers,
+    the Witch has neither and asks a question instead.
+]]
+export type Definition = {
+    id: string,
+    regionId: string,
+    module: any,
+    -- interactionId -> what to do with it, server-side, on a real tap.
+    interactions: { [string]: (state: any, player: Player, now: number) -> (any, any) },
+    -- Called on the service's tick; returns a new state or nil for "no change".
+    tick: ((state: any, now: number) -> any?)?,
+}
+
+type Live = {
+    definition: Definition,
+    state: any,
+    anchors: { [string]: BasePart },
+}
+
+export type RegionEncounterService = typeof(setmetatable(
+    {} :: {
+        Name: string,
+        _logger: Logger,
+        _profileService: any,
+        _survivalService: any,
+        _featureFlags: any,
+        _runId: string,
+        _manifestHash: string,
+        _live: { [string]: Live },
+        _toastHandler: ((Player?, string) -> ())?,
+        _heartbeat: RBXScriptConnection?,
+    },
+    RegionEncounterService
+))
+
+function RegionEncounterService.new(
+    logger: Logger,
+    profileService: any,
+    survivalService: any,
+    featureFlags: any
+): RegionEncounterService
+    return setmetatable({
+        Name = RegionEncounterService.Name,
+        _logger = logger,
+        _profileService = profileService,
+        _survivalService = survivalService,
+        _featureFlags = featureFlags,
+        _runId = "",
+        _manifestHash = "",
+        _live = {},
+        _toastHandler = nil,
+        _heartbeat = nil,
+    }, RegionEncounterService)
+end
+
+function RegionEncounterService.Init(_self: RegionEncounterService, _context: any) end
+
+function RegionEncounterService.setToastHandler(
+    self: RegionEncounterService,
+    handler: (Player?, string) -> ()
+)
+    self._toastHandler = handler
+end
+
+function RegionEncounterService._toast(
+    self: RegionEncounterService,
+    player: Player?,
+    message: string?
+)
+    local handler = self._toastHandler
+    if handler ~= nil and message ~= nil and message ~= "" then
+        handler(player, message)
+    end
+end
+
+--[[
+    Bind a region's encounters to a run. Called when a region is built,
+    with the manifest hash that makes every reward id in the run unique
+    to it -- the same guarantee the Old Growth has had since it shipped,
+    and the reason a player cannot farm one elite by rejoining.
+]]
+function RegionEncounterService.beginRun(
+    self: RegionEncounterService,
+    runId: string,
+    manifestHash: string,
+    definitions: { Definition },
+    anchorsById: { [string]: { [string]: BasePart } }
+)
+    assert(runId ~= "", "encounter run id is required")
+    assert(manifestHash ~= "", "encounter manifest hash is required")
+    self._runId = runId
+    self._manifestHash = manifestHash
+    self._live = {}
+    for _, definition in definitions do
+        local enabled = self._featureFlags:isEnabled("region_encounters_enabled")
+        self._live[definition.id] = {
+            definition = definition,
+            state = definition.module.create(runId, manifestHash, enabled),
+            anchors = anchorsById[definition.id] or {},
+        }
+        self._logger:info("region_encounter_ready", {
+            encounter = definition.id,
+            enabled = enabled,
+            region = definition.regionId,
+        })
+    end
+end
+
+function RegionEncounterService.endRun(self: RegionEncounterService)
+    self._live = {}
+end
+
+--[[
+    A player taps something in an arena. The interaction table decides
+    what that means to this fight, and the fight's own module decides
+    whether it was allowed -- this only carries the answer back out.
+]]
+function RegionEncounterService.interact(
+    self: RegionEncounterService,
+    player: Player,
+    encounterId: string,
+    interactionId: string
+): boolean
+    local live = self._live[encounterId]
+    if live == nil then
+        return false
+    end
+    if not self._survivalService:canAct(player) then
+        self:_toast(player, "YOU CANNOT DO THAT WHILE DOWNED")
+        return false
+    end
+    local handler = live.definition.interactions[interactionId]
+    if handler == nil then
+        return false
+    end
+    local nextState, result = handler(live.state, player, workspace:GetServerTimeNow())
+    if nextState ~= nil then
+        live.state = nextState
+    end
+    if type(result) == "table" then
+        self:_toast(player, result.message)
+        if result.completed == true then
+            self:_settle(player, live)
+        end
+    end
+    return true
+end
+
+--[[
+    Strike whichever encounter this player is standing in. Returns the
+    same (landed, message) shape EnemyService.damageNearest does, because
+    the strike path routes through one call site and every encounter that
+    answers it has to answer it the same way.
+]]
+function RegionEncounterService.damageNearest(
+    self: RegionEncounterService,
+    player: Player,
+    encounterId: string,
+    amount: number
+): (boolean, string)
+    local live = self._live[encounterId]
+    if live == nil then
+        return false, "No encounter is active."
+    end
+    if not self._survivalService:canAct(player) then
+        return false, "You cannot strike while downed."
+    end
+    local strike = live.definition.module.strike
+    local nextState, result =
+        strike(live.state, player.UserId, amount, workspace:GetServerTimeNow())
+    live.state = nextState
+    if type(result) ~= "table" or result.accepted ~= true then
+        local snapshot = live.definition.module.snapshot(live.state, player.UserId, 0)
+        return false, tostring(snapshot.instruction)
+    end
+    if result.completed == true then
+        self:_settle(player, live)
+    end
+    return true, tostring(result.reason)
+end
+
+--[[
+    Pay the encounter out, once per participant per run. The transaction
+    id is the encounter's own, which is what makes a rejoin idempotent:
+    the ledger has seen that id before and refuses the second grant
+    without anyone here having to remember.
+]]
+function RegionEncounterService._settle(self: RegionEncounterService, player: Player, live: Live)
+    local reward = live.definition.module.Reward
+    if type(reward) ~= "table" then
+        return
+    end
+    local transactionId = live.definition.module.rewardTransactionId(live.state, player.UserId)
+    local result = self._profileService:grantUnbankedExpeditionReward(
+        player,
+        transactionId,
+        self._manifestHash,
+        { materialId = reward.materialId, amount = reward.amount }
+    )
+    self._logger:info("region_encounter_settled", {
+        applied = if type(result) == "table" then result.applied else nil,
+        encounter = live.definition.id,
+        player = player.UserId,
+    })
+end
+
+function RegionEncounterService.snapshot(
+    self: RegionEncounterService,
+    player: Player,
+    encounterId: string
+): any
+    local live = self._live[encounterId]
+    if live == nil then
+        return nil
+    end
+    return live.definition.module.snapshot(live.state, player.UserId, workspace:GetServerTimeNow())
+end
+
+function RegionEncounterService.activeIds(self: RegionEncounterService): { string }
+    local ids: { string } = {}
+    for encounterId in self._live do
+        table.insert(ids, encounterId)
+    end
+    table.sort(ids)
+    return ids
+end
+
+function RegionEncounterService.Start(self: RegionEncounterService)
+    local accumulator = 0
+    self._heartbeat = RunService.Heartbeat:Connect(function(deltaTime: number)
+        accumulator += deltaTime
+        if accumulator < 0.25 then
+            return
+        end
+        accumulator = 0
+        local now = workspace:GetServerTimeNow()
+        for _, live in self._live do
+            local tick = live.definition.tick
+            if tick ~= nil then
+                local nextState = tick(live.state, now)
+                if nextState ~= nil then
+                    live.state = nextState
+                end
+            end
+        end
+    end)
+end
+
+return table.freeze(RegionEncounterService)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="117">
+          <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
 
@@ -34362,7 +34667,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="117">
+        <Item class="ModuleScript" referent="118">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -36393,7 +36698,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="118">
+        <Item class="ModuleScript" referent="119">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -37262,7 +37567,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="119">
+        <Item class="ModuleScript" referent="120">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49548,11 +49853,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="120">
+      <Item class="Folder" referent="121">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="121">
+        <Item class="ModuleScript" referent="122">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -53332,7 +53637,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="122">
+        <Item class="ModuleScript" referent="123">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -54431,7 +54736,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="123">
+        <Item class="ModuleScript" referent="124">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -55126,7 +55431,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="124">
+        <Item class="ModuleScript" referent="125">
           <Properties>
             <string name="Name">IronrootBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -56141,7 +56446,7 @@ return table.freeze(IronrootBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="125">
+        <Item class="ModuleScript" referent="126">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -57000,7 +57305,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="126">
+        <Item class="ModuleScript" referent="127">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -57086,7 +57391,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="127">
+        <Item class="ModuleScript" referent="128">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -57460,7 +57765,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="128">
+        <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">MireglassBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -58216,7 +58521,7 @@ return table.freeze(MireglassBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="129">
+        <Item class="ModuleScript" referent="130">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -58396,7 +58701,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="130">
+        <Item class="ModuleScript" referent="131">
           <Properties>
             <string name="Name">RegionBuilders</string>
             <string name="Source"><![CDATA[--!strict
@@ -58441,7 +58746,6 @@ local ENTRIES: { [string]: any } = {
         builder = IronrootBuilder,
         walkable = false,
         missing = {
-            "encounter services to drive the arenas",
             "wayfinding and mesh dressing",
         },
     },
@@ -58449,7 +58753,6 @@ local ENTRIES: { [string]: any } = {
         builder = MireglassBuilder,
         walkable = false,
         missing = {
-            "encounter services to drive the arenas",
             "wayfinding and mesh dressing",
         },
     },
@@ -58937,7 +59240,7 @@ return table.freeze(RegionBuilders)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -59533,7 +59836,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -59770,7 +60073,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -59859,7 +60162,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="134">
+        <Item class="ModuleScript" referent="135">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -60196,15 +60499,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="135">
+  <Item class="StarterPlayer" referent="136">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="136">
+    <Item class="StarterPlayerScripts" referent="137">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="137">
+      <Item class="LocalScript" referent="138">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -60503,11 +60806,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="138">
+        <Item class="Folder" referent="139">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="139">
+          <Item class="ModuleScript" referent="140">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -60638,7 +60941,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="140">
+          <Item class="ModuleScript" referent="141">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -63584,7 +63887,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="141">
+          <Item class="ModuleScript" referent="142">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -63883,7 +64186,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="142">
+          <Item class="ModuleScript" referent="143">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -63991,7 +64294,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="143">
+          <Item class="ModuleScript" referent="144">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64110,7 +64413,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="144">
+          <Item class="ModuleScript" referent="145">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64384,7 +64687,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="145">
+          <Item class="ModuleScript" referent="146">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64484,7 +64787,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="146">
+          <Item class="ModuleScript" referent="147">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64596,7 +64899,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="147">
+          <Item class="ModuleScript" referent="148">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64756,7 +65059,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="148">
+          <Item class="ModuleScript" referent="149">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64965,7 +65268,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="149">
+          <Item class="ModuleScript" referent="150">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -65110,7 +65413,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="150">
+          <Item class="ModuleScript" referent="151">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -65410,13 +65713,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="151">
+  <Item class="TextChatService" referent="152">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="152">
+  <Item class="Workspace" referent="153">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>
