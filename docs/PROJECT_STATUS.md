@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-07, at `main` = `HEAD` (PR #304), build `0.53.0`,
-save schema 21, 23 services. Published to Roblox as place version 128,
+Last updated: 2026-08-07, at `main` = `HEAD` (PR #313), build `0.53.0`,
+save schema 21, 23 services. Published to Roblox as place version 129,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 7 through 10 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** Studio is
@@ -46,6 +46,28 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#306–#313** (v129) **the reachability sweep, which is the most
+  important thing in this header.** A live Studio pass — possible at all
+  because #307 finally made the tutorial skippable in Studio, where it
+  belongs, in TutorialService rather than ProfileService — went to look
+  at two rewritten HUD surfaces and instead found that **120 of the 130
+  recipes had no bench to be crafted at** (#309, fixed in #310 by
+  deriving benches and interaction ids from the catalog), and then, on
+  asking the same question about people, that **24 of the 27 residents
+  had no body in the town** (#311, fixed in #313 by deriving a body from
+  the roster when none is authored).
+
+  Both had passed every spec for a milestone. The generalisation is
+  written into CONTENT_CATALOG.md beside them and is the thing to carry
+  forward: **a thing existing in a catalog and a thing being reachable in
+  the world are different facts, and only the first one is easy to
+  test.** Anywhere a hand-written table in WorldService mirrors a shared
+  catalog deserves the same suspicion. Decorations, town buildings and
+  encounter arenas were swept and are clean (#312).
+
+  Both census cases now assert the *derivation* rather than the count,
+  because in both cases the silent fallback — a skipped resident, a
+  missing bench — is exactly what made the gap invisible.
 - **#304** (v128) **Mastery trials and region mysteries** — the two quest
   families that had a dependency rather than a design problem. Objectives
   can now be *keyed*: one names a profession, another names a region, and
