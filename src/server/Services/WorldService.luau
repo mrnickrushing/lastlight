@@ -1904,7 +1904,9 @@ function WorldService.new(
     professionAbilityVisuals: any,
     townConstruction: any,
     memoryFragments: any,
-    townDecorations: any
+    townDecorations: any,
+    craftingCatalog: any,
+    consumables: any
 ): WorldService
     return setmetatable({
         Name = WorldService.Name,
@@ -1914,6 +1916,8 @@ function WorldService.new(
         _professionAbilityVisuals = professionAbilityVisuals,
         _memoryFragments = memoryFragments,
         _memoryFragmentTargets = {},
+        _craftingCatalog = craftingCatalog,
+        _consumables = consumables,
         _runtimeIds = nil,
         _world = nil,
         _interactions = {},
@@ -6127,7 +6131,56 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             color = Color3.fromRGB(112, 151, 119),
         },
     }
+    --[[
+        Every other recipe gets a bench too.
+
+        The ten above are authored: bespoke marker shapes, sizes and
+        materials, because they are the ten a player meets first and they
+        should look like the things they make. They were also, for one
+        milestone, the *only* benches -- the list was written when there
+        were ten recipes and did not grow with the catalog, so a hundred
+        and twenty recipes shipped that nobody could craft. Every spec
+        passed; a recipe existing and a recipe being reachable are
+        different facts, and only walking to the workshop found it.
+
+        So the rest are derived rather than authored: same bench, same
+        prompt, a marker coloured from what the recipe makes -- a
+        consumable's own accent, or amber for gear -- laid out in rows
+        behind the front one. The interaction id is derived too
+        (`craft:<recipeId>`), which is what stops this list from ever
+        needing a hand-written constant again.
+    ]]
+    local authored: { [string]: boolean } = {}
     for _, definition in craftingBenches do
+        authored[definition.recipeId] = true
+    end
+    local derivedIndex = 0
+    for _, recipe in self._craftingCatalog:list() do
+        if not authored[recipe.id] then
+            local column = derivedIndex % 13
+            local row = math.floor(derivedIndex / 13)
+            derivedIndex += 1
+            local consumable = self._consumables.get(recipe.outputItemId)
+            local accent = if consumable ~= nil
+                then Color3.fromRGB(
+                    consumable.accent[1],
+                    consumable.accent[2],
+                    consumable.accent[3]
+                )
+                else Color3.fromRGB(214, 172, 88)
+            table.insert(craftingBenches, {
+                color = accent,
+                id = "craft:" .. recipe.id,
+                label = recipe.displayName,
+                recipeId = recipe.id,
+                x = -72 + column * 12,
+                z = workshopZ + 14 + row * 13,
+            })
+        end
+    end
+
+    for _, definition in craftingBenches do
+        local benchZ = definition.z or workshopZ
         local display = Instance.new("Model")
         display.Name = "CraftingDisplay_" .. definition.recipeId
         display:SetAttribute("RecipeId", definition.recipeId)
@@ -6137,7 +6190,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             display,
             "CraftingBench_" .. definition.recipeId,
             Vector3.new(6, 2.6, 6),
-            CFrame.new(definition.x, 1.3, workshopZ),
+            CFrame.new(definition.x, 1.3, benchZ),
             Color3.fromRGB(66, 70, 65),
             Enum.Material.Slate
         )
@@ -6148,7 +6201,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             display,
             "CraftingTableTop",
             Vector3.new(6.4, 0.55, 4.8),
-            CFrame.new(definition.x, 3.15, workshopZ),
+            CFrame.new(definition.x, 3.15, benchZ),
             Color3.fromRGB(91, 64, 44),
             Enum.Material.WoodPlanks
         )
@@ -6158,7 +6211,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                     display,
                     "CraftingTableLeg",
                     Vector3.new(0.55, 3.15, 0.55),
-                    CFrame.new(definition.x + side * 2.65, 1.57, workshopZ + depth * 1.85)
+                    CFrame.new(definition.x + side * 2.65, 1.57, benchZ + depth * 1.85)
                         * CFrame.Angles(0, 0, math.rad(side * 3)),
                     WET_BARK,
                     Enum.Material.Wood
@@ -6169,7 +6222,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             display,
             "CraftingWorkbenchApron",
             Vector3.new(5.4, 0.75, 0.42),
-            CFrame.new(definition.x, 2.55, workshopZ + 2.18),
+            CFrame.new(definition.x, 2.55, benchZ + 2.18),
             Color3.fromRGB(68, 48, 36),
             Enum.Material.Wood,
             false
@@ -6178,7 +6231,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             display,
             "CraftingBenchGlow",
             Vector3.new(2, 3.4, 2),
-            CFrame.new(definition.x, 4.3, workshopZ),
+            CFrame.new(definition.x, 4.3, benchZ),
             definition.color,
             Enum.Material.Neon,
             false
@@ -6206,7 +6259,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "SatchelFlap",
                 Vector3.new(2.35, 0.32, 1.1),
-                CFrame.new(definition.x, 4.72, workshopZ + 0.36) * CFrame.Angles(math.rad(18), 0, 0),
+                CFrame.new(definition.x, 4.72, benchZ + 0.36) * CFrame.Angles(math.rad(18), 0, 0),
                 Color3.fromRGB(103, 128, 84),
                 Enum.Material.Fabric,
                 false
@@ -6216,7 +6269,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                     display,
                     "SatchelStrap",
                     Vector3.new(0.22, 2.4, 0.22),
-                    CFrame.new(definition.x + strapSide * 1.05, 4.65, workshopZ - 0.2)
+                    CFrame.new(definition.x + strapSide * 1.05, 4.65, benchZ - 0.2)
                         * CFrame.Angles(0, 0, math.rad(strapSide * 24)),
                     Color3.fromRGB(78, 58, 41),
                     Enum.Material.Fabric,
@@ -6228,7 +6281,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "AmberCharmRing",
                 Vector3.new(0.32, 2.4, 2.4),
-                CFrame.new(definition.x, 4.55, workshopZ) * CFrame.Angles(0, math.rad(90), 0),
+                CFrame.new(definition.x, 4.55, benchZ) * CFrame.Angles(0, math.rad(90), 0),
                 Color3.fromRGB(126, 97, 54),
                 Enum.Material.Metal,
                 false
@@ -6238,7 +6291,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "AmberCharmCord",
                 Vector3.new(0.2, 1.7, 0.2),
-                CFrame.new(definition.x, 5.8, workshopZ),
+                CFrame.new(definition.x, 5.8, benchZ),
                 Color3.fromRGB(73, 54, 38),
                 Enum.Material.Fabric,
                 false
@@ -6248,7 +6301,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "HoodShoulders",
                 Vector3.new(3.6, 0.55, 1.45),
-                CFrame.new(definition.x, 3.82, workshopZ),
+                CFrame.new(definition.x, 3.82, benchZ),
                 Color3.fromRGB(75, 91, 81),
                 Enum.Material.Fabric,
                 false
@@ -6257,7 +6310,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "HoodStand",
                 Vector3.new(0.34, 2.5, 0.34),
-                CFrame.new(definition.x, 4.45, workshopZ),
+                CFrame.new(definition.x, 4.45, benchZ),
                 Color3.fromRGB(76, 55, 39),
                 Enum.Material.Wood,
                 false
@@ -6272,7 +6325,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                     display,
                     "BrambleBoot",
                     Vector3.new(0.92, 1.45, 1.9),
-                    CFrame.new(definition.x + bootSide * 0.72, 4.05, workshopZ + 0.28)
+                    CFrame.new(definition.x + bootSide * 0.72, 4.05, benchZ + 0.28)
                         * CFrame.Angles(0, math.rad(bootSide * 8), 0),
                     Color3.fromRGB(103, 76, 54),
                     Enum.Material.Leather,
@@ -6284,7 +6337,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "BowSampleStave",
                 Vector3.new(0.3, 3, 0.5),
-                CFrame.new(definition.x + 0.35, 4.6, workshopZ) * CFrame.Angles(0, 0, math.rad(14)),
+                CFrame.new(definition.x + 0.35, 4.6, benchZ) * CFrame.Angles(0, 0, math.rad(14)),
                 Color3.fromRGB(112, 84, 52),
                 Enum.Material.Wood,
                 false
@@ -6293,7 +6346,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "BowSampleString",
                 Vector3.new(0.08, 2.8, 0.08),
-                CFrame.new(definition.x - 0.45, 4.6, workshopZ),
+                CFrame.new(definition.x - 0.45, 4.6, benchZ),
                 Color3.fromRGB(214, 205, 186),
                 Enum.Material.Fabric,
                 false
@@ -6303,7 +6356,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "MaulSampleHaft",
                 Vector3.new(0.4, 3.1, 0.4),
-                CFrame.new(definition.x, 4.55, workshopZ) * CFrame.Angles(0, 0, math.rad(-18)),
+                CFrame.new(definition.x, 4.55, benchZ) * CFrame.Angles(0, 0, math.rad(-18)),
                 Color3.fromRGB(96, 68, 44),
                 Enum.Material.Wood,
                 false
@@ -6312,7 +6365,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "MaulSampleHead",
                 Vector3.new(1.9, 1.15, 1.15),
-                CFrame.new(definition.x + 0.5, 5.9, workshopZ) * CFrame.Angles(0, 0, math.rad(-18)),
+                CFrame.new(definition.x + 0.5, 5.9, benchZ) * CFrame.Angles(0, 0, math.rad(-18)),
                 Color3.fromRGB(139, 98, 54),
                 Enum.Material.Wood,
                 false
@@ -6322,7 +6375,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "LanceSampleShaft",
                 Vector3.new(0.32, 4.4, 0.32),
-                CFrame.new(definition.x, 4.9, workshopZ) * CFrame.Angles(0, 0, math.rad(24)),
+                CFrame.new(definition.x, 4.9, benchZ) * CFrame.Angles(0, 0, math.rad(24)),
                 Color3.fromRGB(104, 128, 68),
                 Enum.Material.Wood,
                 false
@@ -6331,7 +6384,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "LanceSampleTip",
                 Vector3.new(0.5, 1.1, 0.5),
-                CFrame.new(definition.x - 0.95, 6.85, workshopZ) * CFrame.Angles(0, 0, math.rad(24)),
+                CFrame.new(definition.x - 0.95, 6.85, benchZ) * CFrame.Angles(0, 0, math.rad(24)),
                 Color3.fromRGB(74, 96, 46),
                 Enum.Material.Wood,
                 false
@@ -6342,7 +6395,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "SlingSampleStrap",
                 Vector3.new(0.22, 2.6, 0.22),
-                CFrame.new(definition.x, 4.7, workshopZ) * CFrame.Angles(0, 0, math.rad(32)),
+                CFrame.new(definition.x, 4.7, benchZ) * CFrame.Angles(0, 0, math.rad(32)),
                 Color3.fromRGB(78, 58, 41),
                 Enum.Material.Fabric,
                 false
@@ -6351,7 +6404,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "SlingSamplePouch",
                 Vector3.new(0.95, 0.7, 0.95),
-                CFrame.new(definition.x - 0.75, 3.75, workshopZ),
+                CFrame.new(definition.x - 0.75, 3.75, benchZ),
                 Color3.fromRGB(94, 206, 176),
                 Enum.Material.Fabric,
                 false
@@ -6362,7 +6415,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "EdgeSampleBlade",
                 Vector3.new(0.35, 2.5, 0.9),
-                CFrame.new(definition.x + 0.2, 4.95, workshopZ) * CFrame.Angles(0, 0, math.rad(-9)),
+                CFrame.new(definition.x + 0.2, 4.95, benchZ) * CFrame.Angles(0, 0, math.rad(-9)),
                 Color3.fromRGB(255, 197, 106),
                 Enum.Material.Glass,
                 false
@@ -6372,7 +6425,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "EdgeSampleGrip",
                 Vector3.new(0.42, 1.05, 0.42),
-                CFrame.new(definition.x - 0.15, 3.6, workshopZ) * CFrame.Angles(0, 0, math.rad(-9)),
+                CFrame.new(definition.x - 0.15, 3.6, benchZ) * CFrame.Angles(0, 0, math.rad(-9)),
                 Color3.fromRGB(73, 54, 38),
                 Enum.Material.Leather,
                 false
@@ -6384,7 +6437,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "CudgelSampleShaft",
                 Vector3.new(0.45, 2.7, 0.45),
-                CFrame.new(definition.x, 4.5, workshopZ) * CFrame.Angles(0, 0, math.rad(12)),
+                CFrame.new(definition.x, 4.5, benchZ) * CFrame.Angles(0, 0, math.rad(12)),
                 Color3.fromRGB(91, 62, 40),
                 Enum.Material.Wood,
                 false
@@ -6393,7 +6446,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "CudgelSampleHead",
                 Vector3.new(1, 1, 1),
-                CFrame.new(definition.x - 0.35, 5.85, workshopZ),
+                CFrame.new(definition.x - 0.35, 5.85, benchZ),
                 Color3.fromRGB(112, 151, 119),
                 Enum.Material.Wood,
                 false

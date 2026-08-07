@@ -122,7 +122,9 @@ local worldService = WorldService.new(
     ProfessionAbilityVisuals,
     TownConstruction,
     MemoryFragments,
-    TownDecorations
+    TownDecorations,
+    CraftingCatalog,
+    Consumables
 )
 --[[
     The third gate on a region, after its enabled flag and its chapter:

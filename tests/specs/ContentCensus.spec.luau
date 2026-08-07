@@ -254,57 +254,51 @@ return {
                 file quietly assumes.
 
                 A recipe exists when it is in the catalog. A recipe is
-                *craftable* when something in the world offers it, and the
-                two are not the same: the benches are a hardcoded list in
-                WorldService, one entry per recipe, each needing its own
-                id in RuntimeIds.InteractionIds. Ten of them were written
-                by hand and never grew.
+                *craftable* when something in the world offers it, and for
+                one milestone those were different numbers: the benches
+                were a hardcoded list of ten, written when there were ten
+                recipes, and 120 shipped that nobody could make. Every
+                spec passed. Only walking to the workshop found it.
 
-                So 120 of the 130 recipes cannot be made by anybody. Every
-                spec passes, the equipment exists, the visual plans exist,
-                the equip panel has a button for each -- and there is no
-                bench. A live Studio session found this by walking to the
-                workshop and counting; nothing in the suite could, because
-                nothing in the suite asked.
-
-                This asserts the gap at its real size rather than the size
-                anyone would like it to be. Closing it means deriving the
-                benches from CraftingCatalog.list() and giving the
-                interaction id a derivable form (`craft:<recipeId>`)
-                instead of one hand-written constant per recipe.
+                The benches are derived from the catalog now, so this
+                reads the source and refuses a return to a hand-written
+                list -- one authored table for the original ten, and every
+                other recipe deriving its bench and its interaction id
+                from its own entry.
             ]]
-            name = "the crafting benches in the world are a hardcoded ten, not the whole catalog",
+            name = "every recipe has a bench, and the bench list is derived rather than written",
             run = function()
                 local fs = require("@lune/fs")
                 local world = fs.readFile("src/server/Services/WorldService.luau")
-                local benched: { [string]: boolean } = {}
-                local count = 0
-                for recipeId in string.gmatch(world, 'recipeId = "(recipe_[a-z_]+)"') do
-                    if not benched[recipeId] then
-                        benched[recipeId] = true
-                        count += 1
-                    end
-                end
-                TestRunner.equal(count, 10, "the bench list changed size")
-
-                local unreachable = 0
-                for _, recipe in CraftingCatalog.list() do
-                    if not benched[recipe.id] then
-                        unreachable += 1
-                    end
-                end
-                TestRunner.equal(
-                    unreachable,
-                    120,
-                    "the number of recipes nobody can craft moved -- if it went down, "
-                        .. "lower this number; if it went up, something shipped unreachable"
+                --[[
+                    The derivation itself, named exactly: a loop over the
+                    crafting catalog that inserts a bench per recipe, with
+                    an id derived from the recipe rather than a constant.
+                ]]
+                TestRunner.truthy(
+                    string.find(world, "for _, recipe in self._craftingCatalog:list() do", 1, true)
+                        ~= nil,
+                    "the benches no longer derive from the crafting catalog"
                 )
-                -- and the ten that are reachable are the originals, so a
-                -- fresh player's path through the game still works
+                TestRunner.truthy(
+                    string.find(world, 'id = "craft:" .. recipe.id', 1, true) ~= nil,
+                    "bench interaction ids are no longer derived from the recipe"
+                )
+
+                -- the authored ten keep their bespoke benches, because
+                -- they are the ten a fresh player meets first
+                local authored = 0
+                for _ in string.gmatch(world, 'recipeId = "(recipe_[a-z_]+)"') do
+                    authored += 1
+                end
+                TestRunner.equal(authored, 10, "the authored bench list changed size")
                 for _, recipeId in
                     { "recipe_meadow_satchel", "recipe_amber_charm", "recipe_thornwood_bow" }
                 do
-                    TestRunner.equal(benched[recipeId], true, recipeId .. " lost its bench")
+                    TestRunner.truthy(
+                        string.find(world, 'recipeId = "' .. recipeId .. '"', 1, true) ~= nil,
+                        recipeId .. " lost its authored bench"
+                    )
                 end
             end,
         },
