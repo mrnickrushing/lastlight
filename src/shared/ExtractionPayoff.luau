@@ -21,6 +21,12 @@ local PRESENTATION = table.freeze({
     material_witchlight_pollen = table.freeze({ kind = "pollen", label = "WITCHLIGHT POLLEN" }),
     material_eel_oil = table.freeze({ kind = "eel_oil", label = "EEL OIL" }),
     material_blackwater_herb = table.freeze({ kind = "herb", label = "BLACKWATER HERB" }),
+    -- Tempest Reach
+    material_storm_glass = table.freeze({ kind = "storm_glass", label = "STORM GLASS" }),
+    material_salt_kelp = table.freeze({ kind = "kelp", label = "SALT KELP" }),
+    material_ships_iron = table.freeze({ kind = "ships_iron", label = "SHIP'S IRON" }),
+    material_rope_fiber = table.freeze({ kind = "rope", label = "ROPE FIBER" }),
+    material_amberglass = table.freeze({ kind = "amberglass", label = "AMBERGLASS" }),
 })
 
 export type Entry = {
