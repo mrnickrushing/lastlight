@@ -319,6 +319,11 @@ return {
                 from their arrival order. This reads the source and
                 refuses a return to the skip, because the skip is what
                 made the gap invisible.
+
+                The derivation is a floor and stays one; the count that
+                moves is how far above it the authoring has got. Eleven
+                now, chapters I through III, and the assertion is here so
+                that number can only go up on purpose.
             ]]
             name = "a resident with no authored body derives one rather than being skipped",
             run = function()
@@ -346,14 +351,29 @@ return {
                     )
                 end
 
-                -- the three authored ones keep their authored bodies
+                -- the authored ones keep their authored bodies: chapter
+                -- one's three, the Delve's four and the Fen's four
                 local built = 0
-                for _, residentId in { "npc_tomas_reed", "npc_pip_wren", "npc_ena_moss" } do
+                for _, residentId in
+                    {
+                        "npc_tomas_reed",
+                        "npc_pip_wren",
+                        "npc_ena_moss",
+                        "npc_hesper_vane",
+                        "npc_odell_crane",
+                        "npc_junie_falk",
+                        "npc_bartram_hoke",
+                        "npc_saoirse_quill",
+                        "npc_wren_dabbler",
+                        "npc_marek_still",
+                        "npc_lissen_ford",
+                    }
+                do
                     if string.find(world, residentId .. " = {", 1, true) ~= nil then
                         built += 1
                     end
                 end
-                TestRunner.equal(built, 3, "an authored resident lost their body")
+                TestRunner.equal(built, 11, "an authored resident lost their body")
             end,
         },
         {

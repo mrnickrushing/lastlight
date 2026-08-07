@@ -356,9 +356,16 @@ Fixed the way the gear visuals were: an unauthored resident derives a
 body from the roster rather than being skipped — their own name and job
 title, a palette from the region they walked out of, and a spot worked
 out from their arrival order so no two share one. It is a floor rather
-than an art pass, and each derived body says so. Chapter one's three keep
-their authored bodies. The census reads the source and refuses a return
-to the skip, because the skip is what made the gap invisible.
+than an art pass, and each derived body says so. The census reads the
+source and refuses a return to the skip, because the skip is what made
+the gap invisible.
+
+Eleven of the twenty-seven are authored above that floor: chapter one's
+three, and the eight who arrive with chapters II and III, each standing
+at the building the roster gives them the job at with their own colours,
+their own prop and their own evening. The remaining sixteen — chapters IV
+through VII — still derive, and the census asserts the count of authored
+bodies so raising it stays a deliberate act rather than a drift.
 
 **Recipes (fixed): 120 of the 130 could not be crafted.** The workshop's benches were a
 hardcoded list of ten in `WorldService`, each needing its own constant in

@@ -163,6 +163,19 @@ local FOLIAGE_TONE: FoliageBuilder.Tone = {
     stoneWarm = Color3.fromRGB(88, 84, 74),
 }
 
+--[[
+    One piece of the thing a resident is carrying, positioned in the grip's
+    own space: +Y up out of the fist, -Z forward along the forearm.
+]]
+type ResidentPropPiece = {
+    color: Color3,
+    material: Enum.Material,
+    offset: CFrame,
+    shape: Enum.PartType?,
+    size: Vector3,
+    transparency: number?,
+}
+
 type MeshPlacement = {
     assetId: string,
     fallbackKind: string,
@@ -9775,6 +9788,399 @@ local function buildTownProgressionBuildings(
         },
     }
 
+    --[[
+        What a resident is holding, keyed by the prop their definition
+        names.
+
+        This was two inline branches and an `else`, which is a fine shape
+        for three people and stops being one at eleven: the `else` was the
+        seedkeeper's basket, so every prop nobody had written a branch for
+        would have come out as her green box. A smith carrying a basket
+        says the wrong thing about the smith, and says it silently.
+
+        Each prop is an assembly rather than one block, because one block
+        is what a hammer, a ladle and a pair of shears all look like --
+        the visual standard's rule is that recolouring a cube is not
+        construction, and a prop held in the hand is the closest piece of
+        art in the game to a player's eye when they walk up to talk to
+        somebody. A hammer is a haft with a head on it; a ladle is a shaft
+        with a bowl; shears are two blades on a pivot. The three that were
+        already here are built the same way now, basket included, because
+        the standard does not have a grandfather clause.
+    ]]
+    -- A Roblox cylinder lies on its side by default -- its flat faces are
+    -- the two X faces -- so anything meant to stand up as a vessel has to
+    -- be tipped a quarter turn first, and its size reads (height,
+    -- diameter, diameter) afterwards.
+    local UPRIGHT_CYLINDER = CFrame.Angles(0, 0, math.rad(90))
+
+    local RESIDENT_PROPS: { [string]: { ResidentPropPiece } } = {
+        -- Round, with a bail handle over it on two arms. Photographed
+        -- square first, where it was a black box with a stick on top.
+        cookpot = {
+            {
+                color = Color3.fromRGB(58, 62, 60),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0, -0.06, 0) * UPRIGHT_CYLINDER,
+                shape = Enum.PartType.Cylinder,
+                size = Vector3.new(0.7, 0.9, 0.9),
+            },
+            {
+                color = Color3.fromRGB(88, 92, 90),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0, 0.32, 0) * UPRIGHT_CYLINDER,
+                shape = Enum.PartType.Cylinder,
+                size = Vector3.new(0.1, 1.02, 1.02),
+            },
+            {
+                color = Color3.fromRGB(88, 92, 90),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0, 0.6, 0),
+                size = Vector3.new(1.04, 0.08, 0.08),
+            },
+            {
+                color = Color3.fromRGB(88, 92, 90),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0.5, 0.46, 0) * CFrame.Angles(0, 0, math.rad(28)),
+                size = Vector3.new(0.35, 0.07, 0.07),
+            },
+            {
+                color = Color3.fromRGB(88, 92, 90),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(-0.5, 0.46, 0) * CFrame.Angles(0, 0, math.rad(-28)),
+                size = Vector3.new(0.35, 0.07, 0.07),
+            },
+        },
+        -- Closed, with the ribbon still in it at the page she stopped on.
+        ferry_ledger = {
+            {
+                color = Color3.fromRGB(226, 216, 190),
+                material = Enum.Material.SmoothPlastic,
+                offset = CFrame.new(0, 0, 0),
+                size = Vector3.new(0.96, 0.16, 0.74),
+            },
+            {
+                color = Color3.fromRGB(84, 62, 46),
+                material = Enum.Material.Leather,
+                offset = CFrame.new(0, 0.13, 0),
+                size = Vector3.new(1.04, 0.1, 0.8),
+            },
+            {
+                color = Color3.fromRGB(84, 62, 46),
+                material = Enum.Material.Leather,
+                offset = CFrame.new(0, -0.13, 0),
+                size = Vector3.new(1.04, 0.1, 0.8),
+            },
+            {
+                color = Color3.fromRGB(168, 88, 74),
+                material = Enum.Material.Fabric,
+                offset = CFrame.new(0.26, 0.02, 0.22),
+                size = Vector3.new(0.1, 0.28, 0.5),
+            },
+        },
+        forge_hammer = {
+            {
+                color = Color3.fromRGB(122, 86, 52),
+                material = Enum.Material.Wood,
+                offset = CFrame.new(0, 0, -0.1),
+                size = Vector3.new(0.15, 0.15, 1.5),
+            },
+            {
+                color = Color3.fromRGB(68, 48, 34),
+                material = Enum.Material.Leather,
+                offset = CFrame.new(0, 0, 0.4),
+                size = Vector3.new(0.21, 0.21, 0.42),
+            },
+            {
+                color = Color3.fromRGB(74, 78, 82),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0, 0.04, -0.72),
+                size = Vector3.new(0.44, 0.44, 0.56),
+            },
+            {
+                color = Color3.fromRGB(96, 100, 104),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0, 0.04, -1.06),
+                size = Vector3.new(0.28, 0.28, 0.3),
+            },
+        },
+        long_ladle = {
+            {
+                color = Color3.fromRGB(152, 122, 72),
+                material = Enum.Material.Wood,
+                offset = CFrame.new(0, 0, 0),
+                size = Vector3.new(0.12, 0.12, 1.5),
+            },
+            {
+                color = Color3.fromRGB(176, 150, 96),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0, -0.08, -0.86),
+                shape = Enum.PartType.Ball,
+                size = Vector3.new(0.52, 0.36, 0.52),
+            },
+            -- The hook that lets it live on the pot's rim rather than in
+            -- a drawer, which is where a pit cook's ladle actually lives.
+            {
+                color = Color3.fromRGB(152, 122, 72),
+                material = Enum.Material.Wood,
+                offset = CFrame.new(0, 0.14, 0.7),
+                size = Vector3.new(0.1, 0.28, 0.1),
+            },
+        },
+        --[[
+            Transparent on purpose: this is the one prop whose whole point
+            is that you can see through it, and an opaque pane of
+            mireglass is a slate.
+
+            The first pass was paler and thinner than this and photographed
+            as a white smear against the sky -- glass needs a colour to
+            tint what is behind it and an iron holder to have an edge, or
+            it reads as nothing at all.
+        ]]
+        mireglass_shard = {
+            {
+                color = Color3.fromRGB(108, 170, 182),
+                material = Enum.Material.Glass,
+                offset = CFrame.new(0, 0, -0.14) * CFrame.Angles(0, 0, math.rad(7)),
+                size = Vector3.new(0.72, 0.07, 0.66),
+                transparency = 0.3,
+            },
+            {
+                color = Color3.fromRGB(150, 204, 214),
+                material = Enum.Material.Glass,
+                offset = CFrame.new(-0.12, 0.06, -0.56) * CFrame.Angles(0, math.rad(16), 0),
+                size = Vector3.new(0.3, 0.06, 0.34),
+                transparency = 0.34,
+            },
+            {
+                color = Color3.fromRGB(64, 68, 72),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0, 0, 0.24),
+                size = Vector3.new(0.44, 0.16, 0.14),
+            },
+            {
+                color = Color3.fromRGB(64, 68, 72),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0.2, 0, 0.02),
+                size = Vector3.new(0.07, 0.13, 0.36),
+            },
+            {
+                color = Color3.fromRGB(64, 68, 72),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(-0.2, 0, 0.02),
+                size = Vector3.new(0.07, 0.13, 0.36),
+            },
+        },
+        -- Three stalks that do not agree on an angle, tied once. A bundle
+        -- that agrees on an angle is a plank.
+        reed_bundle = {
+            {
+                color = Color3.fromRGB(178, 158, 96),
+                material = Enum.Material.Grass,
+                offset = CFrame.new(0.09, 0.04, -0.1) * CFrame.Angles(math.rad(3), 0, 0),
+                size = Vector3.new(0.11, 0.11, 1.7),
+            },
+            {
+                color = Color3.fromRGB(160, 142, 84),
+                material = Enum.Material.Grass,
+                offset = CFrame.new(-0.08, 0.02, -0.02)
+                    * CFrame.Angles(math.rad(-4), 0, math.rad(3)),
+                size = Vector3.new(0.1, 0.1, 1.54),
+            },
+            {
+                color = Color3.fromRGB(192, 174, 116),
+                material = Enum.Material.Grass,
+                offset = CFrame.new(0, -0.09, -0.06) * CFrame.Angles(math.rad(2), 0, math.rad(-4)),
+                size = Vector3.new(0.1, 0.1, 1.62),
+            },
+            {
+                color = Color3.fromRGB(122, 96, 58),
+                material = Enum.Material.Fabric,
+                offset = CFrame.new(0, 0, 0.24),
+                size = Vector3.new(0.32, 0.3, 0.14),
+            },
+        },
+        -- Open, with the route inked across it and the spindle still on
+        -- the far edge, so it reads as a map rather than a page.
+        route_map = {
+            {
+                color = Color3.fromRGB(216, 200, 160),
+                material = Enum.Material.SmoothPlastic,
+                offset = CFrame.new(0, 0, 0),
+                size = Vector3.new(1.4, 0.07, 1.02),
+            },
+            {
+                color = Color3.fromRGB(122, 74, 48),
+                material = Enum.Material.SmoothPlastic,
+                offset = CFrame.new(0.02, 0.05, -0.12) * CFrame.Angles(0, math.rad(18), 0),
+                size = Vector3.new(0.96, 0.03, 0.08),
+            },
+            {
+                color = Color3.fromRGB(122, 74, 48),
+                material = Enum.Material.SmoothPlastic,
+                offset = CFrame.new(-0.16, 0.05, 0.26) * CFrame.Angles(0, math.rad(-24), 0),
+                size = Vector3.new(0.62, 0.03, 0.07),
+            },
+            {
+                color = Color3.fromRGB(138, 104, 58),
+                material = Enum.Material.Wood,
+                offset = CFrame.new(-0.74, 0, 0),
+                size = Vector3.new(0.16, 0.16, 1.14),
+            },
+        },
+        -- Wicker, narrower at the base than the rim, with the green load
+        -- sitting proud of it. The taper is what says basket rather than
+        -- crate, and the green is what says seed rather than laundry.
+        seed_basket = {
+            {
+                color = Color3.fromRGB(138, 104, 58),
+                material = Enum.Material.WoodPlanks,
+                offset = CFrame.new(0, -0.24, 0) * UPRIGHT_CYLINDER,
+                shape = Enum.PartType.Cylinder,
+                size = Vector3.new(0.2, 0.66, 0.66),
+            },
+            {
+                color = Color3.fromRGB(146, 112, 64),
+                material = Enum.Material.WoodPlanks,
+                offset = CFrame.new(0, 0.02, 0) * UPRIGHT_CYLINDER,
+                shape = Enum.PartType.Cylinder,
+                size = Vector3.new(0.34, 0.82, 0.82),
+            },
+            {
+                color = Color3.fromRGB(112, 82, 44),
+                material = Enum.Material.Wood,
+                offset = CFrame.new(0, 0.26, 0) * UPRIGHT_CYLINDER,
+                shape = Enum.PartType.Cylinder,
+                size = Vector3.new(0.12, 0.98, 0.98),
+            },
+            {
+                color = Color3.fromRGB(96, 128, 74),
+                material = Enum.Material.Grass,
+                offset = CFrame.new(0, 0.38, 0) * UPRIGHT_CYLINDER,
+                shape = Enum.PartType.Cylinder,
+                size = Vector3.new(0.2, 0.8, 0.8),
+            },
+        },
+        -- A handle, a shoulder, a skirt, a lip and a clapper. Built square
+        -- first, where it photographed as a gold box: a bell is a bell
+        -- because it widens on the way down.
+        signal_bell = {
+            {
+                color = Color3.fromRGB(122, 92, 48),
+                material = Enum.Material.Wood,
+                offset = CFrame.new(0, 0.42, 0),
+                size = Vector3.new(0.15, 0.42, 0.15),
+            },
+            {
+                color = Color3.fromRGB(190, 152, 82),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0, 0.2, 0) * UPRIGHT_CYLINDER,
+                shape = Enum.PartType.Cylinder,
+                size = Vector3.new(0.12, 0.3, 0.3),
+            },
+            {
+                color = Color3.fromRGB(168, 132, 66),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0, 0.02, 0) * UPRIGHT_CYLINDER,
+                shape = Enum.PartType.Cylinder,
+                size = Vector3.new(0.26, 0.52, 0.52),
+            },
+            {
+                color = Color3.fromRGB(168, 132, 66),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0, -0.22, 0) * UPRIGHT_CYLINDER,
+                shape = Enum.PartType.Cylinder,
+                size = Vector3.new(0.24, 0.74, 0.74),
+            },
+            {
+                color = Color3.fromRGB(190, 152, 82),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0, -0.38, 0) * UPRIGHT_CYLINDER,
+                shape = Enum.PartType.Cylinder,
+                size = Vector3.new(0.1, 0.82, 0.82),
+            },
+            {
+                color = Color3.fromRGB(96, 76, 44),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0, -0.5, 0),
+                shape = Enum.PartType.Ball,
+                size = Vector3.new(0.16, 0.16, 0.16),
+            },
+        },
+        -- The slate she counts on, with two nights of marks still on it.
+        tally_slate = {
+            {
+                color = Color3.fromRGB(62, 66, 70),
+                material = Enum.Material.Slate,
+                offset = CFrame.new(0, 0, 0),
+                size = Vector3.new(0.8, 0.08, 1),
+            },
+            {
+                color = Color3.fromRGB(108, 84, 52),
+                material = Enum.Material.Wood,
+                offset = CFrame.new(0, 0, -0.52),
+                size = Vector3.new(0.9, 0.11, 0.1),
+            },
+            {
+                color = Color3.fromRGB(108, 84, 52),
+                material = Enum.Material.Wood,
+                offset = CFrame.new(0, 0, 0.52),
+                size = Vector3.new(0.9, 0.11, 0.1),
+            },
+            {
+                color = Color3.fromRGB(226, 226, 220),
+                material = Enum.Material.SmoothPlastic,
+                offset = CFrame.new(0, 0.05, -0.2),
+                size = Vector3.new(0.46, 0.03, 0.06),
+            },
+        },
+        --[[
+            Two blades open on a pivot with the handles running back past
+            it to a bow. Both the blades and the handles have to splay:
+            closed to five degrees they photographed as one needle, since
+            nothing about a pair of shears is legible except the gap.
+        ]]
+        wick_shears = {
+            {
+                color = Color3.fromRGB(196, 200, 204),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0.11, 0, -0.44) * CFrame.Angles(0, math.rad(13), 0),
+                size = Vector3.new(0.09, 0.05, 0.86),
+            },
+            {
+                color = Color3.fromRGB(196, 200, 204),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(-0.11, 0, -0.44) * CFrame.Angles(0, math.rad(-13), 0),
+                size = Vector3.new(0.09, 0.05, 0.86),
+            },
+            {
+                color = Color3.fromRGB(120, 124, 128),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0, 0, 0),
+                shape = Enum.PartType.Ball,
+                size = Vector3.new(0.17, 0.17, 0.17),
+            },
+            {
+                color = Color3.fromRGB(120, 124, 128),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0.12, 0, 0.32) * CFrame.Angles(0, math.rad(-16), 0),
+                size = Vector3.new(0.07, 0.07, 0.5),
+            },
+            {
+                color = Color3.fromRGB(120, 124, 128),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(-0.12, 0, 0.32) * CFrame.Angles(0, math.rad(16), 0),
+                size = Vector3.new(0.07, 0.07, 0.5),
+            },
+            {
+                color = Color3.fromRGB(120, 124, 128),
+                material = Enum.Material.Metal,
+                offset = CFrame.new(0, 0, 0.58),
+                size = Vector3.new(0.42, 0.06, 0.1),
+            },
+        },
+    }
+
     local residentDefinitions = {
         npc_tomas_reed = {
             displayName = "TOMAS REED",
@@ -9814,6 +10220,157 @@ local function buildTownProgressionBuildings(
             dusk = CFrame.new(10, 3, -128) * CFrame.Angles(0, math.rad(10), 0),
             night = CFrame.new(9, 3, -138) * CFrame.Angles(0, math.rad(15), 0),
             dayDuty = "TENDING THE GREENWARD",
+        },
+
+        --[[
+            Chapters II and III, authored rather than derived.
+
+            The derivation below gives every roster resident a body, which
+            is what stopped twenty-four people arriving to a town with
+            nothing standing in it. It cannot do more than that: it knows
+            a region and a job title, so a shift smith and a ferry clerk
+            out of the same country wear the same coat, carry the same
+            nothing, and stand on the same ring around the plaza whatever
+            their job is.
+
+            These eight are the whole cast of the next two chapters --
+            the people a player meets immediately after the three they
+            start with -- and the roster already says what each of them
+            should be holding and where they should be. Hesper keeps a
+            forge, Junie trims the lamp before nightfall, Lissen counts
+            heads at dusk. Authoring them is mostly reading the roster
+            aloud.
+
+            Day puts each of them at the building the roster gives them
+            the job at, so the person and the workplace are one fact
+            rather than two. Dusk is that person's own last hour: the
+            walk in off the row, a woven charm left on the inn door, the
+            wick trimmed while there is still light to see it by. Night
+            puts all eleven on the lantern road between the square and
+            the south gate, because DEFENDING THE LANTERN ROAD is what
+            the routine's own night duty says they are doing, and eleven
+            people saying it from one spot would be a crowd rather than a
+            watch.
+        ]]
+        npc_hesper_vane = {
+            displayName = "HESPER VANE",
+            role = "SHIFT SMITH",
+            coat = Color3.fromRGB(92, 60, 44),
+            accent = Color3.fromRGB(236, 132, 58),
+            skin = Color3.fromRGB(166, 118, 84),
+            hair = Color3.fromRGB(42, 34, 30),
+            prop = "forge_hammer",
+            day = CFrame.new(134, 3, -132) * CFrame.Angles(0, math.rad(-63), 0),
+            dusk = CFrame.new(128, 3, -126) * CFrame.Angles(0, math.rad(110), 0),
+            night = CFrame.new(11, 3, -122) * CFrame.Angles(0, math.rad(-90), 0),
+            dayDuty = "KEEPING THE FORGE IN",
+        },
+        npc_odell_crane = {
+            displayName = "ODELL CRANE",
+            role = "RAIL KEEPER",
+            coat = Color3.fromRGB(86, 92, 98),
+            accent = Color3.fromRGB(208, 166, 84),
+            skin = Color3.fromRGB(188, 140, 102),
+            hair = Color3.fromRGB(96, 86, 78),
+            prop = "signal_bell",
+            day = CFrame.new(-134, 3, -190) * CFrame.Angles(0, math.rad(69), 0),
+            dusk = CFrame.new(-70, 3, -184) * CFrame.Angles(0, math.rad(-90), 0),
+            night = CFrame.new(-11, 3, -180) * CFrame.Angles(0, math.rad(90), 0),
+            dayDuty = "WORKING THE HAULAGE LINES",
+        },
+        npc_junie_falk = {
+            displayName = "JUNIE FALK",
+            role = "LAMP TRIMMER",
+            coat = Color3.fromRGB(68, 74, 66),
+            accent = Color3.fromRGB(255, 186, 92),
+            skin = Color3.fromRGB(150, 106, 78),
+            hair = Color3.fromRGB(58, 44, 36),
+            prop = "wick_shears",
+            day = CFrame.new(10, 3, -72) * CFrame.Angles(0, math.rad(51), 0),
+            dusk = CFrame.new(0, 3, -70),
+            --[[
+                South of the lantern looking further south, which is the
+                one arrangement she will stand in: the light at her back
+                and the dark part of the road in front of her, because
+                she will not sit with her back to a dark doorway.
+            ]]
+            night = CFrame.new(0, 3, -92),
+            dayDuty = "TRIMMING THE FIRST LANTERN",
+        },
+        npc_bartram_hoke = {
+            displayName = "BARTRAM HOKE",
+            role = "PIT COOK",
+            coat = Color3.fromRGB(118, 92, 62),
+            accent = Color3.fromRGB(226, 206, 166),
+            skin = Color3.fromRGB(176, 126, 92),
+            hair = Color3.fromRGB(74, 66, 58),
+            prop = "long_ladle",
+            day = CFrame.new(-136, 3, -152) * CFrame.Angles(0, math.rad(67), 0),
+            dusk = CFrame.new(-60, 3, -144) * CFrame.Angles(0, math.rad(-90), 0),
+            night = CFrame.new(-12, 3, -128) * CFrame.Angles(0, math.rad(90), 0),
+            dayDuty = "COOKING FOR A LONGER SHIFT THAN THIS ONE",
+        },
+        npc_saoirse_quill = {
+            displayName = "SAOIRSE QUILL",
+            role = "LEDGER KEEPER",
+            coat = Color3.fromRGB(58, 74, 78),
+            accent = Color3.fromRGB(214, 198, 158),
+            skin = Color3.fromRGB(178, 132, 96),
+            hair = Color3.fromRGB(48, 40, 36),
+            prop = "ferry_ledger",
+            day = CFrame.new(-80, 3, -142) * CFrame.Angles(0, math.rad(81), 0),
+            dusk = CFrame.new(-24, 3, -144) * CFrame.Angles(0, math.rad(-90), 0),
+            -- Facing back up the road, which is the direction the people
+            -- she is counting come from.
+            night = CFrame.new(12, 3, -160) * CFrame.Angles(0, math.rad(180), 0),
+            dayDuty = "KEEPING THE STORES LEDGER",
+        },
+        npc_wren_dabbler = {
+            displayName = "WREN DABBLER",
+            role = "REED WEAVER",
+            coat = Color3.fromRGB(84, 102, 72),
+            accent = Color3.fromRGB(198, 176, 110),
+            skin = Color3.fromRGB(196, 148, 108),
+            hair = Color3.fromRGB(122, 96, 58),
+            prop = "reed_bundle",
+            day = CFrame.new(0, 3, -212),
+            -- At the inn's door at dusk, which is where the charm she
+            -- leaves for a house ends up.
+            dusk = CFrame.new(-82, 3, -174) * CFrame.Angles(0, math.rad(45), 0),
+            night = CFrame.new(12, 3, -192) * CFrame.Angles(0, math.rad(-90), 0),
+            dayDuty = "WEAVING FOR THE STAGE",
+        },
+        npc_marek_still = {
+            displayName = "MAREK STILL",
+            role = "GLASS READER",
+            coat = Color3.fromRGB(72, 84, 88),
+            accent = Color3.fromRGB(146, 214, 226),
+            skin = Color3.fromRGB(162, 120, 90),
+            -- White before his time, which is the first thing anyone
+            -- notices about a man who read mireglass for a living.
+            hair = Color3.fromRGB(176, 172, 166),
+            prop = "mireglass_shard",
+            day = CFrame.new(62, 3, -250) * CFrame.Angles(0, math.rad(-34), 0),
+            dusk = CFrame.new(24, 3, -196) * CFrame.Angles(0, math.rad(146), 0),
+            -- The far end of the road facing out, since naming a tell
+            -- before the night uses it means seeing it first.
+            night = CFrame.new(0, 3, -204),
+            dayDuty = "READING THE GLASS FROM THE TOWER",
+        },
+        npc_lissen_ford = {
+            displayName = "LISSEN FORD",
+            role = "FEN HEALER",
+            coat = Color3.fromRGB(108, 120, 104),
+            accent = Color3.fromRGB(232, 226, 208),
+            skin = Color3.fromRGB(152, 108, 80),
+            hair = Color3.fromRGB(62, 52, 46),
+            prop = "tally_slate",
+            day = CFrame.new(-58, 3, -250) * CFrame.Angles(0, math.rad(45), 0),
+            -- Facing the muster rather than standing in it, because what
+            -- she is doing at dusk is counting the people in it.
+            dusk = CFrame.new(-20, 3, -126) * CFrame.Angles(0, math.rad(-84), 0),
+            night = CFrame.new(-13, 3, -148) * CFrame.Angles(0, math.rad(-90), 0),
+            dayDuty = "KEEPING THE GUARDHOUSE INFIRMARY",
         },
     }
 
@@ -10009,24 +10566,26 @@ local function buildTownProgressionBuildings(
         -- The prop that says what they do.
         local lowerArm = model:FindFirstChild("RightLowerArm")
         if lowerArm ~= nil and lowerArm:IsA("BasePart") then
-            local propColor = if definition.prop == "cookpot"
-                then Color3.fromRGB(58, 62, 60)
-                elseif definition.prop == "route_map" then Color3.fromRGB(216, 200, 160)
-                else Color3.fromRGB(96, 128, 74)
-            local prop = part(
-                model,
-                "RolePropCarried",
-                if definition.prop == "route_map"
-                    then Vector3.new(1.5, 0.12, 1.1)
-                    else Vector3.new(1, 0.9, 1),
-                lowerArm.CFrame * CFrame.new(0, -lowerArm.Size.Y * 0.7, -0.3),
-                propColor,
-                if definition.prop == "route_map"
-                    then Enum.Material.SmoothPlastic
-                    else Enum.Material.Metal,
-                false
-            )
-            attach(prop, lowerArm)
+            local pieces = RESIDENT_PROPS[definition.prop] or RESIDENT_PROPS.seed_basket
+            local grip = lowerArm.CFrame * CFrame.new(0, -lowerArm.Size.Y * 0.7, -0.3)
+            for _, piece in pieces do
+                local prop = part(
+                    model,
+                    "RolePropCarried",
+                    piece.size,
+                    grip * piece.offset,
+                    piece.color,
+                    piece.material,
+                    false
+                )
+                if piece.shape ~= nil then
+                    prop.Shape = piece.shape
+                end
+                if piece.transparency ~= nil then
+                    prop.Transparency = piece.transparency
+                end
+                attach(prop, lowerArm)
+            end
         end
 
         model.PrimaryPart = root
@@ -10078,7 +10637,9 @@ local function buildTownProgressionBuildings(
         from the order they arrive in, spread around the plaza so no two
         share a spot. It is a floor, not an art pass -- each one carries
         `Derived` so nothing downstream mistakes it for authored work, and
-        the three that were authored are untouched.
+        anybody with an authored body above is untouched. Eleven are
+        authored now, through chapter III; the floor is what holds the
+        other sixteen up until somebody writes them.
 
         A plain body in the right place beats a person the story insists
         has arrived and who is not there.
