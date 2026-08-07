@@ -304,55 +304,56 @@ return {
         },
         {
             --[[
-                The same question the benches failed, asked of people.
+                The same question the benches failed, asked of people, and
+                answered the same way.
 
-                A resident exists when the roster names them. A resident
-                is *meetable* when WorldService builds a body for them,
-                and those are different facts: the world's resident
-                definitions are a hand-written table that has three
-                entries, so twenty-four of the twenty-seven arrive with a
-                chapter, take a job at a real building, carry a quest and
-                a full set of dialogue -- and have nobody standing in the
-                town to say it to.
+                Three residents had authored bodies and the roster names
+                twenty-seven, so twenty-four arrived with a chapter, a
+                job, a quest and a full set of dialogue and had nothing
+                standing in the town to say it to. Nothing failed, because
+                a resident nobody built is a resident nobody misses.
 
-                This is the crafting-bench gap in a second place, found by
-                asking the same question after the first one was fixed.
-                Their quests are unreachable for the same reason their
-                greetings are.
-
-                Chapter one's three are built, so the arcs shipped for
-                them work. The number below is asserted at its real size
-                until the world can render the rest; if it goes down,
-                lower it, and if it goes up, something regressed.
+                An unauthored resident now derives a body from the roster
+                rather than being skipped -- name, job title, a palette
+                from the region they walked out of, and a spot worked out
+                from their arrival order. This reads the source and
+                refuses a return to the skip, because the skip is what
+                made the gap invisible.
             ]]
-            name = "most residents have no body in the town, and the count says how many",
+            name = "a resident with no authored body derives one rather than being skipped",
             run = function()
                 local fs = require("@lune/fs")
                 local world = fs.readFile("src/server/Services/WorldService.luau")
-                local built: { [string]: boolean } = {}
-                for residentId in string.gmatch(world, "(npc_[a-z_]+) = {") do
-                    built[residentId] = true
+                TestRunner.truthy(
+                    string.find(world, "local entry = residentRoster.get(residentId)", 1, true)
+                        ~= nil,
+                    "unauthored residents no longer derive a body from the roster"
+                )
+                TestRunner.truthy(
+                    string.find(world, "REGION_RESIDENT_PALETTES", 1, true) ~= nil,
+                    "derived residents no longer wear their own region"
+                )
+                -- every region a resident can come from has a palette, or
+                -- somebody arrives in the fallback's clothes
+                local palettes: { [string]: boolean } = {}
+                for regionId in string.gmatch(world, "(region_[a-z]+) = {\n%s+accent") do
+                    palettes[regionId] = true
                 end
-                local meetable, missing = 0, 0
                 for _, definition in ResidentRoster.list() do
-                    if built[definition.id] then
-                        meetable += 1
-                    else
-                        missing += 1
+                    TestRunner.truthy(
+                        palettes[definition.homeRegion],
+                        definition.homeRegion .. " has no resident palette"
+                    )
+                end
+
+                -- the three authored ones keep their authored bodies
+                local built = 0
+                for _, residentId in { "npc_tomas_reed", "npc_pip_wren", "npc_ena_moss" } do
+                    if string.find(world, residentId .. " = {", 1, true) ~= nil then
+                        built += 1
                     end
                 end
-                TestRunner.equal(meetable, 3, "the world's resident list changed size")
-                TestRunner.equal(
-                    missing,
-                    24,
-                    "residents nobody can meet -- if this went up, a roster addition "
-                        .. "shipped without a body"
-                )
-                -- the three that exist are chapter one's, so a fresh
-                -- player's whole path is populated
-                for _, residentId in { "npc_tomas_reed", "npc_pip_wren", "npc_ena_moss" } do
-                    TestRunner.equal(built[residentId], true, residentId .. " lost their body")
-                end
+                TestRunner.equal(built, 3, "an authored resident lost their body")
             end,
         },
         {

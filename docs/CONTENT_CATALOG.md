@@ -345,14 +345,20 @@ number in this table cannot drift from the number in the game.
 whether content that exists can actually be got at.** The first is fixed;
 the second is recorded at its real size.
 
-**Residents (open): 24 of the 27 cannot be met.** `WorldService`'s
+**Residents (fixed): 24 of the 27 could not be met.** `WorldService`'s
 resident definitions are a hand-written table with three entries, so
 everyone after chapter one arrives with a chapter, takes a job at a real
-building, carries a quest and a full set of dialogue — and has no body
-standing in the town to say it to. Their quests are unreachable for the
-same reason their greetings are. Chapter one's three are built, so a
-fresh player's whole path is populated and the arcs shipped for Tomas,
-Pip and Ena work. `ContentCensus.spec` asserts 3 built and 24 missing.
+building, carried a quest and a full set of dialogue — and had no body
+standing in the town to say it to. Their quests were unreachable for the
+same reason their greetings were.
+
+Fixed the way the gear visuals were: an unauthored resident derives a
+body from the roster rather than being skipped — their own name and job
+title, a palette from the region they walked out of, and a spot worked
+out from their arrival order so no two share one. It is a floor rather
+than an art pass, and each derived body says so. Chapter one's three keep
+their authored bodies. The census reads the source and refuses a return
+to the skip, because the skip is what made the gap invisible.
 
 **Recipes (fixed): 120 of the 130 could not be crafted.** The workshop's benches were a
 hardcoded list of ten in `WorldService`, each needing its own constant in

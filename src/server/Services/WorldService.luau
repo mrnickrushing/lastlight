@@ -1906,7 +1906,8 @@ function WorldService.new(
     memoryFragments: any,
     townDecorations: any,
     craftingCatalog: any,
-    consumables: any
+    consumables: any,
+    residentRoster: any
 ): WorldService
     return setmetatable({
         Name = WorldService.Name,
@@ -1918,6 +1919,7 @@ function WorldService.new(
         _memoryFragmentTargets = {},
         _craftingCatalog = craftingCatalog,
         _consumables = consumables,
+        _residentRoster = residentRoster,
         _runtimeIds = nil,
         _world = nil,
         _interactions = {},
@@ -8742,7 +8744,8 @@ local function buildTownProgressionBuildings(
     assetParent: Instance,
     meshPlacements: { MeshPlacement },
     construction: any,
-    townConstructionRules: any
+    townConstructionRules: any,
+    residentRoster: any
 ): (
     { [string]: any },
     { [string]: any },
@@ -9721,6 +9724,57 @@ local function buildTownProgressionBuildings(
     )
     noteConstructionTarget("building_meeting_hall", "MEETING HALL", signAnchor(meetingHall))
 
+    --[[
+        A palette per region, for residents whose bodies are derived. Each
+        one wears what their own region wore -- the Delve's ore and
+        coalglass, the Vale's ice and wool -- so a town filling up still
+        reads as people arriving from named places rather than as a crowd.
+    ]]
+    local REGION_RESIDENT_PALETTES = {
+        region_bramblewake = {
+            accent = Color3.fromRGB(221, 154, 78),
+            coat = Color3.fromRGB(96, 110, 74),
+            hair = Color3.fromRGB(55, 40, 34),
+            skin = Color3.fromRGB(190, 140, 100),
+        },
+        region_ironroot = {
+            accent = Color3.fromRGB(255, 168, 66),
+            coat = Color3.fromRGB(112, 85, 49),
+            hair = Color3.fromRGB(42, 34, 30),
+            skin = Color3.fromRGB(166, 118, 84),
+        },
+        region_mireglass = {
+            accent = Color3.fromRGB(146, 214, 226),
+            coat = Color3.fromRGB(76, 96, 88),
+            hair = Color3.fromRGB(60, 52, 44),
+            skin = Color3.fromRGB(178, 132, 96),
+        },
+        region_tempest = {
+            accent = Color3.fromRGB(238, 178, 96),
+            coat = Color3.fromRGB(92, 96, 100),
+            hair = Color3.fromRGB(48, 44, 40),
+            skin = Color3.fromRGB(200, 150, 108),
+        },
+        region_frostmere = {
+            accent = Color3.fromRGB(168, 202, 216),
+            coat = Color3.fromRGB(214, 206, 188),
+            hair = Color3.fromRGB(72, 60, 48),
+            skin = Color3.fromRGB(210, 160, 118),
+        },
+        region_cinderfall = {
+            accent = Color3.fromRGB(214, 172, 88),
+            coat = Color3.fromRGB(148, 142, 134),
+            hair = Color3.fromRGB(38, 34, 32),
+            skin = Color3.fromRGB(172, 124, 92),
+        },
+        region_hollow = {
+            accent = Color3.fromRGB(255, 216, 150),
+            coat = Color3.fromRGB(88, 84, 96),
+            hair = Color3.fromRGB(160, 156, 150),
+            skin = Color3.fromRGB(186, 146, 112),
+        },
+    }
+
     local residentDefinitions = {
         npc_tomas_reed = {
             displayName = "TOMAS REED",
@@ -10006,8 +10060,61 @@ local function buildTownProgressionBuildings(
     local activeResidentIds = if type(consequence.residentIds) == "table"
         then consequence.residentIds
         else {}
+    --[[
+        Everybody the story has sent, whether or not somebody authored
+        them.
+
+        Three residents had bodies here and the roster names twenty-seven,
+        so for a milestone twenty-four people arrived with a chapter, took
+        a job at a real building, carried a quest and a full set of
+        dialogue -- and had nothing standing in the town to say it to.
+        Their quests were unreachable for the same reason their greetings
+        were, and nothing failed, because a resident nobody built is a
+        resident nobody misses.
+
+        So an unauthored resident derives a body from the roster rather
+        than being skipped: their own name and job title, a palette from
+        the region they walked out of, and a place to stand worked out
+        from the order they arrive in, spread around the plaza so no two
+        share a spot. It is a floor, not an art pass -- each one carries
+        `Derived` so nothing downstream mistakes it for authored work, and
+        the three that were authored are untouched.
+
+        A plain body in the right place beats a person the story insists
+        has arrived and who is not there.
+    ]]
+    local derivedResidentIndex = 0
     for _, residentId in activeResidentIds do
         local definition = residentDefinitions[residentId]
+        if definition == nil then
+            local entry = residentRoster.get(residentId)
+            if entry ~= nil then
+                local angle = derivedResidentIndex * 0.68
+                local radius = 26 + (derivedResidentIndex % 3) * 9
+                derivedResidentIndex += 1
+                local spot = Vector3.new(
+                    math.cos(angle) * radius,
+                    3,
+                    TOWN_CENTER.Z - 62 + math.sin(angle) * radius
+                )
+                local palette = REGION_RESIDENT_PALETTES[(entry :: any).homeRegion]
+                    or REGION_RESIDENT_PALETTES.region_bramblewake
+                definition = {
+                    accent = palette.accent,
+                    coat = palette.coat,
+                    day = CFrame.new(spot, Vector3.new(0, spot.Y, TOWN_CENTER.Z - 62)),
+                    dayDuty = (entry :: any).job.title,
+                    derived = true,
+                    displayName = string.upper((entry :: any).fullName),
+                    dusk = CFrame.new(spot, Vector3.new(0, spot.Y, TOWN_CENTER.Z - 62)),
+                    hair = palette.hair,
+                    night = CFrame.new(spot, Vector3.new(0, spot.Y, TOWN_CENTER.Z - 62)),
+                    prop = nil,
+                    role = (entry :: any).job.title,
+                    skin = palette.skin,
+                }
+            end
+        end
         if definition ~= nil then
             buildResident(residentId, definition)
         end
@@ -10120,7 +10227,8 @@ function WorldService._rebuildTownProgression(self: WorldService)
         authoredMeshes,
         townMeshPlacements,
         self._townConstruction,
-        self._townConstructionRules
+        self._townConstructionRules,
+        self._residentRoster
     )
     self._townResidents = residents
     self._buildingPlacements = buildingPlacements

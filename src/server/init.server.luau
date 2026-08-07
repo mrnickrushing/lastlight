@@ -38,6 +38,7 @@ local ProfessionRescue = require(root.ProfessionRescue)
 local ProfessionState = require(root.ProfessionState)
 local RateLimiter = require(root.RateLimiter)
 local ResidentDialogue = require(root.ResidentDialogue)
+local ResidentRoster = require(root.ResidentRoster)
 local ReviveFlow = require(root.ReviveFlow)
 local RuntimeIds = require(root.RuntimeIds)
 local SaveSchema = require(root.SaveSchema)
@@ -124,7 +125,8 @@ local worldService = WorldService.new(
     MemoryFragments,
     TownDecorations,
     CraftingCatalog,
-    Consumables
+    Consumables,
+    ResidentRoster
 )
 --[[
     The third gate on a region, after its enabled flag and its chapter:
