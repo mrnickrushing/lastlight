@@ -3,6 +3,8 @@
 local BellowsMaw = require("../../src/shared/BellowsMawEncounter")
 local ChapterCatalog = require("../../src/shared/ChapterCatalog")
 local LanternWitch = require("../../src/shared/LanternWitchEncounter")
+local TideboundTitan = require("../../src/shared/TideboundTitanEncounter")
+local WhiteHowler = require("../../src/shared/WhiteHowlerEncounter")
 local ResidentRoster = require("../../src/shared/ResidentRoster")
 local SaveSchema = require("../../src/shared/SaveSchema")
 local WardenStag = require("../../src/shared/WardenStagEncounter")
@@ -27,11 +29,13 @@ return {
             name = "every chapter names a region, a boss, and outcomes its boss can reach",
             run = function()
                 local chapters = ChapterCatalog.list()
-                TestRunner.equal(#chapters, 3)
+                TestRunner.equal(#chapters, 5)
                 local bosses = {
                     boss_warden_stag = WardenStag,
                     boss_bellows_maw = BellowsMaw,
                     boss_lantern_witch = LanternWitch,
+                    boss_tidebound_titan = TideboundTitan,
+                    boss_white_howler = WhiteHowler,
                 }
                 for index, definition in chapters do
                     TestRunner.equal(definition.number, index)
@@ -49,6 +53,23 @@ return {
                 end
                 TestRunner.equal(ChapterCatalog.require("chapter_two").requires, "chapter_one")
                 TestRunner.equal(ChapterCatalog.require("chapter_three").requires, "chapter_two")
+                TestRunner.equal(ChapterCatalog.require("chapter_four").requires, "chapter_three")
+                TestRunner.equal(ChapterCatalog.require("chapter_five").requires, "chapter_four")
+                -- no two chapters may claim the same region or the same
+                -- boss, or forRegion and forBoss silently answer for one
+                -- of them and the other becomes unreachable
+                local claimedRegions: { [string]: boolean } = {}
+                local claimedBosses: { [string]: boolean } = {}
+                for _, definition in chapters do
+                    TestRunner.equal(
+                        claimedRegions[definition.regionId],
+                        nil,
+                        "region claimed twice"
+                    )
+                    TestRunner.equal(claimedBosses[definition.bossId], nil, "boss claimed twice")
+                    claimedRegions[definition.regionId] = true
+                    claimedBosses[definition.bossId] = true
+                end
             end,
         },
         {
@@ -66,6 +87,14 @@ return {
                 for _, outcome in { "sealed", "bound", "broken" } do
                     TestRunner.equal(ChapterCatalog.isOutcome("chapter_three", outcome), true)
                 end
+                for _, outcome in { "navigable", "scoured", "broken" } do
+                    TestRunner.equal(ChapterCatalog.isOutcome("chapter_four", outcome), true)
+                end
+                for _, outcome in { "sheltered", "thinned", "silenced" } do
+                    TestRunner.equal(ChapterCatalog.isOutcome("chapter_five", outcome), true)
+                end
+                TestRunner.equal(ChapterCatalog.isOutcome("chapter_four", "sheltered"), false)
+                TestRunner.equal(ChapterCatalog.isOutcome("chapter_five", "navigable"), false)
                 TestRunner.equal(ChapterCatalog.isOutcome("chapter_two", "sealed"), false)
                 TestRunner.equal(
                     ChapterCatalog.isDecision("chapter_two", "restore_farmland"),

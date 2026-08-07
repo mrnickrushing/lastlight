@@ -49,7 +49,13 @@ local function chapter(definition: Chapter): Chapter
     })
 end
 
-local ORDER = table.freeze({ "chapter_one", "chapter_two", "chapter_three" })
+local ORDER = table.freeze({
+    "chapter_one",
+    "chapter_two",
+    "chapter_three",
+    "chapter_four",
+    "chapter_five",
+})
 
 local DEFINITIONS: { [string]: Chapter } = {
     chapter_one = chapter({
@@ -95,6 +101,42 @@ local DEFINITIONS: { [string]: Chapter } = {
         decisions = { "spared_copies", "spent_copies", "refused_her" },
         outcomes = { "sealed", "bound", "broken" },
         requires = "chapter_two",
+    }),
+    chapter_four = chapter({
+        id = "chapter_four",
+        number = 4,
+        displayName = "THE HARBOUR MOUTH",
+        regionId = "region_tempest",
+        bossId = "boss_tidebound_titan",
+        --[[
+            The Titan's tide gates are the decision, and like the Maw's
+            wheel they are worked rather than chosen. Eased down, the
+            channel survives and the harbour can be a harbour again;
+            slammed, the tide drops at once and takes the mouth with it.
+            A party in trouble tonight may not care, which is the point.
+        ]]
+        decisionPrompt = "HOW THE TIDE WAS LOWERED",
+        decisions = { "eased_gates", "slammed_gates", "mixed_gates" },
+        outcomes = { "navigable", "scoured", "broken" },
+        requires = "chapter_three",
+    }),
+    chapter_five = chapter({
+        id = "chapter_five",
+        number = 5,
+        displayName = "THE QUIET VALE",
+        regionId = "region_frostmere",
+        bossId = "boss_white_howler",
+        --[[
+            The Howler's fight spends warmth three times, and each time
+            it can go on the party's own fire or up to the den where its
+            pups are. The den costs -- one more aurora mark to read in the
+            phase that paid for it -- so the decision is made in the one
+            currency the whole region is about.
+        ]]
+        decisionPrompt = "WHERE THE WARMTH WENT",
+        decisions = { "warmed_den", "kept_warmth", "split_warmth" },
+        outcomes = { "sheltered", "thinned", "silenced" },
+        requires = "chapter_four",
     }),
 }
 
