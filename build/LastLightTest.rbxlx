@@ -58739,15 +58739,19 @@ local ENTRIES: { [string]: any } = {
     region_ironroot = {
         builder = IronrootBuilder,
         walkable = false,
+        -- Mesh dressing is an art pass: authored assets, not wiring.
+        -- Everything a party needs to walk the region is built.
         missing = {
-            "wayfinding and mesh dressing",
+            "authored mesh dressing",
         },
     },
     region_mireglass = {
         builder = MireglassBuilder,
         walkable = false,
+        -- Mesh dressing is an art pass: authored assets, not wiring.
+        -- Everything a party needs to walk the region is built.
         missing = {
-            "wayfinding and mesh dressing",
+            "authored mesh dressing",
         },
     },
 }
@@ -59227,6 +59231,83 @@ RegionBuilders.Arenas = table.freeze({
         name = "LanternWitchRing",
         regionId = "region_mireglass",
         radius = 36,
+    }),
+})
+
+--[[
+    Wayfinding: the trail that tells a party which way the run goes.
+
+    Bramblewake learned this the expensive way. A twelve-module walk with
+    no thread through it reads as twelve unrelated clearings, and players
+    wander back the way they came -- so it grew a lit trail between module
+    centres, and the wandering stopped. A new region needs the same thread
+    in its own materials, which is all this is: a line of low markers from
+    each module to the next, lit enough to find at night and quiet enough
+    to ignore in daylight.
+]]
+function RegionBuilders.buildWayfinding(
+    parent: Instance,
+    manifest: any,
+    catalog: any,
+    origin: Vector3,
+    markerColor: Color3,
+    glowColor: Color3
+): number
+    local placed = 0
+    for index = 1, #manifest.modules - 1 do
+        local here = manifest.modules[index]
+        local next = manifest.modules[index + 1]
+        local from = origin
+            + Vector3.new(here.cellX * catalog.CellSize, 0, here.cellZ * catalog.CellSize)
+        local to = origin
+            + Vector3.new(next.cellX * catalog.CellSize, 0, next.cellZ * catalog.CellSize)
+        local span = to - from
+        local steps = 5
+        for step = 1, steps do
+            local at = from + span * (step / (steps + 1))
+            local marker = Instance.new("Part")
+            marker.Name = "WayMarker"
+            marker.Size = Vector3.new(2.2, 1.4, 2.2)
+            marker.CFrame = CFrame.new(at + Vector3.new(0, 0.7, 0))
+                * CFrame.Angles(0, math.rad((index * 37 + step * 19) % 360), 0)
+            marker.Color = markerColor
+            marker.Material = Enum.Material.Slate
+            marker.Anchored = true
+            marker.CanCollide = false
+            marker.Parent = parent
+
+            local cue = Instance.new("Part")
+            cue.Name = "WayGlow"
+            cue.Shape = Enum.PartType.Ball
+            cue.Size = Vector3.new(0.6, 0.6, 0.6)
+            cue.CFrame = CFrame.new(at + Vector3.new(0, 1.7, 0))
+            cue.Color = glowColor
+            cue.Material = Enum.Material.Neon
+            cue.Anchored = true
+            cue.CanCollide = false
+            cue.CanQuery = false
+            cue.CastShadow = false
+            cue.Transparency = 0.55
+            cue.Parent = parent
+            placed += 1
+        end
+    end
+    return placed
+end
+
+--[[
+    The look of each region's trail. Ironroot marks its way with the same
+    lamps it works by; the Fen uses witchlight on stone, because a lantern
+    in the Fen is exactly the thing a player has learned not to trust.
+]]
+RegionBuilders.Wayfinding = table.freeze({
+    region_ironroot = table.freeze({
+        marker = Color3.fromRGB(62, 58, 56),
+        glow = Color3.fromRGB(255, 206, 128),
+    }),
+    region_mireglass = table.freeze({
+        marker = Color3.fromRGB(76, 78, 74),
+        glow = Color3.fromRGB(146, 214, 226),
     }),
 })
 
