@@ -87,6 +87,31 @@ function StatusEffectState.clear(_state: State): State
     return StatusEffectState.create()
 end
 
+--[[
+    Clear what was done to you, and only that.
+
+    A player drinking something to shake off a rooting or a drowsiness
+    must not also lose the shield they just put up -- that would make the
+    cure worse than the condition in exactly the moment it is reached
+    for. So this drops drowsy and rooted and leaves the shield alone,
+    which is the difference between a cure and a reset.
+]]
+function StatusEffectState.clearAfflictions(state: State): (State, boolean)
+    local nextState = table.clone(state)
+    local had = state.drowsyUntil > 0 or state.rootedUntil > 0
+    nextState.drowsyUntil = 0
+    nextState.drowsyMultiplier = 1
+    nextState.rootedUntil = 0
+    nextState.rootedMultiplier = 1
+    return nextState, had
+end
+
+-- Whether anything is currently being done to this player, which is the
+-- precondition a cure has to clear before it is spent.
+function StatusEffectState.afflicted(state: State, now: number): boolean
+    return now < state.drowsyUntil or now < state.rootedUntil
+end
+
 function StatusEffectState.snapshot(state: State, now: number): Snapshot
     local active = now < state.drowsyUntil
     local rooted = now < state.rootedUntil

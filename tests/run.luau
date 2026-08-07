@@ -21,6 +21,7 @@ TestRunner.run({
     require("./specs/TempestExpedition.spec"),
     require("./specs/CinderfallEncounters.spec"),
     require("./specs/Consumables.spec"),
+    require("./specs/ContentCensus.spec"),
     require("./specs/CinderfallExpedition.spec"),
     require("./specs/FrostmereEncounters.spec"),
     require("./specs/Epilogue.spec"),

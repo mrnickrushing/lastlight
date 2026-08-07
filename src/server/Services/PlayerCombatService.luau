@@ -360,6 +360,39 @@ end
 -- value and only later calls restoreStamina can see stamina go from
 -- "not full" to "full" in that gap — this advances (without persisting)
 -- so a precondition check sees exactly what restoreStamina is about to see.
+--[[
+    Shake off whatever is being done to this player. Returns whether
+    anything was actually cleared, so a caller can refuse to spend an item
+    on a player who is fine -- the same rule stamina restoration has had
+    since it shipped.
+]]
+function PlayerCombatService.clearAfflictions(self: PlayerCombatService, player: Player): any
+    local statusState = self._statusStates[player]
+    if statusState == nil then
+        return { applied = false, reason = "no_state" }
+    end
+    local now = workspace:GetServerTimeNow()
+    if not self._statusEffectState.afflicted(statusState, now) then
+        return { applied = false, reason = "nothing_to_clear" }
+    end
+    local nextStatus, had = self._statusEffectState.clearAfflictions(statusState)
+    self._statusStates[player] = nextStatus
+    self:_syncPlayer(player)
+    return { applied = had, reason = if had then "cleared" else "nothing_to_clear" }
+end
+
+--[[
+    Whether anything is being done to this player right now. Read before
+    the item is spent.
+]]
+function PlayerCombatService.isAfflicted(self: PlayerCombatService, player: Player): boolean
+    local statusState = self._statusStates[player]
+    if statusState == nil then
+        return false
+    end
+    return self._statusEffectState.afflicted(statusState, workspace:GetServerTimeNow())
+end
+
 function PlayerCombatService.peekStamina(self: PlayerCombatService, player: Player): number?
     local state = self._states[player]
     if state == nil then
