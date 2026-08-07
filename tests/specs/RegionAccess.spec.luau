@@ -65,8 +65,35 @@ return {
                     },
                 }
                 TestRunner.equal(RegionAccess.chapterReached(both, "region_mireglass"), true)
-                -- a region with no chapter of its own answers only to its flag
-                TestRunner.equal(RegionAccess.chapterReached(nil, "region_tempest"), true)
+                -- and the chain keeps going: the Reach waits on the Fen's
+                -- chapter, the Vale on the Reach's. Before chapters IV and
+                -- V existed these two answered only to their flags, which
+                -- would have opened them to anyone the day a flag flipped.
+                TestRunner.equal(RegionAccess.chapterReached(both, "region_tempest"), false)
+                local throughThree = {
+                    chapterOne = RESOLVED_ONE.chapterOne,
+                    chapters = {
+                        chapter_three = { status = "complete", outcome = "sealed" },
+                        chapter_two = { status = "complete", outcome = "cleared" },
+                    },
+                }
+                TestRunner.equal(RegionAccess.chapterReached(throughThree, "region_tempest"), true)
+                TestRunner.equal(
+                    RegionAccess.chapterReached(throughThree, "region_frostmere"),
+                    false
+                )
+                local throughFour = {
+                    chapterOne = RESOLVED_ONE.chapterOne,
+                    chapters = {
+                        chapter_four = { status = "complete", outcome = "navigable" },
+                        chapter_three = { status = "complete", outcome = "sealed" },
+                        chapter_two = { status = "complete", outcome = "cleared" },
+                    },
+                }
+                TestRunner.equal(RegionAccess.chapterReached(throughFour, "region_frostmere"), true)
+                -- a region with no chapter of its own still answers only to
+                -- its flag
+                TestRunner.equal(RegionAccess.chapterReached(nil, "region_hollow"), true)
             end,
         },
         {
