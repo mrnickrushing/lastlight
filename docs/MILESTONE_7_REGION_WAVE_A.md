@@ -54,13 +54,40 @@ Both are read at session build and again on change, so ordering does not
 matter. Setting them while *editing* does nothing — that value never
 reaches the run.
 
+### Verified live on 2026-08-07
+
+- **130 crafting benches** in the world, each carrying
+  `InteractionId=craft:<recipeId>`, `ActionId=craft_item` and its own
+  `Payload` — checked on a derived bench specifically, not just counted.
+- **The server boots clean** with the derived-resident change in it: the
+  town builds, Mara stands where she should, no errors.
+- **A real expedition reports `pois=6`** — Bramblewake placing its four
+  pinned fragment anchors plus two rotating.
+- **The tutorial skip works** — `tutorialComplete=true`, the toast
+  changing mid-run, `studio_tutorial_skipped` logged.
+
 ### What is still unverified
+
+**The derived resident bodies.** A fresh Studio save is `TownTier=0`, and
+`TownProgression.residentIds` returns nothing below tier 1, so only Mara
+(who is built separately) stands in town. The derivation is boot-safe and
+unexercised. Exercising it needs a save with chapter progress, which
+neither Studio hook grants — deliberately, since chapters are the thing a
+verification run should perform rather than be handed.
+
+The cheapest honest route is nights: tier is `floor((nights - 1) / 3)`,
+so a save at night four is tier 1 and shows chapter one's three, and a
+resolved chapter II shows seven. Somebody driving this should get to tier
+1 first and confirm the three authored residents still look right, then
+past chapter II to see a derived body for the first time.
+
+
 
 The consumable column and equip panel (#294, #299) are confirmed to
 **build** correctly — four consumable slots, ninety-six equip buttons,
 right labels, correctly hidden at zero owned — and are still unverified
-**populated**, because crafting is a world interaction: a driver has to
-walk to the workbench and tap it.
+**populated**. The benches exist now and are correctly wired, so this is
+a walk to the workshop and a keypress.
 
 Worth stating precisely, because getting it wrong wastes a session:
 `craft_item` is an **interaction id**, not a sent kind. Firing
