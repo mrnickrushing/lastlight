@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-07, at `main` = `HEAD` (PR #316), build `0.53.0`,
-save schema 21, 23 services. Published to Roblox as place version 130,
+Last updated: 2026-08-07, at `main` = `HEAD` (PR #318), build `0.53.0`,
+save schema 21, 23 services. Published to Roblox as place version 131,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 7 through 10 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** Studio is
@@ -46,6 +46,33 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#318** (v131) **nineteen residents are authored now, not eleven.**
+  Chapters IV and V's eight — the Reach's four and the Vale's four — get
+  what #316 gave chapters II and III. That is the whole cast of the half
+  of the town a player only reaches after the storm coast and the frozen
+  valley, and it is also the half whose tier four and five buildings had
+  shipped as procedural shells with nobody in them. Day puts each of them
+  at their own building (signal house, ropewalk, trade post, waterworks,
+  bell tower, infirmary, cold store, almshouse); dusk is the hour that
+  costs them something — Isolde south of her signal house with the lamp
+  lit behind her and nothing in front of it, Halvard locking the store,
+  Maud standing in the one door she has holding it open; night puts all
+  nineteen down the length of the lantern road. Positions were checked in
+  each phase against each other, against the eight spots the Crown and
+  the Hollow still derive, against Mara and against every footprint; the
+  closest pair in town is still Ena and Pip at 9.06.
+
+  **The camera threw out three of the eight new props.** The bell clapper
+  was a bolt until the ball became four times the shaft and the flight ran
+  past it; the grapnel was a microphone stand until the barbs turned back
+  up, because the corner is the whole shape; the keyring was a lollipop,
+  all ring and no keys, and a keyring is mostly keys. The mortar was a
+  pail and is a bowl. The lamp, the rope coil, the balance and the warming
+  pan read first time. All six were then hung on a real R15 rig, because a
+  prop that drops a stud below the grip can end up in the ground — the
+  closest clears the sole by 0.93. Same lesson as #316's five and #251's
+  six creature shapes. The remaining eight residents still derive, and the
+  census asserts nineteen authored bodies.
 - **#316** (v130) **eleven residents are authored now, not three.** The
   derivation from #313 is a floor and stays one; what moved is how far
   above it the authoring reaches. Chapters II and III's eight — the
