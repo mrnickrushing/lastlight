@@ -3,6 +3,8 @@
 local BellowsMaw = require("../../src/shared/BellowsMawEncounter")
 local ChapterCatalog = require("../../src/shared/ChapterCatalog")
 local LanternWitch = require("../../src/shared/LanternWitchEncounter")
+local AshRegent = require("../../src/shared/AshRegentEncounter")
+local NamelessNight = require("../../src/shared/NamelessNightEncounter")
 local TideboundTitan = require("../../src/shared/TideboundTitanEncounter")
 local WhiteHowler = require("../../src/shared/WhiteHowlerEncounter")
 local ResidentRoster = require("../../src/shared/ResidentRoster")
@@ -29,13 +31,15 @@ return {
             name = "every chapter names a region, a boss, and outcomes its boss can reach",
             run = function()
                 local chapters = ChapterCatalog.list()
-                TestRunner.equal(#chapters, 5)
+                TestRunner.equal(#chapters, 7)
                 local bosses = {
                     boss_warden_stag = WardenStag,
                     boss_bellows_maw = BellowsMaw,
                     boss_lantern_witch = LanternWitch,
                     boss_tidebound_titan = TideboundTitan,
                     boss_white_howler = WhiteHowler,
+                    boss_ash_regent = AshRegent,
+                    boss_nameless_night = NamelessNight,
                 }
                 for index, definition in chapters do
                     TestRunner.equal(definition.number, index)
@@ -55,6 +59,8 @@ return {
                 TestRunner.equal(ChapterCatalog.require("chapter_three").requires, "chapter_two")
                 TestRunner.equal(ChapterCatalog.require("chapter_four").requires, "chapter_three")
                 TestRunner.equal(ChapterCatalog.require("chapter_five").requires, "chapter_four")
+                TestRunner.equal(ChapterCatalog.require("chapter_six").requires, "chapter_five")
+                TestRunner.equal(ChapterCatalog.require("chapter_seven").requires, "chapter_six")
                 -- no two chapters may claim the same region or the same
                 -- boss, or forRegion and forBoss silently answer for one
                 -- of them and the other becomes unreachable
@@ -95,6 +101,12 @@ return {
                 end
                 TestRunner.equal(ChapterCatalog.isOutcome("chapter_four", "sheltered"), false)
                 TestRunner.equal(ChapterCatalog.isOutcome("chapter_five", "navigable"), false)
+                for _, outcome in { "remembered", "recast", "erased" } do
+                    TestRunner.equal(ChapterCatalog.isOutcome("chapter_six", outcome), true)
+                end
+                for _, outcome in { "lantern_kept", "lantern_out", "lantern_shared" } do
+                    TestRunner.equal(ChapterCatalog.isOutcome("chapter_seven", outcome), true)
+                end
                 TestRunner.equal(ChapterCatalog.isOutcome("chapter_two", "sealed"), false)
                 TestRunner.equal(
                     ChapterCatalog.isDecision("chapter_two", "restore_farmland"),

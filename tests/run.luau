@@ -22,6 +22,7 @@ TestRunner.run({
     require("./specs/CinderfallEncounters.spec"),
     require("./specs/CinderfallExpedition.spec"),
     require("./specs/FrostmereEncounters.spec"),
+    require("./specs/Epilogue.spec"),
     require("./specs/HollowFinale.spec"),
     require("./specs/FrostmereExpedition.spec"),
     require("./specs/IronrootEnemies.spec"),

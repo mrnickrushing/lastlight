@@ -6,6 +6,8 @@ local ExpeditionInventory = require("./ExpeditionInventory")
 local ProfessionCatalog = require("./ProfessionCatalog")
 local ChapterCatalog = require("./ChapterCatalog")
 local Crafting = require("./Crafting")
+local HollowFinale = require("./Content/Definitions/HollowFinale")
+local NamelessNight = require("./NamelessNightEncounter")
 local MemoryFragments = require("./MemoryFragments")
 local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
@@ -13,6 +15,7 @@ local Equipment = require("./Equipment")
 local GearTraits = require("./GearTraits")
 local GearWear = require("./GearWear")
 local ResidentLife = require("./ResidentLife")
+local ResidentRoster = require("./ResidentRoster")
 local TownDecorations = require("./TownDecorations")
 local TownProgression = require("./TownProgression")
 local TownCondition = require("./TownCondition")
@@ -56,6 +59,23 @@ export type Profile = {
             by chapter id, and validated against ChapterCatalog.
         ]]
         chapters: { [string]: any },
+        --[[
+            The finale's own record. It could not live in `chapters`: that
+            block is deliberately five fixed fields, and the Hollow
+            records what a party did in its scenes as well as what they
+            chose at the end -- the post left empty, the light spent, who
+            came back up. The epilogue reads all of it.
+        ]]
+        finale: {
+            abandonedPost: string?,
+            completedAt: number?,
+            ending: string?,
+            leftBehind: string?,
+            light: number,
+            rescued: string?,
+            status: string,
+            transactionId: string?,
+        },
         fragments: { [string]: boolean },
     },
     town: {
@@ -88,7 +108,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 20,
+        schemaVersion = 21,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -115,6 +135,16 @@ function SaveSchema.default(now: number): Profile
                 wardenOutcome = nil,
             },
             chapters = {},
+            finale = {
+                abandonedPost = nil,
+                completedAt = nil,
+                ending = nil,
+                leftBehind = nil,
+                light = NamelessNight.StartingLight,
+                rescued = nil,
+                status = "unresolved",
+                transactionId = nil,
+            },
             fragments = MemoryFragments.normalize(nil),
         },
         town = {
@@ -266,6 +296,59 @@ function SaveSchema.normalize(value: any, now: number): Profile
             end
         end
     end
+    --[[
+        The finale. A record survives only if it names an ending the
+        Hollow actually offers, with a real transaction id -- the same bar
+        every chapter record clears. Everything else it carries is
+        detail the epilogue reads, and each field is dropped on its own
+        rather than taking the record down with it, because a save that
+        forgot which post was abandoned should still remember how the
+        story ended.
+    ]]
+    local finale = if type(story) == "table" then story.finale else nil
+    if type(finale) == "table" and finale.status == "complete" then
+        local ending: string? = nil
+        for _, definition in HollowFinale.Endings do
+            if definition.id == finale.ending then
+                ending = definition.id
+            end
+        end
+        local post: string? = nil
+        for _, postId in NamelessNight.PostIds do
+            if postId == finale.abandonedPost then
+                post = postId
+            end
+        end
+        if
+            ending ~= nil
+            and type(finale.transactionId) == "string"
+            and finale.transactionId ~= ""
+            and #finale.transactionId <= 160
+            and type(finale.completedAt) == "number"
+            and finale.completedAt > 0
+        then
+            profile.story.finale = {
+                abandonedPost = post,
+                completedAt = finale.completedAt,
+                ending = ending,
+                leftBehind = if type(finale.leftBehind) == "string"
+                        and ResidentRoster.get(finale.leftBehind) ~= nil
+                    then finale.leftBehind
+                    else nil,
+                light = math.clamp(
+                    math.floor(tonumber(finale.light) or 0),
+                    0,
+                    NamelessNight.StartingLight
+                ),
+                rescued = if type(finale.rescued) == "string"
+                        and ResidentRoster.get(finale.rescued) ~= nil
+                    then finale.rescued
+                    else nil,
+                status = "complete",
+                transactionId = finale.transactionId,
+            }
+        end
+    end
     -- Recovered memory fragments. Unknown IDs are dropped the same way gear
     -- and quest claims drop theirs, so a retired fragment cannot keep
     -- occupying an archive count. A schema-13 profile simply arrives with
@@ -348,7 +431,7 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 20
+    profile.schemaVersion = 21
     return profile
 end
 
@@ -655,6 +738,85 @@ function SaveSchema.withChapterResolution(
             duplicate = false,
             reason = "resolved",
             record = table.clone(nextProfile.story.chapters[chapterId]),
+        }
+end
+
+--[[
+    Record the finale.
+
+    Written like a chapter resolution and idempotent the same way, but it
+    writes two places: the finale block, which carries what a party did in
+    the Hollow's scenes, and chapter seven's record, so everything that
+    already reasons about chapters (tier floors, resident arrival, the
+    story's shape) sees the last chapter close without learning a new
+    thing to read.
+
+    The ending is chapter seven's decision and the world state it produces
+    is its outcome, which keeps the catalog's contract intact: a player
+    chose `ending_shared`, and what the world became is `lantern_shared`.
+]]
+local ENDING_OUTCOMES: { [string]: string } = {
+    ending_kept = "lantern_kept",
+    ending_ended = "lantern_out",
+    ending_shared = "lantern_shared",
+}
+
+function SaveSchema.withFinaleResolution(
+    profile: Profile,
+    transactionId: string,
+    record: any,
+    now: number
+): (Profile, any)
+    assert(transactionId ~= "" and #transactionId <= 160, "finale transaction ID is invalid")
+    assert(type(record) == "table", "finale record is required")
+    local outcome = ENDING_OUTCOMES[record.ending]
+    assert(outcome ~= nil, "finale ending is unknown")
+
+    local current = profile.story.finale
+    if current.status == "complete" then
+        return profile,
+            {
+                applied = false,
+                duplicate = current.transactionId == transactionId,
+                reason = if current.transactionId == transactionId
+                    then "duplicate"
+                    else "finale_already_resolved",
+                record = table.clone(current),
+            }
+    end
+    if not SaveSchema.isChapterComplete(profile, "chapter_six") then
+        return profile,
+            { applied = false, duplicate = false, reason = "chapter_locked", record = nil }
+    end
+
+    local nextProfile: any = table.clone(profile)
+    nextProfile.story = table.clone(profile.story)
+    nextProfile.story.chapters = table.clone(profile.story.chapters)
+    nextProfile.story.finale = {
+        abandonedPost = record.abandonedPost,
+        completedAt = now,
+        ending = record.ending,
+        leftBehind = record.leftBehind,
+        light = math.clamp(math.floor(tonumber(record.light) or 0), 0, NamelessNight.StartingLight),
+        rescued = record.rescued,
+        status = "complete",
+        transactionId = transactionId,
+    }
+    nextProfile.story.chapters.chapter_seven = {
+        completedAt = now,
+        decision = record.ending,
+        outcome = outcome,
+        status = "complete",
+        transactionId = transactionId,
+    }
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile,
+        {
+            applied = true,
+            duplicate = false,
+            reason = "resolved",
+            record = table.clone(nextProfile.story.finale),
         }
 end
 

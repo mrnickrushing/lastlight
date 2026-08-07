@@ -250,6 +250,40 @@ local ERA_PROFILES: { [number]: any } = {
     -- Schema 19 shipped rolled traits; 20 adds chapters II and III. A
     -- 19-era save carries traits that must survive, and must arrive in 20
     -- with no chapters beyond the first -- those regions did not exist.
+    -- Schema 20 shipped chapters II and III; 21 adds the Hollow's finale
+    -- record. A 20-era save carries chapters that must survive, and must
+    -- arrive in 21 with an unresolved finale and its light untouched --
+    -- nobody had been down there, because there was no down there.
+    [20] = {
+        schemaVersion = 20,
+        createdAt = 36,
+        updatedAt = 96,
+        revision = 150,
+        tutorial = { stage = "complete", complete = true, selectedTool = "axe" },
+        profession = { selectedId = "profession_engineer" },
+        gear = { gear_amber_edge = 1 },
+        equipped = { weapon = "gear_amber_edge" },
+        gearWear = { gear_amber_edge = 62 },
+        gearTraits = { gear_amber_edge = "trait_keen" },
+        story = {
+            chapterOne = {
+                completedAt = 40,
+                decision = "shared_agroforest",
+                status = "complete",
+                transactionId = "chapter_1:era20:hash:7",
+                wardenOutcome = "preserved",
+            },
+            chapters = {
+                chapter_two = {
+                    completedAt = 60,
+                    decision = "vent_stope",
+                    outcome = "cleared",
+                    status = "complete",
+                    transactionId = "chapter_2:era20:hash:7",
+                },
+            },
+        },
+    },
     [19] = {
         schemaVersion = 19,
         createdAt = 34,
