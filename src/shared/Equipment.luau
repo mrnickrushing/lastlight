@@ -113,6 +113,71 @@ local DEFINITIONS: { [string]: Definition } = {
     }),
 
     --[[
+        Bramblewake's other eight. The starting region shipped with a hood
+        and boots and nothing else, because its kit predates the slot
+        system -- the census recorded that gap, and this closes it. The
+        numbers are the gentlest in the game on purpose: this is the gear
+        a player crafts before they understand the light/heavy choice, so
+        it introduces the two lines without punishing either.
+    ]]
+    gear_meadow_cowl = table.freeze({
+        slot = "head",
+        damageReduction = 0,
+        description = "Recover stamina 4% faster. Cut light on purpose.",
+        displayName = "MEADOW COWL",
+        staminaRegenMultiplier = 1.04,
+    }),
+    gear_bramble_treads = table.freeze({
+        slot = "feet",
+        damageReduction = 0.03,
+        description = "Softens incoming damage by 3%. Heavy, and worth it.",
+        displayName = "BRAMBLE TREADS",
+        staminaRegenMultiplier = 1,
+    }),
+    gear_meadow_coat = table.freeze({
+        slot = "body",
+        damageReduction = 0,
+        description = "Recover stamina 5% faster. Cut light on purpose.",
+        displayName = "MEADOW COAT",
+        staminaRegenMultiplier = 1.05,
+    }),
+    gear_bark_plate = table.freeze({
+        slot = "body",
+        damageReduction = 0.04,
+        description = "Softens incoming damage by 4%. Heavy, and worth it.",
+        displayName = "BARK PLATE",
+        staminaRegenMultiplier = 1,
+    }),
+    gear_meadow_wraps = table.freeze({
+        slot = "hands",
+        damageReduction = 0,
+        description = "Recover stamina 4% faster. Cut light on purpose.",
+        displayName = "MEADOW WRAPS",
+        staminaRegenMultiplier = 1.04,
+    }),
+    gear_bramble_gauntlets = table.freeze({
+        slot = "hands",
+        damageReduction = 0.03,
+        description = "Softens incoming damage by 3%. Heavy, and worth it.",
+        displayName = "BRAMBLE GAUNTLETS",
+        staminaRegenMultiplier = 1,
+    }),
+    gear_foxfire_token = table.freeze({
+        slot = "charm",
+        damageReduction = 0,
+        description = "Recover stamina 5% faster. It hums faintly at dusk.",
+        displayName = "FOXFIRE TOKEN",
+        staminaRegenMultiplier = 1.05,
+    }),
+    gear_heartwood_seal = table.freeze({
+        slot = "charm",
+        damageReduction = 0.04,
+        description = "Softens incoming damage by 4%. Heartwood remembers.",
+        displayName = "HEARTWOOD SEAL",
+        staminaRegenMultiplier = 1,
+    }),
+
+    --[[
         The other five regions' gear.
 
         Six weapon families and five armour slots across five regions is a

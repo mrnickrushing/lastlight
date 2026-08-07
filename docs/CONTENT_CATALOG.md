@@ -314,7 +314,7 @@ event cannot block progression.
 
 ### Crafting target
 
-**This target was revised down from 180 to 122, deliberately.** The
+**This target was revised down from 180 to 130, deliberately.** The
 original allocation was written before the game had weapon families,
 armour lines, or an effect system for consumables, and it assumed
 categories that turned out not to exist -- tool variants (tools are a
@@ -328,12 +328,12 @@ second copy of every item with different numbers. That clears any count
 gate and nothing in a test suite can detect it, but a player meets it
 within an hour. The count moved instead.
 
-The 122 launch recipes are allocated as:
+The 130 launch recipes are allocated as:
 
 | ID | Recipe group | Count | What makes each one distinct |
 |---|---|---:|---|
 | recipe_group_weapons | Weapons | 36 | Six families × six regions; a region is an axis (weight, reach, range, stamina, guard), not a tier |
-| recipe_group_wearables | Armour | 52 | Five slots × two lines for five regions; Bramblewake still has only its original hood and boots |
+| recipe_group_wearables | Armour | 60 | Five slots × six regions × two lines; light returns stamina, heavy reduces damage, every slot offers both |
 | recipe_group_consumables | Things that are used | 34 | Six effect kinds, each answering a threat the game already makes |
 
 No recipe may be a strict paid upgrade. Each recipe declares its output,
@@ -341,12 +341,11 @@ its station, and ingredients the expedition ledger accepts, and
 `ContentCensus.spec` asserts these counts against the catalogs so the
 number in this table cannot drift from the number in the game.
 
-One known gap, recorded rather than filled with content nobody designed:
-**Bramblewake carries two armour pieces where every later region has
-ten**, because the starting region's kit predates the slot system. Eight
-recipes and a tutorial-adjacent change. (Its other gap — four POIs where
-every region has twelve — was closed by the wave that gave it eight
-rotating POIs, with the four fragment anchors pinned into every run.)
+Both of the gaps this section once recorded are closed: Bramblewake now
+carries ten armour pieces and twelve points of interest like every other
+region, with its four fragment-anchored POIs pinned into every run. The
+gentlest numbers in the game live on its new armour on purpose — it is
+the gear a player crafts before they understand the light/heavy choice.
 
 ## Dynamic events
 

@@ -101,10 +101,10 @@ return {
                 meant a second copy of every item with different numbers.
                 This asserts what was built instead.
             ]]
-            name = "the crafting inventory is 122 recipes, and each group is what the doc says",
+            name = "the crafting inventory is 130 recipes, and each group is what the doc says",
             run = function()
                 local recipes = CraftingCatalog.list()
-                TestRunner.equal(#recipes, 122)
+                TestRunner.equal(#recipes, 130)
 
                 local weapons, armour, used = 0, 0, 0
                 for _, recipe in recipes do
@@ -119,16 +119,10 @@ return {
                         used += 1
                     end
                 end
-                --[[
-                    52 armour rather than 54: Bramblewake only ever had two
-                    pieces, a hood and boots, and they were not rebuilt into
-                    the five-slot shape when the other regions were. That is
-                    a real gap in the first region's kit and it is written
-                    down here rather than papered over with two filler
-                    items.
-                ]]
+                -- 60 armour: five slots × two lines × six regions,
+                -- Bramblewake included since its gap closed.
                 TestRunner.equal(weapons, 36)
-                TestRunner.equal(armour, 52)
+                TestRunner.equal(armour, 60)
                 TestRunner.equal(used, 34)
                 TestRunner.equal(weapons + armour + used, #recipes, "a recipe makes an orphan")
                 TestRunner.equal(#Consumables.list(), 34)
@@ -178,10 +172,10 @@ return {
                 local doc = fs.readFile("docs/CONTENT_CATALOG.md")
                 for _, claim in
                     {
-                        "The 122 launch recipes",
+                        "The 130 launch recipes",
                         "180 reusable surface modules",
                         "| recipe_group_weapons | Weapons | 36 |",
-                        "| recipe_group_wearables | Armour | 52 |",
+                        "| recipe_group_wearables | Armour | 60 |",
                         "| recipe_group_consumables | Things that are used | 34 |",
                     }
                 do
