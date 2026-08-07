@@ -7,15 +7,48 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-06, at `main` = `35ee5c3` (PR #272), build `0.53.0`,
-save schema 20, 23 services. Published to Roblox as place version 103,
-matching this revision exactly. **The owner's standing directive: finish
-Milestones 6 and 7 entirely, wave by wave, each merged and published.**
-Studio is unavailable this stretch ("do what you can without using
-studio"), so waves ship terminal-only and every Studio-facing check is
-recorded open rather than performed.
+Last updated: 2026-08-07, at `main` = `2bc4cd6` (PR #282), build `0.53.0`,
+save schema 20, 23 services. Published to Roblox as place version 113,
+matching this revision exactly. **The owner's standing directive: complete
+Milestones 7 through 10 continuously, wave by wave, each implemented,
+tested, merged and published, with no check-in between waves.** Studio is
+available again and is driven from the terminal (see the M7 runbook for
+the launch recipe); Studio-facing checks that have not been performed are
+recorded open rather than assumed.
+
+**Milestones 7 and 8 are complete.** The next wave is M9 wave A
+(Cinderfall Crown catalog); the whole remaining queue, with files, shapes
+and done-gates, is in [WAVE_PLAN_M8_M10.md](WAVE_PLAN_M8_M10.md).
 
 Newest first since the last header:
+- **#277–#282** (v108–v113) **Milestone 8 finished**: Frostmere Vale from
+  catalog to town. **#277** the Vale's catalog (30 modules, 12 POIs, 8
+  events, 5 materials) around one rule — warmth is a resource, and
+  nothing here is safe because it is indoors, it is safe because
+  something in it is still burning. **#278** its six enemies, the Abbey
+  Silence (takes sound, leaves sight; three cloister bells put it back),
+  the Aurora Hart (never destroys warmth, only divides it) and
+  `boss_white_howler` in three phases — quiet the bowl, share the
+  warmth, read the aurora in order — whose middle verb is chapter V's
+  decision. **#279** the Vale's thirty visuals, which also turned up that
+  the Reach's three encounters had shipped with no arenas at all; both
+  regions' arenas are filed now and the coverage spec's expected list ran
+  from three to twelve. **#280** chapters IV and V, which closed a gate
+  that had been standing open: `chapterReached` returns true for a region
+  no chapter names, so the Reach and the Vale would have opened to a
+  chapter-I player the day their flags flipped. **#281** town tiers four
+  and five with six buildings to grow into (signal house, cold store,
+  almshouse, ropewalk, bell tower, infirmary — 16 → 22). **#282** eight
+  more residents, four per region, 11 → 19, with a spec that walks every
+  quest with every signal raised so an unrouted objective kind cannot
+  reach a player as a promise the game has no way to keep.
+- **#274–#276** (v105–v107) **M8 waves A–C: Tempest Reach** — catalog,
+  roster, the Lighthouse Eater (windows are rented, not bought), the
+  Admiral Wreck (cover comes back if a party lets go), the Tidebound
+  Titan (climb, ground, lower, in that order every phase), and thirty
+  visuals whose identity is exposure. #276 also wrote
+  [WAVE_PLAN_M8_M10.md](WAVE_PLAN_M8_M10.md), the queue that lets a cold
+  session start warm.
 - **#266–#272** (v98–v103) **the new regions went from content to
   runtime**, and the session's own blind spot got closed first:
   **#266** an action-wiring spec that reads the ids, the contract, the
