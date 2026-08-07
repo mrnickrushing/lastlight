@@ -254,3 +254,33 @@ copies.
 both builders, and pins both `enabled` flags false — geometry is
 necessary but not sufficient, and the regions stay shut until their
 services and arenas exist too.
+
+## The regions' runtime
+
+Four waves took both new regions from "a catalog and some geometry" to
+"everything but dressing":
+
+- **Readiness (#267)** — `RegionBuilders` records which builder draws a
+  region and what that region still owes, and `RegionAccess` refuses one
+  that cannot be walked even if its enabled flag is flipped. Three gates
+  in order: enabled, chapter reached, walkable.
+- **Resource nodes (#268)** — the same contract Bramblewake has, planted
+  from each region's own material list, with every material put through
+  the ledger by spec. That is the #212 lesson a layer earlier: a node
+  made of a material nobody registered pays nothing, silently.
+- **POIs and event sockets (#269)** — anchors, attributes, tags, and one
+  anchor per event step at the offsets the event itself names. A spec
+  holds the catalog to those offsets, because a step outside its module
+  is a prompt in the next module's ground.
+- **Arenas (#270)** — one builder for the four things every fight wants
+  from a world, with anchors taken from the encounters' own id lists so
+  the arena and the fight cannot drift.
+- **`RegionEncounterService` (this wave)** — one service driving all six
+  new encounters rather than six services of eight hundred lines each.
+  The encounters were written to the Old Growth's contract on purpose,
+  so what differs between them arrives as an interaction table and their
+  rules stay in their own modules.
+
+What both regions still owe is wayfinding and mesh dressing, which is an
+art pass. The flags stay off until that lands and a live session walks
+one end to end.

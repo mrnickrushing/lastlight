@@ -40,7 +40,6 @@ local ENTRIES: { [string]: any } = {
         builder = IronrootBuilder,
         walkable = false,
         missing = {
-            "encounter services to drive the arenas",
             "wayfinding and mesh dressing",
         },
     },
@@ -48,7 +47,6 @@ local ENTRIES: { [string]: any } = {
         builder = MireglassBuilder,
         walkable = false,
         missing = {
-            "encounter services to drive the arenas",
             "wayfinding and mesh dressing",
         },
     },
