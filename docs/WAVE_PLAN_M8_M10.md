@@ -5,8 +5,11 @@ it done."* This is the queue that makes that possible without a check-in
 between waves. Every entry names its files, its shape, and the gate that
 says it is done, so a session picks up cold and starts warm.
 
-Milestone 7 is complete. Its runbook is
-[MILESTONE_7_REGION_WAVE_A.md](MILESTONE_7_REGION_WAVE_A.md).
+Milestones 7 and 8 are complete. Milestone 7's runbook is
+[MILESTONE_7_REGION_WAVE_A.md](MILESTONE_7_REGION_WAVE_A.md); milestone 8
+shipped as #274–#282 (place versions 105–113).
+
+**Next up: M9 wave A.**
 
 ## The rhythm
 
@@ -35,13 +38,19 @@ them:
 |---|---|---|
 | A ✅ | Tempest Reach catalog (30 modules, 12 POIs, 8 events, 5 materials) | Shipped #274 |
 | B ✅ | Reach roster, Lighthouse Eater, Admiral Wreck, Tidebound Titan | Shipped #275 |
-| C | **Reach geometry** — `TempestBuilder`, 30 visuals. Identity: exposure. Primitives: jetty deck, breakwater block, wreck hull, rigging, signal mast, storm rail, grounding rod, spray. Register in `RegionBuilders` + `NodeMaterials` + `Wayfinding` | `RegionBuilderCoverage` green for `region_tempest` |
-| D | **Frostmere Vale catalog** — chapter V. Identity: warmth as a resource. Materials: frostmere ice, thawed iron, ember moss, wool, aurora salt | Its own spec passes 2,000 seeds; Bramblewake still `2b08c29f` |
-| E | **Vale roster + elites + White Howler** — catalog names `enemy_*` for Frostmere; elites per CONTENT_CATALOG; boss `boss_white_howler` (3 phases: manage noise, share warmth, track aurora) | Encounter spec: kill switch, verb order, outcomes, no shared telegraph |
-| F | **Vale geometry** — `FrostmereBuilder`, 30 visuals | Coverage spec green for `region_frostmere` |
-| G | **Chapters IV–V** — extend `ChapterCatalog` with `chapter_four` (region_tempest, boss_tidebound_titan, outcomes navigable/scoured/broken) and `chapter_five` (region_frostmere, boss_white_howler). No schema bump: `story.chapters` already generic | `ChapterProgress` spec extended; resident arrival still gated |
-| H | **Eight more residents** — four from the Reach, four from the Vale, into `ResidentRoster` with `arrivesInChapter` 4 and 5, jobs on real buildings, one quest each | `ResidentRoster` spec: 19 residents, no shared building/quest/title |
-| I | **Town tiers 4–5** — extend `TownProgression` ceiling to 5 behind chapter IV, floor at 4 behind chapter V | Tier spec extended; nights alone still cap at 3 |
+| C ✅ | **Reach geometry** — `TempestBuilder`, 30 visuals. Identity: exposure. Primitives: jetty deck, breakwater block, wreck hull, rigging, signal mast, storm rail, grounding rod, spray. Register in `RegionBuilders` + `NodeMaterials` + `Wayfinding` | `RegionBuilderCoverage` green for `region_tempest` |
+| D ✅ | **Frostmere Vale catalog** — chapter V. Identity: warmth as a resource. Materials: frostmere ice, thawed iron, ember moss, wool, aurora salt | Its own spec passes 2,000 seeds; Bramblewake still `2b08c29f` |
+| E ✅ | **Vale roster + elites + White Howler** — catalog names `enemy_*` for Frostmere; elites per CONTENT_CATALOG; boss `boss_white_howler` (3 phases: manage noise, share warmth, track aurora) | Encounter spec: kill switch, verb order, outcomes, no shared telegraph |
+| F ✅ | **Vale geometry** — `FrostmereBuilder`, 30 visuals | Coverage spec green for `region_frostmere` |
+| G ✅ | **Chapters IV–V** — extend `ChapterCatalog` with `chapter_four` (region_tempest, boss_tidebound_titan, outcomes navigable/scoured/broken) and `chapter_five` (region_frostmere, boss_white_howler). No schema bump: `story.chapters` already generic | `ChapterProgress` spec extended; resident arrival still gated |
+| H ✅ | **Eight more residents** — four from the Reach, four from the Vale, into `ResidentRoster` with `arrivesInChapter` 4 and 5, jobs on real buildings, one quest each | `ResidentRoster` spec: 19 residents, no shared building/quest/title |
+| I ✅ | **Town tiers 4–5** — extend `TownProgression` ceiling to 5 behind chapter IV, floor at 4 behind chapter V | Tier spec extended; nights alone still cap at 3 |
+
+Wave I shipped before H, because eight residents need eight buildings to
+work in and the town only had five unclaimed. Tiers four and five brought
+six more (16 → 22), built as procedural shells rather than authored
+meshes: the mesh pipeline is a separate art pass, and a tier a player can
+reach has to have something standing in it the day it opens.
 
 ## Milestone 9 — Region production wave C and finale
 
@@ -79,5 +88,15 @@ them:
 - **A new region's builder returns false for unknown keys**, and the
   coverage spec is what turns "geometry exists" into "geometry is
   complete".
+- **A new region needs an arena entry per encounter**, in
+  `RegionBuilders.Arenas`, and the coverage spec's expected list has to
+  grow with it. The Reach shipped three encounters with no arenas at all
+  and nothing failed for two waves.
+- **A new chapter changes who can reach its region.**
+  `RegionAccess.chapterReached` answers true for a region no chapter
+  names, so a region without a chapter is gated only by its flag.
+- **A quest's objective kind must be routed in `Quests.currentValue`**
+  and fed by `SaveSchema.questSignals`. An unrouted kind reads zero
+  forever and nothing errors.
 - **The cylinder rule**: a `Cylinder` part's axis is its `Size.X`. This
   has cost six shapes so far. Thickness on X for a disc, then rotate.
