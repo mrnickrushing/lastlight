@@ -16,11 +16,13 @@
 local fs = require("@lune/fs")
 local Ironroot = require("../../src/shared/Content/Definitions/IronrootExpedition")
 local Mireglass = require("../../src/shared/Content/Definitions/MireglassExpedition")
+local Tempest = require("../../src/shared/Content/Definitions/TempestExpedition")
 local TestRunner = require("../TestRunner")
 
 local REGIONS = {
     { catalog = Ironroot, builder = "src/server/World/IronrootBuilder.luau" },
     { catalog = Mireglass, builder = "src/server/World/MireglassBuilder.luau" },
+    { catalog = Tempest, builder = "src/server/World/TempestBuilder.luau" },
 }
 
 local function builderSource(path: string): string
@@ -69,6 +71,7 @@ return {
                 -- allowed to.
                 TestRunner.equal(byId.region_ironroot.enabled, false)
                 TestRunner.equal(byId.region_mireglass.enabled, false)
+                TestRunner.equal(byId.region_tempest.enabled, false)
             end,
         },
         {
