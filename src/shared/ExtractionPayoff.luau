@@ -33,6 +33,12 @@ local PRESENTATION = table.freeze({
     material_ember_moss = table.freeze({ kind = "ember_moss", label = "EMBER MOSS" }),
     material_frostmere_wool = table.freeze({ kind = "wool", label = "FROSTMERE WOOL" }),
     material_aurora_salt = table.freeze({ kind = "aurora_salt", label = "AURORA SALT" }),
+    -- Cinderfall Crown
+    material_cindersteel = table.freeze({ kind = "cindersteel", label = "CINDERSTEEL" }),
+    material_memory_glass = table.freeze({ kind = "memory_glass", label = "MEMORY GLASS" }),
+    material_ash_silk = table.freeze({ kind = "ash_silk", label = "ASH SILK" }),
+    material_kiln_pearl = table.freeze({ kind = "kiln_pearl", label = "KILN PEARL" }),
+    material_crown_coal = table.freeze({ kind = "crown_coal", label = "CROWN COAL" }),
 })
 
 export type Entry = {
