@@ -73,6 +73,24 @@ end
 -- Progress is always read live from `signals`, never stored, so a quest
 -- that briefly regresses (e.g. crafting an item and then using it up)
 -- doesn't lose credit once already claimed — only the claimed set persists.
+--[[
+    Whether a quest's arc has reached it yet. A stage whose predecessor is
+    unclaimed is not merely hidden -- it does not progress either, so a
+    player cannot satisfy stage three by accident while stage one is still
+    open and then have both claim themselves in the same tick.
+]]
+function Quests.isUnlocked(questId: string, claimed: { [string]: boolean }): boolean
+    local quest = QuestCatalog.get(questId)
+    if quest == nil then
+        return false
+    end
+    local requires = quest.requires
+    if requires == nil then
+        return true
+    end
+    return claimed[requires] == true
+end
+
 function Quests.progress(questId: string, signals: Signals): (number, number, boolean)
     if not QuestCatalog.isValid(questId) then
         return 0, 0, false
@@ -86,13 +104,16 @@ end
 function Quests.snapshot(claimed: { [string]: boolean }, signals: Signals): { any }
     local result = {}
     for _, quest in QuestCatalog.list() do
+        local unlocked = Quests.isUnlocked(quest.id, claimed)
         local current, threshold, complete = Quests.progress(quest.id, signals)
         table.insert(result, {
             claimed = claimed[quest.id] == true,
-            complete = complete,
+            complete = complete and unlocked,
             displayName = quest.displayName,
             id = quest.id,
-            progress = current,
+            locked = not unlocked,
+            progress = if unlocked then current else 0,
+            requires = quest.requires,
             threshold = threshold,
         })
     end
@@ -115,7 +136,15 @@ function Quests.checkAndClaim(
     local nextMaterials = materials
 
     for _, quest in QuestCatalog.list() do
-        if claimed[quest.id] ~= true then
+        --[[
+            Unlock is judged against the set this pass started with, not
+            the running one. Otherwise claiming stage one would unlock
+            stage two inside the same loop and a player who had already
+            satisfied everything would receive a whole arc's rewards in
+            one tick without ever hearing the next request. One stage per
+            arc per pass; the next pass takes the next one.
+        ]]
+        if claimed[quest.id] ~= true and Quests.isUnlocked(quest.id, claimed) then
             local _current, _threshold, complete = Quests.progress(quest.id, signals)
             if complete then
                 if nextClaimed == claimed then

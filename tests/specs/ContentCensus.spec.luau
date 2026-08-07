@@ -161,6 +161,76 @@ return {
         },
         {
             --[[
+                Quests, counted the same way as everything else. The
+                interesting assertion is not the total: it is that every
+                resident has an arc that starts where the roster says it
+                does and runs forward without a cycle, because a stage
+                that requires itself -- or two stages that require each
+                other -- would lock silently rather than fail.
+            ]]
+            name = "every resident's arc starts where the roster says and goes somewhere",
+            run = function()
+                local QuestCatalog = require("../../src/shared/QuestCatalog")
+                local byId: { [string]: any } = {}
+                for _, quest in QuestCatalog.list() do
+                    byId[quest.id] = quest
+                end
+                TestRunner.equal(#QuestCatalog.list(), 33)
+
+                local stagesFor: { [string]: number } = {}
+                for _, quest in QuestCatalog.list() do
+                    TestRunner.truthy(quest.residentId ~= nil, quest.id .. " is nobody's quest")
+                    TestRunner.truthy(
+                        ResidentRoster.get(quest.residentId) ~= nil,
+                        quest.id .. " belongs to somebody who does not exist"
+                    )
+                    stagesFor[quest.residentId] = (stagesFor[quest.residentId] or 0) + 1
+                    -- walk the chain back to its start, refusing a cycle
+                    local seen: { [string]: boolean } = { [quest.id] = true }
+                    local cursor = quest
+                    local guard = 0
+                    while cursor.requires ~= nil and guard < 12 do
+                        guard += 1
+                        local previous = byId[cursor.requires]
+                        TestRunner.truthy(
+                            previous ~= nil,
+                            quest.id .. " requires a quest that does not exist"
+                        )
+                        TestRunner.equal(
+                            seen[(previous :: any).id],
+                            nil,
+                            "quest arc loops at " .. (previous :: any).id
+                        )
+                        seen[(previous :: any).id] = true
+                        cursor = previous :: any
+                    end
+                    TestRunner.equal(
+                        cursor.requires,
+                        nil,
+                        quest.id .. " never reaches the start of its arc"
+                    )
+                    -- and the arc's first stage is the one the roster names
+                    TestRunner.equal(
+                        cursor.id,
+                        (ResidentRoster.require(quest.residentId) :: any).questId,
+                        quest.residentId .. "'s arc starts somewhere the roster does not"
+                    )
+                end
+
+                for _, definition in ResidentRoster.list() do
+                    TestRunner.truthy(
+                        (stagesFor[definition.id] or 0) >= 1,
+                        definition.id .. " has nothing to ask for"
+                    )
+                end
+                -- chapter one's three are the ones with runway for an arc
+                for _, residentId in { "npc_tomas_reed", "npc_pip_wren", "npc_ena_moss" } do
+                    TestRunner.equal(stagesFor[residentId], 3, residentId .. " lost an arc stage")
+                end
+            end,
+        },
+        {
+            --[[
                 The census is only worth anything if it matches the
                 document, so it reads the document. A count changed in one
                 place and not the other is exactly the drift this exists to
@@ -177,6 +247,7 @@ return {
                         "| recipe_group_weapons | Weapons | 36 |",
                         "| recipe_group_wearables | Armour | 60 |",
                         "| recipe_group_consumables | Things that are used | 34 |",
+                        "| quest_group_resident | Resident arcs | 33 |",
                     }
                 do
                     TestRunner.truthy(
