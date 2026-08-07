@@ -10,7 +10,7 @@ Milestones 7, 8 and 9 are complete. Milestone 7's runbook is
 shipped as #274–#282 (v105–v113) and milestone 9 as #284–#290
 (v114–v120).
 
-**Next up: M10 wave A-1.**
+**Next up: M10 wave A-2 — a code wave before a content wave.**
 
 ## The rhythm
 
@@ -26,6 +26,11 @@ them:
 
 - **Live Studio passes** for anything a camera has to judge. The ledger
   of what is open lives in the M7 runbook.
+- **The gear art pass.** 82 of the 90 craftable items draw a derived
+  plan: the family's silhouette in the region's palette, marked
+  `derived = true`. Nothing is invisible and nothing claims to be
+  authored. Replacing them is an art pass on the same footing as the
+  regions' mesh dressing.
 - **The WHET press** on a genuinely dulled weapon (~30 landed strikes).
 - **Device-hardware items** — baseline phone performance, touch reach,
   safe areas. Studio's emulator cannot close these.
@@ -69,7 +74,7 @@ reach has to have something standing in it the day it opens.
 
 | Wave | Scope | Done when |
 |---|---|---|
-| A-1 | **Weapons and armour to ~96** — six weapon families × six regions, then five armour slots × six regions × two lines (a light line that returns stamina, a heavy line that reduces damage). `Equipment` is already fully data-driven (slot, `damageReduction`, `staminaRegenMultiplier`, `kind`, `strikeRange`/`meleeReach`/multiplier/riders), so these are data, not code | Every output has an `Equipment` definition; every stat inside the bounds combat clamps |
+| A-1 ✅ | **Weapons and armour to 90** (shipped #292) — six weapon families × six regions, then five armour slots × six regions × two lines (a light line that returns stamina, a heavy line that reduces damage). `Equipment` is already fully data-driven (slot, `damageReduction`, `staminaRegenMultiplier`, `kind`, `strikeRange`/`meleeReach`/multiplier/riders), so these are data, not code | Every output has an `Equipment` definition; every stat inside the bounds combat clamps |
 | A-2 | **Tools, light and defence** — the outputs that are used rather than worn. Needs a small data-driven consumable contract first: today `gear_meadow_satchel` and `gear_amber_charm` are hardcoded branches in `TutorialService`, `HUDController` and the client, which does not scale past two | Consumable spec: every usable output resolves through one table, no bespoke branch |
 | A-3 | **Comfort and medicine to 180** — the remainder, plus the recipe spec's full gate | Recipe spec: 180 recipes, no unknown material, no orphan output |
 | B | **Quest completion** — resident arcs to the catalog's counts, every quest a real signal | Quest spec: every quest's objective kind has a signal |
