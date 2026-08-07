@@ -304,6 +304,59 @@ return {
         },
         {
             --[[
+                The same question the benches failed, asked of people.
+
+                A resident exists when the roster names them. A resident
+                is *meetable* when WorldService builds a body for them,
+                and those are different facts: the world's resident
+                definitions are a hand-written table that has three
+                entries, so twenty-four of the twenty-seven arrive with a
+                chapter, take a job at a real building, carry a quest and
+                a full set of dialogue -- and have nobody standing in the
+                town to say it to.
+
+                This is the crafting-bench gap in a second place, found by
+                asking the same question after the first one was fixed.
+                Their quests are unreachable for the same reason their
+                greetings are.
+
+                Chapter one's three are built, so the arcs shipped for
+                them work. The number below is asserted at its real size
+                until the world can render the rest; if it goes down,
+                lower it, and if it goes up, something regressed.
+            ]]
+            name = "most residents have no body in the town, and the count says how many",
+            run = function()
+                local fs = require("@lune/fs")
+                local world = fs.readFile("src/server/Services/WorldService.luau")
+                local built: { [string]: boolean } = {}
+                for residentId in string.gmatch(world, "(npc_[a-z_]+) = {") do
+                    built[residentId] = true
+                end
+                local meetable, missing = 0, 0
+                for _, definition in ResidentRoster.list() do
+                    if built[definition.id] then
+                        meetable += 1
+                    else
+                        missing += 1
+                    end
+                end
+                TestRunner.equal(meetable, 3, "the world's resident list changed size")
+                TestRunner.equal(
+                    missing,
+                    24,
+                    "residents nobody can meet -- if this went up, a roster addition "
+                        .. "shipped without a body"
+                )
+                -- the three that exist are chapter one's, so a fresh
+                -- player's whole path is populated
+                for _, residentId in { "npc_tomas_reed", "npc_pip_wren", "npc_ena_moss" } do
+                    TestRunner.equal(built[residentId], true, residentId .. " lost their body")
+                end
+            end,
+        },
+        {
+            --[[
                 The census is only worth anything if it matches the
                 document, so it reads the document. A count changed in one
                 place and not the other is exactly the drift this exists to
