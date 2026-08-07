@@ -19,6 +19,7 @@ TestRunner.run({
     require("./specs/IronrootExpedition.spec"),
     require("./specs/MireglassExpedition.spec"),
     require("./specs/TempestExpedition.spec"),
+    require("./specs/CinderfallEncounters.spec"),
     require("./specs/CinderfallExpedition.spec"),
     require("./specs/FrostmereEncounters.spec"),
     require("./specs/FrostmereExpedition.spec"),
