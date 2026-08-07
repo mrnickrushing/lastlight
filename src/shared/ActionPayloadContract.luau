@@ -74,6 +74,11 @@ function ActionPayloadContract.extraField(runtimeIds: any, kind: string): string
         return "slot"
     elseif kind == actions.CompanionCommand then
         return "mode"
+    elseif kind == actions.PartyReply then
+        -- Yes or no to the one invitation a player can be holding. A player
+        -- holds at most one at a time, so the reply does not have to name
+        -- which -- which is what keeps this to a single field.
+        return "accept"
     end
     return nil
 end

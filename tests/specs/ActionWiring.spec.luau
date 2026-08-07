@@ -116,7 +116,7 @@ return {
                     if extra ~= nil then
                         payload[extra] = if extra == "partySize" or extra == "slot"
                             then 1
-                            elseif extra == "enabled" then true
+                            elseif extra == "enabled" or extra == "accept" then true
                             else "probe"
                     end
                     TestRunner.truthy(
@@ -211,6 +211,41 @@ return {
                         kind .. " is filed in two groups at once"
                     )
                 end
+            end,
+        },
+        {
+            --[[
+                The gap the cases above cannot see: an action can have a
+                sender in `init.client` and still be unreachable, because the
+                sender is wired to a button the HUD never draws. That is the
+                same shape as the equip panel's hardcoded eight-item list,
+                which left ninety craftable items unwearable while every spec
+                passed -- a thing existing and a thing being reachable are
+                different facts.
+
+                The party row is checked by name because it is the newest and
+                because all five of its presses share one wiring call: if
+                `setPartyHandlers` were dropped, every party action would
+                still have a sender by the case above and none of them would
+                do anything.
+            ]]
+            name = "every party press has a button behind it and a wire out of it",
+            run = function()
+                local client = readSide("src/client")
+                for _, key in { "rejoin", "accept", "decline", "invite", "leave" } do
+                    TestRunner.truthy(
+                        string.find(client, string.format("key = %q", key), 1, true) ~= nil,
+                        "the party row draws no " .. key .. " button"
+                    )
+                    TestRunner.truthy(
+                        string.find(client, "_partyButtons." .. key, 1, true) ~= nil,
+                        "nothing reads the party row's " .. key .. " button"
+                    )
+                end
+                TestRunner.truthy(
+                    string.find(client, "setPartyHandlers", 1, true) ~= nil,
+                    "the party buttons are never wired to the remote"
+                )
             end,
         },
         {

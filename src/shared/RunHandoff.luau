@@ -23,6 +23,12 @@
         staging state is worse than a party that never left.
       * The party size that was chosen travels with the payload so the run
         server can bound its own population without asking the lobby.
+      * **The party's ID travels too, and is the only reason it is here.** A
+        run server that knows which party it belongs to can recognise one of
+        its own members arriving on a rejoin ticket and leave them where they
+        landed, instead of forwarding them to the world they are standing in.
+        Like everything else in the payload it is inert: it names a party, it
+        does not prove membership of one, and nothing is granted on it.
 ]]
 
 local RunHandoff = {}
@@ -32,11 +38,19 @@ export type Payload = {
     kind: string,
     partySize: number,
     departedAt: number,
+    partyId: string?,
 }
 
-local SCHEMA_VERSION = 1
+--[[
+    Bumped to 2 when the party ID joined the payload. A server mid-flight
+    across a deploy carries a version-1 payload, which now reads as a
+    mismatch and resolves to a lobby -- the safe direction the whole module
+    is built on, and the reason the version is checked before anything else.
+]]
+local SCHEMA_VERSION = 2
 local RUN_KIND = "last_light_run"
 local MAX_PARTY_SIZE = 8
+local MAX_PARTY_ID_LENGTH = 64
 
 local function finite(value: any): boolean
     return type(value) == "number" and value == value and value > -math.huge and value < math.huge
@@ -54,25 +68,38 @@ function RunHandoff.runKind(): string
     return RUN_KIND
 end
 
+local function isPartyId(value: any): boolean
+    return type(value) == "string" and #value > 0 and #value <= MAX_PARTY_ID_LENGTH
+end
+
 --[[
     Build the payload a departing party carries to its run server.
 
     `partySize` is the size the lobby actually launched, not the size that was
     requested, so a party that shrank on the platform arrives described
     correctly.
+
+    `partyId` is optional because this module has to keep working for a
+    departure that formed no party -- one player stepping onto the platform
+    and tapping a number is still a run, and refusing it for want of a roster
+    would be the party system taking something away.
 ]]
-function RunHandoff.buildPayload(partySize: any, now: any): (Payload?, any)
+function RunHandoff.buildPayload(partySize: any, now: any, partyId: any): (Payload?, any)
     if not wholeBetween(partySize, 1, MAX_PARTY_SIZE) then
         return nil, { accepted = false, reason = "invalid_party_size" }
     end
     if not finite(now) or now < 0 then
         return nil, { accepted = false, reason = "invalid_time" }
     end
+    if partyId ~= nil and not isPartyId(partyId) then
+        return nil, { accepted = false, reason = "invalid_party_id" }
+    end
     return {
         schemaVersion = SCHEMA_VERSION,
         kind = RUN_KIND,
         partySize = partySize,
         departedAt = now,
+        partyId = partyId,
     }, { accepted = true }
 end
 
@@ -100,7 +127,18 @@ function RunHandoff.readPayload(value: any): any
     if not finite(value.departedAt) or value.departedAt < 0 then
         return { isRun = false, reason = "invalid_time" }
     end
-    return { isRun = true, partySize = value.partySize, departedAt = value.departedAt }
+    --[[
+        An unreadable party ID is dropped rather than rejected. The run is
+        still a run; what is lost is only the server's ability to recognise
+        its own returning members, and refusing the whole payload over that
+        would strand a party in the lodge to protect a convenience.
+    ]]
+    return {
+        isRun = true,
+        partySize = value.partySize,
+        departedAt = value.departedAt,
+        partyId = if isPartyId(value.partyId) then value.partyId else nil,
+    }
 end
 
 --[[

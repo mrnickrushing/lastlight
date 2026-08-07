@@ -36,8 +36,57 @@ return {
             end,
         },
         {
+            -- The party ID is what lets a run server recognise a returning
+            -- member instead of teleporting them into the world they are
+            -- already standing in.
+            name = "carries the departing party's identity both ways",
+            run = function()
+                local payload, result = RunHandoff.buildPayload(3, 500, "party_77_400")
+                TestRunner.equal(result.accepted, true)
+                TestRunner.equal(RunHandoff.readPayload(payload).partyId, "party_77_400")
+            end,
+        },
+        {
+            name = "a departure that formed no party is still a run",
+            run = function()
+                local payload, result = RunHandoff.buildPayload(1, 500)
+                TestRunner.equal(result.accepted, true)
+                local read = RunHandoff.readPayload(payload)
+                TestRunner.equal(read.isRun, true)
+                TestRunner.equal(read.partyId, nil)
+            end,
+        },
+        {
+            -- An unusable ID costs the convenience it buys, not the run.
+            name = "an unreadable party id is dropped rather than refusing the run",
+            run = function()
+                local read = RunHandoff.readPayload({
+                    schemaVersion = RunHandoff.schemaVersion(),
+                    kind = RunHandoff.runKind(),
+                    partySize = 2,
+                    departedAt = 10,
+                    partyId = string.rep("x", 200),
+                })
+                TestRunner.equal(read.isRun, true)
+                TestRunner.equal(read.partyId, nil)
+            end,
+        },
+        {
+            name = "refuses to build a payload naming an impossible party",
+            run = function()
+                local payload, result = RunHandoff.buildPayload(2, 500, string.rep("x", 200))
+                TestRunner.equal(payload, nil)
+                TestRunner.equal(result.reason, "invalid_party_id")
+            end,
+        },
+        {
             name = "treats anything unrecognised as a lobby rather than a run",
             run = function()
+                -- The version is read from the module rather than written as a
+                -- literal: it moved from 1 to 2 when the party ID landed, and
+                -- these cases are about the shape of a refusal, not about
+                -- which number is current.
+                local version = RunHandoff.schemaVersion()
                 local cases = {
                     { value = nil, reason = "no_payload" },
                     { value = "run", reason = "no_payload" },
@@ -47,12 +96,12 @@ return {
                         reason = "schema_mismatch",
                     },
                     {
-                        value = { schemaVersion = 1, kind = "something_else", partySize = 2 },
+                        value = { schemaVersion = version, kind = "something_else", partySize = 2 },
                         reason = "unknown_kind",
                     },
                     {
                         value = {
-                            schemaVersion = 1,
+                            schemaVersion = version,
                             kind = "last_light_run",
                             partySize = 99,
                             departedAt = 1,
@@ -61,7 +110,7 @@ return {
                     },
                     {
                         value = {
-                            schemaVersion = 1,
+                            schemaVersion = version,
                             kind = "last_light_run",
                             partySize = 2,
                             departedAt = -1,
@@ -83,7 +132,7 @@ return {
                 -- deliberately inert: it can say "this is a run" and nothing
                 -- about rewards, stage, or progression.
                 local read = RunHandoff.readPayload({
-                    schemaVersion = 1,
+                    schemaVersion = RunHandoff.schemaVersion(),
                     kind = "last_light_run",
                     partySize = 2,
                     departedAt = 10,
