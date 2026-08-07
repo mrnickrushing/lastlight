@@ -86,6 +86,7 @@ local LobbyService = require(script.Services.LobbyService)
 local AdminService = require(script.Services.AdminService)
 local CompanionService = require(script.Services.CompanionService)
 local DefenseService = require(script.Services.DefenseService)
+local RegionEncounterService = require(script.Services.RegionEncounterService)
 local PlayerSurvivalService = require(script.Services.PlayerSurvivalService)
 local PlayerCombatService = require(script.Services.PlayerCombatService)
 local ProfessionService = require(script.Services.ProfessionService)
@@ -213,6 +214,14 @@ professionService:setCombatService(combatService)
 expeditionService:bindEnemyService(enemyService)
 enemyService:setProfessionService(professionService)
 local companionService = CompanionService.new(logger, CompanionMotion)
+--[[
+    The six encounters the Delve and the Fen brought. Registered even
+    though no region can open yet: a service that first boots on the day
+    its content ships is a service nobody has ever booted, and that is the
+    wrong day to find out.
+]]
+local regionEncounterService =
+    RegionEncounterService.new(logger, profileService, survivalService, featureFlags)
 local defenseService =
     DefenseService.new(logger, DefenseLanes, worldService, enemyService, profileService)
 enemyService:setDefenseLanes(DefenseLanes)
@@ -391,6 +400,7 @@ services:register(lobbyService)
 services:register(townNightService)
 services:register(companionService)
 services:register(defenseService)
+services:register(regionEncounterService)
 -- Without this the departure countdown never reached a client: LobbyService
 -- published every whole second into a handler nobody had set, so the panel
 -- froze at "DEPARTING IN 10" while the server counted down and launched.
@@ -426,6 +436,13 @@ survivalService:setGearWearAccruer(function(player: Player)
                 )
             end
         end
+    end
+end)
+regionEncounterService:setToastHandler(function(player: Player?, message: string)
+    if player ~= nil then
+        tutorialService:toastPlayer(player, message)
+    else
+        tutorialService:toastEveryone(message)
     end
 end)
 defenseService:setToastHandler(function(player: Player?, message: string)
