@@ -10,7 +10,7 @@ Milestones 7, 8 and 9 are complete. Milestone 7's runbook is
 shipped as #274–#282 (v105–v113) and milestone 9 as #284–#290
 (v114–v120).
 
-**Next up: M10 wave B, and an owner call on A-3 (see below).**
+**Next up: Bramblewake's two gaps, then M10 B and C.**
 
 ## The rhythm
 
@@ -76,9 +76,9 @@ reach has to have something standing in it the day it opens.
 |---|---|---|
 | A-1 ✅ | **Weapons and armour to 90** (shipped #292) — six weapon families × six regions, then five armour slots × six regions × two lines (a light line that returns stamina, a heavy line that reduces damage). `Equipment` is already fully data-driven (slot, `damageReduction`, `staminaRegenMultiplier`, `kind`, `strikeRange`/`meleeReach`/multiplier/riders), so these are data, not code | Every output has an `Equipment` definition; every stat inside the bounds combat clamps |
 | A-2 ✅ | **Consumables became data** (shipped #294) — the outputs that are used rather than worn. Needs a small data-driven consumable contract first: today `gear_meadow_satchel` and `gear_amber_charm` are hardcoded branches in `TutorialService`, `HUDController` and the client, which does not scale past two | Consumable spec: every usable output resolves through one table, no bespoke branch |
-| A-3 ⚠️ | **104 → 180 recipes** — needs an owner decision first, see below | Recipe spec: 180 recipes, no unknown material, no orphan output |
+| A-3 ✅ | **Three new effect kinds and the counters that use them** (shipped #296) — 122 recipes, gate moved from 180 | `ContentCensus.spec` |
 
-### A-3 is a design decision, not a wiring task
+### How A-3 was decided (kept, because the reasoning outlived the wave)
 
 104 recipes exist and each one has a reason to: 36 weapons (six families
 bent along a different axis per region), 54 armour pieces (five slots,
@@ -102,12 +102,24 @@ defensible each is:
    numbers. This clears the gate and nothing in the suite can tell.
    Recommended against.
 
-Options 1–3 total roughly the 76 needed and are all genuine. They are
-also three separate systems, which is why this is a milestone decision
-rather than a wave a session should quietly make on its own.
+The owner chose option 1 and to move the gate. What shipped was three new
+effect kinds -- lantern restoration, an affliction cure, and a field
+repair -- chosen by asking which threats the game already makes that a
+player could not answer, plus eighteen consumables using them. 122
+recipes, and `CONTENT_CATALOG.md` and `validate-plan.mjs` both now say
+122 with the reasoning attached.
+
+**What is left, and it is the best content work available:** the census
+found Bramblewake carrying four points of interest where every later
+region has twelve, and two armour pieces where every later region has
+ten. The starting region is the thinnest in the game. Filling the POIs is
+eight authored entries plus eight cases in `BramblewakeBuilder` -- note
+that Bramblewake has its own builder and is not covered by
+`RegionBuilderCoverage`, so a POI added without a builder case would be
+invisible rather than failing a test.
 | B | **Quest completion** — resident arcs to the catalog's counts, every quest a real signal | Quest spec: every quest's objective kind has a signal |
 | C | **Codex/archive completion** — memory fragments to full count across regions | Fragment spec: one per region minimum, anchors resolvable |
-| D | **Content census** — a single spec asserting the roadmap's launch inventory: 180 modules, 79 POIs, 48 events, 180 recipes, region counts | Census spec green |
+| D ✅ | **Content census** (shipped #296) — a single spec asserting the roadmap's launch inventory: 180 modules, 79 POIs, 48 events, 180 recipes, region counts | Census spec green |
 
 ## Notes that save a session
 
