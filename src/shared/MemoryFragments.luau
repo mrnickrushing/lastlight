@@ -41,6 +41,14 @@ export type Fragment = {
     -- world it just built, so content owns placement and the builder owns
     -- geometry: "story:<landmark>", "poi:<poi id>", or a named site.
     anchorKey: string,
+    --[[
+        Which region holds it. Bramblewake's ten predate this field and
+        are stamped by the helper below, because for a year there was only
+        one region with a story in it. The archive reads this to group
+        what it shows; the builder reads it so a run only places the
+        fragments belonging to the region it just built.
+    ]]
+    regionId: string?,
     act: number,
     body: string,
     -- Fragments that only exist once the chapter is resolved. They are the
@@ -55,7 +63,11 @@ export type CollectResult = {
 }
 
 local function fragment(definition: Fragment): Fragment
-    return table.freeze(definition)
+    local copy = table.clone(definition)
+    if copy.regionId == nil then
+        copy.regionId = "region_bramblewake"
+    end
+    return table.freeze(copy)
 end
 
 local LIST: { Fragment } = table.freeze({
@@ -193,6 +205,138 @@ local LIST: { Fragment } = table.freeze({
             .. "shaft. Orin went that way. He is walking one town's debt at a "
             .. "time, and the next question waiting for you is what a town "
             .. "owes the people whose labour built it. Bring an answer.",
+    }),
+
+    --[[
+        ACT IV -- the regions after the forest.
+
+        Bramblewake's ten tell one story in three acts and were the whole
+        archive for a year. These are shorter on purpose: two per region,
+        found at points of interest that already exist, each saying one
+        thing about what happened to a place rather than retelling a
+        chapter a player is already walking through. They are the archive
+        proving the world is bigger than the wood, which is the same job
+        the Wayhome fragment does at the end of act three.
+    ]]
+    fragment({
+        id = "fragment_delve_shift_book",
+        anchorKey = "poi:poi_ir_tally_wall",
+        regionId = "region_ironroot",
+        title = "THE LAST SHIFT",
+        foundAt = "Tally Wall",
+        act = 4,
+        requiresChapterOne = true,
+        body = "The wall still shows a shift that went down and did not come "
+            .. "up, and somebody kept chalking it forward. The names are in a "
+            .. "steady hand for the first month and a shaking one after.",
+    }),
+    fragment({
+        id = "fragment_delve_air",
+        anchorKey = "poi:poi_ir_crushed_cage",
+        regionId = "region_ironroot",
+        title = "WHAT THE AIR TOOK",
+        foundAt = "Crushed Cage",
+        act = 4,
+        requiresChapterOne = true,
+        body = "They kept birds because a bird stops singing before a person "
+            .. "stops standing. The cage came out crushed and empty, and "
+            .. "somebody carried it all the way up rather than leave it.",
+    }),
+    fragment({
+        id = "fragment_fen_ferry",
+        anchorKey = "poi:poi_mg_ferry_ledger",
+        regionId = "region_mireglass",
+        title = "THE LAST CROSSING",
+        foundAt = "Ferry Ledger",
+        act = 4,
+        requiresChapterOne = true,
+        body = "The ferryman's tally runs to the day the water rose and then "
+            .. "stops mid-column. He did not stop counting because he left. "
+            .. "He stopped because there was nobody on the far bank to count.",
+    }),
+    fragment({
+        id = "fragment_fen_reflection",
+        anchorKey = "poi:poi_mg_still_pool",
+        regionId = "region_mireglass",
+        title = "WHAT LOOKED BACK",
+        foundAt = "The Still Pool",
+        act = 4,
+        requiresChapterOne = true,
+        body = "Every account of this water agrees on one detail and disagrees "
+            .. "on everything else: whatever you see in it is doing what you "
+            .. "are doing, a half-second late.",
+    }),
+    fragment({
+        id = "fragment_reach_signal",
+        anchorKey = "poi:poi_tr_lighthouse_stump",
+        regionId = "region_tempest",
+        title = "THE SIGNAL BOOK",
+        foundAt = "Lighthouse Stump",
+        act = 4,
+        requiresChapterOne = true,
+        body = "The tower is a stump and the lamp is gone, but the log "
+            .. "survived: every light shown from this coast for sixty years. "
+            .. "The last was for a ship already down, shown all night anyway.",
+    }),
+    fragment({
+        id = "fragment_reach_harbour",
+        anchorKey = "poi:poi_tr_anchor_field",
+        regionId = "region_tempest",
+        title = "WHERE THE BIG BOATS WENT",
+        foundAt = "Anchor Field",
+        act = 4,
+        requiresChapterOne = true,
+        body = "Anchors from boats too big for this water now, laid out in "
+            .. "rows. Somebody cut the year beside each one, and the years "
+            .. "stop within a season of each other.",
+    }),
+    fragment({
+        id = "fragment_vale_bell_rope",
+        anchorKey = "poi:poi_fv_bell_without_rope",
+        regionId = "region_frostmere",
+        title = "WHO CUT THE ROPE",
+        foundAt = "Bell Without a Rope",
+        act = 4,
+        requiresChapterOne = true,
+        body = "The abbey rang for anyone still alive in the valley. Somebody "
+            .. "decided that calling the living was also calling the other "
+            .. "thing, and went round every bell with a knife.",
+    }),
+    fragment({
+        id = "fragment_vale_cold_hearth",
+        anchorKey = "poi:poi_fv_cold_hearth",
+        regionId = "region_frostmere",
+        title = "THE FIRE THEY KEPT",
+        foundAt = "The Cold Hearth",
+        act = 4,
+        requiresChapterOne = true,
+        body = "The great fire was tended in shifts for nine years without "
+            .. "going out. The wood beside it is still stacked and still dry, "
+            .. "which means it did not go out for want of anyone trying.",
+    }),
+    fragment({
+        id = "fragment_crown_ovation",
+        anchorKey = "poi:poi_cc_last_ovation",
+        regionId = "region_cinderfall",
+        title = "THE LAST OVATION",
+        foundAt = "The Last Ovation",
+        act = 4,
+        requiresChapterOne = true,
+        body = "They were watching something right up until the end, and every "
+            .. "one of them is turned the same way. Whatever it was, it was "
+            .. "worth not running from.",
+    }),
+    fragment({
+        id = "fragment_crown_name_wall",
+        anchorKey = "poi:poi_cc_name_wall",
+        regionId = "region_cinderfall",
+        title = "THE OTHER NAMES",
+        foundAt = "The Name Wall",
+        act = 4,
+        requiresChapterOne = true,
+        body = "Official names cut deep and formal, and under each one, small "
+            .. "and scratched, the name the person actually went by. Somebody "
+            .. "came back with a nail and corrected the whole wall.",
     }),
 })
 

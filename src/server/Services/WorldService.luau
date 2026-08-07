@@ -10667,7 +10667,28 @@ function WorldService.buildBramblewake(
             local anchorPart = if model ~= nil
                 then model:FindFirstChild("PointOfInterest", true)
                 else nil
-            return if anchorPart ~= nil and anchorPart:IsA("BasePart") then anchorPart else nil
+            if anchorPart ~= nil and anchorPart:IsA("BasePart") then
+                return anchorPart
+            end
+            --[[
+                Bramblewake wraps each point of interest in a
+                PhysicalPOI_<id> model; the later regions' shared builder
+                parents a bare `PointOfInterest` anchor into the module
+                instead. Both are the same thing to a fragment, so fall
+                back to finding the anchor by the content id it carries
+                rather than by the name of a wrapper only one builder
+                makes.
+            ]]
+            for _, descendant in result.model:GetDescendants() do
+                if
+                    descendant:IsA("BasePart")
+                    and descendant.Name == "PointOfInterest"
+                    and descendant:GetAttribute("ContentId") == key
+                then
+                    return descendant
+                end
+            end
+            return nil
         elseif kind == "site" and key == "wayhome" then
             return result.extractionTarget
         elseif kind == "site" and key == "warden_seal" then
@@ -10677,8 +10698,22 @@ function WorldService.buildBramblewake(
         return nil
     end
 
+    --[[
+        Only the fragments belonging to the region that was just built.
+        Every fragment used to be Bramblewake's, so the loop never had to
+        ask; now that the other regions carry their own, a fragment whose
+        anchor happens to share an id would otherwise be placed in the
+        wrong world.
+    ]]
+    local builtRegionId = if type(manifest) == "table"
+            and type(manifest.regionId) == "string"
+        then manifest.regionId
+        else "region_bramblewake"
     for _, fragment in self._memoryFragments.List do
-        local anchorPart = resolveFragmentAnchor(fragment.anchorKey)
+        local fragmentRegion = fragment.regionId or "region_bramblewake"
+        local anchorPart = if fragmentRegion == builtRegionId
+            then resolveFragmentAnchor(fragment.anchorKey)
+            else nil
         if anchorPart ~= nil then
             local shard = Instance.new("Model")
             shard.Name = "MemoryFragment_" .. fragment.id

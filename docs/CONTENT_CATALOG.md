@@ -347,6 +347,25 @@ region, with its four fragment-anchored POIs pinned into every run. The
 gentlest numbers in the game live on its new armour on purpose — it is
 the gear a player crafts before they understand the light/heavy choice.
 
+## Memory archive
+
+Twenty memory fragments. Bramblewake carries ten in three authored acts —
+what the forest kept, the keeper's trail, and your part in it — and each
+later surface region carries two, in a fourth act that says one thing
+about what happened to a place rather than retelling a chapter the player
+is already walking through.
+
+Every fragment names the region that holds it and anchors to a point of
+interest that region can actually place, checked against the catalogs by
+`MemoryFragments.spec` rather than against a list. A run only places the
+fragments belonging to the region it built. Act four is gated behind
+chapter one, like act three, because the archive reaching past the forest
+is nonsense read before the forest is finished.
+
+The Hollow Below has no fragments and will not get any: the finale is the
+thing the archive has been pointing at, and a collectible inside it would
+be the game explaining its own ending twice.
+
 ## Dynamic events
 
 Each surface region ships eight event templates:
@@ -429,7 +448,7 @@ missing quests would have meant building a second, worse copy of each.
 | quest_group_chapter | Chapter arcs | n/a | delivered as `ChapterCatalog` and the boss encounters |
 | quest_group_postgame | Postgame | n/a | delivered as the three endings and `requiresEnding` |
 | quest_group_mastery | Profession mastery tracks | 0 | needs a mastery signal in `Quests.currentValue`; the data exists in `ProfessionMastery` |
-| quest_group_mystery | Region mystery groups | 0 | needs fragments outside Bramblewake first (see codex) |
+| quest_group_mystery | Region mystery groups | 0 | the fragments now exist in every region; this needs an objective kind that reads *which* fragments, not how many |
 | quest_group_contract | Contract templates | 0 | needs a contract generator; no system today |
 | quest_group_crisis | Crisis templates | 0 | `ResidentLife.crisis` is the seed of this and is not yet quest-shaped |
 
