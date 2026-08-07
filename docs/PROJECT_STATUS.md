@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-06, at `main` = `cb68431` (PR #264), build `0.53.0`,
-save schema 20, 22 services. Published to Roblox as place version 97,
+Last updated: 2026-08-06, at `main` = `35ee5c3` (PR #272), build `0.53.0`,
+save schema 20, 23 services. Published to Roblox as place version 103,
 matching this revision exactly. **The owner's standing directive: finish
 Milestones 6 and 7 entirely, wave by wave, each merged and published.**
 Studio is unavailable this stretch ("do what you can without using
@@ -16,6 +16,20 @@ studio"), so waves ship terminal-only and every Studio-facing check is
 recorded open rather than performed.
 
 Newest first since the last header:
+- **#266–#272** (v98–v103) **the new regions went from content to
+  runtime**, and the session's own blind spot got closed first:
+  **#266** an action-wiring spec that reads the ids, the contract, the
+  server's branches and the client's senders — the gap #219 and #249 both
+  came through; it also surfaced that RuntimeIds.Actions holds two kinds
+  of id (sent kinds vs interaction ids stamped on prompts), now policed
+  separately. Then **#267** a readiness gate (a region is refused unless
+  its builder can draw a walkable world, even if the flag is flipped),
+  **#268** resource nodes with every material put through the ledger,
+  **#269** POIs and event sockets with one anchor per event step,
+  **#270** arenas whose interaction anchors come from the encounters' own
+  id lists, **#271** RegionEncounterService driving all six new fights
+  instead of six 800-line services, **#272** wayfinding trails. Both
+  regions now owe only authored mesh dressing.
 - **#264** (v97) **M7 wave L: Mireglass Fen's geometry** — all thirty
   visuals, built as the Delve's opposite. The Delve reads as underground
   because every module carries a roof; the Fen reads as drowned because
