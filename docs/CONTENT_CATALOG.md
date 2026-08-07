@@ -373,6 +373,19 @@ reachable in the world are different facts, and only the first one is
 easy to test.** Anywhere a hand-written table in `WorldService` mirrors a
 shared catalog is worth the same suspicion.
 
+The rest of that sweep, so nobody repeats it:
+
+- **Town decorations — clean.** All eight of `TownDecorations`' slots are
+  built in the world, so the resident quest that asks for eight placed is
+  finishable.
+- **Town buildings — clean.** All 28 are placed: 26 through
+  `authoredBuilding`/`buildingShell` (which `validate_town_layout.py`
+  reads), plus `building_town_board` and `building_first_lantern` through
+  older bespoke code.
+- **Encounter arenas — not applicable yet.** All twelve are filed in
+  `RegionBuilders.Arenas`, and their regions are still closed, so
+  unreachable is the correct state rather than a gap.
+
 Both of the earlier gaps this section recorded are closed: Bramblewake now
 carries ten armour pieces and twelve points of interest like every other
 region, with its four fragment-anchored POIs pinned into every run. The
