@@ -46,6 +46,19 @@ local BUILDING_FIRST_TIER: { [string]: number } = {
     building_trade_post = 3,
     building_trapworks = 3,
     building_waterworks = 3,
+
+    -- Tiers four and five are the story's rather than the calendar's, and
+    -- what they add is what a crew brought home rather than what a town
+    -- outgrew. The Reach teaches signalling, cold storage and charity to a
+    -- place that has been hoarding; the Vale teaches rope, bells and
+    -- nursing to a place that has been burying.
+    building_signal_house = 4,
+    building_cold_store = 4,
+    building_almshouse = 4,
+
+    building_ropewalk = 5,
+    building_bell_tower = 5,
+    building_infirmary = 5,
 }
 
 --[[
@@ -149,13 +162,17 @@ function TownProgression.resolve(profile: any): Consequence
         else 1
     local story = if type(profile) == "table" then profile.story else nil
     --[[
-        Milestone 7 extends the town to tier 4, but the road there is the
-        story's: nights alone still cap at 3, exactly as they always have
-        (spec-pinned), and only a town whose crew has stilled the Bellows
-        Maw can grow past it. Each resolved chapter also floors the tier,
-        so coming home from a chapter always shows something changed.
+        The town grows to tier 5, but the road there is the story's:
+        nights alone still cap at 3, exactly as they always have
+        (spec-pinned). Stilling the Bellows Maw lifts the ceiling to 4 and
+        lowering the harbour's tide lifts it to 5. Each resolved chapter
+        also floors the tier, so coming home from a chapter always shows
+        something changed.
     ]]
-    local ceiling = if chapterComplete(story, "chapter_two") then 4 else 3
+    local ceiling = if chapterComplete(story, "chapter_four")
+        then 5
+        elseif chapterComplete(story, "chapter_two") then 4
+        else 3
     local tier = math.clamp(math.floor(math.max(0, nights - 1) / 3), 0, ceiling)
     local decision = if type(chapter) == "table" then chapter.decision else nil
     local outcome = if type(chapter) == "table" then chapter.wardenOutcome else nil
@@ -167,6 +184,12 @@ function TownProgression.resolve(profile: any): Consequence
     end
     if chapterComplete(story, "chapter_three") then
         tier = math.max(3, tier)
+    end
+    if chapterComplete(story, "chapter_four") then
+        tier = math.max(4, tier)
+    end
+    if chapterComplete(story, "chapter_five") then
+        tier = math.max(5, tier)
     end
     local title = if decision == "restore_farmland"
         then "FARMLAND RENEWED"

@@ -81,15 +81,15 @@ return {
             end,
         },
         {
-            name = "the town has sixteen buildings and every one of them stages",
+            name = "the town has twenty-two buildings and every one of them stages",
             run = function()
-                -- Milestone 4 asks for sixteen initial buildings through their
-                -- first functional tiers. The count is asserted here so adding
-                -- an asset without wiring its progression, or wiring one
-                -- without adding it to the shared list, fails rather than
-                -- quietly producing a town with a hole in it.
+                -- Milestone 4 asked for sixteen; tiers four and five bring
+                -- six more. The count is asserted here so adding an asset
+                -- without wiring its progression, or wiring one without
+                -- adding it to the shared list, fails rather than quietly
+                -- producing a town with a hole in it.
                 local ids = TownProgression.buildingIds()
-                TestRunner.equal(#ids, 16)
+                TestRunner.equal(#ids, 22)
 
                 local seen: { [string]: boolean } = {}
                 for _, buildingId in ids do
@@ -97,7 +97,7 @@ return {
                     seen[buildingId] = true
                 end
 
-                for tier = 0, 3 do
+                for tier = 0, 5 do
                     local consequence = TownProgression.resolve({
                         town = { nightNumber = tier * 3 + 1 },
                     })
@@ -231,6 +231,65 @@ return {
                 local merged = TownProgression.merge(unresolved, wild)
                 TestRunner.equal(merged.decision, "wild_regrowth")
                 TestRunner.equal(merged.memorialKind, "broken_antlers")
+            end,
+        },
+        {
+            -- The same contract two chapters further on: the Reach lifts the
+            -- ceiling, the Vale floors the town at the top of it, and a
+            -- player who never leaves Bramblewake still tops out at 3.
+            name = "the Reach opens tier five and the Vale floors the town in it",
+            run = function()
+                local chapterOne = {
+                    status = "complete",
+                    decision = "shared_agroforest",
+                    wardenOutcome = "preserved",
+                }
+                local throughFour = {
+                    chapterOne = chapterOne,
+                    chapters = {
+                        chapter_four = { status = "complete", outcome = "navigable" },
+                        chapter_three = { status = "complete", outcome = "sealed" },
+                        chapter_two = { status = "complete", outcome = "cleared" },
+                    },
+                }
+                -- floored at four on a young calendar
+                local young = TownProgression.resolve({
+                    story = throughFour,
+                    town = { nightNumber = 1 },
+                })
+                TestRunner.equal(young.tier, 4)
+                -- and the ceiling is five, which no number of nights alone
+                -- could have reached
+                local matured = TownProgression.resolve({
+                    story = throughFour,
+                    town = { nightNumber = 100 },
+                })
+                TestRunner.equal(matured.tier, 5)
+                TestRunner.equal(matured.buildingStages.building_signal_house, 2)
+                TestRunner.equal(matured.buildingStages.building_ropewalk, 1)
+                TestRunner.equal(matured.buildingStages.building_infirmary, 1)
+                -- the Vale's own buildings are lots until the ceiling lifts
+                TestRunner.equal(young.buildingStages.building_ropewalk, 0)
+                TestRunner.equal(young.buildingStages.building_bell_tower, 0)
+                -- the Vale floors the town at the top of the new ceiling
+                local throughFive = {
+                    chapterOne = chapterOne,
+                    chapters = {
+                        chapter_five = { status = "complete", outcome = "sheltered" },
+                        chapter_four = { status = "complete", outcome = "navigable" },
+                        chapter_three = { status = "complete", outcome = "sealed" },
+                        chapter_two = { status = "complete", outcome = "cleared" },
+                    },
+                }
+                TestRunner.equal(
+                    TownProgression.resolve({
+                        story = throughFive,
+                        town = { nightNumber = 1 },
+                    }).tier,
+                    5
+                )
+                -- and nights alone still cap where they always did
+                TestRunner.equal(TownProgression.resolve({ town = { nightNumber = 900 } }).tier, 3)
             end,
         },
         {
