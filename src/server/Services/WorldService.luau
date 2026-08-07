@@ -9521,6 +9521,85 @@ local function buildTownProgressionBuildings(
     )
     noteConstructionTarget("building_trapworks", "TRAPWORKS", signAnchor(trapworks))
 
+    --[[
+        Tiers four and five: the six buildings a town only reaches once its
+        crew has come back from the Reach and the Vale.
+
+        These are procedural shells rather than authored meshes, and that
+        is a decision rather than a shortcut. The mesh pipeline is an art
+        pass with its own gates, and a tier a player can actually reach has
+        to have something standing in it the day the tier opens -- an empty
+        lot is worse than a plain building. The shell path is the same one
+        the eleven authored buildings fall back to when an asset fails, so
+        it is already readable and already stages correctly from a
+        construction site up to a flourishing building. If these earn
+        authored models later, swapping them is one call each.
+
+        Positions clear every existing keep-out zone and every other
+        building by at least six studs, and validate_town_layout.py reads
+        these literals to keep it that way.
+    ]]
+    local signalHouse = buildingShell(
+        "building_signal_house",
+        "SIGNAL HOUSE",
+        Vector3.new(150, 0, -220),
+        Vector3.new(18, 0, 14),
+        stageFor("building_signal_house"),
+        Color3.fromRGB(212, 176, 108),
+        yawToward(Vector3.new(150, 0, -220), PLAZA)
+    )
+    noteConstructionTarget("building_signal_house", "SIGNAL HOUSE", signAnchor(signalHouse))
+    local coldStore = buildingShell(
+        "building_cold_store",
+        "COLD STORE",
+        Vector3.new(-110, 0, -212),
+        Vector3.new(16, 0, 12),
+        stageFor("building_cold_store"),
+        Color3.fromRGB(148, 178, 190),
+        yawToward(Vector3.new(-110, 0, -212), PLAZA)
+    )
+    noteConstructionTarget("building_cold_store", "COLD STORE", signAnchor(coldStore))
+    local almshouse = buildingShell(
+        "building_almshouse",
+        "ALMSHOUSE",
+        Vector3.new(-40, 0, -226),
+        Vector3.new(14, 0, 12),
+        stageFor("building_almshouse"),
+        Color3.fromRGB(198, 146, 96),
+        yawToward(Vector3.new(-40, 0, -226), PLAZA)
+    )
+    noteConstructionTarget("building_almshouse", "ALMSHOUSE", signAnchor(almshouse))
+    local ropewalk = buildingShell(
+        "building_ropewalk",
+        "ROPEWALK",
+        Vector3.new(150, 0, -258),
+        Vector3.new(16, 0, 12),
+        stageFor("building_ropewalk"),
+        Color3.fromRGB(158, 142, 106),
+        yawToward(Vector3.new(150, 0, -258), PLAZA)
+    )
+    noteConstructionTarget("building_ropewalk", "ROPEWALK", signAnchor(ropewalk))
+    local bellTower = buildingShell(
+        "building_bell_tower",
+        "BELL TOWER",
+        Vector3.new(40, 0, -226),
+        Vector3.new(12, 0, 12),
+        stageFor("building_bell_tower"),
+        Color3.fromRGB(148, 124, 78),
+        yawToward(Vector3.new(40, 0, -226), PLAZA)
+    )
+    noteConstructionTarget("building_bell_tower", "BELL TOWER", signAnchor(bellTower))
+    local infirmary = buildingShell(
+        "building_infirmary",
+        "INFIRMARY",
+        Vector3.new(-150, 0, -268),
+        Vector3.new(18, 0, 14),
+        stageFor("building_infirmary"),
+        Color3.fromRGB(206, 206, 198),
+        yawToward(Vector3.new(-150, 0, -268), PLAZA)
+    )
+    noteConstructionTarget("building_infirmary", "INFIRMARY", signAnchor(infirmary))
+
     local residentDefinitions = {
         npc_tomas_reed = {
             displayName = "TOMAS REED",
