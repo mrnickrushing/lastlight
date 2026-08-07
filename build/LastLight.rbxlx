@@ -15987,6 +15987,19 @@ function RegionAccess.chapterReached(story: any, regionId: any): boolean
     return chapterComplete(story, (chapter :: any).requires)
 end
 
+--[[
+    Readiness is the server's business (the builders live there), so the
+    shared layer takes it as an injected fact rather than reaching for a
+    server module it cannot see. Absent, every enabled region is treated
+    as walkable, which is the behavior this module had before readiness
+    existed.
+]]
+local readinessProvider: ((string) -> boolean)? = nil
+
+function RegionAccess.setReadinessProvider(provider: ((string) -> boolean)?)
+    readinessProvider = provider
+end
+
 function RegionAccess.evaluate(regionId: any, story: any): Verdict
     local region = if type(regionId) == "string" then REGIONS_BY_ID[regionId] else nil
     if region == nil then
@@ -16003,6 +16016,12 @@ function RegionAccess.evaluate(regionId: any, story: any): Verdict
     end
     if not RegionAccess.chapterReached(story, regionId) then
         return { allowed = false, reason = "chapter_not_reached" }
+    end
+    -- A region whose builder cannot yet draw a walkable world is refused
+    -- even if somebody flips its enabled flag: the flag says "we mean to
+    -- ship this", readiness says "a party would find something there".
+    if readinessProvider ~= nil and not readinessProvider(regionId :: string) then
+        return { allowed = false, reason = "region_not_walkable" }
     end
     return { allowed = true, reason = "open" }
 end
@@ -21609,6 +21628,7 @@ local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedi
 local CraftingCatalog = require(root.CraftingCatalog)
 local DefenseLanes = require(root.DefenseLanes)
 local RegionAccess = require(root.RegionAccess)
+local RegionBuilders = require(script.World.RegionBuilders)
 local Equipment = require(root.Equipment)
 local GearVisualPlan = require(root.GearVisualPlan)
 local EnemyCatalog = require(root.EnemyCatalog)
@@ -21719,6 +21739,16 @@ local worldService = WorldService.new(
     MemoryFragments,
     TownDecorations
 )
+--[[
+    The third gate on a region, after its enabled flag and its chapter:
+    can its builder actually draw a world a party could walk. Bramblewake
+    can; the Delve and the Fen have module geometry and nothing else yet,
+    and RegionBuilders is where that stays honest.
+]]
+RegionAccess.setReadinessProvider(function(regionId: string): boolean
+    return RegionBuilders.readiness(regionId).walkable
+end)
+
 local expeditionService = ExpeditionService.new(
     logger,
     worldService,
@@ -58368,6 +58398,149 @@ return table.freeze(OldGrowthBuilder)
         </Item>
         <Item class="ModuleScript" referent="130">
           <Properties>
+            <string name="Name">RegionBuilders</string>
+            <string name="Source"><![CDATA[--!strict
+
+--[[
+    Which builder draws which region, and what a region still owes before
+    it can be walked.
+
+    Bramblewake's builder does everything: module visuals, points of
+    interest, event sockets, resource nodes, the elite arena, the boss
+    annex, the Blackout layer, mesh dressing, wayfinding. The Delve's and
+    the Fen's builders currently do one of those things -- module visuals
+    -- and pretending otherwise is how a region ships as an empty grid
+    with a name.
+
+    So this registry records both halves: the builder, and the honest
+    list of what that region has yet to grow. `readiness` is the answer
+    to "could a party walk this today", and nothing but a builder gaining
+    the missing pieces should ever change it.
+]]
+
+local BramblewakeBuilder = require(script.Parent.BramblewakeBuilder)
+local IronrootBuilder = require(script.Parent.IronrootBuilder)
+local MireglassBuilder = require(script.Parent.MireglassBuilder)
+
+local RegionBuilders = {}
+
+export type Readiness = {
+    regionId: string,
+    walkable: boolean,
+    -- What the region still owes, in the order it will be built.
+    missing: { string },
+}
+
+local ENTRIES: { [string]: any } = {
+    region_bramblewake = {
+        builder = BramblewakeBuilder,
+        walkable = true,
+        missing = {},
+    },
+    region_ironroot = {
+        builder = IronrootBuilder,
+        walkable = false,
+        missing = {
+            "points of interest",
+            "event sockets",
+            "resource nodes",
+            "elite arenas (Foreman Echo, Iron Widow)",
+            "boss chamber (Bellows Maw)",
+            "wayfinding and mesh dressing",
+        },
+    },
+    region_mireglass = {
+        builder = MireglassBuilder,
+        walkable = false,
+        missing = {
+            "points of interest",
+            "event sockets",
+            "resource nodes",
+            "elite arenas (The Many-Face, Drowned Caller)",
+            "boss chamber (Lantern Witch)",
+            "wayfinding and mesh dressing",
+        },
+    },
+}
+
+function RegionBuilders.get(regionId: any): any
+    return if type(regionId) == "string" then (ENTRIES[regionId] or {}).builder else nil
+end
+
+function RegionBuilders.readiness(regionId: any): Readiness
+    local entry = if type(regionId) == "string" then ENTRIES[regionId] else nil
+    if entry == nil then
+        return { regionId = tostring(regionId), walkable = false, missing = { "unknown region" } }
+    end
+    return {
+        regionId = regionId :: string,
+        walkable = entry.walkable == true,
+        missing = table.clone(entry.missing),
+    }
+end
+
+function RegionBuilders.ids(): { string }
+    local ids: { string } = {}
+    for regionId in ENTRIES do
+        table.insert(ids, regionId)
+    end
+    table.sort(ids)
+    return ids
+end
+
+--[[
+    Draw one region's modules from a manifest.
+
+    This is the shared half of expedition assembly: a model per placement,
+    the attributes the world and its tests read, the streaming cell, and
+    the region's own visual for the module. It is deliberately not the
+    whole of Bramblewake's builder -- that one also plants POIs, events,
+    nodes and arenas, and each of those is its own wave for a new region.
+
+    Returns the module models it made, so a caller can keep building on
+    top of them, and the count of visuals the region's builder actually
+    knew how to draw.
+]]
+function RegionBuilders.buildModules(
+    parent: Instance,
+    manifest: any,
+    generator: any,
+    catalog: any,
+    origin: Vector3
+): (number, number)
+    local builder = RegionBuilders.get(manifest.regionId)
+    assert(builder ~= nil, "no builder for region " .. tostring(manifest.regionId))
+    assert(
+        type(builder.buildModuleVisual) == "function",
+        tostring(manifest.regionId) .. " has no module visual builder"
+    )
+
+    local drawn = 0
+    for _, placement in manifest.modules do
+        local definition = generator.moduleDefinition(placement.moduleId)
+        local center = origin
+            + Vector3.new(placement.cellX * catalog.CellSize, 0, placement.cellZ * catalog.CellSize)
+        local module = Instance.new("Model")
+        module.Name = string.format("Module_%02d", placement.index)
+        module:SetAttribute("ContentId", placement.moduleId)
+        module:SetAttribute("DisplayName", definition.displayName)
+        module:SetAttribute("SequenceIndex", placement.index)
+        module:SetAttribute("CellX", placement.cellX)
+        module:SetAttribute("CellZ", placement.cellZ)
+        module.Parent = parent
+        if builder.buildModuleVisual(module, definition.visual, center) then
+            drawn += 1
+        end
+    end
+    return #manifest.modules, drawn
+end
+
+return table.freeze(RegionBuilders)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="131">
+          <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
 
@@ -58962,7 +59135,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -59199,7 +59372,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -59288,7 +59461,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -59625,15 +59798,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="134">
+  <Item class="StarterPlayer" referent="135">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="135">
+    <Item class="StarterPlayerScripts" referent="136">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="136">
+      <Item class="LocalScript" referent="137">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -59932,11 +60105,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="137">
+        <Item class="Folder" referent="138">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="138">
+          <Item class="ModuleScript" referent="139">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -60067,7 +60240,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="139">
+          <Item class="ModuleScript" referent="140">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -63013,7 +63186,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="140">
+          <Item class="ModuleScript" referent="141">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -63312,7 +63485,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="141">
+          <Item class="ModuleScript" referent="142">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -63420,7 +63593,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="142">
+          <Item class="ModuleScript" referent="143">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -63539,7 +63712,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="143">
+          <Item class="ModuleScript" referent="144">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -63813,7 +63986,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="144">
+          <Item class="ModuleScript" referent="145">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -63913,7 +64086,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="145">
+          <Item class="ModuleScript" referent="146">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64025,7 +64198,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="146">
+          <Item class="ModuleScript" referent="147">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64185,7 +64358,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="147">
+          <Item class="ModuleScript" referent="148">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64394,7 +64567,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="148">
+          <Item class="ModuleScript" referent="149">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64539,7 +64712,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="149">
+          <Item class="ModuleScript" referent="150">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64839,13 +65012,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="150">
+  <Item class="TextChatService" referent="151">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="151">
+  <Item class="Workspace" referent="152">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>
