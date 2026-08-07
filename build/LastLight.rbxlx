@@ -6325,8 +6325,915 @@ return table.freeze(regions)
 ]]></string>
             </Properties>
           </Item>
+          <Item class="ModuleScript" referent="25">
+            <Properties>
+              <string name="Name">TempestExpedition</string>
+              <string name="Source"><![CDATA[--!strict
+
+--[[
+    Tempest Reach -- chapter IV's region: a drowned coast in permanent
+    weather, where the sea took a harbour town and the storm never left.
+
+    Each region so far has one thing it will not let a player ignore. The
+    Delve's is grade and dark, the Fen's is trust. The Reach's is
+    exposure: there is nowhere here that weather does not reach, and the
+    only shelter is what people built to survive a storm that has already
+    beaten it once. Its modules are jetties, breakwaters, wreck fields,
+    signal chains and lightning-struck ground, and its hazards come from
+    above and from the water at the same time.
+]]
+
+local function frozenDefinition(definition: any): any
+    local copy = table.clone(definition)
+    if copy.enabled == nil then
+        copy.enabled = true
+    end
+    if string.sub(copy.id, 1, 7) == "module_" and copy.defaultTraversal == nil then
+        copy.defaultTraversal = true
+    end
+    if copy.tags ~= nil then
+        copy.tags = table.freeze(table.clone(copy.tags))
+    end
+    for _, key in { "startConditions", "incompatibleEvents" } do
+        if copy[key] ~= nil then
+            copy[key] = table.freeze(table.clone(copy[key]))
+        end
+    end
+    if copy.reward ~= nil then
+        copy.reward = table.freeze(table.clone(copy.reward))
+    end
+    if copy.soloVariant ~= nil then
+        copy.soloVariant = table.freeze(table.clone(copy.soloVariant))
+    end
+    if copy.storyOffset ~= nil then
+        copy.storyOffset = table.freeze(table.clone(copy.storyOffset))
+    end
+    if copy.groupVariant ~= nil then
+        copy.groupVariant = table.freeze(table.clone(copy.groupVariant))
+    end
+    if copy.steps ~= nil then
+        local steps: { any } = {}
+        for _, step in copy.steps do
+            local stepCopy: any = table.clone(step :: any)
+            if stepCopy.offset ~= nil then
+                stepCopy.offset = table.freeze(table.clone(stepCopy.offset))
+            end
+            table.insert(steps, table.freeze(stepCopy))
+        end
+        copy.steps = table.freeze(steps)
+    end
+    return table.freeze(copy)
+end
+
+--[[
+    Thirty modules in the distribution the earlier regions proved: one
+    arrival, one extraction, seven resource, six traversal, five combat,
+    four connector, three story, two puzzle, one landmark.
+]]
+local modules = {
+    frozenDefinition({
+        id = "module_tr_harbour_steps",
+        displayName = "Harbour Steps",
+        role = "arrival",
+        visual = "harbour_steps",
+        tags = { "safe", "connector", "arrival" },
+        poiSocket = false,
+        eventSocket = false,
+        partBudget = 24,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_lee_shore",
+        displayName = "Lee Shore",
+        role = "extraction",
+        visual = "lee_shore",
+        tags = { "safe", "extraction" },
+        poiSocket = false,
+        eventSocket = false,
+        partBudget = 26,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_salvage_flats",
+        displayName = "Salvage Flats",
+        role = "resource",
+        visual = "salvage_flats",
+        tags = { "resource", "wreck" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 44,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_saltworks",
+        displayName = "Saltworks",
+        role = "resource",
+        visual = "saltworks",
+        tags = { "resource", "safe" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 42,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_kelp_racks",
+        displayName = "Kelp Racks",
+        role = "resource",
+        visual = "kelp_racks",
+        tags = { "resource", "water" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_amberglass_shoal",
+        displayName = "Amberglass Shoal",
+        role = "resource",
+        visual = "amberglass_shoal",
+        tags = { "resource", "risk" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 44,
+        lightBudget = 2,
+        effectBudget = 3,
+    }),
+    frozenDefinition({
+        id = "module_tr_rope_walk",
+        displayName = "Rope Walk",
+        role = "resource",
+        visual = "rope_walk",
+        tags = { "resource", "story" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_storm_glass_beds",
+        displayName = "Storm Glass Beds",
+        role = "resource",
+        visual = "storm_glass_beds",
+        tags = { "resource", "mystery" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 42,
+        lightBudget = 3,
+        effectBudget = 3,
+    }),
+    frozenDefinition({
+        id = "module_tr_gull_colony",
+        displayName = "Gull Colony",
+        role = "resource",
+        visual = "gull_colony",
+        tags = { "resource", "safe" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 38,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_breakwater_run",
+        displayName = "Breakwater Run",
+        role = "traversal",
+        visual = "breakwater_run",
+        tags = { "traversal", "risk" },
+        poiSocket = false,
+        eventSocket = true,
+        partBudget = 44,
+        lightBudget = 2,
+        effectBudget = 3,
+    }),
+    frozenDefinition({
+        id = "module_tr_rigging_climb",
+        displayName = "Rigging Climb",
+        role = "traversal",
+        visual = "rigging_climb",
+        tags = { "traversal", "wreck" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 46,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_tide_stair",
+        displayName = "Tide Stair",
+        role = "traversal",
+        visual = "tide_stair",
+        tags = { "traversal", "water" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 42,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_gale_crossing",
+        displayName = "Gale Crossing",
+        role = "traversal",
+        visual = "gale_crossing",
+        tags = { "traversal", "storm" },
+        poiSocket = false,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 2,
+        effectBudget = 3,
+    }),
+    frozenDefinition({
+        id = "module_tr_hull_bridge",
+        displayName = "Hull Bridge",
+        role = "traversal",
+        visual = "hull_bridge",
+        tags = { "traversal", "wreck" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 44,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_sea_cave_mouth",
+        displayName = "Sea Cave Mouth",
+        role = "traversal",
+        visual = "sea_cave_mouth",
+        tags = { "traversal", "safe" },
+        poiSocket = false,
+        eventSocket = true,
+        partBudget = 38,
+        lightBudget = 1,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_imp_reef",
+        displayName = "Imp Reef",
+        role = "combat",
+        visual = "imp_reef",
+        tags = { "combat", "storm" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 42,
+        lightBudget = 2,
+        effectBudget = 3,
+    }),
+    frozenDefinition({
+        id = "module_tr_wreck_yard",
+        displayName = "Wreck Yard",
+        role = "combat",
+        visual = "wreck_yard",
+        tags = { "combat", "wreck" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 46,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_grounding_field",
+        displayName = "Grounding Field",
+        role = "combat",
+        visual = "grounding_field",
+        tags = { "combat", "puzzle" },
+        poiSocket = false,
+        eventSocket = true,
+        partBudget = 44,
+        lightBudget = 3,
+        effectBudget = 3,
+    }),
+    frozenDefinition({
+        id = "module_tr_husk_shallows",
+        displayName = "Husk Shallows",
+        role = "combat",
+        visual = "husk_shallows",
+        tags = { "combat", "water" },
+        poiSocket = false,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_breaker_line",
+        displayName = "Breaker Line",
+        role = "combat",
+        visual = "breaker_line",
+        tags = { "combat", "risk" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 44,
+        lightBudget = 2,
+        effectBudget = 3,
+    }),
+    frozenDefinition({
+        id = "module_tr_jetty_span",
+        displayName = "Jetty Span",
+        role = "connector",
+        visual = "jetty_span",
+        tags = { "connector", "safe" },
+        poiSocket = false,
+        eventSocket = true,
+        partBudget = 30,
+        lightBudget = 2,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_tr_boat_shed",
+        displayName = "Boat Shed",
+        role = "connector",
+        visual = "boat_shed",
+        tags = { "connector", "safe" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 32,
+        lightBudget = 2,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_tr_signal_post",
+        displayName = "Signal Post",
+        role = "connector",
+        visual = "signal_post",
+        tags = { "connector", "story" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 32,
+        lightBudget = 3,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_tr_sea_wall_gate",
+        displayName = "Sea Wall Gate",
+        role = "connector",
+        visual = "sea_wall_gate",
+        tags = { "connector", "safe" },
+        poiSocket = false,
+        eventSocket = true,
+        partBudget = 34,
+        lightBudget = 2,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_tr_harbourmaster_office",
+        displayName = "Harbourmaster's Office",
+        role = "story",
+        visual = "harbourmaster_office",
+        tags = { "story", "resident" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 2,
+        effectBudget = 1,
+    }),
+    frozenDefinition({
+        id = "module_tr_widows_walk",
+        displayName = "Widow's Walk",
+        role = "story",
+        visual = "widows_walk",
+        tags = { "story", "sanctuary" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 38,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_drowned_bell_tower",
+        displayName = "Drowned Bell Tower",
+        role = "story",
+        visual = "drowned_bell_tower",
+        tags = { "story", "mystery" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 42,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_signal_chain_room",
+        displayName = "Signal Chain Room",
+        role = "puzzle",
+        visual = "signal_chain_room",
+        tags = { "puzzle", "story" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 40,
+        lightBudget = 3,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_tide_gauge",
+        displayName = "Tide Gauge",
+        role = "puzzle",
+        visual = "tide_gauge",
+        tags = { "puzzle", "water" },
+        poiSocket = true,
+        eventSocket = true,
+        partBudget = 42,
+        lightBudget = 2,
+        effectBudget = 2,
+    }),
+    frozenDefinition({
+        id = "module_tr_titan_approach",
+        displayName = "Tidebound Approach",
+        role = "landmark",
+        visual = "titan_approach",
+        tags = { "landmark", "boss", "story" },
+        poiSocket = false,
+        eventSocket = false,
+        partBudget = 48,
+        lightBudget = 3,
+        effectBudget = 3,
+    }),
+}
+
+local pointsOfInterest = {
+    frozenDefinition({
+        id = "poi_tr_lighthouse_stump",
+        displayName = "Lighthouse Stump",
+        visual = "lighthouse_stump",
+        tags = { "story", "warning" },
+        detail = "The tower is gone above the second gallery. The lamp room "
+            .. "washed up four miles east, still bolted to its floor.",
+    }),
+    frozenDefinition({
+        id = "poi_tr_ship_names_wall",
+        displayName = "Wall of Names",
+        visual = "ship_names_wall",
+        tags = { "story", "resident" },
+        detail = "Every hull the reach has taken, cut into the sea wall. "
+            .. "The last three were added in the same hand, on the same day.",
+    }),
+    frozenDefinition({
+        id = "poi_tr_still_water",
+        displayName = "The Still Water",
+        visual = "still_water",
+        tags = { "mystery", "risk" },
+        detail = "A circle of flat calm the storm does not touch, and no "
+            .. "gull will cross. Whatever holds it has held for years.",
+    }),
+    frozenDefinition({
+        id = "poi_tr_beached_keel",
+        displayName = "Beached Keel",
+        visual = "beached_keel",
+        tags = { "wreck", "resource" },
+        detail = "A hull laid open like a ribcage, picked clean of iron. "
+            .. "Somebody has been sleeping in the forward hold.",
+    }),
+    frozenDefinition({
+        id = "poi_tr_signal_kite",
+        displayName = "Signal Kite",
+        visual = "signal_kite",
+        tags = { "story", "warning" },
+        detail = "A storm kite still flying on a wire nobody has touched "
+            .. "in a season, spelling the same warning to an empty coast.",
+    }),
+    frozenDefinition({
+        id = "poi_tr_glass_beach",
+        displayName = "Glass Beach",
+        visual = "glass_beach",
+        tags = { "resource", "mystery" },
+        detail = "Lightning struck this sand often enough to make a floor "
+            .. "of it. It rings underfoot and it is warm after dark.",
+    }),
+    frozenDefinition({
+        id = "poi_tr_pilots_chair",
+        displayName = "Pilot's Chair",
+        visual = "pilots_chair",
+        tags = { "story", "sanctuary" },
+        detail = "Bolted to the rock facing the channel, worn smooth. "
+            .. "Whoever sat here watched every ship in and did not leave.",
+    }),
+    frozenDefinition({
+        id = "poi_tr_anchor_field",
+        displayName = "Anchor Field",
+        visual = "anchor_field",
+        tags = { "wreck", "warning" },
+        detail = "Thirty anchors set in a row on the tideline, flukes up. "
+            .. "Not lost -- planted, by somebody who wanted them found.",
+    }),
+    frozenDefinition({
+        id = "poi_tr_gull_watch",
+        displayName = "Gull Watch",
+        visual = "gull_watch",
+        tags = { "warning", "safe" },
+        detail = "The colony leaves this ledge a full minute before the "
+            .. "lightning turns. The birds have never once been wrong.",
+    }),
+    frozenDefinition({
+        id = "poi_tr_rope_locker",
+        displayName = "Rope Locker",
+        visual = "rope_locker",
+        tags = { "resource", "resident" },
+        detail = "Coils enough to rig a fleet, kept dry and kept coiled, "
+            .. "by someone who still expects the fleet.",
+    }),
+    frozenDefinition({
+        id = "poi_tr_drowned_chapel_bell",
+        displayName = "Drowned Chapel Bell",
+        visual = "drowned_chapel_bell",
+        tags = { "story", "mystery" },
+        detail = "It rings at the turn of the tide, underwater, and the "
+            .. "sound arrives through the soles of your feet.",
+    }),
+    frozenDefinition({
+        id = "poi_tr_last_boat",
+        displayName = "The Last Boat",
+        visual = "last_boat",
+        tags = { "story", "sanctuary" },
+        detail = "Provisioned, rigged and never launched. The mooring line "
+            .. "was cut from the shore side, by somebody staying behind.",
+    }),
+}
+
+local events = {
+    frozenDefinition({
+        id = "event_tr_signal_chain",
+        displayName = "Signal Chain",
+        visual = "signal_chain",
+        tags = { "storm", "urgent" },
+        objective = "RAISE THE THREE SIGNAL LAMPS IN ORDER",
+        detail = "The chain relays a warning up the coast, and it is dark from here to the point.",
+        completionMessage = "THE CHAIN IS LIT — +3 STORM GLASS",
+        failureMessage = "THE WARNING DIES AT THIS LINK",
+        durationSeconds = 90,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 18,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The chance passes; the marked critical path stays open.",
+        localizationKey = "events.tempest.signal_chain",
+        analyticsId = "TempestSignalChain",
+        killSwitchFlag = "tempest_events_enabled",
+        soloVariant = { guidance = "Raise them low to high; the chain reads in order." },
+        groupVariant = { guidance = "One lamp each, and call the order." },
+        reward = { materialId = "material_storm_glass", amount = 3 },
+        steps = {
+            {
+                id = "lamp_low",
+                actionText = "RAISE",
+                objectText = "Lower Signal Lamp",
+                offset = { x = -7, y = 1.6, z = 0 },
+            },
+            {
+                id = "lamp_mid",
+                actionText = "RAISE",
+                objectText = "Middle Signal Lamp",
+                offset = { x = 0, y = 1.6, z = 4 },
+            },
+            {
+                id = "lamp_high",
+                actionText = "RAISE",
+                objectText = "High Signal Lamp",
+                offset = { x = 7, y = 1.6, z = 0 },
+            },
+        },
+    }),
+    frozenDefinition({
+        id = "event_tr_sudden_tide",
+        displayName = "Sudden Tide",
+        visual = "sudden_tide",
+        tags = { "hazard", "timed" },
+        objective = "GET THE CATCH ABOVE THE TIDE LINE",
+        detail = "The water is coming up faster than the tables say, and the racks are still full.",
+        completionMessage = "THE CATCH IS SAVED — +3 SALT KELP",
+        failureMessage = "THE TIDE TAKES THE RACKS",
+        durationSeconds = 80,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 18,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The chance passes; the marked critical path stays open.",
+        localizationKey = "events.tempest.sudden_tide",
+        analyticsId = "TempestSuddenTide",
+        killSwitchFlag = "tempest_events_enabled",
+        soloVariant = { guidance = "Lift each rack; the far one first if you are quick." },
+        groupVariant = { guidance = "Take a rack each and do not wait for the last." },
+        reward = { materialId = "material_salt_kelp", amount = 3 },
+        steps = {
+            {
+                id = "rack_west",
+                actionText = "LIFT",
+                objectText = "West Rack",
+                offset = { x = -6, y = 1.2, z = -2 },
+            },
+            {
+                id = "rack_east",
+                actionText = "LIFT",
+                objectText = "East Rack",
+                offset = { x = 6, y = 1.2, z = -2 },
+            },
+            {
+                id = "rack_far",
+                actionText = "LIFT",
+                objectText = "Far Rack",
+                offset = { x = 0, y = 1.2, z = 5 },
+            },
+        },
+    }),
+    frozenDefinition({
+        id = "event_tr_wreck_survivor",
+        displayName = "Wreck Survivor",
+        visual = "wreck_survivor",
+        tags = { "rescue", "urgent" },
+        objective = "CUT THE RIGGING AND GET THEM OFF THE HULL",
+        detail = "Somebody is tangled in the shrouds of a hull the sea is still working on.",
+        completionMessage = "THEY ARE OFF THE WRECK — +3 SHIPS IRON",
+        failureMessage = "THE HULL GOES OVER",
+        durationSeconds = 110,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 20,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The chance passes; the marked critical path stays open.",
+        localizationKey = "events.tempest.wreck_survivor",
+        analyticsId = "TempestWreckSurvivor",
+        killSwitchFlag = "tempest_events_enabled",
+        soloVariant = { guidance = "Both shrouds, then haul -- cutting one only swings them." },
+        groupVariant = { guidance = "Cut together, haul together." },
+        reward = { materialId = "material_ships_iron", amount = 3 },
+        steps = {
+            {
+                id = "shroud_port",
+                actionText = "CUT",
+                objectText = "Port Shroud",
+                offset = { x = -5, y = 1.6, z = 0 },
+            },
+            {
+                id = "shroud_starboard",
+                actionText = "CUT",
+                objectText = "Starboard Shroud",
+                offset = { x = 5, y = 1.6, z = 0 },
+            },
+            {
+                id = "haul_line",
+                actionText = "HAUL",
+                objectText = "Haul Line",
+                offset = { x = 0, y = 1.4, z = 4 },
+            },
+        },
+    }),
+    frozenDefinition({
+        id = "event_tr_lightning_map",
+        displayName = "Lightning Map",
+        visual = "lightning_map",
+        tags = { "puzzle", "storm" },
+        objective = "READ THE STRIKES AND SET THE GROUNDING RODS",
+        detail = "The storm hits the same three places every turn. Rods there make the rest of the reach survivable.",
+        completionMessage = "THE GROUND HOLDS — +2 STORM GLASS",
+        failureMessage = "THE ROD FIELD SCATTERS THE STRIKE",
+        durationSeconds = 100,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 18,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The chance passes; the marked critical path stays open.",
+        localizationKey = "events.tempest.lightning_map",
+        analyticsId = "TempestLightningMap",
+        killSwitchFlag = "tempest_events_enabled",
+        soloVariant = { guidance = "Watch one full turn before you set anything." },
+        groupVariant = { guidance = "Split the watch; agree before anyone sets a rod." },
+        reward = { materialId = "material_storm_glass", amount = 2 },
+        steps = {
+            {
+                id = "rod_first",
+                actionText = "SET",
+                objectText = "First Rod",
+                offset = { x = -6, y = 1.4, z = -3 },
+            },
+            {
+                id = "rod_second",
+                actionText = "SET",
+                objectText = "Second Rod",
+                offset = { x = 6, y = 1.4, z = -3 },
+            },
+            {
+                id = "rod_third",
+                actionText = "SET",
+                objectText = "Third Rod",
+                offset = { x = 0, y = 1.4, z = 5 },
+            },
+        },
+    }),
+    frozenDefinition({
+        id = "event_tr_sail_lift",
+        displayName = "Sail Lift",
+        visual = "sail_lift",
+        tags = { "traversal", "machine" },
+        objective = "RIG THE SAIL AND RIDE THE GUST",
+        detail = "A sail on a spar will carry a party over the breakwater if the gust is caught cleanly.",
+        completionMessage = "THE GUST CARRIES — +2 ROPE FIBER",
+        failureMessage = "THE SPAR SPILLS THE WIND",
+        durationSeconds = 85,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 20,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The chance passes; the marked critical path stays open.",
+        localizationKey = "events.tempest.sail_lift",
+        analyticsId = "TempestSailLift",
+        killSwitchFlag = "tempest_events_enabled",
+        soloVariant = { guidance = "Bend the sail, then haul when the gust builds." },
+        groupVariant = { guidance = "One bends, one hauls, on the call." },
+        reward = { materialId = "material_rope_fiber", amount = 2 },
+        steps = {
+            {
+                id = "bend_sail",
+                actionText = "BEND",
+                objectText = "Sail To Spar",
+                offset = { x = -4, y = 1.5, z = 0 },
+            },
+            {
+                id = "haul_halyard",
+                actionText = "HAUL",
+                objectText = "Halyard",
+                offset = { x = 4, y = 1.5, z = 0 },
+            },
+        },
+    }),
+    frozenDefinition({
+        id = "event_tr_storm_eye",
+        displayName = "Storm Eye",
+        visual = "storm_eye",
+        tags = { "mystery", "timed" },
+        objective = "STAND THE EYE AND MARK WHAT IT SHOWS",
+        detail = "The eye passes over once and the reach goes silent. Whatever is under the water is visible for that minute.",
+        completionMessage = "THE MARKS ARE MADE — +3 AMBERGLASS",
+        failureMessage = "THE EYE CLOSES OVER IT",
+        durationSeconds = 75,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 16,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The chance passes; the marked critical path stays open.",
+        localizationKey = "events.tempest.storm_eye",
+        analyticsId = "TempestStormEye",
+        killSwitchFlag = "tempest_events_enabled",
+        soloVariant = { guidance = "Mark both before the wind returns." },
+        groupVariant = { guidance = "A mark each; the eye does not wait." },
+        reward = { materialId = "material_amberglass", amount = 3 },
+        steps = {
+            {
+                id = "mark_near",
+                actionText = "MARK",
+                objectText = "Near Shadow",
+                offset = { x = -5, y = 1.3, z = 2 },
+            },
+            {
+                id = "mark_far",
+                actionText = "MARK",
+                objectText = "Far Shadow",
+                offset = { x = 5, y = 1.3, z = 2 },
+            },
+        },
+    }),
+    frozenDefinition({
+        id = "event_tr_gull_delivery",
+        displayName = "Gull Delivery",
+        visual = "gull_delivery",
+        tags = { "story", "gentle" },
+        objective = "SEE THE BIRD'S MESSAGE HOME",
+        detail = "A storm gull came in exhausted with a capsule on its leg and the wrong coast under it.",
+        completionMessage = "THE MESSAGE IS DELIVERED — +2 SALT KELP",
+        failureMessage = "THE GULL LIFTS OFF WITHOUT IT",
+        durationSeconds = 85,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 16,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The chance passes; the marked critical path stays open.",
+        localizationKey = "events.tempest.gull_delivery",
+        analyticsId = "TempestGullDelivery",
+        killSwitchFlag = "tempest_events_enabled",
+        soloVariant = { guidance = "Take the capsule gently, then post it." },
+        groupVariant = { guidance = "One holds the bird, one posts." },
+        reward = { materialId = "material_salt_kelp", amount = 2 },
+        steps = {
+            {
+                id = "take_capsule",
+                actionText = "TAKE",
+                objectText = "Message Capsule",
+                offset = { x = -4, y = 1.3, z = 0 },
+            },
+            {
+                id = "post_capsule",
+                actionText = "POST",
+                objectText = "Signal Post",
+                offset = { x = 4, y = 1.5, z = 1 },
+            },
+        },
+    }),
+    frozenDefinition({
+        id = "event_tr_broken_beacon",
+        displayName = "Broken Beacon",
+        visual = "broken_beacon",
+        tags = { "hazard", "story" },
+        objective = "RELIGHT THE BEACON BEFORE THE NEXT HULL",
+        detail = "The beacon is dark, the channel is not, and something is coming in on the tide.",
+        completionMessage = "THE BEACON BURNS — +3 SHIPS IRON",
+        failureMessage = "THE CHANNEL STAYS DARK",
+        durationSeconds = 105,
+        defaultSolution = true,
+        criticalPathBlocking = false,
+        minimumRouteSpace = 20,
+        startConditions = { "player_in_expedition", "interaction_in_range" },
+        incompatibleEvents = {},
+        failureResolution = "The chance passes; the marked critical path stays open.",
+        localizationKey = "events.tempest.broken_beacon",
+        analyticsId = "TempestBrokenBeacon",
+        killSwitchFlag = "tempest_events_enabled",
+        soloVariant = { guidance = "Clear, prime, strike -- in that order or it will not catch." },
+        groupVariant = { guidance = "Clear and prime together, then strike." },
+        reward = { materialId = "material_ships_iron", amount = 3 },
+        steps = {
+            {
+                id = "clear_lens",
+                actionText = "CLEAR",
+                objectText = "Salted Lens",
+                offset = { x = -5, y = 1.8, z = 0 },
+            },
+            {
+                id = "prime_oil",
+                actionText = "PRIME",
+                objectText = "Oil Reservoir",
+                offset = { x = 5, y = 1.6, z = 0 },
+            },
+            {
+                id = "strike_light",
+                actionText = "STRIKE",
+                objectText = "Beacon Wick",
+                offset = { x = 0, y = 2, z = 4 },
+            },
+        },
+    }),
+}
+
+local eventInteractionCount = 0
+for _, definition in events do
+    eventInteractionCount += #definition.steps
+end
+
+return table.freeze({
+    RegionId = "region_tempest",
+    Version = 1,
+    CellSize = 72,
+    ModuleCount = 12,
+    PointOfInterestCount = 4,
+    EventCount = 8,
+    EventInteractionCount = eventInteractionCount,
+    -- Planning budgets, as in every region catalog: PartBudget bounds the
+    -- manifest's summed module allowances, not built parts.
+    PartBudget = 640,
+    BossArenaPartBudget = 40,
+    BlackoutPartBudget = 20,
+    LightBudget = 32,
+    EffectBudget = 32,
+    RequiredTags = table.freeze({
+        safe = 2,
+        traversal = 2,
+        resource = 2,
+        combat = 2,
+        story = 2,
+        puzzle = 1,
+        landmark = 1,
+    }),
+    RequiredModuleIds = table.freeze({
+        "module_tr_titan_approach",
+    }),
+    FixedMiddleIds = table.freeze({
+        "module_tr_jetty_span",
+        "module_tr_salvage_flats",
+        "module_tr_breakwater_run",
+        "module_tr_imp_reef",
+        "module_tr_saltworks",
+        "module_tr_signal_chain_room",
+        "module_tr_rigging_climb",
+        "module_tr_harbourmaster_office",
+        "module_tr_wreck_yard",
+        "module_tr_titan_approach",
+    }),
+    Modules = table.freeze(modules),
+    PointsOfInterest = table.freeze(pointsOfInterest),
+    Events = table.freeze(events),
+})
+]]></string>
+            </Properties>
+          </Item>
         </Item>
-        <Item class="ModuleScript" referent="25">
+        <Item class="ModuleScript" referent="26">
           <Properties>
             <string name="Name">Registry</string>
             <string name="Source"><![CDATA[--!strict
@@ -6555,7 +7462,7 @@ return table.freeze(Registry)
           </Properties>
         </Item>
       </Item>
-      <Item class="ModuleScript" referent="26">
+      <Item class="ModuleScript" referent="27">
         <Properties>
           <string name="Name">Crafting</string>
           <string name="Source"><![CDATA[--!strict
@@ -6667,7 +7574,7 @@ return table.freeze(Crafting)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="27">
+      <Item class="ModuleScript" referent="28">
         <Properties>
           <string name="Name">CraftingCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -6843,7 +7750,7 @@ return table.freeze(CraftingCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="28">
+      <Item class="ModuleScript" referent="29">
         <Properties>
           <string name="Name">DefenseLanes</string>
           <string name="Source"><![CDATA[--!strict
@@ -6968,7 +7875,7 @@ return table.freeze(DefenseLanes)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="29">
+      <Item class="ModuleScript" referent="30">
         <Properties>
           <string name="Name">DrownedCallerEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -7286,7 +8193,7 @@ return table.freeze(DrownedCallerEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="30">
+      <Item class="ModuleScript" referent="31">
         <Properties>
           <string name="Name">EnemyAttackFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -7371,7 +8278,7 @@ return table.freeze(EnemyAttackFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="31">
+      <Item class="ModuleScript" referent="32">
         <Properties>
           <string name="Name">EnemyCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -7462,7 +8369,7 @@ return table.freeze(EnemyCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="32">
+      <Item class="ModuleScript" referent="33">
         <Properties>
           <string name="Name">EnemyCombatRules</string>
           <string name="Source"><![CDATA[--!strict
@@ -7553,7 +8460,7 @@ return table.freeze(EnemyCombatRules)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="33">
+      <Item class="ModuleScript" referent="34">
         <Properties>
           <string name="Name">EnemyMotion</string>
           <string name="Source"><![CDATA[--!strict
@@ -7623,7 +8530,7 @@ return table.freeze(EnemyMotion)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="34">
+      <Item class="ModuleScript" referent="35">
         <Properties>
           <string name="Name">EngineerBrace</string>
           <string name="Source"><![CDATA[--!strict
@@ -7782,7 +8689,7 @@ return table.freeze(EngineerBrace)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="35">
+      <Item class="ModuleScript" referent="36">
         <Properties>
           <string name="Name">Environment</string>
           <string name="Source"><![CDATA[--!strict
@@ -7861,7 +8768,7 @@ return table.freeze(Environment)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="36">
+      <Item class="ModuleScript" referent="37">
         <Properties>
           <string name="Name">Equipment</string>
           <string name="Source"><![CDATA[--!strict
@@ -8118,7 +9025,7 @@ return table.freeze(Equipment)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="37">
+      <Item class="ModuleScript" referent="38">
         <Properties>
           <string name="Name">ExpeditionContracts</string>
           <string name="Source"><![CDATA[--!strict
@@ -8219,7 +9126,7 @@ return table.freeze(ExpeditionContracts)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="38">
+      <Item class="ModuleScript" referent="39">
         <Properties>
           <string name="Name">ExpeditionEventFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -8568,7 +9475,7 @@ return table.freeze(ExpeditionEventFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="39">
+      <Item class="ModuleScript" referent="40">
         <Properties>
           <string name="Name">ExpeditionGenerator</string>
           <string name="Source"><![CDATA[--!strict
@@ -8576,6 +9483,7 @@ return table.freeze(ExpeditionEventFlow)
 local Bramblewake = require("./Content/Definitions/BramblewakeExpedition")
 local Ironroot = require("./Content/Definitions/IronrootExpedition")
 local Mireglass = require("./Content/Definitions/MireglassExpedition")
+local Tempest = require("./Content/Definitions/TempestExpedition")
 local ExpeditionEventFlow = require("./ExpeditionEventFlow")
 
 --[[
@@ -8637,7 +9545,8 @@ end
 -- Catalogs are structurally alike but not identical (Bramblewake carries a
 -- measured BuiltPartBudget the Delve cannot have until its builder ships),
 -- so the list is typed by what the generator actually reads from it.
-local CATALOGS: { any } = table.freeze({ Bramblewake :: any, Ironroot :: any, Mireglass :: any })
+local CATALOGS: { any } =
+    table.freeze({ Bramblewake :: any, Ironroot :: any, Mireglass :: any, Tempest :: any })
 local DEFAULT_REGION_ID = Bramblewake.RegionId
 
 type Region = {
@@ -9135,7 +10044,7 @@ return table.freeze(ExpeditionGenerator)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="40">
+      <Item class="ModuleScript" referent="41">
         <Properties>
           <string name="Name">ExpeditionInventory</string>
           <string name="Source"><![CDATA[--!strict
@@ -9174,6 +10083,12 @@ local KNOWN_MATERIALS = table.freeze({
     material_witchlight_pollen = true,
     material_eel_oil = true,
     material_blackwater_herb = true,
+    -- Tempest Reach
+    material_storm_glass = true,
+    material_salt_kelp = true,
+    material_ships_iron = true,
+    material_rope_fiber = true,
+    material_amberglass = true,
 })
 
 local function hashText(hash: number, value: string): number
@@ -9777,7 +10692,7 @@ return table.freeze(ExpeditionInventory)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="41">
+      <Item class="ModuleScript" referent="42">
         <Properties>
           <string name="Name">ExpeditionRewardLedger</string>
           <string name="Source"><![CDATA[--!strict
@@ -9916,7 +10831,7 @@ return table.freeze(ExpeditionRewardLedger)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="42">
+      <Item class="ModuleScript" referent="43">
         <Properties>
           <string name="Name">ExtractionPayoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -9942,6 +10857,12 @@ local PRESENTATION = table.freeze({
     material_witchlight_pollen = table.freeze({ kind = "pollen", label = "WITCHLIGHT POLLEN" }),
     material_eel_oil = table.freeze({ kind = "eel_oil", label = "EEL OIL" }),
     material_blackwater_herb = table.freeze({ kind = "herb", label = "BLACKWATER HERB" }),
+    -- Tempest Reach
+    material_storm_glass = table.freeze({ kind = "storm_glass", label = "STORM GLASS" }),
+    material_salt_kelp = table.freeze({ kind = "kelp", label = "SALT KELP" }),
+    material_ships_iron = table.freeze({ kind = "ships_iron", label = "SHIP'S IRON" }),
+    material_rope_fiber = table.freeze({ kind = "rope", label = "ROPE FIBER" }),
+    material_amberglass = table.freeze({ kind = "amberglass", label = "AMBERGLASS" }),
 })
 
 export type Entry = {
@@ -10001,7 +10922,7 @@ return table.freeze(ExtractionPayoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="43">
+      <Item class="ModuleScript" referent="44">
         <Properties>
           <string name="Name">ForemanEchoEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -10311,7 +11232,7 @@ return table.freeze(ForemanEchoEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="44">
+      <Item class="ModuleScript" referent="45">
         <Properties>
           <string name="Name">GearTraits</string>
           <string name="Source"><![CDATA[--!strict
@@ -10453,7 +11374,7 @@ return table.freeze(GearTraits)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="45">
+      <Item class="ModuleScript" referent="46">
         <Properties>
           <string name="Name">GearVisualPlan</string>
           <string name="Source"><![CDATA[--!strict
@@ -10846,7 +11767,7 @@ return table.freeze(GearVisualPlan)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="46">
+      <Item class="ModuleScript" referent="47">
         <Properties>
           <string name="Name">GearWear</string>
           <string name="Source"><![CDATA[--!strict
@@ -10993,7 +11914,7 @@ return table.freeze(GearWear)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="47">
+      <Item class="ModuleScript" referent="48">
         <Properties>
           <string name="Name">IronWidowEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -11293,7 +12214,7 @@ return table.freeze(IronWidowEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="48">
+      <Item class="ModuleScript" referent="49">
         <Properties>
           <string name="Name">IronrootEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -11590,7 +12511,7 @@ return table.freeze(IronrootEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="49">
+      <Item class="ModuleScript" referent="50">
         <Properties>
           <string name="Name">LanternWitchEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -11941,7 +12862,7 @@ return table.freeze(LanternWitchEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="50">
+      <Item class="ModuleScript" referent="51">
         <Properties>
           <string name="Name">LobbyDeparture</string>
           <string name="Source"><![CDATA[--!strict
@@ -12117,7 +13038,7 @@ return table.freeze(LobbyDeparture)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="51">
+      <Item class="ModuleScript" referent="52">
         <Properties>
           <string name="Name">ManyFaceEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -12456,7 +13377,7 @@ return table.freeze(ManyFaceEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="52">
+      <Item class="ModuleScript" referent="53">
         <Properties>
           <string name="Name">MemoryFragments</string>
           <string name="Source"><![CDATA[--!strict
@@ -12769,7 +13690,7 @@ return table.freeze(MemoryFragments)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="53">
+      <Item class="ModuleScript" referent="54">
         <Properties>
           <string name="Name">MireglassEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -13053,7 +13974,7 @@ return table.freeze(MireglassEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="54">
+      <Item class="ModuleScript" referent="55">
         <Properties>
           <string name="Name">MusicCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -13414,7 +14335,7 @@ return table.freeze(MusicCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">NightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -13462,7 +14383,7 @@ return table.freeze(NightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">OldGrowthEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -13747,7 +14668,7 @@ return table.freeze(OldGrowthEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">PerformanceBudget</string>
           <string name="Source"><![CDATA[--!strict
@@ -14136,7 +15057,7 @@ return table.freeze(PerformanceBudget)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">ProfessionAbilityVisuals</string>
           <string name="Source"><![CDATA[--!strict
@@ -14230,7 +15151,7 @@ return table.freeze(ProfessionAbilityVisuals)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">ProfessionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -14396,7 +15317,7 @@ return table.freeze(ProfessionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">ProfessionMastery</string>
           <string name="Source"><![CDATA[--!strict
@@ -14837,7 +15758,7 @@ return table.freeze(ProfessionMastery)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">ProfessionRescue</string>
           <string name="Source"><![CDATA[--!strict
@@ -14916,7 +15837,7 @@ return table.freeze(ProfessionRescue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">ProfessionState</string>
           <string name="Source"><![CDATA[--!strict
@@ -15083,7 +16004,7 @@ return table.freeze(ProfessionState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">ProfileBackup</string>
           <string name="Source"><![CDATA[--!strict
@@ -15397,7 +16318,7 @@ return table.freeze(ProfileBackup)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">ProfilePersistence</string>
           <string name="Source"><![CDATA[--!strict
@@ -15571,7 +16492,7 @@ return table.freeze(ProfilePersistence)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">QuestCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -15723,7 +16644,7 @@ return table.freeze(QuestCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">Quests</string>
           <string name="Source"><![CDATA[--!strict
@@ -15858,7 +16779,7 @@ return table.freeze(Quests)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
@@ -15917,7 +16838,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="68">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">RegionAccess</string>
           <string name="Source"><![CDATA[--!strict
@@ -16061,7 +16982,7 @@ return table.freeze(RegionAccess)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="69">
+      <Item class="ModuleScript" referent="70">
         <Properties>
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
@@ -16215,7 +17136,7 @@ return table.freeze(ResidentDialogue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="70">
+      <Item class="ModuleScript" referent="71">
         <Properties>
           <string name="Name">ResidentLife</string>
           <string name="Source"><![CDATA[--!strict
@@ -16538,7 +17459,7 @@ return table.freeze(ResidentLife)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="71">
+      <Item class="ModuleScript" referent="72">
         <Properties>
           <string name="Name">ResidentRoster</string>
           <string name="Source"><![CDATA[--!strict
@@ -16860,7 +17781,7 @@ return table.freeze(ResidentRoster)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="72">
+      <Item class="ModuleScript" referent="73">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -16975,7 +17896,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="73">
+      <Item class="ModuleScript" referent="74">
         <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -17104,7 +18025,7 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="74">
+      <Item class="ModuleScript" referent="75">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -17265,7 +18186,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="75">
+      <Item class="ModuleScript" referent="76">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -18527,7 +19448,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="76">
+      <Item class="ModuleScript" referent="77">
         <Properties>
           <string name="Name">SfxCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -18694,7 +19615,7 @@ return table.freeze(SfxCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="77">
+      <Item class="ModuleScript" referent="78">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -18813,7 +19734,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="78">
+      <Item class="ModuleScript" referent="79">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -19070,7 +19991,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="79">
+      <Item class="ModuleScript" referent="80">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -19214,7 +20135,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="80">
+      <Item class="ModuleScript" referent="81">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -19624,7 +20545,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="81">
+      <Item class="ModuleScript" referent="82">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -19805,7 +20726,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="82">
+      <Item class="ModuleScript" referent="83">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -19869,7 +20790,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="83">
+      <Item class="ModuleScript" referent="84">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -20043,7 +20964,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="84">
+      <Item class="ModuleScript" referent="85">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -20135,7 +21056,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="85">
+      <Item class="ModuleScript" referent="86">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -20347,7 +21268,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="86">
+      <Item class="ModuleScript" referent="87">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -20525,7 +21446,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="87">
+      <Item class="ModuleScript" referent="88">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -20678,7 +21599,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="88">
+      <Item class="ModuleScript" referent="89">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -20962,7 +21883,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="89">
+      <Item class="ModuleScript" referent="90">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -21124,7 +22045,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="90">
+      <Item class="ModuleScript" referent="91">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -21160,7 +22081,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="91">
+      <Item class="ModuleScript" referent="92">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -21542,7 +22463,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="92">
+      <Item class="ModuleScript" referent="93">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -21614,11 +22535,11 @@ return table.freeze(WeatherProfile)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="93">
+  <Item class="ServerScriptService" referent="94">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="94">
+    <Item class="Script" referent="95">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -22111,7 +23032,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="95">
+      <Item class="ModuleScript" referent="96">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -22209,11 +23130,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="96">
+      <Item class="Folder" referent="97">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="97">
+        <Item class="ModuleScript" referent="98">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -22828,7 +23749,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="98">
+        <Item class="ModuleScript" referent="99">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -23699,7 +24620,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="99">
+        <Item class="ModuleScript" referent="100">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24200,7 +25121,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="100">
+        <Item class="ModuleScript" referent="101">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24471,7 +25392,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="101">
+        <Item class="ModuleScript" referent="102">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -24891,7 +25812,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="102">
+        <Item class="ModuleScript" referent="103">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -26527,7 +27448,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="103">
+        <Item class="ModuleScript" referent="104">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -27241,7 +28162,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="104">
+        <Item class="ModuleScript" referent="105">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -27345,7 +28266,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="105">
+        <Item class="ModuleScript" referent="106">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -27630,7 +28551,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="106">
+        <Item class="ModuleScript" referent="107">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -28036,7 +28957,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="107">
+        <Item class="ModuleScript" referent="108">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -28130,7 +29051,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="108">
+        <Item class="ModuleScript" referent="109">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -28348,7 +29269,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="109">
+        <Item class="ModuleScript" referent="110">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -29218,7 +30139,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="110">
+        <Item class="ModuleScript" referent="111">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -29473,7 +30394,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="111">
+        <Item class="ModuleScript" referent="112">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -29652,7 +30573,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="112">
+        <Item class="ModuleScript" referent="113">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -30235,7 +31156,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="113">
+        <Item class="ModuleScript" referent="114">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -31348,7 +32269,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="114">
+        <Item class="ModuleScript" referent="115">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -31973,7 +32894,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="115">
+        <Item class="ModuleScript" referent="116">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -33761,7 +34682,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="116">
+        <Item class="ModuleScript" referent="117">
           <Properties>
             <string name="Name">RegionEncounterService</string>
             <string name="Source"><![CDATA[--!strict
@@ -34059,7 +34980,7 @@ return table.freeze(RegionEncounterService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="117">
+        <Item class="ModuleScript" referent="118">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -34684,7 +35605,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="118">
+        <Item class="ModuleScript" referent="119">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -36715,7 +37636,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="119">
+        <Item class="ModuleScript" referent="120">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -37584,7 +38505,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="120">
+        <Item class="ModuleScript" referent="121">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49870,11 +50791,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="121">
+      <Item class="Folder" referent="122">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="122">
+        <Item class="ModuleScript" referent="123">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -53654,7 +54575,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="123">
+        <Item class="ModuleScript" referent="124">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -54753,7 +55674,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="124">
+        <Item class="ModuleScript" referent="125">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -55448,7 +56369,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="125">
+        <Item class="ModuleScript" referent="126">
           <Properties>
             <string name="Name">IronrootBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -56463,7 +57384,7 @@ return table.freeze(IronrootBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="126">
+        <Item class="ModuleScript" referent="127">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -57322,7 +58243,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="127">
+        <Item class="ModuleScript" referent="128">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -57408,7 +58329,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="128">
+        <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -57782,7 +58703,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="129">
+        <Item class="ModuleScript" referent="130">
           <Properties>
             <string name="Name">MireglassBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -58538,7 +59459,7 @@ return table.freeze(MireglassBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="130">
+        <Item class="ModuleScript" referent="131">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -58718,7 +59639,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">RegionBuilders</string>
             <string name="Source"><![CDATA[--!strict
@@ -59338,7 +60259,7 @@ return table.freeze(RegionBuilders)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -59934,7 +60855,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -60171,7 +61092,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="134">
+        <Item class="ModuleScript" referent="135">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -60260,7 +61181,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="135">
+        <Item class="ModuleScript" referent="136">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -60597,15 +61518,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="136">
+  <Item class="StarterPlayer" referent="137">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="137">
+    <Item class="StarterPlayerScripts" referent="138">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="138">
+      <Item class="LocalScript" referent="139">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -60904,11 +61825,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="139">
+        <Item class="Folder" referent="140">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="140">
+          <Item class="ModuleScript" referent="141">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -61039,7 +61960,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="141">
+          <Item class="ModuleScript" referent="142">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -63985,7 +64906,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="142">
+          <Item class="ModuleScript" referent="143">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64284,7 +65205,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="143">
+          <Item class="ModuleScript" referent="144">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64392,7 +65313,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="144">
+          <Item class="ModuleScript" referent="145">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64511,7 +65432,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="145">
+          <Item class="ModuleScript" referent="146">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64785,7 +65706,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="146">
+          <Item class="ModuleScript" referent="147">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64885,7 +65806,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="147">
+          <Item class="ModuleScript" referent="148">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -64997,7 +65918,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="148">
+          <Item class="ModuleScript" referent="149">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -65157,7 +66078,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="149">
+          <Item class="ModuleScript" referent="150">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -65366,7 +66287,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="150">
+          <Item class="ModuleScript" referent="151">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -65511,7 +66432,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="151">
+          <Item class="ModuleScript" referent="152">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -65811,13 +66732,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="152">
+  <Item class="TextChatService" referent="153">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="153">
+  <Item class="Workspace" referent="154">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

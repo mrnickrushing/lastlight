@@ -3,6 +3,7 @@
 local Bramblewake = require("./Content/Definitions/BramblewakeExpedition")
 local Ironroot = require("./Content/Definitions/IronrootExpedition")
 local Mireglass = require("./Content/Definitions/MireglassExpedition")
+local Tempest = require("./Content/Definitions/TempestExpedition")
 local ExpeditionEventFlow = require("./ExpeditionEventFlow")
 
 --[[
@@ -64,7 +65,8 @@ end
 -- Catalogs are structurally alike but not identical (Bramblewake carries a
 -- measured BuiltPartBudget the Delve cannot have until its builder ships),
 -- so the list is typed by what the generator actually reads from it.
-local CATALOGS: { any } = table.freeze({ Bramblewake :: any, Ironroot :: any, Mireglass :: any })
+local CATALOGS: { any } =
+    table.freeze({ Bramblewake :: any, Ironroot :: any, Mireglass :: any, Tempest :: any })
 local DEFAULT_REGION_ID = Bramblewake.RegionId
 
 type Region = {

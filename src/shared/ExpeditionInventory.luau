@@ -34,6 +34,12 @@ local KNOWN_MATERIALS = table.freeze({
     material_witchlight_pollen = true,
     material_eel_oil = true,
     material_blackwater_herb = true,
+    -- Tempest Reach
+    material_storm_glass = true,
+    material_salt_kelp = true,
+    material_ships_iron = true,
+    material_rope_fiber = true,
+    material_amberglass = true,
 })
 
 local function hashText(hash: number, value: string): number
