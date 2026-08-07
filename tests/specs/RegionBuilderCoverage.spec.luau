@@ -123,5 +123,54 @@ return {
                 end
             end,
         },
+        {
+            --[[
+                An event's steps are the event. "Turn the three latches"
+                is three places a player has to stand, and a step with no
+                offset has nowhere to happen -- the prompt would sit on
+                top of the socket, or nowhere at all. The assembly reads
+                these offsets straight from the catalog, so the catalog is
+                where they have to be right.
+            ]]
+            name = "every event step names a place it happens",
+            run = function()
+                for _, region in REGIONS do
+                    for _, event in region.catalog.Events do
+                        TestRunner.truthy(
+                            #event.steps >= 2,
+                            event.id .. " asks for nothing the player can stand at"
+                        )
+                        local seen: { [string]: boolean } = {}
+                        for _, step in event.steps do
+                            TestRunner.equal(
+                                seen[step.id],
+                                nil,
+                                event.id .. " repeats step id " .. tostring(step.id)
+                            )
+                            seen[step.id] = true
+                            TestRunner.truthy(
+                                type(step.offset) == "table",
+                                event.id .. "/" .. tostring(step.id) .. " has no offset"
+                            )
+                            local x = tonumber(step.offset.x) or 0
+                            local z = tonumber(step.offset.z) or 0
+                            TestRunner.truthy(
+                                math.abs(x) + math.abs(z) > 0,
+                                event.id
+                                    .. "/"
+                                    .. tostring(step.id)
+                                    .. " sits on top of its own socket"
+                            )
+                            -- and inside the module it belongs to, or the
+                            -- prompt lands in the next module's ground
+                            TestRunner.truthy(
+                                math.abs(x) <= 30 and math.abs(z) <= 30,
+                                event.id .. "/" .. tostring(step.id) .. " falls outside its module"
+                            )
+                        end
+                    end
+                end
+            end,
+        },
     },
 }

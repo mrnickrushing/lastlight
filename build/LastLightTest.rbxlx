@@ -58435,8 +58435,6 @@ local ENTRIES: { [string]: any } = {
         builder = IronrootBuilder,
         walkable = false,
         missing = {
-            "points of interest",
-            "event sockets",
             "elite arenas (Foreman Echo, Iron Widow)",
             "boss chamber (Bellows Maw)",
             "wayfinding and mesh dressing",
@@ -58446,8 +58444,6 @@ local ENTRIES: { [string]: any } = {
         builder = MireglassBuilder,
         walkable = false,
         missing = {
-            "points of interest",
-            "event sockets",
             "elite arenas (The Many-Face, Drowned Caller)",
             "boss chamber (Lantern Witch)",
             "wayfinding and mesh dressing",
@@ -58643,6 +58639,159 @@ RegionBuilders.NodeMaterials = table.freeze({
         }),
     }),
 })
+
+local CollectionService = game:GetService("CollectionService")
+
+--[[
+    Points of interest and event sockets for a region that has neither.
+
+    Both are anchors with words on them: a POI says what a place is, an
+    event socket says what is about to be asked of you and how far along
+    it is. Bramblewake dresses them heavily -- cairns, icons, billboards
+    tuned over several waves. A new region gets the anchor, the
+    attributes, and the tag, which is everything the runtime and the
+    tests read; its own dressing is an art pass, not a wiring one, and
+    saying so is better than faking it.
+]]
+local function labelled(parent: Instance, text: string, color: Color3)
+    local gui = Instance.new("BillboardGui")
+    gui.Name = "Label"
+    gui.Size = UDim2.fromOffset(220, 40)
+    gui.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
+    gui.AlwaysOnTop = false
+    gui.MaxDistance = 140
+    gui.Parent = parent
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Font = Enum.Font.GothamBold
+    label.Text = string.upper(text)
+    label.TextColor3 = color
+    label.TextScaled = true
+    label.TextStrokeTransparency = 0.4
+    label.Parent = gui
+end
+
+function RegionBuilders.buildPointsOfInterest(
+    modules: { Instance },
+    manifest: any,
+    generator: any,
+    catalog: any,
+    origin: Vector3,
+    color: Color3
+): number
+    local placed = 0
+    for index, placement in manifest.modules do
+        if placement.poiId ~= nil and modules[index] ~= nil then
+            local definition = generator.pointOfInterestDefinition(placement.poiId)
+            local center = origin
+                + Vector3.new(
+                    placement.cellX * catalog.CellSize,
+                    0,
+                    placement.cellZ * catalog.CellSize
+                )
+            local anchor = Instance.new("Part")
+            anchor.Name = "PointOfInterest"
+            anchor.Size = Vector3.new(8, 1, 8)
+            anchor.CFrame = CFrame.new(center + Vector3.new(-21, 0.5, 18))
+            anchor.Anchored = true
+            anchor.CanCollide = false
+            anchor.CanTouch = false
+            anchor.Transparency = 1
+            anchor.CastShadow = false
+            anchor:SetAttribute("ContentId", definition.id)
+            anchor:SetAttribute("DisplayName", definition.displayName)
+            anchor:SetAttribute("Detail", definition.detail)
+            anchor.Parent = modules[index]
+            labelled(anchor, definition.displayName, color)
+            placed += 1
+        end
+    end
+    return placed
+end
+
+function RegionBuilders.buildEventSockets(
+    modules: { Instance },
+    manifest: any,
+    generator: any,
+    catalog: any,
+    origin: Vector3,
+    runtimeIds: any,
+    color: Color3
+): { any }
+    local sockets = {}
+    for index, placement in manifest.modules do
+        if placement.eventId ~= nil and modules[index] ~= nil then
+            local definition = generator.eventDefinition(placement.eventId)
+            local center = origin
+                + Vector3.new(
+                    placement.cellX * catalog.CellSize,
+                    0,
+                    placement.cellZ * catalog.CellSize
+                )
+            local anchor = Instance.new("Part")
+            anchor.Name = "EventSocket"
+            anchor.Size = Vector3.new(7, 1, 7)
+            anchor.CFrame = CFrame.new(center + Vector3.new(22, 0.5, -19))
+            anchor.Anchored = true
+            anchor.CanCollide = false
+            anchor.CanTouch = false
+            anchor.Transparency = 1
+            anchor.CastShadow = false
+            anchor:SetAttribute("ContentId", definition.id)
+            anchor:SetAttribute("DisplayName", definition.displayName)
+            anchor:SetAttribute("Dormant", true)
+            anchor:SetAttribute("Status", "dormant")
+            anchor:SetAttribute("Progress", 0)
+            anchor:SetAttribute("ProgressTotal", #definition.steps)
+            anchor.Parent = modules[index]
+            CollectionService:AddTag(anchor, runtimeIds.ExpeditionEventTag)
+            labelled(anchor, definition.displayName, color)
+
+            --[[
+                One anchor per step, at the offsets the event's own
+                definition names. The steps are the event: "turn the three
+                latches" is three places a player has to stand, and an
+                event whose steps have nowhere to happen is a prompt that
+                never appears.
+            ]]
+            local steps = {}
+            for _, step in definition.steps do
+                local offset = step.offset or { x = 0, y = 1, z = 0 }
+                local stepAnchor = Instance.new("Part")
+                stepAnchor.Name = "EventStep"
+                stepAnchor.Size = Vector3.new(3, 4, 3)
+                stepAnchor.CFrame = CFrame.new(
+                    anchor.Position
+                        + Vector3.new(
+                            tonumber(offset.x) or 0,
+                            tonumber(offset.y) or 1,
+                            tonumber(offset.z) or 0
+                        )
+                )
+                stepAnchor.Anchored = true
+                stepAnchor.CanCollide = false
+                stepAnchor.CanTouch = false
+                stepAnchor.Transparency = 1
+                stepAnchor:SetAttribute("StepId", step.id)
+                stepAnchor.Parent = anchor
+                table.insert(steps, {
+                    target = stepAnchor,
+                    stepId = step.id,
+                    actionText = step.actionText,
+                    objectText = step.objectText,
+                })
+            end
+
+            table.insert(sockets, {
+                target = anchor,
+                eventId = definition.id,
+                steps = steps,
+            })
+        end
+    end
+    return sockets
+end
 
 return table.freeze(RegionBuilders)
 ]]></string>
