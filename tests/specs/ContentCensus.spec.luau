@@ -178,11 +178,23 @@ return {
                 for _, quest in QuestCatalog.list() do
                     byId[quest.id] = quest
                 end
-                TestRunner.equal(#QuestCatalog.list(), 33)
+                TestRunner.equal(#QuestCatalog.list(), 46)
 
                 local stagesFor: { [string]: number } = {}
+                local standing = 0
                 for _, quest in QuestCatalog.list() do
-                    TestRunner.truthy(quest.residentId ~= nil, quest.id .. " is nobody's quest")
+                    --[[
+                        Two families belong to nobody: the mastery trials
+                        and the region mysteries are the town's own
+                        standing questions rather than a person's. They are
+                        counted separately and may not be arc stages;
+                        everything else has to name a resident who exists.
+                    ]]
+                    if quest.residentId == nil then
+                        standing += 1
+                        TestRunner.equal(quest.requires, nil, quest.id .. " is a stage of nothing")
+                        continue
+                    end
                     TestRunner.truthy(
                         ResidentRoster.get(quest.residentId) ~= nil,
                         quest.id .. " belongs to somebody who does not exist"
@@ -220,6 +232,10 @@ return {
                     )
                 end
 
+                -- seven mastery trials and six region mysteries
+                TestRunner.equal(standing, 13)
+                -- seven mastery trials and six region mysteries
+                TestRunner.equal(standing, 13)
                 for _, definition in ResidentRoster.list() do
                     TestRunner.truthy(
                         (stagesFor[definition.id] or 0) >= 1,
@@ -251,6 +267,8 @@ return {
                         "| recipe_group_wearables | Armour | 60 |",
                         "| recipe_group_consumables | Things that are used | 34 |",
                         "| quest_group_resident | Resident arcs | 33 |",
+                        "| quest_group_mastery | Profession mastery tracks | 7 |",
+                        "| quest_group_mystery | Region mystery groups | 6 |",
                     }
                 do
                     TestRunner.truthy(

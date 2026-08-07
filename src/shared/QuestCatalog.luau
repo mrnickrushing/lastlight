@@ -5,6 +5,14 @@ local QuestCatalog = {}
 export type Objective = {
     kind: string,
     threshold: number,
+    --[[
+        Keyed objectives. A kind that counts everything needs neither of
+        these; a kind that counts one profession's mastery or one region's
+        memories names which, and `Quests.currentValue` reads the key off
+        the objective rather than off a second table somewhere.
+    ]]
+    professionId: string?,
+    regionId: string?,
 }
 
 export type Reward = {
@@ -69,6 +77,27 @@ local ORDER = table.freeze({
     "quest_vale_nursing",
     "quest_cold_stores",
     "quest_almshouse_doors",
+    --[[
+        Two families that belong to nobody: the mastery trials, which ask
+        a player to go deep in one profession rather than wide across
+        seven, and the region mysteries, which ask for a place's memories
+        specifically rather than for memories in general. Neither is a
+        resident's, so neither carries a residentId -- they are the
+        town's own standing questions.
+    ]]
+    "quest_mastery_scout",
+    "quest_mastery_warden",
+    "quest_mastery_engineer",
+    "quest_mastery_medic",
+    "quest_mastery_alchemist",
+    "quest_mastery_beastkeeper",
+    "quest_mastery_runebinder",
+    "quest_mystery_bramblewake",
+    "quest_mystery_ironroot",
+    "quest_mystery_mireglass",
+    "quest_mystery_tempest",
+    "quest_mystery_frostmere",
+    "quest_mystery_cinderfall",
     -- Cinderfall Crown residents
     "quest_glass_hands",
     "quest_kept_record",
@@ -370,6 +399,136 @@ local DEFINITIONS: { [string]: Quest } = {
         requires = "quest_ena_first_growth",
         residentId = "npc_ena_moss",
         reward = table.freeze({ materialId = "material_amber_sap", amount = 12 }),
+    }),
+    quest_mastery_scout = table.freeze({
+        id = "quest_mastery_scout",
+        displayName = "THE ROAD KNOWN",
+        objective = table.freeze({
+            kind = "profession_mastery",
+            professionId = "profession_scout",
+            threshold = 4,
+        }),
+        reward = table.freeze({ materialId = "material_meadow_fiber", amount = 10 }),
+    }),
+    quest_mastery_warden = table.freeze({
+        id = "quest_mastery_warden",
+        displayName = "THE WATCH KEPT",
+        objective = table.freeze({
+            kind = "profession_mastery",
+            professionId = "profession_warden",
+            threshold = 4,
+        }),
+        reward = table.freeze({ materialId = "material_heartwood", amount = 10 }),
+    }),
+    quest_mastery_engineer = table.freeze({
+        id = "quest_mastery_engineer",
+        displayName = "THE WORK STANDING",
+        objective = table.freeze({
+            kind = "profession_mastery",
+            professionId = "profession_engineer",
+            threshold = 4,
+        }),
+        reward = table.freeze({ materialId = "material_ironroot_ore", amount = 10 }),
+    }),
+    quest_mastery_medic = table.freeze({
+        id = "quest_mastery_medic",
+        displayName = "EVERY HEAD COUNTED",
+        objective = table.freeze({
+            kind = "profession_mastery",
+            professionId = "profession_medic",
+            threshold = 4,
+        }),
+        reward = table.freeze({ materialId = "material_blackwater_herb", amount = 10 }),
+    }),
+    quest_mastery_alchemist = table.freeze({
+        id = "quest_mastery_alchemist",
+        displayName = "THE MIXTURE RIGHT",
+        objective = table.freeze({
+            kind = "profession_mastery",
+            professionId = "profession_alchemist",
+            threshold = 4,
+        }),
+        reward = table.freeze({ materialId = "material_amber_sap", amount = 10 }),
+    }),
+    quest_mastery_beastkeeper = table.freeze({
+        id = "quest_mastery_beastkeeper",
+        displayName = "THE PACK TRUSTED",
+        objective = table.freeze({
+            kind = "profession_mastery",
+            professionId = "profession_beastkeeper",
+            threshold = 4,
+        }),
+        reward = table.freeze({ materialId = "material_ember_moss", amount = 10 }),
+    }),
+    quest_mastery_runebinder = table.freeze({
+        id = "quest_mastery_runebinder",
+        displayName = "THE MARK HELD",
+        objective = table.freeze({
+            kind = "profession_mastery",
+            professionId = "profession_runebinder",
+            threshold = 4,
+        }),
+        reward = table.freeze({ materialId = "material_memory_glass", amount = 10 }),
+    }),
+    quest_mystery_bramblewake = table.freeze({
+        id = "quest_mystery_bramblewake",
+        displayName = "WHAT THE FOREST KEPT",
+        objective = table.freeze({
+            kind = "fragments_in_region",
+            regionId = "region_bramblewake",
+            threshold = 10,
+        }),
+        reward = table.freeze({ materialId = "material_brightcap", amount = 8 }),
+    }),
+    quest_mystery_ironroot = table.freeze({
+        id = "quest_mystery_ironroot",
+        displayName = "WHAT THE DELVE BURIED",
+        objective = table.freeze({
+            kind = "fragments_in_region",
+            regionId = "region_ironroot",
+            threshold = 2,
+        }),
+        reward = table.freeze({ materialId = "material_coalglass", amount = 8 }),
+    }),
+    quest_mystery_mireglass = table.freeze({
+        id = "quest_mystery_mireglass",
+        displayName = "WHAT THE WATER TOOK",
+        objective = table.freeze({
+            kind = "fragments_in_region",
+            regionId = "region_mireglass",
+            threshold = 2,
+        }),
+        reward = table.freeze({ materialId = "material_mirror_reed", amount = 8 }),
+    }),
+    quest_mystery_tempest = table.freeze({
+        id = "quest_mystery_tempest",
+        displayName = "WHAT THE COAST SIGNALLED",
+        objective = table.freeze({
+            kind = "fragments_in_region",
+            regionId = "region_tempest",
+            threshold = 2,
+        }),
+        reward = table.freeze({ materialId = "material_storm_glass", amount = 8 }),
+    }),
+    quest_mystery_frostmere = table.freeze({
+        id = "quest_mystery_frostmere",
+        displayName = "WHAT THE VALLEY STOPPED SAYING",
+        objective = table.freeze({
+            kind = "fragments_in_region",
+            regionId = "region_frostmere",
+            threshold = 2,
+        }),
+        reward = table.freeze({ materialId = "material_aurora_salt", amount = 8 }),
+    }),
+    quest_mystery_cinderfall = table.freeze({
+        id = "quest_mystery_cinderfall",
+        displayName = "WHAT THE CROWN WOULD NOT SAY",
+        objective = table.freeze({
+            kind = "fragments_in_region",
+            regionId = "region_cinderfall",
+            threshold = 2,
+        }),
+        reward = table.freeze({ materialId = "material_ash_silk", amount = 8 }),
     }),
 }
 

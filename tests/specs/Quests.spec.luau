@@ -15,13 +15,93 @@ local function signals(overrides: any): Quests.Signals
         gearTraits = overrides.gearTraits or 0,
         materialsBanked = overrides.materialsBanked or 0,
         nightsSurvived = overrides.nightsSurvived or 0,
+        fragmentsByRegion = overrides.fragmentsByRegion or {},
+        masteryByProfession = overrides.masteryByProfession or {},
         residentsBonded = overrides.residentsBonded or 0,
     }
+end
+
+--[[
+    Keyed signals are maps rather than counts, so "raise everything"
+    cannot be a number. This builds a map that answers high for any key an
+    objective might name, which is what the coverage cases need in order
+    to prove a kind is routed at all.
+]]
+local function raisedByKey(prefix: string): { [string]: number }
+    local raised: { [string]: number } = {}
+    for _, quest in QuestCatalog.list() do
+        local objective: any = quest.objective
+        for _, key in { objective.regionId, objective.professionId } do
+            if type(key) == "string" and string.sub(key, 1, #prefix) == prefix then
+                raised[key] = 999
+            end
+        end
+    end
+    return raised
 end
 
 return {
     name = "Quests",
     cases = {
+        {
+            --[[
+                A keyed objective only counts progress in the thing it
+                names. The failure it guards against is the one that would
+                make these two families pointless: if a mastery trial read
+                total levels rather than one profession's, a player who
+                dabbled in seven would clear the scout's trial without
+                ever scouting, and the whole reason to specialise would go
+                with it.
+            ]]
+            name = "a keyed objective counts only the profession or region it names",
+            run = function()
+                local scout = QuestCatalog.get("quest_mastery_scout") :: any
+                TestRunner.equal(scout.objective.professionId, "profession_scout")
+                -- deep in the wrong profession does nothing
+                local elsewhere = signals({
+                    masteryByProfession = { profession_warden = 9 },
+                })
+                local current, threshold, complete = Quests.progress(scout.id, elsewhere)
+                TestRunner.equal(current, 0)
+                TestRunner.equal(complete, false)
+                TestRunner.truthy(threshold > 1)
+                -- deep in the right one does
+                local right = signals({ masteryByProfession = { profession_scout = 9 } })
+                local _, _, done = Quests.progress(scout.id, right)
+                TestRunner.equal(done, true)
+
+                local mystery = QuestCatalog.get("quest_mystery_frostmere") :: any
+                TestRunner.equal(mystery.objective.regionId, "region_frostmere")
+                -- the archive being full of another region's memories is
+                -- not this region's mystery solved
+                local wrongRegion = signals({ fragmentsByRegion = { region_bramblewake = 10 } })
+                TestRunner.equal((select(3, Quests.progress(mystery.id, wrongRegion))), false)
+                local rightRegion = signals({ fragmentsByRegion = { region_frostmere = 2 } })
+                TestRunner.equal((select(3, Quests.progress(mystery.id, rightRegion))), true)
+
+                --[[
+                    And every region's mystery asks for exactly what that
+                    region holds -- a threshold above the fragment count
+                    would be a quest nobody can finish, which is the kind
+                    of thing that only shows up in a player's log.
+                ]]
+                local MemoryFragments = require("../../src/shared/MemoryFragments")
+                local perRegion: { [string]: number } = {}
+                for _, fragment in MemoryFragments.List do
+                    local regionId = tostring(fragment.regionId)
+                    perRegion[regionId] = (perRegion[regionId] or 0) + 1
+                end
+                for _, quest in QuestCatalog.list() do
+                    local objective: any = quest.objective
+                    if objective.kind == "fragments_in_region" then
+                        TestRunner.truthy(
+                            objective.threshold <= (perRegion[objective.regionId] or 0),
+                            quest.id .. " asks for more memories than its region has"
+                        )
+                    end
+                end
+            end,
+        },
         {
             --[[
                 An arc is only an arc if its stages happen in order. The
@@ -64,6 +144,8 @@ return {
                     materialsBanked = 999,
                     nightsSurvived = 999,
                     residentsBonded = 999,
+                    fragmentsByRegion = raisedByKey("region_"),
+                    masteryByProfession = raisedByKey("profession_"),
                 })
                 TestRunner.equal(Quests.isUnlocked(later.id, {}), false)
                 local snapshot = Quests.snapshot(Quests.default(), raised)
@@ -122,6 +204,8 @@ return {
                     materialsBanked = 999,
                     nightsSurvived = 999,
                     residentsBonded = 999,
+                    fragmentsByRegion = raisedByKey("region_"),
+                    masteryByProfession = raisedByKey("profession_"),
                 })
                 local empty = signals({})
                 for _, quest in QuestCatalog.list() do
