@@ -20,6 +20,7 @@
 local BramblewakeBuilder = require(script.Parent.BramblewakeBuilder)
 local IronrootBuilder = require(script.Parent.IronrootBuilder)
 local MireglassBuilder = require(script.Parent.MireglassBuilder)
+local TempestBuilder = require(script.Parent.TempestBuilder)
 
 local RegionBuilders = {}
 
@@ -41,6 +42,13 @@ local ENTRIES: { [string]: any } = {
         walkable = false,
         -- Mesh dressing is an art pass: authored assets, not wiring.
         -- Everything a party needs to walk the region is built.
+        missing = {
+            "authored mesh dressing",
+        },
+    },
+    region_tempest = {
+        builder = TempestBuilder,
+        walkable = false,
         missing = {
             "authored mesh dressing",
         },
@@ -224,6 +232,23 @@ RegionBuilders.NodeMaterials = table.freeze({
             id = "material_glow_fungus",
             label = "Glow Fungus",
             color = Color3.fromRGB(150, 226, 176),
+        }),
+    }),
+    region_tempest = table.freeze({
+        table.freeze({
+            id = "material_storm_glass",
+            label = "Storm Glass",
+            color = Color3.fromRGB(238, 178, 96),
+        }),
+        table.freeze({
+            id = "material_salt_kelp",
+            label = "Salt Kelp",
+            color = Color3.fromRGB(66, 88, 62),
+        }),
+        table.freeze({
+            id = "material_ships_iron",
+            label = "Ship's Iron",
+            color = Color3.fromRGB(92, 96, 100),
         }),
     }),
     region_mireglass = table.freeze({
@@ -604,6 +629,10 @@ RegionBuilders.Wayfinding = table.freeze({
     region_ironroot = table.freeze({
         marker = Color3.fromRGB(62, 58, 56),
         glow = Color3.fromRGB(255, 206, 128),
+    }),
+    region_tempest = table.freeze({
+        marker = Color3.fromRGB(88, 92, 96),
+        glow = Color3.fromRGB(255, 216, 150),
     }),
     region_mireglass = table.freeze({
         marker = Color3.fromRGB(76, 78, 74),
