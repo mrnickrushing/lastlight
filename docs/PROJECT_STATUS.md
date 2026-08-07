@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-07, at `main` = `HEAD` (PR #290), build `0.53.0`,
-save schema 21, 23 services. Published to Roblox as place version 120,
+Last updated: 2026-08-07, at `main` = `HEAD` (PR #292), build `0.53.0`,
+save schema 21, 23 services. Published to Roblox as place version 121,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 7 through 10 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** Studio is
@@ -18,10 +18,27 @@ Studio-facing checks not performed are recorded open rather than assumed.
 **Milestones 7, 8 and 9 are complete.** The story runs end to end: seven
 chapters, seven regions, an authored finale with three endings, an
 epilogue that reads the whole save, 27 residents and all 28 buildings.
-The next wave is M10 wave A-1; the queue lives in
+M10 wave A-1 is done (90 recipes). **The next wave is M10 A-2, and it is
+a code wave before it is a content wave**: the two consumables this game
+has are hardcoded branches in `TutorialService`, `HUDController` and the
+client, so a data-driven consumable contract has to land before any more
+"used" outputs can. The queue lives in
 [WAVE_PLAN_M8_M10.md](WAVE_PLAN_M8_M10.md).
 
 Newest first since the last header:
+- **#292** (v121) **M10 wave A-1: 10 recipes became 90.** Six weapon
+  families in every region and five armour slots in two lines each, with
+  the rule that a region is an axis rather than a tier — the Delve makes
+  everything heavier, the Fen longer, the Reach further, the Vale
+  lighter, the Crown better at taking a hit — and a spec that refuses two
+  regions whose version of a family has identical numbers. Two things had
+  to be fixed to make it real: `body`, `hands` and `charm` had no
+  attachment point in `GearVisualService`, so anything in those slots
+  would have equipped invisibly; and `GearVisualPlan` now derives a plan
+  from family plus region palette, marked `derived = true`, so 82 items
+  are a labelled floor rather than eighty invisible ones. **The art pass
+  that replaces the derived plans is owner-gated, alongside mesh
+  dressing.**
 - **#284–#290** (v114–v120) **Milestone 9 finished — the game has an
   ending.** **#284** Cinderfall Crown, whose hazard is that it is still
   going: the parade still on its route, the crowd still facing the stage,
