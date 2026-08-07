@@ -14,6 +14,7 @@
 ]]
 
 local fs = require("@lune/fs")
+local Frostmere = require("../../src/shared/Content/Definitions/FrostmereExpedition")
 local Ironroot = require("../../src/shared/Content/Definitions/IronrootExpedition")
 local Mireglass = require("../../src/shared/Content/Definitions/MireglassExpedition")
 local Tempest = require("../../src/shared/Content/Definitions/TempestExpedition")
@@ -23,6 +24,7 @@ local REGIONS = {
     { catalog = Ironroot, builder = "src/server/World/IronrootBuilder.luau" },
     { catalog = Mireglass, builder = "src/server/World/MireglassBuilder.luau" },
     { catalog = Tempest, builder = "src/server/World/TempestBuilder.luau" },
+    { catalog = Frostmere, builder = "src/server/World/FrostmereBuilder.luau" },
 }
 
 local function builderSource(path: string): string
@@ -72,6 +74,7 @@ return {
                 TestRunner.equal(byId.region_ironroot.enabled, false)
                 TestRunner.equal(byId.region_mireglass.enabled, false)
                 TestRunner.equal(byId.region_tempest.enabled, false)
+                TestRunner.equal(byId.region_frostmere.enabled, false)
             end,
         },
         {
@@ -193,6 +196,12 @@ return {
                     { id = "elite_many_face", regionId = "region_mireglass" },
                     { id = "elite_drowned_caller", regionId = "region_mireglass" },
                     { id = "boss_lantern_witch", regionId = "region_mireglass" },
+                    { id = "elite_lighthouse_eater", regionId = "region_tempest" },
+                    { id = "elite_admiral_wreck", regionId = "region_tempest" },
+                    { id = "boss_tidebound_titan", regionId = "region_tempest" },
+                    { id = "elite_abbey_silence", regionId = "region_frostmere" },
+                    { id = "elite_aurora_hart", regionId = "region_frostmere" },
+                    { id = "boss_white_howler", regionId = "region_frostmere" },
                 }
                 for _, entry in expected do
                     local slice =

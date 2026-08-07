@@ -20,6 +20,7 @@
 local BramblewakeBuilder = require(script.Parent.BramblewakeBuilder)
 local IronrootBuilder = require(script.Parent.IronrootBuilder)
 local MireglassBuilder = require(script.Parent.MireglassBuilder)
+local FrostmereBuilder = require(script.Parent.FrostmereBuilder)
 local TempestBuilder = require(script.Parent.TempestBuilder)
 
 local RegionBuilders = {}
@@ -49,6 +50,15 @@ local ENTRIES: { [string]: any } = {
     region_tempest = {
         builder = TempestBuilder,
         walkable = false,
+        missing = {
+            "authored mesh dressing",
+        },
+    },
+    region_frostmere = {
+        builder = FrostmereBuilder,
+        walkable = false,
+        -- Mesh dressing is an art pass: authored assets, not wiring.
+        -- Everything a party needs to walk the region is built.
         missing = {
             "authored mesh dressing",
         },
@@ -232,6 +242,28 @@ RegionBuilders.NodeMaterials = table.freeze({
             id = "material_glow_fungus",
             label = "Glow Fungus",
             color = Color3.fromRGB(150, 226, 176),
+        }),
+    }),
+    region_frostmere = table.freeze({
+        table.freeze({
+            id = "material_frostmere_ice",
+            label = "Frostmere Ice",
+            color = Color3.fromRGB(168, 202, 216),
+        }),
+        table.freeze({
+            id = "material_ember_moss",
+            label = "Ember Moss",
+            color = Color3.fromRGB(238, 128, 54),
+        }),
+        table.freeze({
+            id = "material_frostmere_wool",
+            label = "Frostmere Wool",
+            color = Color3.fromRGB(214, 206, 188),
+        }),
+        table.freeze({
+            id = "material_aurora_salt",
+            label = "Aurora Salt",
+            color = Color3.fromRGB(126, 236, 198),
         }),
     }),
     region_tempest = table.freeze({
@@ -542,6 +574,36 @@ RegionBuilders.Arenas = table.freeze({
         regionId = "region_ironroot",
         radius = 38,
     }),
+    elite_lighthouse_eater = table.freeze({
+        name = "LighthouseEaterPoint",
+        regionId = "region_tempest",
+        radius = 30,
+    }),
+    elite_admiral_wreck = table.freeze({
+        name = "AdmiralWreckBerth",
+        regionId = "region_tempest",
+        radius = 33,
+    }),
+    boss_tidebound_titan = table.freeze({
+        name = "TideboundTitanChannel",
+        regionId = "region_tempest",
+        radius = 40,
+    }),
+    elite_abbey_silence = table.freeze({
+        name = "AbbeySilenceCloister",
+        regionId = "region_frostmere",
+        radius = 27,
+    }),
+    elite_aurora_hart = table.freeze({
+        name = "AuroraHartClearing",
+        regionId = "region_frostmere",
+        radius = 31,
+    }),
+    boss_white_howler = table.freeze({
+        name = "WhiteHowlerBowl",
+        regionId = "region_frostmere",
+        radius = 37,
+    }),
     elite_many_face = table.freeze({
         name = "ManyFaceCourt",
         regionId = "region_mireglass",
@@ -633,6 +695,10 @@ RegionBuilders.Wayfinding = table.freeze({
     region_tempest = table.freeze({
         marker = Color3.fromRGB(88, 92, 96),
         glow = Color3.fromRGB(255, 216, 150),
+    }),
+    region_frostmere = table.freeze({
+        marker = Color3.fromRGB(126, 128, 130),
+        glow = Color3.fromRGB(238, 128, 54),
     }),
     region_mireglass = table.freeze({
         marker = Color3.fromRGB(76, 78, 74),
