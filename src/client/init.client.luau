@@ -91,10 +91,8 @@ end, function()
     send(RuntimeIds.Actions.ProfessionAbility)
 end, function()
     hud:setProfessionMenuOpen(true)
-end, function()
-    send(RuntimeIds.Actions.UseGear, { itemId = "gear_amber_charm" })
-end, function()
-    send(RuntimeIds.Actions.UseGear, { itemId = "gear_meadow_satchel" })
+end, function(itemId: string)
+    send(RuntimeIds.Actions.UseGear, { itemId = itemId })
 end)
 
 --[[

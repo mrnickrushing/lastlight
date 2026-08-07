@@ -21,6 +21,21 @@ local ORDER = table.freeze({
     "recipe_foxfire_sling",
     "recipe_amber_edge",
     "recipe_warden_cudgel",
+    -- The things that are used rather than worn
+    "recipe_delve_ration",
+    "recipe_coalglass_ward",
+    "recipe_reed_tonic",
+    "recipe_mirror_ward",
+    "recipe_fen_poultice",
+    "recipe_storm_ration",
+    "recipe_amberglass_ward",
+    "recipe_reach_poultice",
+    "recipe_ember_ration",
+    "recipe_rime_ward",
+    "recipe_vale_poultice",
+    "recipe_kiln_ration",
+    "recipe_cindersteel_ward",
+    "recipe_crown_poultice",
     "recipe_stope_bow",
     "recipe_drift_maul",
     "recipe_pit_lance",
@@ -1002,6 +1017,146 @@ local DEFINITIONS: { [string]: Recipe } = {
         materials = table.freeze({
             material_cindersteel = 7,
             material_kiln_pearl = 2,
+        }),
+    }),
+    recipe_delve_ration = table.freeze({
+        id = "recipe_delve_ration",
+        displayName = "DELVE RATION",
+        outputItemId = "gear_delve_ration",
+        outputDisplayName = "Delve Ration",
+        materials = table.freeze({
+            material_glow_fungus = 4,
+            material_machine_oil = 2,
+        }),
+    }),
+    recipe_coalglass_ward = table.freeze({
+        id = "recipe_coalglass_ward",
+        displayName = "COALGLASS WARD",
+        outputItemId = "gear_coalglass_ward",
+        outputDisplayName = "Coalglass Ward",
+        materials = table.freeze({
+            material_coalglass = 4,
+            material_ironroot_ore = 3,
+        }),
+    }),
+    recipe_reed_tonic = table.freeze({
+        id = "recipe_reed_tonic",
+        displayName = "REED TONIC",
+        outputItemId = "gear_reed_tonic",
+        outputDisplayName = "Reed Tonic",
+        materials = table.freeze({
+            material_blackwater_herb = 4,
+            material_mirror_reed = 3,
+        }),
+    }),
+    recipe_mirror_ward = table.freeze({
+        id = "recipe_mirror_ward",
+        displayName = "MIRROR WARD",
+        outputItemId = "gear_mirror_ward",
+        outputDisplayName = "Mirror Ward",
+        materials = table.freeze({
+            material_mirror_reed = 5,
+            material_witchlight_pollen = 2,
+        }),
+    }),
+    recipe_fen_poultice = table.freeze({
+        id = "recipe_fen_poultice",
+        displayName = "FEN POULTICE",
+        outputItemId = "gear_fen_poultice",
+        outputDisplayName = "Fen Poultice",
+        materials = table.freeze({
+            material_blackwater_herb = 5,
+            material_eel_oil = 3,
+        }),
+    }),
+    recipe_storm_ration = table.freeze({
+        id = "recipe_storm_ration",
+        displayName = "STORM RATION",
+        outputItemId = "gear_storm_ration",
+        outputDisplayName = "Storm Ration",
+        materials = table.freeze({
+            material_rope_fiber = 3,
+            material_salt_kelp = 5,
+        }),
+    }),
+    recipe_amberglass_ward = table.freeze({
+        id = "recipe_amberglass_ward",
+        displayName = "AMBERGLASS WARD",
+        outputItemId = "gear_amberglass_ward",
+        outputDisplayName = "Amberglass Ward",
+        materials = table.freeze({
+            material_amberglass = 4,
+            material_storm_glass = 4,
+        }),
+    }),
+    recipe_reach_poultice = table.freeze({
+        id = "recipe_reach_poultice",
+        displayName = "REACH POULTICE",
+        outputItemId = "gear_reach_poultice",
+        outputDisplayName = "Reach Poultice",
+        materials = table.freeze({
+            material_salt_kelp = 6,
+            material_ships_iron = 2,
+        }),
+    }),
+    recipe_ember_ration = table.freeze({
+        id = "recipe_ember_ration",
+        displayName = "EMBER RATION",
+        outputItemId = "gear_ember_ration",
+        outputDisplayName = "Ember Ration",
+        materials = table.freeze({
+            material_ember_moss = 5,
+            material_frostmere_wool = 3,
+        }),
+    }),
+    recipe_rime_ward = table.freeze({
+        id = "recipe_rime_ward",
+        displayName = "RIME WARD",
+        outputItemId = "gear_rime_ward",
+        outputDisplayName = "Rime Ward",
+        materials = table.freeze({
+            material_frostmere_ice = 5,
+            material_thawed_iron = 3,
+        }),
+    }),
+    recipe_vale_poultice = table.freeze({
+        id = "recipe_vale_poultice",
+        displayName = "VALE POULTICE",
+        outputItemId = "gear_vale_poultice",
+        outputDisplayName = "Vale Poultice",
+        materials = table.freeze({
+            material_aurora_salt = 3,
+            material_ember_moss = 6,
+        }),
+    }),
+    recipe_kiln_ration = table.freeze({
+        id = "recipe_kiln_ration",
+        displayName = "KILN RATION",
+        outputItemId = "gear_kiln_ration",
+        outputDisplayName = "Kiln Ration",
+        materials = table.freeze({
+            material_ash_silk = 4,
+            material_crown_coal = 5,
+        }),
+    }),
+    recipe_cindersteel_ward = table.freeze({
+        id = "recipe_cindersteel_ward",
+        displayName = "CINDERSTEEL WARD",
+        outputItemId = "gear_cindersteel_ward",
+        outputDisplayName = "Cindersteel Ward",
+        materials = table.freeze({
+            material_cindersteel = 5,
+            material_kiln_pearl = 3,
+        }),
+    }),
+    recipe_crown_poultice = table.freeze({
+        id = "recipe_crown_poultice",
+        displayName = "CROWN POULTICE",
+        outputItemId = "gear_crown_poultice",
+        outputDisplayName = "Crown Poultice",
+        materials = table.freeze({
+            material_ash_silk = 6,
+            material_memory_glass = 3,
         }),
     }),
 }

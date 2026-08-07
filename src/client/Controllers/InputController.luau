@@ -56,8 +56,7 @@ function InputController.new(
     onDodge: () -> (),
     onProfessionAbility: () -> (),
     onProfessionMenu: () -> (),
-    onUseCharm: () -> (),
-    onUseSatchel: () -> ()
+    onUseConsumable: (itemId: string) -> ()
 ): InputController
     local self = setmetatable({
         _hud = hud,
@@ -99,14 +98,22 @@ function InputController.new(
             { name = "Keyboard", key = Enum.KeyCode.P },
             { name = "Gamepad", key = Enum.KeyCode.DPadUp },
         }, hud:professionButton())
-        local useCharm = createBoolAction(context, "UseAmberCharm", {
+        --[[
+            C and V keep the first and second consumable the player is
+            carrying rather than two named items. The HUD decides which
+            those are and stamps each button with its id, so a key press
+            asks the button rather than a constant -- which is the whole
+            reason a third consumable no longer needs a code change.
+        ]]
+        local useButtons = hud:useButtons()
+        local useFirst = createBoolAction(context, "UseConsumableOne", {
             { name = "Keyboard", key = Enum.KeyCode.C },
             { name = "Gamepad", key = Enum.KeyCode.ButtonY },
-        }, hud:useCharmButton())
-        local useSatchel = createBoolAction(context, "UseMeadowSatchel", {
+        }, useButtons[1])
+        local useSecond = createBoolAction(context, "UseConsumableTwo", {
             { name = "Keyboard", key = Enum.KeyCode.V },
             { name = "Gamepad", key = Enum.KeyCode.DPadDown },
-        }, hud:useSatchelButton())
+        }, useButtons[2])
 
         table.insert(
             self._connections,
@@ -152,22 +159,22 @@ function InputController.new(
             end)
         )
         table.insert(self._connections, (professionMenu :: any).Pressed:Connect(onProfessionMenu))
-        table.insert(
-            self._connections,
-            (useCharm :: any).Pressed:Connect(function()
-                if not hud:isProfessionMenuOpen() then
-                    onUseCharm()
-                end
-            end)
-        )
-        table.insert(
-            self._connections,
-            (useSatchel :: any).Pressed:Connect(function()
-                if not hud:isProfessionMenuOpen() then
-                    onUseSatchel()
-                end
-            end)
-        )
+        for index, action in { useFirst, useSecond } do
+            local button = useButtons[index]
+            table.insert(
+                self._connections,
+                (action :: any).Pressed:Connect(function()
+                    local itemId = button:GetAttribute("ItemId")
+                    if
+                        not hud:isProfessionMenuOpen()
+                        and type(itemId) == "string"
+                        and itemId ~= ""
+                    then
+                        onUseConsumable(itemId)
+                    end
+                end)
+            )
+        end
     end)
 
     if not ok then
@@ -186,8 +193,7 @@ function InputController.new(
             onDodge,
             onProfessionAbility,
             onProfessionMenu,
-            onUseCharm,
-            onUseSatchel
+            onUseConsumable
         )
     end
 
@@ -224,8 +230,7 @@ function InputController._installFallback(
     onDodge: () -> (),
     onProfessionAbility: () -> (),
     onProfessionMenu: () -> (),
-    onUseCharm: () -> (),
-    onUseSatchel: () -> ()
+    onUseConsumable: (itemId: string) -> ()
 )
     table.insert(self._connections, self._hud:primaryButton().Activated:Connect(onInteract))
     table.insert(self._connections, self._hud:toolButton().Activated:Connect(onUseTool))
@@ -238,8 +243,17 @@ function InputController._installFallback(
         self._connections,
         self._hud:professionButton().Activated:Connect(onProfessionMenu)
     )
-    table.insert(self._connections, self._hud:useCharmButton().Activated:Connect(onUseCharm))
-    table.insert(self._connections, self._hud:useSatchelButton().Activated:Connect(onUseSatchel))
+    for _, button in self._hud:useButtons() do
+        table.insert(
+            self._connections,
+            button.Activated:Connect(function()
+                local itemId = button:GetAttribute("ItemId")
+                if type(itemId) == "string" and itemId ~= "" then
+                    onUseConsumable(itemId)
+                end
+            end)
+        )
+    end
     table.insert(
         self._connections,
         self._hud:sprintButton().MouseButton1Down:Connect(function()
@@ -282,12 +296,32 @@ function InputController._installFallback(
             elseif input.KeyCode == Enum.KeyCode.P or input.KeyCode == Enum.KeyCode.DPadUp then
                 onProfessionMenu()
             elseif input.KeyCode == Enum.KeyCode.C or input.KeyCode == Enum.KeyCode.ButtonY then
-                onUseCharm()
+                self:_useSlot(1, onUseConsumable)
             elseif input.KeyCode == Enum.KeyCode.V or input.KeyCode == Enum.KeyCode.DPadDown then
-                onUseSatchel()
+                self:_useSlot(2, onUseConsumable)
             end
         end)
     )
+end
+
+--[[
+    Use whichever consumable is sitting in a HUD slot. The slot decides
+    the item rather than the key, so the fallback path and the action
+    bindings agree without either of them knowing an item name.
+]]
+function InputController._useSlot(
+    self: InputController,
+    slot: number,
+    onUseConsumable: (itemId: string) -> ()
+)
+    local button = self._hud:useButtons()[slot]
+    if button == nil then
+        return
+    end
+    local itemId = button:GetAttribute("ItemId")
+    if type(itemId) == "string" and itemId ~= "" then
+        onUseConsumable(itemId)
+    end
 end
 
 return InputController
