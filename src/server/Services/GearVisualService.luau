@@ -52,6 +52,30 @@ local function targetFor(character: Model, targetName: string): BasePart?
         end
         return nil
     end
+    --[[
+        Torso and left hand exist because the armour lines use body, hands
+        and charm slots. R15 and R6 name these differently, so each target
+        is a list tried in order -- the same shape the feet have always
+        used, for the same reason.
+    ]]
+    if targetName == "torso" then
+        for _, name in { "UpperTorso", "Torso" } do
+            local candidate = character:FindFirstChild(name)
+            if candidate ~= nil and candidate:IsA("BasePart") then
+                return candidate
+            end
+        end
+        return nil
+    end
+    if targetName == "leftHand" then
+        for _, name in { "LeftHand", "Left Arm" } do
+            local candidate = character:FindFirstChild(name)
+            if candidate ~= nil and candidate:IsA("BasePart") then
+                return candidate
+            end
+        end
+        return nil
+    end
     local names = if targetName == "leftFoot"
         then { "LeftFoot", "LeftLowerLeg", "Left Leg" }
         else { "RightFoot", "RightLowerLeg", "Right Leg" }
