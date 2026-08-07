@@ -142,6 +142,35 @@ end
 
 local function placeContent(manifest: any, random: (number) -> number, region: Region)
     local poiDefinitions = shuffled(region.catalog.PointsOfInterest, random)
+    --[[
+        A catalog may pin some of its points of interest so they place in
+        every run. Bramblewake needs this because four of its POIs anchor
+        memory fragments -- the story's collectibles -- and a fragment
+        whose anchor only turns up one run in three is a story beat
+        demoted to a lottery ticket. The pinned ones move to the front of
+        the already-shuffled pool; the rotating remainder keeps its
+        shuffled order. No extra random draws, so regions that pin nothing
+        generate byte-identically to before this existed.
+    ]]
+    local fixedPoiIds = region.catalog.FixedPointOfInterestIds
+    if fixedPoiIds ~= nil and #fixedPoiIds > 0 then
+        local pinned: { [string]: boolean } = {}
+        for _, poiId in fixedPoiIds do
+            pinned[poiId] = true
+        end
+        local front, back = {}, {}
+        for _, definition in poiDefinitions do
+            if pinned[definition.id] then
+                table.insert(front, definition)
+            else
+                table.insert(back, definition)
+            end
+        end
+        for _, definition in back do
+            table.insert(front, definition)
+        end
+        poiDefinitions = front
+    end
     local eventDefinitions = shuffled(region.catalog.Events, random)
     local occupied: { [number]: boolean } = {}
 

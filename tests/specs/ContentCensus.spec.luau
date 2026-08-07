@@ -60,38 +60,26 @@ return {
                 TestRunner.equal(events, 48)
 
                 --[[
-                    Bramblewake has four points of interest and every later
-                    region has twelve, which is backwards: the starting
-                    region is the one every player sees and the only one
-                    some players see. It predates the twelve-POI shape and
-                    was never brought up to it.
-
-                    This is asserted at its real number rather than at the
-                    number the roadmap wants, because a census that rounds
-                    up is not a census. Filling it is eight authored POIs
-                    and eight builder cases in Bramblewake's own builder,
-                    and it is the highest-value content gap left in the
-                    game.
+                    Twelve per region including Bramblewake, whose gap this
+                    census originally recorded: the starting region carried
+                    four POIs where every later region had twelve, because
+                    it predated the pool-outgrows-the-run shape. Closed by
+                    the wave that added its eight rotating POIs; the four
+                    fragment anchors stay pinned into every run.
                 ]]
-                TestRunner.equal(
-                    #ExpeditionGenerator.catalogFor("region_bramblewake").PointsOfInterest,
-                    4
-                )
                 for _, regionId in SURFACE_REGIONS do
-                    if regionId ~= "region_bramblewake" then
-                        TestRunner.equal(
-                            #ExpeditionGenerator.catalogFor(regionId).PointsOfInterest,
-                            12,
-                            regionId .. " is short of POIs"
-                        )
-                    end
+                    TestRunner.equal(
+                        #ExpeditionGenerator.catalogFor(regionId).PointsOfInterest,
+                        12,
+                        regionId .. " is short of POIs"
+                    )
                 end
-                TestRunner.equal(pois, 64)
+                TestRunner.equal(pois, 72)
 
                 -- the finale is authored, so it has POIs and no event pool
                 TestRunner.equal(#HollowFinale.PointsOfInterest, 7)
                 TestRunner.equal((HollowFinale :: any).Events, nil)
-                TestRunner.equal(pois + #HollowFinale.PointsOfInterest, 71)
+                TestRunner.equal(pois + #HollowFinale.PointsOfInterest, 79)
 
                 -- seven regions in the registry, and every one of them named
                 -- by a chapter
@@ -192,7 +180,6 @@ return {
                     {
                         "The 122 launch recipes",
                         "180 reusable surface modules",
-                        "Bramblewake carries four",
                         "| recipe_group_weapons | Weapons | 36 |",
                         "| recipe_group_wearables | Armour | 52 |",
                         "| recipe_group_consumables | Things that are used | 34 |",

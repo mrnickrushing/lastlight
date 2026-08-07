@@ -2064,7 +2064,7 @@ local function buildPointOfInterest(
             )
             vial.Transparency = 0.16
         end
-    else
+    elseif definition.visual == "root_chapel" then
         for side = -1, 1, 2 do
             detail(
                 "RootChapelPillar",
@@ -2159,6 +2159,501 @@ local function buildPointOfInterest(
             parent = parent,
             fallbackInstance = shell,
         })
+    elseif definition.visual == "first_camp" then
+        -- Emberhollow's first night out: a ring of cold firepits around
+        -- nothing, because there was nothing yet to put in the middle.
+        for pitIndex = 1, 4 do
+            local angle = pitIndex * math.pi * 2 / 4 + 0.4
+            local at = origin + Vector3.new(math.cos(angle) * 5.2, 0, math.sin(angle) * 5.2)
+            for stoneIndex = 1, 6 do
+                local stoneAngle = stoneIndex * math.pi * 2 / 6
+                detail(
+                    "FirstCampPitStone",
+                    Vector3.new(1.1, 0.7, 0.8),
+                    CFrame.new(
+                        at
+                            + Vector3.new(
+                                math.cos(stoneAngle) * 1.5,
+                                0.35,
+                                math.sin(stoneAngle) * 1.5
+                            )
+                    ) * CFrame.Angles(0, -stoneAngle, 0),
+                    STONE,
+                    Enum.Material.Slate,
+                    nil
+                )
+            end
+            local ash = detail(
+                "FirstCampAsh",
+                Vector3.new(2.2, 0.22, 2.2),
+                CFrame.new(at + Vector3.new(0, 0.12, 0)),
+                Color3.fromRGB(88, 86, 82),
+                Enum.Material.Sand,
+                Enum.PartType.Cylinder
+            )
+            ash.Orientation = Vector3.new(0, 0, 90)
+        end
+        for bedIndex = -1, 1 do
+            detail(
+                "FirstCampBedroll",
+                Vector3.new(2.1, 0.45, 5.2),
+                CFrame.new(origin + Vector3.new(bedIndex * 3.1, 0.25, -7.6))
+                    * CFrame.Angles(0, math.rad(bedIndex * 9), 0),
+                Color3.fromRGB(104, 92, 74),
+                Enum.Material.Fabric,
+                nil
+            )
+        end
+        -- the wood they stacked for whoever came next, still stacked
+        for logIndex = 0, 4 do
+            detail(
+                "FirstCampWoodStack",
+                Vector3.new(0.85, 0.85, 3.4),
+                CFrame.new(
+                    origin
+                        + Vector3.new(
+                            7.4 + (logIndex % 2) * 0.9,
+                            0.45 + (logIndex // 2) * 0.85,
+                            5.5
+                        )
+                ),
+                DARK_BARK,
+                Enum.Material.Wood,
+                Enum.PartType.Cylinder
+            )
+        end
+        dress(
+            extra,
+            "mesh_creator_campfire_a",
+            parent,
+            origin2 + Vector3.new(0, 0, 0),
+            1,
+            0.6,
+            2550
+        )
+        dress(
+            extra,
+            "mesh_fern_cluster_a",
+            parent,
+            origin2 + Vector3.new(-8, 0, -4),
+            1.1,
+            2.2,
+            2551
+        )
+    elseif definition.visual == "keepers_rest" then
+        -- One bed, one cup, one lantern hook worn bright. Orin's overnight
+        -- stops, which the archive's fragments have been pointing at since
+        -- chapter one -- this is the trail made walkable.
+        for side = -1, 1, 2 do
+            detail(
+                "KeepersRestPost",
+                Vector3.new(0.6, 5.4, 0.6),
+                CFrame.new(origin + Vector3.new(side * 3.1, 2.7, -1.6)),
+                DARK_BARK,
+                Enum.Material.Wood,
+                nil
+            )
+        end
+        detail(
+            "KeepersRestRoof",
+            Vector3.new(7.6, 0.5, 6.4),
+            CFrame.new(origin + Vector3.new(0, 5.3, 0.6)) * CFrame.Angles(math.rad(-22), 0, 0),
+            BARK,
+            Enum.Material.WoodPlanks,
+            nil
+        )
+        detail(
+            "KeepersRestCot",
+            Vector3.new(2.2, 0.7, 5),
+            CFrame.new(origin + Vector3.new(-1.6, 0.45, 0.4)),
+            Color3.fromRGB(96, 84, 66),
+            Enum.Material.Fabric,
+            nil
+        )
+        detail(
+            "KeepersRestTable",
+            Vector3.new(1.9, 1.7, 1.9),
+            CFrame.new(origin + Vector3.new(1.8, 0.85, 0.8)),
+            Color3.fromRGB(92, 65, 44),
+            Enum.Material.WoodPlanks,
+            nil
+        )
+        detail(
+            "KeepersRestCup",
+            Vector3.new(0.5, 0.6, 0.5),
+            CFrame.new(origin + Vector3.new(1.8, 2, 0.8)),
+            Color3.fromRGB(120, 116, 108),
+            Enum.Material.Metal,
+            Enum.PartType.Cylinder
+        )
+        -- the hook, worn bright: the one polished thing in a weathered camp
+        local hook = detail(
+            "KeepersRestLanternHook",
+            Vector3.new(0.28, 1.1, 0.28),
+            CFrame.new(origin + Vector3.new(2.9, 4.4, -1.4)) * CFrame.Angles(0, 0, math.rad(30)),
+            Color3.fromRGB(214, 206, 188),
+            Enum.Material.Metal,
+            nil
+        )
+        hook.Reflectance = 0.25
+        dress(
+            extra,
+            "mesh_creator_kerosene_lantern_a",
+            parent,
+            origin2 + Vector3.new(4, 0, 3),
+            1,
+            1.2,
+            2552
+        )
+        dress(extra, "mesh_creator_stump_a", parent, origin2 + Vector3.new(-6, 0, 4), 1, 0.8, 2553)
+    elseif definition.visual == "split_waymarker" then
+        -- Both names scratched out, and the scratching is old. The forest's
+        -- first hint that the world is wider than the chapter, and that
+        -- somebody wanted it left alone.
+        detail(
+            "WaymarkerPost",
+            Vector3.new(0.8, 7.4, 0.8),
+            CFrame.new(origin + Vector3.new(0, 3.7, 0)) * CFrame.Angles(0, 0, math.rad(-3)),
+            DARK_BARK,
+            Enum.Material.Wood,
+            nil
+        )
+        for side = -1, 1, 2 do
+            local arm = detail(
+                "WaymarkerArm",
+                Vector3.new(4.6, 0.85, 0.35),
+                CFrame.new(origin + Vector3.new(side * 2, 5.4 + side * 0.55, 0))
+                    * CFrame.Angles(0, math.rad(side * 24), math.rad(side * 4)),
+                BARK,
+                Enum.Material.WoodPlanks,
+                nil
+            )
+            -- the scratches: gouges across where a name was
+            for gougeIndex = -1, 1 do
+                local gouge = detail(
+                    "WaymarkerGouge",
+                    Vector3.new(2.6, 0.14, 0.1),
+                    arm.CFrame
+                        * CFrame.new(0.2, gougeIndex * 0.22, -0.2)
+                        * CFrame.Angles(0, 0, math.rad(gougeIndex * 7)),
+                    Color3.fromRGB(50, 38, 28),
+                    Enum.Material.Wood,
+                    nil
+                )
+                gouge.CanQuery = false
+            end
+        end
+        dress(
+            extra,
+            "mesh_creator_road_stones_a",
+            parent,
+            origin2 + Vector3.new(0, 0, 4),
+            1,
+            0.3,
+            2554
+        )
+        dress(
+            extra,
+            "mesh_boulder_cluster_a",
+            parent,
+            origin2 + Vector3.new(6, 0, -4),
+            0.7,
+            1.9,
+            2555
+        )
+    elseif definition.visual == "colliers_clearing" then
+        -- Charcoal mounds, still sealed, from when the forest had an
+        -- industry. One opened in a hurry, decades ago.
+        for moundIndex = 1, 3 do
+            local angle = moundIndex * 2.1
+            local at = origin + Vector3.new(math.cos(angle) * 5.6, 0, math.sin(angle) * 5.6)
+            local mound = detail(
+                "CollierMound",
+                Vector3.new(4.6, 3.4, 4.6),
+                CFrame.new(at + Vector3.new(0, 1.2, 0)),
+                Color3.fromRGB(74, 64, 54),
+                Enum.Material.Ground,
+                Enum.PartType.Ball
+            )
+            mound.Name = "CollierMound"
+            -- turf seal, still on
+            local cap = detail(
+                "CollierTurfCap",
+                Vector3.new(3.4, 0.5, 3.4),
+                CFrame.new(at + Vector3.new(0, 2.9, 0)),
+                Color3.fromRGB(74, 96, 58),
+                Enum.Material.Grass,
+                Enum.PartType.Cylinder
+            )
+            cap.Orientation = Vector3.new(0, 0, 90)
+        end
+        -- the one opened in a hurry: a broken shell and a dead burn
+        detail(
+            "CollierBrokenMound",
+            Vector3.new(4.2, 1.6, 4.2),
+            CFrame.new(origin + Vector3.new(0, 0.6, -6.4)),
+            Color3.fromRGB(60, 52, 46),
+            Enum.Material.Ground,
+            nil
+        )
+        local charcoal = detail(
+            "CollierDeadBurn",
+            Vector3.new(2.6, 0.5, 2.6),
+            CFrame.new(origin + Vector3.new(0, 0.35, -6.4)),
+            Color3.fromRGB(38, 36, 36),
+            Enum.Material.Slate,
+            Enum.PartType.Cylinder
+        )
+        charcoal.Orientation = Vector3.new(0, 0, 90)
+        dress(extra, "mesh_creator_barrel_a", parent, origin2 + Vector3.new(7, 0, 3), 1, 0.5, 2556)
+        dress(extra, "mesh_hand_axe_a", parent, origin2 + Vector3.new(-6, 0, 5), 1, 1.6, 2557)
+        dress(
+            extra,
+            "mesh_old_growth_stump_a",
+            parent,
+            origin2 + Vector3.new(-8, 0, -5),
+            0.9,
+            2.8,
+            2558
+        )
+    elseif definition.visual == "sunken_footbridge" then
+        -- Black water over the boards. The first thing in the game that
+        -- points at the Fen, two chapters before the Fen has a name.
+        local water = detail(
+            "SunkenStream",
+            Vector3.new(16, 0.6, 7.5),
+            CFrame.new(origin + Vector3.new(0, 0.1, 0)),
+            Color3.fromRGB(26, 34, 34),
+            Enum.Material.Water,
+            nil
+        )
+        water.Transparency = 0.18
+        for plankIndex = -3, 3 do
+            local plank = detail(
+                "SunkenPlank",
+                Vector3.new(1.7, 0.3, 1.1),
+                CFrame.new(origin + Vector3.new(plankIndex * 1.9, 0.28, plankIndex % 2 * 0.4))
+                    * CFrame.Angles(0, math.rad(plankIndex * 3), math.rad(plankIndex % 2 * 4)),
+                Color3.fromRGB(66, 54, 42),
+                Enum.Material.WoodPlanks,
+                nil
+            )
+            plank.Transparency = 0.05
+        end
+        for side = -1, 1, 2 do
+            detail(
+                "SunkenRailPost",
+                Vector3.new(0.5, 2.6, 0.5),
+                CFrame.new(origin + Vector3.new(side * 6.8, 1, side * 0.8))
+                    * CFrame.Angles(math.rad(side * 8), 0, math.rad(side * -11)),
+                DARK_BARK,
+                Enum.Material.Wood,
+                nil
+            )
+        end
+        dress(extra, "mesh_fern_cluster_a", parent, origin2 + Vector3.new(-7, 0, 5), 1.3, 0.9, 2559)
+        dress(extra, "mesh_deadfall_a", parent, origin2 + Vector3.new(8, 0, -4), 1, 1.7, 2560)
+    elseif definition.visual == "scored_pine" then
+        -- Antler scores far too high, the oldest healed over. The Warden
+        -- has been this size a very long time, and the tree is the proof.
+        detail(
+            "ScoredPineTrunk",
+            Vector3.new(2.6, 13.5, 2.6),
+            CFrame.new(origin + Vector3.new(0, 6.75, 0)) * CFrame.Angles(0, 0, math.rad(2)),
+            DARK_BARK,
+            Enum.Material.Wood,
+            Enum.PartType.Cylinder
+        )
+        for scoreIndex = 1, 5 do
+            local height = 4.2 + scoreIndex * 1.35
+            local fresh = scoreIndex >= 4
+            local score = detail(
+                "ScoredPineMark",
+                Vector3.new(0.18, 1.9, 0.5),
+                CFrame.new(origin + Vector3.new(1.15, height, (scoreIndex % 3 - 1) * 0.5))
+                    * CFrame.Angles(math.rad(14), 0, math.rad(-32 + scoreIndex * 4)),
+                if fresh then Color3.fromRGB(196, 154, 96) else Color3.fromRGB(96, 74, 52),
+                if fresh then Enum.Material.Wood else Enum.Material.WoodPlanks,
+                nil
+            )
+            score.CanQuery = false
+            -- the healed ones carry sap that has hardened over the wound
+            if not fresh then
+                local seal = detail(
+                    "ScoredPineSapSeal",
+                    Vector3.new(0.14, 1.2, 0.4),
+                    score.CFrame * CFrame.new(-0.06, -0.2, 0),
+                    AMBER,
+                    Enum.Material.Glass,
+                    nil
+                )
+                seal.Transparency = 0.35
+                seal.CanQuery = false
+            end
+        end
+        detail(
+            "ScoredPineCanopy",
+            Vector3.new(7.5, 5, 7.5),
+            CFrame.new(origin + Vector3.new(0, 14.6, 0)),
+            Color3.fromRGB(52, 74, 52),
+            Enum.Material.Grass,
+            Enum.PartType.Ball
+        )
+        -- shed velvet at the base: it was here recently
+        detail(
+            "ScoredPineVelvet",
+            Vector3.new(1.9, 0.25, 1.3),
+            CFrame.new(origin + Vector3.new(1.8, 0.2, 1.2)) * CFrame.Angles(0, math.rad(28), 0),
+            Color3.fromRGB(112, 84, 66),
+            Enum.Material.Fabric,
+            nil
+        )
+        dress(
+            extra,
+            "mesh_boulder_cluster_a",
+            parent,
+            origin2 + Vector3.new(-6, 0, -5),
+            0.8,
+            2.4,
+            2561
+        )
+        dress(
+            extra,
+            "mesh_foxglove_cluster_a",
+            parent,
+            origin2 + Vector3.new(6, 0, 5),
+            1.1,
+            0.7,
+            2562
+        )
+    elseif definition.visual == "bee_hollows" then
+        -- The bees never left. The one point of interest that is evidence
+        -- of continuity rather than of loss, and it hums.
+        for hollowIndex = 1, 3 do
+            local angle = hollowIndex * 2.3
+            local at = origin + Vector3.new(math.cos(angle) * 4.8, 0, math.sin(angle) * 4.8)
+            detail(
+                "BeeHollowRoot",
+                Vector3.new(3.1, 4.6 + hollowIndex * 0.5, 3.1),
+                CFrame.new(at + Vector3.new(0, 2.1, 0))
+                    * CFrame.Angles(math.rad(6), angle, math.rad(-4)),
+                DARK_BARK,
+                Enum.Material.Wood,
+                Enum.PartType.Cylinder
+            )
+            local mouth = detail(
+                "BeeHollowMouth",
+                Vector3.new(1.3, 1.7, 0.7),
+                CFrame.new(at + Vector3.new(math.cos(angle) * 1.4, 2.4, math.sin(angle) * 1.4))
+                    * CFrame.Angles(0, -angle, 0),
+                Color3.fromRGB(30, 26, 22),
+                Enum.Material.Wood,
+                nil
+            )
+            mouth.CanQuery = false
+            -- comb spilling from the mouth, amber and alive
+            local comb = detail(
+                "BeeHollowComb",
+                Vector3.new(1, 1.2, 0.4),
+                mouth.CFrame * CFrame.new(0, -1, 0.2) * CFrame.Angles(math.rad(18), 0, 0),
+                AMBER,
+                Enum.Material.Glass,
+                nil
+            )
+            comb.Transparency = 0.25
+            comb.CanQuery = false
+        end
+        for beeIndex = 1, 6 do
+            local angle = beeIndex * 1.9
+            local bee = detail(
+                "BeeHollowBee",
+                Vector3.new(0.32, 0.24, 0.42),
+                CFrame.new(
+                    origin
+                        + Vector3.new(
+                            math.cos(angle) * (2.6 + beeIndex * 0.4),
+                            2.4 + (beeIndex % 3) * 0.8,
+                            math.sin(angle) * (2.6 + beeIndex * 0.4)
+                        )
+                ),
+                Color3.fromRGB(214, 172, 88),
+                Enum.Material.Neon,
+                nil
+            )
+            bee.Transparency = 0.2
+            CollectionService:AddTag(bee, runtimeIds.AmbientMoteTag)
+        end
+        dress(
+            extra,
+            "mesh_foxglove_cluster_a",
+            parent,
+            origin2 + Vector3.new(-5, 0, 5),
+            1.2,
+            1.1,
+            2563
+        )
+        dress(extra, "mesh_fern_cluster_a", parent, origin2 + Vector3.new(7, 0, -3), 1, 2.6, 2564)
+    elseif definition.visual == "lantern_rest" then
+        -- Rows of retired lanterns on a dead oak, all of them empty. The
+        -- game's mythology in one image, three chapters before the Hollow
+        -- explains what a dimmed lantern actually is.
+        detail(
+            "LanternRestOak",
+            Vector3.new(2.2, 10.5, 2.2),
+            CFrame.new(origin + Vector3.new(0, 5.25, 0)) * CFrame.Angles(0, 0, math.rad(-4)),
+            Color3.fromRGB(58, 50, 44),
+            Enum.Material.Wood,
+            Enum.PartType.Cylinder
+        )
+        for branchIndex = 1, 3 do
+            local yaw = branchIndex * 2.1
+            detail(
+                "LanternRestBranch",
+                Vector3.new(6.4, 0.55, 0.55),
+                CFrame.new(origin + Vector3.new(0, 5.4 + branchIndex * 1.6, 0))
+                    * CFrame.Angles(0, yaw, math.rad(12))
+                    * CFrame.new(3, 0, 0),
+                Color3.fromRGB(58, 50, 44),
+                Enum.Material.Wood,
+                nil
+            )
+            for hangIndex = 1, 3 do
+                local hang = CFrame.new(origin + Vector3.new(0, 5.4 + branchIndex * 1.6, 0))
+                    * CFrame.Angles(0, yaw, math.rad(12))
+                    * CFrame.new(1.4 + hangIndex * 1.5, -1.1, 0)
+                local body = detail(
+                    "LanternRestLantern",
+                    Vector3.new(0.85, 1.15, 0.85),
+                    hang * CFrame.Angles(0, math.rad(hangIndex * 40), 0),
+                    Color3.fromRGB(88, 84, 78),
+                    Enum.Material.Metal,
+                    nil
+                )
+                body.CanQuery = false
+                -- empty glass: transparent, and deliberately unlit
+                local pane = detail(
+                    "LanternRestPane",
+                    Vector3.new(0.6, 0.7, 0.6),
+                    hang * CFrame.Angles(0, math.rad(hangIndex * 40), 0),
+                    Color3.fromRGB(140, 146, 142),
+                    Enum.Material.Glass,
+                    nil
+                )
+                pane.Transparency = 0.55
+                pane.CanQuery = false
+            end
+        end
+        dress(extra, "mesh_lantern_post_a", parent, origin2 + Vector3.new(6, 0, 4), 1, 0.4, 2565)
+        dress(
+            extra,
+            "mesh_boulder_cluster_a",
+            parent,
+            origin2 + Vector3.new(-7, 0, -3),
+            0.75,
+            1.3,
+            2566
+        )
+        dress(extra, "mesh_fern_cluster_a", parent, origin2 + Vector3.new(-4, 0, 6), 1.1, 0.2, 2567)
     end
 
     local memory = orb(

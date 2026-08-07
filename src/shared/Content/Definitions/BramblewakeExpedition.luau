@@ -463,6 +463,88 @@ local pointsOfInterest = {
         detail = "Nobody built this. The roots grew into a nave and Emberhollow "
             .. "took it as a sign, and sheltered here on the way out.",
     }),
+    --[[
+        The eight that rotate. The first four anchor memory fragments and
+        are pinned into every run; these appear a few at a time, so a
+        player who has walked Bramblewake fifty times still meets ground
+        they have not stood on. Each belongs to one of the region's three
+        acts -- what the forest kept, the keeper's trail, and what came
+        after -- and two of them face outward, toward regions a chapter-I
+        player has not heard of yet.
+    ]]
+    frozenDefinition({
+        id = "poi_bw_first_camp",
+        displayName = "The First Camp",
+        visual = "first_camp",
+        tags = { "story", "evacuation" },
+        detail = "Where Emberhollow spent its first night out: a ring of "
+            .. "cold firepits, and bedrolls nobody came back for. They "
+            .. "left the wood stacked for whoever came next.",
+    }),
+    frozenDefinition({
+        id = "poi_bw_keepers_rest",
+        displayName = "The Keeper's Rest",
+        visual = "keepers_rest",
+        tags = { "story", "keeper" },
+        detail = "A lean-to with one bed, one cup, and a lantern hook worn "
+            .. "bright with use. Whoever slept here slept alone, often, "
+            .. "for years, and never built anything better.",
+    }),
+    frozenDefinition({
+        id = "poi_bw_split_waymarker",
+        displayName = "The Split Waymarker",
+        visual = "split_waymarker",
+        tags = { "mystery", "traversal" },
+        detail = "A signpost pointing two ways. Both names have been "
+            .. "scratched out by hand, and the scratching is old -- "
+            .. "somebody decided long ago that nobody should go either way.",
+    }),
+    frozenDefinition({
+        id = "poi_bw_colliers_clearing",
+        displayName = "Colliers' Clearing",
+        visual = "colliers_clearing",
+        tags = { "resource", "story" },
+        detail = "Charcoal mounds, still sealed, from when the forest had an "
+            .. "industry. One was opened in a hurry and the burn inside it "
+            .. "is decades dead. The others were left to wait.",
+    }),
+    frozenDefinition({
+        id = "poi_bw_sunken_footbridge",
+        displayName = "The Sunken Footbridge",
+        visual = "sunken_footbridge",
+        tags = { "traversal", "warning" },
+        detail = "A footbridge with black water over its boards. The stream "
+            .. "it crossed has widened every year since the evacuation, and "
+            .. "it is wider downstream. Something down there is patient.",
+    }),
+    frozenDefinition({
+        id = "poi_bw_scored_pine",
+        displayName = "The Scored Pine",
+        visual = "scored_pine",
+        tags = { "warning", "warden" },
+        detail = "A trunk scored by antlers, deep, and far too high. The "
+            .. "sap has healed over the oldest marks, which means whatever "
+            .. "makes them has been this size a very long time.",
+    }),
+    frozenDefinition({
+        id = "poi_bw_bee_hollows",
+        displayName = "The Bee Hollows",
+        visual = "bee_hollows",
+        tags = { "resource", "sanctuary" },
+        detail = "Wild hives in the root hollows, still humming. The bees "
+            .. "never left, which is worth standing still for a moment: "
+            .. "something in this forest never found a reason to run.",
+    }),
+    frozenDefinition({
+        id = "poi_bw_lantern_rest",
+        displayName = "The Lantern Rest",
+        visual = "lantern_rest",
+        tags = { "story", "mystery" },
+        detail = "Rows of old lanterns hung on a dead oak, every one of "
+            .. "them empty. When a lantern dimmed past saving it was "
+            .. "brought here rather than thrown away. Nobody remembers why "
+            .. "that mattered, only that it did.",
+    }),
 }
 
 local events = {
@@ -856,7 +938,7 @@ return table.freeze({
     Version = 3,
     CellSize = 72,
     ModuleCount = 12,
-    PointOfInterestCount = 4,
+    PointOfInterestCount = 6,
     EventCount = 8,
     EventInteractionCount = eventInteractionCount,
     --[[
@@ -911,6 +993,17 @@ return table.freeze({
         story = 2,
         puzzle = 1,
         landmark = 1,
+    }),
+    --[[
+        The four fragment-anchored POIs place in every run; the eight new
+        ones rotate through the remaining two slots. See the generator's
+        note on FixedPointOfInterestIds for why.
+    ]]
+    FixedPointOfInterestIds = table.freeze({
+        "poi_bw_reedstead_ruin",
+        "poi_bw_mothwell",
+        "poi_bw_sapglass_grove",
+        "poi_bw_root_chapel",
     }),
     RequiredModuleIds = table.freeze({
         "module_bw_old_growth_approach",

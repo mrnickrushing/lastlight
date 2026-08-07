@@ -23,7 +23,79 @@ return {
                     TestRunner.truthy(not seen[poi.detail], "duplicate line: " .. poi.id)
                     seen[poi.detail] = true
                 end
-                TestRunner.equal(#Catalog.PointsOfInterest, Catalog.PointOfInterestCount)
+                --[[
+                    The pool outgrew the run: twelve declared, six placed,
+                    which is the shape every other region has always had.
+                    Bramblewake was the last region whose pool equaled its
+                    run count, and the old assertion here pinned exactly
+                    that -- so this is the deliberate reversal of it.
+                ]]
+                TestRunner.equal(#Catalog.PointsOfInterest, 12)
+                TestRunner.equal(Catalog.PointOfInterestCount, 6)
+            end,
+        },
+        {
+            --[[
+                Four of Bramblewake's twelve anchor memory fragments, and a
+                fragment whose anchor only turns up one run in three is a
+                story beat demoted to a lottery ticket. The catalog pins
+                those four into every run; the other eight rotate through
+                the remaining two slots. Both halves are asserted across
+                many seeds, because "the pinned ones always place" and "the
+                rotating ones actually rotate" can each fail alone.
+            ]]
+            name = "the fragment anchors place every run, and the other eight rotate",
+            run = function()
+                local pinned: { [string]: boolean } = {}
+                for _, poiId in Catalog.FixedPointOfInterestIds do
+                    pinned[poiId] = true
+                end
+                local rotatingSeen: { [string]: boolean } = {}
+                for seed = 1, 120 do
+                    local manifest = ExpeditionGenerator.generate(seed)
+                    local placed: { [string]: boolean } = {}
+                    local total = 0
+                    for _, placement in manifest.modules do
+                        if placement.poiId ~= nil then
+                            placed[placement.poiId] = true
+                            total += 1
+                            if not pinned[placement.poiId] then
+                                rotatingSeen[placement.poiId] = true
+                            end
+                        end
+                    end
+                    TestRunner.equal(total, 6)
+                    for poiId in pinned do
+                        TestRunner.truthy(
+                            placed[poiId],
+                            string.format("seed %d dropped fragment anchor %s", seed, poiId)
+                        )
+                    end
+                end
+                local rotatingCount = 0
+                for _ in rotatingSeen do
+                    rotatingCount += 1
+                end
+                TestRunner.equal(
+                    rotatingCount,
+                    #Catalog.PointsOfInterest - #Catalog.FixedPointOfInterestIds,
+                    "some rotating points of interest never place at all"
+                )
+                -- and the fallback carries the anchors too, because a save
+                -- rescued by the fallback still deserves its story
+                local fallback = ExpeditionGenerator.generate(1, true)
+                local fallbackPlaced: { [string]: boolean } = {}
+                for _, placement in fallback.modules do
+                    if placement.poiId ~= nil then
+                        fallbackPlaced[placement.poiId] = true
+                    end
+                end
+                for poiId in pinned do
+                    TestRunner.truthy(
+                        fallbackPlaced[poiId],
+                        "the fallback dropped fragment anchor " .. poiId
+                    )
+                end
             end,
         },
         {

@@ -26,8 +26,6 @@ undefined moving target.
 | region_hollow | The Hollow Below | 7 | authored finale | 7 | authored |
 
 The launch inventory therefore contains 180 reusable surface modules, 79 POIs
-(71 built today — Bramblewake carries four where every later region has twelve;
-see the crafting-target section)
 (72 surface POIs plus 7 authored finale POIs), and 48 surface event templates.
 The Hollow Below is an authored finale rather than a procedural surface region,
 so its scenes and encounters are validated as a fixed sequence instead of being
@@ -343,20 +341,12 @@ its station, and ingredients the expedition ledger accepts, and
 `ContentCensus.spec` asserts these counts against the catalogs so the
 number in this table cannot drift from the number in the game.
 
-Two known gaps, both in Bramblewake, both the same shape: the starting
-region predates the systems the later regions were built into.
-
-- **Armour**: Bramblewake carries two pieces where every later region has
-  ten. Eight recipes and a tutorial-adjacent change.
-- **Points of interest**: Bramblewake carries four where every later
-  region has twelve, so the real POI count is 71 rather than 79. Eight
-  authored POIs and eight cases in Bramblewake's own builder.
-
-Both are recorded rather than filled with content nobody designed, and
-`ContentCensus.spec` asserts the real numbers so neither can be forgotten
-or quietly rounded up. The POI gap is the highest-value content work left
-in the game: it is thinnest in the region every player sees, and the only
-region some players ever see.
+One known gap, recorded rather than filled with content nobody designed:
+**Bramblewake carries two armour pieces where every later region has
+ten**, because the starting region's kit predates the slot system. Eight
+recipes and a tutorial-adjacent change. (Its other gap — four POIs where
+every region has twelve — was closed by the wave that gave it eight
+rotating POIs, with the four fragment anchors pinned into every run.)
 
 ## Dynamic events
 
