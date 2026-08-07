@@ -58441,8 +58441,7 @@ local ENTRIES: { [string]: any } = {
         builder = IronrootBuilder,
         walkable = false,
         missing = {
-            "elite arenas (Foreman Echo, Iron Widow)",
-            "boss chamber (Bellows Maw)",
+            "encounter services to drive the arenas",
             "wayfinding and mesh dressing",
         },
     },
@@ -58450,8 +58449,7 @@ local ENTRIES: { [string]: any } = {
         builder = MireglassBuilder,
         walkable = false,
         missing = {
-            "elite arenas (The Many-Face, Drowned Caller)",
-            "boss chamber (Lantern Witch)",
+            "encounter services to drive the arenas",
             "wayfinding and mesh dressing",
         },
     },
@@ -58798,6 +58796,142 @@ function RegionBuilders.buildEventSockets(
     end
     return sockets
 end
+
+--[[
+    An arena for an elite or a boss.
+
+    Every encounter this project has shipped needs the same four things
+    from the world: a floor a fight can happen on, a place the creature
+    stands, a set of anchors for whatever the fight asks the player to
+    interact with (root nodes, levers, mirrors, pools, vent wheels), and
+    an edge so the arena reads as a room rather than a clearing.
+
+    The encounter modules already name their own interaction ids --
+    ForemanEcho.LeverIds, IronWidow.AnchorIds, BellowsMaw.LineIds and so
+    on -- so the arena takes that list rather than inventing its own. If
+    an encounter grows a fifth lever, its arena grows a fifth anchor with
+    no change here, which is the only way these two stay in agreement.
+]]
+function RegionBuilders.buildArena(
+    parent: Instance,
+    center: Vector3,
+    options: {
+        name: string,
+        radius: number,
+        floorColor: Color3,
+        edgeColor: Color3,
+        anchorIds: { string },
+        anchorColor: Color3,
+    }
+): { [string]: BasePart }
+    local arena = Instance.new("Model")
+    arena.Name = options.name
+    arena.Parent = parent
+
+    local floor = Instance.new("Part")
+    floor.Name = "ArenaFloor"
+    floor.Shape = Enum.PartType.Cylinder
+    -- A cylinder's axis is its Size.X, so the disc lies flat only when
+    -- the thickness is on X and the rotation stands it up.
+    floor.Size = Vector3.new(1.2, options.radius * 2, options.radius * 2)
+    floor.CFrame = CFrame.new(center + Vector3.new(0, 0.6, 0)) * CFrame.Angles(0, 0, math.rad(90))
+    floor.Color = options.floorColor
+    floor.Material = Enum.Material.Slate
+    floor.Anchored = true
+    floor.CanCollide = false
+    floor.CanQuery = false
+    floor.Parent = arena
+
+    local edges = 12
+    for index = 0, edges - 1 do
+        local angle = index * (math.pi * 2 / edges)
+        local post = Instance.new("Part")
+        post.Name = "ArenaEdge"
+        post.Size = Vector3.new(2.2, 5.5, 2.2)
+        post.CFrame = CFrame.new(
+            center
+                + Vector3.new(
+                    math.cos(angle) * options.radius,
+                    2.7,
+                    math.sin(angle) * options.radius
+                )
+        ) * CFrame.Angles(0, angle, math.rad((index % 3) - 1))
+        post.Color = options.edgeColor
+        post.Material = Enum.Material.Rock
+        post.Anchored = true
+        post.Parent = arena
+    end
+
+    --[[
+        One anchor per interaction the encounter names, evenly spaced
+        inside the ring so no two are ever in the same place and every one
+        is reachable from the middle.
+    ]]
+    local anchors: { [string]: BasePart } = {}
+    local count = #options.anchorIds
+    for index, anchorId in options.anchorIds do
+        local angle = (index - 1) * (math.pi * 2 / math.max(1, count))
+        local anchor = Instance.new("Part")
+        anchor.Name = "ArenaAnchor"
+        anchor.Size = Vector3.new(3.4, 5, 3.4)
+        anchor.CFrame = CFrame.new(
+            center
+                + Vector3.new(
+                    math.cos(angle) * (options.radius * 0.62),
+                    2.5,
+                    math.sin(angle) * (options.radius * 0.62)
+                )
+        )
+        anchor.Color = options.anchorColor
+        anchor.Material = Enum.Material.Neon
+        anchor.Anchored = true
+        anchor.CanCollide = false
+        anchor.Transparency = 0.35
+        anchor:SetAttribute("AnchorId", anchorId)
+        anchor.Parent = arena
+        anchors[anchorId] = anchor
+    end
+    return anchors
+end
+
+--[[
+    The arena each new encounter needs, named next to the encounter that
+    needs it so the two are read together. Radii come from the fights:
+    the Widow's web has to be walked between cuts, so hers is widest; the
+    Echo's three levers want a room rather than a field.
+]]
+RegionBuilders.Arenas = table.freeze({
+    elite_foreman_echo = table.freeze({
+        name = "ForemanEchoArena",
+        regionId = "region_ironroot",
+        radius = 26,
+    }),
+    elite_iron_widow = table.freeze({
+        name = "IronWidowArena",
+        regionId = "region_ironroot",
+        radius = 34,
+    }),
+    boss_bellows_maw = table.freeze({
+        name = "BellowsMawChamber",
+        regionId = "region_ironroot",
+        radius = 38,
+    }),
+    elite_many_face = table.freeze({
+        name = "ManyFaceCourt",
+        regionId = "region_mireglass",
+        radius = 28,
+    }),
+    elite_drowned_caller = table.freeze({
+        name = "DrownedCallerMarsh",
+        regionId = "region_mireglass",
+        radius = 32,
+    }),
+    boss_lantern_witch = table.freeze({
+        name = "LanternWitchRing",
+        regionId = "region_mireglass",
+        radius = 36,
+    }),
+})
 
 return table.freeze(RegionBuilders)
 ]]></string>
