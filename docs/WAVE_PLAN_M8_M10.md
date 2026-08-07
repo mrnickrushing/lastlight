@@ -10,7 +10,7 @@ Milestones 7, 8 and 9 are complete. Milestone 7's runbook is
 shipped as #274–#282 (v105–v113) and milestone 9 as #284–#290
 (v114–v120).
 
-**Next up: M10 B (quests), then C (codex/fragments).**
+**All planned waves are shipped.** What remains is listed in CONTENT_CATALOG.md's own tables, each beside the dependency it waits on.
 
 ## The rhythm
 
@@ -113,8 +113,8 @@ Both Bramblewake gaps shipped (#298, #299), each closing traps found on
 the way: the POI dispatch's catch-all `else`, the uncovered
 `BramblewakeBuilder`, and the equip panel's hardcoded eight-item list
 that had left ninety craftable items unwearable with nothing failing.
-| B | **Quest completion** — resident arcs to the catalog's counts, every quest a real signal | Quest spec: every quest's objective kind has a signal |
-| C | **Codex/archive completion** — memory fragments to full count across regions | Fragment spec: one per region minimum, anchors resolvable |
+| B ✅ | **Quest arcs** (shipped #301) — resident arcs to the catalog's counts, every quest a real signal | Quest spec: every quest's objective kind has a signal |
+| C ✅ | **Archive across six regions** (shipped #302) — memory fragments to full count across regions | Fragment spec: one per region minimum, anchors resolvable |
 | D ✅ | **Content census** (shipped #296) — a single spec asserting the roadmap's launch inventory: 180 modules, 79 POIs, 48 events, 180 recipes, region counts | Census spec green |
 
 ## Notes that save a session

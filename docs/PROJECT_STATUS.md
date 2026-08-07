@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-07, at `main` = `HEAD` (PR #299), build `0.53.0`,
-save schema 21, 23 services. Published to Roblox as place version 125,
+Last updated: 2026-08-07, at `main` = `HEAD` (PR #302), build `0.53.0`,
+save schema 21, 23 services. Published to Roblox as place version 127,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 7 through 10 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** Studio is
@@ -18,17 +18,42 @@ Studio-facing checks not performed are recorded open rather than assumed.
 **Milestones 7, 8 and 9 are complete.** The story runs end to end: seven
 chapters, seven regions, an authored finale with three endings, an
 epilogue that reads the whole save, 27 residents and all 28 buildings.
-M10 waves A-1 through A-3 and D are done, and **both census gaps are
-closed**: 130 recipes, 79 points of interest built, Bramblewake brought
-up to every later region's shape. **The remaining M10 work is wave B
-(quest completion — every resident quest is real, so this is checking
-the catalog's quest-group table against what exists and deciding what
-"completion" still asks) and wave C (codex/fragment completion — the ten
-fragments are all Bramblewake's; the other regions have none, and
-`MemoryFragments` plus the anchor resolver in WorldService are the shape
-to extend).**
+**Milestone 10 is complete, and so is the roadmap through M10.** Waves
+A-1 through A-3, B, C and D all shipped; both census gaps closed. The
+game has seven chapters, seven regions, an authored finale with three
+endings, an epilogue that reads the whole save, 27 residents in 28
+buildings, 130 recipes, 33 quests in arcs, and 20 memory fragments across
+six regions.
+
+**Two counts were moved rather than met**, both with the reasoning
+recorded in CONTENT_CATALOG.md and both asserted by `ContentCensus.spec`
+so they cannot drift: recipes from 180 to 130 (the original allocation
+assumed craftable tools, town project components, trap devices and
+companion utilities, none of which are recipe categories here), and the
+quest table from eight families to what exists (three of the eight were
+other systems wearing the word "quest").
+
+**What is left is written in the catalog's own tables**, each with the
+dependency it waits on: profession mastery quests need a mastery signal
+in `Quests.currentValue` (the data is already in `ProfessionMastery`),
+region mystery quests need an objective kind that reads *which* fragments
+rather than how many, and contracts and crises need systems that do not
+exist yet. Resident arcs past chapter one's three are catalog-only work
+now that sequencing exists.
 
 Newest first since the last header:
+- **#301–#302** (v126–v127) **M10 waves B and C: arcs, and an archive
+  bigger than one region.** Quests can be sequenced — a stage whose
+  predecessor is unclaimed does not progress, is not offered and cannot
+  claim itself, and a pass claims at most one stage per arc, because
+  every quest here claims itself on satisfaction and without the lock a
+  player who crafted forty things on day one would have finished Tomas's
+  whole arc before he asked for anything. Chapter one's three get the
+  first arcs. Then the archive: 10 fragments became 20, two per surface
+  region, with a `regionId` on each so a run places only its own, and a
+  resolver that no longer assumes Bramblewake's `PhysicalPOI_<id>`
+  wrapper — the later regions' shared builder makes a bare anchor, and
+  both now resolve. The Hollow gets none on purpose.
 - **#298–#299** (v124–v125) **Bramblewake stops being the thinnest
   region.** Eight new points of interest across the region's three acts,
   with a new generator rule — a catalog can pin POIs into every run — so
