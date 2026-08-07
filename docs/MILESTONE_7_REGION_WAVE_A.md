@@ -59,11 +59,20 @@ reaches the run.
 The consumable column and equip panel (#294, #299) are confirmed to
 **build** correctly — four consumable slots, ninety-six equip buttons,
 right labels, correctly hidden at zero owned — and are still unverified
-**populated**, because crafting is a world interaction at the bench
-rather than an action payload: `RuntimeIds.Actions.CraftItem` exists but
-nothing sends or handles it, so a driver has to walk to the workbench.
-That is the next thing to do with these hooks, and it is now a short walk
-rather than a playthrough.
+**populated**, because crafting is a world interaction: a driver has to
+walk to the workbench and tap it.
+
+Worth stating precisely, because getting it wrong wastes a session:
+`craft_item` is an **interaction id**, not a sent kind. Firing
+`ActionRequest` with `{ kind = "craft_item" }` does nothing, correctly —
+the id is stamped on the bench's prompt and reaches the server as a plain
+`Interact`. `ActionWiring.spec` files it under `INTERACTION_ROUTED` and
+checks something in the world stamps it, so it is wired and tested; it
+simply cannot be driven from a console the way a sent kind can. The same
+is true of the other sixteen ids in that group.
+
+So the remaining check is a short walk rather than a playthrough, and it
+cannot be shortcut by firing a remote.
 
 Also confirmed live in the same session: a real expedition reports
 `pois=6`, so Bramblewake's point-of-interest wave (#298) is placing four
