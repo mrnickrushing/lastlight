@@ -58443,7 +58443,6 @@ local ENTRIES: { [string]: any } = {
         missing = {
             "points of interest",
             "event sockets",
-            "resource nodes",
             "elite arenas (Foreman Echo, Iron Widow)",
             "boss chamber (Bellows Maw)",
             "wayfinding and mesh dressing",
@@ -58455,7 +58454,6 @@ local ENTRIES: { [string]: any } = {
         missing = {
             "points of interest",
             "event sockets",
-            "resource nodes",
             "elite arenas (The Many-Face, Drowned Caller)",
             "boss chamber (Lantern Witch)",
             "wayfinding and mesh dressing",
@@ -58534,6 +58532,123 @@ function RegionBuilders.buildModules(
     end
     return #manifest.modules, drawn
 end
+
+--[[
+    Resource nodes for a region that has none yet.
+
+    Bramblewake grows its own inside its builder, tangled with mesh
+    dressing and ambient light tags. A new region needs the same contract
+    -- an anchor part, an interaction id, the material it pays, the words
+    the prompt says -- without inheriting the forest's dressing, so this
+    plants them from the region's own material list and hands the
+    descriptors back for the caller to register as prompts.
+
+    Two per module from the second module on, which is the cadence
+    Bramblewake settled on: the arrival module stays clean so a party's
+    first look at a region is the region and not a shopping list.
+]]
+function RegionBuilders.buildResourceNodes(
+    modules: { Instance },
+    manifest: any,
+    catalog: any,
+    origin: Vector3,
+    materials: { { id: string, label: string, color: Color3 } },
+    prefix: string
+): { any }
+    local descriptors = {}
+    for index, placement in manifest.modules do
+        if index >= 2 and modules[index] ~= nil then
+            local center = origin
+                + Vector3.new(
+                    placement.cellX * catalog.CellSize,
+                    0,
+                    placement.cellZ * catalog.CellSize
+                )
+            for slot = 1, 2 do
+                local material = materials[((index + slot) % #materials) + 1]
+                local side = if slot == 1 then -1 else 1
+                local at = center + Vector3.new(side * (15 + (index % 3) * 2), 0, (slot - 1.5) * 18)
+                local anchor = Instance.new("Part")
+                anchor.Name = material.label .. "Node"
+                anchor.Size = Vector3.new(5, 7, 5)
+                anchor.CFrame = CFrame.new(at + Vector3.new(0, 3.5, 0))
+                anchor.Anchored = true
+                anchor.CanCollide = false
+                anchor.CanTouch = false
+                anchor.Transparency = 1
+                anchor.Parent = modules[index]
+
+                -- Small and quiet, for the reason Bramblewake learned the
+                -- hard way: a resource cue should be findable when looked
+                -- for, never the loudest thing on the screen.
+                local cue = Instance.new("Part")
+                cue.Name = "ResourceGlow"
+                cue.Shape = Enum.PartType.Ball
+                cue.Size = Vector3.new(0.7, 0.7, 0.7)
+                cue.CFrame = CFrame.new(at + Vector3.new(0, 3.2, 0))
+                cue.Color = material.color
+                cue.Material = Enum.Material.Neon
+                cue.Anchored = true
+                cue.CanCollide = false
+                cue.CanQuery = false
+                cue.CastShadow = false
+                cue.Transparency = 0.8
+                cue.Parent = modules[index]
+
+                table.insert(descriptors, {
+                    target = anchor,
+                    interactionId = string.format("node_%s_%d_%d", prefix, index, slot),
+                    materialId = material.id,
+                    objectText = material.label,
+                })
+            end
+        end
+    end
+    return descriptors
+end
+
+--[[
+    The materials each region pays out of its own ground, in the order
+    its nodes cycle them. Kept beside the builders because it is a fact
+    about the region's world, not about its economy: what a node is made
+    of is what the player sees before they harvest it.
+]]
+RegionBuilders.NodeMaterials = table.freeze({
+    region_ironroot = table.freeze({
+        table.freeze({
+            id = "material_ironroot_ore",
+            label = "Ironroot Ore",
+            color = Color3.fromRGB(196, 142, 58),
+        }),
+        table.freeze({
+            id = "material_coalglass",
+            label = "Coalglass",
+            color = Color3.fromRGB(255, 168, 66),
+        }),
+        table.freeze({
+            id = "material_glow_fungus",
+            label = "Glow Fungus",
+            color = Color3.fromRGB(150, 226, 176),
+        }),
+    }),
+    region_mireglass = table.freeze({
+        table.freeze({
+            id = "material_mirror_reed",
+            label = "Mirror Reed",
+            color = Color3.fromRGB(186, 206, 210),
+        }),
+        table.freeze({
+            id = "material_bog_iron",
+            label = "Bog Iron",
+            color = Color3.fromRGB(146, 118, 92),
+        }),
+        table.freeze({
+            id = "material_witchlight_pollen",
+            label = "Witchlight Pollen",
+            color = Color3.fromRGB(146, 214, 226),
+        }),
+    }),
+})
 
 return table.freeze(RegionBuilders)
 ]]></string>
