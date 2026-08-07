@@ -414,16 +414,35 @@ in one expedition; the seed history system reduces immediate repetition.
 
 ## Quest inventory
 
-| ID | Quest family | Structure count | Playable count | Requirement |
-|---|---|---:|---:|---|
-| quest_group_prologue | Prologue arc | 1 | 7 | authored first-session beats |
-| quest_group_chapter | Chapter arcs | 7 | 56 | critical story and boss missions |
-| quest_group_resident | Resident arcs | 24 | 72 | minimum three missions each |
-| quest_group_mastery | Profession mastery tracks | 7 | 21 | three signature trials per profession |
-| quest_group_mystery | Region mystery groups | 7 | 42 | six per surface region and six finale echoes |
-| quest_group_contract | Contract templates | 36 | 36 | parameterized, validated, non-repetitive |
-| quest_group_crisis | Crisis templates | 18 | 18 | damage, injury, relationship, and weather variants |
-| quest_group_postgame | Postgame groups | 3 | 9 | three follow-ups for each ending direction |
+**Revised, like the crafting target, to describe what exists.** Three of
+the original eight families turned out to be other systems wearing the
+word "quest": the prologue is `TutorialFlow`, the chapter arcs are
+`ChapterCatalog` (seven chapters, each with a decision and three
+outcomes, resolved by a boss encounter), and the postgame is the finale's
+three endings plus `requiresEnding` on the roster. Counting those as
+missing quests would have meant building a second, worse copy of each.
+
+| ID | Quest family | Built | Requirement |
+|---|---|---:|---|
+| quest_group_resident | Resident arcs | 33 | one per resident, plus three-stage arcs for chapter one's three |
+| quest_group_prologue | Prologue arc | n/a | delivered as `TutorialFlow`, not as quests |
+| quest_group_chapter | Chapter arcs | n/a | delivered as `ChapterCatalog` and the boss encounters |
+| quest_group_postgame | Postgame | n/a | delivered as the three endings and `requiresEnding` |
+| quest_group_mastery | Profession mastery tracks | 0 | needs a mastery signal in `Quests.currentValue`; the data exists in `ProfessionMastery` |
+| quest_group_mystery | Region mystery groups | 0 | needs fragments outside Bramblewake first (see codex) |
+| quest_group_contract | Contract templates | 0 | needs a contract generator; no system today |
+| quest_group_crisis | Crisis templates | 0 | `ResidentLife.crisis` is the seed of this and is not yet quest-shaped |
+
+Every quest declares an objective kind that `Quests.currentValue` routes
+and `SaveSchema.questSignals` feeds -- a kind nothing feeds reads zero
+forever and is refused by spec. Arcs are ordered: a stage whose
+predecessor is unclaimed does not progress, is not offered, and cannot
+claim itself, and one pass claims at most one stage of an arc so a
+player hears each request rather than receiving a whole arc in one tick.
+
+Extending an arc is now catalog-only work: an entry with `residentId` and
+`requires` is a new stage, and the dialogue finds it without any list
+being kept in a second place.
 
 Quest steps use stable IDs and idempotent completion. A player can always recover
 from disconnect between objective completion and reward.

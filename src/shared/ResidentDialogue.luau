@@ -1,5 +1,6 @@
 --!strict
 
+local QuestCatalog = require("./QuestCatalog")
 local ResidentRoster = require("./ResidentRoster")
 
 local ResidentDialogue = {}
@@ -15,13 +16,24 @@ export type Response = {
     hold them here were the first place the roster drifted, which is why
     it exists.
 ]]
-local RESIDENT_QUESTS: { [string]: string } = {}
+--[[
+    A resident's arc, in order, taken from the quest catalog rather than
+    from a list here -- the roster names where an arc starts and the
+    catalog's `requires` chain says what follows, so the two cannot drift
+    into disagreeing about what somebody is asking for.
+]]
+local RESIDENT_ARCS: { [string]: { string } } = {}
 local RESIDENT_NAMES: { [string]: string } = {}
 for _, definition in ResidentRoster.list() do
-    RESIDENT_QUESTS[definition.id] = definition.questId
+    RESIDENT_ARCS[definition.id] = { definition.questId }
     RESIDENT_NAMES[definition.id] = definition.displayName
 end
-table.freeze(RESIDENT_QUESTS)
+for _, quest in QuestCatalog.list() do
+    local residentId = quest.residentId
+    if residentId ~= nil and quest.requires ~= nil and RESIDENT_ARCS[residentId] ~= nil then
+        table.insert(RESIDENT_ARCS[residentId], quest.id)
+    end
+end
 table.freeze(RESIDENT_NAMES)
 
 --[[
@@ -88,6 +100,30 @@ local ARRIVAL_LINES = table.freeze({
     npc_edda_pyne = "THIRTY NIGHTS AND THE WARDS TOOK THE FIRST BITE OF EVERY ONE.",
 })
 
+--[[
+    Later stages of an arc speak for themselves rather than for the person
+    -- the same resident is asking, so the name is already on the line,
+    and what changes is what they want next. Stage one keeps GUIDANCE and
+    ARRIVAL_LINES above, which players have already heard.
+]]
+local STAGE_GUIDANCE = table.freeze({
+    quest_tomas_second_bench = "TWELVE THINGS MADE. I WANT A BENCH THAT LOOKS WORKED AT",
+    quest_tomas_full_house = "TEN PEOPLE WHO TRUST YOU. THEN EVERY BED HERE IS FULL",
+    quest_pip_further_roads = "SIX RUNS OUT AND BACK. I WANT THE FAR ROADS ON THE BOARD",
+    quest_pip_every_night = "TWENTY-ONE NIGHTS POSTED BEFORE THEY ARRIVED. NOT ONE SURPRISE",
+    quest_ena_first_growth = "FIVE THINGS PLANTED OR HUNG. THIS PLACE SHOULD LOOK TENDED",
+    quest_ena_the_archive = "SIX OF WHAT THE FOREST KEPT. IT IS A STORY, NOT A COLLECTION",
+})
+
+local STAGE_STORIES = table.freeze({
+    quest_tomas_second_bench = "TWELVE THINGS OFF THAT BENCH AND THE GRAIN IS GOING SMOOTH. THAT IS WHAT A TOOL BENCH IS FOR.",
+    quest_tomas_full_house = "EVERY BED FULL AND I KNOW WHO IS IN EACH ONE. I DID NOT THINK I WOULD SEE THAT AGAIN.",
+    quest_pip_further_roads = "SIX RUNS OUT AND SIX BACK. THE FAR ROADS ARE ON THE BOARD NOW, IN INK.",
+    quest_pip_every_night = "TWENTY-ONE NIGHTS AND NOBODY WAS SURPRISED BY ANY OF THEM. THAT IS THE WHOLE JOB.",
+    quest_ena_first_growth = "FIVE THINGS PLANTED, AND THE TOWN LOOKS TENDED INSTEAD OF OCCUPIED.",
+    quest_ena_the_archive = "SIX OF THEM, IN ORDER. IT IS A STORY, AND SOMEBODY IS FINALLY READING IT.",
+})
+
 local function questById(quests: any, questId: string): any
     if type(quests) ~= "table" then
         return nil
@@ -100,7 +136,13 @@ local function questById(quests: any, questId: string): any
     return nil
 end
 
-local function completedStory(residentId: string, consequence: any): string
+local function completedStory(residentId: string, consequence: any, questId: string?): string
+    -- A later stage of an arc has its own answer; only stage one falls
+    -- back to the resident's arrival line.
+    local staged = if questId ~= nil then STAGE_STORIES[questId] else nil
+    if staged ~= nil then
+        return staged
+    end
     local arrival = ARRIVAL_LINES[residentId]
     if arrival ~= nil then
         return arrival
@@ -139,31 +181,57 @@ function ResidentDialogue.respond(residentId: any, quests: any, consequence: any
     if type(residentId) ~= "string" then
         return nil
     end
-    local questId = RESIDENT_QUESTS[residentId]
+    local arc = RESIDENT_ARCS[residentId]
     local residentName = RESIDENT_NAMES[residentId]
-    if questId == nil or residentName == nil then
+    if arc == nil or residentName == nil then
         return nil
     end
+    --[[
+        Whichever stage of their arc they are on: the first one they have
+        not finished. A stage the caller knows nothing about is not the
+        answer -- an arc can run ahead of what a snapshot carries -- so an
+        unknown stage falls back to the last one there is a record for,
+        and a resident who has been answered talks about what happened
+        rather than repeating a request.
+    ]]
+    local questId: string? = nil
+    local lastKnown: string? = nil
+    for _, candidate in arc do
+        local record = questById(quests, candidate)
+        if record ~= nil then
+            lastKnown = candidate
+            if record.claimed ~= true then
+                questId = candidate
+                break
+            end
+        end
+    end
+    -- arc[1] always exists: the roster's own questId seeded it.
+    local currentQuestId: string = questId or lastKnown or arc[1]
 
-    local quest = questById(quests, questId)
+    local quest = questById(quests, currentQuestId)
     if quest == nil then
         return {
             message = residentName .. ": CHECK BACK WHEN THE GREENWARD RECORDS ARE READY.",
-            questId = questId,
+            questId = currentQuestId,
             state = "loading",
         }
     end
     if quest.claimed == true then
         return {
-            message = residentName .. ": " .. completedStory(residentId, consequence),
-            questId = questId,
+            message = residentName
+                .. ": "
+                .. completedStory(residentId, consequence, currentQuestId),
+            questId = currentQuestId,
             state = "story",
         }
     end
 
     local current = math.max(0, math.floor(tonumber(quest.progress) or 0))
     local threshold = math.max(1, math.floor(tonumber(quest.threshold) or 1))
-    local guidance = GUIDANCE[residentId] or "RETURN SAFELY FROM BRAMBLEWAKE THREE TIMES"
+    local guidance = STAGE_GUIDANCE[currentQuestId]
+        or GUIDANCE[residentId]
+        or "RETURN SAFELY FROM BRAMBLEWAKE THREE TIMES"
     return {
         message = string.format(
             "%s: %s — %d/%d. I WILL MARK IT WHEN IT IS DONE.",
@@ -172,7 +240,7 @@ function ResidentDialogue.respond(residentId: any, quests: any, consequence: any
             math.min(current, threshold),
             threshold
         ),
-        questId = questId,
+        questId = currentQuestId,
         state = if current >= threshold then "ready" else "active",
     }
 end

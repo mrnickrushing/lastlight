@@ -24,6 +24,82 @@ return {
     cases = {
         {
             --[[
+                An arc is only an arc if its stages happen in order. The
+                failure this guards against is specific and would look
+                like a bug rather than a design mistake: every quest in
+                this game claims itself the moment its objective is met,
+                so without a lock a player who crafts forty things on day
+                one would have all three of Tomas's stages claim
+                themselves in the same tick, and his arc would be over
+                before he asked for anything.
+            ]]
+            name = "a later stage of an arc does not progress until the one before it is claimed",
+            run = function()
+                local later: any = nil
+                for _, quest in QuestCatalog.list() do
+                    if quest.requires ~= nil then
+                        later = quest
+                        break
+                    end
+                end
+                TestRunner.truthy(later ~= nil, "no quest is part of an arc")
+                local first = QuestCatalog.get(later.requires)
+                TestRunner.truthy(first ~= nil, later.id .. " requires a quest that does not exist")
+                TestRunner.equal(
+                    (first :: any).residentId,
+                    later.residentId,
+                    "an arc crosses two people"
+                )
+
+                -- everything satisfied, nothing claimed: the locked stage
+                -- reads as zero progress and refuses to claim
+                local raised = signals({
+                    bramblewakeSettlements = 999,
+                    buildingsRaised = 999,
+                    chaptersResolved = 999,
+                    craftedItems = 999,
+                    decorationsPlaced = 999,
+                    fragmentsRecovered = 999,
+                    gearTraits = 999,
+                    materialsBanked = 999,
+                    nightsSurvived = 999,
+                    residentsBonded = 999,
+                })
+                TestRunner.equal(Quests.isUnlocked(later.id, {}), false)
+                local snapshot = Quests.snapshot(Quests.default(), raised)
+                for _, entry in snapshot do
+                    if entry.id == later.id then
+                        TestRunner.equal(entry.locked, true)
+                        TestRunner.equal(entry.progress, 0)
+                        TestRunner.equal(entry.complete, false)
+                        TestRunner.equal(entry.requires, later.requires)
+                    end
+                end
+
+                --[[
+                    And a single checkAndClaim pass may not walk a whole
+                    arc: claiming stage one unlocks stage two, but the
+                    unlock is read from the set as it was, so the player
+                    goes back and hears the next request rather than
+                    receiving three rewards silently.
+                ]]
+                local claimed, materials, results =
+                    Quests.checkAndClaim(Quests.default(), {}, raised)
+                local claimedIds: { [string]: boolean } = {}
+                for _, result in results do
+                    claimedIds[result.questId or result.id] = true
+                end
+                TestRunner.equal(claimedIds[later.id], nil, "an arc claimed two stages at once")
+                TestRunner.equal(claimed[(first :: any).id], true)
+                TestRunner.equal(Quests.isUnlocked(later.id, claimed), true)
+
+                -- the next pass claims it, now that it is genuinely open
+                local afterClaimed = (Quests.checkAndClaim(claimed, materials, raised))
+                TestRunner.equal(afterClaimed[later.id], true)
+            end,
+        },
+        {
+            --[[
                 A quest whose objective kind nothing routes reads zero
                 forever: it shows in the log, never completes, and nothing
                 fails. That is how a resident ends up carrying a promise
