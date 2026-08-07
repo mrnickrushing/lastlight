@@ -13,6 +13,7 @@ local DefenseLanes = require(root.DefenseLanes)
 local RegionAccess = require(root.RegionAccess)
 local RegionBuilders = require(script.World.RegionBuilders)
 local Equipment = require(root.Equipment)
+local Consumables = require(root.Consumables)
 local GearVisualPlan = require(root.GearVisualPlan)
 local EnemyCatalog = require(root.EnemyCatalog)
 local CombatState = require(root.CombatState)
@@ -364,7 +365,8 @@ local tutorialService = TutorialService.new(
     ActionProgress,
     ToolCatalog,
     GearWear,
-    GearTraits
+    GearTraits,
+    Consumables
 )
 
 local services = ServiceRegistry.new({

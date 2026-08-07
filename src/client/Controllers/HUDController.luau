@@ -4,6 +4,14 @@ local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local GuiService = game:GetService("GuiService")
 local TweenService = game:GetService("TweenService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Consumables = require(ReplicatedStorage:WaitForChild("LastLight").Consumables)
+
+-- How many consumables the column shows at once. There are more than a
+-- phone screen has room for, so the HUD shows what a player is actually
+-- carrying, in catalog order, and stops at four.
+local MAX_USE_BUTTONS = 4
 
 local HUDController = {}
 HUDController.__index = HUDController
@@ -77,6 +85,29 @@ local function createItemIcon(parent: Instance, itemId: string, size: number): V
         )
         ring.Shape = Enum.PartType.Cylinder
         ring.Orientation = Vector3.new(0, 0, 90)
+    elseif Consumables.get(itemId) ~= nil and itemId ~= "gear_amber_charm" then
+        --[[
+            Every consumable after the first two draws from its own entry
+            rather than from a branch here: a flask in the catalog's own
+            colour, banded so the three kinds read apart at icon size.
+        ]]
+        local definition = Consumables.get(itemId) :: any
+        local accent =
+            Color3.fromRGB(definition.accent[1], definition.accent[2], definition.accent[3])
+        shape("Flask", Vector3.new(1.5, 1.9, 1.5), Vector3.new(0, -0.1, 0), accent)
+        shape(
+            "Neck",
+            Vector3.new(0.6, 0.7, 0.6),
+            Vector3.new(0, 1.1, 0),
+            Color3.fromRGB(73, 48, 36)
+        )
+        local band = shape(
+            "Band",
+            Vector3.new(1.62, 0.34, 1.62),
+            Vector3.new(0, if definition.effect.kind == "shield" then 0.35 else -0.45, 0),
+            Color3.fromRGB(236, 232, 220)
+        )
+        band.Transparency = 0.1
     elseif itemId == "gear_thornwood_bow" then
         shape(
             "Stave",
@@ -325,8 +356,7 @@ export type HUDController = typeof(setmetatable(
         _onLobbyDepart: ((number) -> ())?,
         _selectedPartySize: number?,
         _progressButton: TextButton,
-        _useCharm: TextButton,
-        _useSatchel: TextButton,
+        _useButtons: { TextButton },
         _professionOverlay: Frame,
         _professionPanel: Frame,
         _professionCards: { [string]: TextButton },
@@ -959,43 +989,35 @@ function HUDController.new(
     corner(progressButton, 12)
     stroke(progressButton, COLORS.cream, 0.42)
 
-    local useCharm = Instance.new("TextButton")
-    useCharm.Name = "UseAmberCharm"
-    useCharm.AnchorPoint = Vector2.new(1, 0)
-    useCharm.Position = UDim2.new(1, -18, 0, 110)
-    useCharm.Size = UDim2.fromOffset(118, 42)
-    useCharm.BackgroundColor3 = COLORS.panel
-    useCharm.BackgroundTransparency = 0.08
-    useCharm.Font = Enum.Font.GothamBold
-    useCharm.Text = "CHARM"
-    useCharm.TextColor3 = COLORS.amber
-    useCharm.TextSize = 12
-    useCharm.Visible = false
-    useCharm.ZIndex = 10
-    useCharm.Parent = canvas
-    corner(useCharm, 12)
-    stroke(useCharm, COLORS.amber, 0.42)
-    createItemIcon(useCharm, "gear_amber_charm", 30)
-    useCharm.TextXAlignment = Enum.TextXAlignment.Right
-
-    local useSatchel = Instance.new("TextButton")
-    useSatchel.Name = "UseMeadowSatchel"
-    useSatchel.AnchorPoint = Vector2.new(1, 0)
-    useSatchel.Position = UDim2.new(1, -18, 0, 156)
-    useSatchel.Size = UDim2.fromOffset(118, 42)
-    useSatchel.BackgroundColor3 = COLORS.panel
-    useSatchel.BackgroundTransparency = 0.08
-    useSatchel.Font = Enum.Font.GothamBold
-    useSatchel.Text = "SATCHEL"
-    useSatchel.TextColor3 = Color3.fromRGB(133, 176, 108)
-    useSatchel.TextSize = 12
-    useSatchel.Visible = false
-    useSatchel.ZIndex = 10
-    useSatchel.Parent = canvas
-    corner(useSatchel, 12)
-    stroke(useSatchel, Color3.fromRGB(133, 176, 108), 0.42)
-    createItemIcon(useSatchel, "gear_meadow_satchel", 30)
-    useSatchel.TextXAlignment = Enum.TextXAlignment.Right
+    --[[
+        The use buttons are built from the consumable catalog rather than
+        one per item name. There are more consumables than a phone screen
+        has room for, so this draws a fixed short column and _updateGear
+        fills it with whichever ones a player is actually carrying, in
+        catalog order. A new consumable needs no change here at all.
+    ]]
+    local useButtons: { TextButton } = {}
+    for index = 1, MAX_USE_BUTTONS do
+        local button = Instance.new("TextButton")
+        button.Name = string.format("UseConsumable%d", index)
+        button.AnchorPoint = Vector2.new(1, 0)
+        button.Position = UDim2.new(1, -18, 0, 110 + (index - 1) * 46)
+        button.Size = UDim2.fromOffset(118, 42)
+        button.BackgroundColor3 = COLORS.panel
+        button.BackgroundTransparency = 0.08
+        button.Font = Enum.Font.GothamBold
+        button.Text = ""
+        button.TextColor3 = COLORS.amber
+        button.TextSize = 12
+        button.TextXAlignment = Enum.TextXAlignment.Right
+        button.Visible = false
+        button.ZIndex = 10
+        button:SetAttribute("ItemId", "")
+        button.Parent = canvas
+        corner(button, 12)
+        stroke(button, COLORS.amber, 0.42)
+        table.insert(useButtons, button)
+    end
 
     local professionOverlay = Instance.new("Frame")
     professionOverlay.Name = "ProfessionOverlay"
@@ -1496,8 +1518,7 @@ function HUDController.new(
         _compact = compact,
         _professionButton = professionButton,
         _progressButton = progressButton,
-        _useCharm = useCharm,
-        _useSatchel = useSatchel,
+        _useButtons = useButtons,
         _professionOverlay = professionOverlay,
         _professionPanel = professionPanel,
         _professionCards = professionCards,
@@ -1679,12 +1700,15 @@ function HUDController.progressButton(self: HUDController): TextButton
     return self._progressButton
 end
 
-function HUDController.useCharmButton(self: HUDController): TextButton
-    return self._useCharm
-end
-
-function HUDController.useSatchelButton(self: HUDController): TextButton
-    return self._useSatchel
+--[[
+    The consumable buttons, in the order they are drawn. Each carries the
+    item it is currently standing for in an `ItemId` attribute, because
+    which consumable a button means changes with what a player is
+    carrying -- so a caller sends the button's own id rather than one it
+    was told at startup.
+]]
+function HUDController.useButtons(self: HUDController): { TextButton }
+    return self._useButtons
 end
 
 function HUDController.setCompactHandler(self: HUDController, callback: (boolean) -> ())
@@ -2080,13 +2104,42 @@ function HUDController._updateGear(self: HUDController)
     local state = self._currentState
     local gear = if type(state) == "table" and type(state.gear) == "table" then state.gear else nil
     local tutorialComplete = type(state) == "table" and state.tutorialComplete == true
-    local charmCount = if gear ~= nil then tonumber(gear.gear_amber_charm) or 0 else 0
-    local satchelCount = if gear ~= nil then tonumber(gear.gear_meadow_satchel) or 0 else 0
+    local usable = tutorialComplete and not self._playerDowned
 
-    self._useCharm.Visible = tutorialComplete and not self._playerDowned and charmCount > 0
-    self._useCharm.Text = string.format("CHARM ×%d", charmCount)
-    self._useSatchel.Visible = tutorialComplete and not self._playerDowned and satchelCount > 0
-    self._useSatchel.Text = string.format("SATCHEL ×%d", satchelCount)
+    local slot = 0
+    for _, definition in Consumables.list() do
+        local count = if gear ~= nil then tonumber(gear[definition.id]) or 0 else 0
+        if count > 0 and slot < MAX_USE_BUTTONS then
+            slot += 1
+            local button = self._useButtons[slot]
+            local accent =
+                Color3.fromRGB(definition.accent[1], definition.accent[2], definition.accent[3])
+            button:SetAttribute("ItemId", definition.id)
+            button.Text = string.format("%s ×%d", definition.shortLabel, count)
+            button.TextColor3 = accent
+            button.Visible = usable
+            local outline = button:FindFirstChildOfClass("UIStroke")
+            if outline ~= nil then
+                outline.Color = accent
+            end
+            local icon = button:FindFirstChild("ItemIcon")
+            if icon == nil or icon:GetAttribute("ItemId") ~= definition.id then
+                if icon ~= nil then
+                    icon:Destroy()
+                end
+                createItemIcon(button, definition.id, 30)
+                local made = button:FindFirstChild("ItemIcon")
+                if made ~= nil then
+                    made:SetAttribute("ItemId", definition.id)
+                end
+            end
+        end
+    end
+    for index = slot + 1, MAX_USE_BUTTONS do
+        local button = self._useButtons[index]
+        button:SetAttribute("ItemId", "")
+        button.Visible = false
+    end
 end
 
 function HUDController._updateProgress(self: HUDController)
@@ -2436,8 +2489,9 @@ function HUDController._layout(self: HUDController)
         self._downedFrame.Size = UDim2.new(1, -36, 0, 90)
         local professionY = if self._compactEnabled then 158 else 218
         self._professionButton.Position = UDim2.new(1, -18, 0, professionY)
-        self._useCharm.Position = UDim2.new(1, -18, 0, professionY + 46)
-        self._useSatchel.Position = UDim2.new(1, -18, 0, professionY + 92)
+        for index, button in self._useButtons do
+            button.Position = UDim2.new(1, -18, 0, professionY + index * 46)
+        end
         self._professionPanel.Size = UDim2.new(1, -24, 0, 440)
         --[[
             Thumb cluster, bottom-right, stacked in two rows.
@@ -2505,8 +2559,9 @@ function HUDController._layout(self: HUDController)
         self._threatFrame.Size = UDim2.fromOffset(330, 66)
         self._downedFrame.Size = UDim2.fromOffset(540, 90)
         self._professionButton.Position = UDim2.new(1, -18, 0, 64)
-        self._useCharm.Position = UDim2.new(1, -18, 0, 110)
-        self._useSatchel.Position = UDim2.new(1, -18, 0, 156)
+        for index, button in self._useButtons do
+            button.Position = UDim2.new(1, -18, 0, 110 + (index - 1) * 46)
+        end
         self._professionPanel.Size = UDim2.fromOffset(640, 440)
         self._ability.Position = UDim2.new(1, -346, 1, -40)
     end

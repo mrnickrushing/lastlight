@@ -63,6 +63,7 @@ export type TutorialService = typeof(setmetatable(
         _toolCatalog: any,
         _gearWear: any,
         _gearTraits: any,
+        _consumables: any,
         _companionService: any,
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
@@ -102,7 +103,8 @@ function TutorialService.new(
     actionProgress: any,
     toolCatalog: any,
     gearWear: any,
-    gearTraits: any
+    gearTraits: any,
+    consumables: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -135,6 +137,7 @@ function TutorialService.new(
         _toolCatalog = toolCatalog,
         _gearWear = gearWear,
         _gearTraits = gearTraits,
+        _consumables = consumables,
         _companionService = nil,
         _actions = {},
         _sessions = {},
@@ -1413,21 +1416,39 @@ function TutorialService._useGear(self: TutorialService, player: Player, itemId:
         self:_publish(player)
         return
     end
-    if itemId == "gear_meadow_satchel" then
-        -- Uses the same freshly-advanced stamina restoreStamina itself
-        -- computes below, not the possibly-stale snapshot() value, so this
-        -- check can't pass on stale data only for the real restore to find
-        -- stamina already full after the item has been consumed.
+    --[[
+        Everything below reads the consumable catalog rather than knowing
+        item names. The precondition is checked before the item is spent,
+        because a player must never lose one to a no-op, and the effect is
+        applied by whichever service owns it -- this only decides which.
+    ]]
+    local definition = self._consumables.get(itemId)
+    if definition == nil then
+        self._analyticsService:usedGear(player, itemId, false, "unknown_item")
+        return
+    end
+    local requires = definition.requires
+    if requires == "stamina_not_full" then
+        -- The freshly-advanced stamina restoreStamina itself computes, not
+        -- the possibly-stale snapshot, so this cannot pass on stale data
+        -- only for the real restore to find stamina already full after the
+        -- item has been consumed.
         local staminaNow = self._combatService:peekStamina(player)
         if staminaNow == nil or staminaNow >= self._config.MaxStamina then
             self._analyticsService:usedGear(player, itemId, false, "stamina_full")
-            self:_setToast(player, "STAMINA ALREADY FULL")
+            self:_setToast(player, definition.refusedMessage or "NOTHING TO RESTORE")
             self:_publish(player)
             return
         end
-    elseif itemId ~= "gear_amber_charm" then
-        self._analyticsService:usedGear(player, itemId, false, "unknown_item")
-        return
+    elseif requires == "someone_hurt_nearby" then
+        local canHeal, reason =
+            self._survivalService:canHealInRadius(player, definition.effect.radius or 18)
+        if not canHeal then
+            self._analyticsService:usedGear(player, itemId, false, tostring(reason))
+            self:_setToast(player, definition.refusedMessage or "NOBODY NEAR YOU NEEDS IT")
+            self:_publish(player)
+            return
+        end
     end
 
     local result = self._profileService:useGearItem(player, itemId)
@@ -1438,18 +1459,15 @@ function TutorialService._useGear(self: TutorialService, player: Player, itemId:
         return
     end
 
-    if itemId == "gear_amber_charm" then
-        self._combatService:applyShield(player, 5, 0.6)
-        self:_setToast(player, "AMBER CHARM — SHIELDED")
+    local effect = definition.effect
+    if effect.kind == "shield" then
+        self._combatService:applyShield(player, effect.amount, effect.seconds or 0.6)
+    elseif effect.kind == "heal_party" then
+        self._survivalService:healInRadius(player, effect.amount, effect.radius or 18)
     else
-        local staminaResult = self._combatService:restoreStamina(player, 50)
-        self:_setToast(
-            player,
-            if staminaResult.applied
-                then "MEADOW SATCHEL — STAMINA RESTORED"
-                else "MEADOW SATCHEL USED"
-        )
+        self._combatService:restoreStamina(player, effect.amount)
     end
+    self:_setToast(player, definition.successMessage)
     self:_publish(player)
 end
 
