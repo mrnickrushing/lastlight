@@ -332,7 +332,60 @@ function TutorialService.Init(self: TutorialService, context: any)
     end)
 end
 
+--[[
+    The other half of the Studio verification hooks, and it has to live
+    here rather than in ProfileService.
+
+    `LastLightStockProfile` fills a purse so a driver can craft without
+    playing an hour first. But crafting -- and the progress panel, the
+    equip column, the consumable column, almost every surface worth
+    looking at -- sits behind tutorial completion, and a fresh Studio
+    profile is always pre-tutorial. A live pass on 2026-08-07 launched
+    Studio to check two rewritten HUD surfaces, found both correctly
+    empty, and ended knowing nothing.
+
+    The obvious place to fix that is ProfileService, beside the stock
+    hook, and it does not work there: the profile flag would be set and
+    nothing a player can see would change, because this service has
+    already built the session it gates on. It was written there, tested
+    green, and reverted for exactly that reason.
+
+    So the skip is applied where the stage is decided -- at session build,
+    and again whenever the attribute changes, because a Play session
+    starts from a fresh DataModel and an edit-time value never arrives.
+    Same guard as the stock hook: Studio only, which is false on every
+    Roblox server, and logged loudly every time.
+
+    First Light is verified by playing First Light. Nothing else should
+    have to be.
+]]
+function TutorialService._studioSkipRequested(_self: TutorialService): boolean
+    return RunService:IsStudio() and game:GetAttribute("LastLightSkipTutorial") == true
+end
+
+function TutorialService._watchStudioSkip(self: TutorialService)
+    if not RunService:IsStudio() then
+        return
+    end
+    game:GetAttributeChangedSignal("LastLightSkipTutorial"):Connect(function()
+        if not self:_studioSkipRequested() then
+            return
+        end
+        for player, session in self._sessions do
+            if session.stage ~= "complete" then
+                session.stage = "complete"
+                session.toast = "STUDIO: TUTORIAL SKIPPED"
+                session.toastRevision += 1
+                player:SetAttribute("LastLightTutorialSurvivalReady", true)
+                self._logger:warn("studio_tutorial_skipped", { player = player.UserId })
+                self:_publish(player)
+            end
+        end
+    end)
+end
+
 function TutorialService.Start(self: TutorialService)
+    self:_watchStudioSkip()
     Players.PlayerRemoving:Connect(function(player: Player)
         self._sessions[player] = nil
         self._expeditionModuleIndex[player] = nil
@@ -412,6 +465,9 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     local stage = if self._featureFlags:isEnabled("tutorial_persistence")
         then profile.tutorial.stage
         else self._tutorialFlow.firstStage()
+    if self:_studioSkipRequested() then
+        stage = "complete"
+    end
     player:SetAttribute("LastLightTutorialSurvivalReady", isCombatEligibleStage(stage))
     local session: Session = {
         stage = stage,
