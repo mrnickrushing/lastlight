@@ -7,20 +7,48 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-07, at `main` = `2bc4cd6` (PR #282), build `0.53.0`,
-save schema 21, 23 services. Published to Roblox as place version 113,
+Last updated: 2026-08-07, at `main` = `HEAD` (PR #290), build `0.53.0`,
+save schema 21, 23 services. Published to Roblox as place version 120,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 7 through 10 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** Studio is
-available again and is driven from the terminal (see the M7 runbook for
-the launch recipe); Studio-facing checks that have not been performed are
-recorded open rather than assumed.
+available and driven from the terminal (launch recipe in the M7 runbook);
+Studio-facing checks not performed are recorded open rather than assumed.
 
-**Milestones 7 and 8 are complete.** The next wave is M9 wave A
-(Cinderfall Crown catalog); the whole remaining queue, with files, shapes
-and done-gates, is in [WAVE_PLAN_M8_M10.md](WAVE_PLAN_M8_M10.md).
+**Milestones 7, 8 and 9 are complete.** The story runs end to end: seven
+chapters, seven regions, an authored finale with three endings, an
+epilogue that reads the whole save, 27 residents and all 28 buildings.
+The next wave is M10 wave A-1; the queue lives in
+[WAVE_PLAN_M8_M10.md](WAVE_PLAN_M8_M10.md).
 
 Newest first since the last header:
+- **#284–#290** (v114–v120) **Milestone 9 finished — the game has an
+  ending.** **#284** Cinderfall Crown, whose hazard is that it is still
+  going: the parade still on its route, the crowd still facing the stage,
+  and a rule that a memory can be false. **#285** its six, the Lead Actor
+  (a readable line, where a wrong answer costs the line rather than
+  health), the Glass Bailiff (its openings are bought with the party's
+  own cover) and the Ash Regent, whose four phases make the fast way
+  through the Crown the destruction of the only record of its dead.
+  **#286** thirty visuals that draw the tell rather than describing it —
+  performing casts are posed and seamed, authentic ones are neither.
+  **#287** The Hollow Below, the one authored place in the game: five
+  scenes rather than five phases, the two trapped people named by the
+  save rather than the module, and per-scene transaction ids because a
+  disconnect at the bottom must not resolve a finale twice. **#288**
+  chapters VI and VII, schema 21's `story.finale`, and an epilogue that
+  reads every resolved chapter plus what happened in the Hollow —
+  spec-walked across all 54 outcome/ending combinations. **#289** tiers
+  six and seven with the last six buildings (28 total). **#290** the
+  final eight residents including Orin Vale, whose presence is the one
+  thing in the game that reads the ending directly: put the light out or
+  share it and he walks up; keep it and somebody is still down there
+  tending it, and it is him.
+- **#277–#283** (v108–v113) **Milestone 8**: Frostmere Vale end to end,
+  chapters IV and V, town tiers four and five, eight more residents. Two
+  gaps closed along the way — the Reach had shipped three encounters with
+  no arenas, and `chapterReached` was answering yes for regions no
+  chapter named.
 - **#277–#282** (v108–v113) **Milestone 8 finished**: Frostmere Vale from
   catalog to town. **#277** the Vale's catalog (30 modules, 12 POIs, 8
   events, 5 materials) around one rule — warmth is a resource, and

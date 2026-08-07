@@ -5,11 +5,12 @@ it done."* This is the queue that makes that possible without a check-in
 between waves. Every entry names its files, its shape, and the gate that
 says it is done, so a session picks up cold and starts warm.
 
-Milestones 7 and 8 are complete. Milestone 7's runbook is
+Milestones 7, 8 and 9 are complete. Milestone 7's runbook is
 [MILESTONE_7_REGION_WAVE_A.md](MILESTONE_7_REGION_WAVE_A.md); milestone 8
-shipped as #274–#282 (place versions 105–113).
+shipped as #274–#282 (v105–v113) and milestone 9 as #284–#290
+(v114–v120).
 
-**Next up: M9 wave A.**
+**Next up: M10 wave A-1.**
 
 ## The rhythm
 
@@ -56,19 +57,21 @@ reach has to have something standing in it the day it opens.
 
 | Wave | Scope | Done when |
 |---|---|---|
-| A | **Cinderfall Crown catalog** — chapter VI. Identity: memory made physical (false statues, authentic memories) | Spec green |
-| B | **Crown roster + elites + Ash Regent** (4 phases: expose authentic memories, break false statues) | Encounter spec green |
-| C | **Crown geometry** | Coverage green |
-| D | **The Hollow Below** — authored finale rather than a procedural region: 7 POIs, no event pool, `boss_nameless_night` in five scenes (defend, pursue, rescue, witness, choose) | Finale spec: five scenes, three endings reachable, each idempotent |
-| E | **Three ending states + epilogue** — stored like chapter outcomes; every chapter-decision combination maps to valid finale content | Spec walks every combination |
-| F | **Final eight residents including Orin**; postgame resident states | Roster spec: 27 residents |
-| G | **Town tiers 6–7 and all 28 buildings** — extend `TownProgression` and `TownConstruction` | Tier spec; building count spec |
+| A ✅ | **Cinderfall Crown catalog** — chapter VI. Identity: memory made physical (false statues, authentic memories) | Spec green |
+| B ✅ | **Crown roster + elites + Ash Regent** (4 phases: expose authentic memories, break false statues) | Encounter spec green |
+| C ✅ | **Crown geometry** | Coverage green |
+| D ✅ | **The Hollow Below** — authored finale rather than a procedural region: 7 POIs, no event pool, `boss_nameless_night` in five scenes (defend, pursue, rescue, witness, choose) | Finale spec: five scenes, three endings reachable, each idempotent |
+| E ✅ | **Three ending states + epilogue** — stored like chapter outcomes; every chapter-decision combination maps to valid finale content | Spec walks every combination |
+| F ✅ | **Final eight residents including Orin**; postgame resident states | Roster spec: 27 residents |
+| G ✅ | **Town tiers 6–7 and all 28 buildings** — extend `TownProgression` and `TownConstruction` | Tier spec; building count spec |
 
 ## Milestone 10 — Content completion
 
 | Wave | Scope | Done when |
 |---|---|---|
-| A | **Recipe completion to 180** — `CraftingCatalog` grows by group (tools, defenses, comfort, medicine, light). Every recipe's materials must clear the ledger; every output must be equippable or usable | Recipe spec: 180 recipes, no unknown material, no orphan output |
+| A-1 | **Weapons and armour to ~96** — six weapon families × six regions, then five armour slots × six regions × two lines (a light line that returns stamina, a heavy line that reduces damage). `Equipment` is already fully data-driven (slot, `damageReduction`, `staminaRegenMultiplier`, `kind`, `strikeRange`/`meleeReach`/multiplier/riders), so these are data, not code | Every output has an `Equipment` definition; every stat inside the bounds combat clamps |
+| A-2 | **Tools, light and defence** — the outputs that are used rather than worn. Needs a small data-driven consumable contract first: today `gear_meadow_satchel` and `gear_amber_charm` are hardcoded branches in `TutorialService`, `HUDController` and the client, which does not scale past two | Consumable spec: every usable output resolves through one table, no bespoke branch |
+| A-3 | **Comfort and medicine to 180** — the remainder, plus the recipe spec's full gate | Recipe spec: 180 recipes, no unknown material, no orphan output |
 | B | **Quest completion** — resident arcs to the catalog's counts, every quest a real signal | Quest spec: every quest's objective kind has a signal |
 | C | **Codex/archive completion** — memory fragments to full count across regions | Fragment spec: one per region minimum, anchors resolvable |
 | D | **Content census** — a single spec asserting the roadmap's launch inventory: 180 modules, 79 POIs, 48 events, 180 recipes, region counts | Census spec green |
@@ -98,5 +101,13 @@ reach has to have something standing in it the day it opens.
 - **A quest's objective kind must be routed in `Quests.currentValue`**
   and fed by `SaveSchema.questSignals`. An unrouted kind reads zero
   forever and nothing errors.
+- **Region waves need their buildings before their residents.** Twice now
+  (M8 and M9) the resident wave had to wait on the tier wave, because
+  every resident needs an unclaimed building and the town only had a
+  few. Ship the tier wave first.
+- **`Equipment` is data-driven; consumables are not.** Anything worn can
+  be added as a table entry. Anything *used* currently needs branches in
+  three files, which is what M10 wave A-2 has to fix before the recipe
+  count can be finished honestly.
 - **The cylinder rule**: a `Cylinder` part's axis is its `Size.X`. This
   has cost six shapes so far. Thickness on X for a disc, then rotate.
