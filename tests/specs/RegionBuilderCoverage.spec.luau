@@ -71,5 +71,57 @@ return {
                 TestRunner.equal(byId.region_mireglass.enabled, false)
             end,
         },
+        {
+            --[[
+                Every material a region's nodes pay must be one the ledger
+                already accepts. This is the #212 lesson applied one layer
+                earlier: there, a reward shape the ledger refused meant a
+                node that paid nothing, silently, for weeks. A node made of
+                a material nobody registered is the same bug with a longer
+                fuse, and it is cheap to refuse here.
+            ]]
+            name = "every region's nodes are made of materials the ledger knows",
+            run = function()
+                local ExpeditionInventory = require("../../src/shared/ExpeditionInventory")
+                local registrySource = fs.readFile("src/server/World/RegionBuilders.luau")
+                for _, region in REGIONS do
+                    local regionId = region.catalog.RegionId
+                    --[[
+                        The node material list lives beside the builders
+                        (it is a fact about the region's world, not its
+                        economy), and RegionBuilders cannot be required
+                        here -- it reaches for `script` like every server
+                        module. So the ids are read out of its source, from
+                        the region's own slice of the table.
+                    ]]
+                    -- take everything from this region's key to the next
+                    -- region key (or the end of the table), which is its slice
+                    local afterKey = string.match(registrySource, regionId .. " = table(.*)$")
+                    local slice = if afterKey == nil
+                        then nil
+                        else string.match(afterKey, "^(.-)\n    region_") or afterKey
+                    TestRunner.truthy(
+                        slice ~= nil,
+                        regionId .. " has no node material list beside the builders"
+                    )
+                    local seen = 0
+                    for materialId in string.gmatch(slice or "", 'id = "(material_[a-z_]+)"') do
+                        seen += 1
+                        local _, result = ExpeditionInventory.addUnbanked(
+                            ExpeditionInventory.default(),
+                            "spec:" .. materialId,
+                            "spechash",
+                            { materialId = materialId, amount = 1 },
+                            1000
+                        )
+                        TestRunner.truthy(
+                            result.applied,
+                            regionId .. " plants a node the ledger refuses: " .. materialId
+                        )
+                    end
+                    TestRunner.truthy(seen >= 3, regionId .. " has too few node materials")
+                end
+            end,
+        },
     },
 }
