@@ -360,12 +360,13 @@ than an art pass, and each derived body says so. The census reads the
 source and refuses a return to the skip, because the skip is what made
 the gap invisible.
 
-Eleven of the twenty-seven are authored above that floor: chapter one's
-three, and the eight who arrive with chapters II and III, each standing
-at the building the roster gives them the job at with their own colours,
-their own prop and their own evening. The remaining sixteen — chapters IV
-through VII — still derive, and the census asserts the count of authored
-bodies so raising it stays a deliberate act rather than a drift.
+Nineteen of the twenty-seven are authored above that floor: chapter
+one's three, and the sixteen who arrive with chapters II through V, each
+standing at the building the roster gives them the job at with their own
+colours, their own prop and their own evening. The remaining eight — the
+Crown's four and the Hollow's four — still derive, and the census
+asserts the count of authored bodies so raising it stays a deliberate
+act rather than a drift.
 
 **Recipes (fixed): 120 of the 130 could not be crafted.** The workshop's benches were a
 hardcoded list of ten in `WorldService`, each needing its own constant in

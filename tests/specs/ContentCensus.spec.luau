@@ -321,8 +321,8 @@ return {
                 made the gap invisible.
 
                 The derivation is a floor and stays one; the count that
-                moves is how far above it the authoring has got. Eleven
-                now, chapters I through III, and the assertion is here so
+                moves is how far above it the authoring has got. Nineteen
+                now, chapters I through V, and the assertion is here so
                 that number can only go up on purpose.
             ]]
             name = "a resident with no authored body derives one rather than being skipped",
@@ -352,7 +352,8 @@ return {
                 end
 
                 -- the authored ones keep their authored bodies: chapter
-                -- one's three, the Delve's four and the Fen's four
+                -- one's three, then the Delve's four, the Fen's four, the
+                -- Reach's four and the Vale's four
                 local built = 0
                 for _, residentId in
                     {
@@ -367,13 +368,21 @@ return {
                         "npc_wren_dabbler",
                         "npc_marek_still",
                         "npc_lissen_ford",
+                        "npc_isolde_maren",
+                        "npc_cass_pell",
+                        "npc_alder_kine",
+                        "npc_nell_barrow",
+                        "npc_anselm_rill",
+                        "npc_ivy_thorn",
+                        "npc_halvard_sunn",
+                        "npc_maud_ferrow",
                     }
                 do
                     if string.find(world, residentId .. " = {", 1, true) ~= nil then
                         built += 1
                     end
                 end
-                TestRunner.equal(built, 11, "an authored resident lost their body")
+                TestRunner.equal(built, 19, "an authored resident lost their body")
             end,
         },
         {
