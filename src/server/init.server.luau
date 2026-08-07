@@ -11,6 +11,7 @@ local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedi
 local CraftingCatalog = require(root.CraftingCatalog)
 local DefenseLanes = require(root.DefenseLanes)
 local RegionAccess = require(root.RegionAccess)
+local RegionBuilders = require(script.World.RegionBuilders)
 local Equipment = require(root.Equipment)
 local GearVisualPlan = require(root.GearVisualPlan)
 local EnemyCatalog = require(root.EnemyCatalog)
@@ -121,6 +122,16 @@ local worldService = WorldService.new(
     MemoryFragments,
     TownDecorations
 )
+--[[
+    The third gate on a region, after its enabled flag and its chapter:
+    can its builder actually draw a world a party could walk. Bramblewake
+    can; the Delve and the Fen have module geometry and nothing else yet,
+    and RegionBuilders is where that stays honest.
+]]
+RegionAccess.setReadinessProvider(function(regionId: string): boolean
+    return RegionBuilders.readiness(regionId).walkable
+end)
+
 local expeditionService = ExpeditionService.new(
     logger,
     worldService,

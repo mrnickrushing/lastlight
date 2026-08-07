@@ -95,5 +95,33 @@ return {
                 TestRunner.equal(RegionAccess.DefaultRegionId, "region_bramblewake")
             end,
         },
+        {
+            --[[
+                The third gate: a region can be enabled and its chapter
+                reached and still have nothing a party could walk. The
+                Delve and the Fen are exactly there today -- module
+                geometry and no points of interest, events, nodes or
+                arenas -- and the gate exists so that flipping an enabled
+                flag early cannot put anyone in an empty grid.
+            ]]
+            name = "a region with no walkable world is refused even when it is enabled",
+            run = function()
+                RegionAccess.setReadinessProvider(function(regionId: string): boolean
+                    return regionId == "region_bramblewake"
+                end)
+                TestRunner.equal(RegionAccess.evaluate("region_bramblewake", nil).allowed, true)
+                -- pretend the Delve's flag was flipped: chapter reached,
+                -- registry enabled, and still refused for the honest reason
+                local verdict = RegionAccess.evaluate("region_ironroot", RESOLVED_ONE)
+                TestRunner.equal(verdict.allowed, false)
+                TestRunner.truthy(
+                    verdict.reason == "region_not_built" or verdict.reason == "region_not_walkable"
+                )
+                -- and with no provider at all, behavior is what it was
+                -- before readiness existed
+                RegionAccess.setReadinessProvider(nil)
+                TestRunner.equal(RegionAccess.evaluate("region_bramblewake", nil).allowed, true)
+            end,
+        },
     },
 }

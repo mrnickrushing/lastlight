@@ -72,6 +72,19 @@ function RegionAccess.chapterReached(story: any, regionId: any): boolean
     return chapterComplete(story, (chapter :: any).requires)
 end
 
+--[[
+    Readiness is the server's business (the builders live there), so the
+    shared layer takes it as an injected fact rather than reaching for a
+    server module it cannot see. Absent, every enabled region is treated
+    as walkable, which is the behavior this module had before readiness
+    existed.
+]]
+local readinessProvider: ((string) -> boolean)? = nil
+
+function RegionAccess.setReadinessProvider(provider: ((string) -> boolean)?)
+    readinessProvider = provider
+end
+
 function RegionAccess.evaluate(regionId: any, story: any): Verdict
     local region = if type(regionId) == "string" then REGIONS_BY_ID[regionId] else nil
     if region == nil then
@@ -88,6 +101,12 @@ function RegionAccess.evaluate(regionId: any, story: any): Verdict
     end
     if not RegionAccess.chapterReached(story, regionId) then
         return { allowed = false, reason = "chapter_not_reached" }
+    end
+    -- A region whose builder cannot yet draw a walkable world is refused
+    -- even if somebody flips its enabled flag: the flag says "we mean to
+    -- ship this", readiness says "a party would find something there".
+    if readinessProvider ~= nil and not readinessProvider(regionId :: string) then
+        return { allowed = false, reason = "region_not_walkable" }
     end
     return { allowed = true, reason = "open" }
 end
