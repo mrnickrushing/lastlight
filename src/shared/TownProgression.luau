@@ -159,7 +159,13 @@ local function residentIds(tier: number, story: any): { string }
     if tier < 1 then
         return {}
     end
-    return ResidentRoster.idsForChapter(reachedChapter(story))
+    -- The finale's ending decides one resident: Orin is in town or he is
+    -- still below, depending on what was done with the light.
+    local finale = if type(story) == "table" then story.finale else nil
+    local ending = if type(finale) == "table" and finale.status == "complete"
+        then finale.ending
+        else nil
+    return ResidentRoster.idsForChapter(reachedChapter(story), ending)
 end
 
 function TownProgression.resolve(profile: any): Consequence
