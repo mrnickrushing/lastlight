@@ -172,5 +172,92 @@ return {
                 end
             end,
         },
+        {
+            --[[
+                Every new encounter needs somewhere to happen, and the
+                arena has to belong to the region whose catalog can
+                actually place it. An arena filed under the wrong region
+                is a fight that never loads; an encounter with no arena is
+                a fight with nowhere to stand.
+            ]]
+            name = "every new encounter has an arena in its own region",
+            run = function()
+                local registrySource = fs.readFile("src/server/World/RegionBuilders.luau")
+                local expected = {
+                    { id = "elite_foreman_echo", regionId = "region_ironroot" },
+                    { id = "elite_iron_widow", regionId = "region_ironroot" },
+                    { id = "boss_bellows_maw", regionId = "region_ironroot" },
+                    { id = "elite_many_face", regionId = "region_mireglass" },
+                    { id = "elite_drowned_caller", regionId = "region_mireglass" },
+                    { id = "boss_lantern_witch", regionId = "region_mireglass" },
+                }
+                for _, entry in expected do
+                    local slice =
+                        string.match(registrySource, entry.id .. " = table%.freeze%({(.-)%}%)")
+                    TestRunner.truthy(slice ~= nil, entry.id .. " has no arena")
+                    TestRunner.truthy(
+                        string.find(slice or "", entry.regionId, 1, true) ~= nil,
+                        entry.id .. " has an arena in the wrong region"
+                    )
+                    local radius = tonumber(string.match(slice or "", "radius = (%d+)"))
+                    -- big enough that a fight can be walked, small enough
+                    -- that a telegraph still reaches the far side
+                    TestRunner.truthy(
+                        radius ~= nil and radius >= 24 and radius <= 44,
+                        entry.id .. " has an unusable arena radius"
+                    )
+                end
+            end,
+        },
+        {
+            --[[
+                The arena builds its interaction anchors from the
+                encounter's own id list, so those lists are what keep the
+                world and the fight in agreement. Each must be non-empty
+                and free of duplicates, or two of a fight's steps land on
+                the same anchor and one of them can never be done.
+            ]]
+            name = "each encounter's interaction ids can each get their own anchor",
+            run = function()
+                local ForemanEcho = require("../../src/shared/ForemanEchoEncounter")
+                local IronWidow = require("../../src/shared/IronWidowEncounter")
+                local BellowsMaw = require("../../src/shared/BellowsMawEncounter")
+                local ManyFace = require("../../src/shared/ManyFaceEncounter")
+                local DrownedCaller = require("../../src/shared/DrownedCallerEncounter")
+                local LanternWitch = require("../../src/shared/LanternWitchEncounter")
+
+                local lists = {
+                    { label = "foreman levers", ids = ForemanEcho.LeverIds },
+                    { label = "widow anchors", ids = IronWidow.AnchorIds },
+                    { label = "caller pools", ids = DrownedCaller.PoolIds },
+                    { label = "witch copies", ids = LanternWitch.CopyIds },
+                }
+                for _, entry in lists do
+                    local seen: { [string]: boolean } = {}
+                    local count = 0
+                    for _, id in entry.ids do
+                        TestRunner.equal(seen[id], nil, entry.label .. " repeats " .. tostring(id))
+                        seen[id] = true
+                        count += 1
+                    end
+                    TestRunner.truthy(count >= 3, entry.label .. " has too few to space out")
+                end
+
+                -- keyed sets rather than arrays, counted the same way
+                for _, entry in
+                    {
+                        { label = "maw lines", ids = BellowsMaw.LineIds },
+                        { label = "maw vents", ids = BellowsMaw.VentIds },
+                        { label = "many-face mirrors", ids = ManyFace.MirrorIds },
+                    }
+                do
+                    local count = 0
+                    for _ in entry.ids do
+                        count += 1
+                    end
+                    TestRunner.truthy(count >= 2, entry.label .. " has too few to space out")
+                end
+            end,
+        },
     },
 }
