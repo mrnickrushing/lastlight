@@ -138,6 +138,9 @@ return {
                 TestRunner.equal(#ResidentRoster.list(), 27)
                 TestRunner.equal(#ChapterCatalog.list(), 7)
                 TestRunner.equal(#HollowFinale.Scenes, 5)
+                -- the archive: Bramblewake's ten, plus two per later region
+                local MemoryFragments = require("../../src/shared/MemoryFragments")
+                TestRunner.equal(MemoryFragments.Count, 20)
                 TestRunner.equal(#HollowFinale.Endings, 3)
 
                 -- six enemies per surface region, and none for the finale,

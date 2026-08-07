@@ -29,9 +29,74 @@ return {
                     TestRunner.equal(#fragment.title > 0, true)
                     TestRunner.equal(#fragment.foundAt > 0, true)
                     TestRunner.equal(#fragment.body > 80, true)
-                    TestRunner.equal(fragment.act >= 1 and fragment.act <= 3, true)
+                    -- Acts one to three are Bramblewake's story; act four
+                    -- is the archive reaching past it, two per region.
+                    TestRunner.equal(fragment.act >= 1 and fragment.act <= 4, true)
+                    TestRunner.truthy(
+                        type(fragment.regionId) == "string",
+                        fragment.id .. " belongs to no region"
+                    )
                 end
                 TestRunner.equal(MemoryFragments.Count, #MemoryFragments.List)
+            end,
+        },
+        {
+            --[[
+                Every region's fragments have to be anchored to points of
+                interest that region can actually place, or the archive
+                names a place a player can never stand in. The anchors are
+                checked against the catalogs rather than against a list
+                here, because a POI renamed in its own file is exactly how
+                this breaks.
+            ]]
+            name = "every fragment is anchored somewhere its region can place",
+            run = function()
+                local ExpeditionGenerator = require("../../src/shared/ExpeditionGenerator")
+                local perRegion: { [string]: number } = {}
+                for _, fragment in MemoryFragments.List do
+                    local regionId = fragment.regionId :: string
+                    perRegion[regionId] = (perRegion[regionId] or 0) + 1
+                    local kind, key = string.match(fragment.anchorKey, "^(%a+):(.+)$")
+                    TestRunner.truthy(
+                        kind ~= nil,
+                        fragment.id .. " has an unreadable anchor: " .. fragment.anchorKey
+                    )
+                    if kind == "poi" then
+                        local catalog = ExpeditionGenerator.catalogFor(regionId)
+                        TestRunner.truthy(catalog ~= nil, regionId .. " has no catalog")
+                        local found = false
+                        for _, poi in (catalog :: any).PointsOfInterest do
+                            if poi.id == key then
+                                found = true
+                                break
+                            end
+                        end
+                        TestRunner.truthy(
+                            found,
+                            fragment.id
+                                .. " anchors to a point of interest "
+                                .. regionId
+                                .. " cannot place: "
+                                .. tostring(key)
+                        )
+                    end
+                end
+                -- one per surface region minimum, which is the gate
+                for _, regionId in
+                    {
+                        "region_bramblewake",
+                        "region_ironroot",
+                        "region_mireglass",
+                        "region_tempest",
+                        "region_frostmere",
+                        "region_cinderfall",
+                    }
+                do
+                    TestRunner.truthy(
+                        (perRegion[regionId] or 0) >= 1,
+                        regionId .. " has nothing in the archive"
+                    )
+                end
             end,
         },
         {
