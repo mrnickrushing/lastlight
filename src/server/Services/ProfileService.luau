@@ -536,6 +536,38 @@ function ProfileService.spendMaterials(self: ProfileService, player: Player, cos
     return result
 end
 
+--[[
+    Field repair: the most-worn item, no material cost. Used by a carried
+    item rather than a bench, so it works where a bench cannot.
+]]
+function ProfileService.fieldRepairGear(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { applied = false, reason = "profile_loading" }
+    end
+    if not self:isWritable(player) then
+        return { applied = false, reason = "profile_read_only" }
+    end
+    local nextProfile, result = self._saveSchema.withFieldRepair(profile, os.time())
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent and self._writable[player] == true then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
+function ProfileService.hasWornGear(self: ProfileService, player: Player): boolean
+    local wear = self:gearWearOf(player)
+    for _, points in wear do
+        if (tonumber(points) or 0) > 0 then
+            return true
+        end
+    end
+    return false
+end
+
 function ProfileService.gearWearOf(self: ProfileService, player: Player): any
     local profile = self._profiles[player]
     return if profile ~= nil then (profile :: any).gearWear or {} else {}

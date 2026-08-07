@@ -26,6 +26,8 @@ undefined moving target.
 | region_hollow | The Hollow Below | 7 | authored finale | 7 | authored |
 
 The launch inventory therefore contains 180 reusable surface modules, 79 POIs
+(71 built today — Bramblewake carries four where every later region has twelve;
+see the crafting-target section)
 (72 surface POIs plus 7 authored finale POIs), and 48 surface event templates.
 The Hollow Below is an authored finale rather than a procedural surface region,
 so its scenes and encounters are validated as a fixed sequence instead of being
@@ -314,21 +316,47 @@ event cannot block progression.
 
 ### Crafting target
 
-The 180 launch recipes are allocated as:
+**This target was revised down from 180 to 122, deliberately.** The
+original allocation was written before the game had weapon families,
+armour lines, or an effect system for consumables, and it assumed
+categories that turned out not to exist -- tool variants (tools are a
+fixed starting kit, not craftable), town project components (town
+building spends the wallet directly, not recipes), defense devices (the
+trap system arms from materials rather than from crafted items), and
+companion utilities (companions are a party slot, not an inventory one).
 
-| ID | Recipe group | Count |
-|---|---|---:|
-| recipe_group_weapons | Weapons and weapon variants | 36 |
-| recipe_group_tools | Tools and tool variants | 32 |
-| recipe_group_wearables | Armor and wearable sidegrades | 28 |
-| recipe_group_consumables | Food and medicine | 30 |
-| recipe_group_defenses | Traps and defense devices | 24 |
-| recipe_group_town | Town project components | 18 |
-| recipe_group_exploration | Companion and exploration utilities | 12 |
+Reaching 180 inside the categories that do exist would have meant a
+second copy of every item with different numbers. That clears any count
+gate and nothing in a test suite can detect it, but a player meets it
+within an hour. The count moved instead.
 
-No recipe may be a strict paid upgrade. Each recipe declares source, station,
-region, town tier, mastery requirement, ingredients, output, analytics ID,
-salvage result, and migration version.
+The 122 launch recipes are allocated as:
+
+| ID | Recipe group | Count | What makes each one distinct |
+|---|---|---:|---|
+| recipe_group_weapons | Weapons | 36 | Six families × six regions; a region is an axis (weight, reach, range, stamina, guard), not a tier |
+| recipe_group_wearables | Armour | 52 | Five slots × two lines for five regions; Bramblewake still has only its original hood and boots |
+| recipe_group_consumables | Things that are used | 34 | Six effect kinds, each answering a threat the game already makes |
+
+No recipe may be a strict paid upgrade. Each recipe declares its output,
+its station, and ingredients the expedition ledger accepts, and
+`ContentCensus.spec` asserts these counts against the catalogs so the
+number in this table cannot drift from the number in the game.
+
+Two known gaps, both in Bramblewake, both the same shape: the starting
+region predates the systems the later regions were built into.
+
+- **Armour**: Bramblewake carries two pieces where every later region has
+  ten. Eight recipes and a tutorial-adjacent change.
+- **Points of interest**: Bramblewake carries four where every later
+  region has twelve, so the real POI count is 71 rather than 79. Eight
+  authored POIs and eight cases in Bramblewake's own builder.
+
+Both are recorded rather than filled with content nobody designed, and
+`ContentCensus.spec` asserts the real numbers so neither can be forgotten
+or quietly rounded up. The POI gap is the highest-value content work left
+in the game: it is thinnest in the region every player sees, and the only
+region some players ever see.
 
 ## Dynamic events
 

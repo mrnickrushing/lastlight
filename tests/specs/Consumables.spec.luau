@@ -7,8 +7,11 @@ local ExpeditionInventory = require("../../src/shared/ExpeditionInventory")
 local TestRunner = require("../TestRunner")
 
 local KNOWN_REQUIREMENTS = table.freeze({
-    stamina_not_full = true,
+    gear_worn = true,
+    lantern_not_full = true,
     someone_hurt_nearby = true,
+    stamina_not_full = true,
+    status_active = true,
 })
 
 return {
@@ -131,6 +134,86 @@ return {
                         definition.id .. " is both equipment and a consumable"
                     )
                 end
+            end,
+        },
+        {
+            --[[
+                The reason the catalog grew: this game makes threats it
+                gave a player no way to answer. The spark thieves take the
+                lantern, the drowsy strikers take your footing, and gear
+                wears out a long way from the only bench that could fix
+                it. Every effect kind past the first three exists because
+                of one of those, and this is the check that a new kind
+                cannot be added without something in the game it answers.
+            ]]
+            name = "every effect kind answers something the game actually does",
+            run = function()
+                local perKind: { [string]: number } = {}
+                for _, definition in Consumables.list() do
+                    perKind[definition.effect.kind] = (perKind[definition.effect.kind] or 0) + 1
+                end
+                for _, kind in Consumables.EffectKinds do
+                    TestRunner.truthy(
+                        (perKind[kind] or 0) > 0,
+                        kind .. " is an effect nothing in the catalog uses"
+                    )
+                end
+                -- the three answers are carried out of every region, so a
+                -- player is never stuck with a threat they cannot answer
+                -- because they have not reached the one place that sells it
+                for _, kind in { "restore_lantern", "cure_status", "repair_gear" } do
+                    TestRunner.truthy(
+                        (perKind[kind] or 0) >= 6,
+                        kind .. " is not craftable in every region"
+                    )
+                end
+
+                -- the lantern answer scales, because a later night takes
+                -- more off the lantern than an early one
+                local first, last = 0, 0
+                for _, definition in Consumables.list() do
+                    if definition.effect.kind == "restore_lantern" then
+                        if first == 0 then
+                            first = definition.effect.amount
+                        end
+                        last = definition.effect.amount
+                    end
+                end
+                TestRunner.truthy(last > first, "lantern oil does not deepen with the regions")
+                -- and it can never restore more than a night's whole lantern
+                TestRunner.truthy(last <= 40, "lantern oil is worth more than a night")
+            end,
+        },
+        {
+            --[[
+                A cure that also strips the shield a player just put up
+                would be worse than the condition in the exact moment it is
+                reached for. This pins that clearing an affliction leaves
+                what a player did to themselves alone.
+            ]]
+            name = "a cure clears what was done to you and leaves your own shield",
+            run = function()
+                local StatusEffectState = require("../../src/shared/StatusEffectState")
+                local state = StatusEffectState.create()
+                state = StatusEffectState.applyDrowsy(state, 100, 8, 0.7)
+                state = StatusEffectState.applyRooted(state, 100, 3, 0)
+                state = StatusEffectState.applyShield(state, 100, 5, 0.5)
+                TestRunner.equal(StatusEffectState.afflicted(state, 101), true)
+
+                local cleared, had = StatusEffectState.clearAfflictions(state)
+                TestRunner.equal(had, true)
+                TestRunner.equal(StatusEffectState.afflicted(cleared, 101), false)
+                local snapshot = StatusEffectState.snapshot(cleared, 101)
+                TestRunner.equal(snapshot.drowsy, false)
+                TestRunner.equal(snapshot.rooted, false)
+                TestRunner.equal(snapshot.shielded, true, "the cure took the player's own shield")
+
+                -- and a player with nothing on them is not afflicted, so
+                -- the item is refused rather than wasted
+                local clean = StatusEffectState.create()
+                TestRunner.equal(StatusEffectState.afflicted(clean, 101), false)
+                local _, nothing = StatusEffectState.clearAfflictions(clean)
+                TestRunner.equal(nothing, false)
             end,
         },
         {

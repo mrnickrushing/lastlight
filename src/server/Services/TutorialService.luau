@@ -1440,6 +1440,27 @@ function TutorialService._useGear(self: TutorialService, player: Player, itemId:
             self:_publish(player)
             return
         end
+    elseif requires == "lantern_not_full" then
+        if self._enemyService:lanternFull() then
+            self._analyticsService:usedGear(player, itemId, false, "lantern_full")
+            self:_setToast(player, definition.refusedMessage or "THE LANTERN IS ALREADY FULL")
+            self:_publish(player)
+            return
+        end
+    elseif requires == "status_active" then
+        if not self._combatService:isAfflicted(player) then
+            self._analyticsService:usedGear(player, itemId, false, "nothing_to_clear")
+            self:_setToast(player, definition.refusedMessage or "NOTHING IS ON YOU")
+            self:_publish(player)
+            return
+        end
+    elseif requires == "gear_worn" then
+        if not self._profileService:hasWornGear(player) then
+            self._analyticsService:usedGear(player, itemId, false, "nothing_worn")
+            self:_setToast(player, definition.refusedMessage or "NOTHING NEEDS MENDING")
+            self:_publish(player)
+            return
+        end
     elseif requires == "someone_hurt_nearby" then
         local canHeal, reason =
             self._survivalService:canHealInRadius(player, definition.effect.radius or 18)
@@ -1464,6 +1485,12 @@ function TutorialService._useGear(self: TutorialService, player: Player, itemId:
         self._combatService:applyShield(player, effect.amount, effect.seconds or 0.6)
     elseif effect.kind == "heal_party" then
         self._survivalService:healInRadius(player, effect.amount, effect.radius or 18)
+    elseif effect.kind == "restore_lantern" then
+        self._enemyService:restoreLanternStrength(effect.amount, "consumable:" .. itemId)
+    elseif effect.kind == "cure_status" then
+        self._combatService:clearAfflictions(player)
+    elseif effect.kind == "repair_gear" then
+        self._profileService:fieldRepairGear(player)
     else
         self._combatService:restoreStamina(player, effect.amount)
     end

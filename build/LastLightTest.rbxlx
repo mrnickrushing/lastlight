@@ -5049,6 +5049,25 @@ local ORDER = table.freeze({
     "gear_kiln_ration",
     "gear_cindersteel_ward",
     "gear_crown_poultice",
+    -- The answers to threats this game already makes
+    "gear_meadow_lantern_oil",
+    "gear_meadow_clearwater",
+    "gear_meadow_mending_kit",
+    "gear_delve_lantern_oil",
+    "gear_delve_clearwater",
+    "gear_delve_mending_kit",
+    "gear_fen_lantern_oil",
+    "gear_fen_clearwater",
+    "gear_fen_mending_kit",
+    "gear_reach_lantern_oil",
+    "gear_reach_clearwater",
+    "gear_reach_mending_kit",
+    "gear_vale_lantern_oil",
+    "gear_vale_clearwater",
+    "gear_vale_mending_kit",
+    "gear_crown_lantern_oil",
+    "gear_crown_clearwater",
+    "gear_crown_mending_kit",
 })
 
 local DEFINITIONS: { [string]: Consumable } = {
@@ -5211,10 +5230,205 @@ local DEFINITIONS: { [string]: Consumable } = {
         refusedMessage = "NOBODY NEAR YOU NEEDS IT",
         successMessage = "CROWN POULTICE — THE PARTY IS PATCHED UP",
     }),
+    gear_meadow_lantern_oil = consumable({
+        id = "gear_meadow_lantern_oil",
+        displayName = "MEADOW LANTERN OIL",
+        shortLabel = "OIL",
+        accent = { 255, 216, 150 },
+        effect = { kind = "restore_lantern", amount = 14 },
+        requires = "lantern_not_full",
+        refusedMessage = "THE LANTERN IS ALREADY FULL",
+        successMessage = "MEADOW LANTERN OIL — THE LIGHT COMES BACK UP",
+    }),
+    gear_meadow_clearwater = consumable({
+        id = "gear_meadow_clearwater",
+        displayName = "MEADOW CLEARWATER",
+        shortLabel = "CLEAR",
+        accent = { 176, 226, 236 },
+        effect = { kind = "cure_status", amount = 1 },
+        requires = "status_active",
+        refusedMessage = "NOTHING IS ON YOU",
+        successMessage = "MEADOW CLEARWATER — YOUR HEAD CLEARS",
+    }),
+    gear_meadow_mending_kit = consumable({
+        id = "gear_meadow_mending_kit",
+        displayName = "MEADOW MENDING KIT",
+        shortLabel = "MEND",
+        accent = { 186, 168, 132 },
+        effect = { kind = "repair_gear", amount = 1 },
+        requires = "gear_worn",
+        refusedMessage = "NOTHING NEEDS MENDING",
+        successMessage = "MEADOW MENDING KIT — THE WORST OF IT IS MENDED",
+    }),
+    gear_delve_lantern_oil = consumable({
+        id = "gear_delve_lantern_oil",
+        displayName = "DELVE LANTERN OIL",
+        shortLabel = "OIL",
+        accent = { 255, 216, 150 },
+        effect = { kind = "restore_lantern", amount = 18 },
+        requires = "lantern_not_full",
+        refusedMessage = "THE LANTERN IS ALREADY FULL",
+        successMessage = "DELVE LANTERN OIL — THE LIGHT COMES BACK UP",
+    }),
+    gear_delve_clearwater = consumable({
+        id = "gear_delve_clearwater",
+        displayName = "DELVE CLEARWATER",
+        shortLabel = "CLEAR",
+        accent = { 176, 226, 236 },
+        effect = { kind = "cure_status", amount = 1 },
+        requires = "status_active",
+        refusedMessage = "NOTHING IS ON YOU",
+        successMessage = "DELVE CLEARWATER — YOUR HEAD CLEARS",
+    }),
+    gear_delve_mending_kit = consumable({
+        id = "gear_delve_mending_kit",
+        displayName = "DELVE MENDING KIT",
+        shortLabel = "MEND",
+        accent = { 186, 168, 132 },
+        effect = { kind = "repair_gear", amount = 1 },
+        requires = "gear_worn",
+        refusedMessage = "NOTHING NEEDS MENDING",
+        successMessage = "DELVE MENDING KIT — THE WORST OF IT IS MENDED",
+    }),
+    gear_fen_lantern_oil = consumable({
+        id = "gear_fen_lantern_oil",
+        displayName = "FEN LANTERN OIL",
+        shortLabel = "OIL",
+        accent = { 255, 216, 150 },
+        effect = { kind = "restore_lantern", amount = 22 },
+        requires = "lantern_not_full",
+        refusedMessage = "THE LANTERN IS ALREADY FULL",
+        successMessage = "FEN LANTERN OIL — THE LIGHT COMES BACK UP",
+    }),
+    gear_fen_clearwater = consumable({
+        id = "gear_fen_clearwater",
+        displayName = "FEN CLEARWATER",
+        shortLabel = "CLEAR",
+        accent = { 176, 226, 236 },
+        effect = { kind = "cure_status", amount = 1 },
+        requires = "status_active",
+        refusedMessage = "NOTHING IS ON YOU",
+        successMessage = "FEN CLEARWATER — YOUR HEAD CLEARS",
+    }),
+    gear_fen_mending_kit = consumable({
+        id = "gear_fen_mending_kit",
+        displayName = "FEN MENDING KIT",
+        shortLabel = "MEND",
+        accent = { 186, 168, 132 },
+        effect = { kind = "repair_gear", amount = 1 },
+        requires = "gear_worn",
+        refusedMessage = "NOTHING NEEDS MENDING",
+        successMessage = "FEN MENDING KIT — THE WORST OF IT IS MENDED",
+    }),
+    gear_reach_lantern_oil = consumable({
+        id = "gear_reach_lantern_oil",
+        displayName = "REACH LANTERN OIL",
+        shortLabel = "OIL",
+        accent = { 255, 216, 150 },
+        effect = { kind = "restore_lantern", amount = 26 },
+        requires = "lantern_not_full",
+        refusedMessage = "THE LANTERN IS ALREADY FULL",
+        successMessage = "REACH LANTERN OIL — THE LIGHT COMES BACK UP",
+    }),
+    gear_reach_clearwater = consumable({
+        id = "gear_reach_clearwater",
+        displayName = "REACH CLEARWATER",
+        shortLabel = "CLEAR",
+        accent = { 176, 226, 236 },
+        effect = { kind = "cure_status", amount = 1 },
+        requires = "status_active",
+        refusedMessage = "NOTHING IS ON YOU",
+        successMessage = "REACH CLEARWATER — YOUR HEAD CLEARS",
+    }),
+    gear_reach_mending_kit = consumable({
+        id = "gear_reach_mending_kit",
+        displayName = "REACH MENDING KIT",
+        shortLabel = "MEND",
+        accent = { 186, 168, 132 },
+        effect = { kind = "repair_gear", amount = 1 },
+        requires = "gear_worn",
+        refusedMessage = "NOTHING NEEDS MENDING",
+        successMessage = "REACH MENDING KIT — THE WORST OF IT IS MENDED",
+    }),
+    gear_vale_lantern_oil = consumable({
+        id = "gear_vale_lantern_oil",
+        displayName = "VALE LANTERN OIL",
+        shortLabel = "OIL",
+        accent = { 255, 216, 150 },
+        effect = { kind = "restore_lantern", amount = 30 },
+        requires = "lantern_not_full",
+        refusedMessage = "THE LANTERN IS ALREADY FULL",
+        successMessage = "VALE LANTERN OIL — THE LIGHT COMES BACK UP",
+    }),
+    gear_vale_clearwater = consumable({
+        id = "gear_vale_clearwater",
+        displayName = "VALE CLEARWATER",
+        shortLabel = "CLEAR",
+        accent = { 176, 226, 236 },
+        effect = { kind = "cure_status", amount = 1 },
+        requires = "status_active",
+        refusedMessage = "NOTHING IS ON YOU",
+        successMessage = "VALE CLEARWATER — YOUR HEAD CLEARS",
+    }),
+    gear_vale_mending_kit = consumable({
+        id = "gear_vale_mending_kit",
+        displayName = "VALE MENDING KIT",
+        shortLabel = "MEND",
+        accent = { 186, 168, 132 },
+        effect = { kind = "repair_gear", amount = 1 },
+        requires = "gear_worn",
+        refusedMessage = "NOTHING NEEDS MENDING",
+        successMessage = "VALE MENDING KIT — THE WORST OF IT IS MENDED",
+    }),
+    gear_crown_lantern_oil = consumable({
+        id = "gear_crown_lantern_oil",
+        displayName = "CROWN LANTERN OIL",
+        shortLabel = "OIL",
+        accent = { 255, 216, 150 },
+        effect = { kind = "restore_lantern", amount = 34 },
+        requires = "lantern_not_full",
+        refusedMessage = "THE LANTERN IS ALREADY FULL",
+        successMessage = "CROWN LANTERN OIL — THE LIGHT COMES BACK UP",
+    }),
+    gear_crown_clearwater = consumable({
+        id = "gear_crown_clearwater",
+        displayName = "CROWN CLEARWATER",
+        shortLabel = "CLEAR",
+        accent = { 176, 226, 236 },
+        effect = { kind = "cure_status", amount = 1 },
+        requires = "status_active",
+        refusedMessage = "NOTHING IS ON YOU",
+        successMessage = "CROWN CLEARWATER — YOUR HEAD CLEARS",
+    }),
+    gear_crown_mending_kit = consumable({
+        id = "gear_crown_mending_kit",
+        displayName = "CROWN MENDING KIT",
+        shortLabel = "MEND",
+        accent = { 186, 168, 132 },
+        effect = { kind = "repair_gear", amount = 1 },
+        requires = "gear_worn",
+        refusedMessage = "NOTHING NEEDS MENDING",
+        successMessage = "CROWN MENDING KIT — THE WORST OF IT IS MENDED",
+    }),
 }
 
 Consumables.Order = ORDER
-Consumables.EffectKinds = table.freeze({ "restore_stamina", "shield", "heal_party" })
+--[[
+    Six effect kinds, and every one of them answers something this game
+    already does to a player. Stamina and a shield and a party heal were
+    the first three. The other three exist because the spark thieves take
+    the lantern, the drowsy strikers take your footing, and gear wears out
+    a long way from the only bench that could fix it -- three threats the
+    game had been making with no answer a player could carry.
+]]
+Consumables.EffectKinds = table.freeze({
+    "restore_stamina",
+    "shield",
+    "heal_party",
+    "restore_lantern",
+    "cure_status",
+    "repair_gear",
+})
 
 function Consumables.get(itemId: any): Consumable?
     return if type(itemId) == "string" then DEFINITIONS[itemId] else nil
@@ -11651,6 +11865,24 @@ local ORDER = table.freeze({
     "recipe_kiln_ration",
     "recipe_cindersteel_ward",
     "recipe_crown_poultice",
+    "recipe_meadow_lantern_oil",
+    "recipe_meadow_clearwater",
+    "recipe_meadow_mending_kit",
+    "recipe_delve_lantern_oil",
+    "recipe_delve_clearwater",
+    "recipe_delve_mending_kit",
+    "recipe_fen_lantern_oil",
+    "recipe_fen_clearwater",
+    "recipe_fen_mending_kit",
+    "recipe_reach_lantern_oil",
+    "recipe_reach_clearwater",
+    "recipe_reach_mending_kit",
+    "recipe_vale_lantern_oil",
+    "recipe_vale_clearwater",
+    "recipe_vale_mending_kit",
+    "recipe_crown_lantern_oil",
+    "recipe_crown_clearwater",
+    "recipe_crown_mending_kit",
     "recipe_stope_bow",
     "recipe_drift_maul",
     "recipe_pit_lance",
@@ -12772,6 +13004,186 @@ local DEFINITIONS: { [string]: Recipe } = {
         materials = table.freeze({
             material_ash_silk = 6,
             material_memory_glass = 3,
+        }),
+    }),
+    recipe_meadow_lantern_oil = table.freeze({
+        id = "recipe_meadow_lantern_oil",
+        displayName = "MEADOW LANTERN OIL",
+        outputItemId = "gear_meadow_lantern_oil",
+        outputDisplayName = "Meadow Lantern Oil",
+        materials = table.freeze({
+            material_amber_sap = 4,
+            material_brightcap = 3,
+        }),
+    }),
+    recipe_meadow_clearwater = table.freeze({
+        id = "recipe_meadow_clearwater",
+        displayName = "MEADOW CLEARWATER",
+        outputItemId = "gear_meadow_clearwater",
+        outputDisplayName = "Meadow Clearwater",
+        materials = table.freeze({
+            material_brightcap = 4,
+            material_meadow_fiber = 3,
+        }),
+    }),
+    recipe_meadow_mending_kit = table.freeze({
+        id = "recipe_meadow_mending_kit",
+        displayName = "MEADOW MENDING KIT",
+        outputItemId = "gear_meadow_mending_kit",
+        outputDisplayName = "Meadow Mending Kit",
+        materials = table.freeze({
+            material_heartwood = 4,
+            material_meadow_fiber = 4,
+        }),
+    }),
+    recipe_delve_lantern_oil = table.freeze({
+        id = "recipe_delve_lantern_oil",
+        displayName = "DELVE LANTERN OIL",
+        outputItemId = "gear_delve_lantern_oil",
+        outputDisplayName = "Delve Lantern Oil",
+        materials = table.freeze({
+            material_machine_oil = 4,
+            material_coalglass = 3,
+        }),
+    }),
+    recipe_delve_clearwater = table.freeze({
+        id = "recipe_delve_clearwater",
+        displayName = "DELVE CLEARWATER",
+        outputItemId = "gear_delve_clearwater",
+        outputDisplayName = "Delve Clearwater",
+        materials = table.freeze({
+            material_glow_fungus = 4,
+            material_echo_crystal = 2,
+        }),
+    }),
+    recipe_delve_mending_kit = table.freeze({
+        id = "recipe_delve_mending_kit",
+        displayName = "DELVE MENDING KIT",
+        outputItemId = "gear_delve_mending_kit",
+        outputDisplayName = "Delve Mending Kit",
+        materials = table.freeze({
+            material_ironroot_ore = 4,
+            material_machine_oil = 3,
+        }),
+    }),
+    recipe_fen_lantern_oil = table.freeze({
+        id = "recipe_fen_lantern_oil",
+        displayName = "FEN LANTERN OIL",
+        outputItemId = "gear_fen_lantern_oil",
+        outputDisplayName = "Fen Lantern Oil",
+        materials = table.freeze({
+            material_eel_oil = 4,
+            material_witchlight_pollen = 3,
+        }),
+    }),
+    recipe_fen_clearwater = table.freeze({
+        id = "recipe_fen_clearwater",
+        displayName = "FEN CLEARWATER",
+        outputItemId = "gear_fen_clearwater",
+        outputDisplayName = "Fen Clearwater",
+        materials = table.freeze({
+            material_blackwater_herb = 4,
+            material_witchlight_pollen = 2,
+        }),
+    }),
+    recipe_fen_mending_kit = table.freeze({
+        id = "recipe_fen_mending_kit",
+        displayName = "FEN MENDING KIT",
+        outputItemId = "gear_fen_mending_kit",
+        outputDisplayName = "Fen Mending Kit",
+        materials = table.freeze({
+            material_bog_iron = 4,
+            material_mirror_reed = 3,
+        }),
+    }),
+    recipe_reach_lantern_oil = table.freeze({
+        id = "recipe_reach_lantern_oil",
+        displayName = "REACH LANTERN OIL",
+        outputItemId = "gear_reach_lantern_oil",
+        outputDisplayName = "Reach Lantern Oil",
+        materials = table.freeze({
+            material_storm_glass = 4,
+            material_salt_kelp = 3,
+        }),
+    }),
+    recipe_reach_clearwater = table.freeze({
+        id = "recipe_reach_clearwater",
+        displayName = "REACH CLEARWATER",
+        outputItemId = "gear_reach_clearwater",
+        outputDisplayName = "Reach Clearwater",
+        materials = table.freeze({
+            material_salt_kelp = 5,
+            material_amberglass = 2,
+        }),
+    }),
+    recipe_reach_mending_kit = table.freeze({
+        id = "recipe_reach_mending_kit",
+        displayName = "REACH MENDING KIT",
+        outputItemId = "gear_reach_mending_kit",
+        outputDisplayName = "Reach Mending Kit",
+        materials = table.freeze({
+            material_ships_iron = 4,
+            material_rope_fiber = 4,
+        }),
+    }),
+    recipe_vale_lantern_oil = table.freeze({
+        id = "recipe_vale_lantern_oil",
+        displayName = "VALE LANTERN OIL",
+        outputItemId = "gear_vale_lantern_oil",
+        outputDisplayName = "Vale Lantern Oil",
+        materials = table.freeze({
+            material_ember_moss = 4,
+            material_aurora_salt = 3,
+        }),
+    }),
+    recipe_vale_clearwater = table.freeze({
+        id = "recipe_vale_clearwater",
+        displayName = "VALE CLEARWATER",
+        outputItemId = "gear_vale_clearwater",
+        outputDisplayName = "Vale Clearwater",
+        materials = table.freeze({
+            material_aurora_salt = 4,
+            material_frostmere_wool = 3,
+        }),
+    }),
+    recipe_vale_mending_kit = table.freeze({
+        id = "recipe_vale_mending_kit",
+        displayName = "VALE MENDING KIT",
+        outputItemId = "gear_vale_mending_kit",
+        outputDisplayName = "Vale Mending Kit",
+        materials = table.freeze({
+            material_thawed_iron = 4,
+            material_frostmere_wool = 3,
+        }),
+    }),
+    recipe_crown_lantern_oil = table.freeze({
+        id = "recipe_crown_lantern_oil",
+        displayName = "CROWN LANTERN OIL",
+        outputItemId = "gear_crown_lantern_oil",
+        outputDisplayName = "Crown Lantern Oil",
+        materials = table.freeze({
+            material_crown_coal = 4,
+            material_memory_glass = 3,
+        }),
+    }),
+    recipe_crown_clearwater = table.freeze({
+        id = "recipe_crown_clearwater",
+        displayName = "CROWN CLEARWATER",
+        outputItemId = "gear_crown_clearwater",
+        outputDisplayName = "Crown Clearwater",
+        materials = table.freeze({
+            material_memory_glass = 4,
+            material_ash_silk = 3,
+        }),
+    }),
+    recipe_crown_mending_kit = table.freeze({
+        id = "recipe_crown_mending_kit",
+        displayName = "CROWN MENDING KIT",
+        outputItemId = "gear_crown_mending_kit",
+        outputDisplayName = "Crown Mending Kit",
+        materials = table.freeze({
+            material_cindersteel = 4,
+            material_kiln_pearl = 3,
         }),
     }),
 }
@@ -28085,6 +28497,41 @@ function SaveSchema.withRepairedGear(profile: Profile, itemId: any, now: number)
     return nextProfile, result
 end
 
+--[[
+    Repair a worn item in the field, with no material cost.
+
+    Bench repair spends half a recipe's materials, which is right in a
+    town with a wallet open. A field repair is a thing a player crafted
+    and carried, so it has already been paid for -- charging twice would
+    make the item strictly worse than walking home, which is the one place
+    it cannot be used.
+
+    Picks the most-worn item rather than taking a name, because the point
+    of it is being used in a hurry.
+]]
+function SaveSchema.withFieldRepair(profile: Profile, now: number): (Profile, any)
+    local wear = (profile :: any).gearWear or {}
+    local worstId: string? = nil
+    local worstPoints = 0
+    for itemId, points in wear do
+        local amount = tonumber(points) or 0
+        if amount > worstPoints then
+            worstId = itemId
+            worstPoints = amount
+        end
+    end
+    if worstId == nil then
+        return profile, { applied = false, reason = "nothing_worn" }
+    end
+    local nextProfile: any = table.clone(profile)
+    nextProfile.gearWear = table.clone(wear)
+    nextProfile.gearWear[worstId] = nil
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile,
+        { applied = true, itemId = worstId, points = worstPoints, reason = "repaired" }
+end
+
 return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
@@ -28346,6 +28793,31 @@ end
 
 function StatusEffectState.clear(_state: State): State
     return StatusEffectState.create()
+end
+
+--[[
+    Clear what was done to you, and only that.
+
+    A player drinking something to shake off a rooting or a drowsiness
+    must not also lose the shield they just put up -- that would make the
+    cure worse than the condition in exactly the moment it is reached
+    for. So this drops drowsy and rooted and leaves the shield alone,
+    which is the difference between a cure and a reset.
+]]
+function StatusEffectState.clearAfflictions(state: State): (State, boolean)
+    local nextState = table.clone(state)
+    local had = state.drowsyUntil > 0 or state.rootedUntil > 0
+    nextState.drowsyUntil = 0
+    nextState.drowsyMultiplier = 1
+    nextState.rootedUntil = 0
+    nextState.rootedMultiplier = 1
+    return nextState, had
+end
+
+-- Whether anything is currently being done to this player, which is the
+-- precondition a cure has to clear before it is spent.
+function StatusEffectState.afflicted(state: State, now: number): boolean
+    return now < state.drowsyUntil or now < state.rootedUntil
 end
 
 function StatusEffectState.snapshot(state: State, now: number): Snapshot
@@ -35686,6 +36158,9 @@ local TweenService = game:GetService("TweenService")
 
 local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
 
+-- The lantern starts every night here and can never be pushed past it.
+local LANTERN_CEILING = 100
+
 local EnemyService = {}
 EnemyService.__index = EnemyService
 EnemyService.Name = "EnemyService"
@@ -37293,6 +37768,51 @@ end
 function EnemyService.setBreach(self: EnemyService)
     self._breachMultiplier = 1.35
     self:_notify("THE ROOTS SURGE — HOLD THE LIGHT")
+end
+
+--[[
+    Put strength back into the lantern.
+
+    Everything in this game takes from the lantern -- the spark thieves
+    steal it outright, the nights grind it down, the last stand spends it
+    -- and until now nothing a player could carry put any back. The
+    ceiling is the same 100 the night starts at, so this is a way to
+    recover a bad night rather than a way to bank a good one, and it does
+    nothing outside a night for the same reason pressure does.
+]]
+function EnemyService.restoreLanternStrength(
+    self: EnemyService,
+    amount: number,
+    source: string
+): any
+    if not self._nightActive then
+        return { applied = false, health = self._lanternHealth, reason = "night_inactive" }
+    end
+    if amount ~= amount or amount <= 0 or amount ~= math.floor(amount) then
+        return { applied = false, health = self._lanternHealth, reason = "invalid_amount" }
+    end
+    if self._lanternHealth >= LANTERN_CEILING then
+        return { applied = false, health = self._lanternHealth, reason = "lantern_full" }
+    end
+    local bounded = math.clamp(amount, 1, 40)
+    local previous = self._lanternHealth
+    self._lanternHealth = math.min(LANTERN_CEILING, self._lanternHealth + bounded)
+    local restored = self._lanternHealth - previous
+    self._logger:info("lantern_restored", {
+        health = self._lanternHealth,
+        restored = restored,
+        source = source,
+    })
+    return {
+        applied = restored > 0,
+        health = self._lanternHealth,
+        restored = restored,
+        reason = "restored",
+    }
+end
+
+function EnemyService.lanternFull(self: EnemyService): boolean
+    return self._lanternHealth >= LANTERN_CEILING
 end
 
 function EnemyService.lanternHealth(self: EnemyService): number
@@ -40825,6 +41345,39 @@ end
 -- value and only later calls restoreStamina can see stamina go from
 -- "not full" to "full" in that gap — this advances (without persisting)
 -- so a precondition check sees exactly what restoreStamina is about to see.
+--[[
+    Shake off whatever is being done to this player. Returns whether
+    anything was actually cleared, so a caller can refuse to spend an item
+    on a player who is fine -- the same rule stamina restoration has had
+    since it shipped.
+]]
+function PlayerCombatService.clearAfflictions(self: PlayerCombatService, player: Player): any
+    local statusState = self._statusStates[player]
+    if statusState == nil then
+        return { applied = false, reason = "no_state" }
+    end
+    local now = workspace:GetServerTimeNow()
+    if not self._statusEffectState.afflicted(statusState, now) then
+        return { applied = false, reason = "nothing_to_clear" }
+    end
+    local nextStatus, had = self._statusEffectState.clearAfflictions(statusState)
+    self._statusStates[player] = nextStatus
+    self:_syncPlayer(player)
+    return { applied = had, reason = if had then "cleared" else "nothing_to_clear" }
+end
+
+--[[
+    Whether anything is being done to this player right now. Read before
+    the item is spent.
+]]
+function PlayerCombatService.isAfflicted(self: PlayerCombatService, player: Player): boolean
+    local statusState = self._statusStates[player]
+    if statusState == nil then
+        return false
+    end
+    return self._statusEffectState.afflicted(statusState, workspace:GetServerTimeNow())
+end
+
 function PlayerCombatService.peekStamina(self: PlayerCombatService, player: Player): number?
     local state = self._states[player]
     if state == nil then
@@ -43320,6 +43873,38 @@ function ProfileService.spendMaterials(self: ProfileService, player: Player, cos
         end
     end
     return result
+end
+
+--[[
+    Field repair: the most-worn item, no material cost. Used by a carried
+    item rather than a bench, so it works where a bench cannot.
+]]
+function ProfileService.fieldRepairGear(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { applied = false, reason = "profile_loading" }
+    end
+    if not self:isWritable(player) then
+        return { applied = false, reason = "profile_read_only" }
+    end
+    local nextProfile, result = self._saveSchema.withFieldRepair(profile, os.time())
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent and self._writable[player] == true then
+            self._dirty[player] = true
+        end
+    end
+    return result
+end
+
+function ProfileService.hasWornGear(self: ProfileService, player: Player): boolean
+    local wear = self:gearWearOf(player)
+    for _, points in wear do
+        if (tonumber(points) or 0) > 0 then
+            return true
+        end
+    end
+    return false
 end
 
 function ProfileService.gearWearOf(self: ProfileService, player: Player): any
@@ -46937,6 +47522,27 @@ function TutorialService._useGear(self: TutorialService, player: Player, itemId:
             self:_publish(player)
             return
         end
+    elseif requires == "lantern_not_full" then
+        if self._enemyService:lanternFull() then
+            self._analyticsService:usedGear(player, itemId, false, "lantern_full")
+            self:_setToast(player, definition.refusedMessage or "THE LANTERN IS ALREADY FULL")
+            self:_publish(player)
+            return
+        end
+    elseif requires == "status_active" then
+        if not self._combatService:isAfflicted(player) then
+            self._analyticsService:usedGear(player, itemId, false, "nothing_to_clear")
+            self:_setToast(player, definition.refusedMessage or "NOTHING IS ON YOU")
+            self:_publish(player)
+            return
+        end
+    elseif requires == "gear_worn" then
+        if not self._profileService:hasWornGear(player) then
+            self._analyticsService:usedGear(player, itemId, false, "nothing_worn")
+            self:_setToast(player, definition.refusedMessage or "NOTHING NEEDS MENDING")
+            self:_publish(player)
+            return
+        end
     elseif requires == "someone_hurt_nearby" then
         local canHeal, reason =
             self._survivalService:canHealInRadius(player, definition.effect.radius or 18)
@@ -46961,6 +47567,12 @@ function TutorialService._useGear(self: TutorialService, player: Player, itemId:
         self._combatService:applyShield(player, effect.amount, effect.seconds or 0.6)
     elseif effect.kind == "heal_party" then
         self._survivalService:healInRadius(player, effect.amount, effect.radius or 18)
+    elseif effect.kind == "restore_lantern" then
+        self._enemyService:restoreLanternStrength(effect.amount, "consumable:" .. itemId)
+    elseif effect.kind == "cure_status" then
+        self._combatService:clearAfflictions(player)
+    elseif effect.kind == "repair_gear" then
+        self._profileService:fieldRepairGear(player)
     else
         self._combatService:restoreStamina(player, effect.amount)
     end

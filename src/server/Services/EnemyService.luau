@@ -6,6 +6,9 @@ local TweenService = game:GetService("TweenService")
 
 local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
 
+-- The lantern starts every night here and can never be pushed past it.
+local LANTERN_CEILING = 100
+
 local EnemyService = {}
 EnemyService.__index = EnemyService
 EnemyService.Name = "EnemyService"
@@ -1613,6 +1616,51 @@ end
 function EnemyService.setBreach(self: EnemyService)
     self._breachMultiplier = 1.35
     self:_notify("THE ROOTS SURGE — HOLD THE LIGHT")
+end
+
+--[[
+    Put strength back into the lantern.
+
+    Everything in this game takes from the lantern -- the spark thieves
+    steal it outright, the nights grind it down, the last stand spends it
+    -- and until now nothing a player could carry put any back. The
+    ceiling is the same 100 the night starts at, so this is a way to
+    recover a bad night rather than a way to bank a good one, and it does
+    nothing outside a night for the same reason pressure does.
+]]
+function EnemyService.restoreLanternStrength(
+    self: EnemyService,
+    amount: number,
+    source: string
+): any
+    if not self._nightActive then
+        return { applied = false, health = self._lanternHealth, reason = "night_inactive" }
+    end
+    if amount ~= amount or amount <= 0 or amount ~= math.floor(amount) then
+        return { applied = false, health = self._lanternHealth, reason = "invalid_amount" }
+    end
+    if self._lanternHealth >= LANTERN_CEILING then
+        return { applied = false, health = self._lanternHealth, reason = "lantern_full" }
+    end
+    local bounded = math.clamp(amount, 1, 40)
+    local previous = self._lanternHealth
+    self._lanternHealth = math.min(LANTERN_CEILING, self._lanternHealth + bounded)
+    local restored = self._lanternHealth - previous
+    self._logger:info("lantern_restored", {
+        health = self._lanternHealth,
+        restored = restored,
+        source = source,
+    })
+    return {
+        applied = restored > 0,
+        health = self._lanternHealth,
+        restored = restored,
+        reason = "restored",
+    }
+end
+
+function EnemyService.lanternFull(self: EnemyService): boolean
+    return self._lanternHealth >= LANTERN_CEILING
 end
 
 function EnemyService.lanternHealth(self: EnemyService): number

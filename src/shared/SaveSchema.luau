@@ -1432,4 +1432,39 @@ function SaveSchema.withRepairedGear(profile: Profile, itemId: any, now: number)
     return nextProfile, result
 end
 
+--[[
+    Repair a worn item in the field, with no material cost.
+
+    Bench repair spends half a recipe's materials, which is right in a
+    town with a wallet open. A field repair is a thing a player crafted
+    and carried, so it has already been paid for -- charging twice would
+    make the item strictly worse than walking home, which is the one place
+    it cannot be used.
+
+    Picks the most-worn item rather than taking a name, because the point
+    of it is being used in a hurry.
+]]
+function SaveSchema.withFieldRepair(profile: Profile, now: number): (Profile, any)
+    local wear = (profile :: any).gearWear or {}
+    local worstId: string? = nil
+    local worstPoints = 0
+    for itemId, points in wear do
+        local amount = tonumber(points) or 0
+        if amount > worstPoints then
+            worstId = itemId
+            worstPoints = amount
+        end
+    end
+    if worstId == nil then
+        return profile, { applied = false, reason = "nothing_worn" }
+    end
+    local nextProfile: any = table.clone(profile)
+    nextProfile.gearWear = table.clone(wear)
+    nextProfile.gearWear[worstId] = nil
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile,
+        { applied = true, itemId = worstId, points = worstPoints, reason = "repaired" }
+end
+
 return table.freeze(SaveSchema)
