@@ -33738,6 +33738,7 @@ local ProfessionRescue = require(root.ProfessionRescue)
 local ProfessionState = require(root.ProfessionState)
 local RateLimiter = require(root.RateLimiter)
 local ResidentDialogue = require(root.ResidentDialogue)
+local ResidentRoster = require(root.ResidentRoster)
 local ReviveFlow = require(root.ReviveFlow)
 local RuntimeIds = require(root.RuntimeIds)
 local SaveSchema = require(root.SaveSchema)
@@ -33822,7 +33823,10 @@ local worldService = WorldService.new(
     ProfessionAbilityVisuals,
     TownConstruction,
     MemoryFragments,
-    TownDecorations
+    TownDecorations,
+    CraftingCatalog,
+    Consumables,
+    ResidentRoster
 )
 --[[
     The third gate on a region, after its enabled flag and its chapter:
@@ -51809,7 +51813,10 @@ function WorldService.new(
     professionAbilityVisuals: any,
     townConstruction: any,
     memoryFragments: any,
-    townDecorations: any
+    townDecorations: any,
+    craftingCatalog: any,
+    consumables: any,
+    residentRoster: any
 ): WorldService
     return setmetatable({
         Name = WorldService.Name,
@@ -51819,6 +51826,9 @@ function WorldService.new(
         _professionAbilityVisuals = professionAbilityVisuals,
         _memoryFragments = memoryFragments,
         _memoryFragmentTargets = {},
+        _craftingCatalog = craftingCatalog,
+        _consumables = consumables,
+        _residentRoster = residentRoster,
         _runtimeIds = nil,
         _world = nil,
         _interactions = {},
@@ -56032,7 +56042,56 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             color = Color3.fromRGB(112, 151, 119),
         },
     }
+    --[[
+        Every other recipe gets a bench too.
+
+        The ten above are authored: bespoke marker shapes, sizes and
+        materials, because they are the ten a player meets first and they
+        should look like the things they make. They were also, for one
+        milestone, the *only* benches -- the list was written when there
+        were ten recipes and did not grow with the catalog, so a hundred
+        and twenty recipes shipped that nobody could craft. Every spec
+        passed; a recipe existing and a recipe being reachable are
+        different facts, and only walking to the workshop found it.
+
+        So the rest are derived rather than authored: same bench, same
+        prompt, a marker coloured from what the recipe makes -- a
+        consumable's own accent, or amber for gear -- laid out in rows
+        behind the front one. The interaction id is derived too
+        (`craft:<recipeId>`), which is what stops this list from ever
+        needing a hand-written constant again.
+    ]]
+    local authored: { [string]: boolean } = {}
     for _, definition in craftingBenches do
+        authored[definition.recipeId] = true
+    end
+    local derivedIndex = 0
+    for _, recipe in self._craftingCatalog:list() do
+        if not authored[recipe.id] then
+            local column = derivedIndex % 13
+            local row = math.floor(derivedIndex / 13)
+            derivedIndex += 1
+            local consumable = self._consumables.get(recipe.outputItemId)
+            local accent = if consumable ~= nil
+                then Color3.fromRGB(
+                    consumable.accent[1],
+                    consumable.accent[2],
+                    consumable.accent[3]
+                )
+                else Color3.fromRGB(214, 172, 88)
+            table.insert(craftingBenches, {
+                color = accent,
+                id = "craft:" .. recipe.id,
+                label = recipe.displayName,
+                recipeId = recipe.id,
+                x = -72 + column * 12,
+                z = workshopZ + 14 + row * 13,
+            })
+        end
+    end
+
+    for _, definition in craftingBenches do
+        local benchZ = definition.z or workshopZ
         local display = Instance.new("Model")
         display.Name = "CraftingDisplay_" .. definition.recipeId
         display:SetAttribute("RecipeId", definition.recipeId)
@@ -56042,7 +56101,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             display,
             "CraftingBench_" .. definition.recipeId,
             Vector3.new(6, 2.6, 6),
-            CFrame.new(definition.x, 1.3, workshopZ),
+            CFrame.new(definition.x, 1.3, benchZ),
             Color3.fromRGB(66, 70, 65),
             Enum.Material.Slate
         )
@@ -56053,7 +56112,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             display,
             "CraftingTableTop",
             Vector3.new(6.4, 0.55, 4.8),
-            CFrame.new(definition.x, 3.15, workshopZ),
+            CFrame.new(definition.x, 3.15, benchZ),
             Color3.fromRGB(91, 64, 44),
             Enum.Material.WoodPlanks
         )
@@ -56063,7 +56122,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                     display,
                     "CraftingTableLeg",
                     Vector3.new(0.55, 3.15, 0.55),
-                    CFrame.new(definition.x + side * 2.65, 1.57, workshopZ + depth * 1.85)
+                    CFrame.new(definition.x + side * 2.65, 1.57, benchZ + depth * 1.85)
                         * CFrame.Angles(0, 0, math.rad(side * 3)),
                     WET_BARK,
                     Enum.Material.Wood
@@ -56074,7 +56133,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             display,
             "CraftingWorkbenchApron",
             Vector3.new(5.4, 0.75, 0.42),
-            CFrame.new(definition.x, 2.55, workshopZ + 2.18),
+            CFrame.new(definition.x, 2.55, benchZ + 2.18),
             Color3.fromRGB(68, 48, 36),
             Enum.Material.Wood,
             false
@@ -56083,7 +56142,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             display,
             "CraftingBenchGlow",
             Vector3.new(2, 3.4, 2),
-            CFrame.new(definition.x, 4.3, workshopZ),
+            CFrame.new(definition.x, 4.3, benchZ),
             definition.color,
             Enum.Material.Neon,
             false
@@ -56111,7 +56170,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "SatchelFlap",
                 Vector3.new(2.35, 0.32, 1.1),
-                CFrame.new(definition.x, 4.72, workshopZ + 0.36) * CFrame.Angles(math.rad(18), 0, 0),
+                CFrame.new(definition.x, 4.72, benchZ + 0.36) * CFrame.Angles(math.rad(18), 0, 0),
                 Color3.fromRGB(103, 128, 84),
                 Enum.Material.Fabric,
                 false
@@ -56121,7 +56180,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                     display,
                     "SatchelStrap",
                     Vector3.new(0.22, 2.4, 0.22),
-                    CFrame.new(definition.x + strapSide * 1.05, 4.65, workshopZ - 0.2)
+                    CFrame.new(definition.x + strapSide * 1.05, 4.65, benchZ - 0.2)
                         * CFrame.Angles(0, 0, math.rad(strapSide * 24)),
                     Color3.fromRGB(78, 58, 41),
                     Enum.Material.Fabric,
@@ -56133,7 +56192,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "AmberCharmRing",
                 Vector3.new(0.32, 2.4, 2.4),
-                CFrame.new(definition.x, 4.55, workshopZ) * CFrame.Angles(0, math.rad(90), 0),
+                CFrame.new(definition.x, 4.55, benchZ) * CFrame.Angles(0, math.rad(90), 0),
                 Color3.fromRGB(126, 97, 54),
                 Enum.Material.Metal,
                 false
@@ -56143,7 +56202,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "AmberCharmCord",
                 Vector3.new(0.2, 1.7, 0.2),
-                CFrame.new(definition.x, 5.8, workshopZ),
+                CFrame.new(definition.x, 5.8, benchZ),
                 Color3.fromRGB(73, 54, 38),
                 Enum.Material.Fabric,
                 false
@@ -56153,7 +56212,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "HoodShoulders",
                 Vector3.new(3.6, 0.55, 1.45),
-                CFrame.new(definition.x, 3.82, workshopZ),
+                CFrame.new(definition.x, 3.82, benchZ),
                 Color3.fromRGB(75, 91, 81),
                 Enum.Material.Fabric,
                 false
@@ -56162,7 +56221,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "HoodStand",
                 Vector3.new(0.34, 2.5, 0.34),
-                CFrame.new(definition.x, 4.45, workshopZ),
+                CFrame.new(definition.x, 4.45, benchZ),
                 Color3.fromRGB(76, 55, 39),
                 Enum.Material.Wood,
                 false
@@ -56177,7 +56236,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                     display,
                     "BrambleBoot",
                     Vector3.new(0.92, 1.45, 1.9),
-                    CFrame.new(definition.x + bootSide * 0.72, 4.05, workshopZ + 0.28)
+                    CFrame.new(definition.x + bootSide * 0.72, 4.05, benchZ + 0.28)
                         * CFrame.Angles(0, math.rad(bootSide * 8), 0),
                     Color3.fromRGB(103, 76, 54),
                     Enum.Material.Leather,
@@ -56189,7 +56248,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "BowSampleStave",
                 Vector3.new(0.3, 3, 0.5),
-                CFrame.new(definition.x + 0.35, 4.6, workshopZ) * CFrame.Angles(0, 0, math.rad(14)),
+                CFrame.new(definition.x + 0.35, 4.6, benchZ) * CFrame.Angles(0, 0, math.rad(14)),
                 Color3.fromRGB(112, 84, 52),
                 Enum.Material.Wood,
                 false
@@ -56198,7 +56257,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "BowSampleString",
                 Vector3.new(0.08, 2.8, 0.08),
-                CFrame.new(definition.x - 0.45, 4.6, workshopZ),
+                CFrame.new(definition.x - 0.45, 4.6, benchZ),
                 Color3.fromRGB(214, 205, 186),
                 Enum.Material.Fabric,
                 false
@@ -56208,7 +56267,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "MaulSampleHaft",
                 Vector3.new(0.4, 3.1, 0.4),
-                CFrame.new(definition.x, 4.55, workshopZ) * CFrame.Angles(0, 0, math.rad(-18)),
+                CFrame.new(definition.x, 4.55, benchZ) * CFrame.Angles(0, 0, math.rad(-18)),
                 Color3.fromRGB(96, 68, 44),
                 Enum.Material.Wood,
                 false
@@ -56217,7 +56276,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "MaulSampleHead",
                 Vector3.new(1.9, 1.15, 1.15),
-                CFrame.new(definition.x + 0.5, 5.9, workshopZ) * CFrame.Angles(0, 0, math.rad(-18)),
+                CFrame.new(definition.x + 0.5, 5.9, benchZ) * CFrame.Angles(0, 0, math.rad(-18)),
                 Color3.fromRGB(139, 98, 54),
                 Enum.Material.Wood,
                 false
@@ -56227,7 +56286,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "LanceSampleShaft",
                 Vector3.new(0.32, 4.4, 0.32),
-                CFrame.new(definition.x, 4.9, workshopZ) * CFrame.Angles(0, 0, math.rad(24)),
+                CFrame.new(definition.x, 4.9, benchZ) * CFrame.Angles(0, 0, math.rad(24)),
                 Color3.fromRGB(104, 128, 68),
                 Enum.Material.Wood,
                 false
@@ -56236,7 +56295,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "LanceSampleTip",
                 Vector3.new(0.5, 1.1, 0.5),
-                CFrame.new(definition.x - 0.95, 6.85, workshopZ) * CFrame.Angles(0, 0, math.rad(24)),
+                CFrame.new(definition.x - 0.95, 6.85, benchZ) * CFrame.Angles(0, 0, math.rad(24)),
                 Color3.fromRGB(74, 96, 46),
                 Enum.Material.Wood,
                 false
@@ -56247,7 +56306,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "SlingSampleStrap",
                 Vector3.new(0.22, 2.6, 0.22),
-                CFrame.new(definition.x, 4.7, workshopZ) * CFrame.Angles(0, 0, math.rad(32)),
+                CFrame.new(definition.x, 4.7, benchZ) * CFrame.Angles(0, 0, math.rad(32)),
                 Color3.fromRGB(78, 58, 41),
                 Enum.Material.Fabric,
                 false
@@ -56256,7 +56315,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "SlingSamplePouch",
                 Vector3.new(0.95, 0.7, 0.95),
-                CFrame.new(definition.x - 0.75, 3.75, workshopZ),
+                CFrame.new(definition.x - 0.75, 3.75, benchZ),
                 Color3.fromRGB(94, 206, 176),
                 Enum.Material.Fabric,
                 false
@@ -56267,7 +56326,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "EdgeSampleBlade",
                 Vector3.new(0.35, 2.5, 0.9),
-                CFrame.new(definition.x + 0.2, 4.95, workshopZ) * CFrame.Angles(0, 0, math.rad(-9)),
+                CFrame.new(definition.x + 0.2, 4.95, benchZ) * CFrame.Angles(0, 0, math.rad(-9)),
                 Color3.fromRGB(255, 197, 106),
                 Enum.Material.Glass,
                 false
@@ -56277,7 +56336,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "EdgeSampleGrip",
                 Vector3.new(0.42, 1.05, 0.42),
-                CFrame.new(definition.x - 0.15, 3.6, workshopZ) * CFrame.Angles(0, 0, math.rad(-9)),
+                CFrame.new(definition.x - 0.15, 3.6, benchZ) * CFrame.Angles(0, 0, math.rad(-9)),
                 Color3.fromRGB(73, 54, 38),
                 Enum.Material.Leather,
                 false
@@ -56289,7 +56348,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "CudgelSampleShaft",
                 Vector3.new(0.45, 2.7, 0.45),
-                CFrame.new(definition.x, 4.5, workshopZ) * CFrame.Angles(0, 0, math.rad(12)),
+                CFrame.new(definition.x, 4.5, benchZ) * CFrame.Angles(0, 0, math.rad(12)),
                 Color3.fromRGB(91, 62, 40),
                 Enum.Material.Wood,
                 false
@@ -56298,7 +56357,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 display,
                 "CudgelSampleHead",
                 Vector3.new(1, 1, 1),
-                CFrame.new(definition.x - 0.35, 5.85, workshopZ),
+                CFrame.new(definition.x - 0.35, 5.85, benchZ),
                 Color3.fromRGB(112, 151, 119),
                 Enum.Material.Wood,
                 false
@@ -58594,7 +58653,8 @@ local function buildTownProgressionBuildings(
     assetParent: Instance,
     meshPlacements: { MeshPlacement },
     construction: any,
-    townConstructionRules: any
+    townConstructionRules: any,
+    residentRoster: any
 ): (
     { [string]: any },
     { [string]: any },
@@ -59573,6 +59633,129 @@ local function buildTownProgressionBuildings(
     )
     noteConstructionTarget("building_meeting_hall", "MEETING HALL", signAnchor(meetingHall))
 
+    --[[
+        A palette per region, for residents whose bodies are derived. Each
+        one wears what their own region wore -- the Delve's ore and
+        coalglass, the Vale's ice and wool -- so a town filling up still
+        reads as people arriving from named places rather than as a crowd.
+    ]]
+    local REGION_RESIDENT_PALETTES = {
+        region_bramblewake = {
+            accent = Color3.fromRGB(221, 154, 78),
+            coat = Color3.fromRGB(96, 110, 74),
+            hair = Color3.fromRGB(55, 40, 34),
+            skin = Color3.fromRGB(190, 140, 100),
+        },
+        region_ironroot = {
+            accent = Color3.fromRGB(255, 168, 66),
+            coat = Color3.fromRGB(112, 85, 49),
+            hair = Color3.fromRGB(42, 34, 30),
+            skin = Color3.fromRGB(166, 118, 84),
+        },
+        region_mireglass = {
+            accent = Color3.fromRGB(146, 214, 226),
+            coat = Color3.fromRGB(76, 96, 88),
+            hair = Color3.fromRGB(60, 52, 44),
+            skin = Color3.fromRGB(178, 132, 96),
+        },
+        region_tempest = {
+            accent = Color3.fromRGB(238, 178, 96),
+            coat = Color3.fromRGB(92, 96, 100),
+            hair = Color3.fromRGB(48, 44, 40),
+            skin = Color3.fromRGB(200, 150, 108),
+        },
+        region_frostmere = {
+            accent = Color3.fromRGB(168, 202, 216),
+            coat = Color3.fromRGB(214, 206, 188),
+            hair = Color3.fromRGB(72, 60, 48),
+            skin = Color3.fromRGB(210, 160, 118),
+        },
+        region_cinderfall = {
+            accent = Color3.fromRGB(214, 172, 88),
+            coat = Color3.fromRGB(148, 142, 134),
+            hair = Color3.fromRGB(38, 34, 32),
+            skin = Color3.fromRGB(172, 124, 92),
+        },
+        region_hollow = {
+            accent = Color3.fromRGB(255, 216, 150),
+            coat = Color3.fromRGB(88, 84, 96),
+            hair = Color3.fromRGB(160, 156, 150),
+            skin = Color3.fromRGB(186, 146, 112),
+        },
+    }
+
+    --[[
+        What a resident is holding, keyed by the prop their definition
+        names.
+
+        This was two inline branches and an `else`, which is a fine shape
+        for three people and stops being one at eleven: the `else` is the
+        seedkeeper's basket, so every prop nobody wrote a branch for came
+        out a green box. A smith carrying a basket says the wrong thing
+        about the smith, and says it silently.
+
+        The fallback is still that basket, unchanged, because a derived
+        resident names no prop and what they carry today should not shift
+        under them in a change that is about the authored eight.
+    ]]
+    local RESIDENT_PROPS = {
+        cookpot = {
+            color = Color3.fromRGB(58, 62, 60),
+            material = Enum.Material.Metal,
+            size = Vector3.new(1, 0.9, 1),
+        },
+        ferry_ledger = {
+            color = Color3.fromRGB(84, 62, 46),
+            material = Enum.Material.Leather,
+            size = Vector3.new(1.1, 0.34, 0.85),
+        },
+        forge_hammer = {
+            color = Color3.fromRGB(74, 78, 82),
+            material = Enum.Material.Metal,
+            size = Vector3.new(0.55, 0.5, 1.6),
+        },
+        long_ladle = {
+            color = Color3.fromRGB(176, 150, 96),
+            material = Enum.Material.Metal,
+            size = Vector3.new(0.45, 0.45, 1.7),
+        },
+        mireglass_shard = {
+            color = Color3.fromRGB(168, 208, 216),
+            material = Enum.Material.Glass,
+            size = Vector3.new(0.85, 0.14, 0.85),
+        },
+        reed_bundle = {
+            color = Color3.fromRGB(178, 158, 96),
+            material = Enum.Material.Grass,
+            size = Vector3.new(0.5, 0.5, 1.8),
+        },
+        route_map = {
+            color = Color3.fromRGB(216, 200, 160),
+            material = Enum.Material.SmoothPlastic,
+            size = Vector3.new(1.5, 0.12, 1.1),
+        },
+        seed_basket = {
+            color = Color3.fromRGB(96, 128, 74),
+            material = Enum.Material.Metal,
+            size = Vector3.new(1, 0.9, 1),
+        },
+        signal_bell = {
+            color = Color3.fromRGB(168, 132, 66),
+            material = Enum.Material.Metal,
+            size = Vector3.new(0.85, 1, 0.85),
+        },
+        tally_slate = {
+            color = Color3.fromRGB(62, 66, 70),
+            material = Enum.Material.Slate,
+            size = Vector3.new(0.9, 0.14, 1.1),
+        },
+        wick_shears = {
+            color = Color3.fromRGB(196, 200, 204),
+            material = Enum.Material.Metal,
+            size = Vector3.new(0.22, 0.6, 1.3),
+        },
+    }
+
     local residentDefinitions = {
         npc_tomas_reed = {
             displayName = "TOMAS REED",
@@ -59612,6 +59795,157 @@ local function buildTownProgressionBuildings(
             dusk = CFrame.new(10, 3, -128) * CFrame.Angles(0, math.rad(10), 0),
             night = CFrame.new(9, 3, -138) * CFrame.Angles(0, math.rad(15), 0),
             dayDuty = "TENDING THE GREENWARD",
+        },
+
+        --[[
+            Chapters II and III, authored rather than derived.
+
+            The derivation below gives every roster resident a body, which
+            is what stopped twenty-four people arriving to a town with
+            nothing standing in it. It cannot do more than that: it knows
+            a region and a job title, so a shift smith and a ferry clerk
+            out of the same country wear the same coat, carry the same
+            nothing, and stand on the same ring around the plaza whatever
+            their job is.
+
+            These eight are the whole cast of the next two chapters --
+            the people a player meets immediately after the three they
+            start with -- and the roster already says what each of them
+            should be holding and where they should be. Hesper keeps a
+            forge, Junie trims the lamp before nightfall, Lissen counts
+            heads at dusk. Authoring them is mostly reading the roster
+            aloud.
+
+            Day puts each of them at the building the roster gives them
+            the job at, so the person and the workplace are one fact
+            rather than two. Dusk is that person's own last hour: the
+            walk in off the row, a woven charm left on the inn door, the
+            wick trimmed while there is still light to see it by. Night
+            puts all eleven on the lantern road between the square and
+            the south gate, because DEFENDING THE LANTERN ROAD is what
+            the routine's own night duty says they are doing, and eleven
+            people saying it from one spot would be a crowd rather than a
+            watch.
+        ]]
+        npc_hesper_vane = {
+            displayName = "HESPER VANE",
+            role = "SHIFT SMITH",
+            coat = Color3.fromRGB(92, 60, 44),
+            accent = Color3.fromRGB(236, 132, 58),
+            skin = Color3.fromRGB(166, 118, 84),
+            hair = Color3.fromRGB(42, 34, 30),
+            prop = "forge_hammer",
+            day = CFrame.new(134, 3, -132) * CFrame.Angles(0, math.rad(-63), 0),
+            dusk = CFrame.new(128, 3, -126) * CFrame.Angles(0, math.rad(110), 0),
+            night = CFrame.new(11, 3, -122) * CFrame.Angles(0, math.rad(-90), 0),
+            dayDuty = "KEEPING THE FORGE IN",
+        },
+        npc_odell_crane = {
+            displayName = "ODELL CRANE",
+            role = "RAIL KEEPER",
+            coat = Color3.fromRGB(86, 92, 98),
+            accent = Color3.fromRGB(208, 166, 84),
+            skin = Color3.fromRGB(188, 140, 102),
+            hair = Color3.fromRGB(96, 86, 78),
+            prop = "signal_bell",
+            day = CFrame.new(-134, 3, -190) * CFrame.Angles(0, math.rad(69), 0),
+            dusk = CFrame.new(-70, 3, -184) * CFrame.Angles(0, math.rad(-90), 0),
+            night = CFrame.new(-11, 3, -180) * CFrame.Angles(0, math.rad(90), 0),
+            dayDuty = "WORKING THE HAULAGE LINES",
+        },
+        npc_junie_falk = {
+            displayName = "JUNIE FALK",
+            role = "LAMP TRIMMER",
+            coat = Color3.fromRGB(68, 74, 66),
+            accent = Color3.fromRGB(255, 186, 92),
+            skin = Color3.fromRGB(150, 106, 78),
+            hair = Color3.fromRGB(58, 44, 36),
+            prop = "wick_shears",
+            day = CFrame.new(10, 3, -72) * CFrame.Angles(0, math.rad(51), 0),
+            dusk = CFrame.new(0, 3, -70),
+            --[[
+                South of the lantern looking further south, which is the
+                one arrangement she will stand in: the light at her back
+                and the dark part of the road in front of her, because
+                she will not sit with her back to a dark doorway.
+            ]]
+            night = CFrame.new(0, 3, -92),
+            dayDuty = "TRIMMING THE FIRST LANTERN",
+        },
+        npc_bartram_hoke = {
+            displayName = "BARTRAM HOKE",
+            role = "PIT COOK",
+            coat = Color3.fromRGB(118, 92, 62),
+            accent = Color3.fromRGB(226, 206, 166),
+            skin = Color3.fromRGB(176, 126, 92),
+            hair = Color3.fromRGB(74, 66, 58),
+            prop = "long_ladle",
+            day = CFrame.new(-136, 3, -152) * CFrame.Angles(0, math.rad(67), 0),
+            dusk = CFrame.new(-60, 3, -144) * CFrame.Angles(0, math.rad(-90), 0),
+            night = CFrame.new(-12, 3, -128) * CFrame.Angles(0, math.rad(90), 0),
+            dayDuty = "COOKING FOR A LONGER SHIFT THAN THIS ONE",
+        },
+        npc_saoirse_quill = {
+            displayName = "SAOIRSE QUILL",
+            role = "LEDGER KEEPER",
+            coat = Color3.fromRGB(58, 74, 78),
+            accent = Color3.fromRGB(214, 198, 158),
+            skin = Color3.fromRGB(178, 132, 96),
+            hair = Color3.fromRGB(48, 40, 36),
+            prop = "ferry_ledger",
+            day = CFrame.new(-80, 3, -142) * CFrame.Angles(0, math.rad(81), 0),
+            dusk = CFrame.new(-24, 3, -144) * CFrame.Angles(0, math.rad(-90), 0),
+            -- Facing back up the road, which is the direction the people
+            -- she is counting come from.
+            night = CFrame.new(12, 3, -160) * CFrame.Angles(0, math.rad(180), 0),
+            dayDuty = "KEEPING THE STORES LEDGER",
+        },
+        npc_wren_dabbler = {
+            displayName = "WREN DABBLER",
+            role = "REED WEAVER",
+            coat = Color3.fromRGB(84, 102, 72),
+            accent = Color3.fromRGB(198, 176, 110),
+            skin = Color3.fromRGB(196, 148, 108),
+            hair = Color3.fromRGB(122, 96, 58),
+            prop = "reed_bundle",
+            day = CFrame.new(0, 3, -212),
+            -- At the inn's door at dusk, which is where the charm she
+            -- leaves for a house ends up.
+            dusk = CFrame.new(-82, 3, -174) * CFrame.Angles(0, math.rad(45), 0),
+            night = CFrame.new(12, 3, -192) * CFrame.Angles(0, math.rad(-90), 0),
+            dayDuty = "WEAVING FOR THE STAGE",
+        },
+        npc_marek_still = {
+            displayName = "MAREK STILL",
+            role = "GLASS READER",
+            coat = Color3.fromRGB(72, 84, 88),
+            accent = Color3.fromRGB(146, 214, 226),
+            skin = Color3.fromRGB(162, 120, 90),
+            -- White before his time, which is the first thing anyone
+            -- notices about a man who read mireglass for a living.
+            hair = Color3.fromRGB(176, 172, 166),
+            prop = "mireglass_shard",
+            day = CFrame.new(62, 3, -250) * CFrame.Angles(0, math.rad(-34), 0),
+            dusk = CFrame.new(24, 3, -196) * CFrame.Angles(0, math.rad(146), 0),
+            -- The far end of the road facing out, since naming a tell
+            -- before the night uses it means seeing it first.
+            night = CFrame.new(0, 3, -204),
+            dayDuty = "READING THE GLASS FROM THE TOWER",
+        },
+        npc_lissen_ford = {
+            displayName = "LISSEN FORD",
+            role = "FEN HEALER",
+            coat = Color3.fromRGB(108, 120, 104),
+            accent = Color3.fromRGB(232, 226, 208),
+            skin = Color3.fromRGB(152, 108, 80),
+            hair = Color3.fromRGB(62, 52, 46),
+            prop = "tally_slate",
+            day = CFrame.new(-58, 3, -250) * CFrame.Angles(0, math.rad(45), 0),
+            -- Facing the muster rather than standing in it, because what
+            -- she is doing at dusk is counting the people in it.
+            dusk = CFrame.new(-20, 3, -126) * CFrame.Angles(0, math.rad(-84), 0),
+            night = CFrame.new(-13, 3, -148) * CFrame.Angles(0, math.rad(-90), 0),
+            dayDuty = "KEEPING THE GUARDHOUSE INFIRMARY",
         },
     }
 
@@ -59807,21 +60141,14 @@ local function buildTownProgressionBuildings(
         -- The prop that says what they do.
         local lowerArm = model:FindFirstChild("RightLowerArm")
         if lowerArm ~= nil and lowerArm:IsA("BasePart") then
-            local propColor = if definition.prop == "cookpot"
-                then Color3.fromRGB(58, 62, 60)
-                elseif definition.prop == "route_map" then Color3.fromRGB(216, 200, 160)
-                else Color3.fromRGB(96, 128, 74)
+            local style = RESIDENT_PROPS[definition.prop] or RESIDENT_PROPS.seed_basket
             local prop = part(
                 model,
                 "RolePropCarried",
-                if definition.prop == "route_map"
-                    then Vector3.new(1.5, 0.12, 1.1)
-                    else Vector3.new(1, 0.9, 1),
+                style.size,
                 lowerArm.CFrame * CFrame.new(0, -lowerArm.Size.Y * 0.7, -0.3),
-                propColor,
-                if definition.prop == "route_map"
-                    then Enum.Material.SmoothPlastic
-                    else Enum.Material.Metal,
+                style.color,
+                style.material,
                 false
             )
             attach(prop, lowerArm)
@@ -59858,8 +60185,63 @@ local function buildTownProgressionBuildings(
     local activeResidentIds = if type(consequence.residentIds) == "table"
         then consequence.residentIds
         else {}
+    --[[
+        Everybody the story has sent, whether or not somebody authored
+        them.
+
+        Three residents had bodies here and the roster names twenty-seven,
+        so for a milestone twenty-four people arrived with a chapter, took
+        a job at a real building, carried a quest and a full set of
+        dialogue -- and had nothing standing in the town to say it to.
+        Their quests were unreachable for the same reason their greetings
+        were, and nothing failed, because a resident nobody built is a
+        resident nobody misses.
+
+        So an unauthored resident derives a body from the roster rather
+        than being skipped: their own name and job title, a palette from
+        the region they walked out of, and a place to stand worked out
+        from the order they arrive in, spread around the plaza so no two
+        share a spot. It is a floor, not an art pass -- each one carries
+        `Derived` so nothing downstream mistakes it for authored work, and
+        anybody with an authored body above is untouched. Eleven are
+        authored now, through chapter III; the floor is what holds the
+        other sixteen up until somebody writes them.
+
+        A plain body in the right place beats a person the story insists
+        has arrived and who is not there.
+    ]]
+    local derivedResidentIndex = 0
     for _, residentId in activeResidentIds do
         local definition = residentDefinitions[residentId]
+        if definition == nil then
+            local entry = residentRoster.get(residentId)
+            if entry ~= nil then
+                local angle = derivedResidentIndex * 0.68
+                local radius = 26 + (derivedResidentIndex % 3) * 9
+                derivedResidentIndex += 1
+                local spot = Vector3.new(
+                    math.cos(angle) * radius,
+                    3,
+                    TOWN_CENTER.Z - 62 + math.sin(angle) * radius
+                )
+                local palette = REGION_RESIDENT_PALETTES[(entry :: any).homeRegion]
+                    or REGION_RESIDENT_PALETTES.region_bramblewake
+                definition = {
+                    accent = palette.accent,
+                    coat = palette.coat,
+                    day = CFrame.new(spot, Vector3.new(0, spot.Y, TOWN_CENTER.Z - 62)),
+                    dayDuty = (entry :: any).job.title,
+                    derived = true,
+                    displayName = string.upper((entry :: any).fullName),
+                    dusk = CFrame.new(spot, Vector3.new(0, spot.Y, TOWN_CENTER.Z - 62)),
+                    hair = palette.hair,
+                    night = CFrame.new(spot, Vector3.new(0, spot.Y, TOWN_CENTER.Z - 62)),
+                    prop = nil,
+                    role = (entry :: any).job.title,
+                    skin = palette.skin,
+                }
+            end
+        end
         if definition ~= nil then
             buildResident(residentId, definition)
         end
@@ -59972,7 +60354,8 @@ function WorldService._rebuildTownProgression(self: WorldService)
         authoredMeshes,
         townMeshPlacements,
         self._townConstruction,
-        self._townConstructionRules
+        self._townConstructionRules,
+        self._residentRoster
     )
     self._townResidents = residents
     self._buildingPlacements = buildingPlacements

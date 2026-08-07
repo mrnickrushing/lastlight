@@ -9775,6 +9775,78 @@ local function buildTownProgressionBuildings(
         },
     }
 
+    --[[
+        What a resident is holding, keyed by the prop their definition
+        names.
+
+        This was two inline branches and an `else`, which is a fine shape
+        for three people and stops being one at eleven: the `else` is the
+        seedkeeper's basket, so every prop nobody wrote a branch for came
+        out a green box. A smith carrying a basket says the wrong thing
+        about the smith, and says it silently.
+
+        The fallback is still that basket, unchanged, because a derived
+        resident names no prop and what they carry today should not shift
+        under them in a change that is about the authored eight.
+    ]]
+    local RESIDENT_PROPS = {
+        cookpot = {
+            color = Color3.fromRGB(58, 62, 60),
+            material = Enum.Material.Metal,
+            size = Vector3.new(1, 0.9, 1),
+        },
+        ferry_ledger = {
+            color = Color3.fromRGB(84, 62, 46),
+            material = Enum.Material.Leather,
+            size = Vector3.new(1.1, 0.34, 0.85),
+        },
+        forge_hammer = {
+            color = Color3.fromRGB(74, 78, 82),
+            material = Enum.Material.Metal,
+            size = Vector3.new(0.55, 0.5, 1.6),
+        },
+        long_ladle = {
+            color = Color3.fromRGB(176, 150, 96),
+            material = Enum.Material.Metal,
+            size = Vector3.new(0.45, 0.45, 1.7),
+        },
+        mireglass_shard = {
+            color = Color3.fromRGB(168, 208, 216),
+            material = Enum.Material.Glass,
+            size = Vector3.new(0.85, 0.14, 0.85),
+        },
+        reed_bundle = {
+            color = Color3.fromRGB(178, 158, 96),
+            material = Enum.Material.Grass,
+            size = Vector3.new(0.5, 0.5, 1.8),
+        },
+        route_map = {
+            color = Color3.fromRGB(216, 200, 160),
+            material = Enum.Material.SmoothPlastic,
+            size = Vector3.new(1.5, 0.12, 1.1),
+        },
+        seed_basket = {
+            color = Color3.fromRGB(96, 128, 74),
+            material = Enum.Material.Metal,
+            size = Vector3.new(1, 0.9, 1),
+        },
+        signal_bell = {
+            color = Color3.fromRGB(168, 132, 66),
+            material = Enum.Material.Metal,
+            size = Vector3.new(0.85, 1, 0.85),
+        },
+        tally_slate = {
+            color = Color3.fromRGB(62, 66, 70),
+            material = Enum.Material.Slate,
+            size = Vector3.new(0.9, 0.14, 1.1),
+        },
+        wick_shears = {
+            color = Color3.fromRGB(196, 200, 204),
+            material = Enum.Material.Metal,
+            size = Vector3.new(0.22, 0.6, 1.3),
+        },
+    }
+
     local residentDefinitions = {
         npc_tomas_reed = {
             displayName = "TOMAS REED",
@@ -9814,6 +9886,157 @@ local function buildTownProgressionBuildings(
             dusk = CFrame.new(10, 3, -128) * CFrame.Angles(0, math.rad(10), 0),
             night = CFrame.new(9, 3, -138) * CFrame.Angles(0, math.rad(15), 0),
             dayDuty = "TENDING THE GREENWARD",
+        },
+
+        --[[
+            Chapters II and III, authored rather than derived.
+
+            The derivation below gives every roster resident a body, which
+            is what stopped twenty-four people arriving to a town with
+            nothing standing in it. It cannot do more than that: it knows
+            a region and a job title, so a shift smith and a ferry clerk
+            out of the same country wear the same coat, carry the same
+            nothing, and stand on the same ring around the plaza whatever
+            their job is.
+
+            These eight are the whole cast of the next two chapters --
+            the people a player meets immediately after the three they
+            start with -- and the roster already says what each of them
+            should be holding and where they should be. Hesper keeps a
+            forge, Junie trims the lamp before nightfall, Lissen counts
+            heads at dusk. Authoring them is mostly reading the roster
+            aloud.
+
+            Day puts each of them at the building the roster gives them
+            the job at, so the person and the workplace are one fact
+            rather than two. Dusk is that person's own last hour: the
+            walk in off the row, a woven charm left on the inn door, the
+            wick trimmed while there is still light to see it by. Night
+            puts all eleven on the lantern road between the square and
+            the south gate, because DEFENDING THE LANTERN ROAD is what
+            the routine's own night duty says they are doing, and eleven
+            people saying it from one spot would be a crowd rather than a
+            watch.
+        ]]
+        npc_hesper_vane = {
+            displayName = "HESPER VANE",
+            role = "SHIFT SMITH",
+            coat = Color3.fromRGB(92, 60, 44),
+            accent = Color3.fromRGB(236, 132, 58),
+            skin = Color3.fromRGB(166, 118, 84),
+            hair = Color3.fromRGB(42, 34, 30),
+            prop = "forge_hammer",
+            day = CFrame.new(134, 3, -132) * CFrame.Angles(0, math.rad(-63), 0),
+            dusk = CFrame.new(128, 3, -126) * CFrame.Angles(0, math.rad(110), 0),
+            night = CFrame.new(11, 3, -122) * CFrame.Angles(0, math.rad(-90), 0),
+            dayDuty = "KEEPING THE FORGE IN",
+        },
+        npc_odell_crane = {
+            displayName = "ODELL CRANE",
+            role = "RAIL KEEPER",
+            coat = Color3.fromRGB(86, 92, 98),
+            accent = Color3.fromRGB(208, 166, 84),
+            skin = Color3.fromRGB(188, 140, 102),
+            hair = Color3.fromRGB(96, 86, 78),
+            prop = "signal_bell",
+            day = CFrame.new(-134, 3, -190) * CFrame.Angles(0, math.rad(69), 0),
+            dusk = CFrame.new(-70, 3, -184) * CFrame.Angles(0, math.rad(-90), 0),
+            night = CFrame.new(-11, 3, -180) * CFrame.Angles(0, math.rad(90), 0),
+            dayDuty = "WORKING THE HAULAGE LINES",
+        },
+        npc_junie_falk = {
+            displayName = "JUNIE FALK",
+            role = "LAMP TRIMMER",
+            coat = Color3.fromRGB(68, 74, 66),
+            accent = Color3.fromRGB(255, 186, 92),
+            skin = Color3.fromRGB(150, 106, 78),
+            hair = Color3.fromRGB(58, 44, 36),
+            prop = "wick_shears",
+            day = CFrame.new(10, 3, -72) * CFrame.Angles(0, math.rad(51), 0),
+            dusk = CFrame.new(0, 3, -70),
+            --[[
+                South of the lantern looking further south, which is the
+                one arrangement she will stand in: the light at her back
+                and the dark part of the road in front of her, because
+                she will not sit with her back to a dark doorway.
+            ]]
+            night = CFrame.new(0, 3, -92),
+            dayDuty = "TRIMMING THE FIRST LANTERN",
+        },
+        npc_bartram_hoke = {
+            displayName = "BARTRAM HOKE",
+            role = "PIT COOK",
+            coat = Color3.fromRGB(118, 92, 62),
+            accent = Color3.fromRGB(226, 206, 166),
+            skin = Color3.fromRGB(176, 126, 92),
+            hair = Color3.fromRGB(74, 66, 58),
+            prop = "long_ladle",
+            day = CFrame.new(-136, 3, -152) * CFrame.Angles(0, math.rad(67), 0),
+            dusk = CFrame.new(-60, 3, -144) * CFrame.Angles(0, math.rad(-90), 0),
+            night = CFrame.new(-12, 3, -128) * CFrame.Angles(0, math.rad(90), 0),
+            dayDuty = "COOKING FOR A LONGER SHIFT THAN THIS ONE",
+        },
+        npc_saoirse_quill = {
+            displayName = "SAOIRSE QUILL",
+            role = "LEDGER KEEPER",
+            coat = Color3.fromRGB(58, 74, 78),
+            accent = Color3.fromRGB(214, 198, 158),
+            skin = Color3.fromRGB(178, 132, 96),
+            hair = Color3.fromRGB(48, 40, 36),
+            prop = "ferry_ledger",
+            day = CFrame.new(-80, 3, -142) * CFrame.Angles(0, math.rad(81), 0),
+            dusk = CFrame.new(-24, 3, -144) * CFrame.Angles(0, math.rad(-90), 0),
+            -- Facing back up the road, which is the direction the people
+            -- she is counting come from.
+            night = CFrame.new(12, 3, -160) * CFrame.Angles(0, math.rad(180), 0),
+            dayDuty = "KEEPING THE STORES LEDGER",
+        },
+        npc_wren_dabbler = {
+            displayName = "WREN DABBLER",
+            role = "REED WEAVER",
+            coat = Color3.fromRGB(84, 102, 72),
+            accent = Color3.fromRGB(198, 176, 110),
+            skin = Color3.fromRGB(196, 148, 108),
+            hair = Color3.fromRGB(122, 96, 58),
+            prop = "reed_bundle",
+            day = CFrame.new(0, 3, -212),
+            -- At the inn's door at dusk, which is where the charm she
+            -- leaves for a house ends up.
+            dusk = CFrame.new(-82, 3, -174) * CFrame.Angles(0, math.rad(45), 0),
+            night = CFrame.new(12, 3, -192) * CFrame.Angles(0, math.rad(-90), 0),
+            dayDuty = "WEAVING FOR THE STAGE",
+        },
+        npc_marek_still = {
+            displayName = "MAREK STILL",
+            role = "GLASS READER",
+            coat = Color3.fromRGB(72, 84, 88),
+            accent = Color3.fromRGB(146, 214, 226),
+            skin = Color3.fromRGB(162, 120, 90),
+            -- White before his time, which is the first thing anyone
+            -- notices about a man who read mireglass for a living.
+            hair = Color3.fromRGB(176, 172, 166),
+            prop = "mireglass_shard",
+            day = CFrame.new(62, 3, -250) * CFrame.Angles(0, math.rad(-34), 0),
+            dusk = CFrame.new(24, 3, -196) * CFrame.Angles(0, math.rad(146), 0),
+            -- The far end of the road facing out, since naming a tell
+            -- before the night uses it means seeing it first.
+            night = CFrame.new(0, 3, -204),
+            dayDuty = "READING THE GLASS FROM THE TOWER",
+        },
+        npc_lissen_ford = {
+            displayName = "LISSEN FORD",
+            role = "FEN HEALER",
+            coat = Color3.fromRGB(108, 120, 104),
+            accent = Color3.fromRGB(232, 226, 208),
+            skin = Color3.fromRGB(152, 108, 80),
+            hair = Color3.fromRGB(62, 52, 46),
+            prop = "tally_slate",
+            day = CFrame.new(-58, 3, -250) * CFrame.Angles(0, math.rad(45), 0),
+            -- Facing the muster rather than standing in it, because what
+            -- she is doing at dusk is counting the people in it.
+            dusk = CFrame.new(-20, 3, -126) * CFrame.Angles(0, math.rad(-84), 0),
+            night = CFrame.new(-13, 3, -148) * CFrame.Angles(0, math.rad(-90), 0),
+            dayDuty = "KEEPING THE GUARDHOUSE INFIRMARY",
         },
     }
 
@@ -10009,21 +10232,14 @@ local function buildTownProgressionBuildings(
         -- The prop that says what they do.
         local lowerArm = model:FindFirstChild("RightLowerArm")
         if lowerArm ~= nil and lowerArm:IsA("BasePart") then
-            local propColor = if definition.prop == "cookpot"
-                then Color3.fromRGB(58, 62, 60)
-                elseif definition.prop == "route_map" then Color3.fromRGB(216, 200, 160)
-                else Color3.fromRGB(96, 128, 74)
+            local style = RESIDENT_PROPS[definition.prop] or RESIDENT_PROPS.seed_basket
             local prop = part(
                 model,
                 "RolePropCarried",
-                if definition.prop == "route_map"
-                    then Vector3.new(1.5, 0.12, 1.1)
-                    else Vector3.new(1, 0.9, 1),
+                style.size,
                 lowerArm.CFrame * CFrame.new(0, -lowerArm.Size.Y * 0.7, -0.3),
-                propColor,
-                if definition.prop == "route_map"
-                    then Enum.Material.SmoothPlastic
-                    else Enum.Material.Metal,
+                style.color,
+                style.material,
                 false
             )
             attach(prop, lowerArm)
@@ -10078,7 +10294,9 @@ local function buildTownProgressionBuildings(
         from the order they arrive in, spread around the plaza so no two
         share a spot. It is a floor, not an art pass -- each one carries
         `Derived` so nothing downstream mistakes it for authored work, and
-        the three that were authored are untouched.
+        anybody with an authored body above is untouched. Eleven are
+        authored now, through chapter III; the floor is what holds the
+        other sixteen up until somebody writes them.
 
         A plain body in the right place beats a person the story insists
         has arrived and who is not there.
