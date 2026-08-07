@@ -50,6 +50,16 @@ local ORDER = table.freeze({
     "quest_vale_nursing",
     "quest_cold_stores",
     "quest_almshouse_doors",
+    -- Cinderfall Crown residents
+    "quest_glass_hands",
+    "quest_kept_record",
+    "quest_named_stones",
+    "quest_long_timber",
+    -- After the Hollow
+    "quest_keepers_return",
+    "quest_deep_water",
+    "quest_full_house",
+    "quest_last_ward",
 })
 
 local DEFINITIONS: { [string]: Quest } = {
@@ -197,6 +207,65 @@ local DEFINITIONS: { [string]: Quest } = {
         displayName = "TWELVE DOORS STANDING",
         objective = table.freeze({ kind = "buildings_raised", threshold = 12 }),
         reward = table.freeze({ materialId = "material_frostmere_wool", amount = 8 }),
+    }),
+    -- Sabine will not make anything shaped like a person. She will make
+    -- forty of everything else.
+    quest_glass_hands = table.freeze({
+        id = "quest_glass_hands",
+        displayName = "FORTY HONEST THINGS",
+        objective = table.freeze({ kind = "craft_items", threshold = 40 }),
+        reward = table.freeze({ materialId = "material_memory_glass", amount = 8 }),
+    }),
+    -- Theo copied official names for thirty years. He wants the other kind.
+    quest_kept_record = table.freeze({
+        id = "quest_kept_record",
+        displayName = "THE OTHER NAMES",
+        objective = table.freeze({ kind = "fragments_recovered", threshold = 8 }),
+        reward = table.freeze({ materialId = "material_ash_silk", amount = 8 }),
+    }),
+    -- Delia knows which statues were people, and would like the same to be
+    -- true of this town before it needs to be.
+    quest_named_stones = table.freeze({
+        id = "quest_named_stones",
+        displayName = "FOURTEEN NAMED",
+        objective = table.freeze({ kind = "residents_bonded", threshold = 14 }),
+        reward = table.freeze({ materialId = "material_cindersteel", amount = 8 }),
+    }),
+    -- Bran cuts them longer now, out of spite.
+    quest_long_timber = table.freeze({
+        id = "quest_long_timber",
+        displayName = "TWENTY STANDING",
+        objective = table.freeze({ kind = "buildings_raised", threshold = 20 }),
+        reward = table.freeze({ materialId = "material_heartwood", amount = 12 }),
+    }),
+    -- Orin has been waiting since the first fragment. What he asks for is
+    -- the whole story closed.
+    quest_keepers_return = table.freeze({
+        id = "quest_keepers_return",
+        displayName = "THE KEEPER'S RETURN",
+        objective = table.freeze({ kind = "chapters_resolved", threshold = 7 }),
+        reward = table.freeze({ materialId = "material_crown_coal", amount = 12 }),
+    }),
+    -- Signe walked out of the Hollow behind you and has not explained it.
+    quest_deep_water = table.freeze({
+        id = "quest_deep_water",
+        displayName = "FOUR HUNDRED IN STORE",
+        objective = table.freeze({ kind = "materials_banked", threshold = 400 }),
+        reward = table.freeze({ materialId = "material_kiln_pearl", amount = 8 }),
+    }),
+    -- Ruth ran the meetings before there was a town and intends to keep on.
+    quest_full_house = table.freeze({
+        id = "quest_full_house",
+        displayName = "A TOWN WORTH MEETING IN",
+        objective = table.freeze({ kind = "decorations_placed", threshold = 8 }),
+        reward = table.freeze({ materialId = "material_ember_moss", amount = 10 }),
+    }),
+    -- Edda builds wards for a road that no longer needs them.
+    quest_last_ward = table.freeze({
+        id = "quest_last_ward",
+        displayName = "THIRTY NIGHTS WARDED",
+        objective = table.freeze({ kind = "survive_nights", threshold = 30 }),
+        reward = table.freeze({ materialId = "material_thawed_iron", amount = 10 }),
     }),
 }
 

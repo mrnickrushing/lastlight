@@ -13,10 +13,10 @@ return {
     name = "ResidentRoster",
     cases = {
         {
-            name = "nineteen residents, sixteen of them earned in the new regions",
+            name = "twenty-seven residents, and only three of them were here at the start",
             run = function()
                 local roster = ResidentRoster.list()
-                TestRunner.equal(#roster, 19)
+                TestRunner.equal(#roster, 27)
                 local byRegion: { [string]: number } = {}
                 for _, definition in roster do
                     byRegion[definition.homeRegion] = (byRegion[definition.homeRegion] or 0) + 1
@@ -30,6 +30,8 @@ return {
                 TestRunner.equal(byRegion.region_mireglass, 4)
                 TestRunner.equal(byRegion.region_tempest, 4)
                 TestRunner.equal(byRegion.region_frostmere, 4)
+                TestRunner.equal(byRegion.region_cinderfall, 4)
+                TestRunner.equal(byRegion.region_hollow, 4)
             end,
         },
         {
@@ -49,7 +51,21 @@ return {
                 TestRunner.equal(#ResidentRoster.idsForChapter(3), 11)
                 TestRunner.equal(#ResidentRoster.idsForChapter(4), 15)
                 TestRunner.equal(#ResidentRoster.idsForChapter(5), 19)
-                TestRunner.equal(#ResidentRoster.idsForChapter(9), 19)
+                TestRunner.equal(#ResidentRoster.idsForChapter(6), 23)
+                --[[
+                    Twenty-six after the Hollow, not twenty-seven: Orin is
+                    the postgame's one conditional resident, and a caller
+                    that names no ending gets the town without him, which
+                    is the right answer for every save that has not
+                    finished and for the ending where he stays below.
+                ]]
+                TestRunner.equal(#ResidentRoster.idsForChapter(7), 26)
+                TestRunner.equal(#ResidentRoster.idsForChapter(9), 26)
+                TestRunner.equal(#ResidentRoster.idsForChapter(7, "ending_kept"), 26)
+                TestRunner.equal(#ResidentRoster.idsForChapter(7, "ending_ended"), 27)
+                TestRunner.equal(#ResidentRoster.idsForChapter(7, "ending_shared"), 27)
+                -- and an ending cannot conjure him before his chapter
+                TestRunner.equal(#ResidentRoster.idsForChapter(6, "ending_shared"), 23)
             end,
         },
         {
@@ -92,6 +108,71 @@ return {
                     titles[job.title] = true
                     TestRunner.truthy(#job.boonLabel > 12)
                 end
+            end,
+        },
+        {
+            --[[
+                The postgame's one conditional resident. Orin is the answer
+                the archive has been asking about since the first ten
+                fragments shipped, and whether he is in town is the only
+                thing in this game that reads the ending directly -- if
+                the light was kept, somebody has to be down there tending
+                it, and it is him.
+            ]]
+            name = "whether the keeper comes up depends on what was done with the light",
+            run = function()
+                local orin = ResidentRoster.require("npc_orin_vale")
+                TestRunner.equal(orin.arrivesInChapter, 7)
+                TestRunner.equal(orin.homeRegion, "region_hollow")
+                TestRunner.truthy(orin.requiresEnding ~= nil)
+
+                local function present(ids: { string }): boolean
+                    for _, id in ids do
+                        if id == "npc_orin_vale" then
+                            return true
+                        end
+                    end
+                    return false
+                end
+                TestRunner.equal(present(ResidentRoster.idsForChapter(7, "ending_kept")), false)
+                TestRunner.equal(present(ResidentRoster.idsForChapter(7, "ending_ended")), true)
+                TestRunner.equal(present(ResidentRoster.idsForChapter(7, "ending_shared")), true)
+                TestRunner.equal(present(ResidentRoster.idsForChapter(7, nil)), false)
+
+                -- he is the only one who works that way; everybody else
+                -- arrives on their chapter and stays
+                local conditional = 0
+                for _, definition in ResidentRoster.list() do
+                    if definition.requiresEnding ~= nil then
+                        conditional += 1
+                    end
+                end
+                TestRunner.equal(conditional, 1)
+
+                -- and the town resolves through the story's own finale
+                -- record rather than being told the ending separately
+                local ended = TownProgression.resolve({
+                    story = {
+                        chapterOne = { status = "complete" },
+                        chapters = {
+                            chapter_seven = { status = "complete", outcome = "lantern_out" },
+                        },
+                        finale = { ending = "ending_ended", status = "complete" },
+                    },
+                    town = { nightNumber = 40 },
+                })
+                TestRunner.equal(present(ended.residentIds), true)
+                local kept = TownProgression.resolve({
+                    story = {
+                        chapterOne = { status = "complete" },
+                        chapters = {
+                            chapter_seven = { status = "complete", outcome = "lantern_kept" },
+                        },
+                        finale = { ending = "ending_kept", status = "complete" },
+                    },
+                    town = { nightNumber = 40 },
+                })
+                TestRunner.equal(present(kept.residentIds), false)
             end,
         },
         {

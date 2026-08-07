@@ -22238,6 +22238,16 @@ local ORDER = table.freeze({
     "quest_vale_nursing",
     "quest_cold_stores",
     "quest_almshouse_doors",
+    -- Cinderfall Crown residents
+    "quest_glass_hands",
+    "quest_kept_record",
+    "quest_named_stones",
+    "quest_long_timber",
+    -- After the Hollow
+    "quest_keepers_return",
+    "quest_deep_water",
+    "quest_full_house",
+    "quest_last_ward",
 })
 
 local DEFINITIONS: { [string]: Quest } = {
@@ -22385,6 +22395,65 @@ local DEFINITIONS: { [string]: Quest } = {
         displayName = "TWELVE DOORS STANDING",
         objective = table.freeze({ kind = "buildings_raised", threshold = 12 }),
         reward = table.freeze({ materialId = "material_frostmere_wool", amount = 8 }),
+    }),
+    -- Sabine will not make anything shaped like a person. She will make
+    -- forty of everything else.
+    quest_glass_hands = table.freeze({
+        id = "quest_glass_hands",
+        displayName = "FORTY HONEST THINGS",
+        objective = table.freeze({ kind = "craft_items", threshold = 40 }),
+        reward = table.freeze({ materialId = "material_memory_glass", amount = 8 }),
+    }),
+    -- Theo copied official names for thirty years. He wants the other kind.
+    quest_kept_record = table.freeze({
+        id = "quest_kept_record",
+        displayName = "THE OTHER NAMES",
+        objective = table.freeze({ kind = "fragments_recovered", threshold = 8 }),
+        reward = table.freeze({ materialId = "material_ash_silk", amount = 8 }),
+    }),
+    -- Delia knows which statues were people, and would like the same to be
+    -- true of this town before it needs to be.
+    quest_named_stones = table.freeze({
+        id = "quest_named_stones",
+        displayName = "FOURTEEN NAMED",
+        objective = table.freeze({ kind = "residents_bonded", threshold = 14 }),
+        reward = table.freeze({ materialId = "material_cindersteel", amount = 8 }),
+    }),
+    -- Bran cuts them longer now, out of spite.
+    quest_long_timber = table.freeze({
+        id = "quest_long_timber",
+        displayName = "TWENTY STANDING",
+        objective = table.freeze({ kind = "buildings_raised", threshold = 20 }),
+        reward = table.freeze({ materialId = "material_heartwood", amount = 12 }),
+    }),
+    -- Orin has been waiting since the first fragment. What he asks for is
+    -- the whole story closed.
+    quest_keepers_return = table.freeze({
+        id = "quest_keepers_return",
+        displayName = "THE KEEPER'S RETURN",
+        objective = table.freeze({ kind = "chapters_resolved", threshold = 7 }),
+        reward = table.freeze({ materialId = "material_crown_coal", amount = 12 }),
+    }),
+    -- Signe walked out of the Hollow behind you and has not explained it.
+    quest_deep_water = table.freeze({
+        id = "quest_deep_water",
+        displayName = "FOUR HUNDRED IN STORE",
+        objective = table.freeze({ kind = "materials_banked", threshold = 400 }),
+        reward = table.freeze({ materialId = "material_kiln_pearl", amount = 8 }),
+    }),
+    -- Ruth ran the meetings before there was a town and intends to keep on.
+    quest_full_house = table.freeze({
+        id = "quest_full_house",
+        displayName = "A TOWN WORTH MEETING IN",
+        objective = table.freeze({ kind = "decorations_placed", threshold = 8 }),
+        reward = table.freeze({ materialId = "material_ember_moss", amount = 10 }),
+    }),
+    -- Edda builds wards for a road that no longer needs them.
+    quest_last_ward = table.freeze({
+        id = "quest_last_ward",
+        displayName = "THIRTY NIGHTS WARDED",
+        objective = table.freeze({ kind = "survive_nights", threshold = 30 }),
+        reward = table.freeze({ materialId = "material_thawed_iron", amount = 10 }),
     }),
 }
 
@@ -22816,6 +22885,14 @@ local GUIDANCE = table.freeze({
     npc_ivy_thorn = "BE TRUSTED BY EIGHT OF US. I COUNT BY NAME, NOT BY HEAD",
     npc_halvard_sunn = "CLOSE EVERY CHAPTER. A STORE IS ONLY FULL WHEN NOTHING IS STILL OPEN",
     npc_maud_ferrow = "RAISE TWELVE BUILDINGS. TWELVE DOORS IS A TOWN, NOT A CAMP",
+    npc_sabine_ash = "MAKE FORTY THINGS. NOT ONE OF THEM SHAPED LIKE A PERSON",
+    npc_theo_marl = "FIND EIGHT OF WHAT THIS WORLD REMEMBERS AND I WILL COPY THEM OUT",
+    npc_delia_kass = "BE TRUSTED BY FOURTEEN OF US. NAMES, NOT NUMBERS",
+    npc_bran_holt = "TWENTY BUILDINGS STANDING. I WILL CUT THE BEAMS FOR THE REST",
+    npc_orin_vale = "CLOSE ALL SEVEN. I HAVE BEEN WAITING ON THE LAST ONE A LONG TIME",
+    npc_signe_marr = "FOUR HUNDRED IN THE STORES. A TOWN SHOULD NEVER BE THIRSTY AGAIN",
+    npc_ruth_calder = "PUT UP EIGHT DECORATIONS. NOBODY MEETS IN A ROOM NOBODY LIKES",
+    npc_edda_pyne = "THIRTY NIGHTS. I WILL HAVE THE WARDS UP BY THE TENTH",
 })
 
 local ARRIVAL_LINES = table.freeze({
@@ -22835,6 +22912,14 @@ local ARRIVAL_LINES = table.freeze({
     npc_ivy_thorn = "EIGHT NAMES, ALL OF THEM ANSWERING. THE ABBEY NEVER MANAGED THAT.",
     npc_halvard_sunn = "NOTHING LEFT OPEN AND THE STORE STILL SHUT. THAT IS A WINTER SURVIVED.",
     npc_maud_ferrow = "TWELVE DOORS, AND NOT ONE OF THEM MINE TO GIVE AWAY. GOOD.",
+    npc_sabine_ash = "FORTY THINGS AND NOT A FACE AMONG THEM. I CAN WORK IN A TOWN LIKE THIS.",
+    npc_theo_marl = "EIGHT OF THEM, COPIED OUT PROPERLY. THE SCRATCHED NAMES GO IN THE SAME BOOK NOW.",
+    npc_delia_kass = "FOURTEEN PEOPLE WHO KNOW YOUR NAME AND YOU KNOW THEIRS. THAT IS A MEMORIAL.",
+    npc_bran_holt = "TWENTY STANDING. LET SOMETHING TRY TO BURN THIS ONE.",
+    npc_orin_vale = "ALL SEVEN CLOSED, AND I AM STANDING IN DAYLIGHT. I HAD STOPPED EXPECTING IT.",
+    npc_signe_marr = "FOUR HUNDRED IN STORE AND THE WELL STILL COLD. NOBODY GOES SHORT THIS YEAR.",
+    npc_ruth_calder = "EIGHT THINGS SOMEBODY CHOSE TO PUT UP. NOW IT IS A ROOM AND NOT A SHELTER.",
+    npc_edda_pyne = "THIRTY NIGHTS AND THE WARDS TOOK THE FIRST BITE OF EVERY ONE.",
 })
 
 local function questById(quests: any, questId: string): any
@@ -23299,6 +23384,13 @@ export type Resident = {
     arrivesInChapter: number,
     questId: string,
     job: Job,
+    --[[
+        Postgame only. A resident with this arrives with chapter seven and
+        only for the endings named -- which is how the town can be
+        different afterwards without the roster growing a second copy of
+        itself for each ending.
+    ]]
+    requiresEnding: { string }?,
     -- One line about who they are, for the world sign and the Field Book.
     introduction: string,
 }
@@ -23313,6 +23405,9 @@ local function resident(definition: Resident): Resident
         questId = definition.questId,
         introduction = definition.introduction,
         job = table.freeze(definition.job),
+        requiresEnding = if definition.requiresEnding ~= nil
+            then table.freeze(table.clone(definition.requiresEnding))
+            else nil,
     })
 end
 
@@ -23345,6 +23440,16 @@ local ORDER = table.freeze({
     "npc_ivy_thorn",
     "npc_halvard_sunn",
     "npc_maud_ferrow",
+    -- Cinderfall Crown, chapter VI
+    "npc_sabine_ash",
+    "npc_theo_marl",
+    "npc_delia_kass",
+    "npc_bran_holt",
+    -- After the Hollow, chapter VII
+    "npc_orin_vale",
+    "npc_signe_marr",
+    "npc_ruth_calder",
+    "npc_edda_pyne",
 })
 
 local DEFINITIONS: { [string]: Resident } = {
@@ -23658,6 +23763,142 @@ local DEFINITIONS: { [string]: Resident } = {
             boonLabel = "MAUD FINDS A BED FOR WHOEVER CAME BACK WITH NOTHING",
         },
     }),
+    npc_sabine_ash = resident({
+        id = "npc_sabine_ash",
+        displayName = "SABINE",
+        fullName = "Sabine Ash",
+        homeRegion = "region_cinderfall",
+        arrivesInChapter = 6,
+        questId = "quest_glass_hands",
+        introduction = "Made casts for the Crown's ceremonies. Will not make anything shaped like a person now.",
+        job = {
+            residentId = "npc_sabine_ash",
+            buildingId = "building_glassworks",
+            title = "GLASSWRIGHT",
+            boon = "dawn_glazing",
+            boonLabel = "SABINE REGLAZES WHAT THE NIGHT PUT THROUGH A WINDOW",
+        },
+    }),
+    npc_theo_marl = resident({
+        id = "npc_theo_marl",
+        displayName = "THEO",
+        fullName = "Theo Marl",
+        homeRegion = "region_cinderfall",
+        arrivesInChapter = 6,
+        questId = "quest_kept_record",
+        introduction = "Copied the official names for thirty years. Started copying the scratched ones too.",
+        job = {
+            residentId = "npc_theo_marl",
+            buildingId = "building_records_office",
+            title = "RECORDKEEPER",
+            boon = "dawn_ledger",
+            boonLabel = "THEO FINDS SOMETHING IN THE RECORD THAT WAS OWED TO YOU",
+        },
+    }),
+    npc_delia_kass = resident({
+        id = "npc_delia_kass",
+        displayName = "DELIA",
+        fullName = "Delia Kass",
+        homeRegion = "region_cinderfall",
+        arrivesInChapter = 6,
+        questId = "quest_named_stones",
+        introduction = "Knows which of the Crown's statues were people. Will tell anyone who asks, at length.",
+        job = {
+            residentId = "npc_delia_kass",
+            buildingId = "building_memorial_hall",
+            title = "MEMORIALIST",
+            boon = "dawn_remembrance",
+            boonLabel = "DELIA PUTS A NAME ON SOMETHING AND THE TOWN STANDS STRAIGHTER",
+        },
+    }),
+    npc_bran_holt = resident({
+        id = "npc_bran_holt",
+        displayName = "BRAN",
+        fullName = "Bran Holt",
+        homeRegion = "region_cinderfall",
+        arrivesInChapter = 6,
+        questId = "quest_long_timber",
+        introduction = "Cut beams for a city that burned anyway. Cuts them longer now, out of spite.",
+        job = {
+            residentId = "npc_bran_holt",
+            buildingId = "building_sawmill",
+            title = "TIMBERWRIGHT",
+            boon = "dawn_framing",
+            boonLabel = "BRAN FRAMES UP A BUILDING A WHOLE STAGE EARLY",
+        },
+    }),
+    --[[
+        Orin Vale, who has been the answer to the archive's question since
+        the first ten fragments shipped. He comes up only if the light was
+        put out or broken up -- if it was kept, somebody has to be down
+        there tending it, and it is him. That is the postgame the endings
+        earn, and it is one field rather than three copies of the roster.
+    ]]
+    npc_orin_vale = resident({
+        id = "npc_orin_vale",
+        displayName = "ORIN",
+        fullName = "Orin Vale",
+        homeRegion = "region_hollow",
+        arrivesInChapter = 7,
+        questId = "quest_keepers_return",
+        introduction = "The keeper whose trail runs through every fragment in the archive. Older than he should be.",
+        requiresEnding = { "ending_ended", "ending_shared" },
+        job = {
+            residentId = "npc_orin_vale",
+            buildingId = "building_lamp_house",
+            title = "LANTERN KEEPER",
+            boon = "night_keepers_watch",
+            boonLabel = "ORIN KEEPS THE WATCH HE KEPT ALONE FOR YEARS",
+        },
+    }),
+    npc_signe_marr = resident({
+        id = "npc_signe_marr",
+        displayName = "SIGNE",
+        fullName = "Signe Marr",
+        homeRegion = "region_hollow",
+        arrivesInChapter = 7,
+        questId = "quest_deep_water",
+        introduction = "Walked out of the Hollow behind you and has not explained how she got in.",
+        job = {
+            residentId = "npc_signe_marr",
+            buildingId = "building_deep_well",
+            title = "WELLKEEPER",
+            boon = "dawn_draught",
+            boonLabel = "SIGNE DRAWS SOMETHING CLEAN UP OUT OF THE DEEP WELL",
+        },
+    }),
+    npc_ruth_calder = resident({
+        id = "npc_ruth_calder",
+        displayName = "RUTH",
+        fullName = "Ruth Calder",
+        homeRegion = "region_hollow",
+        arrivesInChapter = 7,
+        questId = "quest_full_house",
+        introduction = "Ran the town meetings before there was a town. Intends to keep running them.",
+        job = {
+            residentId = "npc_ruth_calder",
+            buildingId = "building_meeting_hall",
+            title = "SPEAKER",
+            boon = "dawn_assembly",
+            boonLabel = "RUTH GETS THE WHOLE TOWN POINTED AT ONE JOB FOR A DAY",
+        },
+    }),
+    npc_edda_pyne = resident({
+        id = "npc_edda_pyne",
+        displayName = "EDDA",
+        fullName = "Edda Pyne",
+        homeRegion = "region_hollow",
+        arrivesInChapter = 7,
+        questId = "quest_last_ward",
+        introduction = "Built traps for a road that no longer needs them. Building them anyway, smaller.",
+        job = {
+            residentId = "npc_edda_pyne",
+            buildingId = "building_trapworks",
+            title = "TRAPWRIGHT",
+            boon = "night_ward",
+            boonLabel = "EDDA'S WARDS TAKE THE FIRST BITE OF THE NIGHT",
+        },
+    }),
 }
 
 ResidentRoster.Order = ORDER
@@ -23685,11 +23926,29 @@ end
     what every caller that predates the roster means, so nothing changes
     for a save that has not left Bramblewake.
 ]]
-function ResidentRoster.idsForChapter(chapter: number?): { string }
+--[[
+    Who is in town at a given point in the story. `ending` is the finale's
+    own id and only matters to the postgame residents: one of them is in
+    town or is not depending on what a party did with the light, and a
+    caller that does not know the ending gets the town without them, which
+    is the correct answer for every save that has not finished.
+]]
+function ResidentRoster.idsForChapter(chapter: number?, ending: string?): { string }
     local reached = math.max(1, math.floor(tonumber(chapter) or 1))
     local ids: { string } = {}
     for _, residentId in ORDER do
-        if DEFINITIONS[residentId].arrivesInChapter <= reached then
+        local definition = DEFINITIONS[residentId]
+        local allowed = true
+        if definition.requiresEnding ~= nil then
+            allowed = false
+            for _, endingId in definition.requiresEnding do
+                if endingId == ending then
+                    allowed = true
+                    break
+                end
+            end
+        end
+        if allowed and definition.arrivesInChapter <= reached then
             table.insert(ids, residentId)
         end
     end
@@ -28583,7 +28842,13 @@ local function residentIds(tier: number, story: any): { string }
     if tier < 1 then
         return {}
     end
-    return ResidentRoster.idsForChapter(reachedChapter(story))
+    -- The finale's ending decides one resident: Orin is in town or he is
+    -- still below, depending on what was done with the light.
+    local finale = if type(story) == "table" then story.finale else nil
+    local ending = if type(finale) == "table" and finale.status == "complete"
+        then finale.ending
+        else nil
+    return ResidentRoster.idsForChapter(reachedChapter(story), ending)
 end
 
 function TownProgression.resolve(profile: any): Consequence

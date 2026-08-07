@@ -41,6 +41,13 @@ export type Resident = {
     arrivesInChapter: number,
     questId: string,
     job: Job,
+    --[[
+        Postgame only. A resident with this arrives with chapter seven and
+        only for the endings named -- which is how the town can be
+        different afterwards without the roster growing a second copy of
+        itself for each ending.
+    ]]
+    requiresEnding: { string }?,
     -- One line about who they are, for the world sign and the Field Book.
     introduction: string,
 }
@@ -55,6 +62,9 @@ local function resident(definition: Resident): Resident
         questId = definition.questId,
         introduction = definition.introduction,
         job = table.freeze(definition.job),
+        requiresEnding = if definition.requiresEnding ~= nil
+            then table.freeze(table.clone(definition.requiresEnding))
+            else nil,
     })
 end
 
@@ -87,6 +97,16 @@ local ORDER = table.freeze({
     "npc_ivy_thorn",
     "npc_halvard_sunn",
     "npc_maud_ferrow",
+    -- Cinderfall Crown, chapter VI
+    "npc_sabine_ash",
+    "npc_theo_marl",
+    "npc_delia_kass",
+    "npc_bran_holt",
+    -- After the Hollow, chapter VII
+    "npc_orin_vale",
+    "npc_signe_marr",
+    "npc_ruth_calder",
+    "npc_edda_pyne",
 })
 
 local DEFINITIONS: { [string]: Resident } = {
@@ -400,6 +420,142 @@ local DEFINITIONS: { [string]: Resident } = {
             boonLabel = "MAUD FINDS A BED FOR WHOEVER CAME BACK WITH NOTHING",
         },
     }),
+    npc_sabine_ash = resident({
+        id = "npc_sabine_ash",
+        displayName = "SABINE",
+        fullName = "Sabine Ash",
+        homeRegion = "region_cinderfall",
+        arrivesInChapter = 6,
+        questId = "quest_glass_hands",
+        introduction = "Made casts for the Crown's ceremonies. Will not make anything shaped like a person now.",
+        job = {
+            residentId = "npc_sabine_ash",
+            buildingId = "building_glassworks",
+            title = "GLASSWRIGHT",
+            boon = "dawn_glazing",
+            boonLabel = "SABINE REGLAZES WHAT THE NIGHT PUT THROUGH A WINDOW",
+        },
+    }),
+    npc_theo_marl = resident({
+        id = "npc_theo_marl",
+        displayName = "THEO",
+        fullName = "Theo Marl",
+        homeRegion = "region_cinderfall",
+        arrivesInChapter = 6,
+        questId = "quest_kept_record",
+        introduction = "Copied the official names for thirty years. Started copying the scratched ones too.",
+        job = {
+            residentId = "npc_theo_marl",
+            buildingId = "building_records_office",
+            title = "RECORDKEEPER",
+            boon = "dawn_ledger",
+            boonLabel = "THEO FINDS SOMETHING IN THE RECORD THAT WAS OWED TO YOU",
+        },
+    }),
+    npc_delia_kass = resident({
+        id = "npc_delia_kass",
+        displayName = "DELIA",
+        fullName = "Delia Kass",
+        homeRegion = "region_cinderfall",
+        arrivesInChapter = 6,
+        questId = "quest_named_stones",
+        introduction = "Knows which of the Crown's statues were people. Will tell anyone who asks, at length.",
+        job = {
+            residentId = "npc_delia_kass",
+            buildingId = "building_memorial_hall",
+            title = "MEMORIALIST",
+            boon = "dawn_remembrance",
+            boonLabel = "DELIA PUTS A NAME ON SOMETHING AND THE TOWN STANDS STRAIGHTER",
+        },
+    }),
+    npc_bran_holt = resident({
+        id = "npc_bran_holt",
+        displayName = "BRAN",
+        fullName = "Bran Holt",
+        homeRegion = "region_cinderfall",
+        arrivesInChapter = 6,
+        questId = "quest_long_timber",
+        introduction = "Cut beams for a city that burned anyway. Cuts them longer now, out of spite.",
+        job = {
+            residentId = "npc_bran_holt",
+            buildingId = "building_sawmill",
+            title = "TIMBERWRIGHT",
+            boon = "dawn_framing",
+            boonLabel = "BRAN FRAMES UP A BUILDING A WHOLE STAGE EARLY",
+        },
+    }),
+    --[[
+        Orin Vale, who has been the answer to the archive's question since
+        the first ten fragments shipped. He comes up only if the light was
+        put out or broken up -- if it was kept, somebody has to be down
+        there tending it, and it is him. That is the postgame the endings
+        earn, and it is one field rather than three copies of the roster.
+    ]]
+    npc_orin_vale = resident({
+        id = "npc_orin_vale",
+        displayName = "ORIN",
+        fullName = "Orin Vale",
+        homeRegion = "region_hollow",
+        arrivesInChapter = 7,
+        questId = "quest_keepers_return",
+        introduction = "The keeper whose trail runs through every fragment in the archive. Older than he should be.",
+        requiresEnding = { "ending_ended", "ending_shared" },
+        job = {
+            residentId = "npc_orin_vale",
+            buildingId = "building_lamp_house",
+            title = "LANTERN KEEPER",
+            boon = "night_keepers_watch",
+            boonLabel = "ORIN KEEPS THE WATCH HE KEPT ALONE FOR YEARS",
+        },
+    }),
+    npc_signe_marr = resident({
+        id = "npc_signe_marr",
+        displayName = "SIGNE",
+        fullName = "Signe Marr",
+        homeRegion = "region_hollow",
+        arrivesInChapter = 7,
+        questId = "quest_deep_water",
+        introduction = "Walked out of the Hollow behind you and has not explained how she got in.",
+        job = {
+            residentId = "npc_signe_marr",
+            buildingId = "building_deep_well",
+            title = "WELLKEEPER",
+            boon = "dawn_draught",
+            boonLabel = "SIGNE DRAWS SOMETHING CLEAN UP OUT OF THE DEEP WELL",
+        },
+    }),
+    npc_ruth_calder = resident({
+        id = "npc_ruth_calder",
+        displayName = "RUTH",
+        fullName = "Ruth Calder",
+        homeRegion = "region_hollow",
+        arrivesInChapter = 7,
+        questId = "quest_full_house",
+        introduction = "Ran the town meetings before there was a town. Intends to keep running them.",
+        job = {
+            residentId = "npc_ruth_calder",
+            buildingId = "building_meeting_hall",
+            title = "SPEAKER",
+            boon = "dawn_assembly",
+            boonLabel = "RUTH GETS THE WHOLE TOWN POINTED AT ONE JOB FOR A DAY",
+        },
+    }),
+    npc_edda_pyne = resident({
+        id = "npc_edda_pyne",
+        displayName = "EDDA",
+        fullName = "Edda Pyne",
+        homeRegion = "region_hollow",
+        arrivesInChapter = 7,
+        questId = "quest_last_ward",
+        introduction = "Built traps for a road that no longer needs them. Building them anyway, smaller.",
+        job = {
+            residentId = "npc_edda_pyne",
+            buildingId = "building_trapworks",
+            title = "TRAPWRIGHT",
+            boon = "night_ward",
+            boonLabel = "EDDA'S WARDS TAKE THE FIRST BITE OF THE NIGHT",
+        },
+    }),
 }
 
 ResidentRoster.Order = ORDER
@@ -427,11 +583,29 @@ end
     what every caller that predates the roster means, so nothing changes
     for a save that has not left Bramblewake.
 ]]
-function ResidentRoster.idsForChapter(chapter: number?): { string }
+--[[
+    Who is in town at a given point in the story. `ending` is the finale's
+    own id and only matters to the postgame residents: one of them is in
+    town or is not depending on what a party did with the light, and a
+    caller that does not know the ending gets the town without them, which
+    is the correct answer for every save that has not finished.
+]]
+function ResidentRoster.idsForChapter(chapter: number?, ending: string?): { string }
     local reached = math.max(1, math.floor(tonumber(chapter) or 1))
     local ids: { string } = {}
     for _, residentId in ORDER do
-        if DEFINITIONS[residentId].arrivesInChapter <= reached then
+        local definition = DEFINITIONS[residentId]
+        local allowed = true
+        if definition.requiresEnding ~= nil then
+            allowed = false
+            for _, endingId in definition.requiresEnding do
+                if endingId == ending then
+                    allowed = true
+                    break
+                end
+            end
+        end
+        if allowed and definition.arrivesInChapter <= reached then
             table.insert(ids, residentId)
         end
     end
