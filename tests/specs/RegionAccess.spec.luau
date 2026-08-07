@@ -91,9 +91,25 @@ return {
                     },
                 }
                 TestRunner.equal(RegionAccess.chapterReached(throughFour, "region_frostmere"), true)
-                -- a region with no chapter of its own still answers only to
-                -- its flag
-                TestRunner.equal(RegionAccess.chapterReached(nil, "region_hollow"), true)
+                -- and the chain now runs to the bottom of it: the Crown
+                -- behind the Vale's chapter, the Hollow behind the Crown's.
+                -- Nothing in this game is reachable by flag alone any more.
+                TestRunner.equal(
+                    RegionAccess.chapterReached(throughFour, "region_cinderfall"),
+                    false
+                )
+                local throughSix = {
+                    chapterOne = RESOLVED_ONE.chapterOne,
+                    chapters = {
+                        chapter_six = { status = "complete", outcome = "remembered" },
+                        chapter_five = { status = "complete", outcome = "sheltered" },
+                        chapter_four = { status = "complete", outcome = "navigable" },
+                        chapter_three = { status = "complete", outcome = "sealed" },
+                        chapter_two = { status = "complete", outcome = "cleared" },
+                    },
+                }
+                TestRunner.equal(RegionAccess.chapterReached(throughSix, "region_hollow"), true)
+                TestRunner.equal(RegionAccess.chapterReached(nil, "region_hollow"), false)
             end,
         },
         {

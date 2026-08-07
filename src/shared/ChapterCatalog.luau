@@ -55,6 +55,8 @@ local ORDER = table.freeze({
     "chapter_three",
     "chapter_four",
     "chapter_five",
+    "chapter_six",
+    "chapter_seven",
 })
 
 local DEFINITIONS: { [string]: Chapter } = {
@@ -137,6 +139,42 @@ local DEFINITIONS: { [string]: Chapter } = {
         decisions = { "warmed_den", "kept_warmth", "split_warmth" },
         outcomes = { "sheltered", "thinned", "silenced" },
         requires = "chapter_four",
+    }),
+    chapter_six = chapter({
+        id = "chapter_six",
+        number = 6,
+        displayName = "THE CROWN STILL BURNING",
+        regionId = "region_cinderfall",
+        bossId = "boss_ash_regent",
+        --[[
+            The Regent is rooted deeper in something true than in
+            something it made up, so an authentic statue is worth two
+            anchors and a cast is worth one. That makes the fast way
+            through the Crown the destruction of the only record of the
+            people who died in it, and the chapter records how much of
+            that a party was willing to do.
+        ]]
+        decisionPrompt = "WHAT WAS BROKEN TO REACH IT",
+        decisions = { "spared_memories", "broke_some", "broke_them_all" },
+        outcomes = { "remembered", "recast", "erased" },
+        requires = "chapter_five",
+    }),
+    chapter_seven = chapter({
+        id = "chapter_seven",
+        number = 7,
+        displayName = "THE HOLLOW BELOW",
+        regionId = "region_hollow",
+        bossId = "boss_nameless_night",
+        --[[
+            The finale's one menu, and the only one in the game. Everything
+            else the Hollow asks is decided with a player's hands while
+            something is happening; this is what is left when there is
+            nothing happening any more.
+        ]]
+        decisionPrompt = "WHAT HAPPENS TO THE LIGHT",
+        decisions = { "ending_kept", "ending_ended", "ending_shared" },
+        outcomes = { "lantern_kept", "lantern_out", "lantern_shared" },
+        requires = "chapter_six",
     }),
 }
 

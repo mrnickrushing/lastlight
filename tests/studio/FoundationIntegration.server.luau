@@ -47,7 +47,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 local TerrainBuilder = require(serverRoot.World.TerrainBuilder)
 
 local content = Registry.new(Regions)
-assert(Config.SaveSchemaVersion == 20, "unexpected save schema version")
+assert(Config.SaveSchemaVersion == 21, "unexpected save schema version")
 assert(Config.BuildVersion == "0.53.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
