@@ -18,6 +18,7 @@
 local BramblewakeEnemies = require("./BramblewakeEnemies")
 local IronrootEnemies = require("./IronrootEnemies")
 local MireglassEnemies = require("./MireglassEnemies")
+local TempestEnemies = require("./TempestEnemies")
 
 local EnemyCatalog = {}
 
@@ -27,6 +28,7 @@ local ROSTERS: { { regionId: string, roster: any } } = {
     { regionId = "region_bramblewake", roster = BramblewakeEnemies },
     { regionId = "region_ironroot", roster = IronrootEnemies },
     { regionId = "region_mireglass", roster = MireglassEnemies },
+    { regionId = "region_tempest", roster = TempestEnemies },
 }
 
 local ROSTER_BY_REGION: { [string]: any } = {}

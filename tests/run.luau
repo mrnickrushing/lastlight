@@ -23,6 +23,7 @@ TestRunner.run({
     require("./specs/IronrootElites.spec"),
     require("./specs/BellowsMawEncounter.spec"),
     require("./specs/MireglassEncounters.spec"),
+    require("./specs/TempestEncounters.spec"),
     require("./specs/ResidentRoster.spec"),
     require("./specs/ChapterProgress.spec"),
     require("./specs/RegionAccess.spec"),
