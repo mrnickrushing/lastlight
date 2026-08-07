@@ -81,15 +81,16 @@ return {
             end,
         },
         {
-            name = "the town has twenty-two buildings and every one of them stages",
+            name = "the town has twenty-eight buildings and every one of them stages",
             run = function()
-                -- Milestone 4 asked for sixteen; tiers four and five bring
-                -- six more. The count is asserted here so adding an asset
-                -- without wiring its progression, or wiring one without
-                -- adding it to the shared list, fails rather than quietly
-                -- producing a town with a hole in it.
+                -- Milestone 4 asked for sixteen; tiers four and five brought
+                -- six more and tiers six and seven the last six, which is
+                -- the roadmap's launch town. The count is asserted here so
+                -- adding an asset without wiring its progression, or wiring
+                -- one without adding it to the shared list, fails rather
+                -- than quietly producing a town with a hole in it.
                 local ids = TownProgression.buildingIds()
-                TestRunner.equal(#ids, 22)
+                TestRunner.equal(#ids, 28)
 
                 local seen: { [string]: boolean } = {}
                 for _, buildingId in ids do
@@ -97,7 +98,7 @@ return {
                     seen[buildingId] = true
                 end
 
-                for tier = 0, 5 do
+                for tier = 0, 7 do
                     local consequence = TownProgression.resolve({
                         town = { nightNumber = tier * 3 + 1 },
                     })
@@ -231,6 +232,49 @@ return {
                 local merged = TownProgression.merge(unresolved, wild)
                 TestRunner.equal(merged.decision, "wild_regrowth")
                 TestRunner.equal(merged.memorialKind, "broken_antlers")
+            end,
+        },
+        {
+            -- The last two tiers, and the end of the road: the Crown lifts
+            -- the ceiling to six, the Hollow to seven, and a town that
+            -- finished the story is floored at the top of it.
+            name = "the Crown and the Hollow open the last two tiers",
+            run = function()
+                local chapterOne = {
+                    status = "complete",
+                    decision = "shared_agroforest",
+                    wardenOutcome = "preserved",
+                }
+                local chapters: { [string]: any } = {
+                    chapter_two = { status = "complete", outcome = "cleared" },
+                    chapter_three = { status = "complete", outcome = "sealed" },
+                    chapter_four = { status = "complete", outcome = "navigable" },
+                    chapter_five = { status = "complete", outcome = "sheltered" },
+                    chapter_six = { status = "complete", outcome = "remembered" },
+                }
+                local throughSix = TownProgression.resolve({
+                    story = { chapterOne = chapterOne, chapters = chapters },
+                    town = { nightNumber = 1 },
+                })
+                TestRunner.equal(throughSix.tier, 6)
+                TestRunner.equal(throughSix.buildingStages.building_glassworks, 1)
+                -- the Hollow's own buildings are still lots
+                TestRunner.equal(throughSix.buildingStages.building_lamp_house, 0)
+
+                chapters.chapter_seven = { status = "complete", outcome = "lantern_shared" }
+                local finished = TownProgression.resolve({
+                    story = { chapterOne = chapterOne, chapters = chapters },
+                    town = { nightNumber = 1 },
+                })
+                TestRunner.equal(finished.tier, 7)
+                TestRunner.equal(finished.buildingStages.building_lamp_house, 1)
+                TestRunner.equal(finished.buildingStages.building_glassworks, 2)
+                -- storage grows with the town all the way up
+                TestRunner.truthy(
+                    TownProgression.storageCapForTier(7) > TownProgression.storageCapForTier(5)
+                )
+                -- and nights alone still cap where they always did
+                TestRunner.equal(TownProgression.resolve({ town = { nightNumber = 900 } }).tier, 3)
             end,
         },
         {

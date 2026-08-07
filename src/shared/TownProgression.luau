@@ -59,6 +59,18 @@ local BUILDING_FIRST_TIER: { [string]: number } = {
     building_ropewalk = 5,
     building_bell_tower = 5,
     building_infirmary = 5,
+
+    -- Tiers six and seven are the last two, and what they add is what a
+    -- town does after the story rather than during it. The Crown teaches
+    -- it to keep a record; the Hollow leaves it deciding what to do with
+    -- a light it now understands.
+    building_glassworks = 6,
+    building_memorial_hall = 6,
+    building_records_office = 6,
+
+    building_lamp_house = 7,
+    building_deep_well = 7,
+    building_meeting_hall = 7,
 }
 
 --[[
@@ -68,7 +80,7 @@ local BUILDING_FIRST_TIER: { [string]: number } = {
     it, and each tier earns real headroom.
 ]]
 function TownProgression.storageCapForTier(tier: number): number
-    return 80 + math.clamp(math.floor(tonumber(tier) or 0), 0, 5) * 60
+    return 80 + math.clamp(math.floor(tonumber(tier) or 0), 0, 7) * 60
 end
 
 local function buildingStages(tier: number): { [string]: number }
@@ -162,15 +174,17 @@ function TownProgression.resolve(profile: any): Consequence
         else 1
     local story = if type(profile) == "table" then profile.story else nil
     --[[
-        The town grows to tier 5, but the road there is the story's:
+        The town grows to tier 7, but the road there is the story's:
         nights alone still cap at 3, exactly as they always have
-        (spec-pinned). Stilling the Bellows Maw lifts the ceiling to 4 and
-        lowering the harbour's tide lifts it to 5. Each resolved chapter
-        also floors the tier, so coming home from a chapter always shows
-        something changed.
+        (spec-pinned). Stilling the Bellows Maw lifts the ceiling to 4,
+        lowering the harbour's tide lifts it to 5, the Crown lifts it to 6
+        and the Hollow to 7. Each resolved chapter also floors the tier,
+        so coming home from a chapter always shows something changed.
     ]]
-    local ceiling = if chapterComplete(story, "chapter_four")
-        then 5
+    local ceiling = if chapterComplete(story, "chapter_seven")
+        then 7
+        elseif chapterComplete(story, "chapter_six") then 6
+        elseif chapterComplete(story, "chapter_four") then 5
         elseif chapterComplete(story, "chapter_two") then 4
         else 3
     local tier = math.clamp(math.floor(math.max(0, nights - 1) / 3), 0, ceiling)
@@ -190,6 +204,12 @@ function TownProgression.resolve(profile: any): Consequence
     end
     if chapterComplete(story, "chapter_five") then
         tier = math.max(5, tier)
+    end
+    if chapterComplete(story, "chapter_six") then
+        tier = math.max(6, tier)
+    end
+    if chapterComplete(story, "chapter_seven") then
+        tier = math.max(7, tier)
     end
     local title = if decision == "restore_farmland"
         then "FARMLAND RENEWED"

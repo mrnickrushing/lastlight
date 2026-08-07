@@ -28489,6 +28489,18 @@ local BUILDING_FIRST_TIER: { [string]: number } = {
     building_ropewalk = 5,
     building_bell_tower = 5,
     building_infirmary = 5,
+
+    -- Tiers six and seven are the last two, and what they add is what a
+    -- town does after the story rather than during it. The Crown teaches
+    -- it to keep a record; the Hollow leaves it deciding what to do with
+    -- a light it now understands.
+    building_glassworks = 6,
+    building_memorial_hall = 6,
+    building_records_office = 6,
+
+    building_lamp_house = 7,
+    building_deep_well = 7,
+    building_meeting_hall = 7,
 }
 
 --[[
@@ -28498,7 +28510,7 @@ local BUILDING_FIRST_TIER: { [string]: number } = {
     it, and each tier earns real headroom.
 ]]
 function TownProgression.storageCapForTier(tier: number): number
-    return 80 + math.clamp(math.floor(tonumber(tier) or 0), 0, 5) * 60
+    return 80 + math.clamp(math.floor(tonumber(tier) or 0), 0, 7) * 60
 end
 
 local function buildingStages(tier: number): { [string]: number }
@@ -28592,15 +28604,17 @@ function TownProgression.resolve(profile: any): Consequence
         else 1
     local story = if type(profile) == "table" then profile.story else nil
     --[[
-        The town grows to tier 5, but the road there is the story's:
+        The town grows to tier 7, but the road there is the story's:
         nights alone still cap at 3, exactly as they always have
-        (spec-pinned). Stilling the Bellows Maw lifts the ceiling to 4 and
-        lowering the harbour's tide lifts it to 5. Each resolved chapter
-        also floors the tier, so coming home from a chapter always shows
-        something changed.
+        (spec-pinned). Stilling the Bellows Maw lifts the ceiling to 4,
+        lowering the harbour's tide lifts it to 5, the Crown lifts it to 6
+        and the Hollow to 7. Each resolved chapter also floors the tier,
+        so coming home from a chapter always shows something changed.
     ]]
-    local ceiling = if chapterComplete(story, "chapter_four")
-        then 5
+    local ceiling = if chapterComplete(story, "chapter_seven")
+        then 7
+        elseif chapterComplete(story, "chapter_six") then 6
+        elseif chapterComplete(story, "chapter_four") then 5
         elseif chapterComplete(story, "chapter_two") then 4
         else 3
     local tier = math.clamp(math.floor(math.max(0, nights - 1) / 3), 0, ceiling)
@@ -28620,6 +28634,12 @@ function TownProgression.resolve(profile: any): Consequence
     end
     if chapterComplete(story, "chapter_five") then
         tier = math.max(5, tier)
+    end
+    if chapterComplete(story, "chapter_six") then
+        tier = math.max(6, tier)
+    end
+    if chapterComplete(story, "chapter_seven") then
+        tier = math.max(7, tier)
     end
     local title = if decision == "restore_farmland"
         then "FARMLAND RENEWED"
@@ -55420,6 +55440,74 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(-150, 0, -268), PLAZA)
     )
     noteConstructionTarget("building_infirmary", "INFIRMARY", signAnchor(infirmary))
+
+    --[[
+        Tiers six and seven: the last six, and the only ones a town builds
+        after its story rather than during it. Same procedural shells as
+        the tier four and five group, same reason -- a reachable tier
+        needs something standing in it the day it opens, and swapping any
+        of them for an authored model later is one call each.
+    ]]
+    local glassworks = buildingShell(
+        "building_glassworks",
+        "GLASSWORKS",
+        Vector3.new(150, 0, -60),
+        Vector3.new(18, 0, 14),
+        stageFor("building_glassworks"),
+        Color3.fromRGB(180, 196, 206),
+        yawToward(Vector3.new(150, 0, -60), PLAZA)
+    )
+    noteConstructionTarget("building_glassworks", "GLASSWORKS", signAnchor(glassworks))
+    local memorialHall = buildingShell(
+        "building_memorial_hall",
+        "MEMORIAL HALL",
+        Vector3.new(-150, 0, -120),
+        Vector3.new(18, 0, 14),
+        stageFor("building_memorial_hall"),
+        Color3.fromRGB(148, 142, 134),
+        yawToward(Vector3.new(-150, 0, -120), PLAZA)
+    )
+    noteConstructionTarget("building_memorial_hall", "MEMORIAL HALL", signAnchor(memorialHall))
+    local recordsOffice = buildingShell(
+        "building_records_office",
+        "RECORDS OFFICE",
+        Vector3.new(92, 0, -166),
+        Vector3.new(16, 0, 12),
+        stageFor("building_records_office"),
+        Color3.fromRGB(160, 138, 100),
+        yawToward(Vector3.new(92, 0, -166), PLAZA)
+    )
+    noteConstructionTarget("building_records_office", "RECORDS OFFICE", signAnchor(recordsOffice))
+    local lampHouse = buildingShell(
+        "building_lamp_house",
+        "LAMP HOUSE",
+        Vector3.new(-70, 0, -226),
+        Vector3.new(16, 0, 12),
+        stageFor("building_lamp_house"),
+        Color3.fromRGB(255, 216, 150),
+        yawToward(Vector3.new(-70, 0, -226), PLAZA)
+    )
+    noteConstructionTarget("building_lamp_house", "LAMP HOUSE", signAnchor(lampHouse))
+    local deepWell = buildingShell(
+        "building_deep_well",
+        "DEEP WELL",
+        Vector3.new(-30, 0, -190),
+        Vector3.new(12, 0, 12),
+        stageFor("building_deep_well"),
+        Color3.fromRGB(96, 118, 128),
+        yawToward(Vector3.new(-30, 0, -190), PLAZA)
+    )
+    noteConstructionTarget("building_deep_well", "DEEP WELL", signAnchor(deepWell))
+    local meetingHall = buildingShell(
+        "building_meeting_hall",
+        "MEETING HALL",
+        Vector3.new(110, 0, -258),
+        Vector3.new(18, 0, 14),
+        stageFor("building_meeting_hall"),
+        Color3.fromRGB(196, 140, 79),
+        yawToward(Vector3.new(110, 0, -258), PLAZA)
+    )
+    noteConstructionTarget("building_meeting_hall", "MEETING HALL", signAnchor(meetingHall))
 
     local residentDefinitions = {
         npc_tomas_reed = {
