@@ -307,8 +307,6 @@ if (existsSync(catalogPath)) {
     }, 0);
   for (const [column, expected, label] of [
     [2, 180, "surface modules"],
-    // 79 is the design target; 71 are built, and the eight-POI gap in
-    // Bramblewake is asserted at its real size in ContentCensus.spec.
     [3, 79, "points of interest"],
     [4, 48, "surface events"]
   ]) {

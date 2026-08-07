@@ -59,6 +59,50 @@ return {
             end,
         },
         {
+            --[[
+                Bramblewake has its own builder and is not in REGIONS
+                above, so nothing else checks it -- and its points of
+                interest dispatch on `definition.visual ==` exactly the way
+                module visuals do in the newer builders. A POI added to its
+                catalog without a case here still gets an anchor and a
+                memory lantern, so it does not fail; it just stands in the
+                world as a floating name over empty ground, which is worse.
+            ]]
+            name = "every Bramblewake point of interest has geometry behind it",
+            run = function()
+                local Bramblewake =
+                    require("../../src/shared/Content/Definitions/BramblewakeExpedition")
+                local source = builderSource("src/server/World/BramblewakeBuilder.luau")
+                local missing: { string } = {}
+                for _, definition in Bramblewake.PointsOfInterest do
+                    local needle = string.format("visual == %q", definition.visual)
+                    if string.find(source, needle, 1, true) == nil then
+                        table.insert(missing, definition.visual)
+                    end
+                end
+                TestRunner.truthy(
+                    #missing == 0,
+                    "Bramblewake POI visuals with no case in its builder: "
+                        .. table.concat(missing, ", ")
+                )
+                --[[
+                    And no catch-all: the root chapel spent its first year
+                    as the chain's `else`, which meant any unknown visual
+                    silently drew a chapel. Every branch must name its
+                    visual so an unknown one draws nothing and the check
+                    above is the thing that catches it.
+                ]]
+                local poiChunk =
+                    string.match(source, "local function buildPointOfInterest(.-)\nlocal function")
+                TestRunner.truthy(poiChunk ~= nil, "buildPointOfInterest went missing")
+                TestRunner.equal(
+                    string.find(poiChunk :: string, "\n    else\n", 1, true),
+                    nil,
+                    "buildPointOfInterest has a catch-all branch again"
+                )
+            end,
+        },
+        {
             -- The region must not open until it is whole. This pins the
             -- other half of that promise: the builder answering for every
             -- key is what earns the enabled flag, not the reverse.
