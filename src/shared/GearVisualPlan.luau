@@ -1,5 +1,7 @@
 --!strict
 
+local Equipment = require("./Equipment")
+
 local GearVisualPlan = {}
 
 export type PartPlan = {
@@ -369,8 +371,289 @@ local DEFINITIONS: { [string]: ItemPlan } = {
     }),
 }
 
+--[[
+    Everything the other five regions craft.
+
+    There are eighty of those, and hand-authoring eighty part lists at the
+    quality of the ten above is an art pass, not a wiring wave. What is
+    not acceptable in the meantime is a player equipping a Vale maul and
+    seeing nothing on their character, so a plan is derived rather than
+    missing: the silhouette comes from the item's family (a maul reads as
+    a maul, a bow as a bow) and the palette comes from its region.
+
+    This is deliberately labelled. A derived plan carries `derived = true`
+    so nothing downstream can mistake a recolour for authored work, and
+    the art pass that replaces them is tracked as an owner-gated item
+    alongside the regions' mesh dressing. The rule the visual standard
+    sets -- recolouring an assembly is not new content -- is exactly why
+    these are a floor rather than a deliverable.
+]]
+--[[
+    The three armour slots the first ten items never used. These are
+    authored here rather than borrowed, because there was nothing to
+    borrow -- a coat is not a hood in a different colour -- and because a
+    slot with no template would be an item that equips and never appears.
+]]
+local SLOT_TEMPLATE_PARTS: { [string]: { PartPlan } } = {
+    body = {
+        part(
+            "CoatFront",
+            "torso",
+            "Block",
+            { 2.05, 1.7, 0.42 },
+            { 0, 0.1, -0.62 },
+            { 0, 0, 0 },
+            { 92, 78, 62 },
+            "Fabric"
+        ),
+        part(
+            "CoatBack",
+            "torso",
+            "Block",
+            { 2.05, 1.7, 0.34 },
+            { 0, 0.1, 0.58 },
+            { 0, 0, 0 },
+            { 72, 60, 48 },
+            "Fabric"
+        ),
+        part(
+            "ShoulderLeft",
+            "torso",
+            "Block",
+            { 0.75, 0.42, 1.1 },
+            { -1.05, 0.82, 0 },
+            { 0, 0, -12 },
+            { 108, 92, 74 },
+            "Metal"
+        ),
+        part(
+            "ShoulderRight",
+            "torso",
+            "Block",
+            { 0.75, 0.42, 1.1 },
+            { 1.05, 0.82, 0 },
+            { 0, 0, 12 },
+            { 108, 92, 74 },
+            "Metal"
+        ),
+        part(
+            "Belt",
+            "torso",
+            "Block",
+            { 2.15, 0.3, 1.15 },
+            { 0, -0.72, 0 },
+            { 0, 0, 0 },
+            { 58, 46, 36 },
+            "Leather"
+        ),
+    },
+    hands = {
+        part(
+            "CuffRight",
+            "RightHand",
+            "Block",
+            { 1.1, 0.62, 1.1 },
+            { 0, 0.34, 0 },
+            { 0, 0, 0 },
+            { 96, 82, 66 },
+            "Leather"
+        ),
+        part(
+            "CuffLeft",
+            "leftHand",
+            "Block",
+            { 1.1, 0.62, 1.1 },
+            { 0, 0.34, 0 },
+            { 0, 0, 0 },
+            { 96, 82, 66 },
+            "Leather"
+        ),
+        part(
+            "StrapRight",
+            "RightHand",
+            "Block",
+            { 1.16, 0.16, 1.16 },
+            { 0, 0.06, 0 },
+            { 0, 0, 0 },
+            { 62, 52, 42 },
+            "Fabric"
+        ),
+        part(
+            "StrapLeft",
+            "leftHand",
+            "Block",
+            { 1.16, 0.16, 1.16 },
+            { 0, 0.06, 0 },
+            { 0, 0, 0 },
+            { 62, 52, 42 },
+            "Fabric"
+        ),
+    },
+    charm = {
+        part(
+            "Cord",
+            "torso",
+            "Block",
+            { 0.9, 0.08, 0.08 },
+            { 0, 0.68, -0.6 },
+            { 0, 0, 0 },
+            { 148, 132, 102 },
+            "Fabric"
+        ),
+        part(
+            "Pendant",
+            "torso",
+            "Block",
+            { 0.44, 0.5, 0.16 },
+            { 0, 0.34, -0.66 },
+            { 0, 0, 0 },
+            { 214, 172, 88 },
+            "Neon"
+        ),
+        part(
+            "PendantBack",
+            "torso",
+            "Block",
+            { 0.5, 0.56, 0.1 },
+            { 0, 0.34, -0.58 },
+            { 0, 0, 0 },
+            { 92, 80, 58 },
+            "Metal"
+        ),
+    },
+}
+
+local FAMILY_TEMPLATES: { [string]: string } = {
+    -- weapon family -> the authored item whose silhouette it borrows
+    bow = "gear_thornwood_bow",
+    maul = "gear_heartwood_maul",
+    lance = "gear_briar_lance",
+    sling = "gear_foxfire_sling",
+    edge = "gear_amber_edge",
+    cudgel = "gear_warden_cudgel",
+    -- armour slot -> same
+    head = "gear_ironroot_hood",
+    feet = "gear_bramble_boots",
+}
+
+local REGION_PALETTES: { [string]: { number } } = {
+    ironroot = { 112, 85, 49 },
+    mireglass = { 76, 96, 88 },
+    tempest = { 92, 96, 100 },
+    frostmere = { 168, 202, 216 },
+    cinderfall = { 148, 142, 134 },
+}
+
+local REGION_PREFIXES = table.freeze({
+    { prefix = "ironroot", region = "ironroot" },
+    { prefix = "mireglass", region = "mireglass" },
+    { prefix = "tempest", region = "tempest" },
+    { prefix = "frostmere", region = "frostmere" },
+    { prefix = "cinderfall", region = "cinderfall" },
+    -- the display names do not all start with the region word, so the
+    -- catalog's own material choice is the fallback signal
+    { prefix = "coalglass", region = "ironroot" },
+    { prefix = "stope", region = "ironroot" },
+    { prefix = "drift", region = "ironroot" },
+    { prefix = "pit", region = "ironroot" },
+    { prefix = "slag", region = "ironroot" },
+    { prefix = "shift", region = "ironroot" },
+    { prefix = "reed", region = "mireglass" },
+    { prefix = "bog", region = "mireglass" },
+    { prefix = "punt", region = "mireglass" },
+    { prefix = "mirror", region = "mireglass" },
+    { prefix = "witchlight", region = "mireglass" },
+    { prefix = "ferry", region = "mireglass" },
+    { prefix = "jetty", region = "tempest" },
+    { prefix = "ballast", region = "tempest" },
+    { prefix = "gaff", region = "tempest" },
+    { prefix = "halyard", region = "tempest" },
+    { prefix = "amberglass", region = "tempest" },
+    { prefix = "breakwater", region = "tempest" },
+    { prefix = "vale", region = "frostmere" },
+    { prefix = "thaw", region = "frostmere" },
+    { prefix = "crevasse", region = "frostmere" },
+    { prefix = "hush", region = "frostmere" },
+    { prefix = "rime", region = "frostmere" },
+    { prefix = "cloister", region = "frostmere" },
+    { prefix = "tier", region = "cinderfall" },
+    { prefix = "kiln", region = "cinderfall" },
+    { prefix = "procession", region = "cinderfall" },
+    { prefix = "cinder", region = "cinderfall" },
+    { prefix = "memory", region = "cinderfall" },
+    { prefix = "bailiff", region = "cinderfall" },
+})
+
+function GearVisualPlan.regionFor(itemId: string): string?
+    local name = string.sub(itemId, 6)
+    for _, entry in REGION_PREFIXES do
+        if string.sub(name, 1, #entry.prefix) == entry.prefix then
+            return entry.region
+        end
+    end
+    return nil
+end
+
+local derivedCache: { [string]: ItemPlan } = {}
+
+local function derive(itemId: string, definition: any): ItemPlan?
+    local cached = derivedCache[itemId]
+    if cached ~= nil then
+        return cached
+    end
+    local templateId = FAMILY_TEMPLATES[definition.kind or ""] or FAMILY_TEMPLATES[definition.slot]
+    local sourceParts: { PartPlan }? = if templateId ~= nil
+            and DEFINITIONS[templateId] ~= nil
+        then DEFINITIONS[templateId].parts
+        else SLOT_TEMPLATE_PARTS[definition.slot]
+    if sourceParts == nil then
+        return nil
+    end
+    local palette = REGION_PALETTES[GearVisualPlan.regionFor(itemId) or ""]
+    local parts: { PartPlan } = {}
+    for _, source in sourceParts do
+        table.insert(
+            parts,
+            part(
+                source.name,
+                source.target,
+                source.shape,
+                table.clone(source.size),
+                table.clone(source.offset),
+                table.clone(source.rotation),
+                if palette ~= nil then palette else source.color,
+                source.material
+            )
+        )
+    end
+    local plan: any = table.freeze({
+        derived = true,
+        itemId = itemId,
+        parts = table.freeze(parts),
+        slot = definition.slot,
+    })
+    derivedCache[itemId] = plan
+    return plan
+end
+
+--[[
+    An authored plan if there is one, a derived one if the item's family
+    has a template, and nil only for an item nobody has described at all
+    -- which the coverage spec refuses.
+]]
 function GearVisualPlan.get(itemId: any): ItemPlan?
-    return if type(itemId) == "string" then DEFINITIONS[itemId] else nil
+    if type(itemId) ~= "string" then
+        return nil
+    end
+    local authored = DEFINITIONS[itemId]
+    if authored ~= nil then
+        return authored
+    end
+    local definition = Equipment.get(itemId)
+    if definition == nil then
+        return nil
+    end
+    return derive(itemId, definition)
 end
 
 function GearVisualPlan.list(): { ItemPlan }
