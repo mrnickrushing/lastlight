@@ -341,7 +341,23 @@ its station, and ingredients the expedition ledger accepts, and
 `ContentCensus.spec` asserts these counts against the catalogs so the
 number in this table cannot drift from the number in the game.
 
-Both of the gaps this section once recorded are closed: Bramblewake now
+**The gap that matters most, found live on 2026-08-07: 120 of the 130
+recipes cannot be crafted by anybody.** The workshop's benches are a
+hardcoded list of ten in `WorldService`, each needing its own constant in
+`RuntimeIds.InteractionIds`, and it never grew when the catalog did.
+Every spec passes, the equipment exists, the visual plans exist, the
+equip panel has a button for each — and there is no bench to make them
+at. A recipe existing and a recipe being reachable are different facts,
+and until this the census only checked the first.
+
+`ContentCensus.spec` now asserts the gap at its real size (10 benched,
+120 unreachable) so it cannot be forgotten or rounded away. Closing it
+means deriving the benches from `CraftingCatalog.list()` and giving the
+interaction id a derivable form — `craft:<recipeId>` rather than one
+hand-written constant per recipe. That is the single highest-value piece
+of work outstanding in this repository.
+
+Both of the earlier gaps this section recorded are closed: Bramblewake now
 carries ten armour pieces and twelve points of interest like every other
 region, with its four fragment-anchored POIs pinned into every run. The
 gentlest numbers in the game live on its new armour on purpose — it is

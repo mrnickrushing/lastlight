@@ -250,6 +250,66 @@ return {
         },
         {
             --[[
+                Reachability, which is the thing every other count in this
+                file quietly assumes.
+
+                A recipe exists when it is in the catalog. A recipe is
+                *craftable* when something in the world offers it, and the
+                two are not the same: the benches are a hardcoded list in
+                WorldService, one entry per recipe, each needing its own
+                id in RuntimeIds.InteractionIds. Ten of them were written
+                by hand and never grew.
+
+                So 120 of the 130 recipes cannot be made by anybody. Every
+                spec passes, the equipment exists, the visual plans exist,
+                the equip panel has a button for each -- and there is no
+                bench. A live Studio session found this by walking to the
+                workshop and counting; nothing in the suite could, because
+                nothing in the suite asked.
+
+                This asserts the gap at its real size rather than the size
+                anyone would like it to be. Closing it means deriving the
+                benches from CraftingCatalog.list() and giving the
+                interaction id a derivable form (`craft:<recipeId>`)
+                instead of one hand-written constant per recipe.
+            ]]
+            name = "the crafting benches in the world are a hardcoded ten, not the whole catalog",
+            run = function()
+                local fs = require("@lune/fs")
+                local world = fs.readFile("src/server/Services/WorldService.luau")
+                local benched: { [string]: boolean } = {}
+                local count = 0
+                for recipeId in string.gmatch(world, 'recipeId = "(recipe_[a-z_]+)"') do
+                    if not benched[recipeId] then
+                        benched[recipeId] = true
+                        count += 1
+                    end
+                end
+                TestRunner.equal(count, 10, "the bench list changed size")
+
+                local unreachable = 0
+                for _, recipe in CraftingCatalog.list() do
+                    if not benched[recipe.id] then
+                        unreachable += 1
+                    end
+                end
+                TestRunner.equal(
+                    unreachable,
+                    120,
+                    "the number of recipes nobody can craft moved -- if it went down, "
+                        .. "lower this number; if it went up, something shipped unreachable"
+                )
+                -- and the ten that are reachable are the originals, so a
+                -- fresh player's path through the game still works
+                for _, recipeId in
+                    { "recipe_meadow_satchel", "recipe_amber_charm", "recipe_thornwood_bow" }
+                do
+                    TestRunner.equal(benched[recipeId], true, recipeId .. " lost its bench")
+                end
+            end,
+        },
+        {
+            --[[
                 The census is only worth anything if it matches the
                 document, so it reads the document. A count changed in one
                 place and not the other is exactly the drift this exists to
