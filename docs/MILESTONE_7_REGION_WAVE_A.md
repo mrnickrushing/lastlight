@@ -6,6 +6,47 @@ constraint. This runbook records what exists, what remains, and every
 live check the constraint deferred — so the next Studio session opens
 with a checklist instead of an excavation.
 
+## The Studio verification gap (found 2026-08-07, still open)
+
+A live pass to check two rewritten HUD surfaces — the consumable column
+and the equip panel — got as far as proving both **build** correctly
+(four consumable slots, ninety-six equip buttons, right labels, all
+correctly hidden at zero owned) and no further. Neither can be seen
+populated, and the reason is structural rather than a missing step:
+
+- A fresh Studio profile is **pre-tutorial**, and almost every interface
+  worth verifying is behind tutorial completion — the progress panel, the
+  equip column, the consumable column, crafting itself.
+- `LastLightStockProfile` deliberately grants materials and never
+  progress, which is the right rule and does not help here.
+- **A Play session starts from a fresh DataModel.** An attribute set
+  while editing does not survive into the run; this was verified
+  directly (`skipAttr=nil` in Play after setting it in Edit). So a hook
+  can only be set *during* play.
+- The tutorial **session** is built when the profile loads, which is
+  before a driver can set anything. `ProfileService`'s change-signal
+  watcher can re-stock a purse mid-session because materials are just
+  profile data; it cannot retro-complete a tutorial, because
+  `TutorialService` has already built `_sessions[player]` and gates on
+  `session.stage`.
+
+An attempt to add a `LastLightSkipTutorial` attribute to `ProfileService`
+was written, tested green, and then **reverted**: it would have set the
+profile flag and changed nothing a player could see, which is worse than
+no hook at all.
+
+**The fix, for whoever takes it:** `TutorialService` has to honour the
+flag where it builds or evaluates a session, not `ProfileService` where
+it loads a profile. Either rebuild the session when a profile arrives
+with `tutorial.complete`, or check the attribute in the session's stage
+gate. One of those, plus the same three guards the stock hook carries
+(Studio only, non-persistent only, logged loudly), turns every
+post-tutorial check from a full playthrough into two seconds.
+
+Until then, treat any post-tutorial UI as **unverified live**, including
+the consumable column and the equip panel shipped in #294 and #299.
+
+
 ## What exists (merged, published, spec-pinned)
 
 | Wave | PR | Ver | Delivered |
