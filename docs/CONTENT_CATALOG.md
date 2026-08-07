@@ -341,8 +341,20 @@ its station, and ingredients the expedition ledger accepts, and
 `ContentCensus.spec` asserts these counts against the catalogs so the
 number in this table cannot drift from the number in the game.
 
-**The gap that matters most, found live on 2026-08-07: 120 of the 130
-recipes cannot be crafted by anybody.** The workshop's benches are a
+**Two reachability gaps, the same shape, found on 2026-08-07 by asking
+whether content that exists can actually be got at.** The first is fixed;
+the second is recorded at its real size.
+
+**Residents (open): 24 of the 27 cannot be met.** `WorldService`'s
+resident definitions are a hand-written table with three entries, so
+everyone after chapter one arrives with a chapter, takes a job at a real
+building, carries a quest and a full set of dialogue — and has no body
+standing in the town to say it to. Their quests are unreachable for the
+same reason their greetings are. Chapter one's three are built, so a
+fresh player's whole path is populated and the arcs shipped for Tomas,
+Pip and Ena work. `ContentCensus.spec` asserts 3 built and 24 missing.
+
+**Recipes (fixed): 120 of the 130 could not be crafted.** The workshop's benches were a
 hardcoded list of ten in `WorldService`, each needing its own constant in
 `RuntimeIds.InteractionIds`, and it never grew when the catalog did.
 Every spec passes, the equipment exists, the visual plans exist, the
@@ -350,12 +362,16 @@ equip panel has a button for each — and there is no bench to make them
 at. A recipe existing and a recipe being reachable are different facts,
 and until this the census only checked the first.
 
-`ContentCensus.spec` now asserts the gap at its real size (10 benched,
-120 unreachable) so it cannot be forgotten or rounded away. Closing it
-means deriving the benches from `CraftingCatalog.list()` and giving the
-interaction id a derivable form — `craft:<recipeId>` rather than one
-hand-written constant per recipe. That is the single highest-value piece
-of work outstanding in this repository.
+Fixed: the benches derive from `CraftingCatalog.list()` and the
+interaction id derives from the recipe (`craft:<recipeId>`), and the
+census asserts the derivation itself so a hand-written list cannot come
+back. Verified live — 130 benches, each carrying its own payload.
+
+The lesson generalises, which is why the resident gap above was found
+immediately afterwards: **a thing existing in a catalog and a thing being
+reachable in the world are different facts, and only the first one is
+easy to test.** Anywhere a hand-written table in `WorldService` mirrors a
+shared catalog is worth the same suspicion.
 
 Both of the earlier gaps this section recorded are closed: Bramblewake now
 carries ten armour pieces and twelve points of interest like every other
