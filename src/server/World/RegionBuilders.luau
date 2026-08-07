@@ -20,6 +20,7 @@
 local BramblewakeBuilder = require(script.Parent.BramblewakeBuilder)
 local IronrootBuilder = require(script.Parent.IronrootBuilder)
 local MireglassBuilder = require(script.Parent.MireglassBuilder)
+local CinderfallBuilder = require(script.Parent.CinderfallBuilder)
 local FrostmereBuilder = require(script.Parent.FrostmereBuilder)
 local TempestBuilder = require(script.Parent.TempestBuilder)
 
@@ -50,6 +51,15 @@ local ENTRIES: { [string]: any } = {
     region_tempest = {
         builder = TempestBuilder,
         walkable = false,
+        missing = {
+            "authored mesh dressing",
+        },
+    },
+    region_cinderfall = {
+        builder = CinderfallBuilder,
+        walkable = false,
+        -- Mesh dressing is an art pass: authored assets, not wiring.
+        -- Everything a party needs to walk the region is built.
         missing = {
             "authored mesh dressing",
         },
@@ -242,6 +252,28 @@ RegionBuilders.NodeMaterials = table.freeze({
             id = "material_glow_fungus",
             label = "Glow Fungus",
             color = Color3.fromRGB(150, 226, 176),
+        }),
+    }),
+    region_cinderfall = table.freeze({
+        table.freeze({
+            id = "material_cindersteel",
+            label = "Cindersteel",
+            color = Color3.fromRGB(112, 104, 96),
+        }),
+        table.freeze({
+            id = "material_memory_glass",
+            label = "Memory Glass",
+            color = Color3.fromRGB(206, 168, 214),
+        }),
+        table.freeze({
+            id = "material_ash_silk",
+            label = "Ash Silk",
+            color = Color3.fromRGB(214, 190, 158),
+        }),
+        table.freeze({
+            id = "material_crown_coal",
+            label = "Crown Coal",
+            color = Color3.fromRGB(52, 48, 46),
         }),
     }),
     region_frostmere = table.freeze({
@@ -589,6 +621,21 @@ RegionBuilders.Arenas = table.freeze({
         regionId = "region_tempest",
         radius = 40,
     }),
+    elite_lead_actor = table.freeze({
+        name = "LeadActorStage",
+        regionId = "region_cinderfall",
+        radius = 28,
+    }),
+    elite_glass_bailiff = table.freeze({
+        name = "GlassBailiffCourt",
+        regionId = "region_cinderfall",
+        radius = 32,
+    }),
+    boss_ash_regent = table.freeze({
+        name = "AshRegentBox",
+        regionId = "region_cinderfall",
+        radius = 38,
+    }),
     elite_abbey_silence = table.freeze({
         name = "AbbeySilenceCloister",
         regionId = "region_frostmere",
@@ -695,6 +742,10 @@ RegionBuilders.Wayfinding = table.freeze({
     region_tempest = table.freeze({
         marker = Color3.fromRGB(88, 92, 96),
         glow = Color3.fromRGB(255, 216, 150),
+    }),
+    region_cinderfall = table.freeze({
+        marker = Color3.fromRGB(148, 142, 134),
+        glow = Color3.fromRGB(255, 148, 62),
     }),
     region_frostmere = table.freeze({
         marker = Color3.fromRGB(126, 128, 130),
