@@ -75,6 +75,142 @@ return {
             end,
         },
         {
+            --[[
+                The census, in the shape `ContentCensus` uses for everything
+                else: a count that can only move deliberately.
+
+                A catalog is the one kind of content where a quiet addition is
+                also a quiet *sale*, so the numbers are pinned here and pinned
+                again in CONTENT_CATALOG.md, and the case below reads the
+                document to make sure the two still agree. Two targets is no
+                target.
+            ]]
+            name = "the cosmetic catalog is four complete lines and twenty-four products",
+            run = function()
+                TestRunner.equal(#CosmeticCatalog.lines(), 4)
+                TestRunner.equal(#CosmeticCatalog.slots(), 5)
+                TestRunner.equal(#CosmeticCatalog.list(), 20)
+                TestRunner.equal(#CosmeticCatalog.products(), 24)
+
+                --[[
+                    And every line is complete, which is the reachability half.
+                    A line missing a slot is a set product with a hole in it,
+                    and the hole is invisible until somebody wears the set and
+                    finds their lantern still bare.
+                ]]
+                for _, line in CosmeticCatalog.lines() do
+                    TestRunner.truthy(#line.displayName > 0, line.id .. " has no name")
+                    TestRunner.truthy(#line.detail > 0, line.id .. " has no description")
+                    local filled: { [string]: number } = {}
+                    for _, slot in CosmeticCatalog.slots() do
+                        filled[slot] = 0
+                    end
+                    for _, cosmetic in CosmeticCatalog.list() do
+                        if cosmetic.line == line.id then
+                            filled[cosmetic.slot] += 1
+                        end
+                    end
+                    for slot, count in filled do
+                        TestRunner.equal(
+                            count,
+                            1,
+                            string.format(
+                                "%s holds %d cosmetics in the %s slot",
+                                line.id,
+                                count,
+                                slot
+                            )
+                        )
+                    end
+                end
+
+                -- and every cosmetic belongs to a line that exists, so the
+                -- grouping cannot drift into a fifth line nobody declared
+                for _, cosmetic in CosmeticCatalog.list() do
+                    TestRunner.truthy(
+                        CosmeticCatalog.isLine(cosmetic.line),
+                        cosmetic.id .. " names a line that does not exist"
+                    )
+                end
+                for _, product in CosmeticCatalog.products() do
+                    TestRunner.truthy(
+                        CosmeticCatalog.isLine(product.line),
+                        product.id .. " names a line that does not exist"
+                    )
+                end
+            end,
+        },
+        {
+            --[[
+                A set grants its whole line and nothing else.
+
+                This is the case wave E's grant path was built for and had
+                nothing to exercise: one purchase id handing over five
+                cosmetics. A set that granted four would be a purchase whose
+                missing fifth is invisible until the buyer looks in a mirror.
+            ]]
+            name = "every line has one set, and each set grants exactly that line",
+            run = function()
+                local sets: { [string]: any } = {}
+                for _, product in CosmeticCatalog.products() do
+                    if #product.grants > 1 then
+                        TestRunner.equal(
+                            sets[product.line],
+                            nil,
+                            product.line .. " has more than one set"
+                        )
+                        sets[product.line] = product
+                    end
+                end
+                for _, line in CosmeticCatalog.lines() do
+                    local set = sets[line.id]
+                    TestRunner.truthy(set ~= nil, line.id .. " has no set product")
+                    TestRunner.equal(#set.grants, 5, set.id .. " does not grant five things")
+                    local slots: { [string]: boolean } = {}
+                    for _, cosmeticId in set.grants do
+                        local cosmetic = CosmeticCatalog.get(cosmeticId)
+                        TestRunner.truthy(cosmetic ~= nil, set.id .. " grants " .. cosmeticId)
+                        TestRunner.equal(
+                            (cosmetic :: any).line,
+                            line.id,
+                            set.id .. " grants something from another line"
+                        )
+                        TestRunner.equal(
+                            slots[(cosmetic :: any).slot],
+                            nil,
+                            set.id .. " grants two things for one slot"
+                        )
+                        slots[(cosmetic :: any).slot] = true
+                    end
+                end
+            end,
+        },
+        {
+            --[[
+                The numbers in this spec are the numbers in the content
+                catalog, read the same way `ContentCensus` reads its own.
+            ]]
+            name = "the counts in this spec are the counts in the content catalog",
+            run = function()
+                local fs = require("@lune/fs")
+                local doc = fs.readFile("docs/CONTENT_CATALOG.md")
+                for _, claim in
+                    {
+                        "20 cosmetics across four lines",
+                        "| line_greenward | The Greenward | 5 |",
+                        "| line_ironroot | The Ironroot | 5 |",
+                        "| line_mireglass | The Mireglass | 5 |",
+                        "| line_cinderfall | The Cinderfall | 5 |",
+                    }
+                do
+                    TestRunner.truthy(
+                        string.find(doc, claim, 1, true) ~= nil,
+                        "the content catalog no longer says: " .. claim
+                    )
+                end
+            end,
+        },
+        {
             -- Every slot has something in it. An empty slot is a row in the
             -- store's own panel that can never show a card, which is the equip
             -- panel's failure inverted.

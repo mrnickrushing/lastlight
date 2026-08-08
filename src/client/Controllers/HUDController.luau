@@ -525,8 +525,10 @@ export type HUDController =
                     terms: TextLabel,
                     action: TextButton,
                     productId: string,
+                    pieces: number,
                 },
             },
+            _storeLineHeaders: { [string]: TextLabel },
             _storeWardrobeTitle: TextLabel,
             _storeWardrobeRows: {
                 [string]: { frame: Frame, name: TextLabel, action: TextButton, cosmeticId: string },
@@ -1732,13 +1734,52 @@ function HUDController.new(
             terms: TextLabel,
             action: TextButton,
             productId: string,
+            pieces: number,
         },
     } =
         {}
+    --[[
+        Grouped by line, and the grouping is what makes twenty-four cards
+        readable on a 502-point canvas rather than a wall.
+
+        Walked line by line and then product by product inside each, so the
+        order on screen is the order in the catalog and a new line appears
+        where it was written rather than wherever the hash landed. The set
+        comes first under its heading, because it is the thing the line is.
+    ]]
+    local storeLineHeaders: { [string]: TextLabel } = {}
+    for lineOrder, line in CosmeticCatalog.lines() do
+        local header = textLabel(
+            storeScroll,
+            "Line_" .. line.id,
+            line.displayName,
+            UDim2.new(1, -8, 0, 22),
+            UDim2.fromOffset(0, 0),
+            13,
+            COLORS.amber
+        )
+        header.Font = Enum.Font.GothamBold
+        header.LayoutOrder = lineOrder * 100
+        header.Visible = false
+        header.ZIndex = 57
+        storeLineHeaders[line.id] = header
+    end
+
+    local function lineOrderOf(lineId: string): number
+        for lineOrder, line in CosmeticCatalog.lines() do
+            if line.id == lineId then
+                return lineOrder
+            end
+        end
+        return 99
+    end
+
     for order, product in CosmeticCatalog.products() do
         local card = Instance.new("TextButton")
         card.Name = "Card_" .. product.id
-        card.LayoutOrder = 10 + order
+        -- Under its own line's heading, and a set before the pieces it bundles.
+        card.LayoutOrder = lineOrderOf(product.line) * 100
+            + (if #product.grants > 1 then 1 else 10 + order)
         card.Size = UDim2.new(1, -8, 0, 96)
         card.BackgroundColor3 = COLORS.panelSoft
         card.AutoButtonColor = false
@@ -1750,15 +1791,22 @@ function HUDController.new(
         corner(card, 12)
         stroke(card, COLORS.amber, 0.62)
 
-        local previewParts = {}
+        --[[
+            One cosmetic in the picture, even for a set.
+
+            Merging five plans into one frame stacks a coat, a blade, a haft, a
+            lantern and a banner at the same origin, which photographs as a pile
+            rather than as a look. A set shows the outfit -- the piece that *is*
+            the silhouette -- and says how many pieces come with it in words.
+        ]]
+        local previewSource = nil
         for _, cosmeticId in product.grants do
             local cosmetic = CosmeticCatalog.get(cosmeticId)
-            if cosmetic ~= nil then
-                for _, plan in cosmetic.parts do
-                    table.insert(previewParts, plan)
-                end
+            if cosmetic ~= nil and (previewSource == nil or cosmetic.slot == "outfit") then
+                previewSource = cosmetic
             end
         end
+        local previewParts = if previewSource == nil then {} else previewSource.parts
         local preview = createCosmeticPreview(card, previewParts, 76)
         preview.Position = UDim2.fromOffset(10, 10)
         corner(preview, 10)
@@ -1822,6 +1870,9 @@ function HUDController.new(
             terms = cardTerms,
             action = cardAction,
             productId = product.id,
+            -- Read from the catalog rather than sent, because it never changes
+            -- and a field on the wire that never changes is a field on the wire.
+            pieces = #product.grants,
         }
     end
 
@@ -2297,6 +2348,7 @@ function HUDController.new(
         _storeClose = storeClose,
         _storeEmpty = storeEmpty,
         _storeCards = storeCards,
+        _storeLineHeaders = storeLineHeaders,
         _storeWardrobeTitle = storeWardrobeTitle,
         _storeWardrobeRows = storeWardrobeRows,
         _storeRevision = 0,
@@ -2758,6 +2810,12 @@ function HUDController._updateStore(self: HUDController, state: any)
     end
 
     local shown = 0
+    --[[
+        A heading appears only when its line has a card under it. A line whose
+        products are all unpriced would otherwise show a title with nothing
+        beneath it, which reads as the store having lost something.
+    ]]
+    local linesShown: { [string]: boolean } = {}
     local cards = if type(store.cards) == "table" then store.cards else {}
     local byProduct: { [string]: any } = {}
     for _, card in cards do
@@ -2770,6 +2828,10 @@ function HUDController._updateStore(self: HUDController, state: any)
         entry.frame.Visible = card ~= nil
         if card ~= nil then
             shown += 1
+            local product = CosmeticCatalog.product(productId)
+            if product ~= nil then
+                linesShown[product.line] = true
+            end
             entry.name.Text = tostring(card.displayName)
             entry.price.Text = tostring(card.priceLabel)
             --[[
@@ -2787,6 +2849,9 @@ function HUDController._updateStore(self: HUDController, state: any)
                 taking the HUD down.
             ]]
             local terms = tostring(card.permanenceLabel) .. " · " .. tostring(card.ownedLabel)
+            if entry.pieces > 1 then
+                terms ..= string.format(" · %d PIECES", entry.pieces)
+            end
             entry.terms.Text = if card.equipped == true then terms .. " · WORN" else terms
             entry.action.Text = tostring(card.actionLabel)
             entry.action:SetAttribute("StoreAction", tostring(card.action))
@@ -2797,6 +2862,10 @@ function HUDController._updateStore(self: HUDController, state: any)
             entry.action.TextColor3 = if purchasable then COLORS.cream else COLORS.green
             entry.action.BackgroundColor3 = if purchasable then COLORS.panel else COLORS.panelSoft
         end
+    end
+
+    for lineId, header in self._storeLineHeaders do
+        header.Visible = linesShown[lineId] == true
     end
 
     local worn = 0
