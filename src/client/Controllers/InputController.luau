@@ -223,6 +223,18 @@ function InputController.new(
         UserInputService.InputBegan:Connect(function(input: InputObject, _processed: boolean)
             if input.KeyCode == Enum.KeyCode.Escape and hud:isProfessionMenuOpen() then
                 hud:setProfessionMenuOpen(false)
+            elseif input.KeyCode == Enum.KeyCode.Escape and hud:isCallMenuOpen() then
+                hud:setCallMenuOpen(false)
+            elseif input.KeyCode == Enum.KeyCode.B or input.KeyCode == Enum.KeyCode.DPadLeft then
+                --[[
+                    The wheel's key, on the two devices that have one. B is free
+                    on a keyboard and DPadLeft is the one direction the pad has
+                    not spent (up is the profession menu, down the second
+                    consumable). Touch reaches the wheel through the CALL button
+                    in the thumb cluster, which is the path the owner's phone
+                    actually uses.
+                ]]
+                hud:toggleCallMenu()
             end
         end)
     )
@@ -281,6 +293,14 @@ function InputController._installFallback(
             then
                 self._hud:setProfessionMenuOpen(false)
             elseif self._hud:isProfessionMenuOpen() then
+                return
+            elseif input.KeyCode == Enum.KeyCode.B or input.KeyCode == Enum.KeyCode.DPadLeft then
+                self._hud:toggleCallMenu()
+            elseif self._hud:isCallMenuOpen() and input.KeyCode == Enum.KeyCode.Escape then
+                self._hud:setCallMenuOpen(false)
+            elseif self._hud:isCallMenuOpen() then
+                -- An open wheel swallows the rest: a phrase press must not also
+                -- swing the tool, which is the shape #325 found on every click.
                 return
             elseif input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
                 onInteract()

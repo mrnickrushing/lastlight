@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #327), build `0.53.0`,
-save schema 22, 24 services. Published to Roblox as place version 139,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #328), build `0.53.0`,
+save schema 22, 25 services. Published to Roblox as place version 139,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,6 +59,75 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#328** (v140) **M11 wave B: a player can say something to another player,
+  and there is no string in it.** Twenty-four phrases in four categories, and
+  the design decision under all of it is that the vocabulary is *closed*: free
+  text in a game with this audience means a filter, an appeal path and a human
+  reading reports, while a fixed list means moderation is structural. There is
+  nothing a player can compose, so there is nothing to moderate — and
+  `QuickChat.spec` asserts that as a property of the source rather than as a
+  claim in a document, walking every file in `src` for the entry points a text
+  channel would have to use. Roblox's own chat is deliberately out of scope of
+  that check and belongs in wave D's inventory: it is the platform's channel
+  with the platform's moderation, and whether it is on is a dashboard setting.
+  The one place `TextChatService` is touched at all is AdminService's slash
+  commands, pinned to that file by name so it cannot spread.
+
+  **A phrase both says something and marks a place, and the place is the
+  sender's own, resolved server-side.** The payload carries a phrase id and
+  nothing else — which is the one-extra-field rule #219 was found against, and
+  here it is also the security property: there is no position in the payload to
+  forge, so a ping cannot mark somewhere its sender is not standing. Verified
+  live: the anchor's coordinates matched the character's `HumanoidRootPart` to
+  four decimal places.
+
+  **The six courtesies mark nothing on purpose.** A thank-you is speech, and
+  speech has no place in it; they draw over the speaker's own head instead.
+  Six people being polite must not put six cards over the town — and the
+  live pass found the smaller version of exactly that: the budget allows three
+  calls in a burst, and three courtesies drew three billboards on one head at
+  one offset, an unreadable smear. **One card per speaker per surface, newest
+  wins**, which is also what every ping wheel a player has used already does.
+  The rate limiter bounds how much is said; that rule bounds how much is drawn,
+  and they are different problems.
+
+  **There is no call log on the HUD, and that is a decision about a phone.**
+  A portrait canvas is 503 points wide with the objective card across the top
+  and the thumb cluster along the bottom; the band left over is the band a
+  player is trying to see creatures in, which is what #325's report was
+  literally about. A call is drawn in the world instead, where it means
+  something. Presentation is resolved from the catalog by the ping kind the
+  server names — glyph, colour, life, reach — rather than chosen by that name
+  in a client ladder a twenty-fifth phrase's new kind would fall off silently.
+
+  **Verified live at a 392 x 608 viewport**, which is the 503-point canvas the
+  owner's phone gives: the CALL button takes the corner slot nearest the jump
+  button and nothing in the cluster is off-screen; the wheel opens by real
+  mouse press and by key, four tabs and six phrases fit with CLOSE fully on
+  screen; a real press on WATCH THE DARK closed the wheel and left one danger
+  marker at the sender's feet; a second marking phrase from the same player
+  replaced the first at the new position with the right glyph; distance on the
+  card counts up as you walk away (0m → 59m); and a fourth call inside the
+  burst is refused with LET THE LAST CALL LAND. Blocking is the platform's own
+  answer through `Chat:CanUsersChatAsync`, called in exactly one place and
+  spec-pinned to one place, applied symmetrically and to both the record and
+  the markers — a suppression rule that covers the log and not the marker
+  covers nothing, because the marker is the loud half.
+
+  **Open, and not closable here:** what the ping card *looks like* on screen.
+  Studio's `screen_capture` does not render BillboardGuis — proven in the same
+  session, where a plain magenta probe billboard was invisible while a magenta
+  part at the same coordinates rendered. The card is the same recipe as the
+  objective markers and the 33 landmark labels; its geometry, adornee, text,
+  colour and lifetime are all measured, and only the pixels are unseen.
+
+  Also written this wave: the portrait-click recipe in
+  [STUDIO_MCP_SETUP.md](STUDIO_MCP_SETUP.md). The M7 runbook's advice to click
+  GUI buttons by `instance_path` is true of a maximized window and **silently
+  false** of a resized one — the tool reports success, `Activated` never fires,
+  and that looks exactly like a dead handler. Pass the button's own
+  `AbsolutePosition` centre instead, and do not correct for the 58-pixel inset
+  that `GetMouseLocation` reports back.
 - **#327** (v139) **the walkthrough's deferred list, cleared on a portrait
   viewport — because the owner plays this game on a phone, in portrait, and
   every bug report that started this effort was a phone screenshot.** The

@@ -66,6 +66,7 @@ export type TutorialService = typeof(setmetatable(
         _consumables: any,
         _companionService: any,
         _partyService: any,
+        _socialService: any,
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -141,6 +142,7 @@ function TutorialService.new(
         _consumables = consumables,
         _companionService = nil,
         _partyService = nil,
+        _socialService = nil,
         _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -937,6 +939,10 @@ end
 
 function TutorialService.setPartyService(self: TutorialService, partyService: any)
     self._partyService = partyService
+end
+
+function TutorialService.setSocialService(self: TutorialService, socialService: any)
+    self._socialService = socialService
 end
 
 function TutorialService.strike(self: TutorialService, player: Player)
@@ -1785,6 +1791,28 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             self._partyService:rejoin(player)
             self:_publish(player)
         end
+    elseif kind == self._runtimeIds.Actions.QuickChat then
+        --[[
+            A phrase reaches everyone who has not blocked the sender, so it is
+            published to the whole server rather than to the presser. Nothing
+            is toasted on success: the call appears in every recipient's own
+            log, including the sender's, and a toast on top of that would be
+            the game saying the same thing twice in the surface that #325
+            found every success message dying in.
+        ]]
+        if self._socialService ~= nil then
+            local result = self._socialService:say(player, payload.phraseId)
+            if result.accepted then
+                self:_publishAll()
+            else
+                if result.reason == "rate_limited" then
+                    self:_setToast(player, "LET THE LAST CALL LAND")
+                elseif result.reason == "disabled" then
+                    self:_setToast(player, "CALLS ARE CLOSED RIGHT NOW")
+                end
+                self:_publish(player)
+            end
+        end
     elseif kind == self._runtimeIds.Actions.CompanionCommand then
         local mode = payload.mode
         if self._companionService ~= nil and type(mode) == "string" and #mode <= 12 then
@@ -2195,6 +2223,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             then self._companionService:snapshot(player)
             else nil,
         party = if self._partyService ~= nil then self._partyService:snapshot(player) else nil,
+        social = if self._socialService ~= nil then self._socialService:snapshot(player) else nil,
         gearCare = gearCare,
         whetTarget = whetTarget,
         equipped = self._profileService:equippedSnapshot(player),

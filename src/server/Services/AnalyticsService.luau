@@ -562,6 +562,35 @@ function AnalyticsService.residentTalked(
     end
 end
 
+--[[
+    One phrase said. The phrase id and its category, never a composed string,
+    because there is no composed string to log -- which is the same fact the
+    safety review reads and worth having in the telemetry as well as in the
+    code. `marked` says whether it left a ping, which is how a tuning pass
+    tells a party that is coordinating from one that is only talking.
+]]
+function AnalyticsService.quickChatSent(
+    self: AnalyticsService,
+    player: Player,
+    phrase: any,
+    marked: boolean
+)
+    self._logger:info("quick_chat_sent", {
+        category = string.sub(tostring(phrase.category), 1, 24),
+        marked = marked,
+        phrase = string.sub(tostring(phrase.id), 1, 48),
+        player = player.UserId,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "QuickChatSent", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = phrase.id,
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = phrase.category,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.eliteStarted(
     self: AnalyticsService,
     player: Player,
