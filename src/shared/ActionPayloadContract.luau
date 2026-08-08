@@ -84,6 +84,17 @@ function ActionPayloadContract.extraField(runtimeIds: any, kind: string): string
         -- payload because the server reads the sender's own, which is what
         -- makes a ping unforgeable rather than merely validated.
         return "phraseId"
+    elseif kind == actions.StoreDetail or kind == actions.StorePurchase then
+        -- Which product is being looked at, or bought. The Roblox product id
+        -- is never in a payload: the server maps this game's id to the
+        -- dashboard number, so a forged payload cannot prompt a purchase for
+        -- something this catalog does not sell.
+        return "productId"
+    elseif kind == actions.EquipCosmetic then
+        -- The cosmetic, and never its slot. The slot is the catalog's answer
+        -- about that id, and a payload with no slot in it cannot name the
+        -- wrong one.
+        return "cosmeticId"
     end
     return nil
 end

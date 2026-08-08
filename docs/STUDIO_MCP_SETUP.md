@@ -155,6 +155,22 @@ several real day/dusk/night cycles end to end, defeated enemies across all six
 species to drain the wave queue, and reached a Town Guard Last Stand, all
 without waiting on wall-clock time or a mouse.
 
+Four DataModel attributes exist purely so a session can reach a surface that
+would otherwise be correctly empty, and every one of them is Studio-only and
+logged loudly when it fires:
+
+| Attribute | Value | What it does |
+|---|---|---|
+| `LastLightSkipTutorial` | `true` | Completes First Light and wakes the world the same way a loaded complete profile does. |
+| `LastLightStockProfile` | a number | Fills the purse so crafting and equipping can be driven without playing an hour. |
+| `LastLightStudioStore` | Robux price | Turns the `cosmetic_store_enabled` flag on and gives every product that price, so the outfitter's cards render. It is a **price**, not a product id — `promptPurchase` still refuses with `product_not_configured`, because a Creator Dashboard product genuinely does not exist. |
+| `LastLightStudioGrant` | a product id | Pushes a synthetic receipt through `applyReceipt`, the real and only grant authority, for every player in the server. The platform's own `ProcessReceipt` cannot be driven in Studio; this is the closest honest thing to it. |
+
+The reason the last two exist is written into the wave that added them: a live
+pass on a store with no priced products sees an empty panel, and an empty panel
+and a broken panel look identical. That is the same failure `LastLightSkipTutorial`
+was written against.
+
 Two things about Studio Play mode that read as bugs the first time but are not:
 
 - **A local Play-mode profile is session-only.** It lives in memory and is not

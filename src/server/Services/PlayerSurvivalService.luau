@@ -1100,8 +1100,36 @@ function PlayerSurvivalService.snapshot(self: PlayerSurvivalService, viewer: Pla
         ally = ally,
         downedCount = downedCount,
         enabled = self._featureFlags:isEnabled("player_survival_enabled"),
+        partyDown = self:_partyDown(),
         self = selfSnapshot,
     }
+end
+
+--[[
+    Everybody who could act is down.
+
+    This game has no permanent loss, so defeat is the party wipe -- the exact
+    condition the guard's last stand answers, computed with the same
+    eligibility rule so the two can never disagree about what a wipe is.
+    Reported in the snapshot because it is the single worst moment in the game
+    to open a storefront, and the rule that says so has to be able to see it.
+]]
+function PlayerSurvivalService._partyDown(self: PlayerSurvivalService): boolean
+    local eligible = 0
+    local downed = 0
+    for player, state in self._states do
+        if
+            player.Parent ~= nil
+            and player:GetAttribute("LastLightTutorialSurvivalReady") == true
+            and player:GetAttribute("LastLightInExpedition") ~= true
+        then
+            eligible += 1
+            if state.status == "downed" then
+                downed += 1
+            end
+        end
+    end
+    return eligible > 0 and downed == eligible
 end
 
 return table.freeze(PlayerSurvivalService)

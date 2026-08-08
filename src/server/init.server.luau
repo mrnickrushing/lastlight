@@ -68,6 +68,8 @@ local PartySession = require(root.PartySession)
 local QuickChat = require(root.QuickChat)
 local CosmeticCatalog = require(root.CosmeticCatalog)
 local Entitlements = require(root.Entitlements)
+local StoreAvailability = require(root.StoreAvailability)
+local StoreCard = require(root.StoreCard)
 local AdminRoster = require(root.AdminRoster)
 local TownDecorations = require(root.TownDecorations)
 local TownProgression = require(root.TownProgression)
@@ -355,6 +357,7 @@ local commerceService = CommerceService.new(
     Config,
     CosmeticCatalog,
     Entitlements,
+    StoreCard,
     profileService,
     featureFlags,
     analyticsService
@@ -488,7 +491,8 @@ local tutorialService = TutorialService.new(
     GearWear,
     GearTraits,
     Consumables,
-    TownVisitPolicy
+    TownVisitPolicy,
+    StoreAvailability
 )
 
 local services = ServiceRegistry.new({
@@ -541,6 +545,25 @@ end)
 tutorialService:setCompanionService(companionService)
 tutorialService:setPartyService(partyService)
 tutorialService:setSocialService(socialService)
+tutorialService:setCommerceService(commerceService)
+--[[
+    A grant has to arrive somewhere the buyer can see.
+
+    `applyReceipt` and the mailbox drain both settle correctly on their own,
+    and both were silent: the live pass granted a product, watched the ledger
+    and the profile take it, and the card in front of the buyer went on saying
+    NOT OWNED until an unrelated push happened along. A purchase that lands
+    without a word is the one moment in this game where the player has already
+    paid.
+]]
+commerceService:setGrantHandler(function(player: Player, granted: { string })
+    tutorialService:announceTo(
+        player,
+        if #granted == 1
+            then "IT IS YOURS — WEAR IT AT THE OUTFITTER"
+            else string.format("%d THINGS ARE YOURS — WEAR THEM AT THE OUTFITTER", #granted)
+    )
+end)
 partyService:setToastHandler(function(player: Player?, message: string)
     if player ~= nil then
         tutorialService:toastPlayer(player, message)

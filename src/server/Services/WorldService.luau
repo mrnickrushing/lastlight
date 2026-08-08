@@ -4154,9 +4154,19 @@ function WorldService._buildLobby(self: WorldService, world: Model)
             yaw = -90,
             scale = 1,
         },
+        --[[
+            The table moved to the fireside when the outfitter's stand arrived.
+
+            Measured rather than eyeballed: the east wall's only unbroken run
+            between the notice board and the first bed is the stretch this
+            table was sitting across, and the first placement of the stand put
+            a stone plinth through the table's own bench. A table belongs by a
+            hearth anyway; standing it in the middle of a wall was the least
+            considered thing in the room.
+        ]]
         {
             asset = "mesh_creator_picnic_table_a",
-            at = Vector3.new(23, 0, -6),
+            at = Vector3.new(14, 0, 17),
             yaw = 0,
             scale = 1.1,
         },
@@ -4184,6 +4194,315 @@ function WorldService._buildLobby(self: WorldService, world: Model)
             fallbackInstance = nil,
         })
     end
+    --[[
+        The outfitter's stand, on the east wall between the notice board and
+        the first bed -- which is where it fits, measured rather than chosen.
+
+        This is the only door into the store, and that is the design rather
+        than a placement. A storefront reachable from a HUD button is a
+        storefront that can open in any moment, and the moments it may not open
+        in are the whole of Milestone 11's exit gate -- onboarding, active
+        defense, downed, defeat. Making it a thing you walk up to, in the one
+        room in the game where none of those four can be happening, means the
+        refusal is the second line of defence rather than the only one. The
+        town gate settled the same argument for the visit policy.
+
+        A tailor's dummy rather than a sign on a stick: the silhouette says
+        clothing before a word of the label is read, which is what
+        VISUAL_QUALITY_STANDARD asks for, and a rail with a coat hanging off it
+        says the rest. Nothing here is a cosmetic -- the stand is furniture, and
+        what is for sale lives in the catalog.
+
+        Everything is arranged along Z and faces west into the room, because
+        the stand is against the east wall and every player walking from the
+        spawn to the departure platform passes it looking that way.
+    ]]
+    local outfitter = Instance.new("Folder")
+    outfitter.Name = "OutfitterStand"
+    outfitter.Parent = lobby
+    local outfitterAt = LOBBY_CENTER + Vector3.new(26, 0, -4)
+    local outfitterPlinth = part(
+        outfitter,
+        "OutfitterPlinth",
+        Vector3.new(5.5, 1.1, 7.5),
+        CFrame.new(outfitterAt + Vector3.new(0, 1.55, 0)),
+        Color3.fromRGB(66, 70, 66),
+        Enum.Material.Slate
+    )
+    --[[
+        The dummy: a splayed tripod foot, a post, and a torso that narrows at
+        the waist and squares at the shoulder. A single capsule would be a
+        bollard; the taper is the whole reason it reads as a person's shape.
+    ]]
+    local dummyAt = outfitterAt + Vector3.new(-1.1, 0, 0)
+    for footIndex = 0, 2 do
+        local footAngle = (footIndex / 3) * math.pi * 2
+        part(
+            outfitter,
+            "OutfitterDummyFoot",
+            Vector3.new(0.26, 0.26, 2.1),
+            CFrame.new(
+                dummyAt + Vector3.new(math.cos(footAngle) * 0.75, 2.35, math.sin(footAngle) * 0.75)
+            ) * CFrame.Angles(math.rad(22), -footAngle, 0),
+            Color3.fromRGB(74, 56, 38),
+            Enum.Material.Wood,
+            false
+        )
+    end
+    part(
+        outfitter,
+        "OutfitterDummyPost",
+        Vector3.new(0.34, 3.4, 0.34),
+        CFrame.new(dummyAt + Vector3.new(0, 3.8, 0)),
+        Color3.fromRGB(74, 56, 38),
+        Enum.Material.Wood,
+        false
+    )
+    part(
+        outfitter,
+        "OutfitterDummyWaist",
+        Vector3.new(1.05, 1.5, 1.25),
+        CFrame.new(dummyAt + Vector3.new(0, 5.9, 0)),
+        Color3.fromRGB(214, 198, 166),
+        Enum.Material.Fabric,
+        false
+    )
+    part(
+        outfitter,
+        "OutfitterDummyChest",
+        Vector3.new(1.5, 2.1, 2.35),
+        CFrame.new(dummyAt + Vector3.new(0, 7.4, 0)),
+        Color3.fromRGB(214, 198, 166),
+        Enum.Material.Fabric,
+        false
+    )
+    --[[
+        The dummy is wearing something, which is the whole point of a dummy.
+
+        The first pass was one fabric colour from waist to shoulder and it
+        photographed as a stack of two boxes -- VISUAL_QUALITY_STANDARD's
+        recoloured cube, in an interior dark enough that the taper did no work.
+        The second pass covered the whole front in one dark panel and
+        photographed as a black slab, which is worse. Two lapels with a gap
+        between them read as a coat worn open over a pale shirt, and the three
+        values are what make the shape survive a room lit by two lamps.
+    ]]
+    for lapelSide = -1, 1, 2 do
+        part(
+            outfitter,
+            "OutfitterDummyLapel",
+            Vector3.new(0.3, 2.5, 0.95),
+            CFrame.new(dummyAt + Vector3.new(-0.72, 7.1, lapelSide * 0.7)),
+            Color3.fromRGB(58, 46, 38),
+            Enum.Material.Fabric,
+            false
+        )
+    end
+    part(
+        outfitter,
+        "OutfitterDummyCoatTrim",
+        Vector3.new(0.34, 0.22, 2.55),
+        CFrame.new(dummyAt + Vector3.new(-0.72, 8.28, 0)),
+        Color3.fromRGB(226, 168, 88),
+        Enum.Material.Fabric,
+        false
+    )
+    local dummyShoulder = part(
+        outfitter,
+        "OutfitterDummyShoulder",
+        Vector3.new(0.7, 2.6, 1.6),
+        CFrame.new(dummyAt + Vector3.new(0, 8.55, 0)) * CFrame.Angles(math.rad(90), 0, 0),
+        Color3.fromRGB(186, 168, 134),
+        Enum.Material.Fabric,
+        false
+    )
+    dummyShoulder.Shape = Enum.PartType.Cylinder
+    part(
+        outfitter,
+        "OutfitterDummyNeck",
+        Vector3.new(0.5, 0.9, 0.5),
+        CFrame.new(dummyAt + Vector3.new(0, 9.25, 0)),
+        Color3.fromRGB(74, 56, 38),
+        Enum.Material.Wood,
+        false
+    )
+
+    --[[
+        The rail behind it, with one coat hung on it. A hanging garment needs
+        something to hang from, or it is a rectangle floating against a wall.
+    ]]
+    local railAt = outfitterAt + Vector3.new(1.6, 0, 0)
+    for railSide = -1, 1, 2 do
+        part(
+            outfitter,
+            "OutfitterRailPost",
+            Vector3.new(0.28, 6.4, 0.28),
+            CFrame.new(railAt + Vector3.new(0, 5.3, railSide * 3.1)),
+            Color3.fromRGB(88, 66, 44),
+            Enum.Material.Wood,
+            false
+        )
+    end
+    local outfitterRail = part(
+        outfitter,
+        "OutfitterRail",
+        Vector3.new(0.22, 6.5, 0.22),
+        CFrame.new(railAt + Vector3.new(0, 8.4, 0)) * CFrame.Angles(math.rad(90), 0, 0),
+        Color3.fromRGB(102, 78, 52),
+        Enum.Material.Wood,
+        false
+    )
+    outfitterRail.Shape = Enum.PartType.Cylinder
+    --[[
+        The spare garment hangs at the far end of the rail rather than behind
+        the dummy. At the middle it was invisible from every angle a player
+        approaches from -- the dummy stands two and a half studs in front of the
+        rail and covered it completely, which is geometry paid for and never
+        seen.
+    ]]
+    part(
+        outfitter,
+        "OutfitterHangerHook",
+        Vector3.new(0.12, 0.9, 0.12),
+        CFrame.new(railAt + Vector3.new(0, 8.05, -2.6)),
+        Color3.fromRGB(128, 126, 118),
+        Enum.Material.Metal,
+        false
+    )
+    part(
+        outfitter,
+        "OutfitterHungCoat",
+        Vector3.new(0.24, 3.5, 2.3),
+        CFrame.new(railAt + Vector3.new(0, 5.9, -2.6)) * CFrame.Angles(math.rad(3), 0, 0),
+        Color3.fromRGB(74, 96, 88),
+        Enum.Material.Fabric,
+        false
+    )
+    part(
+        outfitter,
+        "OutfitterHungCoatTrim",
+        Vector3.new(0.28, 0.2, 2.35),
+        CFrame.new(railAt + Vector3.new(0, 7.5, -2.6)),
+        Color3.fromRGB(226, 168, 88),
+        Enum.Material.Fabric,
+        false
+    )
+
+    --[[
+        Three lanterns, and the count is the fix rather than the decoration.
+
+        The stand went in at the darkest point on that wall -- the lodge's two
+        east lamps are at z = 46 and z = 78 and this sits between them -- and
+        the first pass gave it one lantern at the strength of a bedside lamp.
+        Photographed, the whole object was a silhouette: the sign unreadable,
+        the dummy a black mass, the coat gone. A shop stand is lit *from the
+        front*, which the rail lantern cannot do because it hangs behind the
+        dummy, so the two that matter are the pair flanking the sign on its own
+        posts. Shadows are off on all three: a light casting shadows through a
+        dummy is the dummy lighting nothing but the wall behind it.
+    ]]
+    local outfitterLamp = part(
+        outfitter,
+        "OutfitterLamp",
+        Vector3.new(0.9, 1.1, 0.9),
+        CFrame.new(railAt + Vector3.new(0, 7.7, 2.6)),
+        AMBER,
+        Enum.Material.Neon,
+        false
+    )
+    outfitterLamp.CastShadow = false
+    local outfitterLampLight = Instance.new("PointLight")
+    outfitterLampLight.Color = AMBER
+    outfitterLampLight.Brightness = 3.2
+    outfitterLampLight.Range = 34
+    outfitterLampLight.Shadows = false
+    outfitterLampLight.Parent = outfitterLamp
+    CollectionService:AddTag(outfitterLamp, self._runtimeIds.AmbientLightTag)
+
+    --[[
+        The board faces west, into the room.
+
+        A board's Front face is its -Z and a yaw of +90 degrees turns that to
+        -X, which is the way a player walking from the spawn to the platform is
+        looking. #329's gate sign shipped facing into the trees and was blank
+        from every angle anybody approaches from; the fix there was the same
+        arithmetic, checked by dot product and by eye.
+    ]]
+    for boardSide = -1, 1, 2 do
+        part(
+            outfitter,
+            "OutfitterBoardPost",
+            Vector3.new(0.3, 9.6, 0.3),
+            CFrame.new(dummyAt + Vector3.new(0, 6.9, boardSide * 3)),
+            Color3.fromRGB(88, 66, 44),
+            Enum.Material.Wood,
+            false
+        )
+        --[[
+            The bracket reaches two studs out, and the reason is measured.
+
+            Hung close to the post the lamps sat level with the dummy's own
+            front face and lit it edge-on: the sign above them read perfectly
+            and the thing being sold stayed a silhouette. A shop is lit from
+            where the customer is standing.
+        ]]
+        part(
+            outfitter,
+            "OutfitterPostBracket",
+            Vector3.new(2.4, 0.14, 0.14),
+            CFrame.new(dummyAt + Vector3.new(-1, 8.72, boardSide * 3)),
+            Color3.fromRGB(128, 126, 118),
+            Enum.Material.Metal,
+            false
+        )
+        local postLamp = part(
+            outfitter,
+            "OutfitterPostLamp",
+            Vector3.new(0.66, 0.8, 0.66),
+            CFrame.new(dummyAt + Vector3.new(-2, 8.2, boardSide * 3)),
+            AMBER,
+            Enum.Material.Neon,
+            false
+        )
+        postLamp.CastShadow = false
+        local postLight = Instance.new("PointLight")
+        postLight.Color = Color3.fromRGB(255, 214, 160)
+        postLight.Brightness = 3
+        postLight.Range = 24
+        postLight.Shadows = false
+        postLight.Parent = postLamp
+        CollectionService:AddTag(postLamp, self._runtimeIds.AmbientLightTag)
+    end
+    local outfitterBoard = part(
+        outfitter,
+        "OutfitterBoard",
+        Vector3.new(6.2, 2.4, 0.5),
+        CFrame.new(dummyAt + Vector3.new(0, 10.4, 0)) * CFrame.Angles(0, math.rad(90), 0),
+        Color3.fromRGB(91, 65, 44),
+        Enum.Material.WoodPlanks
+    )
+    WorldSignBuilder.dressBoard(outfitterBoard, "THE OUTFITTER", CREAM)
+    --[[
+        Registered on the plinth, not on the board.
+
+        The click volume grows *upward* from whatever it is anchored to, which
+        is right for a pedestal and wrong for a sign hanging ten studs up: on
+        the board it would have covered the ceiling and nothing a player is
+        pointing at. Anchored to the floor of the stand it covers the dummy,
+        the rail and the board -- the whole object, which is what a player is
+        aiming at when they aim at any of it. #325 was three defects of this
+        exact shape.
+    ]]
+    self:_registerInteraction(
+        outfitterPlinth,
+        self._runtimeIds.InteractionIds.Outfitter,
+        self._runtimeIds.Actions.OpenStore,
+        "BROWSE",
+        "The Outfitter",
+        nil,
+        nil,
+        Vector3.new(7.5, 12, 9.5)
+    )
 
     labelSign(
         lobby,

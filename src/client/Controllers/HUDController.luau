@@ -8,8 +8,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local sharedRoot = ReplicatedStorage:WaitForChild("LastLight")
 local Consumables = require(sharedRoot.Consumables)
+local CosmeticCatalog = require(sharedRoot.CosmeticCatalog)
 local Equipment = require(sharedRoot.Equipment)
 local QuickChat = require(sharedRoot.QuickChat)
+local StoreAvailability = require(sharedRoot.StoreAvailability)
 
 -- How many consumables the column shows at once. There are more than a
 -- phone screen has room for, so the HUD shows what a player is actually
@@ -216,6 +218,100 @@ local function createItemIcon(parent: Instance, itemId: string, size: number): V
     return viewport
 end
 
+--[[
+    A cosmetic's own geometry, drawn in a frame.
+
+    There is no per-cosmetic case here and that is the whole point: a plan is a
+    list of parts with a shape, a size, an offset, a rotation, a colour and a
+    material, so the twelfth cosmetic draws itself the day it is added to the
+    catalog. The equip panel shipped as a hardcoded list of eight items and
+    left ninety craftable items unwearable with every spec green (#299); a
+    storefront with a hand-written preview per product has that shape and a
+    price attached to it.
+
+    The camera is fitted to whatever the plan turns out to be rather than
+    parked at a constant distance -- a banner is four studs tall and a weapon
+    finish is half a stud wide, and one distance cannot frame both.
+]]
+local function createCosmeticPreview(parent: Instance, parts: { any }, size: number): ViewportFrame
+    local viewport = Instance.new("ViewportFrame")
+    viewport.Name = "Preview"
+    viewport.Size = UDim2.fromOffset(size, size)
+    viewport.BackgroundColor3 = Color3.fromRGB(31, 44, 42)
+    viewport.BorderSizePixel = 0
+    --[[
+        Nearly flat ambient, on purpose.
+
+        A viewport lit the way the world is lit renders a dark leather grip on
+        a dark panel as a black smear -- photographed at a 392 x 608 viewport,
+        the tool skin and the banner were both unreadable at 76 points. A
+        product preview is a catalogue photograph, not a scene: it is lit so
+        the shape can be read, and the key light only gives it a top.
+    ]]
+    viewport.Ambient = Color3.fromRGB(205, 206, 202)
+    viewport.LightColor = Color3.fromRGB(255, 246, 230)
+    viewport.LightDirection = Vector3.new(-0.55, -1, -0.8)
+    viewport.ZIndex = if parent:IsA("GuiObject") then parent.ZIndex + 1 else 1
+    viewport.Parent = parent
+
+    local world = Instance.new("WorldModel")
+    world.Parent = viewport
+
+    local minimum = Vector3.new(math.huge, math.huge, math.huge)
+    local maximum = Vector3.new(-math.huge, -math.huge, -math.huge)
+    for index, plan in parts do
+        local dimensions = Vector3.new(plan.size[1], plan.size[2], plan.size[3])
+        local offset = Vector3.new(plan.offset[1], plan.offset[2], plan.offset[3])
+        local piece = Instance.new("Part")
+        piece.Name = if type(plan.name) == "string" then plan.name else "Part" .. index
+        piece.Anchored = true
+        piece.CanCollide = false
+        piece.CanQuery = false
+        piece.Size = dimensions
+        piece.CFrame = CFrame.new(offset)
+            * CFrame.Angles(
+                math.rad(plan.rotation[1]),
+                math.rad(plan.rotation[2]),
+                math.rad(plan.rotation[3])
+            )
+        piece.Color = Color3.fromRGB(plan.color[1], plan.color[2], plan.color[3])
+        --[[
+            A material named by a string the catalog wrote, resolved rather
+            than branched on. An unknown name falls back to a plastic finish
+            instead of throwing: a preview that fails to draw is worse than one
+            drawn in the wrong material, because the second still shows a
+            player what they are buying.
+        ]]
+        local resolved = (Enum.Material :: any)[plan.material]
+        piece.Material = if typeof(resolved) == "EnumItem"
+            then resolved
+            else Enum.Material.SmoothPlastic
+        if plan.shape == "Ball" then
+            piece.Shape = Enum.PartType.Ball
+        elseif plan.shape == "Cylinder" then
+            piece.Shape = Enum.PartType.Cylinder
+        elseif plan.shape == "Wedge" then
+            piece.Shape = Enum.PartType.Wedge
+        end
+        piece.Parent = world
+        local half = dimensions / 2
+        minimum = minimum:Min(offset - half)
+        maximum = maximum:Max(offset + half)
+    end
+
+    local center = (minimum + maximum) / 2
+    local extent = maximum - minimum
+    local reach = math.max(extent.X, extent.Y, extent.Z, 0.6)
+    local camera = Instance.new("Camera")
+    camera.FieldOfView = 30
+    -- Three quarters round and a little above, which is the angle every one of
+    -- this project's prop photographs was judged from.
+    camera.CFrame = CFrame.new(center + Vector3.new(reach * 1.5, reach * 0.75, reach * 2.1), center)
+    camera.Parent = viewport
+    viewport.CurrentCamera = camera
+    return viewport
+end
+
 local COLORS = {
     ink = Color3.fromRGB(14, 22, 21),
     panel = Color3.fromRGB(20, 31, 29),
@@ -316,117 +412,144 @@ end
 -- a gap, so a wrapped row can never be drawn through the row below it.
 local ACTION_ROW_PITCH = 128
 
-export type HUDController = typeof(setmetatable(
-    {} :: {
-        _gui: ScreenGui,
-        _actionFrame: Frame,
-        _actionLabel: TextLabel,
-        _actionFill: Frame,
-        _canvas: Frame,
-        _scale: UIScale,
-        _phaseFrame: Frame,
-        _phase: TextLabel,
-        _objectiveFrame: Frame,
-        _objective: TextLabel,
-        _detail: TextLabel,
-        _progress: TextLabel,
-        _mara: TextLabel,
-        _resource: TextLabel,
-        _health: TextLabel,
-        _staminaFrame: Frame,
-        _staminaFill: Frame,
-        _staminaText: TextLabel,
-        _toast: TextLabel,
-        _lanternFrame: Frame,
-        _lanternFill: Frame,
-        _lanternText: TextLabel,
-        _blackoutFrame: Frame,
-        _blackoutFill: Frame,
-        _blackoutTitle: TextLabel,
-        _blackoutDetail: TextLabel,
-        _eliteFrame: Frame,
-        _eliteFill: Frame,
-        _eliteTitle: TextLabel,
-        _eliteDetail: TextLabel,
-        _allyFrame: Frame,
-        _allyTitle: TextLabel,
-        _allyDetail: TextLabel,
-        _threatFrame: Frame,
-        _threatTitle: TextLabel,
-        _threatDetail: TextLabel,
-        _downedFrame: Frame,
-        _downedFill: Frame,
-        _downedTimer: TextLabel,
-        _downedDetail: TextLabel,
-        _downedAlly: TextLabel,
-        _primary: TextButton,
-        _tool: TextButton,
-        _sprint: TextButton,
-        _dodge: TextButton,
-        _ability: TextButton,
-        _companion: TextButton,
-        _call: TextButton,
-        _callOverlay: Frame,
-        _callPanel: Frame,
-        _callTabRow: Frame,
-        _callGrid: Frame,
-        _callTabs: { [string]: TextButton },
-        _callPhraseButtons: { { button: TextButton, phraseId: string, category: string } },
-        _callCategory: string,
-        _actionClusterRows: number,
-        _onQuickChat: ((string) -> ())?,
-        _companionMode: string,
-        _onCompanionCommand: ((string) -> ())?,
-        _compact: TextButton,
-        _professionButton: TextButton,
-        _lobbyFrame: Frame,
-        _lobbyTitle: TextLabel,
-        _lobbyDetail: TextLabel,
-        _lobbySizes: Frame,
-        _lobbySizeButtons: { TextButton },
-        _contractButtons: { [string]: TextButton },
-        _selectedContractId: string,
-        _onLobbyDepart: ((number) -> ())?,
-        _selectedPartySize: number?,
-        _partyLine: TextLabel,
-        _partyButtons: { [string]: TextButton },
-        _progressButton: TextButton,
-        _useButtons: { TextButton },
-        _professionOverlay: Frame,
-        _professionPanel: Frame,
-        _professionCards: { [string]: TextButton },
-        _professionOrder: { string },
-        _professionClose: TextButton,
-        _progressOverlay: Frame,
-        _progressPanel: Frame,
-        _progressScroll: ScrollingFrame,
-        _progressClose: TextButton,
-        _progressText: TextLabel,
-        _equipmentButtons: { [string]: TextButton },
-        _loadoutButtons: { [string]: TextButton },
-        _whetButton: TextButton,
-        _whetItemId: string?,
-        _onWhet: ((string) -> ())?,
-        _currentState: any,
-        _interactionLabel: string?,
-        _interactionAvailable: boolean,
-        _inputMode: string,
-        _maraText: string,
-        _maraShownAt: number,
-        _compactEnabled: boolean,
-        _playerDowned: boolean,
-        _combatContext: boolean,
-        _professionMenuOpen: boolean,
-        _professionSwitchable: boolean,
-        _lastToastRevision: number,
-        _lastPhase: string?,
-        _actionClusterSignature: string?,
-        _onCompact: ((boolean) -> ())?,
-        _onProfessionSelected: ((string) -> ())?,
-        _onEquip: ((string) -> ())?,
-    },
-    HUDController
-))
+export type HUDController =
+    typeof(setmetatable(
+        {} :: {
+            _gui: ScreenGui,
+            _actionFrame: Frame,
+            _actionLabel: TextLabel,
+            _actionFill: Frame,
+            _canvas: Frame,
+            _scale: UIScale,
+            _phaseFrame: Frame,
+            _phase: TextLabel,
+            _objectiveFrame: Frame,
+            _objective: TextLabel,
+            _detail: TextLabel,
+            _progress: TextLabel,
+            _mara: TextLabel,
+            _resource: TextLabel,
+            _health: TextLabel,
+            _staminaFrame: Frame,
+            _staminaFill: Frame,
+            _staminaText: TextLabel,
+            _toast: TextLabel,
+            _lanternFrame: Frame,
+            _lanternFill: Frame,
+            _lanternText: TextLabel,
+            _blackoutFrame: Frame,
+            _blackoutFill: Frame,
+            _blackoutTitle: TextLabel,
+            _blackoutDetail: TextLabel,
+            _eliteFrame: Frame,
+            _eliteFill: Frame,
+            _eliteTitle: TextLabel,
+            _eliteDetail: TextLabel,
+            _allyFrame: Frame,
+            _allyTitle: TextLabel,
+            _allyDetail: TextLabel,
+            _threatFrame: Frame,
+            _threatTitle: TextLabel,
+            _threatDetail: TextLabel,
+            _downedFrame: Frame,
+            _downedFill: Frame,
+            _downedTimer: TextLabel,
+            _downedDetail: TextLabel,
+            _downedAlly: TextLabel,
+            _primary: TextButton,
+            _tool: TextButton,
+            _sprint: TextButton,
+            _dodge: TextButton,
+            _ability: TextButton,
+            _companion: TextButton,
+            _call: TextButton,
+            _callOverlay: Frame,
+            _callPanel: Frame,
+            _callTabRow: Frame,
+            _callGrid: Frame,
+            _callTabs: { [string]: TextButton },
+            _callPhraseButtons: { { button: TextButton, phraseId: string, category: string } },
+            _callCategory: string,
+            _actionClusterRows: number,
+            _onQuickChat: ((string) -> ())?,
+            _companionMode: string,
+            _onCompanionCommand: ((string) -> ())?,
+            _compact: TextButton,
+            _professionButton: TextButton,
+            _lobbyFrame: Frame,
+            _lobbyTitle: TextLabel,
+            _lobbyDetail: TextLabel,
+            _lobbySizes: Frame,
+            _lobbySizeButtons: { TextButton },
+            _contractButtons: { [string]: TextButton },
+            _selectedContractId: string,
+            _onLobbyDepart: ((number) -> ())?,
+            _selectedPartySize: number?,
+            _partyLine: TextLabel,
+            _partyButtons: { [string]: TextButton },
+            _progressButton: TextButton,
+            _useButtons: { TextButton },
+            _professionOverlay: Frame,
+            _professionPanel: Frame,
+            _professionCards: { [string]: TextButton },
+            _professionOrder: { string },
+            _professionClose: TextButton,
+            _progressOverlay: Frame,
+            _progressPanel: Frame,
+            _progressScroll: ScrollingFrame,
+            _progressClose: TextButton,
+            _progressText: TextLabel,
+            _storeOverlay: Frame,
+            _storePanel: Frame,
+            _storeScroll: ScrollingFrame,
+            _storeClose: TextButton,
+            _storeEmpty: TextLabel,
+            _storeCards: {
+                [string]: {
+                    frame: Frame,
+                    name: TextLabel,
+                    price: TextLabel,
+                    terms: TextLabel,
+                    action: TextButton,
+                    productId: string,
+                },
+            },
+            _storeWardrobeTitle: TextLabel,
+            _storeWardrobeRows: {
+                [string]: { frame: Frame, name: TextLabel, action: TextButton, cosmeticId: string },
+            },
+            -- The last open instruction this client acted on. The server counts
+            -- store presses; a client that reopened on every push would put a
+            -- modal over a night the moment one arrived.
+            _storeRevision: number,
+            _onStoreDetail: ((string) -> ())?,
+            _onStorePurchase: ((string) -> ())?,
+            _onCosmeticEquip: ((string) -> ())?,
+            _equipmentButtons: { [string]: TextButton },
+            _loadoutButtons: { [string]: TextButton },
+            _whetButton: TextButton,
+            _whetItemId: string?,
+            _onWhet: ((string) -> ())?,
+            _currentState: any,
+            _interactionLabel: string?,
+            _interactionAvailable: boolean,
+            _inputMode: string,
+            _maraText: string,
+            _maraShownAt: number,
+            _compactEnabled: boolean,
+            _playerDowned: boolean,
+            _combatContext: boolean,
+            _professionMenuOpen: boolean,
+            _professionSwitchable: boolean,
+            _lastToastRevision: number,
+            _lastPhase: string?,
+            _actionClusterSignature: string?,
+            _onCompact: ((boolean) -> ())?,
+            _onProfessionSelected: ((string) -> ())?,
+            _onEquip: ((string) -> ())?,
+        },
+        HUDController
+    ))
 
 function HUDController.new(
     playerGui: PlayerGui,
@@ -641,7 +764,18 @@ function HUDController.new(
     toast.BackgroundColor3 = COLORS.ink
     toast.BackgroundTransparency = 0.08
     toast.Visible = false
-    toast.ZIndex = 12
+    --[[
+        Above every overlay in the HUD, which it was not.
+
+        At 12 the toast drew behind the field book, the profession panel, the
+        call wheel and the store -- so a refusal raised while any of them was
+        open was invisible. Found by pressing BUY on a product with no Creator
+        Dashboard id: the server refused correctly, said so, and the sentence
+        was painted underneath the panel the player was looking at, which is
+        indistinguishable from the button doing nothing. #327 was about a modal
+        eating input; this is the same modal eating output.
+    ]]
+    toast.ZIndex = 60
     corner(toast, 14)
     stroke(toast, COLORS.amber, 0.4)
 
@@ -1431,6 +1565,330 @@ function HUDController.new(
     corner(progressClose, 12)
     stroke(progressClose, COLORS.cream, 0.58)
 
+    --[[
+        The outfitter's panel.
+
+        Built to the portrait canvas from the start rather than fitted to one
+        afterwards, because that lesson has a bug number: #327 found the field
+        book 46 points wider than the screen on each side with its CLOSE button
+        57% off it, and a modal overlay nobody can shut eats every world click
+        behind it -- which reads in play as the game having stopped responding.
+        Every figure below that could have been a literal is derived from the
+        canvas in _layoutStore.
+
+        One card per product and one row per owned cosmetic, both walked out of
+        the catalog rather than written here. A hand-written card list is the
+        equip panel's eight hardcoded items with a price attached.
+    ]]
+    local storeOverlay = Instance.new("Frame")
+    storeOverlay.Name = "StoreOverlay"
+    storeOverlay.Size = UDim2.fromScale(1, 1)
+    storeOverlay.BackgroundColor3 = COLORS.ink
+    storeOverlay.BackgroundTransparency = 0.18
+    storeOverlay.Active = true
+    storeOverlay.Visible = false
+    storeOverlay.ZIndex = 54
+    storeOverlay.Parent = canvas
+
+    local storePanel = Instance.new("Frame")
+    storePanel.Name = "StorePanel"
+    -- Top-anchored, and _layoutStore decides how far down. A centred panel on
+    -- a portrait canvas put its own CLOSE button underneath Roblox's topbar.
+    storePanel.AnchorPoint = Vector2.new(0.5, 0)
+    storePanel.Position = UDim2.new(0.5, 0, 0, 80)
+    storePanel.Size = UDim2.fromOffset(540, 560)
+    storePanel.BackgroundColor3 = COLORS.panel
+    storePanel.BackgroundTransparency = 0.02
+    storePanel.ZIndex = 55
+    storePanel.Parent = storeOverlay
+    corner(storePanel, 20)
+    stroke(storePanel, COLORS.amber, 0.2)
+
+    local storeTitle = textLabel(
+        storePanel,
+        "Title",
+        "THE OUTFITTER",
+        UDim2.new(1, -40, 0, 26),
+        UDim2.fromOffset(20, 16),
+        18,
+        COLORS.amber
+    )
+    storeTitle.Font = Enum.Font.GothamBold
+    storeTitle.ZIndex = 56
+
+    --[[
+        The line that has to be on every card, drawn once above all of them.
+
+        MONETIZATION_LIVEOPS_ANALYTICS forbids paid power and
+        CHARACTER_KITS_SPEC asks for the sentence in as many words. It is the
+        header rather than a repeat inside each card because on a 502-point
+        canvas the same sentence five times is five wasted rows of a screen a
+        player is trying to read prices on.
+    ]]
+    local storeAssurance = textLabel(
+        storePanel,
+        "Assurance",
+        "COSMETIC ONLY — ABILITIES ARE EARNED IN PLAY",
+        UDim2.new(1, -40, 0, 16),
+        UDim2.fromOffset(20, 44),
+        11,
+        COLORS.muted
+    )
+    storeAssurance.ZIndex = 56
+
+    --[[
+        CLOSE goes along the bottom of the panel, not into its top-right
+        corner, and that corner is the reason.
+
+        Measured live at 392 x 608: Roblox's own player list occupies
+        x 308..387 from y 4 down to y 308, directly over where this button
+        started. Synthetic input refused to click it -- "hits CoreGUI" -- which
+        is the platform saying the corner is already spoken for by the topbar,
+        the chat toggle and the roster. A modal whose only exit is under
+        somebody else's furniture is #327's field book again, and that one read
+        in play as the game having stopped responding.
+
+        Along the bottom it is also where a thumb already is on a portrait
+        phone, which is the same argument that put the quick chat wheel there.
+    ]]
+    local storeClose = Instance.new("TextButton")
+    storeClose.Name = "Close"
+    storeClose.AnchorPoint = Vector2.new(0.5, 1)
+    storeClose.Position = UDim2.new(0.5, 0, 1, -12)
+    storeClose.Size = UDim2.fromOffset(220, 38)
+    storeClose.BackgroundColor3 = COLORS.panelSoft
+    storeClose.Font = Enum.Font.GothamBold
+    storeClose.Text = "CLOSE"
+    storeClose.TextColor3 = COLORS.cream
+    storeClose.TextSize = 11
+    storeClose.Selectable = true
+    storeClose.ZIndex = 57
+    storeClose.Parent = storePanel
+    corner(storeClose, 10)
+    stroke(storeClose, COLORS.cream, 0.58)
+
+    local storeScroll = Instance.new("ScrollingFrame")
+    storeScroll.Name = "StoreScroll"
+    storeScroll.Position = UDim2.fromOffset(16, 70)
+    -- 132 = the header above it plus the close bar below it, so the list never
+    -- runs under either.
+    storeScroll.Size = UDim2.new(1, -32, 1, -132)
+    storeScroll.BackgroundTransparency = 1
+    storeScroll.BorderSizePixel = 0
+    storeScroll.ScrollBarThickness = 6
+    storeScroll.ScrollBarImageColor3 = COLORS.amber
+    storeScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    storeScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    storeScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+    storeScroll.Selectable = true
+    storeScroll.ZIndex = 56
+    storeScroll.Parent = storePanel
+    local storeLayout = Instance.new("UIListLayout")
+    storeLayout.FillDirection = Enum.FillDirection.Vertical
+    storeLayout.Padding = UDim.new(0, 10)
+    storeLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    storeLayout.Parent = storeScroll
+
+    --[[
+        The empty state, which is the state this store ships in.
+
+        `Config.CommerceProductIds` is empty until somebody creates the
+        products in the Creator Dashboard, and a card with no price does not
+        render at all -- that refusal is in the shared builder and it is
+        deliberate. What must not happen is a panel that opens onto nothing and
+        says nothing, because that is indistinguishable from a broken button.
+    ]]
+    local storeEmpty = textLabel(
+        storeScroll,
+        "Empty",
+        "NOTHING IS ON THE RAIL YET.",
+        UDim2.new(1, -8, 0, 44),
+        UDim2.fromOffset(0, 0),
+        13,
+        COLORS.muted
+    )
+    storeEmpty.LayoutOrder = 1
+    storeEmpty.TextYAlignment = Enum.TextYAlignment.Top
+    storeEmpty.ZIndex = 57
+
+    local storeCards: {
+        [string]: {
+            frame: TextButton,
+            name: TextLabel,
+            price: TextLabel,
+            terms: TextLabel,
+            action: TextButton,
+            productId: string,
+        },
+    } =
+        {}
+    for order, product in CosmeticCatalog.products() do
+        local card = Instance.new("TextButton")
+        card.Name = "Card_" .. product.id
+        card.LayoutOrder = 10 + order
+        card.Size = UDim2.new(1, -8, 0, 96)
+        card.BackgroundColor3 = COLORS.panelSoft
+        card.AutoButtonColor = false
+        card.Text = ""
+        card.Selectable = true
+        card.Visible = false
+        card.ZIndex = 57
+        card.Parent = storeScroll
+        corner(card, 12)
+        stroke(card, COLORS.amber, 0.62)
+
+        local previewParts = {}
+        for _, cosmeticId in product.grants do
+            local cosmetic = CosmeticCatalog.get(cosmeticId)
+            if cosmetic ~= nil then
+                for _, plan in cosmetic.parts do
+                    table.insert(previewParts, plan)
+                end
+            end
+        end
+        local preview = createCosmeticPreview(card, previewParts, 76)
+        preview.Position = UDim2.fromOffset(10, 10)
+        corner(preview, 10)
+
+        local cardName = textLabel(
+            card,
+            "Name",
+            product.displayName,
+            UDim2.new(1, -210, 0, 20),
+            UDim2.fromOffset(96, 12),
+            14,
+            COLORS.cream
+        )
+        cardName.Font = Enum.Font.GothamBold
+        cardName.ZIndex = 58
+        local cardPrice = textLabel(
+            card,
+            "Price",
+            "",
+            UDim2.new(1, -210, 0, 18),
+            UDim2.fromOffset(96, 34),
+            13,
+            COLORS.amber
+        )
+        cardPrice.Font = Enum.Font.GothamBold
+        cardPrice.ZIndex = 58
+        local cardTerms = textLabel(
+            card,
+            "Terms",
+            "",
+            UDim2.new(1, -110, 0, 30),
+            UDim2.fromOffset(96, 54),
+            11,
+            COLORS.muted
+        )
+        cardTerms.TextYAlignment = Enum.TextYAlignment.Top
+        cardTerms.ZIndex = 58
+
+        local cardAction = Instance.new("TextButton")
+        cardAction.Name = "Action"
+        cardAction.AnchorPoint = Vector2.new(1, 0)
+        cardAction.Position = UDim2.new(1, -10, 0, 12)
+        cardAction.Size = UDim2.fromOffset(104, 34)
+        cardAction.BackgroundColor3 = COLORS.panel
+        cardAction.AutoButtonColor = true
+        cardAction.Font = Enum.Font.GothamBold
+        cardAction.Text = "BUY"
+        cardAction.TextColor3 = COLORS.cream
+        cardAction.TextSize = 12
+        cardAction.TextWrapped = true
+        cardAction.Selectable = true
+        cardAction.ZIndex = 59
+        cardAction.Parent = card
+        corner(cardAction, 10)
+        stroke(cardAction, COLORS.amber, 0.3)
+
+        storeCards[product.id] = {
+            frame = card,
+            name = cardName,
+            price = cardPrice,
+            terms = cardTerms,
+            action = cardAction,
+            productId = product.id,
+        }
+    end
+
+    local storeWardrobeTitle = textLabel(
+        storeScroll,
+        "WardrobeTitle",
+        "YOUR WARDROBE",
+        UDim2.new(1, -8, 0, 22),
+        UDim2.fromOffset(0, 0),
+        13,
+        COLORS.amber
+    )
+    storeWardrobeTitle.Font = Enum.Font.GothamBold
+    storeWardrobeTitle.LayoutOrder = 100
+    storeWardrobeTitle.Visible = false
+    storeWardrobeTitle.ZIndex = 57
+
+    --[[
+        The wardrobe is a second list, and the reason is the one this project
+        keeps paying for. A product can stop resolving -- delisted, or a product
+        info call that simply fails -- and a store that showed owned cosmetics
+        only through their sale cards would make a paid-for coat unwearable the
+        moment the thing that sold it went away.
+    ]]
+    local storeWardrobeRows: {
+        [string]: { frame: Frame, name: TextLabel, action: TextButton, cosmeticId: string },
+    } =
+        {}
+    for order, cosmetic in CosmeticCatalog.list() do
+        local row = Instance.new("Frame")
+        row.Name = "Worn_" .. cosmetic.id
+        row.LayoutOrder = 100 + order
+        row.Size = UDim2.new(1, -8, 0, 56)
+        row.BackgroundColor3 = COLORS.panelSoft
+        row.BackgroundTransparency = 0.25
+        row.Visible = false
+        row.ZIndex = 57
+        row.Parent = storeScroll
+        corner(row, 10)
+
+        local rowPreview = createCosmeticPreview(row, cosmetic.parts, 40)
+        rowPreview.Position = UDim2.fromOffset(8, 8)
+        corner(rowPreview, 8)
+
+        local rowName = textLabel(
+            row,
+            "Name",
+            cosmetic.displayName,
+            UDim2.new(1, -170, 0, 40),
+            UDim2.fromOffset(56, 8),
+            12,
+            COLORS.cream
+        )
+        rowName.ZIndex = 58
+
+        local rowAction = Instance.new("TextButton")
+        rowAction.Name = "Action"
+        rowAction.AnchorPoint = Vector2.new(1, 0.5)
+        rowAction.Position = UDim2.new(1, -10, 0.5, 0)
+        rowAction.Size = UDim2.fromOffset(96, 32)
+        rowAction.BackgroundColor3 = COLORS.panel
+        rowAction.AutoButtonColor = true
+        rowAction.Font = Enum.Font.GothamBold
+        rowAction.Text = "WEAR"
+        rowAction.TextColor3 = COLORS.cream
+        rowAction.TextSize = 12
+        rowAction.Selectable = true
+        rowAction.ZIndex = 59
+        rowAction.Parent = row
+        corner(rowAction, 9)
+        stroke(rowAction, COLORS.cream, 0.5)
+
+        storeWardrobeRows[cosmetic.id] = {
+            frame = row,
+            name = rowName,
+            action = rowAction,
+            cosmeticId = cosmetic.id,
+        }
+    end
+
     local professionGrid = Instance.new("Frame")
     professionGrid.Name = "ProfessionGrid"
     professionGrid.BackgroundTransparency = 1
@@ -1820,6 +2278,18 @@ function HUDController.new(
         _progressScroll = progressScroll,
         _progressClose = progressClose,
         _progressText = progressText,
+        _storeOverlay = storeOverlay,
+        _storePanel = storePanel,
+        _storeScroll = storeScroll,
+        _storeClose = storeClose,
+        _storeEmpty = storeEmpty,
+        _storeCards = storeCards,
+        _storeWardrobeTitle = storeWardrobeTitle,
+        _storeWardrobeRows = storeWardrobeRows,
+        _storeRevision = 0,
+        _onStoreDetail = nil,
+        _onStorePurchase = nil,
+        _onCosmeticEquip = nil,
         _equipmentButtons = equipmentButtons,
         _whetButton = whetButton,
         _whetItemId = nil,
@@ -1901,6 +2371,44 @@ function HUDController.new(
             callback(itemId)
         end
     end)
+    storeClose.Activated:Connect(function()
+        self:setStoreOpen(false)
+    end)
+    for productId, card in storeCards do
+        --[[
+            The card body is a detail view; the button on it is the decision.
+            Two targets rather than one because they are two different events
+            in the monetization taxonomy, and because a card whose only
+            pressable region buys something is a card a thumb buys by
+            accident.
+        ]]
+        card.frame.Activated:Connect(function()
+            local callback = self._onStoreDetail
+            if callback ~= nil then
+                callback(productId)
+            end
+        end)
+        card.action.Activated:Connect(function()
+            -- Only ever a purchase. An owned card's button is not clickable,
+            -- because the only other thing it could mean is "wear", and a
+            -- product that grants two cosmetics cannot say which.
+            if card.action:GetAttribute("StoreAction") ~= "buy" then
+                return
+            end
+            local callback = self._onStorePurchase
+            if callback ~= nil then
+                callback(productId)
+            end
+        end)
+    end
+    for cosmeticId, row in storeWardrobeRows do
+        row.action.Activated:Connect(function()
+            local callback = self._onCosmeticEquip
+            if callback ~= nil then
+                callback(cosmeticId)
+            end
+        end)
+    end
     local function bindProfessionCard(professionId: string, card: TextButton)
         card.Activated:Connect(function()
             if not self._professionSwitchable then
@@ -2135,6 +2643,223 @@ function HUDController._focusProgressBook(self: HUDController, open: boolean)
         end
         warn("[Last Light] field book scroll never measured; controller focus skipped")
     end)
+end
+
+function HUDController.setStoreHandlers(
+    self: HUDController,
+    onDetail: (string) -> (),
+    onPurchase: (string) -> (),
+    onEquip: (string) -> ()
+)
+    self._onStoreDetail = onDetail
+    self._onStorePurchase = onPurchase
+    self._onCosmeticEquip = onEquip
+end
+
+function HUDController.storePanel(self: HUDController): Frame
+    return self._storePanel
+end
+
+function HUDController.storeClose(self: HUDController): TextButton
+    return self._storeClose
+end
+
+function HUDController.isStoreOpen(self: HUDController): boolean
+    return self._storeOverlay.Visible
+end
+
+function HUDController.setStoreOpen(self: HUDController, open: boolean)
+    self._storeOverlay.Visible = open
+    if open then
+        self:_layoutStore()
+        if self._currentState ~= nil then
+            self:_updateStore(self._currentState)
+        end
+    else
+        local selected = GuiService.SelectedObject
+        if selected ~= nil and selected:IsDescendantOf(self._storeOverlay) then
+            GuiService.SelectedObject = nil
+        end
+    end
+end
+
+--[[
+    What the panel shows, and when it has to shut itself.
+
+    The refusal is the server's -- it gates the door and the actions -- but the
+    client evaluates the same shared predicate over the same snapshot fields,
+    because a store open when a night starts has to close on the frame the
+    state changes rather than when somebody happens to press something. Two
+    readers, one rule, no second copy to drift.
+]]
+function HUDController._updateStore(self: HUDController, state: any)
+    local store = if type(state) == "table" then state.store else nil
+    if type(store) ~= "table" then
+        self:setStoreOpen(false)
+        return
+    end
+
+    --[[
+        The open instruction, which rises and never falls. The server counts
+        presses on the outfitter's stand; anything else -- a push arriving, a
+        card being tapped -- must not reopen a panel the player has shut.
+    ]]
+    local revision = tonumber(store.revision) or 0
+    if revision > self._storeRevision then
+        self._storeRevision = revision
+        if not self._storeOverlay.Visible then
+            self:setStoreOpen(true)
+            return
+        end
+    end
+    if not self._storeOverlay.Visible then
+        return
+    end
+
+    local verdict = StoreAvailability.evaluate({
+        storeEnabled = store.enabled == true,
+        tutorialComplete = state.tutorialComplete == true,
+        nightActive = state.nightActive == true,
+        enemyCount = state.enemyCount,
+        downed = self._playerDowned,
+        partyDown = type(state.survival) == "table" and state.survival.partyDown == true,
+    })
+    if store.available == false or not verdict.open then
+        self:setStoreOpen(false)
+        return
+    end
+
+    local shown = 0
+    local cards = if type(store.cards) == "table" then store.cards else {}
+    local byProduct: { [string]: any } = {}
+    for _, card in cards do
+        if type(card) == "table" and type(card.productId) == "string" then
+            byProduct[card.productId] = card
+        end
+    end
+    for productId, entry in self._storeCards do
+        local card = byProduct[productId]
+        entry.frame.Visible = card ~= nil
+        if card ~= nil then
+            shown += 1
+            entry.name.Text = card.displayName
+            entry.price.Text = card.priceLabel
+            --[[
+                Permanence and owned state on the same line, because both are
+                required on every card and a portrait canvas has no row to
+                spare for either on its own. "WORN" is added rather than
+                substituted: a player looking at the shelf still needs to know
+                the thing is permanent.
+            ]]
+            entry.terms.Text = if card.equipped
+                then card.permanenceLabel .. " · " .. card.ownedLabel .. " · WORN"
+                else card.permanenceLabel .. " · " .. card.ownedLabel
+            entry.action.Text = card.actionLabel
+            entry.action:SetAttribute("StoreAction", card.action)
+            local purchasable = card.action == "buy"
+            entry.action.Active = purchasable
+            entry.action.AutoButtonColor = purchasable
+            entry.action.Selectable = purchasable
+            entry.action.TextColor3 = if purchasable then COLORS.cream else COLORS.green
+            entry.action.BackgroundColor3 = if purchasable then COLORS.panel else COLORS.panelSoft
+        end
+    end
+
+    local worn = 0
+    local wardrobe: { [string]: any } = {}
+    for _, row in (if type(store.wardrobe) == "table" then store.wardrobe else {}) do
+        if type(row) == "table" and type(row.cosmeticId) == "string" then
+            wardrobe[row.cosmeticId] = row
+        end
+    end
+    for cosmeticId, entry in self._storeWardrobeRows do
+        local row = wardrobe[cosmeticId]
+        entry.frame.Visible = row ~= nil
+        if row ~= nil then
+            worn += 1
+            entry.name.Text = string.format("%s · %s", row.displayName, string.upper(row.slot))
+            entry.action.Text = row.actionLabel
+            entry.action.TextColor3 = if row.equipped then COLORS.amber else COLORS.cream
+        end
+    end
+    self._storeWardrobeTitle.Visible = worn > 0
+
+    --[[
+        The empty state says which kind of empty it is.
+
+        A store with no priced products and a store with nothing in the catalog
+        look identical to a player, and only one of them is somebody's job to
+        fix. `Config.CommerceProductIds` is empty until the products exist in
+        the Creator Dashboard, so this is the line the store ships showing.
+    ]]
+    self._storeEmpty.Visible = shown == 0 and worn == 0
+    local unpriced = tonumber(store.unpricedProducts) or 0
+    self._storeEmpty.Text = if unpriced > 0
+        then string.format("NOTHING IS PRICED YET — %d WAITING ON THE TILL.", unpriced)
+        else "NOTHING IS ON THE RAIL YET."
+end
+
+--[[
+    The panel, measured against the canvas rather than against a desktop.
+
+    Everything here was a literal in the first draft and every one of them was
+    a bet on a screen: #327 found the field book 46 points wider than the
+    portrait canvas on each side with CLOSE 57% off it, which made the panel
+    unclosable and therefore made every world click behind it disappear.
+]]
+function HUDController._layoutStore(self: HUDController)
+    local _viewport, scale, canvasWidth, canvasHeight = canvasMetrics()
+    local margin = 16
+    local panelWidth = math.min(560, math.max(260, canvasWidth - margin * 2))
+    --[[
+        Below Roblox's own topbar, measured rather than guessed.
+
+        This ScreenGui sets `IgnoreGuiInset`, so the canvas starts at the true
+        top of the screen and the platform's menu and chat buttons sit over the
+        first 58 pixels of it. Centred, this panel put its CLOSE button at
+        x 309..367, y 24..51 -- entirely inside `TopbarInset`, which on a phone
+        means a player tapping CLOSE opens the Roblox menu instead. That is
+        #327's defect exactly: a modal overlay nobody can shut swallows every
+        world click behind it, and reads in play as the game freezing.
+
+        The inset is in screen pixels and everything here is in canvas points,
+        so it is divided by the scale before it means anything.
+    ]]
+    local topbar = math.max(GuiService.TopbarInset.Height, 0) / math.max(scale, 0.01)
+    local top = topbar + 10
+    local panelHeight = math.min(600, math.max(240, canvasHeight - top - 24))
+    self._storePanel.AnchorPoint = Vector2.new(0.5, 0)
+    self._storePanel.Position = UDim2.new(0.5, 0, 0, top)
+    self._storePanel.Size = UDim2.fromOffset(panelWidth, panelHeight)
+    self._storeClose.Size = UDim2.fromOffset(math.min(240, panelWidth - margin * 2), 38)
+
+    --[[
+        A card is a preview, three lines of text and one button, and on a
+        narrow canvas the button cannot sit beside the text without one of
+        them being unreadable. Below 400 points it drops under the text and
+        the card grows a row instead, which is the same answer the field
+        book's equip grid reached: add a row, never a clipped control.
+    ]]
+    local narrow = panelWidth < 400
+    local cardHeight = if narrow then 130 else 96
+    local actionWidth = math.min(140, math.max(96, math.floor(panelWidth * 0.28)))
+    for _, entry in self._storeCards do
+        entry.frame.Size = UDim2.new(1, -8, 0, cardHeight)
+        entry.action.Size = UDim2.fromOffset(actionWidth, 34)
+        entry.action.AnchorPoint = if narrow then Vector2.new(0, 0) else Vector2.new(1, 0)
+        entry.action.Position = if narrow
+            then UDim2.fromOffset(96, cardHeight - 46)
+            else UDim2.new(1, -10, 0, 12)
+        local textRight = if narrow then 106 else actionWidth + 26
+        entry.name.Size = UDim2.new(1, -96 - textRight, 0, 20)
+        entry.price.Size = UDim2.new(1, -96 - textRight, 0, 18)
+        entry.terms.Size = UDim2.new(1, -106, 0, if narrow then 34 else 30)
+    end
+    for _, entry in self._storeWardrobeRows do
+        local rowActionWidth = math.min(110, math.max(76, math.floor(panelWidth * 0.24)))
+        entry.action.Size = UDim2.fromOffset(rowActionWidth, 32)
+        entry.name.Size = UDim2.new(1, -66 - rowActionWidth - 20, 0, 40)
+    end
 end
 
 function HUDController.setEquipHandler(self: HUDController, callback: (string) -> ())
@@ -3300,6 +4025,7 @@ function HUDController._layout(self: HUDController)
     self._callPanel.Position =
         UDim2.new(0.5, 0, 1, -(34 + self._actionClusterRows * ACTION_ROW_PITCH + 84 + 14))
     self:_layoutLoadout()
+    self:_layoutStore()
 end
 
 function HUDController._presentPhase(self: HUDController, phase: string)
@@ -3686,6 +4412,7 @@ function HUDController.update(self: HUDController, state: any)
     self:_refreshActionCluster()
     self:_updateGear()
     self:_updateProgress()
+    self:_updateStore(state)
     local eliteVisible = (type(boss) == "table" and (boss.active == true or boss.complete == true))
         or (type(elite) == "table" and (elite.active == true or elite.complete == true))
     eliteVisible = eliteVisible and not self._playerDowned

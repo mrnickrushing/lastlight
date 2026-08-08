@@ -35,6 +35,7 @@
 
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local CommerceService = {}
 CommerceService.__index = CommerceService
@@ -52,6 +53,7 @@ export type CommerceService = typeof(setmetatable(
         _config: any,
         _catalog: any,
         _entitlements: any,
+        _storeCard: any,
         _profileService: any,
         _featureFlags: any,
         _analyticsService: any,
@@ -87,6 +89,7 @@ function CommerceService.new(
     config: any,
     cosmeticCatalog: any,
     entitlements: any,
+    storeCard: any,
     profileService: any,
     featureFlags: any,
     analyticsService: any
@@ -97,6 +100,7 @@ function CommerceService.new(
         _config = config,
         _catalog = cosmeticCatalog,
         _entitlements = entitlements,
+        _storeCard = storeCard,
         _profileService = profileService,
         _featureFlags = featureFlags,
         _analyticsService = analyticsService,
@@ -397,6 +401,140 @@ function CommerceService.equip(
 end
 
 --[[
+    Wear one, named only by the cosmetic.
+
+    The slot comes from the catalog rather than from the caller, which is the
+    only version of it worth trusting: a client that could name a slot could
+    name the wrong one, and #331's review found exactly that hole on the layer
+    below. Pressing something already worn takes it off, so removal needs no
+    second field and no second action -- the toggle is what keeps the payload
+    at one id.
+]]
+function CommerceService.equipById(self: CommerceService, player: Player, cosmeticId: any): any
+    if not self._profileService:isLoaded(player) then
+        return { applied = false, reason = "profile_loading" }
+    end
+    local cosmetic = self._catalog.get(cosmeticId)
+    if cosmetic == nil then
+        return { applied = false, reason = "unknown_cosmetic" }
+    end
+    local state = self._profileService:commerce(player)
+    if self._entitlements.equippedIn(state, cosmetic.slot) == cosmetic.id then
+        return self:equip(player, cosmetic.slot, nil)
+    end
+    return self:equip(player, cosmetic.slot, cosmetic.id)
+end
+
+--[[
+    One card looked at. Nothing is decided here and nothing is returned,
+    because a detail view changes nothing -- it is a fact the monetization
+    taxonomy asks for by name, and an event with no emitter is a dashboard
+    reading nothing.
+]]
+function CommerceService.viewDetail(self: CommerceService, player: Player, productId: any): boolean
+    local product = self._catalog.product(productId)
+    if product == nil then
+        return false
+    end
+    self._analyticsService:productDetailView(player, product.id)
+    return true
+end
+
+--[[
+    The shelf and the wardrobe, built for one player.
+
+    Two lists rather than one, and the reason is the failure this project has
+    now paid for four times. A sale card needs a price and a product; a thing
+    already owned needs neither. If owned cosmetics were shown only through
+    their sale cards, a product delisted in the dashboard -- or a
+    `GetProductInfo` call that simply failed -- would make a paid-for coat
+    unwearable, which is an entitlement that exists and a cosmetic that cannot
+    be worn.
+
+    Every card is built by the shared builder, which refuses to make one
+    without a price, a permanence, an owned state and real geometry. A product
+    with no dashboard id yields no card at all rather than a card with a blank
+    where the price goes.
+]]
+function CommerceService.storeSnapshot(self: CommerceService, player: Player): any
+    if not self._profileService:isLoaded(player) then
+        return nil
+    end
+    local state = self._profileService:commerce(player)
+    local cards = {}
+    local unpriced = 0
+    for _, product in self._catalog.products() do
+        local granted = product.grants
+        local preview = {}
+        local owned = #granted > 0
+        local equipped = #granted > 0
+        for _, cosmeticId in granted do
+            local cosmetic = self._catalog.get(cosmeticId)
+            if cosmetic == nil then
+                owned = false
+                equipped = false
+            else
+                for _, plan in cosmetic.parts do
+                    table.insert(preview, plan)
+                end
+                if not self._entitlements.owns(state, cosmetic.id) then
+                    owned = false
+                end
+                if self._entitlements.equippedIn(state, cosmetic.slot) ~= cosmetic.id then
+                    equipped = false
+                end
+            end
+        end
+        local info = self:productInfo(product.id)
+        local card, reason = self._storeCard.build(product, {
+            priceInRobux = if info == nil then nil else info.priceInRobux,
+            owned = owned,
+            equipped = equipped,
+            preview = preview,
+        })
+        if card ~= nil then
+            table.insert(cards, card)
+        elseif reason == "no_price" then
+            unpriced += 1
+        else
+            -- Anything but a missing price is a catalog fault rather than a
+            -- dashboard one, and it is worth a line: the card is gone and no
+            -- spec would notice a product quietly disappearing from a shelf.
+            self._logger:warn("commerce_card_refused", { product = product.id, reason = reason })
+        end
+    end
+
+    local wardrobe = {}
+    for _, cosmetic in self._catalog.list() do
+        if self._entitlements.owns(state, cosmetic.id) then
+            local row = self._storeCard.wardrobeRow(
+                cosmetic,
+                self._entitlements.equippedIn(state, cosmetic.slot) == cosmetic.id
+            )
+            if row ~= nil then
+                table.insert(wardrobe, row)
+            end
+        end
+    end
+
+    return {
+        enabled = self._featureFlags:isEnabled("cosmetic_store_enabled"),
+        cards = cards,
+        wardrobe = wardrobe,
+        unpricedProducts = unpriced,
+        assurance = self._storeCard.assurance(),
+    }
+end
+
+--[[
+    Somebody opened the store. Counted where it happened rather than where it
+    was drawn: a client-side count of store views is a count a client decides.
+]]
+function CommerceService.recordStoreView(self: CommerceService, player: Player, cardCount: number)
+    self._analyticsService:storeView(player, cardCount)
+end
+
+--[[
     What a client may be told: what is worn, and what is owned.
 
     Owned reaches the client because the store card has to show it -- a card
@@ -531,11 +669,80 @@ function CommerceService.Start(self: CommerceService)
         end)
     end)
 
+    self:_watchStudioStore()
+
     self._logger:info("commerce_started", {
         configured = self:_configuredCount(),
         products = #self._catalog.products(),
         storeEnabled = self._featureFlags:isEnabled("cosmetic_store_enabled"),
     })
+end
+
+--[[
+    The Studio half of a surface whose real half needs a Creator Dashboard.
+
+    Everything about the store that a camera can judge -- the panel on a
+    portrait canvas, a card's price line, the owned state, the wardrobe, the
+    preview of a cosmetic's own geometry -- is invisible until a product has a
+    price, and a product has no price until somebody creates it in the
+    dashboard and pastes the number into `Config.CommerceProductIds`. That is
+    the owner's, and it is not going to happen before this ships.
+
+    The failure that leaves behind is written down elsewhere in this codebase
+    in as many words: a live pass went to look at two rewritten HUD surfaces,
+    found both correctly empty, and ended knowing nothing. `LastLightSkipTutorial`
+    and `LastLightStockProfile` exist because of that pass. These two are the
+    same tool pointed at the store.
+
+    **Neither one grants anything the real path would not.** A price is a
+    number to draw, not a product id -- `promptPurchase` still refuses with
+    `product_not_configured`, because a dashboard product genuinely does not
+    exist. And a grant goes through `applyReceipt`, the single grant authority,
+    with a synthetic receipt: the platform's own `ProcessReceipt` cannot be
+    driven in Studio, and feeding the real handler a receipt is the closest
+    honest thing to it. Studio only, on both, and logged loudly every time.
+]]
+function CommerceService._watchStudioStore(self: CommerceService)
+    if not RunService:IsStudio() then
+        return
+    end
+
+    local function applyPrice()
+        local price = tonumber(game:GetAttribute("LastLightStudioStore"))
+        if price == nil or price <= 0 then
+            return
+        end
+        self._featureFlags:setOverride("cosmetic_store_enabled", true)
+        for _, product in self._catalog.products() do
+            self._productInfo[product.id] =
+                { priceInRobux = math.floor(price), name = product.displayName }
+        end
+        self._logger:warn("studio_store_priced", {
+            price = math.floor(price),
+            products = #self._catalog.products(),
+        })
+    end
+
+    local function applyGrant()
+        local productId = game:GetAttribute("LastLightStudioGrant")
+        if type(productId) ~= "string" or #productId == 0 then
+            return
+        end
+        for _, player in Players:GetPlayers() do
+            self:applyReceipt({
+                purchaseId = string.format("studio_%s_%d", productId, player.UserId),
+                productId = productId,
+                userId = player.UserId,
+                at = os.time(),
+            })
+        end
+        self._logger:warn("studio_store_granted", { product = productId })
+    end
+
+    applyPrice()
+    applyGrant()
+    game:GetAttributeChangedSignal("LastLightStudioStore"):Connect(applyPrice)
+    game:GetAttributeChangedSignal("LastLightStudioGrant"):Connect(applyGrant)
 end
 
 -- The dashboard number back to this game's own product id. A receipt names

@@ -65,9 +65,19 @@ export type TutorialService = typeof(setmetatable(
         _gearTraits: any,
         _consumables: any,
         _townVisitPolicy: any,
+        _storeAvailability: any,
         _companionService: any,
         _partyService: any,
         _socialService: any,
+        _commerceService: any,
+        --[[
+            Which store view each player is on, so the panel can be told to
+            open by the world rather than by a HUD button. It is a revision
+            rather than a boolean for the same reason the toast is: closing is
+            the client's own business, and a boolean the client cannot clear
+            would reopen the panel on every push.
+        ]]
+        _storeRevision: { [Player]: number },
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -108,7 +118,8 @@ function TutorialService.new(
     gearWear: any,
     gearTraits: any,
     consumables: any,
-    townVisitPolicy: any
+    townVisitPolicy: any,
+    storeAvailability: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -143,9 +154,12 @@ function TutorialService.new(
         _gearTraits = gearTraits,
         _consumables = consumables,
         _townVisitPolicy = townVisitPolicy,
+        _storeAvailability = storeAvailability,
         _companionService = nil,
         _partyService = nil,
         _socialService = nil,
+        _commerceService = nil,
+        _storeRevision = {},
         _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -427,6 +441,7 @@ function TutorialService.Start(self: TutorialService)
         self._expeditionModuleIndex[player] = nil
         self._expeditionEventRevision[player] = nil
         self._expeditionEventSecond[player] = nil
+        self._storeRevision[player] = nil
         self._limiter:clear(tostring(player.UserId))
         self._analyticsService:clear(player)
     end)
@@ -645,6 +660,20 @@ end
 
 function TutorialService.toastPlayer(self: TutorialService, player: Player, message: string)
     self:_setToast(player, message)
+end
+
+--[[
+    Something changed for one player and they are looking at it right now.
+
+    A toast that waits for the next unrelated push is a purchase that lands in
+    silence, which is how a granted receipt read in the live pass: the ledger
+    was right, the profile was right, and the card in front of the buyer still
+    said NOT OWNED. Same shape as the town that never re-rendered in the
+    session that changed it (#325).
+]]
+function TutorialService.announceTo(self: TutorialService, player: Player, message: string)
+    self:_setToast(player, message)
+    self:_publish(player)
 end
 
 function TutorialService._toastAll(self: TutorialService, message: string)
@@ -946,6 +975,50 @@ end
 
 function TutorialService.setSocialService(self: TutorialService, socialService: any)
     self._socialService = socialService
+end
+
+function TutorialService.setCommerceService(self: TutorialService, commerceService: any)
+    self._commerceService = commerceService
+end
+
+--[[
+    Whether the store may open for this player, right now.
+
+    The facts are read here because this is where they all already are, and the
+    decision is made in the shared predicate because the HUD makes the same one
+    from the same fields -- a panel open when a night starts has to shut itself
+    on the frame the state changes, not when somebody presses something. The
+    server's answer is the one that counts: it gates the door, and the client's
+    copy only decides what is drawn.
+]]
+function TutorialService._storeVerdict(
+    self: TutorialService,
+    player: Player,
+    knownPhase: any,
+    knownSurvival: any
+): any
+    local session = self._sessions[player]
+    local phase = knownPhase
+    if phase == nil then
+        local pastFirstLight = session ~= nil
+            and (
+                session.stage == "reveal"
+                or session.stage == "complete"
+                or self._phaseService:hasCompletedFirstNight()
+            )
+        phase = if pastFirstLight and self._townNightService:isRunning()
+            then self._townNightService:snapshot()
+            else self._phaseService:snapshot()
+    end
+    local survival = knownSurvival or self._survivalService:snapshot(player)
+    return self._storeAvailability.evaluate({
+        storeEnabled = self._featureFlags:isEnabled("cosmetic_store_enabled"),
+        tutorialComplete = session ~= nil and session.stage == "complete",
+        nightActive = phase.nightActive,
+        enemyCount = phase.enemyCount,
+        downed = survival.self ~= nil and survival.self.downed == true,
+        partyDown = survival.partyDown == true,
+    })
 end
 
 function TutorialService.strike(self: TutorialService, player: Player)
@@ -1270,6 +1343,36 @@ function TutorialService._interact(
         -- people already standing in the town may read, and a snapshot they
         -- do not receive is a showcase they keep looking at.
         self:_publishAll()
+        return
+    end
+    if actionId == self._runtimeIds.Actions.OpenStore then
+        --[[
+            The outfitter's stand, and the door the exit gate is about.
+
+            The refusal is here rather than on the button because the button is
+            a thing a client draws: a client that decided when the store may
+            open is a client that could decide it may always open. A player
+            refused is told which moment refused them, because "nothing
+            happened" is how a working gate reads as a broken prompt.
+        ]]
+        local verdict = self:_storeVerdict(player)
+        if not verdict.open then
+            self:_setToast(player, verdict.label)
+            self:_publish(player)
+            return
+        end
+        --[[
+            A revision rather than a flag. Closing the panel is the client's
+            own business -- it has a CLOSE button and a world behind it -- and a
+            server-held boolean the client cannot clear would reopen the store
+            on the next push, which is a modal overlay reappearing over a night.
+        ]]
+        self._storeRevision[player] = (self._storeRevision[player] or 0) + 1
+        if self._commerceService ~= nil then
+            local store = self._commerceService:storeSnapshot(player)
+            self._commerceService:recordStoreView(player, if store == nil then 0 else #store.cards)
+        end
+        self:_publish(player)
         return
     end
     if actionId == self._runtimeIds.Actions.OpenFieldBook then
@@ -1865,6 +1968,71 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
                 self:_publish(player)
             end
         end
+    elseif kind == self._runtimeIds.Actions.StoreDetail then
+        --[[
+            A card looked at. It settles nothing and answers nothing, which is
+            the point: the taxonomy counts detail views, and a count with no
+            emitter is a dashboard reading nothing. The store gate is asked
+            again anyway, because a card tapped through a stale panel during a
+            night is still a store open during a night.
+        ]]
+        if self._commerceService ~= nil and self:_storeVerdict(player).open then
+            self._commerceService:viewDetail(player, payload.productId)
+        end
+    elseif kind == self._runtimeIds.Actions.StorePurchase then
+        if self._commerceService == nil then
+            return
+        end
+        local verdict = self:_storeVerdict(player)
+        if not verdict.open then
+            self:_setToast(player, verdict.label)
+            self:_publish(player)
+            return
+        end
+        local result = self._commerceService:promptPurchase(player, payload.productId)
+        if not result.accepted then
+            --[[
+                Every refusal says something different, because the three mean
+                genuinely different things to the person pressing. A product
+                with no dashboard id is the owner's half of this milestone
+                being outstanding, and saying so is better than a prompt that
+                opens onto nothing -- which on a client looks exactly like the
+                button being broken.
+            ]]
+            self:_setToast(
+                player,
+                if result.reason == "product_not_configured"
+                    then "THAT ONE IS NOT FOR SALE YET"
+                    elseif result.reason == "unknown_product" then "NO SUCH THING IN THE CASE"
+                    elseif result.reason == "store_closed" then "THE OUTFITTER IS NOT OPEN YET"
+                    else "THE TILL DID NOT ANSWER — TRY AGAIN"
+            )
+            self:_publish(player)
+        end
+    elseif kind == self._runtimeIds.Actions.EquipCosmetic then
+        --[[
+            Wearing is not buying, so it is not gated on the store being open.
+
+            A player who is downed at the bottom of a night should not be sold
+            anything, and this sells nothing: it changes a look they already
+            paid for. Refusing it would mean a cosmetic that could only be
+            taken off in daylight, which is a rule nobody asked for and one
+            more thing a player would report as broken.
+        ]]
+        if self._commerceService ~= nil then
+            local result = self._commerceService:equipById(player, payload.cosmeticId)
+            self:_setToast(
+                player,
+                if result.applied and result.reason == "removed"
+                    then "TAKEN OFF"
+                    elseif result.applied then "WORN"
+                    elseif result.reason == "not_owned" then "YOU DO NOT OWN THAT"
+                    elseif result.reason == "unknown_cosmetic" then "NOTHING BY THAT NAME"
+                    elseif result.reason == "profile_loading" then "STILL UNPACKING YOUR THINGS"
+                    else "THAT CANNOT BE WORN"
+            )
+            self:_publish(player)
+        end
     elseif kind == self._runtimeIds.Actions.CompanionCommand then
         local mode = payload.mode
         if self._companionService ~= nil and type(mode) == "string" and #mode <= 12 then
@@ -2276,6 +2444,24 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             else nil,
         party = if self._partyService ~= nil then self._partyService:snapshot(player) else nil,
         social = if self._socialService ~= nil then self._socialService:snapshot(player) else nil,
+        store = (function(): any
+            if self._commerceService == nil then
+                return nil
+            end
+            local store = self._commerceService:storeSnapshot(player)
+            if store == nil then
+                return nil
+            end
+            local verdict = self:_storeVerdict(player, phase, survival)
+            store.available = verdict.open
+            store.reason = verdict.reason
+            store.closedLabel = if verdict.open then nil else verdict.label
+            -- The open instruction, and the only one the client acts on. It
+            -- rises when the stand is used and never falls, so a client that
+            -- missed a push opens late rather than never.
+            store.revision = self._storeRevision[player] or 0
+            return store
+        end)(),
         gearCare = gearCare,
         whetTarget = whetTarget,
         equipped = self._profileService:equippedSnapshot(player),

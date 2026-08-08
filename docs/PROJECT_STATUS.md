@@ -59,6 +59,95 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#337** **M11 wave G: there is a shop, and the interesting half of it is
+  everywhere it refuses to open.** Milestone 11's exit gate is one sentence —
+  *the store never interrupts onboarding, active defense, downed state, or
+  defeat* — and the monetization document forbids the same four from the other
+  side. Both are rules about a **moment**, so they are a predicate rather than a
+  habit: `StoreAvailability` (pure) takes the snapshot fields the HUD already
+  has and answers open or refused, with the reason. The server gates the door
+  with it and the client evaluates the same function on the same fields, so a
+  panel open when a night starts shuts itself on the frame the state changes
+  instead of waiting for somebody to press something.
+
+  **The order the refusals are asked in is the message a player gets.** Defeat
+  before downed before defense: a wiped party told "not while something is out
+  there" is the game not having noticed. Defeat is real rather than nominal —
+  `PlayerSurvivalService` reports `partyDown` using the same eligibility rule
+  the guard's last stand already uses, so the two cannot disagree about what a
+  wipe is. And defense is not only night: a blackout relay, a town incident and
+  both boss fights all put a player in a fight in daylight, which is why the
+  predicate reads the creature count and not just the clock.
+
+  **The door is a thing in the world, not a button on the HUD.** The
+  outfitter's stand in the departure lodge is the only way in, and that is the
+  design: a storefront openable from the HUD is openable in all four forbidden
+  moments, and the predicate would then be the only thing between a player and
+  a shop over a boss fight. It is a plank you walk up to, the same argument the
+  town gate settled for the visit policy.
+
+  **No card renders without price, permanence and owned state.**
+  `StoreCard.build` returns nil and a reason rather than a card with a blank in
+  it — a BUY button over an empty price is a player agreeing to something
+  nobody told them. The price is never a constant; it is read from platform
+  product info, and with `Config.CommerceProductIds` empty the honest answer is
+  that no card renders at all and the panel says how many are waiting on a
+  price. The power assurance is added by the builder rather than written per
+  product, because a line a writer has to remember is a line missing from the
+  twelfth product. **The wardrobe is a second list on purpose**: a product can
+  stop resolving, and a store that showed owned cosmetics only through their
+  sale cards would make a paid-for coat unwearable the moment the thing that
+  sold it went away — an entitlement that exists and a cosmetic that can be
+  worn are different facts, which this project has now paid for five times.
+
+  **The equip payload names a cosmetic and never a slot.** The slot is the
+  catalog's answer about that id, which is the only version a server should
+  trust; #331's review found `equip` letting any owned cosmetic go in any slot.
+  Pressing something already worn takes it off, so removal needs no second
+  field. Four new actions, one interaction-routed and three carrying one id
+  each, all four filed in `ExploitGate`.
+
+  **Verified live at 392 x 608 — and touching it found five defects every spec
+  had passed.** (1) The panel's CLOSE button sat at x 309..367, y 24..51,
+  **entirely inside `GuiService.TopbarInset`** — on a phone that is Roblox's own
+  menu button, so tapping CLOSE would open the platform menu and leave a modal
+  nobody can shut over the world. The panel is measured below the topbar now.
+  (2) A toast raised while any overlay is open drew **behind** it: the store
+  refused a purchase correctly, said so, and painted the sentence under the
+  panel. #327 was a modal eating input; this was the same modal eating output.
+  Toast ZIndex 12 → 60. (3) `CommerceService:setGrantHandler` was never wired,
+  so a granted receipt landed in the ledger and the profile and the card in
+  front of the buyer went on saying NOT OWNED — #325's town that never
+  re-rendered, with money attached. (4) The stand's first placement put a stone
+  plinth **through the picnic table's bench**; the table moved to the fireside,
+  which is where a table belongs anyway. (5) The stand went in at the darkest
+  point on that wall — the lodge's east lamps are at z 46 and z 78 and it sits
+  between them — and photographed as a pure silhouette. Three lanterns now, the
+  two that matter on brackets reaching two studs *forward*, because hung close
+  they lit the sign perfectly and the merchandise edge-on. The dummy's coat went
+  from one dark panel (a black slab) to two lapels over pale linen, because
+  value contrast is what makes a shape read in a room lit by two lamps.
+
+  Walked on the fixed build: the stand refuses with THE OUTFITTER IS NOT OPEN
+  YET while the flag is off; priced, it opens with five cards, each with a real
+  preview drawn from the cosmetic's own plan, 399 ROBUX, PERMANENT — YOURS FOR
+  GOOD · NOT OWNED and a BUY button; a real click on BUY answers THAT ONE IS
+  NOT FOR SALE YET, which is `product_not_configured` and correct, because a
+  Studio price does not make a Creator Dashboard product exist; a granted
+  receipt flips the card to OWNED and raises the wardrobe row; and a real click
+  on WEAR reads WORN on the toast, TAKE OFF on the row and · WORN on the card.
+
+  Two Studio-only attributes make that possible and neither grants anything the
+  real path would not: `LastLightStudioStore` sets a **price**, so
+  `promptPurchase` still refuses, and `LastLightStudioGrant` pushes a synthetic
+  receipt through `applyReceipt`, the single grant authority. They exist for the
+  reason `LastLightSkipTutorial` exists — a live pass on a store with no priced
+  products sees an empty panel, and an empty panel and a broken panel look
+  identical. Documented in [STUDIO_MCP_SETUP.md](STUDIO_MCP_SETUP.md).
+
+  **Still owner-gated and unchanged:** the Creator Dashboard products, the
+  prices, and a live purchase with a real receipt. Nothing in this wave can be
+  bought.
 - **#336** (v146) **M12 wave D: the release gates stop being a list of numbers
   nobody collects.** [RELEASE_GATES.md](RELEASE_GATES.md) has held the promotion
   thresholds since Milestone 1 and most of them had **no emitter at all** —
