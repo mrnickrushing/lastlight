@@ -22,7 +22,10 @@
 ]]
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local Strings = require(ReplicatedStorage:WaitForChild("LastLight").Strings)
 
 local ObjectiveMarkerController = {}
 ObjectiveMarkerController.__index = ObjectiveMarkerController
@@ -188,7 +191,7 @@ function ObjectiveMarkerController.setTargets(self: ObjectiveMarkerController, t
         text.Font = Enum.Font.GothamBold
         text.TextSize = 15
         text.TextColor3 = AMBER
-        text.Text = "▼ " .. tostring(target.label or "OBJECTIVE")
+        text.Text = "▼ " .. tostring(target.label or Strings.get("objective.objective"))
         text.Parent = card
 
         self._anchors[target.interactionId] = anchor
@@ -221,7 +224,7 @@ function ObjectiveMarkerController._step(self: ObjectiveMarkerController)
             if label ~= nil and label:IsA("TextLabel") then
                 label.Text = string.format(
                     "▼ %s · %dm",
-                    tostring(target.label or "OBJECTIVE"),
+                    tostring(target.label or Strings.get("objective.objective")),
                     math.floor(distance + 0.5)
                 )
             end

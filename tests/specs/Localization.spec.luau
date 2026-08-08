@@ -1,0 +1,127 @@
+--!strict
+--[[
+	The source table's own rules.
+
+	`scripts/validate_localization.py` holds the table against the source tree:
+	which files still speak for themselves, which keys nobody reads, which keys
+	nobody defines. What a text check cannot see is what `get` does when it is
+	asked for something that is not there, and that is what a localized build
+	actually fails on -- not at build time, but on a phone, at the moment a
+	label is drawn.
+
+	So the rule this file exists for is that a missing string **throws**. Both
+	alternatives ship. Returning the key paints `hud.close` on a button, which
+	at least looks like a bug somebody will file; returning an empty string
+	paints nothing, which looks like a design. This project has paid four times
+	for a silent fallback hiding a gap -- 120 recipes with no bench, 24 residents
+	with no body, ninety craftable items with no equip button -- and every one of
+	them was a lookup that answered instead of refusing.
+]]
+
+local Strings = require("../../src/shared/Strings")
+local TestRunner = require("../TestRunner")
+
+local SURFACES = { hud = true, client = true, objective = true, common = true }
+
+return {
+    name = "Localization",
+    cases = {
+        {
+            name = "a key that exists answers with the text a player reads",
+            run = function()
+                TestRunner.equal(Strings.get("common.old_growth"), "OLD GROWTH")
+            end,
+        },
+        {
+            name = "a missing string refuses rather than answering",
+            run = function()
+                TestRunner.throws(function()
+                    Strings.get("hud.a_label_nobody_wrote")
+                end, "hud.a_label_nobody_wrote")
+            end,
+        },
+        {
+            name = "it never answers a missing key with the key or with nothing",
+            run = function()
+                -- The two shipping failures, asserted as failures rather than
+                -- assumed absent. A fallback added later out of kindness would
+                -- pass every other case in this file.
+                local ok, value = pcall(function()
+                    return Strings.get("hud.not_a_key")
+                end)
+                TestRunner.equal(ok, false, "a missing key answered instead of refusing")
+                TestRunner.equal(value == "hud.not_a_key", false)
+                TestRunner.equal(value == "", false)
+            end,
+        },
+        {
+            name = "the count is the number a language decision is made on",
+            run = function()
+                local keys = Strings.keys()
+                TestRunner.equal(Strings.count(), #keys)
+                TestRunner.truthy(Strings.count() > 0, "the table is empty")
+            end,
+        },
+        {
+            name = "every key names the surface it is read on",
+            run = function()
+                local wrong = {}
+                for _, key in Strings.keys() do
+                    local surface = string.match(key, "^([a-z]+)%.")
+                    if surface == nil or not SURFACES[surface] then
+                        table.insert(wrong, key)
+                    end
+                end
+                TestRunner.equal(
+                    #wrong,
+                    0,
+                    "keys with no known surface: " .. table.concat(wrong, ", ")
+                )
+            end,
+        },
+        {
+            name = "no two keys hold the same text",
+            run = function()
+                --[[
+					A translator paid twice for one word is the smaller half.
+					The larger half is that two keys holding one sentence
+					drift: somebody edits the button and the other copy of it
+					stays, and the game then says two things in one voice.
+					Merging the first duplicate this found -- the Old Growth's
+					name, written once in the HUD and once in the client
+					bootstrap -- is what the `common` surface exists for.
+				]]
+                local byText: { [string]: string } = {}
+                local duplicates = {}
+                for _, key in Strings.keys() do
+                    local text = Strings.get(key)
+                    if byText[text] ~= nil then
+                        table.insert(duplicates, byText[text] .. " and " .. key)
+                    end
+                    byText[text] = key
+                end
+                TestRunner.equal(
+                    #duplicates,
+                    0,
+                    "same text under two keys: " .. table.concat(duplicates, "; ")
+                )
+            end,
+        },
+        {
+            name = "nothing in the table is empty or only punctuation",
+            run = function()
+                local empty = {}
+                for _, key in Strings.keys() do
+                    if not string.find(Strings.get(key), "%a") then
+                        table.insert(empty, key)
+                    end
+                end
+                TestRunner.equal(
+                    #empty,
+                    0,
+                    "keys with no letters in them: " .. table.concat(empty, ", ")
+                )
+            end,
+        },
+    },
+}

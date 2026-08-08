@@ -12,6 +12,7 @@ local CosmeticCatalog = require(sharedRoot.CosmeticCatalog)
 local Equipment = require(sharedRoot.Equipment)
 local QuickChat = require(sharedRoot.QuickChat)
 local StoreAvailability = require(sharedRoot.StoreAvailability)
+local Strings = require(sharedRoot.Strings)
 
 -- How many consumables the column shows at once. There are more than a
 -- phone screen has room for, so the HUD shows what a player is actually
@@ -622,7 +623,7 @@ function HUDController.new(
     local phase = textLabel(
         phaseFrame,
         "Phase",
-        "DAY · MORNING",
+        Strings.get("hud.day_morning"),
         UDim2.fromScale(1, 1),
         UDim2.fromScale(0, 0),
         17,
@@ -644,7 +645,7 @@ function HUDController.new(
     local progress = textLabel(
         objectiveFrame,
         "Progress",
-        "FIRST LIGHT · 1 / 8",
+        Strings.get("hud.first_light_1_8"),
         UDim2.new(1, -28, 0, 24),
         UDim2.fromOffset(14, 8),
         12,
@@ -654,7 +655,7 @@ function HUDController.new(
     local objective = textLabel(
         objectiveFrame,
         "Objective",
-        "FREE MARA",
+        Strings.get("hud.free_mara"),
         UDim2.new(1, -28, 0, 44),
         UDim2.fromOffset(14, 28),
         26,
@@ -675,7 +676,7 @@ function HUDController.new(
     local detail = textLabel(
         objectiveFrame,
         "Detail",
-        "Follow the lantern path.",
+        Strings.get("hud.follow_the_lantern_path"),
         UDim2.new(1, -28, 0, 42),
         UDim2.fromOffset(14, 76),
         18,
@@ -686,7 +687,7 @@ function HUDController.new(
     local mara = textLabel(
         canvas,
         "MaraGuide",
-        "Mara: Follow the light.",
+        Strings.get("hud.mara_follow_the_light"),
         UDim2.fromOffset(430, 48),
         UDim2.new(0.5, 0, 1, -164),
         15,
@@ -702,7 +703,7 @@ function HUDController.new(
     local resource = textLabel(
         canvas,
         "ResourcePill",
-        "HEARTWOOD · 0",
+        Strings.get("hud.heartwood_0"),
         UDim2.fromOffset(176, 40),
         UDim2.fromOffset(18, 164),
         14,
@@ -717,7 +718,7 @@ function HUDController.new(
     local health = textLabel(
         canvas,
         "HealthPill",
-        "HEALTH · 100 / 100",
+        Strings.get("hud.health_100_100"),
         UDim2.fromOffset(150, 40),
         UDim2.new(0, 18, 1, -100),
         13,
@@ -755,7 +756,7 @@ function HUDController.new(
     local staminaText = textLabel(
         staminaFrame,
         "Text",
-        "STAMINA · 100",
+        Strings.get("hud.stamina_100"),
         UDim2.fromScale(1, 1),
         UDim2.fromScale(0, 0),
         13,
@@ -817,7 +818,7 @@ function HUDController.new(
     local lanternText = textLabel(
         lanternFrame,
         "Text",
-        "LIGHT · 100%",
+        Strings.get("hud.light_100"),
         UDim2.fromScale(1, 1),
         UDim2.fromScale(0, 0),
         13,
@@ -862,7 +863,7 @@ function HUDController.new(
     local blackoutTitle = textLabel(
         blackoutFrame,
         "Title",
-        "BRAMBLEWAKE BLACKOUT · STAGE 1/4",
+        Strings.get("hud.bramblewake_blackout_stage_1_4"),
         UDim2.new(1, -20, 0, 24),
         UDim2.fromOffset(10, 4),
         14,
@@ -874,7 +875,7 @@ function HUDController.new(
     local blackoutDetail = textLabel(
         blackoutFrame,
         "Detail",
-        "ROOTFIRE RELAY · 0/3",
+        Strings.get("hud.rootfire_relay_0_3"),
         UDim2.new(1, -20, 0, 20),
         UDim2.fromOffset(10, 27),
         11,
@@ -919,7 +920,7 @@ function HUDController.new(
     local eliteTitle = textLabel(
         eliteFrame,
         "Title",
-        "OLD GROWTH · PHASE 1/3",
+        Strings.get("hud.old_growth_phase_1_3"),
         UDim2.new(1, -20, 0, 26),
         UDim2.fromOffset(10, 5),
         15,
@@ -931,7 +932,7 @@ function HUDController.new(
     local eliteDetail = textLabel(
         eliteFrame,
         "Detail",
-        "EXPOSED · STRIKE THE AMBER HEART",
+        Strings.get("hud.exposed_strike_the_amber_heart"),
         UDim2.new(1, -20, 0, 21),
         UDim2.fromOffset(10, 45),
         12,
@@ -968,7 +969,7 @@ function HUDController.new(
     local allyDetail = textLabel(
         allyFrame,
         "Detail",
-        "AHEAD · 14m · 23s",
+        Strings.get("hud.ahead_14m_23s"),
         UDim2.new(1, -24, 0, 24),
         UDim2.fromOffset(12, 33),
         13,
@@ -1005,7 +1006,7 @@ function HUDController.new(
     local threatDetail = textLabel(
         threatFrame,
         "Detail",
-        "DODGE OUT OF THE RING · 0.9s",
+        Strings.get("hud.dodge_out_of_the_ring_0"),
         UDim2.new(1, -24, 0, 25),
         UDim2.fromOffset(12, 34),
         13,
@@ -1061,7 +1062,7 @@ function HUDController.new(
     local downedDetail = textLabel(
         downedFrame,
         "Detail",
-        "DOWNED · CRAWL TOWARD LIGHT",
+        Strings.get("hud.downed_crawl_toward_light"),
         UDim2.new(1, -168, 0, 30),
         UDim2.fromOffset(146, 18),
         15,
@@ -1072,7 +1073,7 @@ function HUDController.new(
     local downedAlly = textLabel(
         downedFrame,
         "NearestAlly",
-        "HELP SIGNAL ACTIVE · NO ALLY NEARBY",
+        Strings.get("hud.help_signal_active_no_ally_nearby"),
         UDim2.new(1, -168, 0, 28),
         UDim2.fromOffset(146, 48),
         13,
@@ -1084,27 +1085,39 @@ function HUDController.new(
     local primary = actionButton(
         canvas,
         "PrimaryAction",
-        "FIND",
+        Strings.get("hud.find"),
         116,
         UDim2.new(1, -28, 1, -30),
         Vector2.new(1, 1)
     )
-    local tool =
-        actionButton(canvas, "UseTool", "STRIKE", 84, UDim2.new(1, -158, 1, -40), Vector2.new(1, 1))
+    local tool = actionButton(
+        canvas,
+        "UseTool",
+        Strings.get("hud.strike"),
+        84,
+        UDim2.new(1, -158, 1, -40),
+        Vector2.new(1, 1)
+    )
     tool.Visible = false
     stroke(tool, COLORS.danger, 0.2)
     local sprint =
         actionButton(canvas, "Sprint", "RUN", 80, UDim2.new(0, 166, 1, -34), Vector2.new(0, 1))
     sprint.Visible = UserInputService.TouchEnabled
     stroke(sprint, COLORS.blue, 0.2)
-    local dodge =
-        actionButton(canvas, "Dodge", "DODGE", 84, UDim2.new(1, -252, 1, -40), Vector2.new(1, 1))
+    local dodge = actionButton(
+        canvas,
+        "Dodge",
+        Strings.get("hud.dodge"),
+        84,
+        UDim2.new(1, -252, 1, -40),
+        Vector2.new(1, 1)
+    )
     dodge.Visible = false
     stroke(dodge, COLORS.amber, 0.12)
     local ability = actionButton(
         canvas,
         "ProfessionAbility",
-        "ABILITY",
+        Strings.get("hud.ability"),
         84,
         UDim2.new(1, -346, 1, -40),
         Vector2.new(1, 1)
@@ -1121,7 +1134,7 @@ function HUDController.new(
     local companion = actionButton(
         canvas,
         "CompanionCommand",
-        "HOUND",
+        Strings.get("hud.hound"),
         84,
         UDim2.new(1, -440, 1, -40),
         Vector2.new(1, 1)
@@ -1137,8 +1150,14 @@ function HUDController.new(
         mid-night, and I AM DOWN is the one phrase whose whole value is being
         one press away.
     ]]
-    local call =
-        actionButton(canvas, "QuickChat", "CALL", 84, UDim2.new(1, -534, 1, -40), Vector2.new(1, 1))
+    local call = actionButton(
+        canvas,
+        "QuickChat",
+        Strings.get("hud.call"),
+        84,
+        UDim2.new(1, -534, 1, -40),
+        Vector2.new(1, 1)
+    )
     call.Visible = false
     stroke(call, COLORS.blue, 0.12)
 
@@ -1176,7 +1195,7 @@ function HUDController.new(
     callClose.Size = UDim2.fromOffset(64, 30)
     callClose.BackgroundColor3 = COLORS.panelSoft
     callClose.Font = Enum.Font.GothamBold
-    callClose.Text = "CLOSE"
+    callClose.Text = Strings.get("hud.close")
     callClose.TextColor3 = COLORS.cream
     callClose.TextSize = 11
     callClose.Selectable = true
@@ -1279,7 +1298,7 @@ function HUDController.new(
     compact.BackgroundColor3 = COLORS.panel
     compact.BackgroundTransparency = 0.1
     compact.Font = Enum.Font.GothamBold
-    compact.Text = "COMPACT"
+    compact.Text = Strings.get("hud.compact")
     compact.TextColor3 = COLORS.muted
     compact.TextSize = 12
     compact.Parent = canvas
@@ -1294,7 +1313,7 @@ function HUDController.new(
     professionButton.BackgroundColor3 = COLORS.panel
     professionButton.BackgroundTransparency = 0.08
     professionButton.Font = Enum.Font.GothamBold
-    professionButton.Text = "PROFESSION"
+    professionButton.Text = Strings.get("hud.profession")
     professionButton.TextColor3 = COLORS.amber
     professionButton.TextSize = 12
     professionButton.Visible = false
@@ -1311,7 +1330,7 @@ function HUDController.new(
     progressButton.BackgroundColor3 = COLORS.panel
     progressButton.BackgroundTransparency = 0.08
     progressButton.Font = Enum.Font.GothamBold
-    progressButton.Text = "FIELD BOOK"
+    progressButton.Text = Strings.get("hud.field_book")
     progressButton.TextColor3 = COLORS.cream
     progressButton.TextSize = 12
     progressButton.Visible = false
@@ -1375,7 +1394,7 @@ function HUDController.new(
     local professionTitle = textLabel(
         professionPanel,
         "Title",
-        "CHOOSE YOUR PROFESSION",
+        Strings.get("hud.choose_your_profession"),
         UDim2.new(1, -100, 0, 34),
         UDim2.fromOffset(24, 18),
         22,
@@ -1386,7 +1405,7 @@ function HUDController.new(
     local professionDetail = textLabel(
         professionPanel,
         "Detail",
-        "Switch freely in Emberhollow. Every traveler keeps core combat, building, and rescue.",
+        Strings.get("hud.switch_freely_in_emberhollow_every_traveler"),
         UDim2.new(1, -48, 0, 42),
         UDim2.fromOffset(24, 52),
         13,
@@ -1402,7 +1421,7 @@ function HUDController.new(
     professionClose.Size = UDim2.fromOffset(72, 64)
     professionClose.BackgroundColor3 = COLORS.panelSoft
     professionClose.Font = Enum.Font.GothamBold
-    professionClose.Text = "CLOSE"
+    professionClose.Text = Strings.get("hud.close")
     professionClose.TextColor3 = COLORS.cream
     professionClose.TextSize = 11
     professionClose.ZIndex = 43
@@ -1436,7 +1455,7 @@ function HUDController.new(
     local progressTitle = textLabel(
         progressPanel,
         "Title",
-        "FIELD BOOK · RECIPES · QUESTS · MASTERY",
+        Strings.get("hud.field_book_recipes_quests_mastery"),
         UDim2.new(1, -120, 0, 34),
         UDim2.fromOffset(20, 18),
         16,
@@ -1475,7 +1494,7 @@ function HUDController.new(
     local progressText = textLabel(
         progressScroll,
         "Details",
-        "Loading field notes…",
+        Strings.get("hud.loading_field_notes"),
         UDim2.new(1, -10, 0, 0),
         UDim2.fromOffset(0, 0),
         13,
@@ -1556,7 +1575,7 @@ function HUDController.new(
     whetButton.Size = UDim2.fromOffset(220, 30)
     whetButton.BackgroundColor3 = COLORS.panelSoft
     whetButton.Font = Enum.Font.GothamBold
-    whetButton.Text = "WHET"
+    whetButton.Text = Strings.get("hud.whet")
     whetButton.TextColor3 = COLORS.amber
     whetButton.TextSize = 11
     whetButton.Visible = false
@@ -1572,7 +1591,7 @@ function HUDController.new(
     progressClose.Size = UDim2.fromOffset(72, 42)
     progressClose.BackgroundColor3 = COLORS.panelSoft
     progressClose.Font = Enum.Font.GothamBold
-    progressClose.Text = "CLOSE"
+    progressClose.Text = Strings.get("hud.close")
     progressClose.TextColor3 = COLORS.cream
     progressClose.TextSize = 11
     progressClose.ZIndex = 52
@@ -1622,7 +1641,7 @@ function HUDController.new(
     local storeTitle = textLabel(
         storePanel,
         "Title",
-        "THE OUTFITTER",
+        Strings.get("hud.the_outfitter"),
         UDim2.new(1, -40, 0, 26),
         UDim2.fromOffset(20, 16),
         18,
@@ -1643,7 +1662,7 @@ function HUDController.new(
     local storeAssurance = textLabel(
         storePanel,
         "Assurance",
-        "COSMETIC ONLY — ABILITIES ARE EARNED IN PLAY",
+        Strings.get("hud.cosmetic_only_abilities_are_earned_in"),
         UDim2.new(1, -40, 0, 16),
         UDim2.fromOffset(20, 44),
         11,
@@ -1673,7 +1692,7 @@ function HUDController.new(
     storeClose.Size = UDim2.fromOffset(220, 38)
     storeClose.BackgroundColor3 = COLORS.panelSoft
     storeClose.Font = Enum.Font.GothamBold
-    storeClose.Text = "CLOSE"
+    storeClose.Text = Strings.get("hud.close")
     storeClose.TextColor3 = COLORS.cream
     storeClose.TextSize = 11
     storeClose.Selectable = true
@@ -1716,7 +1735,7 @@ function HUDController.new(
     local storeEmpty = textLabel(
         storeScroll,
         "Empty",
-        "NOTHING IS ON THE RAIL YET.",
+        Strings.get("hud.nothing_is_on_the_rail_yet"),
         UDim2.new(1, -8, 0, 44),
         UDim2.fromOffset(0, 0),
         13,
@@ -1879,7 +1898,7 @@ function HUDController.new(
     local storeWardrobeTitle = textLabel(
         storeScroll,
         "WardrobeTitle",
-        "YOUR WARDROBE",
+        Strings.get("hud.your_wardrobe"),
         UDim2.new(1, -8, 0, 22),
         UDim2.fromOffset(0, 0),
         13,
@@ -1936,7 +1955,7 @@ function HUDController.new(
         rowAction.BackgroundColor3 = COLORS.panel
         rowAction.AutoButtonColor = true
         rowAction.Font = Enum.Font.GothamBold
-        rowAction.Text = "WEAR"
+        rowAction.Text = Strings.get("hud.wear")
         rowAction.TextColor3 = COLORS.cream
         rowAction.TextSize = 12
         rowAction.Selectable = true
@@ -2044,7 +2063,7 @@ function HUDController.new(
     lobbyTitle.Position = UDim2.fromOffset(14, 8)
     lobbyTitle.Size = UDim2.new(1, -28, 0, 18)
     lobbyTitle.Font = Enum.Font.GothamBold
-    lobbyTitle.Text = "DEPARTURE"
+    lobbyTitle.Text = Strings.get("hud.departure")
     lobbyTitle.TextColor3 = Color3.fromRGB(255, 181, 76)
     lobbyTitle.TextSize = 20
     lobbyTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -2057,7 +2076,7 @@ function HUDController.new(
     lobbyDetail.Position = UDim2.fromOffset(14, 34)
     lobbyDetail.Size = UDim2.new(1, -28, 0, 18)
     lobbyDetail.Font = Enum.Font.Gotham
-    lobbyDetail.Text = "STAND ON THE PLATFORM TO DEPART"
+    lobbyDetail.Text = Strings.get("hud.stand_on_the_platform_to_depart")
     lobbyDetail.TextColor3 = Color3.fromRGB(178, 194, 183)
     lobbyDetail.TextSize = 16
     lobbyDetail.TextXAlignment = Enum.TextXAlignment.Left
@@ -2153,7 +2172,7 @@ function HUDController.new(
     partyLine.Position = UDim2.fromOffset(14, 180)
     partyLine.Size = UDim2.new(1, -28, 0, 16)
     partyLine.Font = Enum.Font.Gotham
-    partyLine.Text = "TRAVELLING ALONE"
+    partyLine.Text = Strings.get("hud.travelling_alone")
     partyLine.TextColor3 = Color3.fromRGB(178, 194, 183)
     partyLine.TextSize = 14
     partyLine.TextXAlignment = Enum.TextXAlignment.Left
@@ -2176,11 +2195,11 @@ function HUDController.new(
     local partyButtons: { [string]: TextButton } = {}
     for order, entry in
         {
-            { key = "rejoin", label = "REJOIN" },
-            { key = "accept", label = "JOIN" },
-            { key = "decline", label = "DECLINE" },
-            { key = "invite", label = "INVITE" },
-            { key = "leave", label = "LEAVE" },
+            { key = "rejoin", label = Strings.get("hud.rejoin") },
+            { key = "accept", label = Strings.get("hud.join") },
+            { key = "decline", label = Strings.get("hud.decline") },
+            { key = "invite", label = Strings.get("hud.invite") },
+            { key = "leave", label = Strings.get("hud.leave") },
         }
     do
         local partyButton = Instance.new("TextButton")
@@ -2902,8 +2921,8 @@ function HUDController._updateStore(self: HUDController, state: any)
     self._storeEmpty.Visible = shown == 0 and worn == 0
     local unpriced = tonumber(store.unpricedProducts) or 0
     self._storeEmpty.Text = if unpriced > 0
-        then string.format("NOTHING IS PRICED YET — %d WAITING ON THE TILL.", unpriced)
-        else "NOTHING IS ON THE RAIL YET."
+        then string.format(Strings.get("hud.nothing_is_priced_yet_n_waiting"), unpriced)
+        else Strings.get("hud.nothing_is_on_the_rail_yet")
 end
 
 --[[
@@ -3102,21 +3121,21 @@ function HUDController._updateParty(self: HUDController, state: any)
 
     self._partyLine.Visible = true
     self._partyLine.Text = if hasRejoin
-        then string.format("YOUR PARTY OF %d IS STILL OUT THERE", rejoinSize)
+        then string.format(Strings.get("hud.your_party_of_n_is_still"), rejoinSize)
         elseif invitedBy ~= nil then string.format(
             "%s ASKS YOU TO TRAVEL WITH THEM",
             invitedBy
         )
         elseif party.inParty == true and party.leader == true then string.format(
-            "PARTY OF %d · YOU LEAD",
+            Strings.get("hud.party_of_n_you_lead"),
             size
         )
         elseif party.inParty == true then string.format(
-            "PARTY OF %d · LED BY %s",
+            Strings.get("hud.party_of_n_led_by_n"),
             size,
-            tostring(party.leaderName or "SOMEONE")
+            tostring(party.leaderName or Strings.get("hud.someone"))
         )
-        else "TRAVELLING ALONE"
+        else Strings.get("hud.travelling_alone")
 
     buttons.rejoin.Visible = hasRejoin
     buttons.accept.Visible = invitedBy ~= nil
@@ -3222,15 +3241,16 @@ function HUDController._updateLobby(self: HUDController, state: any)
     self._lobbyFrame.Visible = true
     self:_updateParty(state)
     if lobby.counting then
-        self._lobbyTitle.Text = string.format("DEPARTING IN %d", lobby.secondsRemaining)
+        self._lobbyTitle.Text =
+            string.format(Strings.get("hud.departing_in_n"), lobby.secondsRemaining)
         self._lobbyDetail.Text =
             string.format("%d ON THE PLATFORM * PARTY OF %d", lobby.readyCount, lobby.partySize)
         self._lobbySizes.Visible = false
     else
-        self._lobbyTitle.Text = "DEPARTURE"
+        self._lobbyTitle.Text = Strings.get("hud.departure")
         local chosen = self._selectedPartySize
         self._lobbyDetail.Text = if chosen ~= nil and lobby.readyCount <= 0
-            then string.format("PARTY OF %d * STAND ON THE PLATFORM", chosen)
+            then string.format(Strings.get("hud.party_of_n_stand_on_the"), chosen)
             elseif chosen ~= nil then string.format(
                 "%d ON THE PLATFORM * PARTY OF %d",
                 lobby.readyCount,
@@ -3240,7 +3260,7 @@ function HUDController._updateLobby(self: HUDController, state: any)
                 "%d ON THE PLATFORM * CHOOSE PARTY SIZE",
                 lobby.readyCount
             )
-            else "STAND ON THE PLATFORM TO DEPART"
+            else Strings.get("hud.stand_on_the_platform_to_depart")
         self._lobbySizes.Visible = true
         local maximum = if type(lobby.maxPartySize) == "number" then lobby.maxPartySize else 8
         for size, button in self._lobbySizeButtons do
@@ -3309,7 +3329,7 @@ function HUDController.setInputMode(self: HUDController, mode: string)
     self._tool.Text = if mode == "keyboard"
         then "CLICK\nSTRIKE"
         elseif mode == "gamepad" then "RT\nSTRIKE"
-        else "STRIKE"
+        else Strings.get("hud.strike")
     self:_updateCombatClock()
     self:_updateProfessionClock()
     self:_refreshActionCluster()
@@ -3355,13 +3375,16 @@ function HUDController._updateCombatClock(self: HUDController)
         elseif stamina < maxStamina * 0.55 then COLORS.amber
         else COLORS.blue
     self._staminaText.Text = if rooted
-        then string.format("ROOTED %.1fs · STAMINA %d", rootedRemaining, stamina)
+        then string.format(Strings.get("hud.rooted_ns_stamina_n"), rootedRemaining, stamina)
         elseif drowsy then string.format(
-            "DROWSY %.1fs · STAMINA %d",
+            Strings.get("hud.drowsy_ns_stamina_n"),
             drowsyRemaining,
             stamina
         )
-        elseif stamina < dodgeCost then string.format("LOW STAMINA · %d", stamina)
+        elseif stamina < dodgeCost then string.format(
+            Strings.get("hud.low_stamina_n"),
+            stamina
+        )
         else string.format("STAMINA · %d", stamina)
     self._staminaText.TextColor3 = if rooted
             or drowsy
@@ -3393,7 +3416,7 @@ function HUDController._updateCombatClock(self: HUDController)
         elseif not combatEnabled then "DODGE\nOFF"
         elseif cooldownRemaining > 0 then string.format("DODGE\n%.1fs", cooldownRemaining)
         elseif stamina < dodgeCost then "DODGE\nLOW"
-        else prefix .. "DODGE"
+        else prefix .. Strings.get("hud.dodge")
 end
 
 function HUDController._updateProfessionClock(self: HUDController)
@@ -3412,7 +3435,9 @@ function HUDController._updateProfessionClock(self: HUDController)
     if hasCompanion then
         self._companionMode = if companion.mode == "stay" then "stay" else "follow"
         -- the button names the order it will give, not the state it is in
-        self._companion.Text = if self._companionMode == "follow" then "STAY" else "FOLLOW"
+        self._companion.Text = if self._companionMode == "follow"
+            then Strings.get("hud.stay")
+            else Strings.get("hud.follow")
     end
 
     --[[
@@ -3456,8 +3481,8 @@ function HUDController._updateProfessionClock(self: HUDController)
     -- character kits (docs/CHARACTER_KITS_SPEC.md), and selling one word
     -- while the HUD uses it for a free system would be a bait.
     self._professionButton.Text = if displayName == nil
-        then "PROFESSION"
-        else "ROLE · " .. displayName
+        then Strings.get("hud.profession")
+        else Strings.get("hud.role") .. displayName
 
     for professionId, card in self._professionCards do
         local selected = professionId == selectedId
@@ -3487,7 +3512,7 @@ function HUDController._updateProfessionClock(self: HUDController)
     local remaining = math.max(0, readyAt - now)
     local active = now < activeUntil
     local ready = profession.enabled ~= false and not self._playerDowned and remaining <= 0
-    local abilityName = string.upper(tostring(profession.abilityName or "ABILITY"))
+    local abilityName = string.upper(tostring(profession.abilityName or Strings.get("hud.ability")))
     local compactAbilityName = string.gsub(abilityName, " ", "\n", 1)
     local prefix = if self._inputMode == "keyboard"
         then "Q\n"
@@ -3580,9 +3605,9 @@ function HUDController._updateProgress(self: HUDController)
     local function muted(text: string): string
         return string.format('<font color="#B8A88F">%s</font>', escape(text))
     end
-    local lines = { header("RECIPES") }
+    local lines = { header(Strings.get("hud.recipes")) }
     if #(state.recipes or {}) == 0 then
-        table.insert(lines, muted("Nothing learned yet — find a workbench."))
+        table.insert(lines, muted(Strings.get("hud.nothing_learned_yet_find_a_workbench")))
     end
     for _, recipe in state.recipes or {} do
         local materials = {}
@@ -3602,13 +3627,13 @@ function HUDController._updateProgress(self: HUDController)
         )
     end
     table.insert(lines, "")
-    table.insert(lines, header("QUESTS"))
+    table.insert(lines, header(Strings.get("hud.quests")))
     if #(state.quests or {}) == 0 then
-        table.insert(lines, muted("No open quests."))
+        table.insert(lines, muted(Strings.get("hud.no_open_quests")))
     end
     for _, quest in state.quests or {} do
         local status = if quest.claimed
-            then "CLAIMED"
+            then Strings.get("hud.claimed")
             else string.format("%d/%d", quest.progress, quest.threshold)
         table.insert(lines, string.format("• %s  ·  %s", escape(quest.displayName), status))
     end
@@ -3628,7 +3653,7 @@ function HUDController._updateProgress(self: HUDController)
             lines,
             header(
                 string.format(
-                    "MEMORY ARCHIVE · %d / %d RECOVERED",
+                    Strings.get("hud.memory_archive_n_n_recovered"),
                     tonumber(archive.found) or 0,
                     tonumber(archive.total) or 0
                 )
@@ -3649,14 +3674,14 @@ function HUDController._updateProgress(self: HUDController)
     local residentLife = state.residentLife
     if type(residentLife) == "table" and type(residentLife.residents) == "table" then
         table.insert(lines, "")
-        table.insert(lines, header("RESIDENTS"))
+        table.insert(lines, header(Strings.get("hud.residents")))
         local townHost = state.townHost
         if type(townHost) == "table" and townHost.role == "visitor" then
             table.insert(
                 lines,
                 muted(
                     string.format(
-                        "You are a guest in %s's Emberhollow — your help carries, your damage doesn't.",
+                        Strings.get("hud.you_are_a_guest_in_n"),
                         tostring(townHost.hostName or "a founder")
                     )
                 )
@@ -3677,7 +3702,9 @@ function HUDController._updateProgress(self: HUDController)
                 local name = string.upper(
                     (string.gsub(string.gsub(tostring(resident.residentId), "npc_", ""), "_", " "))
                 )
-                local status = if resident.injured then "RESTING — check on them" else "working"
+                local status = if resident.injured
+                    then Strings.get("hud.resting_check_on_them")
+                    else "working"
                 table.insert(
                     lines,
                     string.format(
@@ -3699,7 +3726,7 @@ function HUDController._updateProgress(self: HUDController)
             lines,
             muted(
                 string.format(
-                    "Decorations placed · %d / %d — marked spots around town take materials.",
+                    Strings.get("hud.decorations_placed_n_n_marked_spots"),
                     tonumber(decorations.count) or 0,
                     tonumber(decorations.cap) or 0
                 )
@@ -3707,7 +3734,7 @@ function HUDController._updateProgress(self: HUDController)
         )
     end
     table.insert(lines, "")
-    table.insert(lines, header("PROFESSION MASTERY"))
+    table.insert(lines, header(Strings.get("hud.profession_mastery")))
     for professionId, mastery in state.mastery or {} do
         table.insert(
             lines,
@@ -3721,9 +3748,9 @@ function HUDController._updateProgress(self: HUDController)
     end
     local equipped = state.equipped or {}
     table.insert(lines, "")
-    table.insert(lines, header("LOADOUT"))
+    table.insert(lines, header(Strings.get("hud.loadout")))
     if equipped.head == nil and equipped.feet == nil then
-        table.insert(lines, muted("Nothing equipped yet — craft gear at the workbenches."))
+        table.insert(lines, muted(Strings.get("hud.nothing_equipped_yet_craft_gear_at")))
     else
         table.insert(
             lines,
@@ -3745,8 +3772,11 @@ function HUDController._updateProgress(self: HUDController)
         local button = self._equipmentButtons[itemId]
         local count = tonumber(gear[itemId]) or 0
         button.Visible = self._progressOverlay.Visible and count > 0
-        local label =
-            string.format("%s ×%d", tostring(button:GetAttribute("BaseLabel") or "EQUIP"), count)
+        local label = string.format(
+            "%s ×%d",
+            tostring(button:GetAttribute("BaseLabel") or Strings.get("hud.equip")),
+            count
+        )
         local note = care[itemId]
         if type(note) == "table" then
             if type(note.trait) == "string" then
@@ -3763,7 +3793,7 @@ function HUDController._updateProgress(self: HUDController)
     local whetTarget = state.whetTarget
     if type(whetTarget) == "table" and type(whetTarget.itemId) == "string" then
         self._whetItemId = whetTarget.itemId
-        self._whetButton.Text = tostring(whetTarget.label or "WHET")
+        self._whetButton.Text = tostring(whetTarget.label or Strings.get("hud.whet"))
         self._whetButton.Visible = self._progressOverlay.Visible
     else
         self._whetItemId = nil
@@ -3868,7 +3898,7 @@ function HUDController.setInteraction(self: HUDController, label: string?, avail
         self._primary.AutoButtonColor = false
         self._primary.BackgroundColor3 = Color3.fromRGB(42, 48, 45)
         self._primary.TextColor3 = COLORS.muted
-        self._primary.Text = "DOWNED"
+        self._primary.Text = Strings.get("hud.downed")
         return
     end
     self._primary.Active = available
@@ -3879,7 +3909,9 @@ function HUDController.setInteraction(self: HUDController, label: string?, avail
         then "E · "
         elseif self._inputMode == "gamepad" then "X · "
         else ""
-    self._primary.Text = if available and label ~= nil then prefix .. label else "FIND"
+    self._primary.Text = if available and label ~= nil
+        then prefix .. label
+        else Strings.get("hud.find")
 end
 
 function HUDController.canInteractAction(self: HUDController, actionId: string): boolean
@@ -4076,7 +4108,9 @@ function HUDController._layout(self: HUDController)
             else UDim2.fromOffset(326, 132)
         self._resource.Position = UDim2.fromOffset(18, 164)
         self._compact.Size = UDim2.fromOffset(118, 38)
-        self._compact.Text = if self._compactEnabled then "EXPAND" else "COMPACT"
+        self._compact.Text = if self._compactEnabled
+            then Strings.get("hud.expand")
+            else Strings.get("hud.compact")
         self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 66)
         self._blackoutFrame.Position = UDim2.new(0.5, 0, 0, 66)
         self._blackoutFrame.Size = UDim2.fromOffset(420, 64)
@@ -4136,10 +4170,10 @@ function HUDController._layout(self: HUDController)
 end
 
 function HUDController._presentPhase(self: HUDController, phase: string)
-    local accent = if phase == "DUSK"
+    local accent = if phase == Strings.get("hud.dusk")
         then Color3.fromRGB(255, 164, 91)
-        elseif phase == "NIGHT" then Color3.fromRGB(174, 211, 255)
-        elseif phase == "REVEAL" then Color3.fromRGB(172, 255, 205)
+        elseif phase == Strings.get("hud.night") then Color3.fromRGB(174, 211, 255)
+        elseif phase == Strings.get("hud.reveal") then Color3.fromRGB(172, 255, 205)
         else COLORS.amber
 
     self._phase.TextColor3 = accent
@@ -4192,10 +4226,14 @@ function HUDController._updateClock(self: HUDController)
         local targetEndsAt = tonumber(blackout.targetEndsAt) or 0
         local remaining = math.max(0, math.ceil(targetEndsAt - workspace:GetServerTimeNow()))
         clockText = if remaining > 0
-            then string.format("BLACKOUT · %02d:%02d", math.floor(remaining / 60), remaining % 60)
-            else "BLACKOUT · OVERTIME"
+            then string.format(
+                Strings.get("hud.blackout_n_n"),
+                math.floor(remaining / 60),
+                remaining % 60
+            )
+            else Strings.get("hud.blackout_overtime")
     elseif blackoutVisible then
-        clockText = "DAWN · CHAPTER I"
+        clockText = Strings.get("hud.dawn_chapter_i")
     elseif phaseEndsAt > 0 then
         --[[
             A held clock reads its seconds off the server rather than deriving
@@ -4213,17 +4251,19 @@ function HUDController._updateClock(self: HUDController)
         local remaining = if held
             then math.max(0, math.ceil(tonumber(state.phaseRemaining) or 0))
             else math.max(0, math.ceil(phaseEndsAt - workspace:GetServerTimeNow()))
-        -- "LEFT" because "DAY · 02:58" reads as three in the morning, not as
+        -- Strings.get("hud.left") because "DAY · 02:58" reads as three in the morning, not as
         -- a countdown. Two glyphs of clarity beat two glyphs of mystery.
         clockText = string.format(
             "%s · %02d:%02d %s",
             phase,
             math.floor(remaining / 60),
             remaining % 60,
-            if held then "HELD" else "LEFT"
+            if held then Strings.get("hud.held") else Strings.get("hud.left")
         )
     else
-        clockText = if phase == "REVEAL" then "DAWN · FIRST LIGHT" else phase .. " · MORNING"
+        clockText = if phase == Strings.get("hud.reveal")
+            then Strings.get("hud.dawn_first_light")
+            else phase .. " · MORNING"
     end
     --[[
         A practice server says so on the clock, and it says so to everybody.
@@ -4241,7 +4281,7 @@ function HUDController._updateClock(self: HUDController)
     ]]
     local practice = state.practice == true
     if practice then
-        clockText = "PRACTICE · " .. clockText
+        clockText = Strings.get("hud.practice") .. clockText
     end
     local pillWidth = if practice then 300 else 206
     if self._phaseFrame.Size.X.Offset ~= pillWidth then
@@ -4267,8 +4307,8 @@ function HUDController._updateClock(self: HUDController)
             elseif blackout.overtime then COLORS.danger
             else COLORS.blue
         self._blackoutTitle.Text = string.format(
-            "BRAMBLEWAKE BLACKOUT · %s · %d/%d",
-            tostring(blackout.stageLabel or "STAGE"),
+            Strings.get("hud.bramblewake_blackout_n_n_n"),
+            tostring(blackout.stageLabel or Strings.get("hud.stage")),
             tonumber(blackout.stage) or 0,
             tonumber(blackout.stageCount) or 4
         )
@@ -4279,28 +4319,28 @@ function HUDController._updateClock(self: HUDController)
                     (tonumber(blackout.fireExpiresAt) or 0) - workspace:GetServerTimeNow()
                 )
                 self._blackoutDetail.Text = string.format(
-                    "CARRY ROOTFIRE %.1fs → %s · %d/%d",
+                    Strings.get("hud.carry_rootfire_ns_n_n_n"),
                     fireRemaining,
-                    tostring(blackout.nextNodeLabel or "NEXT ROOT"),
+                    tostring(blackout.nextNodeLabel or Strings.get("hud.next_root")),
                     tonumber(blackout.deliveredNodes) or 0,
                     tonumber(blackout.relayRequired) or 3
                 )
             else
                 self._blackoutDetail.Text = string.format(
-                    "TAKE ROOTFIRE → %s · %d/%d",
-                    tostring(blackout.nextNodeLabel or "NEXT ROOT"),
+                    Strings.get("hud.take_rootfire_n_n_n"),
+                    tostring(blackout.nextNodeLabel or Strings.get("hud.next_root")),
                     tonumber(blackout.deliveredNodes) or 0,
                     tonumber(blackout.relayRequired) or 3
                 )
             end
         elseif blackout.status == "old_growth" then
-            self._blackoutDetail.Text = "ROOTED WALLS · CLEANSE OLD GROWTH"
+            self._blackoutDetail.Text = Strings.get("hud.rooted_walls_cleanse_old_growth")
         elseif blackout.status == "warden" then
-            self._blackoutDetail.Text = "WARDEN'S SEAL · CLEANSE OR BREAK ANTLERS"
+            self._blackoutDetail.Text = Strings.get("hud.warden_s_seal_cleanse_or_break")
         elseif blackout.status == "resolution" then
             self._blackoutDetail.Text = if blackout.vote == nil
-                then "VOTE: FARMLAND · WILD · SHARED AGROFOREST"
-                else "VOTE RECORDED · WAITING FOR ACTIVE TRAVELERS"
+                then Strings.get("hud.vote_farmland_wild_shared_agroforest")
+                else Strings.get("hud.vote_recorded_waiting_for_active_travelers")
         else
             local decision = string.upper(
                 (string.gsub(tostring(blackout.decision or "chapter resolved"), "_", " "))
@@ -4328,7 +4368,7 @@ function HUDController._updateClock(self: HUDController)
         local apexPhase = math.clamp(tonumber(apex.phase) or 1, 1, 3)
         self._eliteTitle.Text = string.format(
             "%s · PHASE %d/3 · %d/%d",
-            if bossView then "WARDEN STAG" else "OLD GROWTH",
+            if bossView then Strings.get("hud.warden_stag") else Strings.get("common.old_growth"),
             apexPhase,
             health,
             maxHealth
@@ -4346,14 +4386,14 @@ function HUDController._updateClock(self: HUDController)
                     elseif apex.outcome == "harmed" then "DEFEATED · FOREST HARMED · +5 AMBER SAP"
                     else "DEFEATED · FOREST SCARRED · +5 AMBER SAP"
                 elseif apex.rewardEligible then "CLEANSED · +3 AMBER SAP UNBANKED"
-                else "CLEANSED · CONTINUE TO WAYHOME"
+                else Strings.get("hud.cleansed_continue_to_wayhome")
             self._eliteDetail.TextColor3 = COLORS.green
         elseif bossView and apex.exposed then
-            self._eliteDetail.Text = "HEART EXPOSED · STRIKE THE MEMORY SEAL"
+            self._eliteDetail.Text = Strings.get("hud.heart_exposed_strike_the_memory_seal")
             self._eliteDetail.TextColor3 = COLORS.amber
         elseif bossView then
             self._eliteDetail.Text = string.format(
-                "ROOTS %d/%d · PRESERVE: CLEANSE · ANTLERS %d/2",
+                Strings.get("hud.roots_n_n_preserve_cleanse_antlers"),
                 tonumber(apex.cleansedNodes) or 0,
                 tonumber(apex.rootNodesRequired) or 0,
                 tonumber(apex.antlersBroken) or 0
@@ -4365,13 +4405,13 @@ function HUDController._updateClock(self: HUDController)
             local fireRemaining =
                 math.max(0, (tonumber(apex.fireExpiresAt) or 0) - workspace:GetServerTimeNow())
             self._eliteDetail.Text =
-                string.format("FIRE %.1fs · REACH THE ROOT HEART", fireRemaining)
+                string.format(Strings.get("hud.fire_ns_reach_the_root_heart"), fireRemaining)
             self._eliteDetail.TextColor3 = COLORS.amber
         elseif apex.shielded then
-            self._eliteDetail.Text = "SHIELDED · TAKE LANTERN FIRE"
+            self._eliteDetail.Text = Strings.get("hud.shielded_take_lantern_fire")
             self._eliteDetail.TextColor3 = COLORS.danger
         else
-            self._eliteDetail.Text = "EXPOSED · STRIKE THE AMBER HEART"
+            self._eliteDetail.Text = Strings.get("hud.exposed_strike_the_amber_heart")
             self._eliteDetail.TextColor3 = COLORS.amber
         end
         self._eliteFrame.Visible = apex.active == true or apex.complete == true
@@ -4386,17 +4426,19 @@ function HUDController._updateClock(self: HUDController)
     if type(threat) == "table" and not self._playerDowned then
         local remaining =
             math.max(0, (tonumber(threat.resolvesAt) or 0) - workspace:GetServerTimeNow())
-        local enemyName = tostring(threat.enemyName or "THREAT")
-        local attackName = tostring(threat.displayName or "ATTACK")
+        local enemyName = tostring(threat.enemyName or Strings.get("hud.threat"))
+        local attackName = tostring(threat.displayName or Strings.get("hud.attack"))
         local title = if string.find(attackName, enemyName, 1, true) ~= nil
             then attackName
             else enemyName .. " · " .. attackName
-        local shape = if threat.shape == "lane" then "LANE" else "RING"
+        local shape = if threat.shape == "lane"
+            then Strings.get("hud.lane")
+            else Strings.get("hud.ring")
         self._threatTitle.Text = "!! " .. title
         self._threatDetail.Text = string.format(
             "%s · %s · %.1fs",
             shape,
-            tostring(threat.instruction or "MOVE"),
+            tostring(threat.instruction or Strings.get("hud.move")),
             remaining
         )
         self._threatFrame.Visible = remaining > 0
@@ -4419,22 +4461,22 @@ function HUDController._updateClock(self: HUDController)
         local nearest = selfState.nearestAlly
         self._downedAlly.Text = if type(nearest) == "table"
             then string.format(
-                "HELP ACTIVE · %s %dm · %s",
-                tostring(nearest.direction or "UNKNOWN"),
+                Strings.get("hud.help_active_n_nm_n"),
+                tostring(nearest.direction or Strings.get("hud.unknown")),
                 tonumber(nearest.distance) or 0,
-                string.upper(tostring(nearest.displayName or "ALLY"))
+                string.upper(tostring(nearest.displayName or Strings.get("hud.ally")))
             )
-            else "HELP SIGNAL ACTIVE · NO ALLY NEARBY"
+            else Strings.get("hud.help_signal_active_no_ally_nearby")
     end
     local ally = survival.ally
     if type(ally) == "table" and not self._playerDowned then
         local bleedoutAt = tonumber(ally.bleedoutAt) or 0
         local remaining = math.max(0, math.ceil(bleedoutAt - workspace:GetServerTimeNow()))
         self._allyTitle.Text = "✚ ALLY DOWN · "
-            .. string.upper(tostring(ally.displayName or "ALLY"))
+            .. string.upper(tostring(ally.displayName or Strings.get("hud.ally")))
         self._allyDetail.Text = string.format(
             "%s · %dm · %02ds%s",
-            tostring(ally.direction or "UNKNOWN"),
+            tostring(ally.direction or Strings.get("hud.unknown")),
             tonumber(ally.distance) or 0,
             remaining,
             if ally.reviveEndsAt ~= nil then " · REVIVING" else ""
@@ -4459,7 +4501,7 @@ function HUDController.update(self: HUDController, state: any)
     -- Sprint is a toggle, not a hold, so the button has to show which it is.
     local combat = state.combat
     local running = type(combat) == "table" and combat.sprinting == true
-    self._sprint.Text = if running then "RUNNING" else "RUN"
+    self._sprint.Text = if running then Strings.get("hud.running") else "RUN"
     self._sprint.BackgroundColor3 = if running then COLORS.blue else COLORS.panel
     local survival = state.survival
     local selfSurvival = if type(survival) == "table" then survival.self else nil
@@ -4482,7 +4524,7 @@ function HUDController.update(self: HUDController, state: any)
         then UDim2.new(0.5, 0, 1, -264)
         else UDim2.new(0.5, 0, 1, -222)
     -- In the lobby the story has not started: the objective card was
-    -- already reading "FREE MARA" over the departure panel, pointing at a
+    -- already reading Strings.get("hud.free_mara") over the departure panel, pointing at a
     -- woman in a town the player had not left for. The card and the guide
     -- line belong to the world past the platform.
     local departedWorld = state.departed == true
@@ -4492,7 +4534,7 @@ function HUDController.update(self: HUDController, state: any)
     self._detail.Text = tostring(state.detail or "")
     self._progress.Text = string.format(
         "%s · %d / %d",
-        tostring(state.trailName or "FIRST LIGHT"),
+        tostring(state.trailName or Strings.get("hud.first_light")),
         tonumber(state.progress) or 0,
         tonumber(state.progressTotal) or 8
     )
@@ -4525,7 +4567,7 @@ function HUDController.update(self: HUDController, state: any)
     local equipped = state.equipped
     local heldWeapon = if type(equipped) == "table" and equipped.weapon ~= nil then "BOW" else nil
     self._resource.Text = string.format(
-        "HEARTWOOD · %d%s",
+        Strings.get("hud.heartwood_nn"),
         tonumber(state.resources) or 0,
         if heldWeapon ~= nil
             then "  ·  🏹 " .. heldWeapon
@@ -4541,7 +4583,7 @@ function HUDController.update(self: HUDController, state: any)
     local maxHealth = if type(selfSurvival) == "table"
         then tonumber(selfSurvival.maxHealth) or 100
         else 100
-    self._health.Text = string.format("HEALTH · %d / %d", health, maxHealth)
+    self._health.Text = string.format(Strings.get("hud.health_n_n"), health, maxHealth)
     self._health.TextColor3 = if health <= 35 then COLORS.danger else COLORS.cream
     self._health.Visible = not self._playerDowned and (nightActive or health < maxHealth)
     self._resource.Visible = not nightActive
