@@ -10,12 +10,13 @@ it cannot be written in a player's language either. Patch notes in a
 player's language are still the owner's, and QA_RELEASE_PLAN.md's
 checklist says so.
 
-353 merged pull requests. The version column is blank where the
+354 merged pull requests. The version column is blank where the
 handoff did not record one, which is most of the history before it began
 publishing a place per wave.
 
 | PR | Merged | Place | Title |
 |---|---|---|---|
+| #355 | 2026-08-08 | v157 | M13 wave D: the guard goes in before the migration, or the migration has no guard |
 | #354 | 2026-08-08 | v156 | M14 wave E: HEAD is not a revision |
 | #353 | 2026-08-08 | v156 | M14 wave D: the three release documents build from the repository |
 | #352 | 2026-08-08 | v156 | M14 wave C: a claim made once over a whole registry stops being true one asset at a time |
