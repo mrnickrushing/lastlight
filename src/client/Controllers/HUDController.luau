@@ -1878,10 +1878,17 @@ function HUDController._updateParty(self: HUDController, state: any)
     local hasRejoin = type(rejoin) == "table" and rejoin.available == true
     local invitedBy = if type(party.inviteFrom) == "string" then party.inviteFrom else nil
     local size = if type(party.size) == "number" then party.size else 0
+    -- Guarded like every other field this reads, and for a sharper reason:
+    -- `string.format` with %d raises on a nil, and this runs off the render
+    -- loop, so one bad field would break the panel on every frame rather
+    -- than once.
+    local rejoinSize = if hasRejoin and type(rejoin.partySize) == "number"
+        then rejoin.partySize
+        else 0
 
     self._partyLine.Visible = true
     self._partyLine.Text = if hasRejoin
-        then string.format("YOUR PARTY OF %d IS STILL OUT THERE", rejoin.partySize)
+        then string.format("YOUR PARTY OF %d IS STILL OUT THERE", rejoinSize)
         elseif invitedBy ~= nil then string.format(
             "%s ASKS YOU TO TRAVEL WITH THEM",
             invitedBy

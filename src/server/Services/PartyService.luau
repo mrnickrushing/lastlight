@@ -48,6 +48,16 @@ export type PartyService = typeof(setmetatable(
         _parties: { [string]: any },
         _partyByUser: { [number]: string },
         _inviteByUser: { [number]: string },
+        --[[
+            The party that is mid-launch, held in one slot rather than added
+            to `_parties`. A departure is sealed and then never touched again,
+            so filing it with the live rosters would grow that table by one
+            per launch for the life of the server and nothing would ever read
+            the entries. One slot is enough because the platform launches one
+            party at a time, and an unclaimed one is simply overwritten by the
+            next.
+        ]]
+        _departing: any,
         _runPartyId: string?,
         _onToast: ((Player?, string) -> ())?,
         _platformProvider: (() -> { Player })?,
@@ -72,6 +82,7 @@ function PartyService.new(
         _parties = {},
         _partyByUser = {},
         _inviteByUser = {},
+        _departing = nil,
         _runPartyId = nil,
         _onToast = nil,
         _platformProvider = nil,
@@ -181,6 +192,7 @@ function PartyService.invite(self: PartyService, player: Player): any
     end
 
     local partyId, state = self:_partyOf(player)
+    local createdHere = false
     if state == nil then
         local created, result = self._partySession.create(player.UserId, now())
         if created == nil then
@@ -188,10 +200,12 @@ function PartyService.invite(self: PartyService, player: Player): any
         end
         partyId = created.partyId
         state = created
+        createdHere = true
         self:_store(created.partyId, created)
     end
 
     local asked = 0
+    local refusal: string? = nil
     for _, other in eligible do
         local nextState, result = self._partySession.invite(
             state,
@@ -211,13 +225,34 @@ function PartyService.invite(self: PartyService, player: Player): any
                     player.DisplayName
                 )
             )
+        else
+            refusal = result.reason
         end
     end
     self:_store(partyId :: string, state)
 
     if asked == 0 then
-        self:_toast(player, "THERE IS NO ROOM LEFT IN YOUR PARTY")
-        return { accepted = false, reason = "party_full" }
+        --[[
+            A roster nobody joined must not survive the press. The paragraph
+            above is only true if the party created a moment ago is taken
+            back when every invitation was refused, because a stray party of
+            one still outranks the friend who walks up thirty seconds later.
+
+            The refusal is reported rather than assumed, too. "No room" was
+            being said for every reason a party can turn somebody down, which
+            makes the one message that will ever be read the one least likely
+            to be true.
+        ]]
+        if createdHere then
+            self:_store(partyId :: string, nil)
+        end
+        self:_toast(
+            player,
+            if refusal == "party_full"
+                then "THERE IS NO ROOM LEFT IN YOUR PARTY"
+                else "NOBODY HERE CAN BE ASKED RIGHT NOW"
+        )
+        return { accepted = false, reason = refusal or "nobody_to_ask" }
     end
     self:_toast(player, string.format("ASKED %d TO TRAVEL WITH YOU", asked))
     self._logger:info("party_invited", { partyId = partyId, asked = asked })
@@ -380,7 +415,13 @@ function PartyService.formDeparture(self: PartyService, boarding: { Player }): s
         end
     end
 
-    self._parties[sealed.partyId] = sealed
+    --[[
+        Held in the one departing slot, not filed with the live rosters. A
+        sealed party is read exactly once, by issueTickets a moment later, and
+        adding it to `_parties` would grow that table by one entry per launch
+        for the life of the server with nothing ever reading them again.
+    ]]
+    self._departing = sealed
     self._logger:info("party_departed", { partyId = sealed.partyId, size = #userIds })
     return sealed.partyId
 end
@@ -398,21 +439,38 @@ function PartyService.issueTickets(
     boarding: { Player },
     accessCode: string
 )
-    local state = self._parties[partyId]
-    if state == nil then
+    local state = self._departing
+    if state == nil or state.partyId ~= partyId then
+        self._logger:warn("party_tickets_unissued", { partyId = partyId })
         return
     end
+    -- The slot is spent whether or not every write lands. A departure is read
+    -- once, and leaving it filled would hand the next launch's tickets to the
+    -- party before it.
+    self._departing = nil
+
     local issued = 0
     for _, player in boarding do
         local ticket, result =
             self._partySession.issueTicket(state, player.UserId, accessCode, now())
-        if ticket ~= nil and self._profileService:setRejoinTicket(player, ticket) then
-            issued += 1
-        elseif ticket == nil then
+        if ticket == nil then
             self._logger:warn("party_ticket_refused", { reason = result.reason })
+        elseif self._profileService:setRejoinTicket(player, ticket) then
+            issued += 1
+        else
+            --[[
+                A traveller who boards without a ticket has no way back and no
+                sign that anything went wrong, which is the quietest failure
+                in this whole wave. It is worth a line each rather than only
+                a total, because the total looks fine until somebody counts.
+            ]]
+            self._logger:warn("party_ticket_unwritten", { partyId = partyId })
         end
     end
-    self._logger:info("party_tickets_issued", { partyId = partyId, issued = issued })
+    self._logger:info(
+        "party_tickets_issued",
+        { partyId = partyId, issued = issued, boarded = #boarding }
+    )
 end
 
 --[[

@@ -667,5 +667,37 @@ return {
                 TestRunner.equal(next(SaveSchema.constructionSnapshot(profile)), nil)
             end,
         },
+        {
+            --[[
+                Clearing a rejoin ticket and failing to write one look
+                identical at this seam and are opposite in effect: the first
+                is a player who has arrived home, the second is a bad write
+                that would silently take the way back off somebody who still
+                has one. Only nil clears.
+            ]]
+            name = "a malformed rejoin ticket cannot erase a good one",
+            run = function()
+                local ticket = {
+                    partyId = "party_9_9",
+                    accessCode = "ACCESS",
+                    partySize = 3,
+                    issuedAt = 100,
+                    expiresAt = 200,
+                }
+                local held = SaveSchema.withRejoinTicket(SaveSchema.default(10), ticket, 20)
+                TestRunner.equal(SaveSchema.rejoinTicket(held).partyId, "party_9_9")
+
+                for _, junk in { "ticket", 7, {}, { partyId = "p", accessCode = "" } } do
+                    local after = SaveSchema.withRejoinTicket(held, junk, 30)
+                    TestRunner.equal(SaveSchema.rejoinTicket(after).partyId, "party_9_9")
+                    TestRunner.equal(after.revision, held.revision)
+                end
+
+                local cleared = SaveSchema.withRejoinTicket(held, nil, 40)
+                TestRunner.equal(SaveSchema.rejoinTicket(cleared), nil)
+                -- Clearing nothing is not a write, so the save stays unchanged.
+                TestRunner.equal(SaveSchema.withRejoinTicket(cleared, nil, 50), cleared)
+            end,
+        },
     },
 }

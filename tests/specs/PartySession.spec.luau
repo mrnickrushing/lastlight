@@ -328,6 +328,15 @@ return {
                         expiresAt = 2,
                     },
                 }
+                --[[
+                    Absent is a case, and it cannot live in the list above: a
+                    table constructor stores nothing for a leading nil, so
+                    generalized iteration stops before the first real entry
+                    and the whole loop runs zero times. This spec ran zero
+                    times exactly that way before somebody read it.
+                ]]
+                TestRunner.equal(PartySession.normalizeTicket(nil), nil)
+                TestRunner.equal(PartySession.readTicket(nil, 10, nil).reason, "no_ticket")
                 for _, case in cases do
                     TestRunner.equal(PartySession.normalizeTicket(case), nil)
                     TestRunner.equal(PartySession.readTicket(case, 10, nil).rejoin, false)
@@ -360,7 +369,6 @@ return {
             name = "a state that cannot be read admits nobody",
             run = function()
                 local cases = {
-                    nil,
                     "party",
                     {},
                     { partyId = "p", leaderUserId = LEADER, members = {} },
@@ -370,7 +378,18 @@ return {
                         leaderUserId = LEADER,
                         members = { { userId = SECOND, joinedAt = 1 } },
                     },
+                    -- Longer than a ticket can carry, so a party that kept it
+                    -- could issue tickets nobody can read back.
+                    {
+                        partyId = string.rep("p", 200),
+                        leaderUserId = LEADER,
+                        members = { { userId = LEADER, joinedAt = 1 } },
+                    },
                 }
+                -- No party at all, kept out of the list for the reason above:
+                -- a leading nil makes the loop iterate nothing.
+                TestRunner.equal(PartySession.normalize(nil), nil)
+                TestRunner.equal(PartySession.size(nil), 0)
                 for _, case in cases do
                     TestRunner.equal(PartySession.normalize(case), nil)
                     TestRunner.equal(PartySession.size(case), 0)

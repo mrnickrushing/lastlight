@@ -198,7 +198,17 @@ function PartySession.normalize(value: any): State?
     if type(value) ~= "table" then
         return nil
     end
-    if type(value.partyId) ~= "string" or #value.partyId == 0 then
+    --[[
+        Bounded to the same length a ticket can carry. Without that agreement
+        a party could hold an ID it is able to issue tickets for and unable to
+        read them back, which is a way home that works right up until the
+        player uses it.
+    ]]
+    if
+        type(value.partyId) ~= "string"
+        or #value.partyId == 0
+        or #value.partyId > MAX_PARTY_ID_LENGTH
+    then
         return nil
     end
     if not isUserId(value.leaderUserId) then

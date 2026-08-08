@@ -928,9 +928,18 @@ end
     handed over by a service that built it from a teleport call's return
     value, and a reserved-server code that came back as something other than
     a string should stop here rather than at the next load.
+
+    Clearing is nil and only nil. A malformed ticket is refused outright
+    rather than treated as a clear, because those two look identical here and
+    are opposite in effect: one is a player who has arrived home, the other is
+    a bad write that would silently take away the way back from a player who
+    still has one.
 ]]
 function SaveSchema.withRejoinTicket(profile: Profile, ticket: any, now: number): Profile
     local bounded = if ticket == nil then nil else PartySession.normalizeTicket(ticket)
+    if ticket ~= nil and bounded == nil then
+        return profile
+    end
     if bounded == nil and profile.social.rejoin == nil then
         return profile
     end

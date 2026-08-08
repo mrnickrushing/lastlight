@@ -242,8 +242,16 @@ return {
                         "nothing reads the party row's " .. key .. " button"
                     )
                 end
+                --[[
+                    Searched as a CALL, not as a name. `readSide` reads the
+                    whole client including HUDController, which defines
+                    `setPartyHandlers` -- so a bare name search is a check
+                    satisfied by the very definition it is meant to prove
+                    somebody uses, which is the same species of mistake as
+                    the wiring gaps this spec exists for.
+                ]]
                 TestRunner.truthy(
-                    string.find(client, "setPartyHandlers", 1, true) ~= nil,
+                    string.find(client, "hud:setPartyHandlers", 1, true) ~= nil,
                     "the party buttons are never wired to the remote"
                 )
             end,
