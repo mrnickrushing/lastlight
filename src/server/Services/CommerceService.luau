@@ -280,6 +280,7 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
             user = userId,
         })
         -- GATE-METRIC: receipt_result
+        -- COMMERCE-EVENT: receipt_result
         self._analyticsService:receiptResult(
             userId,
             tostring(receipt.productId),
@@ -404,6 +405,7 @@ function CommerceService.equip(
     if result.applied then
         self._profileService:setCommerce(player, state)
         if cosmeticId ~= nil then
+            -- COMMERCE-EVENT: cosmetic_equipped
             self._analyticsService:cosmeticEquipped(player, tostring(cosmeticId), tostring(slot))
         end
     end
@@ -446,6 +448,7 @@ function CommerceService.viewDetail(self: CommerceService, player: Player, produ
     if product == nil then
         return false
     end
+    -- COMMERCE-EVENT: product_detail_view
     self._analyticsService:productDetailView(player, product.id)
     return true
 end
@@ -541,6 +544,7 @@ end
     was drawn: a client-side count of store views is a count a client decides.
 ]]
 function CommerceService.recordStoreView(self: CommerceService, player: Player, cardCount: number)
+    -- COMMERCE-EVENT: store_view
     self._analyticsService:storeView(player, cardCount)
 end
 
@@ -625,9 +629,20 @@ function CommerceService.promptPurchase(self: CommerceService, player: Player, p
     end
     local robloxId = self._config.CommerceProductIds[product.id]
     if type(robloxId) ~= "number" then
-        -- The dashboard half does not exist yet. Refused with a reason rather
-        -- than prompting into nothing, which on a client looks like the button
-        -- being broken.
+        --[[
+            The dashboard half does not exist yet. Refused with a reason rather
+            than prompting into nothing, which on a client looks like the button
+            being broken -- and counted, which is the part a live pass found
+            missing.
+
+            Returning here without emitting meant a player pressing BUY on a
+            product nobody had configured produced no telemetry at all. That is
+            the exact shape this wave's spec exists to catch one level up: a
+            dashboard reading nothing, indistinguishable from a store nobody
+            opened, in the one case where somebody did press the button.
+        ]]
+        -- COMMERCE-EVENT: purchase_prompt
+        self._analyticsService:purchasePrompt(player, product.id, false)
         return { accepted = false, reason = "product_not_configured" }
     end
     local ok = pcall(function()
@@ -671,10 +686,11 @@ function CommerceService.Start(self: CommerceService)
         is the absence of an event, which reads exactly the same as the store
         being shut.
     ]]
-    -- GATE-METRIC: purchase_prompt_finished
+    -- GATE-METRIC: purchase_platform_result
+    -- COMMERCE-EVENT: purchase_platform_result
     MarketplaceService.PromptProductPurchaseFinished:Connect(
         function(userId: number, robloxProductId: number, purchased: boolean)
-            self._analyticsService:purchasePromptFinished(
+            self._analyticsService:purchasePlatformResult(
                 userId,
                 self:_productIdFor(robloxProductId),
                 purchased
