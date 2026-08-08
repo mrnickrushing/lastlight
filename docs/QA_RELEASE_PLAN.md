@@ -362,7 +362,7 @@ have checked a thumbnail would be worse than one that says it cannot.
 |---|---|---|---|
 | `dashboards_and_alerts_live` | yes | open | Owner: dashboards built from [MONETIZATION_LIVEOPS_ANALYTICS.md](MONETIZATION_LIVEOPS_ANALYTICS.md) and alerting |
 | `save_backups_and_migration_plan` | yes | open | Owner: backup cadence and the migration plan for the release |
-| `rollback_build_and_commands` | yes | check | `KillSwitches.spec` |
+| `rollback_build_and_commands` | yes | check | `npm run verify:rollback` |
 | `owners_named` | yes | open | Owner: support, moderation, commerce, data and performance owners named |
 | `incident_channel_and_template` | yes | open | Owner: incident channel and communication template |
 | `kill_switches_tested` | yes | open | Owner: content and offer kill switches exercised in a live server, per [ROLLBACK.md](ROLLBACK.md) |

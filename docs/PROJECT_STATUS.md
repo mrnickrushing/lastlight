@@ -7,9 +7,12 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #353), build `0.53.0`,
+Last updated: 2026-08-08, at `main` = PR #354, build `0.53.0`,
 save schema 25, 27 services. Published to Roblox as place version 156,
-matching this revision exactly. (#352 leaves the built place
+matching this revision exactly. (This line used to say ``at `main` = `HEAD` ``,
+and #354 is the wave that noticed `HEAD` is not a revision. The revision a
+rollback restores is recorded properly in
+[ROLLBACK.md](ROLLBACK.md#the-rollback-target).) (#352 leaves the built place
 byte-identical, because it changes only manifests, validators and
 documentation.) (#341 and #343 both left the built place
 byte-identical, because they add only specs and documentation and the built
@@ -30,7 +33,7 @@ done: routing every player-visible string through one table touches nearly every
 file that speaks to a player, and the check that gives the wave its value — *no
 player-visible literal outside the table* — cannot be switched on until the
 migration is complete. A partial pass is a large diff with no guard on it.
-**Milestone 14 has waves A through D shipped and E still to build.**
+**Milestone 14's buildable half is complete — waves A through E all shipped.**
 
 **Milestones 0 through 11 are complete, and so is Milestone 12's buildable
 half** — M11 waves A through J and M12 waves A through E all shipped. What M12
@@ -79,6 +82,46 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#354** (v156, unchanged — this wave adds a script, a validator and documents)
+  **M14 wave E: `HEAD` is not a revision.** ROLLBACK.md's second step says "republish
+  the last known-good place revision", and it pointed at this file's own header for
+  the revision and the flag state that go together. The header read *at `main` =
+  `HEAD`*. **`HEAD` is whatever the reader happens to be standing on, which during an
+  incident is the build that is on fire.** The one place in the repository where the
+  revision and the flag state were written side by side recorded neither of them, and
+  nothing failed, because nothing was checking. The cost of that lands in the only
+  minute the record exists for.
+
+  It is a table now — a full commit id, the place version it produced, the save
+  schema, the build, and all 26 flags read **out of that revision** rather than out of
+  the working tree. `validate_rollback_target.py` checks it on every `npm run check`.
+
+  **The rule with teeth is the schema one.** Rolling back past a schema bump strands
+  every profile the newer build wrote: the old build does not know the fields, and the
+  first save it writes back is a save it has narrowed. So a schema bump **moves the
+  rollback target forward**, which is the same fact `Config.SaveSchemaFreeze` is
+  about, arriving from the other side. The other three refusals are the ways a
+  recorded target is quietly useless: a revision nobody merged is a build nobody has,
+  a target that is the current tip is not somewhere to roll back *to*, and a flag
+  matrix describing a build it does not match is worse than no matrix, because it will
+  be followed.
+
+  **`npm run verify:rollback` does the half a validator cannot.** It checks the
+  revision out into a throwaway worktree, builds it, and runs the same DataModel
+  verification the normal build runs — because a revision nobody has built since it
+  was recorded is a plan rather than a rollback, and the moment you find that out is
+  the moment you are trying to use it.
+
+  **Verified live rather than by proxy.** The target's build came out **byte-identical**
+  to the published place (`baa0ffd2f37f…`), which is what makes the live pass real
+  rather than a stand-in: the server running in Studio *is* the rollback build. It
+  booted clean with the world raised — `LastLightWorld` at 15,208 descendants, all
+  three defense lanes, 132 interaction prompts and a player character in the town.
+
+  **Five refusals exercised against the real document before it shipped**: the record
+  saying `HEAD` (the actual defect, reproduced), the target set to the current tip, an
+  orphan commit nobody merged, a schema bump that left the target behind, and one flag
+  flipped in the matrix.
 - **#353** (v156, unchanged — this wave adds scripts and documents, and neither is
   in the built place) **M14 wave D: release notes, known issues and dashboards are
   normally written at the end of a project from memory, which is the one moment nobody

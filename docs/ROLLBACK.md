@@ -104,11 +104,10 @@ the first takes seconds and the second takes a publish:
 1. **The flag state.** Turn off the smallest set of switches above that
    contains the failure. This is the whole reason the list exists: most
    incidents are one system, and a flag reaches every running server.
-2. **The build.** Republish the last known-good place revision. The revision
-   and the flag state that go together are recorded in the PROJECT_STATUS
-   header for every published version — "at `main` = *revision*, published as
-   place version *N*" — which is the only place in this repository the two are
-   written side by side.
+2. **The build.** Republish the last known-good place revision, which is
+   recorded below under [The rollback target](#the-rollback-target) as a full
+   commit id, the place version it produced, the save schema it holds, and
+   every flag as it stands at that revision.
 
 **Overrides are refused in production** (`Config.Environments.production`
 sets `AllowFlagOverrides = false`), so step one is a config change and a
@@ -117,6 +116,87 @@ That is deliberate — a runtime override a client could reach would be an
 attack surface — and it is also the honest limit on how fast step one is.
 Making step one genuinely live in production needs a server-side flag store,
 which is owner-gated infrastructure rather than code.
+
+## The rollback target
+
+Step two above says "republish the last known-good place revision", and until
+Milestone 14's wave E it pointed at the PROJECT_STATUS header for the revision
+and the flag state that go together. That header reads *at `main` = `HEAD`*.
+
+**`HEAD` is not a revision.** It is whatever the reader happens to be standing
+on, which during an incident is the build that is on fire. The one place in this
+repository where the revision and the flag state were written side by side
+recorded neither of them, and nothing failed, because nothing was checking.
+
+So it is a table, and `scripts/validate_rollback_target.py` checks it on every
+`npm run check`.
+
+| Field | Value |
+|---|---|
+| **Revision** | `90c0a3e90227b3fb1f9133f71d4895950ea3d204` |
+| **Place version** | `156` |
+| **Save schema** | `25` |
+| **Build** | `0.53.0` |
+| **Published** | `2026-08-08, from PR #351` |
+
+Four rules keep it a thing somebody could actually restore, and each is a way a
+recorded target is quietly useless:
+
+1. **The revision exists and is an ancestor of the tip.** A target on a branch
+   nobody merged is a build nobody has.
+2. **It is not the tip itself.** A build you are already running is not
+   somewhere to roll back to.
+3. **Its save schema equals the current one.** This is the rule with teeth.
+   Rolling back past a schema bump strands every profile the newer build wrote:
+   the old build does not know the fields, and the first save it writes back is
+   a save it has narrowed. So **a schema bump moves the rollback target
+   forward** -- the same fact `Config.SaveSchemaFreeze` is about, arriving from
+   the other side.
+4. **The flag state below is read out of that revision**, not out of the
+   working tree. A matrix describing a build it does not match is worse than no
+   matrix, because it will be followed.
+
+`npm run verify:rollback` does the half a validator cannot: it checks the
+revision out into a throwaway worktree, builds it, and runs the same DataModel
+verification the normal build runs. A revision nobody has built since it was
+recorded is a plan rather than a rollback, and the moment you find that out is
+the moment you are trying to use it.
+
+### The flag state to restore
+
+Every flag as it stands at the target revision. Restoring the build restores
+these; the table is here so that step one and step two can be checked against
+each other, and so that a switch turned off during the incident is turned off
+against a known baseline rather than against a memory.
+
+| Flag | Value |
+|---|---|
+| `bounded_join` | true |
+| `first_ten_minutes` | true |
+| `input_action_system` | true |
+| `combat_mobility_enabled` | true |
+| `profession_kits_enabled` | true |
+| `player_survival_enabled` | true |
+| `tutorial_persistence` | false |
+| `content_registry` | true |
+| `bramblewake_events_enabled` | true |
+| `old_growth_elite_enabled` | true |
+| `warden_stag_boss_enabled` | true |
+| `bramblewake_blackout_enabled` | true |
+| `town_night_cycle_enabled` | true |
+| `lobby_departure_enabled` | true |
+| `reserved_run_servers_enabled` | true |
+| `admin_commands_enabled` | true |
+| `region_encounters_enabled` | true |
+| `region_bramblewake_enabled` | true |
+| `region_ironroot_enabled` | false |
+| `region_mireglass_enabled` | false |
+| `region_tempest_enabled` | false |
+| `region_frostmere_enabled` | false |
+| `region_cinderfall_enabled` | false |
+| `region_hollow_enabled` | false |
+| `quick_chat_enabled` | true |
+| `cosmetic_store_enabled` | false |
 
 ## What this does not decide
 
