@@ -109,4 +109,5 @@ TestRunner.run({
     require("./specs/AdminInspectionReport.spec"),
     require("./specs/AdminRoster.spec"),
     require("./specs/FullPathTraversal.spec"),
+    require("./specs/SoakProbe.spec"),
 })

@@ -7,12 +7,12 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #343), build `0.53.0`,
-save schema 25, 27 services. Published to Roblox as place version 150,
-matching this revision exactly — #341 and #343 both left the built place
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #344), build `0.53.0`,
+save schema 25, 27 services. Published to Roblox as place version 151,
+matching this revision exactly. (#341 and #343 both left the built place
 byte-identical, because they add only specs and documentation and the built
 place carries no tests, so publishing either returned the version #340 had
-already produced. **The owner's standing directive: complete
+already produced.) **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
 that makes that possible is
@@ -62,6 +62,63 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#344** (v151) **M12 wave E: the soak, and three ways the obvious version of it
+  passes on a leaking build.** M12 asks that N cycles leave the same counts they
+  started with. Read a counter at the start and again at the end and subtract,
+  and all three of these are waiting.
+
+  **The first cycle is not a baseline.** A server builds its town, spawns its
+  residents and wires its world on the way into cycle one, so every one-time
+  allocation lands between sample one and sample two. Measured from sample one a
+  build that then holds perfectly reports a leak -- and the fix everybody reaches
+  for is a wider tolerance, which is now wide enough to hide a real one. The
+  baseline is the **second** sample, and three cycles is the least that says
+  anything.
+
+  **A sample is only comparable to one taken at the same point in the cycle.**
+  Instance count during a night is legitimately higher than at dawn, because
+  there are creatures in the world. A series that drifted across phases produces
+  a number that means nothing and looks exactly like one that means something, so
+  a mixed series is **refused** rather than averaged, along with a repeated cycle
+  number -- a sampler that fires twice halves the apparent growth of a real leak.
+
+  **A leak's signature is that it does not stop.** A metric can rise at every
+  sample and sit under a flat tolerance for the length of a test, which is the
+  shape of every leak ever shipped: it was small enough for an hour. So a metric
+  still climbing at every step is a breach *under* its own allowance, and the
+  report says which of the two it is.
+
+  **Connection count is declared unobservable, and that is the honest answer
+  rather than a gap.** Roblox exposes no API for it, so a number here would be
+  one this game invented, and a gate reading an invented number is worse than a
+  gate reading nothing. What a soak *can* watch is `player_residue` -- the
+  per-player tables every service keeps, walked in full -- because a connection
+  that outlived a player kept its table entry alive too. The count of
+  unobservable metrics is pinned, the way RELEASE_GATES pins its `review` rows.
+
+  **A live pass found the wave broken in the way this wave is about, then found
+  the rule wrong.** (1) `LastLightSoak` was read once at boot, and a Studio Play
+  session starts from a fresh DataModel that does not carry attributes set in
+  Edit mode — so the wiring ran on every server and could never be switched on
+  from the only place anybody drives it. Nothing failed: the counters were there,
+  the spec was green, the log was silent. It is read per cycle now, and a spec
+  case refuses a top-level read. (2) Then eight real cycles showed the town
+  gaining **982 instances in one step** as it tiered up and raised new buildings,
+  then holding — and the span-growth rule called that 200 a cycle forever, so a
+  healthy server breached on the game working. Growth is measured over the
+  **tail** now, from the middle sample to the last, which is the rule
+  `PerformanceBudget` already argued for on frame rate. Walked on the fixed
+  build: `incomplete` at cycles 1–2, `ok` at 3, `breach` at 4–6 while the town
+  was actually growing, and **back to `ok` at 7 and 8** once it stopped. The
+  breach clears when the growth does, which is the whole point.
+
+  Also verified live across those eight cycles: one sample per cycle, all at
+  `day`; `enemies=0` at every dawn with a Briarback spawning during night 8, so
+  the counter is live rather than stuck; and `residue=0` throughout. **Open:**
+  `profile_bytes` was read correctly and never exercised under change — driving
+  cycles through the private-server rail latches practice, so the profile is
+  never written, and it read a flat 2661 for a reason that is not the profile
+  holding steady.
 - **#343** (v150, unchanged — this wave adds only a spec and docs) **M12 wave C:
   every content spec counts, and none of them walks.** `ContentCensus` counts the
   catalog, `ChapterProgress` checks a chapter against the chapter beside it,

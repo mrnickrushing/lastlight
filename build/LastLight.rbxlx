@@ -33840,6 +33840,397 @@ return table.freeze(SfxCatalog)
       </Item>
       <Item class="ModuleScript" referent="99">
         <Properties>
+          <string name="Name">SoakProbe</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    Whether a server left running is holding on to things.
+
+    M12's soak gate asks that nothing grows without bound over a long
+    session. The tempting way to check that is to read a counter at the
+    start and again at the end and subtract, and it is wrong in three ways
+    that all produce a pass on a leaking build.
+
+    **The first cycle is not a baseline.** A server builds its town,
+    spawns its residents and wires its world on the way into cycle one, so
+    every one-time allocation in the game lands between the first sample
+    and the second. Measured from sample one, a build that then holds
+    perfectly steady reports a leak; widen the tolerance until that stops
+    and the tolerance is now wide enough to hide a real one. So the
+    baseline is the **second** sample, and a soak that has not run three
+    cycles has not measured anything.
+
+    **A sample is only comparable to a sample taken at the same point in
+    the cycle.** Instance count during a night is legitimately higher than
+    at dawn -- there are creatures in the world. A series that drifted
+    across phases would produce a number that means nothing, and it would
+    look exactly like a number that means something. Every sample carries
+    the phase it was taken at and a series that mixes them is refused
+    rather than averaged.
+
+    **A leak's signature is that it does not stop.** A metric can rise at
+    every single sample and still sit under a flat tolerance for the
+    length of a test, which is the shape of every leak that was ever
+    shipped: it was small enough for an hour. So growth is judged per
+    cycle rather than in total, and a metric that rose at every step from
+    the baseline onward is a breach on its own -- it has not levelled off,
+    and a run twice as long would not have passed.
+
+    One metric is declared **unobservable** and it is the one the gate
+    names first: Roblox exposes no count of live script connections. There
+    is no API, so a number here would be a number this game invented, and
+    a gate reading an invented number is worse than a gate reading
+    nothing. What a soak *can* watch is the residue this game leaves for
+    itself -- the per-player tables every service keeps -- and that is a
+    real metric with a real reading, because a connection that outlives a
+    player is a connection whose table entry outlives them too. The count
+    of unobservable metrics is pinned by its spec for the same reason the
+    release gates pin their `review` rows: a threshold nobody wants to
+    instrument becoming a second one is how a gate quietly stops being a
+    gate.
+
+    Pure. No Roblox services, no clock, no instances. Whatever samples it
+    hands it numbers.
+]]
+
+local SoakProbe = {}
+
+export type Verdict = "ok" | "watch" | "breach" | "incomplete"
+
+export type Metric = {
+    id: string,
+    label: string,
+    -- What one more cycle is allowed to add. A leak scales with cycles, so
+    -- the allowance does too; a flat budget passes any leak slow enough.
+    perCycleAllowance: number,
+    --[[
+        Whether the runtime can answer this at all. A metric declared
+        unobservable is reported as such and never contributes a verdict,
+        which is different from a metric nobody happened to sample.
+    ]]
+    observable: boolean,
+    why: string,
+}
+
+export type Sample = {
+    cycle: number,
+    phase: string,
+    counts: { [string]: number },
+}
+
+export type Run = {
+    phase: string,
+    samples: { Sample },
+}
+
+export type MetricReport = {
+    id: string,
+    verdict: Verdict,
+    -- Why it read that way, so a breach names which of the two it is.
+    reason: string,
+    baseline: number,
+    last: number,
+    growthPerCycle: number,
+    allowance: number,
+    monotone: boolean,
+    cycles: number,
+}
+
+export type Report = {
+    verdict: Verdict,
+    cycles: number,
+    metrics: { MetricReport },
+    missing: { string },
+    unobservable: { string },
+}
+
+-- Three samples is the least that can say anything: one to warm up, one to
+-- be the baseline, one to be compared against it.
+SoakProbe.MinimumCycles = 3
+
+--[[
+    How many samples a monotone rise has to span before it is a breach on
+    its own. Over three samples "rose every time" is two coin flips and
+    happens by accident on a metric that idles between two values; over
+    five it is a slope.
+]]
+SoakProbe.MonotoneCycles = 5
+
+local ORDER: { string } = {
+    "instances",
+    "connections",
+    "tracked_enemies",
+    "player_residue",
+    "profile_bytes",
+}
+
+local DEFINITIONS: { [string]: Metric } = {
+    instances = table.freeze({
+        id = "instances",
+        label = "Instances under the world",
+        --[[
+            Not zero. Dressing a town is not instant and a decoration a
+            player placed on cycle four is a permanent instance that is
+            supposed to persist, so a hard zero would fail on the game
+            working. Sixteen a cycle is far under any leak that matters
+            and far over the handful a played cycle legitimately adds.
+        ]]
+        perCycleAllowance = 16,
+        observable = true,
+        why = "A creature, a marker or a billboard that is never destroyed is an "
+            .. "instance the world keeps forever.",
+    }),
+    connections = table.freeze({
+        id = "connections",
+        label = "Live script connections",
+        perCycleAllowance = 0,
+        observable = false,
+        why = "Roblox exposes no count of live connections. A number here would be "
+            .. "one this game invented, so the residue metric watches the tables a "
+            .. "leaked connection would keep alive instead.",
+    }),
+    tracked_enemies = table.freeze({
+        id = "tracked_enemies",
+        label = "Creatures the server still believes in",
+        -- Zero, and this one really is zero: a night ends by clearing its
+        -- queue, so a creature outliving the night it belongs to is the
+        -- bug rather than a cost of playing.
+        perCycleAllowance = 0,
+        observable = true,
+        why = "A defeated creature still counted is a wave schedule that stalls "
+            .. "behind something nobody can fight.",
+    }),
+    player_residue = table.freeze({
+        id = "player_residue",
+        label = "Entries held for players who have left",
+        perCycleAllowance = 0,
+        observable = true,
+        why = "Every service keeps tables keyed by player. One that survives the "
+            .. "player is the observable half of a connection that survived them.",
+    }),
+    profile_bytes = table.freeze({
+        id = "profile_bytes",
+        label = "Encoded size of a profile",
+        --[[
+            A profile is supposed to grow -- a night survived, a recipe
+            crafted, a seed walked are all things a save remembers. What
+            it may not do is grow *per cycle without bound*, which is why
+            the seed history is capped. 256 bytes a cycle is generous for
+            the former and nowhere near enough to hide the latter.
+        ]]
+        perCycleAllowance = 256,
+        observable = true,
+        why = "A save that grows every night eventually stops fitting in a "
+            .. "DataStore value, and it fails for the player who played most.",
+    }),
+}
+
+SoakProbe.Order = table.freeze(ORDER)
+SoakProbe.Metrics = table.freeze(DEFINITIONS)
+
+function SoakProbe.metric(metricId: any): Metric?
+    return if type(metricId) == "string" then DEFINITIONS[metricId] else nil
+end
+
+function SoakProbe.isObservable(metricId: any): boolean
+    local definition = SoakProbe.metric(metricId)
+    return definition ~= nil and definition.observable
+end
+
+--[[
+    Start a run at a named phase. The phase is fixed here rather than read
+    off the first sample, because a sampler wired to the wrong hook would
+    otherwise define its own correctness.
+]]
+function SoakProbe.begin(phase: string): Run
+    assert(type(phase) == "string" and phase ~= "", "a soak run needs a phase to sample at")
+    return { phase = phase, samples = {} }
+end
+
+export type RecordResult = {
+    accepted: boolean,
+    reason: string,
+}
+
+--[[
+    Add one cycle's counts. Refused, rather than absorbed, when the sample
+    cannot be compared to the ones beside it: a different phase means a
+    different question, and a repeated or reversed cycle number means the
+    sampler fired twice and would halve the apparent growth of a real
+    leak.
+]]
+function SoakProbe.record(run: Run, cycle: any, phase: any, counts: any): (Run, RecordResult)
+    if type(cycle) ~= "number" or cycle ~= math.floor(cycle) or cycle < 1 then
+        return run, { accepted = false, reason = "cycle_invalid" }
+    end
+    if phase ~= run.phase then
+        return run, { accepted = false, reason = "phase_mismatch" }
+    end
+    if type(counts) ~= "table" then
+        return run, { accepted = false, reason = "counts_invalid" }
+    end
+    local previous = run.samples[#run.samples]
+    if previous ~= nil and cycle <= previous.cycle then
+        return run, { accepted = false, reason = "cycle_repeated" }
+    end
+
+    local kept: { [string]: number } = {}
+    for metricId, value in counts do
+        --[[
+            An unknown metric is dropped rather than carried, and an
+            unobservable one is dropped too: accepting a reading for
+            `connections` would let a caller quietly supply the invented
+            number this module exists to refuse.
+        ]]
+        if
+            SoakProbe.isObservable(metricId)
+            and type(value) == "number"
+            and value == value
+            and value >= 0
+            and value < math.huge
+        then
+            kept[metricId] = value
+        end
+    end
+
+    local nextRun: Run = { phase = run.phase, samples = table.clone(run.samples) }
+    table.insert(nextRun.samples, { cycle = cycle, phase = phase, counts = kept })
+    return nextRun, { accepted = true, reason = "recorded" }
+end
+
+local function reportFor(run: Run, definition: Metric): MetricReport?
+    local values: { number } = {}
+    local cycles: { number } = {}
+    for _, sample in run.samples do
+        local value = sample.counts[definition.id]
+        if value ~= nil then
+            table.insert(values, value)
+            table.insert(cycles, sample.cycle)
+        end
+    end
+    if #values < SoakProbe.MinimumCycles then
+        return nil
+    end
+
+    -- The second sample, because the first one paid for everything the
+    -- server builds on its way in.
+    local baseline = values[2]
+    local last = values[#values]
+
+    --[[
+        Growth is measured over the **tail**, from the middle sample to the
+        last, and that is a lesson a live run taught rather than a
+        refinement. Emberhollow builds more of itself as it tiers up: a
+        real seven-cycle soak stepped 982 instances in one cycle when the
+        town raised new buildings, then held flat for three. Measured from
+        the baseline that reads as 200 a cycle forever, so a healthy server
+        breaches on the game working -- and a gate that cries wolf on every
+        server is a gate nobody reads.
+
+        The tail asks the question the gate actually has: **is it still
+        growing?** A one-time build-out is over by the time the tail starts;
+        a leak is not, because a leak is defined by not stopping. It is also
+        the rule `PerformanceBudget` already argued for on frame rate: judge
+        the tail, because a mean hides the thing you are looking for.
+    ]]
+    local middle = math.max(2, math.ceil((#values + 1) / 2))
+    local from = values[middle]
+    local span = cycles[#cycles] - cycles[middle]
+    local growth = if span > 0 then (last - from) / span else 0
+
+    local monotone = true
+    for index = 3, #values do
+        if values[index] <= values[index - 1] then
+            monotone = false
+            break
+        end
+    end
+
+    --[[
+        Two ways to fail, and they are worth telling apart in the report
+        rather than only in the verdict. `over_allowance` is a metric
+        growing faster than it is allowed to. `still_climbing` is the
+        quieter one: under the allowance, and up at every step from the
+        baseline, so this run passed and a longer one would not have --
+        which makes it a result about the length of the test rather than
+        about the build.
+    ]]
+    local overAllowance = growth > definition.perCycleAllowance
+    local stillClimbing = monotone and #values >= SoakProbe.MonotoneCycles
+
+    local verdict: Verdict = "ok"
+    local reason = "steady"
+    if overAllowance or stillClimbing then
+        verdict = "breach"
+        reason = if overAllowance then "over_allowance" else "still_climbing"
+    elseif monotone and growth > 0 then
+        verdict = "watch"
+        reason = "climbing"
+    end
+
+    return {
+        id = definition.id,
+        verdict = verdict,
+        reason = reason,
+        baseline = baseline,
+        last = last,
+        growthPerCycle = growth,
+        allowance = definition.perCycleAllowance,
+        monotone = monotone,
+        cycles = #values,
+    }
+end
+
+--[[
+    The run's verdict. A metric nobody sampled is `missing` and drags the
+    whole run to `incomplete`, which is PerformanceBudget's rule and the
+    same reasoning: the failure a soak gate exists to catch is somebody
+    claiming a pass for something nobody looked at.
+]]
+function SoakProbe.report(run: Run): Report
+    local metrics: { MetricReport } = {}
+    local missing: { string } = {}
+    local unobservable: { string } = {}
+    local worst: Verdict = "ok"
+
+    for _, metricId in ORDER do
+        local definition = DEFINITIONS[metricId]
+        if not definition.observable then
+            table.insert(unobservable, metricId)
+            continue
+        end
+        local report = reportFor(run, definition)
+        if report == nil then
+            table.insert(missing, metricId)
+        else
+            table.insert(metrics, report)
+            if report.verdict == "breach" then
+                worst = "breach"
+            elseif report.verdict == "watch" and worst == "ok" then
+                worst = "watch"
+            end
+        end
+    end
+
+    if #missing > 0 and worst ~= "breach" then
+        worst = "incomplete"
+    end
+
+    return {
+        verdict = worst,
+        cycles = #run.samples,
+        metrics = metrics,
+        missing = missing,
+        unobservable = unobservable,
+    }
+end
+
+return table.freeze(SoakProbe)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="100">
+        <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -33982,7 +34373,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="100">
+      <Item class="ModuleScript" referent="101">
         <Properties>
           <string name="Name">StoreAvailability</string>
           <string name="Source"><![CDATA[--!strict
@@ -34116,7 +34507,7 @@ return table.freeze(StoreAvailability)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="101">
+      <Item class="ModuleScript" referent="102">
         <Properties>
           <string name="Name">StoreCard</string>
           <string name="Source"><![CDATA[--!strict
@@ -34353,7 +34744,7 @@ return table.freeze(StoreCard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="102">
+      <Item class="ModuleScript" referent="103">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -34610,7 +35001,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="103">
+      <Item class="ModuleScript" referent="104">
         <Properties>
           <string name="Name">TempestEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -34888,7 +35279,7 @@ return table.freeze(TempestEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="104">
+      <Item class="ModuleScript" referent="105">
         <Properties>
           <string name="Name">TideboundTitanEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -35319,7 +35710,7 @@ return table.freeze(TideboundTitanEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="105">
+      <Item class="ModuleScript" referent="106">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -35463,7 +35854,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="106">
+      <Item class="ModuleScript" referent="107">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -35873,7 +36264,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="107">
+      <Item class="ModuleScript" referent="108">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -36054,7 +36445,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="108">
+      <Item class="ModuleScript" referent="109">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -36118,7 +36509,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="109">
+      <Item class="ModuleScript" referent="110">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -36292,7 +36683,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="110">
+      <Item class="ModuleScript" referent="111">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -36384,7 +36775,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="111">
+      <Item class="ModuleScript" referent="112">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -36596,7 +36987,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="112">
+      <Item class="ModuleScript" referent="113">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -36774,7 +37165,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="113">
+      <Item class="ModuleScript" referent="114">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -36927,7 +37318,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="114">
+      <Item class="ModuleScript" referent="115">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -37260,7 +37651,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="115">
+      <Item class="ModuleScript" referent="116">
         <Properties>
           <string name="Name">TownVisitPolicy</string>
           <string name="Source"><![CDATA[--!strict
@@ -37433,7 +37824,7 @@ return table.freeze(TownVisitPolicy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="116">
+      <Item class="ModuleScript" referent="117">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -37595,7 +37986,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="117">
+      <Item class="ModuleScript" referent="118">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -37631,7 +38022,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="118">
+      <Item class="ModuleScript" referent="119">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -38013,7 +38404,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="119">
+      <Item class="ModuleScript" referent="120">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -38083,7 +38474,7 @@ return table.freeze(WeatherProfile)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="120">
+      <Item class="ModuleScript" referent="121">
         <Properties>
           <string name="Name">WhiteHowlerEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -38547,11 +38938,11 @@ return table.freeze(WhiteHowlerEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="121">
+  <Item class="ServerScriptService" referent="122">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="122">
+    <Item class="Script" referent="123">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -38616,6 +39007,7 @@ local ActionPayloadContract = require(root.ActionPayloadContract)
 local AdminInspectionReport = require(root.AdminInspectionReport)
 local PerformanceBudget = require(root.PerformanceBudget)
 local SessionSegment = require(root.SessionSegment)
+local SoakProbe = require(root.SoakProbe)
 local ProfilePersistence = require(root.ProfilePersistence)
 local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
@@ -38922,8 +39314,14 @@ local commerceService = CommerceService.new(
     analyticsService
 )
 
-local performanceService =
-    PerformanceService.new(logger, Config, PerformanceBudget, SessionSegment, analyticsService)
+local performanceService = PerformanceService.new(
+    logger,
+    Config,
+    PerformanceBudget,
+    SessionSegment,
+    analyticsService,
+    SoakProbe
+)
 local adminService = AdminService.new(
     logger,
     AdminRoster,
@@ -38951,6 +39349,52 @@ local townNightService = TownNightService.new(
     featureFlags
 )
 townNightService:setDefense(defenseService, DefenseLanes)
+
+--[[
+    The soak, wired here because this is the only file that can see all
+    three things it reads and none of them should learn about each other.
+
+    The counters are injected rather than reached for. This service has no
+    business knowing how many creatures EnemyService believes in or how
+    large a profile encodes to, and a soak that reached across the server
+    for its own numbers would be a second copy of every service's
+    internals going stale on its own schedule.
+
+    `LastLightSoak` is read **inside the observer, every cycle**, and that
+    is not a style choice. A Studio Play session starts from a fresh
+    DataModel that does not carry attributes set in Edit mode, so a check
+    made once at boot can never be true in the only place this is ever
+    driven from: the wiring existed, ran on every server, and was
+    unreachable. Read per cycle it can also be turned on partway through a
+    session, which is what a soak actually gets used like.
+
+    Registering a counter costs nothing; running one costs a full
+    descendant walk of the world. That is why the list is always installed
+    and the sampling is not.
+]]
+performanceService:setSoakCounters({
+    instances = function(): number
+        return #workspace:GetDescendants()
+    end,
+    tracked_enemies = function(): number
+        return enemyService:trackedCount()
+    end,
+    player_residue = function(): number
+        return profileService:playerResidue()
+    end,
+    profile_bytes = function(): number
+        return profileService:largestProfileBytes()
+    end,
+})
+townNightService:setCycleObserver(function(cycle: number, phase: string)
+    if game:GetAttribute("LastLightSoak") ~= true then
+        return
+    end
+    if not performanceService:isSoaking() then
+        performanceService:beginSoak(phase)
+    end
+    performanceService:sampleSoak(cycle, phase)
+end)
 --[[
     The private server's control rail.
 
@@ -39233,7 +39677,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="123">
+      <Item class="ModuleScript" referent="124">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -39331,11 +39775,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="124">
+      <Item class="Folder" referent="125">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="125">
+        <Item class="ModuleScript" referent="126">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -39972,7 +40416,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="126">
+        <Item class="ModuleScript" referent="127">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41251,7 +41695,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="127">
+        <Item class="ModuleScript" referent="128">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41752,7 +42196,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="128">
+        <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">CommerceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42577,7 +43021,7 @@ return table.freeze(CommerceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="129">
+        <Item class="ModuleScript" referent="130">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42848,7 +43292,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="130">
+        <Item class="ModuleScript" referent="131">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43268,7 +43712,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43496,6 +43940,17 @@ function EnemyService.setStillness(self: EnemyService, still: boolean)
         end
     end
     self._lureUntil += heldFor
+end
+
+--[[
+    How many creatures this server still believes are in the world: the one
+    being fought plus everything queued behind it. A soak reads this at
+    dawn, when the honest answer is zero -- a night ends by clearing its
+    queue, so anything counted here at dawn outlived the night it belonged
+    to.
+]]
+function EnemyService.trackedCount(self: EnemyService): number
+    return (if self._active ~= nil then 1 else 0) + #self._queue
 end
 
 function EnemyService.isStill(self: EnemyService): boolean
@@ -45022,7 +45477,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45853,7 +46308,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45957,7 +46412,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="134">
+        <Item class="ModuleScript" referent="135">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46266,7 +46721,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="135">
+        <Item class="ModuleScript" referent="136">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46722,7 +47177,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="136">
+        <Item class="ModuleScript" referent="137">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -46816,7 +47271,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="137">
+        <Item class="ModuleScript" referent="138">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47034,7 +47489,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="138">
+        <Item class="ModuleScript" referent="139">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47904,7 +48359,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="139">
+        <Item class="ModuleScript" referent="140">
           <Properties>
             <string name="Name">PartyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48588,7 +49043,7 @@ return PartyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="140">
+        <Item class="ModuleScript" referent="141">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48659,6 +49114,9 @@ export type PerformanceService = typeof(setmetatable(
         _startedAt: number,
         _lastBreachLogAt: { [string]: number },
         _shuttingDown: boolean,
+        _soakProbe: any,
+        _soakRun: any,
+        _soakCounters: { [string]: () -> number? },
     },
     PerformanceService
 ))
@@ -48668,7 +49126,8 @@ function PerformanceService.new(
     config: any,
     performanceBudget: any,
     sessionSegment: any,
-    analyticsService: any
+    analyticsService: any,
+    soakProbe: any
 ): PerformanceService
     return setmetatable({
         Name = PerformanceService.Name,
@@ -48692,7 +49151,102 @@ function PerformanceService.new(
         _startedAt = 0,
         _lastBreachLogAt = {},
         _shuttingDown = false,
+        _soakProbe = soakProbe,
+        _soakRun = nil,
+        _soakCounters = {},
     }, PerformanceService)
+end
+
+--[[
+    The soak half, which asks a different question from everything above.
+
+    The budgets judge whether a run felt good. A soak asks whether the
+    server is holding on to things, and that only shows up over cycles --
+    so this samples once per town cycle at one fixed phase and hands the
+    series to SoakProbe, which owns every rule about what a series means.
+
+    The counters are injected rather than reached for. This service has no
+    business knowing how many creatures EnemyService believes in or how
+    large a profile encodes to, and a soak that reached across the whole
+    server for its own numbers would be a second copy of every service's
+    internals, going stale on its own schedule.
+
+    It is off unless something turns it on. Reading instance counts costs a
+    full descendant walk, which is affordable once a cycle and not
+    affordable as a thing that happens on every server forever for a
+    measurement nobody is reading.
+]]
+function PerformanceService.setSoakCounters(
+    self: PerformanceService,
+    counters: { [string]: () -> number? }
+)
+    self._soakCounters = counters
+end
+
+function PerformanceService.beginSoak(self: PerformanceService, phase: string): boolean
+    if self._soakProbe == nil then
+        return false
+    end
+    self._soakRun = self._soakProbe.begin(phase)
+    self._logger:info("soak_started", { phase = phase })
+    return true
+end
+
+function PerformanceService.isSoaking(self: PerformanceService): boolean
+    return self._soakRun ~= nil
+end
+
+--[[
+    One cycle's reading. A counter that errors or answers with something
+    that is not a number is left out of the sample entirely rather than
+    filled in with a zero -- a zero is a reading, and an absent metric is
+    what SoakProbe's `missing` list exists to report.
+]]
+function PerformanceService.sampleSoak(self: PerformanceService, cycle: number, phase: string): any
+    local run = self._soakRun
+    if run == nil then
+        return nil
+    end
+
+    local counts: { [string]: number } = {}
+    for metricId, counter in self._soakCounters do
+        local ok, value = pcall(counter)
+        if ok and type(value) == "number" then
+            counts[metricId] = value
+        else
+            self._logger:warn("soak_counter_failed", { metric = metricId })
+        end
+    end
+
+    local nextRun, result = self._soakProbe.record(run, cycle, phase, counts)
+    if not result.accepted then
+        -- Loudly, because a refused sample is a sampler wired to the wrong
+        -- hook, and a soak quietly collecting nothing is the exact shape of
+        -- a gate that passes because nobody measured it.
+        self._logger:warn("soak_sample_refused", { cycle = cycle, reason = result.reason })
+        return nil
+    end
+    self._soakRun = nextRun
+
+    local report = self._soakProbe.report(nextRun)
+    self._logger:info("soak_sample", {
+        cycle = cycle,
+        verdict = report.verdict,
+        cycles = report.cycles,
+        instances = counts.instances,
+        enemies = counts.tracked_enemies,
+        residue = counts.player_residue,
+        profileBytes = counts.profile_bytes,
+    })
+    return report
+end
+
+function PerformanceService.soakReport(self: PerformanceService): any
+    local run = self._soakRun
+    if run == nil then
+        return nil
+    end
+    return self._soakProbe.report(run)
 end
 
 function PerformanceService._record(self: PerformanceService, metricId: string, value: number)
@@ -48997,7 +49551,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="141">
+        <Item class="ModuleScript" referent="142">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49180,7 +49734,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="142">
+        <Item class="ModuleScript" referent="143">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49796,7 +50350,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="143">
+        <Item class="ModuleScript" referent="144">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -50938,7 +51492,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="144">
+        <Item class="ModuleScript" referent="145">
           <Properties>
             <string name="Name">PrivateServerService</string>
             <string name="Source"><![CDATA[--!strict
@@ -51213,7 +51767,7 @@ return PrivateServerService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="145">
+        <Item class="ModuleScript" referent="146">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -51838,7 +52392,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="146">
+        <Item class="ModuleScript" referent="147">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -52347,6 +52901,60 @@ function ProfileService.onEquipmentChanged(
     callback: (Player, any) -> ()
 ): RBXScriptConnection
     return self._equipmentChangedEvent.Event:Connect(callback)
+end
+
+--[[
+    Entries this service is still holding for players who are no longer in
+    the server.
+
+    Roblox exposes no count of live script connections, so this is the
+    observable half of the same question: a connection that outlived a
+    player kept its closure alive, and a closure that outlived a player
+    kept its table entry alive too. Every per-player table is walked rather
+    than a representative one, because a cleanup that forgets a single
+    table is exactly the shape this is looking for.
+]]
+function ProfileService.playerResidue(self: ProfileService): number
+    local present: { [Player]: boolean } = {}
+    for _, player in Players:GetPlayers() do
+        present[player] = true
+    end
+    local residue = 0
+    local tables: { { [Player]: any } } = {
+        self._profiles,
+        self._writable,
+        self._dirty,
+        self._saving,
+        self._loading,
+        self._lockHeartbeat,
+    }
+    for _, held in tables do
+        for player in held do
+            if not present[player] then
+                residue += 1
+            end
+        end
+    end
+    return residue
+end
+
+--[[
+    The largest profile this server is holding, in the bytes a DataStore
+    would charge for it. The largest rather than the average, because the
+    save that stops fitting is one player's, and an average over a lobby of
+    fresh profiles hides it.
+]]
+function ProfileService.largestProfileBytes(self: ProfileService): number
+    local largest = 0
+    for _, profile in self._profiles do
+        local ok, encoded = pcall(function()
+            return game:GetService("HttpService"):JSONEncode(profile)
+        end)
+        if ok and type(encoded) == "string" then
+            largest = math.max(largest, #encoded)
+        end
+    end
+    return largest
 end
 
 function ProfileService.get(self: ProfileService, player: Player): any
@@ -53984,7 +54592,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="147">
+        <Item class="ModuleScript" referent="148">
           <Properties>
             <string name="Name">RegionEncounterService</string>
             <string name="Source"><![CDATA[--!strict
@@ -54282,7 +54890,7 @@ return table.freeze(RegionEncounterService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="148">
+        <Item class="ModuleScript" referent="149">
           <Properties>
             <string name="Name">SocialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -54571,7 +55179,7 @@ return table.freeze(SocialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="149">
+        <Item class="ModuleScript" referent="150">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -54584,6 +55192,7 @@ TownNightService.Name = "TownNightService"
 
 export type Logger = {
     info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+    warn: (self: Logger, event: string, fields: { [string]: any }?) -> (),
 }
 
 export type TownNightService = typeof(setmetatable(
@@ -54635,6 +55244,7 @@ export type TownNightService = typeof(setmetatable(
         _visitPolicyProvider: ((number) -> string)?,
         _relationResolver: ((number, number, (string) -> ()) -> ())?,
         _onNightCompleted: ((number, number, any) -> ())?,
+        _onCycle: ((number, string) -> ())?,
         _incident: any,
         _hold: boolean,
         _skip: boolean,
@@ -54691,6 +55301,7 @@ function TownNightService.new(
         _visitPolicyProvider = nil,
         _relationResolver = nil,
         _onNightCompleted = nil,
+        _onCycle = nil,
         _incident = nil,
         _hold = false,
         _skip = false,
@@ -54719,6 +55330,33 @@ function TownNightService.setNightCompletedHandler(
     callback: (number, number, any) -> ()
 )
     self._onNightCompleted = callback
+end
+
+--[[
+    Fires once at the top of each day, before anything about the new cycle
+    is built, with the cycle number. Its own slot rather than a second use
+    of the night-completed handler, because those are different moments: a
+    night completing is a fact about the night that just ended, and a soak
+    sample has to be taken at the same point in every cycle including the
+    first one, which no night has ended before.
+]]
+function TownNightService.setCycleObserver(
+    self: TownNightService,
+    callback: ((number, string) -> ())?
+)
+    self._onCycle = callback
+end
+
+function TownNightService._observeCycle(self: TownNightService, cycle: number, phase: string)
+    local callback = self._onCycle
+    if callback == nil then
+        return
+    end
+    -- A soak observer that throws must not take the town's clock with it.
+    local ok, err = pcall(callback, cycle, phase)
+    if not ok then
+        self._logger:warn("town_cycle_observer_failed", { cycle = cycle, error = tostring(err) })
+    end
 end
 
 function TownNightService._notify(self: TownNightService, toast: string?)
@@ -55117,7 +55755,9 @@ function TownNightService.nightNumber(self: TownNightService): number
 end
 
 function TownNightService._runCycle(self: TownNightService)
+    local cycle = 0
     while true do
+        cycle += 1
         self._phase = "day"
         self._activeNightNumber = 0
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._daySeconds
@@ -55126,6 +55766,10 @@ function TownNightService._runCycle(self: TownNightService)
         self._worldService:setTownRepairEnabled(true)
         self:_notify(nil)
         self._logger:info("town_day_started", { night = self._nightNumber })
+        -- Sampled here, at the top of the day, because a soak reading is
+        -- only comparable to one taken at the same point in every cycle
+        -- and this is the only moment the world is quiet in all of them.
+        self:_observeCycle(cycle, "day")
         self:_waitForPhaseEnd()
 
         self._phase = "dusk"
@@ -55478,7 +56122,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="150">
+        <Item class="ModuleScript" referent="151">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -58079,7 +58723,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="151">
+        <Item class="ModuleScript" referent="152">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -58948,7 +59592,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="152">
+        <Item class="ModuleScript" referent="153">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -74536,11 +75180,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="153">
+      <Item class="Folder" referent="154">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="154">
+        <Item class="ModuleScript" referent="155">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -78854,7 +79498,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="155">
+        <Item class="ModuleScript" referent="156">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -79953,7 +80597,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="156">
+        <Item class="ModuleScript" referent="157">
           <Properties>
             <string name="Name">CinderfallBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -80820,7 +81464,7 @@ return table.freeze(CinderfallBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="157">
+        <Item class="ModuleScript" referent="158">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -81515,7 +82159,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="158">
+        <Item class="ModuleScript" referent="159">
           <Properties>
             <string name="Name">FrostmereBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -82564,7 +83208,7 @@ return table.freeze(FrostmereBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="159">
+        <Item class="ModuleScript" referent="160">
           <Properties>
             <string name="Name">IronrootBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -83579,7 +84223,7 @@ return table.freeze(IronrootBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="160">
+        <Item class="ModuleScript" referent="161">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -84438,7 +85082,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="161">
+        <Item class="ModuleScript" referent="162">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -84524,7 +85168,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="162">
+        <Item class="ModuleScript" referent="163">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -84898,7 +85542,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="163">
+        <Item class="ModuleScript" referent="164">
           <Properties>
             <string name="Name">MireglassBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -85654,7 +86298,7 @@ return table.freeze(MireglassBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="164">
+        <Item class="ModuleScript" referent="165">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -85834,7 +86478,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="165">
+        <Item class="ModuleScript" referent="166">
           <Properties>
             <string name="Name">RegionBuilders</string>
             <string name="Source"><![CDATA[--!strict
@@ -86600,7 +87244,7 @@ return table.freeze(RegionBuilders)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="166">
+        <Item class="ModuleScript" referent="167">
           <Properties>
             <string name="Name">TempestBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -87421,7 +88065,7 @@ return table.freeze(TempestBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="167">
+        <Item class="ModuleScript" referent="168">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -88017,7 +88661,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="168">
+        <Item class="ModuleScript" referent="169">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -88254,7 +88898,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="169">
+        <Item class="ModuleScript" referent="170">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -88343,7 +88987,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="170">
+        <Item class="ModuleScript" referent="171">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -88680,15 +89324,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="171">
+  <Item class="StarterPlayer" referent="172">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="172">
+    <Item class="StarterPlayerScripts" referent="173">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="173">
+      <Item class="LocalScript" referent="174">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -89075,11 +89719,11 @@ task.spawn(function()
 end)
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="174">
+        <Item class="Folder" referent="175">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="175">
+          <Item class="ModuleScript" referent="176">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -89210,7 +89854,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="176">
+          <Item class="ModuleScript" referent="177">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -93824,7 +94468,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="177">
+          <Item class="ModuleScript" referent="178">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -94192,7 +94836,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="178">
+          <Item class="ModuleScript" referent="179">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -94300,7 +94944,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="179">
+          <Item class="ModuleScript" referent="180">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -94419,7 +95063,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="180">
+          <Item class="ModuleScript" referent="181">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -94693,7 +95337,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="181">
+          <Item class="ModuleScript" referent="182">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -94848,7 +95492,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="182">
+          <Item class="ModuleScript" referent="183">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -94960,7 +95604,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="183">
+          <Item class="ModuleScript" referent="184">
             <Properties>
               <string name="Name">SocialPingController</string>
               <string name="Source"><![CDATA[--!strict
@@ -95342,7 +95986,7 @@ return table.freeze(SocialPingController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="184">
+          <Item class="ModuleScript" referent="185">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -95544,7 +96188,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="185">
+          <Item class="ModuleScript" referent="186">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -95753,7 +96397,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="186">
+          <Item class="ModuleScript" referent="187">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -95898,7 +96542,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="187">
+          <Item class="ModuleScript" referent="188">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -96198,13 +96842,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="188">
+  <Item class="TextChatService" referent="189">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="189">
+  <Item class="Workspace" referent="190">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>
