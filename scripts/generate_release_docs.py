@@ -334,6 +334,19 @@ def main() -> int:
 
     failures: list[str] = []
 
+    if len(merged) < MIN_MERGED:
+        # Said first and on its own. A shallow clone produces an empty merge
+        # stream, and reported as a list of phantoms it reads as the handoff
+        # being full of lies rather than as the history being absent.
+        print(
+            f"Release document generation failed: git holds {len(merged)} merged pull "
+            f"requests and this repository has at least {MIN_MERGED}. The release "
+            f"notes are the merge stream, so a shallow clone cannot produce them -- "
+            f"check out with full history (`fetch-depth: 0`).",
+            file=sys.stderr,
+        )
+        return 1
+
     numbers_in_git = {number for number, _date, _title in merged}
     phantom = sorted(number for number, _version in entries if number not in numbers_in_git)
     # The handoff entry for a wave is written in the pull request it describes,
@@ -361,7 +374,6 @@ def main() -> int:
         )
 
     for count, minimum, what in (
-        (len(merged), MIN_MERGED, "merged pull requests"),
         (len(entries), MIN_ENTRIES, "handoff entries"),
         (len(threads), MIN_OPEN_THREADS, "open threads"),
         (events, MIN_EVENTS, "marked analytics events"),
