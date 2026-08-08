@@ -18,6 +18,7 @@ local WeatherProfile = require(root.WeatherProfile)
 local AmbientController = require(script.Controllers.AmbientController)
 local HUDController = require(script.Controllers.HUDController)
 local ObjectiveMarkerController = require(script.Controllers.ObjectiveMarkerController)
+local SocialPingController = require(script.Controllers.SocialPingController)
 local TapController = require(script.Controllers.TapController)
 local VignetteController = require(script.Controllers.VignetteController)
 local InputController = require(script.Controllers.InputController)
@@ -54,6 +55,7 @@ assert(playerGui ~= nil and playerGui:IsA("PlayerGui"), "PlayerGui unavailable")
 local hud = HUDController.new(playerGui, ProfessionCatalog.list(), ExpeditionContracts.List)
 local vignette = VignetteController.new(playerGui)
 local objectiveMarkers = ObjectiveMarkerController.new(playerGui)
+local socialPings = SocialPingController.new()
 local ambient = AmbientController.new(RuntimeIds.AmbientMoteTag)
 local worldMotion = WorldMotionController.new(
     RuntimeIds.AmbientMotionTag,
@@ -128,6 +130,10 @@ end, function()
     send(RuntimeIds.Actions.PartyLeave)
 end, function()
     send(RuntimeIds.Actions.PartyRejoin)
+end)
+
+hud:setQuickChatHandler(function(phraseId: string)
+    send(RuntimeIds.Actions.QuickChat, { phraseId = phraseId })
 end)
 
 hud:setLoadoutHandlers(function(slot: number)
@@ -273,6 +279,10 @@ stateChanged.OnClientEvent:Connect(function(snapshot: any)
     objectiveMarkers:setTargets(
         if snapshot.departed == true then snapshot.objectiveTargets else nil
     )
+    socialPings:setCalls(
+        if type(snapshot.social) == "table" then snapshot.social.calls else nil,
+        if type(snapshot.social) == "table" then snapshot.social.pings else nil
+    )
     updateVignettes(snapshot)
 end)
 
@@ -294,6 +304,10 @@ task.spawn(function()
         sfx:setSnapshot(snapshot)
         objectiveMarkers:setTargets(
             if snapshot.departed == true then snapshot.objectiveTargets else nil
+        )
+        socialPings:setCalls(
+            if type(snapshot.social) == "table" then snapshot.social.calls else nil,
+            if type(snapshot.social) == "table" then snapshot.social.pings else nil
         )
         updateVignettes(snapshot, true)
     end

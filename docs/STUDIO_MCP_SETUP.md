@@ -168,6 +168,42 @@ Two things about Studio Play mode that read as bugs the first time but are not:
   that never fights back will see the wave schedule stall behind the first
   enemy — correct behaviour, not evidence the spawn system is broken.
 
+## Clicking a HUD button at a portrait viewport
+
+The M7 runbook says GUI buttons are best clicked by `instance_path`, and that
+was true of a maximized window. It is **not** true of the resized window a
+portrait check needs, and the failure is silent: the tool reports Success, the
+button's `Activated` never fires, and nothing distinguishes that from a dead
+handler.
+
+What is actually going on, measured on 2026-08-08 with the window at 805 x 1002
+(which gives a 392 x 608 viewport, the owner's phone):
+
+- `user_mouse_input` hit-tests at the coordinate it is given, in the same space
+  as a GUI object's `AbsolutePosition`. So **pass the button's own
+  `AbsolutePosition` centre as `x`/`y`** and the press lands.
+- `UserInputService:GetMouseLocation()` then reports that point **plus the
+  58-pixel top inset**. That is a reporting artifact of this setup, not an
+  error -- do not "correct" for it, or every click lands an inset below its
+  target, which is exactly what `instance_path` does here.
+- The proof a click landed is not the tool's return value. Connect a probe
+  (`button.Activated`) or watch `UserInputService.InputBegan`'s `processed`
+  flag: `processed = false` on a MouseButton1 means the GUI did not take it.
+
+```lua
+-- read the target first, then click its centre
+local b = player.PlayerGui.LastLightHUD.SafeCanvas.QuickChat
+local p, s = b.AbsolutePosition, b.AbsoluteSize
+-- click at (p.X + s.X / 2, p.Y + s.Y / 2)
+```
+
+Getting the viewport itself to 392 x 608 is arithmetic on the window, because
+Studio's docked panels take a fixed slice: measure once, subtract, resize. On
+this machine that was 805 x 1002 for the window. The MCP resize tool is not
+available for Studio; `xdotool windowsize` is, and it enforces a 640-pixel
+minimum width, which is why the window is sized around the viewport rather
+than to the phone's own dimensions.
+
 And two tool-shape gotchas in the MCP server itself, each worth a wasted call
 to rediscover:
 

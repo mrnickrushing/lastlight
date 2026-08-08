@@ -79,6 +79,11 @@ function ActionPayloadContract.extraField(runtimeIds: any, kind: string): string
         -- holds at most one at a time, so the reply does not have to name
         -- which -- which is what keeps this to a single field.
         return "accept"
+    elseif kind == actions.QuickChat then
+        -- A phrase id and nothing else. There is no position in a quick chat
+        -- payload because the server reads the sender's own, which is what
+        -- makes a ping unforgeable rather than merely validated.
+        return "phraseId"
     end
     return nil
 end

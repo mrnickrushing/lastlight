@@ -1075,6 +1075,11 @@ function ActionPayloadContract.extraField(runtimeIds: any, kind: string): string
         -- holds at most one at a time, so the reply does not have to name
         -- which -- which is what keeps this to a single field.
         return "accept"
+    elseif kind == actions.QuickChat then
+        -- A phrase id and nothing else. There is no position in a quick chat
+        -- payload because the server reads the sender's own, which is what
+        -- makes a ping unforgeable rather than merely validated.
+        return "phraseId"
     end
     return nil
 end
@@ -4867,6 +4872,24 @@ return table.freeze({
     EngineerBraceSeconds = 12,
     EngineerBraceCapacity = 14,
     ActionRatePerSecond = 8,
+    --[[
+        Quick chat's own budget, separate from the action budget on purpose.
+        A player working the phrase wheel must not lose the ability to swing,
+        and a player in a fight must not lose the ability to say I AM DOWN.
+
+        Three in hand and roughly one every two seconds after that: enough to
+        answer a question and point at something without waiting, not enough
+        to fill anybody's screen. The wheel is the one surface in the game
+        whose whole purpose is to reach other players, so its ceiling is a
+        civility setting rather than an anti-macro one.
+    ]]
+    QuickChatRatePerSecond = 0.5,
+    QuickChatBurst = 3,
+    -- How far a ping marker carries. A ping is guidance, and guidance to
+    -- somewhere four hundred studs behind you is noise on the screen. The log
+    -- line is not distance-limited: hearing that someone is down is the point
+    -- even when you cannot reach them.
+    QuickChatPingRadius = 400,
     -- What a baseline phone is assumed to have for this experience before
     -- Roblox starts reclaiming. Client memory headroom is measured against it,
     -- so it decides whether that budget reads as healthy or as one asset load
@@ -4946,6 +4969,16 @@ return table.freeze({
         region_frostmere_enabled = false,
         region_cinderfall_enabled = false,
         region_hollow_enabled = false,
+        --[[
+            Quick chat, the only player-to-player channel this game has. On,
+            because it is a closed vocabulary of twenty-four phrases rather
+            than a text box -- there is nothing a player can compose, so there
+            is nothing to moderate. The flag exists so a single press can take
+            the channel away if the phrase list turns out to carry a meaning
+            nobody intended, which is the failure mode a closed vocabulary
+            actually has.
+        ]]
+        quick_chat_enabled = true,
     }),
     Environments = table.freeze({
         ["local"] = table.freeze({
@@ -26772,6 +26805,393 @@ return table.freeze(Quests)
       </Item>
       <Item class="ModuleScript" referent="83">
         <Properties>
+          <string name="Name">QuickChat</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    What a player is allowed to say to another player, and where it lands.
+
+    This is a closed vocabulary rather than a chat box, and that is the whole
+    design. Free text in a game with a young audience means a moderation
+    pipeline, a filter, an appeal path and a human reading reports; a fixed
+    list of twenty-four phrases means moderation is structural -- there is no
+    string a player can compose, so there is nothing to moderate. The safety
+    review in Milestone 11 reads that as a property of the code rather than as
+    a promise about it.
+
+    A phrase does two things at once. It says something, and it marks a place:
+    **the sender's own position, resolved by the server**. The payload that
+    carries a phrase carries a phrase id and nothing else -- no vector, no
+    target, no name -- which is both the one-extra-field contract every action
+    here obeys and the reason a ping cannot be forged into marking somewhere
+    the sender is not standing. #219 is the reason that rule is a wall: the
+    departure press quietly grew a second field and every real press was
+    dropped for months.
+
+    Courtesy is the exception, and deliberately: a thank-you is speech, and
+    speech has no place in it. Those six phrases resolve to a ping kind that
+    marks nothing, so they appear in the call log and never as a marker in the
+    world. Six people being polite must not put six cards over the town.
+
+    Presentation lives here too, as plain numbers, for the reason the census
+    keeps teaching: a colour the client picks by name is a colour a new ping
+    kind silently does not have. Everything the HUD needs to draw a ping comes
+    off the catalog entry, so a phrase that exists is a phrase that can be
+    drawn.
+]]
+
+export type PingKind = {
+    id: string,
+    label: string,
+    glyph: string,
+    seconds: number,
+    marks: boolean,
+    colour: { number },
+}
+
+export type Phrase = {
+    id: string,
+    category: string,
+    text: string,
+    ping: string,
+}
+
+export type Call = {
+    id: string,
+    phraseId: string,
+    category: string,
+    text: string,
+    ping: string,
+    fromUserId: number,
+    fromName: string,
+    at: number,
+    expiresAt: number,
+    marks: boolean,
+    x: number?,
+    y: number?,
+    z: number?,
+}
+
+local QuickChat = {
+    -- A phrase id is a catalog key, and the catalog is the only source of
+    -- them. The bound is here so the transport can refuse a long string
+    -- before anything looks it up.
+    MaxPhraseIdLength = 32,
+    -- How many calls the server keeps. Long enough that a player who looked
+    -- away sees what was said, short enough that a log is not a chat history.
+    LogLength = 6,
+}
+
+local PING_KINDS: { PingKind } = {
+    {
+        id = "danger",
+        label = "DANGER",
+        glyph = "▲",
+        seconds = 8,
+        marks = true,
+        colour = { 214, 88, 72 },
+    },
+    {
+        id = "aid",
+        label = "AID",
+        glyph = "✚",
+        -- The longest life of any marker. A player asking for help is asking
+        -- for a walk, and a walk across a module takes longer than a callout
+        -- is worth remembering.
+        seconds = 20,
+        marks = true,
+        colour = { 255, 186, 92 },
+    },
+    {
+        id = "move",
+        label = "MOVE",
+        glyph = "➤",
+        seconds = 6,
+        marks = true,
+        colour = { 146, 206, 142 },
+    },
+    {
+        id = "hold",
+        label = "HOLD",
+        glyph = "■",
+        seconds = 12,
+        marks = true,
+        colour = { 168, 190, 200 },
+    },
+    {
+        id = "found",
+        label = "FOUND",
+        glyph = "◆",
+        -- A node does not walk away, so the marker on it outlives every other
+        -- kind. This is the one a party actually navigates by.
+        seconds = 30,
+        marks = true,
+        colour = { 226, 198, 128 },
+    },
+    {
+        id = "reply",
+        label = "REPLY",
+        glyph = "·",
+        -- Spoken, not placed. Zero seconds is not a marker that vanishes
+        -- instantly; marks = false means one is never built at all.
+        seconds = 6,
+        marks = false,
+        colour = { 200, 208, 202 },
+    },
+}
+
+local CATEGORIES = {
+    { id = "danger", label = "DANGER" },
+    { id = "direction", label = "DIRECTION" },
+    { id = "need", label = "NEED" },
+    { id = "courtesy", label = "COURTESY" },
+}
+
+--[[
+    Twenty-four phrases, six per category, written to be useful on a night
+    rather than to be a greeting card. Every one of them is something this
+    game actually asks a party to say: the lantern is the shared clock, being
+    downed is the loudest thing that happens to anybody, and a harvest node
+    somebody else found is the difference between banking a pouch and not.
+]]
+local PHRASES: { Phrase } = {
+    { id = "qc_enemy_here", category = "danger", text = "ENEMY HERE", ping = "danger" },
+    { id = "qc_something_big", category = "danger", text = "SOMETHING BIG", ping = "danger" },
+    {
+        id = "qc_lantern_failing",
+        category = "danger",
+        text = "THE LANTERN IS FAILING",
+        ping = "danger",
+    },
+    { id = "qc_i_am_down", category = "danger", text = "I AM DOWN", ping = "aid" },
+    { id = "qc_fall_back", category = "danger", text = "FALL BACK", ping = "danger" },
+    { id = "qc_watch_the_dark", category = "danger", text = "WATCH THE DARK", ping = "danger" },
+
+    { id = "qc_going_here", category = "direction", text = "GOING HERE", ping = "move" },
+    { id = "qc_this_way", category = "direction", text = "THIS WAY", ping = "move" },
+    { id = "qc_holding_here", category = "direction", text = "HOLDING HERE", ping = "hold" },
+    { id = "qc_wait_for_me", category = "direction", text = "WAIT FOR ME", ping = "hold" },
+    {
+        id = "qc_for_the_gate",
+        category = "direction",
+        text = "HEADING FOR THE GATE",
+        ping = "move",
+    },
+    { id = "qc_splitting_off", category = "direction", text = "SPLITTING OFF", ping = "move" },
+
+    { id = "qc_need_help", category = "need", text = "NEED HELP", ping = "aid" },
+    { id = "qc_need_rootfire", category = "need", text = "NEED ROOTFIRE", ping = "aid" },
+    { id = "qc_short_materials", category = "need", text = "SHORT ON MATERIALS", ping = "aid" },
+    { id = "qc_harvest_here", category = "need", text = "HARVEST HERE", ping = "found" },
+    { id = "qc_memory_here", category = "need", text = "A MEMORY HERE", ping = "found" },
+    { id = "qc_event_here", category = "need", text = "SOMETHING HAPPENING HERE", ping = "found" },
+
+    { id = "qc_yes", category = "courtesy", text = "YES", ping = "reply" },
+    { id = "qc_no", category = "courtesy", text = "NO", ping = "reply" },
+    { id = "qc_ready", category = "courtesy", text = "READY", ping = "reply" },
+    { id = "qc_thank_you", category = "courtesy", text = "THANK YOU", ping = "reply" },
+    { id = "qc_my_mistake", category = "courtesy", text = "MY MISTAKE", ping = "reply" },
+    { id = "qc_well_done", category = "courtesy", text = "WELL DONE", ping = "reply" },
+}
+
+local pingById: { [string]: PingKind } = {}
+for _, kind in PING_KINDS do
+    assert(pingById[kind.id] == nil, "duplicate quick chat ping kind: " .. kind.id)
+    pingById[kind.id] = table.freeze(kind)
+end
+
+local categoryById: { [string]: { id: string, label: string } } = {}
+for _, category in CATEGORIES do
+    assert(categoryById[category.id] == nil, "duplicate quick chat category: " .. category.id)
+    categoryById[category.id] = table.freeze(category)
+end
+
+local phraseById: { [string]: Phrase } = {}
+local phrasesByCategory: { [string]: { Phrase } } = {}
+for _, phrase in PHRASES do
+    assert(phraseById[phrase.id] == nil, "duplicate quick chat phrase: " .. phrase.id)
+    assert(
+        categoryById[phrase.category] ~= nil,
+        string.format("quick chat phrase %s names no category", phrase.id)
+    )
+    assert(
+        pingById[phrase.ping] ~= nil,
+        string.format("quick chat phrase %s names no ping kind", phrase.id)
+    )
+    assert(
+        #phrase.id <= QuickChat.MaxPhraseIdLength,
+        string.format("quick chat phrase id %s is longer than the transport allows", phrase.id)
+    )
+    phraseById[phrase.id] = table.freeze(phrase)
+    local bucket = phrasesByCategory[phrase.category]
+    if bucket == nil then
+        bucket = {}
+        phrasesByCategory[phrase.category] = bucket
+    end
+    table.insert(bucket, phraseById[phrase.id])
+end
+for _, bucket in phrasesByCategory do
+    table.freeze(bucket)
+end
+
+--[[
+    The wheel the client draws, as data.
+
+    The equip panel shipped as a hardcoded list of eight items and left ninety
+    craftable items unwearable with every spec green (#299). A phrase wheel is
+    the same shape: a hand-written list of buttons beside a catalog is a
+    catalog with entries nobody can reach. So the layout is derived here and
+    the spec can assert that walking it visits every phrase exactly once.
+]]
+function QuickChat.wheel(): { { category: string, label: string, phrases: { Phrase } } }
+    local wheel = {}
+    for _, category in CATEGORIES do
+        table.insert(wheel, {
+            category = category.id,
+            label = category.label,
+            phrases = phrasesByCategory[category.id] or {},
+        })
+    end
+    return wheel
+end
+
+function QuickChat.list(): { Phrase }
+    return PHRASES
+end
+
+function QuickChat.categories(): { { id: string, label: string } }
+    return CATEGORIES
+end
+
+function QuickChat.pingKinds(): { PingKind }
+    return PING_KINDS
+end
+
+function QuickChat.byId(phraseId: any): Phrase?
+    if type(phraseId) ~= "string" or #phraseId > QuickChat.MaxPhraseIdLength then
+        return nil
+    end
+    return phraseById[phraseId]
+end
+
+function QuickChat.pingKind(kindId: any): PingKind?
+    if type(kindId) ~= "string" then
+        return nil
+    end
+    return pingById[kindId]
+end
+
+--[[
+    Build the record of one thing said.
+
+    Pure, and given the position rather than asking for it: the shared layer
+    cannot hold a Vector3 (the Lune runner has no Roblox datatypes, and a
+    first draft of CompanionMotion failed typecheck for exactly this), and
+    more importantly the position must come from the server reading the
+    sender's own character. A caller that has no position -- a player without
+    a character, mid-respawn -- still gets a call; it simply marks nothing.
+]]
+function QuickChat.call(
+    phrase: Phrase,
+    fromUserId: number,
+    fromName: string,
+    now: number,
+    sequence: number,
+    x: number?,
+    y: number?,
+    z: number?
+): Call
+    local kind = assert(pingById[phrase.ping], "phrase names no ping kind")
+    local placed = kind.marks and x ~= nil and y ~= nil and z ~= nil
+    return table.freeze({
+        id = string.format("call_%d", sequence),
+        phraseId = phrase.id,
+        category = phrase.category,
+        text = phrase.text,
+        ping = phrase.ping,
+        fromUserId = fromUserId,
+        fromName = fromName,
+        at = now,
+        expiresAt = now + kind.seconds,
+        marks = placed,
+        x = if placed then x else nil,
+        y = if placed then y else nil,
+        z = if placed then z else nil,
+    })
+end
+
+--[[
+    Who may see what was said, as a pure rule over a list of calls.
+
+    Three things suppress a call and all three are checked here rather than at
+    the four places a snapshot is built, because the door a rule is enforced
+    at is the door it can be forgotten at:
+
+      * it has expired;
+      * the recipient has blocked the sender, which the caller answers through
+        `isSuppressed` -- the platform's block list is the authority and it is
+        asynchronous, so resolving it is the service's job and applying it is
+        this one's;
+      * for a marker, it is further away than a marker is useful. A ping is
+        guidance, and guidance to somewhere four hundred studs off is noise on
+        the screen. Distance is not applied to the log line: hearing that a
+        party member is down is the point even when you cannot get there.
+
+    A player always sees their own calls. Blocking yourself is not a thing,
+    and a wheel press that appears to do nothing is a wheel press a player
+    presses again.
+]]
+function QuickChat.visibleCalls(
+    calls: { Call },
+    recipientUserId: number,
+    isSuppressed: (number) -> boolean,
+    now: number
+): { Call }
+    local visible = {}
+    for _, call in calls do
+        if call.expiresAt > now then
+            if call.fromUserId == recipientUserId or not isSuppressed(call.fromUserId) then
+                table.insert(visible, call)
+            end
+        end
+    end
+    return visible
+end
+
+function QuickChat.visiblePings(
+    calls: { Call },
+    recipientUserId: number,
+    isSuppressed: (number) -> boolean,
+    now: number,
+    originX: number?,
+    originY: number?,
+    originZ: number?,
+    radius: number
+): { Call }
+    local visible = {}
+    for _, call in QuickChat.visibleCalls(calls, recipientUserId, isSuppressed, now) do
+        if call.marks and call.x ~= nil and call.y ~= nil and call.z ~= nil then
+            local withinRange = true
+            if originX ~= nil and originY ~= nil and originZ ~= nil then
+                local dx = call.x - originX
+                local dy = call.y - originY
+                local dz = call.z - originZ
+                withinRange = dx * dx + dy * dy + dz * dz <= radius * radius
+            end
+            if withinRange then
+                table.insert(visible, call)
+            end
+        end
+    end
+    return visible
+end
+
+return table.freeze(QuickChat)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="84">
+        <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -26829,7 +27249,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="84">
+      <Item class="ModuleScript" referent="85">
         <Properties>
           <string name="Name">RegionAccess</string>
           <string name="Source"><![CDATA[--!strict
@@ -26973,7 +27393,7 @@ return table.freeze(RegionAccess)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="85">
+      <Item class="ModuleScript" referent="86">
         <Properties>
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
@@ -27240,7 +27660,7 @@ return table.freeze(ResidentDialogue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="86">
+      <Item class="ModuleScript" referent="87">
         <Properties>
           <string name="Name">ResidentLife</string>
           <string name="Source"><![CDATA[--!strict
@@ -27563,7 +27983,7 @@ return table.freeze(ResidentLife)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="87">
+      <Item class="ModuleScript" referent="88">
         <Properties>
           <string name="Name">ResidentRoster</string>
           <string name="Source"><![CDATA[--!strict
@@ -28197,7 +28617,7 @@ return table.freeze(ResidentRoster)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="88">
+      <Item class="ModuleScript" referent="89">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -28312,7 +28732,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="89">
+      <Item class="ModuleScript" referent="90">
         <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -28479,7 +28899,7 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="90">
+      <Item class="ModuleScript" referent="91">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -28596,6 +29016,14 @@ local RuntimeIds = {
         PartyReply = "party_reply",
         PartyLeave = "party_leave",
         PartyRejoin = "party_rejoin",
+        --[[
+            One phrase from a closed vocabulary, and nothing else. The phrase
+            decides both what is said and what kind of marker it leaves; where
+            the marker lands is the sender's own position, read server-side.
+            A payload that could name a place would be a payload that could
+            name somebody else's place.
+        ]]
+        QuickChat = "quick_chat",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -28656,7 +29084,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="91">
+      <Item class="ModuleScript" referent="92">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -30221,7 +30649,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="92">
+      <Item class="ModuleScript" referent="93">
         <Properties>
           <string name="Name">SfxCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -30388,7 +30816,7 @@ return table.freeze(SfxCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="93">
+      <Item class="ModuleScript" referent="94">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -30532,7 +30960,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="94">
+      <Item class="ModuleScript" referent="95">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -30789,7 +31217,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="95">
+      <Item class="ModuleScript" referent="96">
         <Properties>
           <string name="Name">TempestEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -31067,7 +31495,7 @@ return table.freeze(TempestEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="96">
+      <Item class="ModuleScript" referent="97">
         <Properties>
           <string name="Name">TideboundTitanEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -31498,7 +31926,7 @@ return table.freeze(TideboundTitanEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="97">
+      <Item class="ModuleScript" referent="98">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -31642,7 +32070,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="98">
+      <Item class="ModuleScript" referent="99">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -32052,7 +32480,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="99">
+      <Item class="ModuleScript" referent="100">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -32233,7 +32661,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="100">
+      <Item class="ModuleScript" referent="101">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -32297,7 +32725,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="101">
+      <Item class="ModuleScript" referent="102">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -32471,7 +32899,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="102">
+      <Item class="ModuleScript" referent="103">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -32563,7 +32991,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="103">
+      <Item class="ModuleScript" referent="104">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -32775,7 +33203,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="104">
+      <Item class="ModuleScript" referent="105">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -32953,7 +33381,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="105">
+      <Item class="ModuleScript" referent="106">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -33106,7 +33534,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="106">
+      <Item class="ModuleScript" referent="107">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -33439,7 +33867,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="107">
+      <Item class="ModuleScript" referent="108">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -33601,7 +34029,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="108">
+      <Item class="ModuleScript" referent="109">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -33637,7 +34065,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="109">
+      <Item class="ModuleScript" referent="110">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -34019,7 +34447,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="110">
+      <Item class="ModuleScript" referent="111">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -34089,7 +34517,7 @@ return table.freeze(WeatherProfile)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="111">
+      <Item class="ModuleScript" referent="112">
         <Properties>
           <string name="Name">WhiteHowlerEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -34553,11 +34981,11 @@ return table.freeze(WhiteHowlerEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="112">
+  <Item class="ServerScriptService" referent="113">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="113">
+    <Item class="Script" referent="114">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -34625,6 +35053,7 @@ local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
 local RunHandoff = require(root.RunHandoff)
 local PartySession = require(root.PartySession)
+local QuickChat = require(root.QuickChat)
 local AdminRoster = require(root.AdminRoster)
 local TownDecorations = require(root.TownDecorations)
 local TownProgression = require(root.TownProgression)
@@ -34650,6 +35079,7 @@ local ProfileService = require(script.Services.ProfileService)
 local TownNightService = require(script.Services.TownNightService)
 local LobbyService = require(script.Services.LobbyService)
 local PartyService = require(script.Services.PartyService)
+local SocialService = require(script.Services.SocialService)
 local AdminService = require(script.Services.AdminService)
 local CompanionService = require(script.Services.CompanionService)
 local DefenseService = require(script.Services.DefenseService)
@@ -34875,6 +35305,15 @@ partyService:setPlatformProvider(function(): { Player }
     return lobbyService:readyPlayers(lobbyService)
 end)
 lobbyService:setPartyService(partyService)
+--[[
+    Quick chat, the one channel a player has to another player. Registered
+    beside the party service because they are the two halves of the same
+    question -- who you are travelling with, and what you can say to them --
+    and because the block list one of them consults is the block list the
+    other one will (M11 wave D).
+]]
+local socialService =
+    SocialService.new(logger, Config, QuickChat, RateLimiter, featureFlags, analyticsService)
 local performanceService = PerformanceService.new(logger, Config, PerformanceBudget)
 local adminService = AdminService.new(
     logger,
@@ -34986,6 +35425,7 @@ services:register(companionService)
 services:register(defenseService)
 services:register(regionEncounterService)
 services:register(partyService)
+services:register(socialService)
 -- Without this the departure countdown never reached a client: LobbyService
 -- published every whole second into a handler nobody had set, so the panel
 -- froze at "DEPARTING IN 10" while the server counted down and launched.
@@ -34997,6 +35437,7 @@ worldService:setClickHandler(function(clicker: Player, interactionId: string)
 end)
 tutorialService:setCompanionService(companionService)
 tutorialService:setPartyService(partyService)
+tutorialService:setSocialService(socialService)
 partyService:setToastHandler(function(player: Player?, message: string)
     if player ~= nil then
         tutorialService:toastPlayer(player, message)
@@ -35080,7 +35521,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="114">
+      <Item class="ModuleScript" referent="115">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -35178,11 +35619,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="115">
+      <Item class="Folder" referent="116">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="116">
+        <Item class="ModuleScript" referent="117">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -35797,7 +36238,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="117">
+        <Item class="ModuleScript" referent="118">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -36364,6 +36805,35 @@ function AnalyticsService.residentTalked(
     end
 end
 
+--[[
+    One phrase said. The phrase id and its category, never a composed string,
+    because there is no composed string to log -- which is the same fact the
+    safety review reads and worth having in the telemetry as well as in the
+    code. `marked` says whether it left a ping, which is how a tuning pass
+    tells a party that is coordinating from one that is only talking.
+]]
+function AnalyticsService.quickChatSent(
+    self: AnalyticsService,
+    player: Player,
+    phrase: any,
+    marked: boolean
+)
+    self._logger:info("quick_chat_sent", {
+        category = string.sub(tostring(phrase.category), 1, 24),
+        marked = marked,
+        phrase = string.sub(tostring(phrase.id), 1, 48),
+        player = player.UserId,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "QuickChatSent", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = phrase.id,
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = phrase.category,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.eliteStarted(
     self: AnalyticsService,
     player: Player,
@@ -36668,7 +37138,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="118">
+        <Item class="ModuleScript" referent="119">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -37169,7 +37639,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="119">
+        <Item class="ModuleScript" referent="120">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -37440,7 +37910,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="120">
+        <Item class="ModuleScript" referent="121">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -37860,7 +38330,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="121">
+        <Item class="ModuleScript" referent="122">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -39544,7 +40014,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="122">
+        <Item class="ModuleScript" referent="123">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -40258,7 +40728,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="123">
+        <Item class="ModuleScript" referent="124">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -40362,7 +40832,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="124">
+        <Item class="ModuleScript" referent="125">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -40671,7 +41141,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="125">
+        <Item class="ModuleScript" referent="126">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41127,7 +41597,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="126">
+        <Item class="ModuleScript" referent="127">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -41221,7 +41691,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="127">
+        <Item class="ModuleScript" referent="128">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41439,7 +41909,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="128">
+        <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42309,7 +42779,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="129">
+        <Item class="ModuleScript" referent="130">
           <Properties>
             <string name="Name">PartyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42924,7 +43394,7 @@ return PartyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="130">
+        <Item class="ModuleScript" referent="131">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43179,7 +43649,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43358,7 +43828,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43974,7 +44444,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45087,7 +45557,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="134">
+        <Item class="ModuleScript" referent="135">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45712,7 +46182,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="135">
+        <Item class="ModuleScript" referent="136">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47564,7 +48034,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="136">
+        <Item class="ModuleScript" referent="137">
           <Properties>
             <string name="Name">RegionEncounterService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47862,7 +48332,286 @@ return table.freeze(RegionEncounterService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="137">
+        <Item class="ModuleScript" referent="138">
+          <Properties>
+            <string name="Name">SocialService</string>
+            <string name="Source"><![CDATA[--!strict
+
+--[[
+    The live half of quick chat: who said what, where they were standing, and
+    who is allowed to hear it.
+
+    Everything about *what may be said* is in the pure QuickChat module. What
+    needs the running game is here, and it is a short list on purpose:
+
+      * **Where the sender is.** The payload carries a phrase id and nothing
+        else, so the position comes from reading the sender's own character.
+        A client cannot name a place, which is the whole reason a ping cannot
+        be forged into marking somewhere its sender is not.
+      * **Who has blocked whom.** Roblox's block list is the authority. It is
+        asynchronous and it is not free, so it is resolved once per ordered
+        pair and cached for the session.
+      * **A budget.** Quick chat gets its own bucket through the same
+        RateLimiter every action uses. Two budgets rather than one because a
+        player spamming the wheel should not lose the ability to swing, and a
+        player in a fight should not lose the ability to say I AM DOWN.
+
+    The call log is one list for the whole server, filtered per recipient when
+    a snapshot is built, rather than a copy per player. A per-player copy is a
+    second place the suppression rule has to be remembered, and the rule that
+    has two homes is the rule that stops being true in one of them.
+]]
+
+local Chat = game:GetService("Chat")
+local Players = game:GetService("Players")
+
+local SocialService = {}
+SocialService.__index = SocialService
+SocialService.Name = "SocialService"
+
+export type Logger = {
+    info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+    warn: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+}
+
+export type SocialService = typeof(setmetatable(
+    {} :: {
+        Name: string,
+        _logger: Logger,
+        _config: any,
+        _quickChat: any,
+        _featureFlags: any,
+        _analyticsService: any,
+        _limiter: any,
+        _calls: { any },
+        _sequence: number,
+        --[[
+            Resolved block answers, keyed "fromUserId>toUserId". Absent means
+            unresolved rather than allowed, and an unresolved pair resolves in
+            the background the first time it is asked about, so the second
+            call between the same two people is already correct.
+        ]]
+        _canChat: { [string]: boolean },
+        _resolving: { [string]: boolean },
+        _blockApiWarned: boolean,
+    },
+    SocialService
+))
+
+function SocialService.new(
+    logger: Logger,
+    config: any,
+    quickChat: any,
+    rateLimiter: any,
+    featureFlags: any,
+    analyticsService: any
+): SocialService
+    return setmetatable({
+        Name = SocialService.Name,
+        _logger = logger,
+        _config = config,
+        _quickChat = quickChat,
+        _featureFlags = featureFlags,
+        _analyticsService = analyticsService,
+        _limiter = rateLimiter.new(config.QuickChatRatePerSecond, config.QuickChatBurst),
+        _calls = {},
+        _sequence = 0,
+        _canChat = {},
+        _resolving = {},
+        _blockApiWarned = false,
+    }, SocialService)
+end
+
+function SocialService.Init(_self: SocialService, _context: any) end
+
+function SocialService.Start(self: SocialService)
+    Players.PlayerRemoving:Connect(function(player: Player)
+        self._limiter:clear(tostring(player.UserId))
+    end)
+    self._logger:info("social_started", {
+        phrases = #self._quickChat.list(),
+    })
+end
+
+local function pairKey(fromUserId: number, toUserId: number): string
+    return string.format("%d>%d", fromUserId, toUserId)
+end
+
+--[[
+    Has `toUserId` blocked `fromUserId`.
+
+    Chat:CanUsersChatAsync is the platform's own answer, and it accounts for
+    more than an explicit block -- an account whose settings do not permit
+    chat with the other party answers false too, which is the right answer for
+    a phrase as much as for a sentence.
+
+    Unresolved defaults to *allowed*, and that is a deliberate call rather
+    than an oversight. Defaulting to suppressed would mean the first press
+    between any two players is always silent, and in Studio -- where the
+    endpoint is not reachable at all -- every press would be silent forever,
+    which is how a feature ships unverified. A pair that the platform has
+    actually answered on is always honoured, in both directions.
+]]
+function SocialService._resolvePair(self: SocialService, fromUserId: number, toUserId: number)
+    local key = pairKey(fromUserId, toUserId)
+    if self._canChat[key] ~= nil or self._resolving[key] then
+        return
+    end
+    self._resolving[key] = true
+    task.spawn(function()
+        local ok, result = pcall(function()
+            return Chat:CanUsersChatAsync(fromUserId, toUserId)
+        end)
+        self._resolving[key] = nil
+        if ok then
+            self._canChat[key] = result == true
+            if result ~= true then
+                self._logger:info("social_chat_suppressed", {
+                    from = fromUserId,
+                    to = toUserId,
+                })
+            end
+        elseif not self._blockApiWarned then
+            -- Once per server. A warning per pair per session is a log nobody
+            -- reads, and the fallback is the same every time.
+            self._blockApiWarned = true
+            self._logger:warn("social_block_list_unavailable", { reason = tostring(result) })
+        end
+    end)
+end
+
+function SocialService.isSuppressed(
+    self: SocialService,
+    fromUserId: number,
+    toUserId: number
+): boolean
+    if fromUserId == toUserId then
+        return false
+    end
+    local resolved = self._canChat[pairKey(fromUserId, toUserId)]
+    if resolved == nil then
+        self:_resolvePair(fromUserId, toUserId)
+        return false
+    end
+    return resolved == false
+end
+
+--[[
+    Suppression is symmetric here even though the platform answers a directed
+    question. If either party cannot chat with the other, neither hears the
+    other -- a one-way channel between two people who have blocked each other
+    in one direction is a channel somebody did not expect to have.
+]]
+function SocialService._suppressionFor(self: SocialService, recipient: Player): (number) -> boolean
+    local recipientUserId = recipient.UserId
+    return function(fromUserId: number): boolean
+        return self:isSuppressed(fromUserId, recipientUserId)
+            or self:isSuppressed(recipientUserId, fromUserId)
+    end
+end
+
+local function characterPosition(player: Player): (number?, number?, number?)
+    local character = player.Character
+    if character == nil then
+        return nil, nil, nil
+    end
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if root == nil or not root:IsA("BasePart") then
+        return nil, nil, nil
+    end
+    local position = root.Position
+    return position.X, position.Y, position.Z
+end
+
+--[[
+    Say one phrase. The only way anything reaches this service.
+]]
+function SocialService.say(self: SocialService, player: Player, phraseId: any): any
+    if not self._featureFlags:isEnabled("quick_chat_enabled") then
+        return { accepted = false, reason = "disabled" }
+    end
+    local phrase = self._quickChat.byId(phraseId)
+    if phrase == nil then
+        return { accepted = false, reason = "unknown_phrase" }
+    end
+    local now = workspace:GetServerTimeNow()
+    if not self._limiter:allow(tostring(player.UserId), now, 1) then
+        return { accepted = false, reason = "rate_limited" }
+    end
+
+    self._sequence += 1
+    local x, y, z = characterPosition(player)
+    local call = self._quickChat.call(
+        phrase,
+        player.UserId,
+        player.DisplayName,
+        now,
+        self._sequence,
+        x,
+        y,
+        z
+    )
+    table.insert(self._calls, call)
+    -- Trimmed from the front: the log is the last few things said, and an
+    -- unbounded list on a server that runs for hours is a leak the soak test
+    -- would eventually find.
+    while #self._calls > self._quickChat.LogLength do
+        table.remove(self._calls, 1)
+    end
+    -- Every player in the server is a potential recipient, so every pair gets
+    -- resolved now rather than on the snapshot that needs it. The first press
+    -- of a session is otherwise the one press that ignores a block.
+    for _, other in Players:GetPlayers() do
+        if other ~= player then
+            self:_resolvePair(player.UserId, other.UserId)
+            self:_resolvePair(other.UserId, player.UserId)
+        end
+    end
+    if self._analyticsService ~= nil then
+        self._analyticsService:quickChatSent(player, phrase, call.marks)
+    end
+    return { accepted = true, call = call }
+end
+
+function SocialService.snapshot(self: SocialService, player: Player): any
+    local now = workspace:GetServerTimeNow()
+    local suppressed = self:_suppressionFor(player)
+    local x, y, z = characterPosition(player)
+    return {
+        calls = self._quickChat.visibleCalls(self._calls, player.UserId, suppressed, now),
+        pings = self._quickChat.visiblePings(
+            self._calls,
+            player.UserId,
+            suppressed,
+            now,
+            x,
+            y,
+            z,
+            self._config.QuickChatPingRadius
+        ),
+    }
+end
+
+--[[
+    Drop calls nobody can still see. The snapshot filters by expiry already,
+    so this only keeps the list from holding stale entries between presses --
+    which matters for the soak check, not for correctness.
+]]
+function SocialService.prune(self: SocialService, now: number)
+    local kept = {}
+    for _, call in self._calls do
+        if call.expiresAt > now then
+            table.insert(kept, call)
+        end
+    end
+    self._calls = kept
+end
+
+return table.freeze(SocialService)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="139">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48499,7 +49248,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="138">
+        <Item class="ModuleScript" referent="140">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48570,6 +49319,7 @@ export type TutorialService = typeof(setmetatable(
         _consumables: any,
         _companionService: any,
         _partyService: any,
+        _socialService: any,
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -48645,6 +49395,7 @@ function TutorialService.new(
         _consumables = consumables,
         _companionService = nil,
         _partyService = nil,
+        _socialService = nil,
         _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -49441,6 +50192,10 @@ end
 
 function TutorialService.setPartyService(self: TutorialService, partyService: any)
     self._partyService = partyService
+end
+
+function TutorialService.setSocialService(self: TutorialService, socialService: any)
+    self._socialService = socialService
 end
 
 function TutorialService.strike(self: TutorialService, player: Player)
@@ -50289,6 +51044,28 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             self._partyService:rejoin(player)
             self:_publish(player)
         end
+    elseif kind == self._runtimeIds.Actions.QuickChat then
+        --[[
+            A phrase reaches everyone who has not blocked the sender, so it is
+            published to the whole server rather than to the presser. Nothing
+            is toasted on success: the call appears in every recipient's own
+            log, including the sender's, and a toast on top of that would be
+            the game saying the same thing twice in the surface that #325
+            found every success message dying in.
+        ]]
+        if self._socialService ~= nil then
+            local result = self._socialService:say(player, payload.phraseId)
+            if result.accepted then
+                self:_publishAll()
+            else
+                if result.reason == "rate_limited" then
+                    self:_setToast(player, "LET THE LAST CALL LAND")
+                elseif result.reason == "disabled" then
+                    self:_setToast(player, "CALLS ARE CLOSED RIGHT NOW")
+                end
+                self:_publish(player)
+            end
+        end
     elseif kind == self._runtimeIds.Actions.CompanionCommand then
         local mode = payload.mode
         if self._companionService ~= nil and type(mode) == "string" and #mode <= 12 then
@@ -50699,6 +51476,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             then self._companionService:snapshot(player)
             else nil,
         party = if self._partyService ~= nil then self._partyService:snapshot(player) else nil,
+        social = if self._socialService ~= nil then self._socialService:snapshot(player) else nil,
         gearCare = gearCare,
         whetTarget = whetTarget,
         equipped = self._profileService:equippedSnapshot(player),
@@ -50750,7 +51528,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="139">
+        <Item class="ModuleScript" referent="141">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -51619,7 +52397,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="140">
+        <Item class="ModuleScript" referent="142">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -66728,11 +67506,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="141">
+      <Item class="Folder" referent="143">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="142">
+        <Item class="ModuleScript" referent="144">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -71046,7 +71824,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="143">
+        <Item class="ModuleScript" referent="145">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -72145,7 +72923,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="144">
+        <Item class="ModuleScript" referent="146">
           <Properties>
             <string name="Name">CinderfallBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -73012,7 +73790,7 @@ return table.freeze(CinderfallBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="145">
+        <Item class="ModuleScript" referent="147">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -73707,7 +74485,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="146">
+        <Item class="ModuleScript" referent="148">
           <Properties>
             <string name="Name">FrostmereBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -74756,7 +75534,7 @@ return table.freeze(FrostmereBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="147">
+        <Item class="ModuleScript" referent="149">
           <Properties>
             <string name="Name">IronrootBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -75771,7 +76549,7 @@ return table.freeze(IronrootBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="148">
+        <Item class="ModuleScript" referent="150">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -76630,7 +77408,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="149">
+        <Item class="ModuleScript" referent="151">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -76716,7 +77494,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="150">
+        <Item class="ModuleScript" referent="152">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -77090,7 +77868,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="151">
+        <Item class="ModuleScript" referent="153">
           <Properties>
             <string name="Name">MireglassBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -77846,7 +78624,7 @@ return table.freeze(MireglassBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="152">
+        <Item class="ModuleScript" referent="154">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -78026,7 +78804,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="153">
+        <Item class="ModuleScript" referent="155">
           <Properties>
             <string name="Name">RegionBuilders</string>
             <string name="Source"><![CDATA[--!strict
@@ -78792,7 +79570,7 @@ return table.freeze(RegionBuilders)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="154">
+        <Item class="ModuleScript" referent="156">
           <Properties>
             <string name="Name">TempestBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -79613,7 +80391,7 @@ return table.freeze(TempestBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="155">
+        <Item class="ModuleScript" referent="157">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -80209,7 +80987,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="156">
+        <Item class="ModuleScript" referent="158">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -80446,7 +81224,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="157">
+        <Item class="ModuleScript" referent="159">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -80535,7 +81313,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="158">
+        <Item class="ModuleScript" referent="160">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -80871,11 +81649,11 @@ return table.freeze(WorldSignBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="159">
+    <Item class="Folder" referent="161">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="160">
+      <Item class="Script" referent="162">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -82712,7 +83490,7 @@ print("[Last Light] PASS FoundationIntegration")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Script" referent="161">
+      <Item class="Script" referent="163">
         <Properties>
           <string name="Name">ModuleGallery</string>
           <token name="RunContext">0</token>
@@ -82803,15 +83581,15 @@ end
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="162">
+  <Item class="StarterPlayer" referent="164">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="163">
+    <Item class="StarterPlayerScripts" referent="165">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="164">
+      <Item class="LocalScript" referent="166">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -82834,6 +83612,7 @@ local WeatherProfile = require(root.WeatherProfile)
 local AmbientController = require(script.Controllers.AmbientController)
 local HUDController = require(script.Controllers.HUDController)
 local ObjectiveMarkerController = require(script.Controllers.ObjectiveMarkerController)
+local SocialPingController = require(script.Controllers.SocialPingController)
 local TapController = require(script.Controllers.TapController)
 local VignetteController = require(script.Controllers.VignetteController)
 local InputController = require(script.Controllers.InputController)
@@ -82870,6 +83649,7 @@ assert(playerGui ~= nil and playerGui:IsA("PlayerGui"), "PlayerGui unavailable")
 local hud = HUDController.new(playerGui, ProfessionCatalog.list(), ExpeditionContracts.List)
 local vignette = VignetteController.new(playerGui)
 local objectiveMarkers = ObjectiveMarkerController.new(playerGui)
+local socialPings = SocialPingController.new()
 local ambient = AmbientController.new(RuntimeIds.AmbientMoteTag)
 local worldMotion = WorldMotionController.new(
     RuntimeIds.AmbientMotionTag,
@@ -82944,6 +83724,10 @@ end, function()
     send(RuntimeIds.Actions.PartyLeave)
 end, function()
     send(RuntimeIds.Actions.PartyRejoin)
+end)
+
+hud:setQuickChatHandler(function(phraseId: string)
+    send(RuntimeIds.Actions.QuickChat, { phraseId = phraseId })
 end)
 
 hud:setLoadoutHandlers(function(slot: number)
@@ -83089,6 +83873,10 @@ stateChanged.OnClientEvent:Connect(function(snapshot: any)
     objectiveMarkers:setTargets(
         if snapshot.departed == true then snapshot.objectiveTargets else nil
     )
+    socialPings:setCalls(
+        if type(snapshot.social) == "table" then snapshot.social.calls else nil,
+        if type(snapshot.social) == "table" then snapshot.social.pings else nil
+    )
     updateVignettes(snapshot)
 end)
 
@@ -83110,6 +83898,10 @@ task.spawn(function()
         sfx:setSnapshot(snapshot)
         objectiveMarkers:setTargets(
             if snapshot.departed == true then snapshot.objectiveTargets else nil
+        )
+        socialPings:setCalls(
+            if type(snapshot.social) == "table" then snapshot.social.calls else nil,
+            if type(snapshot.social) == "table" then snapshot.social.pings else nil
         )
         updateVignettes(snapshot, true)
     end
@@ -83167,11 +83959,11 @@ task.spawn(function()
 end)
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="165">
+        <Item class="Folder" referent="167">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="166">
+          <Item class="ModuleScript" referent="168">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -83302,7 +84094,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="167">
+          <Item class="ModuleScript" referent="169">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -83316,6 +84108,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local sharedRoot = ReplicatedStorage:WaitForChild("LastLight")
 local Consumables = require(sharedRoot.Consumables)
 local Equipment = require(sharedRoot.Equipment)
+local QuickChat = require(sharedRoot.QuickChat)
 
 -- How many consumables the column shows at once. There are more than a
 -- phone screen has room for, so the HUD shows what a player is actually
@@ -83671,6 +84464,16 @@ export type HUDController = typeof(setmetatable(
         _dodge: TextButton,
         _ability: TextButton,
         _companion: TextButton,
+        _call: TextButton,
+        _callOverlay: Frame,
+        _callPanel: Frame,
+        _callTabRow: Frame,
+        _callGrid: Frame,
+        _callTabs: { [string]: TextButton },
+        _callPhraseButtons: { { button: TextButton, phraseId: string, category: string } },
+        _callCategory: string,
+        _actionClusterRows: number,
+        _onQuickChat: ((string) -> ())?,
         _companionMode: string,
         _onCompanionCommand: ((string) -> ())?,
         _compact: TextButton,
@@ -84275,6 +85078,148 @@ function HUDController.new(
     )
     companion.Visible = false
     stroke(companion, COLORS.amber, 0.12)
+
+    --[[
+        The wheel's own button. Quick chat is the only channel a player has to
+        another player, so it sits in the thumb cluster with the rest of the
+        things a thumb does rather than behind the compact toggle: on the
+        owner's phone, in portrait, a menu two taps deep is a menu nobody uses
+        mid-night, and I AM DOWN is the one phrase whose whole value is being
+        one press away.
+    ]]
+    local call =
+        actionButton(canvas, "QuickChat", "CALL", 84, UDim2.new(1, -534, 1, -40), Vector2.new(1, 1))
+    call.Visible = false
+    stroke(call, COLORS.blue, 0.12)
+
+    local callOverlay = Instance.new("Frame")
+    callOverlay.Name = "QuickChatOverlay"
+    callOverlay.Size = UDim2.fromScale(1, 1)
+    callOverlay.BackgroundColor3 = COLORS.ink
+    callOverlay.BackgroundTransparency = 0.24
+    callOverlay.Active = true
+    callOverlay.Visible = false
+    callOverlay.ZIndex = 46
+    callOverlay.Parent = canvas
+
+    local callPanel = Instance.new("Frame")
+    callPanel.Name = "QuickChatPanel"
+    callPanel.AnchorPoint = Vector2.new(0.5, 1)
+    -- Bottom-anchored, not centred: the wheel is opened by a thumb and its
+    -- buttons are pressed by the same thumb, so it opens where that thumb
+    -- already is. Width and height are settled in _layout from the canvas,
+    -- because the field book taught this HUD what a literal 420 costs on a
+    -- portrait phone.
+    callPanel.Position = UDim2.new(0.5, 0, 1, -132)
+    callPanel.Size = UDim2.fromOffset(420, 300)
+    callPanel.BackgroundColor3 = COLORS.panel
+    callPanel.BackgroundTransparency = 0.02
+    callPanel.ZIndex = 47
+    callPanel.Parent = callOverlay
+    corner(callPanel, 18)
+    stroke(callPanel, COLORS.blue, 0.18)
+
+    local callClose = Instance.new("TextButton")
+    callClose.Name = "Close"
+    callClose.AnchorPoint = Vector2.new(1, 0)
+    callClose.Position = UDim2.new(1, -14, 0, 14)
+    callClose.Size = UDim2.fromOffset(64, 30)
+    callClose.BackgroundColor3 = COLORS.panelSoft
+    callClose.Font = Enum.Font.GothamBold
+    callClose.Text = "CLOSE"
+    callClose.TextColor3 = COLORS.cream
+    callClose.TextSize = 11
+    callClose.Selectable = true
+    callClose.ZIndex = 49
+    callClose.Parent = callPanel
+    corner(callClose, 10)
+    stroke(callClose, COLORS.cream, 0.58)
+
+    local callTabRow = Instance.new("Frame")
+    callTabRow.Name = "Categories"
+    callTabRow.BackgroundTransparency = 1
+    callTabRow.Position = UDim2.fromOffset(14, 52)
+    callTabRow.Size = UDim2.new(1, -28, 0, 32)
+    callTabRow.ZIndex = 48
+    callTabRow.Parent = callPanel
+    local callTabLayout = Instance.new("UIListLayout")
+    callTabLayout.FillDirection = Enum.FillDirection.Horizontal
+    callTabLayout.Padding = UDim.new(0, 6)
+    callTabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    callTabLayout.Parent = callTabRow
+
+    local callGrid = Instance.new("Frame")
+    callGrid.Name = "Phrases"
+    callGrid.BackgroundTransparency = 1
+    callGrid.Position = UDim2.fromOffset(14, 92)
+    callGrid.Size = UDim2.new(1, -28, 1, -106)
+    callGrid.ZIndex = 48
+    callGrid.Parent = callPanel
+    local callGridLayout = Instance.new("UIGridLayout")
+    callGridLayout.CellPadding = UDim2.fromOffset(8, 8)
+    callGridLayout.CellSize = UDim2.new(0.5, -4, 0, 46)
+    callGridLayout.FillDirectionMaxCells = 2
+    callGridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    callGridLayout.Parent = callGrid
+
+    --[[
+        Every tab and every button is built by walking QuickChat.wheel(), and
+        that is the point rather than a convenience. The equip panel shipped as
+        a hardcoded list of eight items and left ninety craftable items
+        unwearable with every spec green (#299); a phrase list beside a
+        hand-written wheel has exactly that shape. Walking the catalog means a
+        phrase that exists is a phrase that can be pressed, and the spec can
+        say so by walking the same structure.
+    ]]
+    local callTabs: { [string]: TextButton } = {}
+    local callPhraseButtons: { { button: TextButton, phraseId: string, category: string } } = {}
+    local firstCategory: string? = nil
+    for order, group in QuickChat.wheel() do
+        if firstCategory == nil then
+            firstCategory = group.category
+        end
+        local tab = Instance.new("TextButton")
+        tab.Name = "Category_" .. group.category
+        tab.LayoutOrder = order
+        tab.Size = UDim2.new(0.25, -5, 1, 0)
+        tab.BackgroundColor3 = COLORS.panelSoft
+        tab.AutoButtonColor = true
+        tab.Font = Enum.Font.GothamBold
+        tab.Text = group.label
+        tab.TextColor3 = COLORS.muted
+        tab.TextSize = 11
+        tab.TextScaled = false
+        tab.Selectable = true
+        tab.ZIndex = 49
+        tab.Parent = callTabRow
+        corner(tab, 9)
+        callTabs[group.category] = tab
+
+        for phraseOrder, phrase in group.phrases do
+            local phraseButton = Instance.new("TextButton")
+            phraseButton.Name = "Phrase_" .. phrase.id
+            phraseButton.LayoutOrder = phraseOrder
+            phraseButton.BackgroundColor3 = COLORS.panelSoft
+            phraseButton.AutoButtonColor = true
+            phraseButton.Font = Enum.Font.GothamBold
+            phraseButton.Text = phrase.text
+            phraseButton.TextColor3 = COLORS.cream
+            phraseButton.TextSize = 12
+            phraseButton.TextWrapped = true
+            phraseButton.Selectable = true
+            phraseButton.Visible = false
+            phraseButton.ZIndex = 49
+            phraseButton:SetAttribute("PhraseId", phrase.id)
+            phraseButton.Parent = callGrid
+            corner(phraseButton, 10)
+            stroke(phraseButton, COLORS.blue, 0.5)
+            table.insert(callPhraseButtons, {
+                button = phraseButton,
+                phraseId = phrase.id,
+                category = phrase.category,
+            })
+        end
+    end
 
     local compact = Instance.new("TextButton")
     compact.Name = "CompactToggle"
@@ -84948,6 +85893,16 @@ function HUDController.new(
         _dodge = dodge,
         _ability = ability,
         _companion = companion,
+        _call = call,
+        _callOverlay = callOverlay,
+        _callPanel = callPanel,
+        _callTabRow = callTabRow,
+        _callGrid = callGrid,
+        _callTabs = callTabs,
+        _callPhraseButtons = callPhraseButtons,
+        _callCategory = firstCategory or "danger",
+        _actionClusterRows = 0,
+        _onQuickChat = nil,
         _companionMode = "follow",
         _onCompanionCommand = nil,
         _compact = compact,
@@ -84999,6 +85954,31 @@ function HUDController.new(
     professionClose.Activated:Connect(function()
         self:setProfessionMenuOpen(false)
     end)
+    callClose.Activated:Connect(function()
+        self:setCallMenuOpen(false)
+    end)
+    -- The CALL button is a toggle, which is the second way out of the wheel.
+    -- A modal overlay with one exit is how the field book ate every world
+    -- click behind it in #327 when that exit went off the screen.
+    call.Activated:Connect(function()
+        self:toggleCallMenu()
+    end)
+    for categoryId, tab in callTabs do
+        tab.Activated:Connect(function()
+            self:_setCallCategory(categoryId)
+        end)
+    end
+    for _, entry in callPhraseButtons do
+        entry.button.Activated:Connect(function()
+            local handler = self._onQuickChat
+            if handler ~= nil then
+                handler(entry.phraseId)
+            end
+            -- Closed on send. A wheel that stays open after a press is a wheel
+            -- covering the thing the press was about.
+            self:setCallMenuOpen(false)
+        end)
+    end
     progressButton.Activated:Connect(function()
         self:setProgressOpen(not self._progressOverlay.Visible)
     end)
@@ -85111,6 +86091,71 @@ function HUDController.setCompanionHandler(self: HUDController, callback: (strin
         -- to the word on it.
         handler(if self._companionMode == "follow" then "stay" else "follow")
     end)
+end
+
+--[[
+    The phrase wheel: one handler for every press in it.
+
+    The setter only stores the callback; the presses are wired once, at
+    construction. A setter that connects is a setter that cannot be called
+    twice -- a second call would leave two connections on every button and one
+    press would send the phrase twice -- and a wire that can only be made once
+    should be made where everything else is made.
+]]
+function HUDController.setQuickChatHandler(self: HUDController, callback: (string) -> ())
+    self._onQuickChat = callback
+end
+
+function HUDController.callButton(self: HUDController): TextButton
+    return self._call
+end
+
+function HUDController.isCallMenuOpen(self: HUDController): boolean
+    return self._callOverlay.Visible
+end
+
+function HUDController._setCallCategory(self: HUDController, categoryId: string)
+    self._callCategory = categoryId
+    for id, tab in self._callTabs do
+        local selected = id == categoryId
+        tab.BackgroundColor3 = if selected then COLORS.blue else COLORS.panelSoft
+        tab.TextColor3 = if selected then COLORS.ink else COLORS.muted
+    end
+    for _, entry in self._callPhraseButtons do
+        entry.button.Visible = entry.category == categoryId
+    end
+end
+
+function HUDController.setCallMenuOpen(self: HUDController, open: boolean)
+    if open and not self._call.Visible then
+        return
+    end
+    self._callOverlay.Visible = open
+    if open then
+        self:_setCallCategory(self._callCategory)
+        self:_layout()
+        --[[
+            Hand the pad the first phrase in the open category. A grid of
+            TextButtons is reachable by D-pad once one of them is selected, and
+            nothing selects itself: the field book paid for this lesson in #327
+            with a scrolling window a controller could not enter.
+        ]]
+        for _, entry in self._callPhraseButtons do
+            if entry.button.Visible then
+                GuiService.SelectedObject = entry.button
+                break
+            end
+        end
+    elseif
+        GuiService.SelectedObject ~= nil
+        and GuiService.SelectedObject:IsDescendantOf(self._callPanel)
+    then
+        GuiService.SelectedObject = nil
+    end
+end
+
+function HUDController.toggleCallMenu(self: HUDController)
+    self:setCallMenuOpen(not self._callOverlay.Visible)
 end
 
 function HUDController.abilityButton(self: HUDController): TextButton
@@ -85393,6 +86438,7 @@ function HUDController._refreshActionCluster(self: HUDController)
         if self._ability.Visible then "1" else "0",
         if self._companion.Visible then "1" else "0",
         if self._dodge.Visible then "1" else "0",
+        if self._call.Visible then "1" else "0",
     })
     if signature == self._actionClusterSignature then
         return
@@ -85634,6 +86680,19 @@ function HUDController._updateProfessionClock(self: HUDController)
         self._companionMode = if companion.mode == "stay" then "stay" else "follow"
         -- the button names the order it will give, not the state it is in
         self._companion.Text = if self._companionMode == "follow" then "STAY" else "FOLLOW"
+    end
+
+    --[[
+        The CALL button appears once First Light is over, because that is the
+        moment a player is out in a world with other people in it -- the
+        tutorial is walked alone with Mara, and a phrase wheel there would be
+        talking to nobody. It stays up while downed on purpose: I AM DOWN is
+        the phrase a downed player most needs, and hiding the wheel exactly
+        when it matters most is the shape of bug this project keeps finding.
+    ]]
+    self._call.Visible = state.tutorialComplete == true
+    if not self._call.Visible and self._callOverlay.Visible then
+        self:setCallMenuOpen(false)
     end
 
     local profession = state.profession
@@ -86256,6 +87315,7 @@ function HUDController._layout(self: HUDController)
                 { button = self._ability, width = 84 },
                 { button = self._companion, width = 84 },
                 { button = self._dodge, width = 84 },
+                { button = self._call, width = 84 },
             }
         do
             if entry.button.Visible then
@@ -86275,6 +87335,7 @@ function HUDController._layout(self: HUDController)
         -- A cluster that fits one row keeps the 206 the tablet pass settled on.
         self._threatFrame.Position =
             UDim2.new(0.5, 0, 1, -math.max(206, 34 + actionRow * ACTION_ROW_PITCH + 84 + 10))
+        self._actionClusterRows = actionRow
     else
         self._objectiveFrame.Position = UDim2.fromOffset(18, 18)
         self._objectiveFrame.Size = if self._compactEnabled
@@ -86320,11 +87381,23 @@ function HUDController._layout(self: HUDController)
         self._dodge.Position = UDim2.new(1, -252, 1, -40)
         self._ability.Position = UDim2.new(1, -346, 1, -40)
         self._companion.Position = UDim2.new(1, -440, 1, -40)
+        self._call.Position = UDim2.new(1, -534, 1, -40)
         -- RUN stays where it was built on a desktop: left of the row, clear of
         -- the mouse-driven cluster on the right.
         self._sprint.Position = UDim2.new(0, 166, 1, -34)
         self._sprint.AnchorPoint = Vector2.new(0, 1)
+        self._actionClusterRows = 0
     end
+    --[[
+        The phrase wheel is measured from the canvas and seated above whatever
+        the thumb cluster wrapped to, for the two reasons the field book paid
+        for: a literal 420 is wider than a portrait phone's whole canvas, and a
+        panel that overlaps the buttons under it turns a press meant for one
+        into a press on the other.
+    ]]
+    self._callPanel.Size = UDim2.fromOffset(math.min(420, canvasWidth - 24), 260)
+    self._callPanel.Position =
+        UDim2.new(0.5, 0, 1, -(34 + self._actionClusterRows * ACTION_ROW_PITCH + 84 + 14))
     self:_layoutLoadout()
 end
 
@@ -86759,7 +87832,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="168">
+          <Item class="ModuleScript" referent="170">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -86987,6 +88060,22 @@ function InputController.new(
         UserInputService.InputBegan:Connect(function(input: InputObject, _processed: boolean)
             if input.KeyCode == Enum.KeyCode.Escape and hud:isProfessionMenuOpen() then
                 hud:setProfessionMenuOpen(false)
+            elseif input.KeyCode == Enum.KeyCode.Escape and hud:isCallMenuOpen() then
+                hud:setCallMenuOpen(false)
+            elseif hud:isProfessionMenuOpen() then
+                -- One menu at a time. Opening the wheel behind the profession
+                -- panel would put a modal under a modal.
+                return
+            elseif input.KeyCode == Enum.KeyCode.B or input.KeyCode == Enum.KeyCode.DPadLeft then
+                --[[
+                    The wheel's key, on the two devices that have one. B is free
+                    on a keyboard and DPadLeft is the one direction the pad has
+                    not spent (up is the profession menu, down the second
+                    consumable). Touch reaches the wheel through the CALL button
+                    in the thumb cluster, which is the path the owner's phone
+                    actually uses.
+                ]]
+                hud:toggleCallMenu()
             end
         end)
     )
@@ -87046,6 +88135,18 @@ function InputController._installFallback(
                 self._hud:setProfessionMenuOpen(false)
             elseif self._hud:isProfessionMenuOpen() then
                 return
+            elseif self._hud:isCallMenuOpen() then
+                --[[
+                    The wheel's own key is NOT handled here. This handler is
+                    installed only when the InputContext path fails, and the
+                    handler in _install is installed either way -- so a branch
+                    for B in both would toggle twice on one press and leave the
+                    wheel exactly as it was. The toggle and Escape live there;
+                    what belongs here is the guard below.
+                ]]
+                -- An open wheel swallows the rest: a phrase press must not also
+                -- swing the tool, which is the shape #325 found on every click.
+                return
             elseif input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
                 onInteract()
             elseif
@@ -87099,7 +88200,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="169">
+          <Item class="ModuleScript" referent="171">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -87207,7 +88308,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="170">
+          <Item class="ModuleScript" referent="172">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -87326,7 +88427,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="171">
+          <Item class="ModuleScript" referent="173">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -87600,7 +88701,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="172">
+          <Item class="ModuleScript" referent="174">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -87700,7 +88801,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="173">
+          <Item class="ModuleScript" referent="175">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -87812,7 +88913,389 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="174">
+          <Item class="ModuleScript" referent="176">
+            <Properties>
+              <string name="Name">SocialPingController</string>
+              <string name="Source"><![CDATA[--!strict
+
+--[[
+    Draw what somebody said where they said it.
+
+    There is deliberately no call log on the HUD, and that is a decision about
+    a phone rather than an omission. The owner plays this game in portrait, and
+    a portrait canvas is about five hundred points wide with the objective card
+    across the top, the lantern bar under it and the thumb cluster along the
+    bottom; the band left over is the band a player is trying to see creatures
+    in. #325's report was literally that the fight UI hid the monsters. A
+    scrolling list of who said what would be one more thing in front of the
+    world.
+
+    So a call is drawn in the world instead, which is also where it means
+    something:
+
+      * A phrase that marks a place gets a card standing at that place, with
+        the sender's name, the phrase, and how far away it is. The place came
+        from the server reading the sender's character, so the card cannot
+        stand anywhere the sender was not.
+      * A phrase that marks nothing -- the six courtesies -- gets a card over
+        the speaker's own head for its few seconds. Speech belongs to a person,
+        not to a spot on the ground.
+
+    How a card looks is resolved from the catalog by the ping kind the server
+    named, not chosen here by that name. The difference matters: a `if kind ==
+    "danger" then red` ladder is a ladder a twenty-fifth phrase's new kind falls
+    off silently, which is the census's lesson in its smallest possible form.
+    Glyph, colour and reach all come out of QuickChat.
+]]
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local QuickChat = require(ReplicatedStorage:WaitForChild("LastLight").QuickChat)
+
+local SocialPingController = {}
+SocialPingController.__index = SocialPingController
+
+export type SocialPingController = typeof(setmetatable(
+    {} :: {
+        _folder: Folder,
+        -- Keyed by call id, which the server mints once and never reuses, so a
+        -- card is built once and then only re-read for its distance.
+        _cards: { [string]: { billboard: BillboardGui, anchor: Part?, call: any, glyph: string } },
+        _connection: RBXScriptConnection?,
+    },
+    SocialPingController
+))
+
+local INK = Color3.fromRGB(18, 14, 11)
+
+function SocialPingController.new(): SocialPingController
+    local folder = Instance.new("Folder")
+    folder.Name = "LastLightSocialPings"
+    folder.Parent = workspace
+
+    local self = setmetatable({
+        _folder = folder,
+        _cards = {},
+        _connection = nil,
+    }, SocialPingController)
+    self._connection = RunService.RenderStepped:Connect(function()
+        self:_step()
+    end)
+    return self
+end
+
+local function presentationOf(call: any): (Color3, string)
+    local kind = QuickChat.pingKind(call.ping)
+    if kind == nil then
+        -- A kind the catalog does not know cannot be drawn honestly, so it is
+        -- drawn plainly rather than guessed at.
+        return Color3.fromRGB(200, 208, 202), "·"
+    end
+    return Color3.fromRGB(kind.colour[1], kind.colour[2], kind.colour[3]), kind.glyph
+end
+
+local function decorate(part: BasePart, colour: Color3, transparency: number)
+    part.Anchored = true
+    part.CanCollide = false
+    part.CanQuery = false
+    part.CanTouch = false
+    part.CastShadow = false
+    part.Material = Enum.Material.Neon
+    part.Color = colour
+    part.Transparency = transparency
+end
+
+--[[
+    Where the floor is under a recorded position.
+
+    The position the server sends is a character's HumanoidRootPart, which on
+    an R15 rig stands about three studs above whatever it is standing on. A
+    ring drawn at that height is a ring floating at hip level, which the first
+    live look caught immediately: the disc cut through the player's shins. So
+    the client casts down for the actual surface, which also puts the mark on
+    the slope rather than through it.
+
+    The fall back is the root's own height minus three rather than the root
+    itself: if the cast finds nothing -- over a gap, mid-fall -- a ring at
+    ankle height is wrong by less than a ring at the hip. Ignoring the ping
+    folder keeps a mark from seating on the mark before it.
+]]
+local function groundBelow(folder: Folder, position: Vector3): number
+    local parameters = RaycastParams.new()
+    parameters.FilterType = Enum.RaycastFilterType.Exclude
+    parameters.FilterDescendantsInstances = { folder, Players.LocalPlayer.Character :: any }
+    parameters.IgnoreWater = false
+    local hit =
+        workspace:Raycast(position + Vector3.new(0, 1, 0), Vector3.new(0, -14, 0), parameters)
+    if hit ~= nil then
+        return hit.Position.Y
+    end
+    return position.Y - 3
+end
+
+--[[
+    The mark itself, as geometry.
+
+    VISUAL_QUALITY_STANDARD is explicit that floating labels are close-range
+    confirmation and not navigation, and a ping is navigation -- it exists to
+    be walked to. A text card alone is 198 pixels that shrink to nothing at the
+    far end of the marker's own five-hundred-stud reach, which is exactly the
+    range at which it has to do its job.
+
+    So the marker is a ring on the ground and a shaft of light standing out of
+    it, in the ping kind's own colour, and the card rides above as the
+    close-range half. Two parts because that is what reads: the ring says where
+    on the floor, the shaft says which direction from anywhere, and a single
+    shape cannot do both. The colour is the catalog's, so a new ping kind is
+    coloured correctly without this file learning its name.
+]]
+function SocialPingController._buildMark(folder: Folder, anchor: Part, colour: Color3)
+    local floor = groundBelow(folder, anchor.Position)
+    local base = Vector3.new(anchor.Position.X, floor + 0.08, anchor.Position.Z)
+
+    local ring = Instance.new("Part")
+    ring.Name = "Ring"
+    ring.Shape = Enum.PartType.Cylinder
+    ring.Size = Vector3.new(0.25, 6, 6)
+    -- A Roblox cylinder lies on its side, so a disc on the floor is one turned
+    -- a quarter over. The same quarter turn the town's props needed in #316.
+    ring.CFrame = CFrame.new(base) * CFrame.Angles(0, 0, math.rad(90))
+    decorate(ring, colour, 0.45)
+    ring.Parent = anchor
+
+    local shaft = Instance.new("Part")
+    shaft.Name = "Shaft"
+    shaft.Size = Vector3.new(0.55, 13, 0.55)
+    shaft.CFrame = CFrame.new(base + Vector3.new(0, 6.5, 0))
+    -- Fainter than the ring: a beam a player looks straight through is a beam
+    -- that does not hide the thing being pointed at, which for HARVEST HERE is
+    -- the entire point of the ping.
+    decorate(shaft, colour, 0.62)
+    shaft.Parent = anchor
+
+    local glow = Instance.new("PointLight")
+    glow.Color = colour
+    glow.Brightness = 1.4
+    glow.Range = 14
+    glow.Shadows = false
+    glow.Parent = ring
+end
+
+--[[
+    Where a card hangs.
+
+    A marking call gets an anchor at the recorded position, carrying the mark
+    above. A courtesy is adorned to the speaker's head and gets no geometry at
+    all -- speech is close range, which is the one case the standard says a
+    floating label is the right answer for. If that player has left, or has no
+    character yet, it is simply not drawn: a thank-you from somebody who is
+    gone is nothing, and inventing a place for it would be the one case where a
+    card stands somewhere nobody stood.
+]]
+function SocialPingController._build(self: SocialPingController, call: any): boolean
+    local adornee: Instance? = nil
+    local anchor: Part? = nil
+    local accent, glyph = presentationOf(call)
+    if call.marks == true and call.x ~= nil then
+        local part = Instance.new("Part")
+        part.Name = "PingAnchor_" .. tostring(call.id)
+        part.Size = Vector3.new(0.2, 0.2, 0.2)
+        part.Transparency = 1
+        part.Anchored = true
+        part.CanCollide = false
+        part.CanQuery = false
+        part.CanTouch = false
+        part.CastShadow = false
+        part.Position = Vector3.new(call.x, call.y, call.z)
+        part.Parent = self._folder
+        SocialPingController._buildMark(self._folder, part, accent)
+        anchor = part
+        adornee = part
+    else
+        local speaker = Players:GetPlayerByUserId(call.fromUserId)
+        local character = if speaker ~= nil then speaker.Character else nil
+        local head = if character ~= nil then character:FindFirstChild("Head") else nil
+        if head == nil or not head:IsA("BasePart") then
+            return false
+        end
+        adornee = head
+    end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "SocialPing_" .. tostring(call.id)
+    billboard.Adornee = adornee
+    billboard.AlwaysOnTop = call.marks == true
+    billboard.LightInfluence = 0
+    billboard.Size = UDim2.fromOffset(198, 50)
+    billboard.StudsOffsetWorldSpace = if call.marks == true
+        then Vector3.new(0, 6.5, 0)
+        else Vector3.new(0, 2.4, 0)
+    -- A marker is guidance and has to be readable from across a module; a
+    -- courtesy is a nearby remark and does not need to carry.
+    billboard.MaxDistance = if call.marks == true then 500 else 90
+    billboard.Parent = if anchor ~= nil then anchor else self._folder
+
+    local card = Instance.new("Frame")
+    card.Name = "Card"
+    card.BackgroundColor3 = INK
+    card.BackgroundTransparency = 0.14
+    card.BorderSizePixel = 0
+    card.Size = UDim2.fromScale(1, 1)
+    card.Parent = billboard
+    local cardCorner = Instance.new("UICorner")
+    cardCorner.CornerRadius = UDim.new(0, 10)
+    cardCorner.Parent = card
+    local cardStroke = Instance.new("UIStroke")
+    cardStroke.Color = accent
+    cardStroke.Transparency = 0.28
+    cardStroke.Thickness = 1.5
+    cardStroke.Parent = card
+
+    local phrase = Instance.new("TextLabel")
+    phrase.Name = "PhraseText"
+    phrase.BackgroundTransparency = 1
+    phrase.Position = UDim2.fromOffset(0, 4)
+    phrase.Size = UDim2.new(1, 0, 0, 24)
+    phrase.Font = Enum.Font.GothamBold
+    phrase.TextSize = 15
+    phrase.TextColor3 = accent
+    phrase.TextScaled = false
+    phrase.Text = string.format("%s %s", glyph, tostring(call.text))
+    phrase.Parent = card
+
+    local who = Instance.new("TextLabel")
+    who.Name = "Sender"
+    who.BackgroundTransparency = 1
+    who.Position = UDim2.fromOffset(0, 27)
+    who.Size = UDim2.new(1, 0, 0, 18)
+    who.Font = Enum.Font.Gotham
+    who.TextSize = 12
+    who.TextColor3 = Color3.fromRGB(200, 208, 202)
+    who.Text = tostring(call.fromName)
+    who.Parent = card
+
+    self._cards[call.id] = { billboard = billboard, anchor = anchor, call = call, glyph = glyph }
+    return true
+end
+
+function SocialPingController._destroy(self: SocialPingController, callId: string)
+    local card = self._cards[callId]
+    if card == nil then
+        return
+    end
+    self._cards[callId] = nil
+    if card.anchor ~= nil then
+        card.anchor:Destroy()
+    else
+        card.billboard:Destroy()
+    end
+end
+
+--[[
+    Take the two lists the server sends, and draw one card per entry.
+
+    They are two lists because they answer two questions. `calls` is
+    everything this player may hear -- the whole record, filtered for expiry
+    and for who has blocked whom -- and the courtesies in it are drawn over
+    their speakers. `pings` is the marking subset that is also close enough for
+    a marker to be guidance rather than clutter; a shout from four hundred
+    studs away is in `calls` and not in `pings`, which is exactly right: it was
+    said, and there is no useful arrow to it.
+
+    Additive and subtractive rather than a rebuild, because the snapshot
+    arrives several times a second and rebuilding would make every card
+    flicker. Same reasoning the objective markers already carry.
+
+    **One card per speaker per surface, newest wins.** Found by playing it: the
+    budget allows three calls in a burst, and three courtesies drew three
+    billboards on the same head at the same offset -- one unreadable smear of
+    stacked text. The same thing happens on the ground when somebody shouts
+    twice without moving. Your latest ping replacing your previous one is also
+    what every game with a ping wheel does, so the fix and the expectation
+    agree. The rate limiter bounds how much is said; this bounds how much is
+    drawn, and those are different problems.
+]]
+function SocialPingController.setCalls(self: SocialPingController, calls: { any }?, pings: { any }?)
+    local present: { [string]: boolean } = {}
+    local function take(list: { any }?, wantMarks: boolean)
+        if type(list) ~= "table" then
+            return
+        end
+        local newest: { [number]: any } = {}
+        for _, call in list do
+            if
+                type(call) == "table"
+                and type(call.id) == "string"
+                and type(call.fromUserId) == "number"
+                and (call.marks == true) == wantMarks
+            then
+                local held = newest[call.fromUserId]
+                if held == nil or (tonumber(call.at) or 0) >= (tonumber(held.at) or 0) then
+                    newest[call.fromUserId] = call
+                end
+            end
+        end
+        for _, call in newest do
+            present[call.id] = true
+            if self._cards[call.id] == nil then
+                self:_build(call)
+            end
+        end
+    end
+    -- Courtesies from the full record, markers from the in-range subset. Taking
+    -- markers from `calls` instead would draw a card for every shout on the
+    -- map, which is the thing the radius exists to prevent.
+    take(calls, false)
+    take(pings, true)
+    for callId in self._cards do
+        if not present[callId] then
+            self:_destroy(callId)
+        end
+    end
+end
+
+function SocialPingController._step(self: SocialPingController)
+    local character = Players.LocalPlayer.Character
+    local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+    if root == nil or not root:IsA("BasePart") then
+        return
+    end
+    for _, card in self._cards do
+        local anchor = card.anchor
+        if anchor ~= nil then
+            local label = card.billboard:FindFirstChild("PhraseText", true)
+            if label ~= nil and label:IsA("TextLabel") then
+                local distance = (anchor.Position - root.Position).Magnitude
+                label.Text = string.format(
+                    "%s %s · %dm",
+                    card.glyph,
+                    tostring(card.call.text),
+                    math.floor(distance + 0.5)
+                )
+            end
+        end
+    end
+end
+
+function SocialPingController.destroy(self: SocialPingController)
+    local connection = self._connection
+    if connection ~= nil then
+        connection:Disconnect()
+        self._connection = nil
+    end
+    for callId in self._cards do
+        self:_destroy(callId)
+    end
+    self._folder:Destroy()
+end
+
+return table.freeze(SocialPingController)
+]]></string>
+            </Properties>
+          </Item>
+          <Item class="ModuleScript" referent="177">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -88014,7 +89497,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="175">
+          <Item class="ModuleScript" referent="178">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -88223,7 +89706,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="176">
+          <Item class="ModuleScript" referent="179">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -88368,7 +89851,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="177">
+          <Item class="ModuleScript" referent="180">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -88668,13 +90151,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="178">
+  <Item class="TextChatService" referent="181">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="179">
+  <Item class="Workspace" referent="182">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

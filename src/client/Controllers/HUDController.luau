@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local sharedRoot = ReplicatedStorage:WaitForChild("LastLight")
 local Consumables = require(sharedRoot.Consumables)
 local Equipment = require(sharedRoot.Equipment)
+local QuickChat = require(sharedRoot.QuickChat)
 
 -- How many consumables the column shows at once. There are more than a
 -- phone screen has room for, so the HUD shows what a player is actually
@@ -364,6 +365,16 @@ export type HUDController = typeof(setmetatable(
         _dodge: TextButton,
         _ability: TextButton,
         _companion: TextButton,
+        _call: TextButton,
+        _callOverlay: Frame,
+        _callPanel: Frame,
+        _callTabRow: Frame,
+        _callGrid: Frame,
+        _callTabs: { [string]: TextButton },
+        _callPhraseButtons: { { button: TextButton, phraseId: string, category: string } },
+        _callCategory: string,
+        _actionClusterRows: number,
+        _onQuickChat: ((string) -> ())?,
         _companionMode: string,
         _onCompanionCommand: ((string) -> ())?,
         _compact: TextButton,
@@ -968,6 +979,148 @@ function HUDController.new(
     )
     companion.Visible = false
     stroke(companion, COLORS.amber, 0.12)
+
+    --[[
+        The wheel's own button. Quick chat is the only channel a player has to
+        another player, so it sits in the thumb cluster with the rest of the
+        things a thumb does rather than behind the compact toggle: on the
+        owner's phone, in portrait, a menu two taps deep is a menu nobody uses
+        mid-night, and I AM DOWN is the one phrase whose whole value is being
+        one press away.
+    ]]
+    local call =
+        actionButton(canvas, "QuickChat", "CALL", 84, UDim2.new(1, -534, 1, -40), Vector2.new(1, 1))
+    call.Visible = false
+    stroke(call, COLORS.blue, 0.12)
+
+    local callOverlay = Instance.new("Frame")
+    callOverlay.Name = "QuickChatOverlay"
+    callOverlay.Size = UDim2.fromScale(1, 1)
+    callOverlay.BackgroundColor3 = COLORS.ink
+    callOverlay.BackgroundTransparency = 0.24
+    callOverlay.Active = true
+    callOverlay.Visible = false
+    callOverlay.ZIndex = 46
+    callOverlay.Parent = canvas
+
+    local callPanel = Instance.new("Frame")
+    callPanel.Name = "QuickChatPanel"
+    callPanel.AnchorPoint = Vector2.new(0.5, 1)
+    -- Bottom-anchored, not centred: the wheel is opened by a thumb and its
+    -- buttons are pressed by the same thumb, so it opens where that thumb
+    -- already is. Width and height are settled in _layout from the canvas,
+    -- because the field book taught this HUD what a literal 420 costs on a
+    -- portrait phone.
+    callPanel.Position = UDim2.new(0.5, 0, 1, -132)
+    callPanel.Size = UDim2.fromOffset(420, 300)
+    callPanel.BackgroundColor3 = COLORS.panel
+    callPanel.BackgroundTransparency = 0.02
+    callPanel.ZIndex = 47
+    callPanel.Parent = callOverlay
+    corner(callPanel, 18)
+    stroke(callPanel, COLORS.blue, 0.18)
+
+    local callClose = Instance.new("TextButton")
+    callClose.Name = "Close"
+    callClose.AnchorPoint = Vector2.new(1, 0)
+    callClose.Position = UDim2.new(1, -14, 0, 14)
+    callClose.Size = UDim2.fromOffset(64, 30)
+    callClose.BackgroundColor3 = COLORS.panelSoft
+    callClose.Font = Enum.Font.GothamBold
+    callClose.Text = "CLOSE"
+    callClose.TextColor3 = COLORS.cream
+    callClose.TextSize = 11
+    callClose.Selectable = true
+    callClose.ZIndex = 49
+    callClose.Parent = callPanel
+    corner(callClose, 10)
+    stroke(callClose, COLORS.cream, 0.58)
+
+    local callTabRow = Instance.new("Frame")
+    callTabRow.Name = "Categories"
+    callTabRow.BackgroundTransparency = 1
+    callTabRow.Position = UDim2.fromOffset(14, 52)
+    callTabRow.Size = UDim2.new(1, -28, 0, 32)
+    callTabRow.ZIndex = 48
+    callTabRow.Parent = callPanel
+    local callTabLayout = Instance.new("UIListLayout")
+    callTabLayout.FillDirection = Enum.FillDirection.Horizontal
+    callTabLayout.Padding = UDim.new(0, 6)
+    callTabLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    callTabLayout.Parent = callTabRow
+
+    local callGrid = Instance.new("Frame")
+    callGrid.Name = "Phrases"
+    callGrid.BackgroundTransparency = 1
+    callGrid.Position = UDim2.fromOffset(14, 92)
+    callGrid.Size = UDim2.new(1, -28, 1, -106)
+    callGrid.ZIndex = 48
+    callGrid.Parent = callPanel
+    local callGridLayout = Instance.new("UIGridLayout")
+    callGridLayout.CellPadding = UDim2.fromOffset(8, 8)
+    callGridLayout.CellSize = UDim2.new(0.5, -4, 0, 46)
+    callGridLayout.FillDirectionMaxCells = 2
+    callGridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    callGridLayout.Parent = callGrid
+
+    --[[
+        Every tab and every button is built by walking QuickChat.wheel(), and
+        that is the point rather than a convenience. The equip panel shipped as
+        a hardcoded list of eight items and left ninety craftable items
+        unwearable with every spec green (#299); a phrase list beside a
+        hand-written wheel has exactly that shape. Walking the catalog means a
+        phrase that exists is a phrase that can be pressed, and the spec can
+        say so by walking the same structure.
+    ]]
+    local callTabs: { [string]: TextButton } = {}
+    local callPhraseButtons: { { button: TextButton, phraseId: string, category: string } } = {}
+    local firstCategory: string? = nil
+    for order, group in QuickChat.wheel() do
+        if firstCategory == nil then
+            firstCategory = group.category
+        end
+        local tab = Instance.new("TextButton")
+        tab.Name = "Category_" .. group.category
+        tab.LayoutOrder = order
+        tab.Size = UDim2.new(0.25, -5, 1, 0)
+        tab.BackgroundColor3 = COLORS.panelSoft
+        tab.AutoButtonColor = true
+        tab.Font = Enum.Font.GothamBold
+        tab.Text = group.label
+        tab.TextColor3 = COLORS.muted
+        tab.TextSize = 11
+        tab.TextScaled = false
+        tab.Selectable = true
+        tab.ZIndex = 49
+        tab.Parent = callTabRow
+        corner(tab, 9)
+        callTabs[group.category] = tab
+
+        for phraseOrder, phrase in group.phrases do
+            local phraseButton = Instance.new("TextButton")
+            phraseButton.Name = "Phrase_" .. phrase.id
+            phraseButton.LayoutOrder = phraseOrder
+            phraseButton.BackgroundColor3 = COLORS.panelSoft
+            phraseButton.AutoButtonColor = true
+            phraseButton.Font = Enum.Font.GothamBold
+            phraseButton.Text = phrase.text
+            phraseButton.TextColor3 = COLORS.cream
+            phraseButton.TextSize = 12
+            phraseButton.TextWrapped = true
+            phraseButton.Selectable = true
+            phraseButton.Visible = false
+            phraseButton.ZIndex = 49
+            phraseButton:SetAttribute("PhraseId", phrase.id)
+            phraseButton.Parent = callGrid
+            corner(phraseButton, 10)
+            stroke(phraseButton, COLORS.blue, 0.5)
+            table.insert(callPhraseButtons, {
+                button = phraseButton,
+                phraseId = phrase.id,
+                category = phrase.category,
+            })
+        end
+    end
 
     local compact = Instance.new("TextButton")
     compact.Name = "CompactToggle"
@@ -1641,6 +1794,16 @@ function HUDController.new(
         _dodge = dodge,
         _ability = ability,
         _companion = companion,
+        _call = call,
+        _callOverlay = callOverlay,
+        _callPanel = callPanel,
+        _callTabRow = callTabRow,
+        _callGrid = callGrid,
+        _callTabs = callTabs,
+        _callPhraseButtons = callPhraseButtons,
+        _callCategory = firstCategory or "danger",
+        _actionClusterRows = 0,
+        _onQuickChat = nil,
         _companionMode = "follow",
         _onCompanionCommand = nil,
         _compact = compact,
@@ -1692,6 +1855,31 @@ function HUDController.new(
     professionClose.Activated:Connect(function()
         self:setProfessionMenuOpen(false)
     end)
+    callClose.Activated:Connect(function()
+        self:setCallMenuOpen(false)
+    end)
+    -- The CALL button is a toggle, which is the second way out of the wheel.
+    -- A modal overlay with one exit is how the field book ate every world
+    -- click behind it in #327 when that exit went off the screen.
+    call.Activated:Connect(function()
+        self:toggleCallMenu()
+    end)
+    for categoryId, tab in callTabs do
+        tab.Activated:Connect(function()
+            self:_setCallCategory(categoryId)
+        end)
+    end
+    for _, entry in callPhraseButtons do
+        entry.button.Activated:Connect(function()
+            local handler = self._onQuickChat
+            if handler ~= nil then
+                handler(entry.phraseId)
+            end
+            -- Closed on send. A wheel that stays open after a press is a wheel
+            -- covering the thing the press was about.
+            self:setCallMenuOpen(false)
+        end)
+    end
     progressButton.Activated:Connect(function()
         self:setProgressOpen(not self._progressOverlay.Visible)
     end)
@@ -1804,6 +1992,71 @@ function HUDController.setCompanionHandler(self: HUDController, callback: (strin
         -- to the word on it.
         handler(if self._companionMode == "follow" then "stay" else "follow")
     end)
+end
+
+--[[
+    The phrase wheel: one handler for every press in it.
+
+    The setter only stores the callback; the presses are wired once, at
+    construction. A setter that connects is a setter that cannot be called
+    twice -- a second call would leave two connections on every button and one
+    press would send the phrase twice -- and a wire that can only be made once
+    should be made where everything else is made.
+]]
+function HUDController.setQuickChatHandler(self: HUDController, callback: (string) -> ())
+    self._onQuickChat = callback
+end
+
+function HUDController.callButton(self: HUDController): TextButton
+    return self._call
+end
+
+function HUDController.isCallMenuOpen(self: HUDController): boolean
+    return self._callOverlay.Visible
+end
+
+function HUDController._setCallCategory(self: HUDController, categoryId: string)
+    self._callCategory = categoryId
+    for id, tab in self._callTabs do
+        local selected = id == categoryId
+        tab.BackgroundColor3 = if selected then COLORS.blue else COLORS.panelSoft
+        tab.TextColor3 = if selected then COLORS.ink else COLORS.muted
+    end
+    for _, entry in self._callPhraseButtons do
+        entry.button.Visible = entry.category == categoryId
+    end
+end
+
+function HUDController.setCallMenuOpen(self: HUDController, open: boolean)
+    if open and not self._call.Visible then
+        return
+    end
+    self._callOverlay.Visible = open
+    if open then
+        self:_setCallCategory(self._callCategory)
+        self:_layout()
+        --[[
+            Hand the pad the first phrase in the open category. A grid of
+            TextButtons is reachable by D-pad once one of them is selected, and
+            nothing selects itself: the field book paid for this lesson in #327
+            with a scrolling window a controller could not enter.
+        ]]
+        for _, entry in self._callPhraseButtons do
+            if entry.button.Visible then
+                GuiService.SelectedObject = entry.button
+                break
+            end
+        end
+    elseif
+        GuiService.SelectedObject ~= nil
+        and GuiService.SelectedObject:IsDescendantOf(self._callPanel)
+    then
+        GuiService.SelectedObject = nil
+    end
+end
+
+function HUDController.toggleCallMenu(self: HUDController)
+    self:setCallMenuOpen(not self._callOverlay.Visible)
 end
 
 function HUDController.abilityButton(self: HUDController): TextButton
@@ -2086,6 +2339,7 @@ function HUDController._refreshActionCluster(self: HUDController)
         if self._ability.Visible then "1" else "0",
         if self._companion.Visible then "1" else "0",
         if self._dodge.Visible then "1" else "0",
+        if self._call.Visible then "1" else "0",
     })
     if signature == self._actionClusterSignature then
         return
@@ -2327,6 +2581,19 @@ function HUDController._updateProfessionClock(self: HUDController)
         self._companionMode = if companion.mode == "stay" then "stay" else "follow"
         -- the button names the order it will give, not the state it is in
         self._companion.Text = if self._companionMode == "follow" then "STAY" else "FOLLOW"
+    end
+
+    --[[
+        The CALL button appears once First Light is over, because that is the
+        moment a player is out in a world with other people in it -- the
+        tutorial is walked alone with Mara, and a phrase wheel there would be
+        talking to nobody. It stays up while downed on purpose: I AM DOWN is
+        the phrase a downed player most needs, and hiding the wheel exactly
+        when it matters most is the shape of bug this project keeps finding.
+    ]]
+    self._call.Visible = state.tutorialComplete == true
+    if not self._call.Visible and self._callOverlay.Visible then
+        self:setCallMenuOpen(false)
     end
 
     local profession = state.profession
@@ -2949,6 +3216,7 @@ function HUDController._layout(self: HUDController)
                 { button = self._ability, width = 84 },
                 { button = self._companion, width = 84 },
                 { button = self._dodge, width = 84 },
+                { button = self._call, width = 84 },
             }
         do
             if entry.button.Visible then
@@ -2968,6 +3236,7 @@ function HUDController._layout(self: HUDController)
         -- A cluster that fits one row keeps the 206 the tablet pass settled on.
         self._threatFrame.Position =
             UDim2.new(0.5, 0, 1, -math.max(206, 34 + actionRow * ACTION_ROW_PITCH + 84 + 10))
+        self._actionClusterRows = actionRow
     else
         self._objectiveFrame.Position = UDim2.fromOffset(18, 18)
         self._objectiveFrame.Size = if self._compactEnabled
@@ -3013,11 +3282,23 @@ function HUDController._layout(self: HUDController)
         self._dodge.Position = UDim2.new(1, -252, 1, -40)
         self._ability.Position = UDim2.new(1, -346, 1, -40)
         self._companion.Position = UDim2.new(1, -440, 1, -40)
+        self._call.Position = UDim2.new(1, -534, 1, -40)
         -- RUN stays where it was built on a desktop: left of the row, clear of
         -- the mouse-driven cluster on the right.
         self._sprint.Position = UDim2.new(0, 166, 1, -34)
         self._sprint.AnchorPoint = Vector2.new(0, 1)
+        self._actionClusterRows = 0
     end
+    --[[
+        The phrase wheel is measured from the canvas and seated above whatever
+        the thumb cluster wrapped to, for the two reasons the field book paid
+        for: a literal 420 is wider than a portrait phone's whole canvas, and a
+        panel that overlaps the buttons under it turns a press meant for one
+        into a press on the other.
+    ]]
+    self._callPanel.Size = UDim2.fromOffset(math.min(420, canvasWidth - 24), 260)
+    self._callPanel.Position =
+        UDim2.new(0.5, 0, 1, -(34 + self._actionClusterRows * ACTION_ROW_PITCH + 84 + 14))
     self:_layoutLoadout()
 end
 

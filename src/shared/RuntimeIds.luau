@@ -112,6 +112,14 @@ local RuntimeIds = {
         PartyReply = "party_reply",
         PartyLeave = "party_leave",
         PartyRejoin = "party_rejoin",
+        --[[
+            One phrase from a closed vocabulary, and nothing else. The phrase
+            decides both what is said and what kind of marker it leaves; where
+            the marker lands is the sender's own position, read server-side.
+            A payload that could name a place would be a payload that could
+            name somebody else's place.
+        ]]
+        QuickChat = "quick_chat",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",

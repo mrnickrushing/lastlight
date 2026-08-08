@@ -223,6 +223,22 @@ function InputController.new(
         UserInputService.InputBegan:Connect(function(input: InputObject, _processed: boolean)
             if input.KeyCode == Enum.KeyCode.Escape and hud:isProfessionMenuOpen() then
                 hud:setProfessionMenuOpen(false)
+            elseif input.KeyCode == Enum.KeyCode.Escape and hud:isCallMenuOpen() then
+                hud:setCallMenuOpen(false)
+            elseif hud:isProfessionMenuOpen() then
+                -- One menu at a time. Opening the wheel behind the profession
+                -- panel would put a modal under a modal.
+                return
+            elseif input.KeyCode == Enum.KeyCode.B or input.KeyCode == Enum.KeyCode.DPadLeft then
+                --[[
+                    The wheel's key, on the two devices that have one. B is free
+                    on a keyboard and DPadLeft is the one direction the pad has
+                    not spent (up is the profession menu, down the second
+                    consumable). Touch reaches the wheel through the CALL button
+                    in the thumb cluster, which is the path the owner's phone
+                    actually uses.
+                ]]
+                hud:toggleCallMenu()
             end
         end)
     )
@@ -281,6 +297,18 @@ function InputController._installFallback(
             then
                 self._hud:setProfessionMenuOpen(false)
             elseif self._hud:isProfessionMenuOpen() then
+                return
+            elseif self._hud:isCallMenuOpen() then
+                --[[
+                    The wheel's own key is NOT handled here. This handler is
+                    installed only when the InputContext path fails, and the
+                    handler in _install is installed either way -- so a branch
+                    for B in both would toggle twice on one press and leave the
+                    wheel exactly as it was. The toggle and Escape live there;
+                    what belongs here is the guard below.
+                ]]
+                -- An open wheel swallows the rest: a phrase press must not also
+                -- swing the tool, which is the shape #325 found on every click.
                 return
             elseif input.KeyCode == Enum.KeyCode.E or input.KeyCode == Enum.KeyCode.ButtonX then
                 onInteract()

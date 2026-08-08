@@ -52,6 +52,24 @@ return table.freeze({
     EngineerBraceSeconds = 12,
     EngineerBraceCapacity = 14,
     ActionRatePerSecond = 8,
+    --[[
+        Quick chat's own budget, separate from the action budget on purpose.
+        A player working the phrase wheel must not lose the ability to swing,
+        and a player in a fight must not lose the ability to say I AM DOWN.
+
+        Three in hand and roughly one every two seconds after that: enough to
+        answer a question and point at something without waiting, not enough
+        to fill anybody's screen. The wheel is the one surface in the game
+        whose whole purpose is to reach other players, so its ceiling is a
+        civility setting rather than an anti-macro one.
+    ]]
+    QuickChatRatePerSecond = 0.5,
+    QuickChatBurst = 3,
+    -- How far a ping marker carries. A ping is guidance, and guidance to
+    -- somewhere four hundred studs behind you is noise on the screen. The log
+    -- line is not distance-limited: hearing that someone is down is the point
+    -- even when you cannot reach them.
+    QuickChatPingRadius = 400,
     -- What a baseline phone is assumed to have for this experience before
     -- Roblox starts reclaiming. Client memory headroom is measured against it,
     -- so it decides whether that budget reads as healthy or as one asset load
@@ -131,6 +149,16 @@ return table.freeze({
         region_frostmere_enabled = false,
         region_cinderfall_enabled = false,
         region_hollow_enabled = false,
+        --[[
+            Quick chat, the only player-to-player channel this game has. On,
+            because it is a closed vocabulary of twenty-four phrases rather
+            than a text box -- there is nothing a player can compose, so there
+            is nothing to moderate. The flag exists so a single press can take
+            the channel away if the phrase list turns out to carry a meaning
+            nobody intended, which is the failure mode a closed vocabulary
+            actually has.
+        ]]
+        quick_chat_enabled = true,
     }),
     Environments = table.freeze({
         ["local"] = table.freeze({

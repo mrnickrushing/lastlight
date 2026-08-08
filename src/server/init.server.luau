@@ -62,6 +62,7 @@ local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
 local RunHandoff = require(root.RunHandoff)
 local PartySession = require(root.PartySession)
+local QuickChat = require(root.QuickChat)
 local AdminRoster = require(root.AdminRoster)
 local TownDecorations = require(root.TownDecorations)
 local TownProgression = require(root.TownProgression)
@@ -87,6 +88,7 @@ local ProfileService = require(script.Services.ProfileService)
 local TownNightService = require(script.Services.TownNightService)
 local LobbyService = require(script.Services.LobbyService)
 local PartyService = require(script.Services.PartyService)
+local SocialService = require(script.Services.SocialService)
 local AdminService = require(script.Services.AdminService)
 local CompanionService = require(script.Services.CompanionService)
 local DefenseService = require(script.Services.DefenseService)
@@ -312,6 +314,15 @@ partyService:setPlatformProvider(function(): { Player }
     return lobbyService:readyPlayers(lobbyService)
 end)
 lobbyService:setPartyService(partyService)
+--[[
+    Quick chat, the one channel a player has to another player. Registered
+    beside the party service because they are the two halves of the same
+    question -- who you are travelling with, and what you can say to them --
+    and because the block list one of them consults is the block list the
+    other one will (M11 wave D).
+]]
+local socialService =
+    SocialService.new(logger, Config, QuickChat, RateLimiter, featureFlags, analyticsService)
 local performanceService = PerformanceService.new(logger, Config, PerformanceBudget)
 local adminService = AdminService.new(
     logger,
@@ -423,6 +434,7 @@ services:register(companionService)
 services:register(defenseService)
 services:register(regionEncounterService)
 services:register(partyService)
+services:register(socialService)
 -- Without this the departure countdown never reached a client: LobbyService
 -- published every whole second into a handler nobody had set, so the panel
 -- froze at "DEPARTING IN 10" while the server counted down and launched.
@@ -434,6 +446,7 @@ worldService:setClickHandler(function(clicker: Player, interactionId: string)
 end)
 tutorialService:setCompanionService(companionService)
 tutorialService:setPartyService(partyService)
+tutorialService:setSocialService(socialService)
 partyService:setToastHandler(function(player: Player?, message: string)
     if player ~= nil then
         tutorialService:toastPlayer(player, message)
