@@ -225,6 +225,10 @@ function InputController.new(
                 hud:setProfessionMenuOpen(false)
             elseif input.KeyCode == Enum.KeyCode.Escape and hud:isCallMenuOpen() then
                 hud:setCallMenuOpen(false)
+            elseif hud:isProfessionMenuOpen() then
+                -- One menu at a time. Opening the wheel behind the profession
+                -- panel would put a modal under a modal.
+                return
             elseif input.KeyCode == Enum.KeyCode.B or input.KeyCode == Enum.KeyCode.DPadLeft then
                 --[[
                     The wheel's key, on the two devices that have one. B is free
@@ -294,11 +298,15 @@ function InputController._installFallback(
                 self._hud:setProfessionMenuOpen(false)
             elseif self._hud:isProfessionMenuOpen() then
                 return
-            elseif input.KeyCode == Enum.KeyCode.B or input.KeyCode == Enum.KeyCode.DPadLeft then
-                self._hud:toggleCallMenu()
-            elseif self._hud:isCallMenuOpen() and input.KeyCode == Enum.KeyCode.Escape then
-                self._hud:setCallMenuOpen(false)
             elseif self._hud:isCallMenuOpen() then
+                --[[
+                    The wheel's own key is NOT handled here. This handler is
+                    installed only when the InputContext path fails, and the
+                    handler in _install is installed either way -- so a branch
+                    for B in both would toggle twice on one press and leave the
+                    wheel exactly as it was. The toggle and Escape live there;
+                    what belongs here is the guard below.
+                ]]
                 -- An open wheel swallows the rest: a phrase press must not also
                 -- swing the tool, which is the shape #325 found on every click.
                 return

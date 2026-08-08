@@ -78,18 +78,108 @@ local function presentationOf(call: any): (Color3, string)
     return Color3.fromRGB(kind.colour[1], kind.colour[2], kind.colour[3]), kind.glyph
 end
 
+local function decorate(part: BasePart, colour: Color3, transparency: number)
+    part.Anchored = true
+    part.CanCollide = false
+    part.CanQuery = false
+    part.CanTouch = false
+    part.CastShadow = false
+    part.Material = Enum.Material.Neon
+    part.Color = colour
+    part.Transparency = transparency
+end
+
+--[[
+    Where the floor is under a recorded position.
+
+    The position the server sends is a character's HumanoidRootPart, which on
+    an R15 rig stands about three studs above whatever it is standing on. A
+    ring drawn at that height is a ring floating at hip level, which the first
+    live look caught immediately: the disc cut through the player's shins. So
+    the client casts down for the actual surface, which also puts the mark on
+    the slope rather than through it.
+
+    The fall back is the root's own height minus three rather than the root
+    itself: if the cast finds nothing -- over a gap, mid-fall -- a ring at
+    ankle height is wrong by less than a ring at the hip. Ignoring the ping
+    folder keeps a mark from seating on the mark before it.
+]]
+local function groundBelow(folder: Folder, position: Vector3): number
+    local parameters = RaycastParams.new()
+    parameters.FilterType = Enum.RaycastFilterType.Exclude
+    parameters.FilterDescendantsInstances = { folder, Players.LocalPlayer.Character :: any }
+    parameters.IgnoreWater = false
+    local hit =
+        workspace:Raycast(position + Vector3.new(0, 1, 0), Vector3.new(0, -14, 0), parameters)
+    if hit ~= nil then
+        return hit.Position.Y
+    end
+    return position.Y - 3
+end
+
+--[[
+    The mark itself, as geometry.
+
+    VISUAL_QUALITY_STANDARD is explicit that floating labels are close-range
+    confirmation and not navigation, and a ping is navigation -- it exists to
+    be walked to. A text card alone is 198 pixels that shrink to nothing at the
+    far end of the marker's own five-hundred-stud reach, which is exactly the
+    range at which it has to do its job.
+
+    So the marker is a ring on the ground and a shaft of light standing out of
+    it, in the ping kind's own colour, and the card rides above as the
+    close-range half. Two parts because that is what reads: the ring says where
+    on the floor, the shaft says which direction from anywhere, and a single
+    shape cannot do both. The colour is the catalog's, so a new ping kind is
+    coloured correctly without this file learning its name.
+]]
+function SocialPingController._buildMark(folder: Folder, anchor: Part, colour: Color3)
+    local floor = groundBelow(folder, anchor.Position)
+    local base = Vector3.new(anchor.Position.X, floor + 0.08, anchor.Position.Z)
+
+    local ring = Instance.new("Part")
+    ring.Name = "Ring"
+    ring.Shape = Enum.PartType.Cylinder
+    ring.Size = Vector3.new(0.25, 6, 6)
+    -- A Roblox cylinder lies on its side, so a disc on the floor is one turned
+    -- a quarter over. The same quarter turn the town's props needed in #316.
+    ring.CFrame = CFrame.new(base) * CFrame.Angles(0, 0, math.rad(90))
+    decorate(ring, colour, 0.45)
+    ring.Parent = anchor
+
+    local shaft = Instance.new("Part")
+    shaft.Name = "Shaft"
+    shaft.Size = Vector3.new(0.55, 13, 0.55)
+    shaft.CFrame = CFrame.new(base + Vector3.new(0, 6.5, 0))
+    -- Fainter than the ring: a beam a player looks straight through is a beam
+    -- that does not hide the thing being pointed at, which for HARVEST HERE is
+    -- the entire point of the ping.
+    decorate(shaft, colour, 0.62)
+    shaft.Parent = anchor
+
+    local glow = Instance.new("PointLight")
+    glow.Color = colour
+    glow.Brightness = 1.4
+    glow.Range = 14
+    glow.Shadows = false
+    glow.Parent = ring
+end
+
 --[[
     Where a card hangs.
 
-    A marking call gets an invisible anchor at the recorded position. A
-    courtesy is adorned to the speaker's head, and if that player has left --
-    or has no character yet -- it is simply not drawn: a thank-you from
-    somebody who is gone is nothing, and inventing a place for it would be the
-    one case where a card stands somewhere nobody stood.
+    A marking call gets an anchor at the recorded position, carrying the mark
+    above. A courtesy is adorned to the speaker's head and gets no geometry at
+    all -- speech is close range, which is the one case the standard says a
+    floating label is the right answer for. If that player has left, or has no
+    character yet, it is simply not drawn: a thank-you from somebody who is
+    gone is nothing, and inventing a place for it would be the one case where a
+    card stands somewhere nobody stood.
 ]]
 function SocialPingController._build(self: SocialPingController, call: any): boolean
     local adornee: Instance? = nil
     local anchor: Part? = nil
+    local accent, glyph = presentationOf(call)
     if call.marks == true and call.x ~= nil then
         local part = Instance.new("Part")
         part.Name = "PingAnchor_" .. tostring(call.id)
@@ -102,6 +192,7 @@ function SocialPingController._build(self: SocialPingController, call: any): boo
         part.CastShadow = false
         part.Position = Vector3.new(call.x, call.y, call.z)
         part.Parent = self._folder
+        SocialPingController._buildMark(self._folder, part, accent)
         anchor = part
         adornee = part
     else
@@ -114,7 +205,6 @@ function SocialPingController._build(self: SocialPingController, call: any): boo
         adornee = head
     end
 
-    local accent, glyph = presentationOf(call)
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "SocialPing_" .. tostring(call.id)
     billboard.Adornee = adornee

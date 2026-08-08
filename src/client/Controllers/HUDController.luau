@@ -1869,6 +1869,17 @@ function HUDController.new(
             self:_setCallCategory(categoryId)
         end)
     end
+    for _, entry in callPhraseButtons do
+        entry.button.Activated:Connect(function()
+            local handler = self._onQuickChat
+            if handler ~= nil then
+                handler(entry.phraseId)
+            end
+            -- Closed on send. A wheel that stays open after a press is a wheel
+            -- covering the thing the press was about.
+            self:setCallMenuOpen(false)
+        end)
+    end
     progressButton.Activated:Connect(function()
         self:setProgressOpen(not self._progressOverlay.Visible)
     end)
@@ -1986,23 +1997,14 @@ end
 --[[
     The phrase wheel: one handler for every press in it.
 
-    The button stamps its own phrase id, the way the consumable column does, so
-    the wire out of this panel does not know a phrase name and a twenty-fifth
-    phrase needs no client change at all.
+    The setter only stores the callback; the presses are wired once, at
+    construction. A setter that connects is a setter that cannot be called
+    twice -- a second call would leave two connections on every button and one
+    press would send the phrase twice -- and a wire that can only be made once
+    should be made where everything else is made.
 ]]
 function HUDController.setQuickChatHandler(self: HUDController, callback: (string) -> ())
     self._onQuickChat = callback
-    for _, entry in self._callPhraseButtons do
-        entry.button.Activated:Connect(function()
-            local handler = self._onQuickChat
-            if handler ~= nil then
-                handler(entry.phraseId)
-            end
-            -- Closed on send. A wheel that stays open after a press is a wheel
-            -- covering the thing the press was about.
-            self:setCallMenuOpen(false)
-        end)
-    end
 end
 
 function HUDController.callButton(self: HUDController): TextButton
