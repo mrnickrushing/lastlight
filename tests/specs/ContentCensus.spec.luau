@@ -320,10 +320,19 @@ return {
                 refuses a return to the skip, because the skip is what
                 made the gap invisible.
 
-                The derivation is a floor and stays one; the count that
-                moves is how far above it the authoring has got. Nineteen
-                now, chapters I through V, and the assertion is here so
-                that number can only go up on purpose.
+                The count that moved is how far above the floor the
+                authoring has got, and it has now got all the way: all
+                twenty-seven have a body somebody wrote, so this case
+                walks the roster rather than a list copied beside it.
+
+                That inverts what the derivation is for. It used to be
+                the path eight people were standing on; it is now the
+                thing that catches the twenty-eighth resident, and both
+                halves have to hold. The roster walk fails on the day a
+                resident is added without a body, which is when it is
+                cheap to fix; the source checks above fail if somebody
+                deletes the net underneath that, which is when it is
+                not.
             ]]
             name = "a resident with no authored body derives one rather than being skipped",
             run = function()
@@ -351,38 +360,59 @@ return {
                     )
                 end
 
-                -- the authored ones keep their authored bodies: chapter
-                -- one's three, then the Delve's four, the Fen's four, the
-                -- Reach's four and the Vale's four
+                -- every resident the roster names has a body somebody
+                -- wrote, checked against the roster rather than a copy of
+                -- it, because a list beside the thing it describes is one
+                -- more list to forget to update
                 local built = 0
-                for _, residentId in
-                    {
-                        "npc_tomas_reed",
-                        "npc_pip_wren",
-                        "npc_ena_moss",
-                        "npc_hesper_vane",
-                        "npc_odell_crane",
-                        "npc_junie_falk",
-                        "npc_bartram_hoke",
-                        "npc_saoirse_quill",
-                        "npc_wren_dabbler",
-                        "npc_marek_still",
-                        "npc_lissen_ford",
-                        "npc_isolde_maren",
-                        "npc_cass_pell",
-                        "npc_alder_kine",
-                        "npc_nell_barrow",
-                        "npc_anselm_rill",
-                        "npc_ivy_thorn",
-                        "npc_halvard_sunn",
-                        "npc_maud_ferrow",
-                    }
-                do
-                    if string.find(world, residentId .. " = {", 1, true) ~= nil then
-                        built += 1
-                    end
+                for _, definition in ResidentRoster.list() do
+                    TestRunner.truthy(
+                        string.find(world, definition.id .. " = {", 1, true) ~= nil,
+                        definition.fullName .. " arrives in town with no body somebody wrote"
+                    )
+                    built += 1
                 end
-                TestRunner.equal(built, 19, "an authored resident lost their body")
+                TestRunner.equal(built, 27, "the roster is not twenty-seven people any more")
+            end,
+        },
+        {
+            --[[
+                The prop lookup was the eight-names bug in miniature and
+                kept a piece of it until this wave.
+
+                `RESIDENT_PROPS[definition.prop] or RESIDENT_PROPS.seed_basket`
+                is the same silent `else` that made eight wrong prop names
+                invisible: a mistyped prop rendered as the seedkeeper's
+                basket, which is a wrong answer that looks like a right
+                one. The `or` is gone, so a name nothing builds is empty
+                hands -- and this refuses the name outright, because the
+                place to catch it is here rather than in a photograph.
+            ]]
+            name = "every prop a resident names is a prop somebody built",
+            run = function()
+                local fs = require("@lune/fs")
+                local world = fs.readFile("src/server/Services/WorldService.luau")
+                local propsBlock = string.match(world, "local RESIDENT_PROPS.-\n    }\n")
+                TestRunner.truthy(propsBlock ~= nil, "RESIDENT_PROPS is no longer one table")
+                local names = 0
+                for propName in string.gmatch(world, 'prop = "([a-z_]+)"') do
+                    names += 1
+                    TestRunner.truthy(
+                        string.find(
+                            propsBlock :: string,
+                            "\n        " .. propName .. " = {",
+                            1,
+                            true
+                        ) ~= nil,
+                        propName .. " is carried by a resident and built by nobody"
+                    )
+                end
+                TestRunner.equal(names, 27, "a resident stopped carrying anything")
+                TestRunner.equal(
+                    string.find(world, "or RESIDENT_PROPS.seed_basket", 1, true),
+                    nil,
+                    "a mistyped prop name renders as the seedkeeper's basket again"
+                )
             end,
         },
         {
