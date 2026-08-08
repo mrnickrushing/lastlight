@@ -260,46 +260,52 @@ return {
                 recipes, and 120 shipped that nobody could make. Every
                 spec passed. Only walking to the workshop found it.
 
-                The benches are derived from the catalog now, so this
-                reads the source and refuses a return to a hand-written
-                list -- one authored table for the original ten, and every
-                other recipe deriving its bench and its interaction id
-                from its own entry.
+                Deriving a bench per recipe closed that gap and broke
+                something worse: thirteen columns by ten rows landed from
+                z -128 to -11 across a plaza spanning -136 to -24, so a
+                player spawned into a maze of colliding furniture whose
+                click volumes ate the taps meant for the tutorial's first
+                interaction. It was "verified" by counting benches in a
+                console, which is exactly why nobody saw it.
+
+                So this asserts the true state -- ten benched, a hundred
+                and twenty not -- and refuses the derivation, because a
+                hundred and thirty pieces of furniture is the wrong shape
+                for the problem wherever they are put. The fix is a bench
+                that lists what a player can make.
             ]]
-            name = "every recipe has a bench, and the bench list is derived rather than written",
+            name = "the crafting benches are the authored ten, and the gap is open",
             run = function()
                 local fs = require("@lune/fs")
                 local world = fs.readFile("src/server/Services/WorldService.luau")
-                --[[
-                    The derivation itself, named exactly: a loop over the
-                    crafting catalog that inserts a bench per recipe, with
-                    an id derived from the recipe rather than a constant.
-                ]]
-                TestRunner.truthy(
-                    string.find(world, "for _, recipe in self._craftingCatalog:list() do", 1, true)
-                        ~= nil,
-                    "the benches no longer derive from the crafting catalog"
-                )
-                TestRunner.truthy(
-                    string.find(world, 'id = "craft:" .. recipe.id', 1, true) ~= nil,
-                    "bench interaction ids are no longer derived from the recipe"
-                )
+                local benched: { [string]: boolean } = {}
+                local count = 0
+                for recipeId in string.gmatch(world, 'recipeId = "(recipe_[a-z_]+)"') do
+                    if not benched[recipeId] then
+                        benched[recipeId] = true
+                        count += 1
+                    end
+                end
+                TestRunner.equal(count, 10, "the bench list changed size")
 
-                -- the authored ten keep their bespoke benches, because
-                -- they are the ten a fresh player meets first
-                local authored = 0
-                for _ in string.gmatch(world, 'recipeId = "(recipe_[a-z_]+)"') do
-                    authored += 1
+                local unreachable = 0
+                for _, recipe in CraftingCatalog.list() do
+                    if not benched[recipe.id] then
+                        unreachable += 1
+                    end
                 end
-                TestRunner.equal(authored, 10, "the authored bench list changed size")
-                for _, recipeId in
-                    { "recipe_meadow_satchel", "recipe_amber_charm", "recipe_thornwood_bow" }
-                do
-                    TestRunner.truthy(
-                        string.find(world, 'recipeId = "' .. recipeId .. '"', 1, true) ~= nil,
-                        recipeId .. " lost its authored bench"
-                    )
-                end
+                TestRunner.equal(
+                    unreachable,
+                    120,
+                    "the count of recipes with no bench moved -- if a crafting menu "
+                        .. "shipped this should be zero and this case should check that"
+                )
+                TestRunner.equal(
+                    string.find(world, 'id = "craft:" .. recipe.id', 1, true),
+                    nil,
+                    "benches are being derived per recipe again -- that put 130 of "
+                        .. "them across the plaza once already"
+                )
             end,
         },
         {

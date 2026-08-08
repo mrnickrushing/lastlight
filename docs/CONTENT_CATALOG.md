@@ -368,18 +368,29 @@ Crown's four and the Hollow's four — still derive, and the census
 asserts the count of authored bodies so raising it stays a deliberate
 act rather than a drift.
 
-**Recipes (fixed): 120 of the 130 could not be crafted.** The workshop's benches were a
-hardcoded list of ten in `WorldService`, each needing its own constant in
-`RuntimeIds.InteractionIds`, and it never grew when the catalog did.
-Every spec passes, the equipment exists, the visual plans exist, the
-equip panel has a button for each — and there is no bench to make them
-at. A recipe existing and a recipe being reachable are different facts,
-and until this the census only checked the first.
+**Recipes (open again): 120 of the 130 have no crafting bench.**
 
-Fixed: the benches derive from `CraftingCatalog.list()` and the
-interaction id derives from the recipe (`craft:<recipeId>`), and the
-census asserts the derivation itself so a hand-written list cannot come
-back. Verified live — 130 benches, each carrying its own payload.
+The workshop's benches were a hardcoded list of ten, written when there
+were ten recipes, and it never grew with the catalog.
+
+It was briefly "fixed" by deriving one bench per recipe, and that is the
+worst thing shipped to this game so far. Thirteen columns by ten rows put
+benches from z -128 to -11, across a plaza that spans -136 to -24: a
+player spawned into a maze of colliding furniture, and every bench
+carried a ten-by-eleven click volume that swallowed the taps meant for
+the tutorial's first interaction. The game was unplayable in its first
+ten seconds. It passed every test, because it was verified by counting
+benches in a console rather than by walking through the town.
+
+Reverted. The gap is open and recorded, which is the correct state: a
+recorded gap is better than a town nobody can cross.
+
+**The fix is not more benches.** A hundred and thirty pieces of furniture
+is the wrong shape for the problem wherever they are put. What this wants
+is one bench that lists what a player can currently make — the recipe
+list already exists in `CraftingCatalog`, the craft handler already
+accepts any recipe id as a payload, and the only missing piece is a
+panel. That is a UI wave, not a geometry wave.
 
 The lesson generalises, which is why the resident gap above was found
 immediately afterwards: **a thing existing in a catalog and a thing being
