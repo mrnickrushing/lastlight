@@ -274,7 +274,7 @@ not replace lived experience.
 - critical fact redundancy;
 - recap accuracy;
 - age-appropriate fear and grief presentation;
-- original-IP and asset provenance;
+- original-IP and asset provenance, against [ASSET_PROVENANCE.md](ASSET_PROVENANCE.md);
 - localization context and cultural review;
 - no premium copy exploiting loss, guilt, or urgency.
 
@@ -329,7 +329,7 @@ exists to prevent, and the two declarations are one act.
 | `content_schemas_and_counts` | yes | check | `ContentCensus.spec` |
 | `save_schema_frozen` | yes | check | `scripts/validate_schema_freeze.py` |
 | `monetization_guard_holds` | yes | check | `scripts/validate_monetization.py` |
-| `asset_provenance` | yes | check | `scripts/validate_mesh_assets.py` |
+| `asset_provenance` | yes | check | `scripts/asset_provenance.py` |
 | `main_synchronized` | yes | open | Owner: release branch merged, local and remote `main` at the release revision |
 | `release_tag_and_manifest` | yes | open | Owner: tag the release commit and record the build manifest |
 | `blocker_critical_zero` | yes | open | Owner: triage record showing no open blocker or critical defect |
