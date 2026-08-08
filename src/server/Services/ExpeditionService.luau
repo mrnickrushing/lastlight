@@ -153,6 +153,17 @@ function ExpeditionService._buildRegion(self: ExpeditionService, seed: number)
     local result = self._worldService:buildBramblewake(manifest, self._generator, self._catalog)
     self._manifest = manifest
     self._partCount = result.partCount
+    --[[
+        Read at every build rather than once at boot.
+
+        A private server owner can ask for a different seed at runtime and this
+        function runs again, so a flag turned off during an incident takes hold
+        on the next wood rather than waiting for a restart. The event states
+        below are created from it, which is why it is stored as well as read:
+        the states have to agree with each other for the life of one manifest,
+        and a flag flipping between two module placements would build a wood
+        where half the events are dormant and half are disabled.
+    ]]
     self._eventsEnabled = self._featureFlags:isEnabled("bramblewake_events_enabled")
     self._worldService:setExpeditionEventsEnabled(self._eventsEnabled)
     self._eventStates = {}
