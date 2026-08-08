@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #328), build `0.53.0`,
-save schema 22, 25 services. Published to Roblox as place version 139,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #329), build `0.53.0`,
+save schema 23, 25 services. Published to Roblox as place version 141,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,6 +59,67 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#329** (v141) **M11 wave C: a town has a gate now, and somebody decides
+  who comes through it.** `TownPermissions` settled the host/visitor split in
+  Milestone 4 and its invariant has held since — a visit improves a town or
+  leaves it alone, never breaks it. What was missing was the other half of the
+  sentence: a player had no say in *who* visited.
+
+  **What a policy can govern, and what it deliberately does not.** It does not
+  govern presence. Roblox decides which server a player lands in, and a game
+  that ejected somebody on arrival would brick a public join for a player who
+  did nothing but get matched. So the policy governs the thing this game does
+  control: whether an arriving player's town record is **adopted** into the
+  host's town, and whether they may **read** the host's showcase. Refused, they
+  are an `outsider` — a third role that is a narrowing of `visitor`, not a
+  widening of anything: they play their own nights, their own expeditions and
+  their own profile, and the host's Emberhollow is scenery. Adoption is the
+  only channel by which one player's save has ever reached another's town, so
+  closing it is a real boundary. And because an outsider contributes *nothing*,
+  the Milestone 4 invariant is preserved twice over rather than merely
+  survived; the spec re-asserts it against this path rather than trusting the
+  older suite.
+
+  **An undecided arrival is held, not guessed.** Deciding needs an answer the
+  platform gives asynchronously (friendship), so the record waits rather than
+  being applied on a guess. A guess in the admitting direction is a closed town
+  adopting one stranger before the gate speaks — the exact bypass this wave
+  exists to make impossible — and a guess the other way drops a legitimate
+  contribution for good. An undecided record is simply never applied, and an
+  unapplied upward-only contribution costs a town nothing. The same reasoning
+  makes `pending` a real role the snapshot reports: the showcase hangs off the
+  role, so a relation the platform has not answered on yet reads nothing.
+
+  **The policy is a plank you walk up to.** `open → friends → invited →
+  closed`, cycled at a gate standing over the south end of the lantern road,
+  because the HUD has had buttons taken back off it twice for portrait screens
+  and a setting about the town belongs in the town — the same reasoning that
+  moved FIND and STRIKE onto the objects they act on. Being *asked along* beats
+  being on a friends list, so a town set to `invited` admits the party the
+  founder just built even if none of them are friends. Only the founder may
+  work the latch; a visitor gets ONLY THIS TOWN'S FOUNDER SETS ITS GATE.
+
+  Save schema 22 → 23 with an era-22 fixture, and that fixture carries a rejoin
+  ticket — the migration case now asserts an era-22 ticket *survives* rather
+  than only that older eras have none, which is the claim that matters to a
+  player who dropped out of a run and updated in between. Era-22 saves arrive
+  **open**, because every town before this schema was open to whoever the
+  matchmaker sent and migrating them shut would be a change of behaviour
+  wearing a safe default's clothes.
+
+  **Verified live**: the gate builds (two posts, a lintel, a hung board over
+  the road), a real mouse click on the board walked all four values with the
+  right toast each time, the snapshot carried `role=host`, the policy, its
+  label and a showcase reading tier 0 / night 1 / integrity 100, and
+  `town_host_established host=… policy=open` logged at adoption. **The camera
+  caught one defect**: a board's Front face is its −Z, so the sign read out
+  into the trees and was blank from every angle a player approaches from.
+  Turned to face the square, and confirmed by dot product and by eye.
+
+  **Open and owner-gated**: the two-player half. A visitor being refused, a
+  showcase being read by somebody else, and a friendship resolving all need a
+  second person in the server, which is the cohort work M12–M13 already list.
+  The pure rules and the single-door guard are spec-covered.
 - **#328** (v140) **M11 wave B: a player can say something to another player,
   and there is no string in it.** Twenty-four phrases in four categories, and
   the design decision under all of it is that the vocabulary is *closed*: free

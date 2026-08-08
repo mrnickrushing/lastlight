@@ -132,6 +132,39 @@ function PartyService._partyOf(self: PartyService, player: Player): (string?, an
     return partyId, state
 end
 
+--[[
+    Whether these two people are travelling together, by user ID.
+
+    Read by the town gate rather than by anything in the party flow: a town set
+    to "invited" has to know who the founder asked along, and the party roster
+    is the record of exactly that. An outstanding invitation counts, because
+    being asked is the invitation -- a player who has been offered a seat and
+    has not yet pressed JOIN was still chosen.
+
+    By ID rather than by Player because the founder may have left the server
+    and their user ID is what the town still remembers them by.
+]]
+function PartyService.sharesPartyWith(
+    self: PartyService,
+    firstUserId: number,
+    secondUserId: number
+): boolean
+    if firstUserId == secondUserId then
+        return true
+    end
+    local held = self._partyByUser[firstUserId]
+    if held ~= nil then
+        if self._partyByUser[secondUserId] == held then
+            return true
+        end
+        if self._inviteByUser[secondUserId] == held then
+            return true
+        end
+    end
+    local theirs = self._partyByUser[secondUserId]
+    return theirs ~= nil and self._inviteByUser[firstUserId] == theirs
+end
+
 function PartyService._store(self: PartyService, partyId: string, state: any)
     if state == nil then
         self._parties[partyId] = nil

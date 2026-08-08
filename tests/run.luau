@@ -87,6 +87,7 @@ TestRunner.run({
     require("./specs/TownConstruction.spec"),
     require("./specs/TownCondition.spec"),
     require("./specs/TownPermissions.spec"),
+    require("./specs/TownVisitPolicy.spec"),
     require("./specs/TownGuardLastStand.spec"),
     require("./specs/LobbyDeparture.spec"),
     require("./specs/ActionProgress.spec"),

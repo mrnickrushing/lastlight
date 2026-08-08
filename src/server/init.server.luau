@@ -1,5 +1,6 @@
 --!strict
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -60,6 +61,7 @@ local PerformanceBudget = require(root.PerformanceBudget)
 local ProfilePersistence = require(root.ProfilePersistence)
 local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
+local TownVisitPolicy = require(root.TownVisitPolicy)
 local RunHandoff = require(root.RunHandoff)
 local PartySession = require(root.PartySession)
 local QuickChat = require(root.QuickChat)
@@ -344,11 +346,63 @@ local townNightService = TownNightService.new(
     TownNightIncident,
     TownCondition,
     TownPermissions,
+    TownVisitPolicy,
     TownGuardLastStand,
     analyticsService,
     featureFlags
 )
 townNightService:setDefense(defenseService, DefenseLanes)
+--[[
+    Who may visit this town, in the two pieces the service cannot supply
+    itself.
+
+    The policy is read once, from the founder's own profile, at the moment the
+    server adopts them as host -- so a founder who disconnects leaves their
+    gate exactly as they set it. The relation is the asynchronous half:
+    friendship is a platform round trip, and a party membership is something
+    PartyService already knows, so both are answered here and handed back
+    through the callback rather than blocking a profile load on a web call.
+
+    Order matters in the check. Being asked along beats being on a friends
+    list, because the party is the group actually playing together; a stranger
+    the founder invited onto the departure platform is somebody the founder
+    chose, and a town set to "invited" should let them in.
+]]
+townNightService:setVisitPolicyProvider(function(hostUserId: number): string
+    local hostPlayer = Players:GetPlayerByUserId(hostUserId)
+    if hostPlayer == nil then
+        return TownVisitPolicy.Default
+    end
+    return profileService:visitPolicy(hostPlayer)
+end)
+townNightService:setRelationResolver(
+    function(actorUserId: number, hostUserId: number, resolve: (string) -> ())
+        task.spawn(function()
+            if partyService:sharesPartyWith(hostUserId, actorUserId) then
+                resolve("invited")
+                return
+            end
+            local hostPlayer = Players:GetPlayerByUserId(hostUserId)
+            if hostPlayer ~= nil then
+                local ok, friends = pcall(function(): boolean
+                    return hostPlayer:IsFriendsWith(actorUserId)
+                end)
+                if ok and friends == true then
+                    resolve("friend")
+                    return
+                end
+                if not ok then
+                    -- The platform did not answer. A stranger is the honest
+                    -- reading and the safe one: it can only ever refuse, and a
+                    -- refusal costs an upward contribution the town was fine
+                    -- without, while a wrong "friend" opens a closed town.
+                    logger:warn("town_friendship_unavailable", { host = hostUserId })
+                end
+            end
+            resolve("stranger")
+        end)
+    end
+)
 survivalService:setPartyRecoveryProvider(
     function(eligiblePlayers: number, downedPlayers: number): any
         return townNightService:attemptLastStand(eligiblePlayers, downedPlayers)
@@ -396,7 +450,8 @@ local tutorialService = TutorialService.new(
     ToolCatalog,
     GearWear,
     GearTraits,
-    Consumables
+    Consumables,
+    TownVisitPolicy
 )
 
 local services = ServiceRegistry.new({
@@ -409,6 +464,7 @@ local services = ServiceRegistry.new({
     actionPayloadContract = ActionPayloadContract,
     adminInspectionReport = AdminInspectionReport,
     profilePersistence = ProfilePersistence,
+    townVisitPolicy = TownVisitPolicy,
     profileBackup = ProfileBackup,
     config = Config,
 })

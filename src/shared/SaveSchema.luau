@@ -10,6 +10,7 @@ local HollowFinale = require("./Content/Definitions/HollowFinale")
 local NamelessNight = require("./NamelessNightEncounter")
 local MemoryFragments = require("./MemoryFragments")
 local PartySession = require("./PartySession")
+local TownVisitPolicy = require("./TownVisitPolicy")
 local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
@@ -107,6 +108,14 @@ export type Profile = {
     ]]
     social: {
         rejoin: PartySession.Ticket?,
+        --[[
+            Who may visit this player's Emberhollow. Lives beside the rejoin
+            ticket because both answer the same question from opposite ends --
+            the ticket is how you get back to people, the policy is who gets to
+            you -- and because a `social` table with one field in it was always
+            going to gain a second.
+        ]]
+        visitPolicy: TownVisitPolicy.Policy,
     },
 }
 
@@ -125,7 +134,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 22,
+        schemaVersion = 23,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -179,6 +188,7 @@ function SaveSchema.default(now: number): Profile
         },
         social = {
             rejoin = nil,
+            visitPolicy = TownVisitPolicy.Default,
         },
     }
 end
@@ -465,8 +475,15 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.social.rejoin = PartySession.normalizeTicket(
         if type(value.social) == "table" then value.social.rejoin else nil
     )
+    -- An era-22 save has no policy, and the value it arrives with is the one
+    -- it was already being played under: every town before this schema was
+    -- open to whoever the matchmaker sent. Migrating them to `closed` would be
+    -- a silent change of behaviour dressed as a safe default.
+    profile.social.visitPolicy = TownVisitPolicy.normalize(
+        if type(value.social) == "table" then value.social.visitPolicy else nil
+    )
 
-    profile.schemaVersion = 22
+    profile.schemaVersion = 23
     return profile
 end
 
@@ -953,6 +970,28 @@ end
 
 function SaveSchema.rejoinTicket(profile: Profile): any
     return profile.social.rejoin
+end
+
+--[[
+    Set who may visit. A value the catalog does not know is refused outright
+    rather than normalized to the default: the caller is the gate, the gate
+    only ever offers the next value in the list, and quietly writing something
+    else would mean a press that says one thing and stores another.
+]]
+function SaveSchema.withVisitPolicy(profile: Profile, policy: any, now: number): Profile
+    if not TownVisitPolicy.isValid(policy) or policy == profile.social.visitPolicy then
+        return profile
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.social = table.clone(profile.social)
+    nextProfile.social.visitPolicy = policy
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile
+end
+
+function SaveSchema.visitPolicy(profile: Profile): TownVisitPolicy.Policy
+    return TownVisitPolicy.normalize(profile.social.visitPolicy)
 end
 
 -- Whether two condition states describe the same town. Compared building by

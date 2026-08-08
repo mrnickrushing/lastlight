@@ -92,6 +92,7 @@ local INTERACTION_ROUTED: { [string]: boolean } = {
     craft_item = true,
     warden_stag_choice = true,
     recover_memory_fragment = true,
+    set_visit_policy = true,
 }
 
 -- Actions the server raises on its own behalf, never in answer to a
