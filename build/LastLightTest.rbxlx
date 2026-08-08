@@ -5040,6 +5040,77 @@ return table.freeze({
         ]]
         cosmetic_store_enabled = false,
     }),
+    --[[
+        Which rung of Milestone 13's rollout each flag has reached.
+
+        The roadmap's four rungs are team and trusted testers, the consented
+        allowlist, the larger controlled cohort, and everyone. `off` is the
+        rung below all of them.
+
+        This table is not a second copy of the switches above -- it is the
+        same fact said in the vocabulary a staged rollout needs, and
+        `RolloutCohorts.globalDefault` is what holds the two together: a flag
+        at `everyone` is on for a player nobody has said anything about, and
+        a flag at any other rung is not. `FeatureFlagService.spec` walks both
+        tables and refuses any disagreement, so a flag added to one and not
+        the other fails on the day it is added rather than on the day a
+        cohort is supposed to see it.
+
+        Nothing sits mid-ladder today, and that is the honest state rather
+        than an oversight: the rungs are populations, and there is no
+        population yet. `RolloutRoster` below is empty for the same reason
+        `CommerceProductIds` is. Why each flag is where it is, is written in
+        the matrix in BETA_ROLLOUT.md, which this table is checked against.
+
+        `percent` is carried at every stage rather than only at `cohort`, so
+        a flag advancing to the cohort rung cannot arrive without one and
+        have somebody pick a number in the same commit that opens the gate.
+    ]]
+    FeatureFlagRollouts = table.freeze({
+        bounded_join = table.freeze({ stage = "everyone", percent = 100 }),
+        first_ten_minutes = table.freeze({ stage = "everyone", percent = 100 }),
+        input_action_system = table.freeze({ stage = "everyone", percent = 100 }),
+        combat_mobility_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        profession_kits_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        player_survival_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        tutorial_persistence = table.freeze({ stage = "off", percent = 0 }),
+        content_registry = table.freeze({ stage = "everyone", percent = 100 }),
+        bramblewake_events_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        old_growth_elite_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        warden_stag_boss_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        bramblewake_blackout_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        town_night_cycle_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        lobby_departure_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        reserved_run_servers_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        admin_commands_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        region_encounters_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        region_bramblewake_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        region_ironroot_enabled = table.freeze({ stage = "off", percent = 0 }),
+        region_mireglass_enabled = table.freeze({ stage = "off", percent = 0 }),
+        region_tempest_enabled = table.freeze({ stage = "off", percent = 0 }),
+        region_frostmere_enabled = table.freeze({ stage = "off", percent = 0 }),
+        region_cinderfall_enabled = table.freeze({ stage = "off", percent = 0 }),
+        region_hollow_enabled = table.freeze({ stage = "off", percent = 0 }),
+        quick_chat_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        cosmetic_store_enabled = table.freeze({ stage = "off", percent = 0 }),
+    }),
+    --[[
+        The two rosters the first two rungs are read from, by Roblox user ID.
+
+        Empty, and correctly so: a trusted tester is a person the owner has
+        asked, and an allowlisted player is one whose guardian has consented.
+        Neither is something this repository can invent. A flag standing at
+        `team` with an empty roster is on for nobody, which is the safe way
+        for this to be wrong.
+
+        By user ID rather than by name, for `AdminRoster`'s reason: a display
+        name can be changed by the person using it, and the number they join
+        with cannot.
+    ]]
+    RolloutRoster = table.freeze({
+        team = table.freeze({}),
+        allowlist = table.freeze({}),
+    }),
     Environments = table.freeze({
         ["local"] = table.freeze({
             LogLevel = "debug",
@@ -31278,6 +31349,230 @@ return table.freeze(ReviveFlow)
       </Item>
       <Item class="ModuleScript" referent="93">
         <Properties>
+          <string name="Name">RolloutCohorts</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    Which players a flag has reached, and in what order it reaches them.
+
+    Milestone 13's rollout is four rungs -- team and trusted testers, then a
+    small allowlist across devices and age ranges with guardian consent, then
+    a larger cohort behind controlled flags, then the creator and community
+    test once moderation and scale look healthy. The flag service this game
+    has shipped since Milestone 1 answers one question globally: on, or off.
+    A staged rollout needs it to answer per player, and the interesting part
+    is not the answer. It is what happens when somebody *advances* the stage.
+
+    **The ladder only ever widens.** A flag moved from `team` to `allowlist`
+    must not take the feature away from the testers who have been living with
+    it, because those are the people whose reports the next rung is decided
+    on. That is not a promise kept by whoever edits the table -- it is
+    structural here: `admits` walks the rungs from the bottom up to the flag's
+    current stage and returns at the first one that lets the player in, so a
+    later stage cannot narrow an earlier one. There is no rung that subtracts.
+
+    **A cohort-scoped flag read without a player is refused, not guessed.**
+    Every call site in this game today asks globally, and a flag that becomes
+    cohort-scoped while one of them still asks globally has to answer
+    something. Both answers are wrong in a way that is invisible: `true` ships
+    an unreleased feature to the whole population, which is the exact thing
+    a staged rollout exists to prevent, and `false` makes it untestable for
+    the cohort it was turned on for. So there is no answer. The read throws,
+    the same way an unknown flag already does, because this can only be
+    reached by a programming mistake and a loud one costs a Studio session
+    while a quiet one costs a beta.
+
+    **A bucket is stable per player and independent per flag.** Stable
+    because a feature that is on in one server and off in the next is worse
+    than a feature that is off: the player reports a bug nobody can
+    reproduce. Independent because if the same players are picked for every
+    flag, the beta has one cohort wearing four flags and every measurement is
+    about that one group.
+
+    The independence is the part that had to be measured rather than
+    reasoned about. The first version hashed `flag .. userId` and ran the
+    result through the same Lehmer step `ExpeditionGenerator` uses, and every
+    operation in that chain is affine -- so changing the flag name shifted
+    every player's bucket by one constant. Two flags at ten percent produced
+    cohorts that were **perfectly disjoint** (measured: 0 players in both,
+    against 201 expected), and two flags at fifty percent would have cut the
+    population into exact complements, so no player would ever have seen both
+    features. Folding the two hashes together with an exclusive or breaks the
+    affinity, and the same measurement then returns 200 against 201 expected.
+
+    Pure. No players, no services, no clock: user IDs and flag names in,
+    booleans out.
+]]
+
+local RolloutCohorts = {}
+
+export type Stage = "off" | "team" | "allowlist" | "cohort" | "everyone"
+
+export type Rollout = {
+    stage: Stage,
+    -- What share of the population the `cohort` rung admits, 0 to 100. Read
+    -- at no other stage, and required at every stage so a flag advancing to
+    -- `cohort` cannot arrive without one.
+    percent: number,
+}
+
+export type Roster = {
+    -- Milestone 13 rung one: the team and the trusted testers.
+    team: { [number]: boolean },
+    -- Rung two: the consented allowlist across devices and age ranges.
+    allowlist: { [number]: boolean },
+}
+
+--[[
+    The rungs, in the order the roadmap climbs them. `off` is a real rung
+    rather than an absent one: a flag nobody has yet is a state a matrix has
+    to be able to say out loud, and it is where every unreleased flag in this
+    game sits today.
+]]
+local STAGES: { Stage } = table.freeze({
+    "off" :: Stage,
+    "team",
+    "allowlist",
+    "cohort",
+    "everyone",
+})
+
+local RANK: { [string]: number } = {}
+for index, stage in STAGES do
+    RANK[stage] = index
+end
+table.freeze(RANK)
+
+local HASH_MULTIPLIER = 33
+local HASH_MODULUS = 2147483647
+local MIX_MULTIPLIER = 16807
+local BUCKETS = 100
+
+local function textHash(text: string): number
+    local result = 0
+    for index = 1, #text do
+        result = (result * HASH_MULTIPLIER + string.byte(text, index)) % HASH_MODULUS
+    end
+    return result
+end
+
+function RolloutCohorts.stages(): { Stage }
+    return table.clone(STAGES)
+end
+
+function RolloutCohorts.rank(stage: any): number?
+    if type(stage) ~= "string" then
+        return nil
+    end
+    return RANK[stage]
+end
+
+function RolloutCohorts.isStage(value: any): boolean
+    return RolloutCohorts.rank(value) ~= nil
+end
+
+--[[
+    Whether this stage has a single answer for the whole population.
+
+    `off` and `everyone` do; the three rungs between them do not, and a read
+    of one of those without a player is the refusal this module exists to
+    make loud.
+]]
+function RolloutCohorts.isScoped(stage: any): boolean
+    local rank = RolloutCohorts.rank(stage)
+    return rank ~= nil and rank > 1 and rank < #STAGES
+end
+
+--[[
+    The one answer a global read is allowed to give. `everyone` is the only
+    stage that is on for a player nobody has said anything about, which is
+    what makes the flag table and the stage matrix the same fact rather than
+    two facts that can drift.
+]]
+function RolloutCohorts.globalDefault(stage: any): boolean
+    return stage == "everyone"
+end
+
+--[[
+    Where a player sits in the 0..99 spread for one flag.
+
+    The two hashes are folded with an exclusive or rather than concatenated,
+    for the reason written at the top of this file: concatenation is affine
+    all the way through and produced rotations of one ordering instead of a
+    different ordering per flag.
+]]
+function RolloutCohorts.bucket(flag: string, userId: number): number
+    local folded = bit32.bxor(textHash(flag), textHash("u" .. tostring(math.floor(userId))))
+    local state = folded % HASH_MODULUS
+    if state == 0 then
+        state = 1
+    end
+    return ((state * MIX_MULTIPLIER) % HASH_MODULUS) % BUCKETS
+end
+
+local function inRoster(roster: Roster?, key: string, userId: number): boolean
+    if roster == nil then
+        return false
+    end
+    local list = (roster :: any)[key]
+    return type(list) == "table" and list[userId] == true
+end
+
+--[[
+    Whether this player has the flag, and which rung let them in.
+
+    The walk is bottom-up on purpose. Every rung is asked in turn until one
+    admits or the flag's own stage is passed, so widening a rollout can only
+    ever add people. There is no branch here that takes the feature back off
+    somebody, which is the property the whole module is for.
+]]
+function RolloutCohorts.admits(
+    flag: string,
+    rollout: Rollout,
+    roster: Roster?,
+    userId: number
+): (boolean, string)
+    local ceiling = RolloutCohorts.rank(rollout.stage)
+    if ceiling == nil then
+        return false, "unknown_stage"
+    end
+
+    if type(userId) ~= "number" or userId ~= userId or math.floor(userId) ~= userId then
+        return false, "no_subject"
+    end
+
+    for rank = 2, ceiling do
+        local stage = STAGES[rank]
+        if stage == "team" then
+            if inRoster(roster, "team", userId) then
+                return true, "team"
+            end
+        elseif stage == "allowlist" then
+            if inRoster(roster, "allowlist", userId) then
+                return true, "allowlist"
+            end
+        elseif stage == "cohort" then
+            local percent = rollout.percent
+            if type(percent) == "number" and RolloutCohorts.bucket(flag, userId) < percent then
+                return true, "cohort"
+            end
+        elseif stage == "everyone" then
+            return true, "everyone"
+        end
+    end
+
+    if ceiling == 1 then
+        return false, "stage_off"
+    end
+    return false, "outside_cohort"
+end
+
+return table.freeze(RolloutCohorts)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="94">
+        <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -31443,7 +31738,7 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="94">
+      <Item class="ModuleScript" referent="95">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -31704,7 +31999,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="95">
+      <Item class="ModuleScript" referent="96">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -33475,7 +33770,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="96">
+      <Item class="ModuleScript" referent="97">
         <Properties>
           <string name="Name">SessionSegment</string>
           <string name="Source"><![CDATA[--!strict
@@ -33665,7 +33960,7 @@ return table.freeze(SessionSegment)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="97">
+      <Item class="ModuleScript" referent="98">
         <Properties>
           <string name="Name">SfxCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -33832,7 +34127,7 @@ return table.freeze(SfxCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="98">
+      <Item class="ModuleScript" referent="99">
         <Properties>
           <string name="Name">SoakProbe</string>
           <string name="Source"><![CDATA[--!strict
@@ -34223,7 +34518,7 @@ return table.freeze(SoakProbe)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="99">
+      <Item class="ModuleScript" referent="100">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -34367,7 +34662,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="100">
+      <Item class="ModuleScript" referent="101">
         <Properties>
           <string name="Name">StoreAvailability</string>
           <string name="Source"><![CDATA[--!strict
@@ -34501,7 +34796,7 @@ return table.freeze(StoreAvailability)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="101">
+      <Item class="ModuleScript" referent="102">
         <Properties>
           <string name="Name">StoreCard</string>
           <string name="Source"><![CDATA[--!strict
@@ -34738,7 +35033,7 @@ return table.freeze(StoreCard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="102">
+      <Item class="ModuleScript" referent="103">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -34995,7 +35290,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="103">
+      <Item class="ModuleScript" referent="104">
         <Properties>
           <string name="Name">TempestEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -35273,7 +35568,7 @@ return table.freeze(TempestEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="104">
+      <Item class="ModuleScript" referent="105">
         <Properties>
           <string name="Name">TideboundTitanEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -35704,7 +35999,7 @@ return table.freeze(TideboundTitanEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="105">
+      <Item class="ModuleScript" referent="106">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -35848,7 +36143,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="106">
+      <Item class="ModuleScript" referent="107">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -36258,7 +36553,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="107">
+      <Item class="ModuleScript" referent="108">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -36439,7 +36734,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="108">
+      <Item class="ModuleScript" referent="109">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -36503,7 +36798,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="109">
+      <Item class="ModuleScript" referent="110">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -36677,7 +36972,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="110">
+      <Item class="ModuleScript" referent="111">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -36769,7 +37064,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="111">
+      <Item class="ModuleScript" referent="112">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -36981,7 +37276,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="112">
+      <Item class="ModuleScript" referent="113">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -37159,7 +37454,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="113">
+      <Item class="ModuleScript" referent="114">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -37312,7 +37607,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="114">
+      <Item class="ModuleScript" referent="115">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -37645,7 +37940,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="115">
+      <Item class="ModuleScript" referent="116">
         <Properties>
           <string name="Name">TownVisitPolicy</string>
           <string name="Source"><![CDATA[--!strict
@@ -37818,7 +38113,7 @@ return table.freeze(TownVisitPolicy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="116">
+      <Item class="ModuleScript" referent="117">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -37980,7 +38275,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="117">
+      <Item class="ModuleScript" referent="118">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -38016,7 +38311,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="118">
+      <Item class="ModuleScript" referent="119">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -38398,7 +38693,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="119">
+      <Item class="ModuleScript" referent="120">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -38468,7 +38763,7 @@ return table.freeze(WeatherProfile)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="120">
+      <Item class="ModuleScript" referent="121">
         <Properties>
           <string name="Name">WhiteHowlerEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -38932,11 +39227,11 @@ return table.freeze(WhiteHowlerEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="121">
+  <Item class="ServerScriptService" referent="122">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="122">
+    <Item class="Script" referent="123">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -39006,6 +39301,7 @@ local ProfilePersistence = require(root.ProfilePersistence)
 local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
 local TownVisitPolicy = require(root.TownVisitPolicy)
+local RolloutCohorts = require(root.RolloutCohorts)
 local RunHandoff = require(root.RunHandoff)
 local PartySession = require(root.PartySession)
 local PrivateServerControls = require(root.PrivateServerControls)
@@ -39066,8 +39362,14 @@ assert(environment ~= nil, environmentError)
 
 local environmentConfig = Config.Environments[environment]
 local logger = Logger.new(environment, environmentConfig.LogLevel)
-local featureFlags =
-    FeatureFlagService.new(Config.FeatureFlags, environmentConfig.AllowFlagOverrides, logger)
+local featureFlags = FeatureFlagService.new(
+    Config.FeatureFlags,
+    environmentConfig.AllowFlagOverrides,
+    logger,
+    RolloutCohorts,
+    Config.FeatureFlagRollouts,
+    Config.RolloutRoster
+)
 local content = Registry.new(Regions)
 local networkService = NetworkService.new(logger)
 -- Analytics before the profile service, because a profile transaction is one
@@ -39671,7 +39973,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="123">
+      <Item class="ModuleScript" referent="124">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -39769,11 +40071,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="124">
+      <Item class="Folder" referent="125">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="125">
+        <Item class="ModuleScript" referent="126">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -40410,7 +40712,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="126">
+        <Item class="ModuleScript" referent="127">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41689,7 +41991,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="127">
+        <Item class="ModuleScript" referent="128">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42190,7 +42492,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="128">
+        <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">CommerceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43015,7 +43317,7 @@ return table.freeze(CommerceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="129">
+        <Item class="ModuleScript" referent="130">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43286,7 +43588,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="130">
+        <Item class="ModuleScript" referent="131">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43706,7 +44008,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45471,7 +45773,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46302,10 +46604,27 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
+
+--[[
+    The switches, and who each one has reached.
+
+    Two questions live here and they are not the same one. "Is this feature
+    built and turned on" is global and has been since Milestone 1. "Has this
+    feature reached this player" is Milestone 13's staged rollout, and it has
+    no global answer at all -- which is why a cohort-scoped flag read without
+    a player throws rather than defaulting. `RolloutCohorts` explains why both
+    defaults are wrong; the short version is that one of them ships an
+    unreleased feature to everybody and the other hides it from the only
+    people it was turned on for, and neither says anything on the way past.
+
+    A local override still wins over both, because an override is a developer
+    holding the switch by hand in an environment where that is allowed, and it
+    is refused outright in production.
+]]
 
 local FeatureFlagService = {}
 FeatureFlagService.__index = FeatureFlagService
@@ -46323,6 +46642,9 @@ export type FeatureFlagService = typeof(setmetatable(
         _overrides: { [string]: boolean },
         _allowOverrides: boolean,
         _logger: Logger,
+        _rollouts: { [string]: any },
+        _roster: any,
+        _cohorts: any,
     },
     FeatureFlagService
 ))
@@ -46330,7 +46652,10 @@ export type FeatureFlagService = typeof(setmetatable(
 function FeatureFlagService.new(
     defaults: { [string]: boolean },
     allowOverrides: boolean,
-    logger: Logger
+    logger: Logger,
+    rolloutCohorts: any,
+    rollouts: { [string]: any },
+    roster: any
 ): FeatureFlagService
     return setmetatable({
         Name = FeatureFlagService.Name,
@@ -46338,6 +46663,9 @@ function FeatureFlagService.new(
         _overrides = {},
         _allowOverrides = allowOverrides,
         _logger = logger,
+        _cohorts = rolloutCohorts,
+        _rollouts = rollouts,
+        _roster = roster,
     }, FeatureFlagService)
 end
 
@@ -46345,6 +46673,7 @@ function FeatureFlagService.Init(self: FeatureFlagService, _context: any)
     self._logger:info("feature_flags_initialized", {
         count = self:count(),
         overridesAllowed = self._allowOverrides,
+        scoped = self:scopedCount(),
     })
 end
 
@@ -46352,7 +46681,25 @@ function FeatureFlagService.Start(self: FeatureFlagService)
     self._logger:info("feature_flags_started")
 end
 
-function FeatureFlagService.isEnabled(self: FeatureFlagService, flag: string): boolean
+function FeatureFlagService.rollout(self: FeatureFlagService, flag: string): any
+    local rollout = self._rollouts[flag]
+    assert(rollout ~= nil, string.format("feature flag %q has no rollout stage", flag))
+    return rollout
+end
+
+--[[
+    Whether this player has the flag.
+
+    `userId` is optional in the signature and required in fact for every flag
+    that is mid-rollout, which is the only shape that lets the twenty-odd
+    existing global call sites go on asking globally and still fails the one
+    that asks about a flag which has since acquired a cohort.
+]]
+function FeatureFlagService.isEnabled(
+    self: FeatureFlagService,
+    flag: string,
+    userId: number?
+): boolean
     local override = self._overrides[flag]
     if override ~= nil then
         return override
@@ -46360,7 +46707,55 @@ function FeatureFlagService.isEnabled(self: FeatureFlagService, flag: string): b
 
     local value = self._defaults[flag]
     assert(value ~= nil, string.format("unknown feature flag %q", flag))
-    return value
+
+    local rollout = self:rollout(flag)
+    if not self._cohorts.isScoped(rollout.stage) then
+        return value
+    end
+
+    assert(
+        userId ~= nil,
+        string.format(
+            "feature flag %q is at rollout stage %q and was read without a player",
+            flag,
+            tostring(rollout.stage)
+        )
+    )
+
+    local admitted = self._cohorts.admits(flag, rollout, self._roster, userId)
+    return admitted
+end
+
+--[[
+    Why a flag read the way it did for this player.
+
+    A staged rollout generates exactly one support question -- "why can I not
+    see it" -- and the answer is a rung name, so it is worth returning rather
+    than reconstructing from the table by hand.
+]]
+function FeatureFlagService.explain(
+    self: FeatureFlagService,
+    flag: string,
+    userId: number?
+): (boolean, string)
+    local override = self._overrides[flag]
+    if override ~= nil then
+        return override, "override"
+    end
+
+    local value = self._defaults[flag]
+    assert(value ~= nil, string.format("unknown feature flag %q", flag))
+
+    local rollout = self:rollout(flag)
+    if not self._cohorts.isScoped(rollout.stage) then
+        return value, if value then "everyone" else "stage_off"
+    end
+
+    if userId == nil then
+        return false, "no_subject"
+    end
+
+    return self._cohorts.admits(flag, rollout, self._roster, userId)
 end
 
 function FeatureFlagService.setOverride(
@@ -46394,8 +46789,35 @@ function FeatureFlagService.count(self: FeatureFlagService): number
     return count
 end
 
-function FeatureFlagService.snapshot(self: FeatureFlagService): { [string]: boolean }
-    local snapshot = table.clone(self._defaults)
+-- How many flags are mid-ladder. Logged at boot because a server that is
+-- running a rollout and a server that is not are different things to read a
+-- session's telemetry against.
+function FeatureFlagService.scopedCount(self: FeatureFlagService): number
+    local count = 0
+    for flag in self._defaults do
+        local rollout = self._rollouts[flag]
+        if rollout ~= nil and self._cohorts.isScoped(rollout.stage) then
+            count += 1
+        end
+    end
+    return count
+end
+
+--[[
+    Every flag as it stands for one player.
+
+    Takes a user ID for the same reason `isEnabled` does: a snapshot that
+    reported a cohort-scoped flag as its global default would be a report
+    that is wrong about exactly the flags anybody is watching.
+]]
+function FeatureFlagService.snapshot(
+    self: FeatureFlagService,
+    userId: number?
+): { [string]: boolean }
+    local snapshot: { [string]: boolean } = {}
+    for flag in self._defaults do
+        snapshot[flag] = self:isEnabled(flag, userId)
+    end
     for flag, value in self._overrides do
         snapshot[flag] = value
     end
@@ -46406,7 +46828,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="134">
+        <Item class="ModuleScript" referent="135">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46715,7 +47137,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="135">
+        <Item class="ModuleScript" referent="136">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47171,7 +47593,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="136">
+        <Item class="ModuleScript" referent="137">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -47265,7 +47687,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="137">
+        <Item class="ModuleScript" referent="138">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47483,7 +47905,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="138">
+        <Item class="ModuleScript" referent="139">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48353,7 +48775,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="139">
+        <Item class="ModuleScript" referent="140">
           <Properties>
             <string name="Name">PartyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49037,7 +49459,7 @@ return PartyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="140">
+        <Item class="ModuleScript" referent="141">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49545,7 +49967,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="141">
+        <Item class="ModuleScript" referent="142">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49728,7 +50150,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="142">
+        <Item class="ModuleScript" referent="143">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -50344,7 +50766,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="143">
+        <Item class="ModuleScript" referent="144">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -51486,7 +51908,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="144">
+        <Item class="ModuleScript" referent="145">
           <Properties>
             <string name="Name">PrivateServerService</string>
             <string name="Source"><![CDATA[--!strict
@@ -51761,7 +52183,7 @@ return PrivateServerService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="145">
+        <Item class="ModuleScript" referent="146">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -52386,7 +52808,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="146">
+        <Item class="ModuleScript" referent="147">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -54586,7 +55008,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="147">
+        <Item class="ModuleScript" referent="148">
           <Properties>
             <string name="Name">RegionEncounterService</string>
             <string name="Source"><![CDATA[--!strict
@@ -54884,7 +55306,7 @@ return table.freeze(RegionEncounterService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="148">
+        <Item class="ModuleScript" referent="149">
           <Properties>
             <string name="Name">SocialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -55173,7 +55595,7 @@ return table.freeze(SocialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="149">
+        <Item class="ModuleScript" referent="150">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -56116,7 +56538,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="150">
+        <Item class="ModuleScript" referent="151">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -58717,7 +59139,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="151">
+        <Item class="ModuleScript" referent="152">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -59586,7 +60008,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="152">
+        <Item class="ModuleScript" referent="153">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -75174,11 +75596,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="153">
+      <Item class="Folder" referent="154">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="154">
+        <Item class="ModuleScript" referent="155">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -79492,7 +79914,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="155">
+        <Item class="ModuleScript" referent="156">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -80591,7 +81013,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="156">
+        <Item class="ModuleScript" referent="157">
           <Properties>
             <string name="Name">CinderfallBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -81458,7 +81880,7 @@ return table.freeze(CinderfallBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="157">
+        <Item class="ModuleScript" referent="158">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -82153,7 +82575,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="158">
+        <Item class="ModuleScript" referent="159">
           <Properties>
             <string name="Name">FrostmereBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -83202,7 +83624,7 @@ return table.freeze(FrostmereBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="159">
+        <Item class="ModuleScript" referent="160">
           <Properties>
             <string name="Name">IronrootBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -84217,7 +84639,7 @@ return table.freeze(IronrootBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="160">
+        <Item class="ModuleScript" referent="161">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -85076,7 +85498,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="161">
+        <Item class="ModuleScript" referent="162">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -85162,7 +85584,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="162">
+        <Item class="ModuleScript" referent="163">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -85536,7 +85958,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="163">
+        <Item class="ModuleScript" referent="164">
           <Properties>
             <string name="Name">MireglassBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -86292,7 +86714,7 @@ return table.freeze(MireglassBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="164">
+        <Item class="ModuleScript" referent="165">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -86472,7 +86894,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="165">
+        <Item class="ModuleScript" referent="166">
           <Properties>
             <string name="Name">RegionBuilders</string>
             <string name="Source"><![CDATA[--!strict
@@ -87238,7 +87660,7 @@ return table.freeze(RegionBuilders)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="166">
+        <Item class="ModuleScript" referent="167">
           <Properties>
             <string name="Name">TempestBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -88059,7 +88481,7 @@ return table.freeze(TempestBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="167">
+        <Item class="ModuleScript" referent="168">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -88655,7 +89077,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="168">
+        <Item class="ModuleScript" referent="169">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -88892,7 +89314,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="169">
+        <Item class="ModuleScript" referent="170">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -88981,7 +89403,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="170">
+        <Item class="ModuleScript" referent="171">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -89317,11 +89739,11 @@ return table.freeze(WorldSignBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="171">
+    <Item class="Folder" referent="172">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="172">
+      <Item class="Script" referent="173">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -91158,7 +91580,7 @@ print("[Last Light] PASS FoundationIntegration")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Script" referent="173">
+      <Item class="Script" referent="174">
         <Properties>
           <string name="Name">ModuleGallery</string>
           <token name="RunContext">0</token>
@@ -91249,15 +91671,15 @@ end
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="174">
+  <Item class="StarterPlayer" referent="175">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="175">
+    <Item class="StarterPlayerScripts" referent="176">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="176">
+      <Item class="LocalScript" referent="177">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -91644,11 +92066,11 @@ task.spawn(function()
 end)
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="177">
+        <Item class="Folder" referent="178">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="178">
+          <Item class="ModuleScript" referent="179">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -91779,7 +92201,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="179">
+          <Item class="ModuleScript" referent="180">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -96393,7 +96815,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="180">
+          <Item class="ModuleScript" referent="181">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -96761,7 +97183,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="181">
+          <Item class="ModuleScript" referent="182">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -96869,7 +97291,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="182">
+          <Item class="ModuleScript" referent="183">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -96988,7 +97410,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="183">
+          <Item class="ModuleScript" referent="184">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -97262,7 +97684,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="184">
+          <Item class="ModuleScript" referent="185">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -97417,7 +97839,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="185">
+          <Item class="ModuleScript" referent="186">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -97529,7 +97951,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="186">
+          <Item class="ModuleScript" referent="187">
             <Properties>
               <string name="Name">SocialPingController</string>
               <string name="Source"><![CDATA[--!strict
@@ -97911,7 +98333,7 @@ return table.freeze(SocialPingController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="187">
+          <Item class="ModuleScript" referent="188">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -98113,7 +98535,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="188">
+          <Item class="ModuleScript" referent="189">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -98322,7 +98744,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="189">
+          <Item class="ModuleScript" referent="190">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -98467,7 +98889,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="190">
+          <Item class="ModuleScript" referent="191">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -98767,13 +99189,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="191">
+  <Item class="TextChatService" referent="192">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="192">
+  <Item class="Workspace" referent="193">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

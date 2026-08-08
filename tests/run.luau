@@ -54,6 +54,7 @@ TestRunner.run({
     require("./specs/ExpeditionRewardLedger.spec"),
     require("./specs/ExtractionPayoff.spec"),
     require("./specs/FeatureFlagService.spec"),
+    require("./specs/RolloutCohorts.spec"),
     require("./specs/NightSchedule.spec"),
     require("./specs/PerformanceBudget.spec"),
     require("./specs/OldGrowthEncounter.spec"),
