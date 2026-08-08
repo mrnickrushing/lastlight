@@ -300,3 +300,52 @@ task.spawn(function()
 end)
 
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
+
+--[[
+    Pull the world's mesh assets down before a player reaches them.
+
+    The server hides a mesh's primitive placeholder the moment the mesh
+    is swapped in, but that swap is a fact about the server: a phone that
+    has not yet downloaded the mesh renders nothing where the placeholder
+    was, and the placeholder is still the collision. The first minute of
+    a mobile session was full of solid air because of exactly this --
+    walls that had visibly "not loaded yet" would at least be honest;
+    these were invisible.
+
+    So the client asks for every mesh in the world up front,
+    nearest-to-spawn first, in small batches so the request queue never
+    starves the assets the engine wants for what is actually on screen.
+    Fire-and-forget: nothing waits on it, it just shrinks the window in
+    which a mesh can be touched before it can be seen.
+]]
+task.spawn(function()
+    local ContentProvider = game:GetService("ContentProvider")
+    local spawnPosition = Vector3.new(0, 0, 74)
+    local meshes: { { part: MeshPart, distance: number } } = {}
+    for _, descendant in workspace:GetDescendants() do
+        if descendant:IsA("MeshPart") then
+            table.insert(meshes, {
+                part = descendant,
+                distance = (descendant.Position - spawnPosition).Magnitude,
+            })
+        end
+    end
+    table.sort(meshes, function(a, b)
+        return a.distance < b.distance
+    end)
+    local batch: { Instance } = {}
+    for _, entry in meshes do
+        table.insert(batch, entry.part)
+        if #batch >= 12 then
+            pcall(function()
+                ContentProvider:PreloadAsync(batch)
+            end)
+            batch = {}
+        end
+    end
+    if #batch > 0 then
+        pcall(function()
+            ContentProvider:PreloadAsync(batch)
+        end)
+    end
+end)
