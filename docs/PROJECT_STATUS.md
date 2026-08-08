@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #331), build `0.53.0`,
-save schema 24, 25 services. Published to Roblox as place version 143,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #332), build `0.53.0`,
+save schema 24, 26 services. Published to Roblox as place version 144,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,6 +59,48 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#332** (v144) **M11 wave F: `CommerceService`, and the allowlist goes from
+  zero entries to one.** The monetization guard has held since Milestone 4 by
+  *absence* — there was no purchase API anywhere to branch on — and its own
+  docstring names that as the weakest way for a gate to pass. This is the wave
+  that adds the thing, and the property survives by design instead: cosmetics
+  are pure presentation, entitlements resolve outside gameplay into plain
+  profile data, and gameplay branches on what is **equipped**. The allowlist
+  entry says all of that in the file itself, because a list that is not read is
+  a list that grows.
+
+  **Two specs now say it from two directions.** The script skips allowlisted
+  files entirely, so a second module added to both the codebase *and* the list
+  would pass it — `CosmeticNeutrality.spec` closes that by counting, over
+  comment-stripped source, how many files in `src` touch a purchase API at all,
+  and demanding the answer be at most one and be `CommerceService`.
+
+  **Every decision a receipt makes is pure.** `ProcessReceipt` cannot be
+  exercised in Studio and will not be exercised anywhere until a real account
+  spends real Robux, so the branch lives in `Entitlements.route` and the
+  service is the shell that hands it a profile, a mailbox and a durable write.
+  `CommerceReceipts.spec` drives the four scenarios the gate names — retry,
+  crash mid-grant, profile lock, disconnect — plus the sequence where they
+  interleave, which is where a real incident comes from: held while away,
+  retried while away, drained on arrival, then retried once more by a platform
+  still waiting on the first answer. **Exactly once is checked by counting what
+  the player ends up owning**, not by counting calls; a call count passes on a
+  grant that ran twice and happened to be idempotent by luck.
+
+  **A receipt is acknowledged only after a durable write**, and two things
+  count as durable: the buyer's profile saved, or — when this server does not
+  hold that profile — the mailbox saved. Telling the platform early loses a
+  purchase; telling it late costs a retry. **An unresolvable product is never
+  banked either**, in either branch: a mailbox full of receipts nobody can ever
+  apply is a support queue with no answer at the end of it.
+
+  Also this wave: the five commerce analytics events the taxonomy names but
+  nothing emitted (`store_view`, `product_detail_view`, `purchase_prompt`,
+  `receipt_result`, `cosmetic_equipped`). **Still owner-gated and unchanged:**
+  the Creator Dashboard products, the prices, and a live purchase with a real
+  receipt. `Config.CommerceProductIds` is empty and the store flag is off, so
+  `promptPurchase` refuses with `product_not_configured` rather than prompting
+  into nothing — which on a client looks like the button being broken.
 - **#331** (v143) **M11 wave E: the cosmetic spine, built before the platform
   call so the platform call has nowhere to put a decision.** `CosmeticCatalog`
   (presentation only, five slots), `Entitlements` (pure: what a grant is, idempotency by

@@ -1015,6 +1015,35 @@ function ProfileService.setVisitPolicy(self: ProfileService, player: Player, pol
     return true
 end
 
+--[[
+    Commerce state, read and written whole.
+
+    Written only by CommerceService, which is the only module allowed to decide
+    what a player owns. The accessor is here rather than there because storage
+    is this service's job and ownership is that one's, and keeping the two
+    apart is what lets the monetization guard hold: nothing in this file knows
+    what an entitlement means.
+]]
+function ProfileService.commerce(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return self._saveSchema.commerce(profile)
+end
+
+function ProfileService.setCommerce(self: ProfileService, player: Player, commerce: any): boolean
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return false
+    end
+    self._profiles[player] = self._saveSchema.withCommerce(profile, commerce, os.time())
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    return true
+end
+
 function ProfileService.decorationsSnapshot(self: ProfileService, player: Player): any
     local profile = self._profiles[player]
     if profile == nil then

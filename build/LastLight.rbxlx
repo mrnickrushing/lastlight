@@ -15322,6 +15322,80 @@ function Entitlements.drain(
     return current, remaining, granted
 end
 
+--[[
+    The whole decision a receipt handler makes, in one pure place.
+
+    `ProcessReceipt` runs on a server that may or may not be holding the
+    buyer's profile, and the branch it takes decides whether a purchase is
+    delivered, held or lost. Keeping that branch here rather than inside the
+    service is what makes it testable at all: the platform call cannot be
+    exercised in Studio, so the decision must be exercisable without it.
+
+    `profileState` is the buyer's commerce state if this server holds their
+    profile and may write it, and nil otherwise. The three verdicts map onto
+    what the platform is told:
+
+      * `granted`  -- the grant is ours, durably, once the caller's write
+                      lands. The platform may stop retrying.
+      * `held`     -- we could not write the profile, so the receipt went to
+                      the mailbox instead. Also durable, also acknowledged: a
+                      mailbox entry is a promise a later load will keep.
+      * `retry`    -- nothing could be done with this receipt in this build.
+                      The platform must call again.
+
+    The distinction between `held` and `retry` is the one that costs money if
+    it is wrong. Holding an unknown product would tell the platform to stop
+    retrying a purchase this build cannot deliver; retrying a receipt we could
+    have banked leaves a player waiting on a coincidence.
+]]
+function Entitlements.route(
+    profileState: any,
+    mailbox: any,
+    receipt: any,
+    resolve: (string) -> { string }
+): (State?, { Receipt }, string)
+    local heldMailbox = Entitlements.normalizeMailbox(mailbox)
+    if
+        type(receipt) ~= "table"
+        or not validId(receipt.purchaseId)
+        or not validId(receipt.productId)
+    then
+        return nil, heldMailbox, "retry"
+    end
+
+    -- Nothing is held or granted for a product this build cannot resolve, in
+    -- either branch. A mailbox full of receipts nobody can ever apply is a
+    -- support queue with no answer at the end of it.
+    local granted = resolve(receipt.productId)
+    if type(granted) ~= "table" or #granted == 0 then
+        return nil, heldMailbox, "retry"
+    end
+
+    if profileState ~= nil then
+        local next, result = Entitlements.apply(profileState, receipt, resolve)
+        if result.acknowledge then
+            -- Includes the duplicate case, which is the platform retrying a
+            -- grant we already have. Returning the state either way lets the
+            -- caller write once and not think about which it was.
+            return next, heldMailbox, "granted"
+        end
+        return nil, heldMailbox, "retry"
+    end
+
+    -- Already waiting is already durable. A retry into a mailbox that holds
+    -- the purchase id is the same answer as the first time.
+    for _, alreadyHeld in heldMailbox do
+        if alreadyHeld.purchaseId == receipt.purchaseId then
+            return nil, heldMailbox, "held"
+        end
+    end
+    local nextMailbox, accepted = Entitlements.enqueue(heldMailbox, receipt)
+    if not accepted then
+        return nil, heldMailbox, "retry"
+    end
+    return nil, nextMailbox, "held"
+end
+
 return table.freeze(Entitlements)
 ]]></string>
         </Properties>
@@ -36255,6 +36329,8 @@ local TownVisitPolicy = require(root.TownVisitPolicy)
 local RunHandoff = require(root.RunHandoff)
 local PartySession = require(root.PartySession)
 local QuickChat = require(root.QuickChat)
+local CosmeticCatalog = require(root.CosmeticCatalog)
+local Entitlements = require(root.Entitlements)
 local AdminRoster = require(root.AdminRoster)
 local TownDecorations = require(root.TownDecorations)
 local TownProgression = require(root.TownProgression)
@@ -36281,6 +36357,7 @@ local TownNightService = require(script.Services.TownNightService)
 local LobbyService = require(script.Services.LobbyService)
 local PartyService = require(script.Services.PartyService)
 local SocialService = require(script.Services.SocialService)
+local CommerceService = require(script.Services.CommerceService)
 local AdminService = require(script.Services.AdminService)
 local CompanionService = require(script.Services.CompanionService)
 local DefenseService = require(script.Services.DefenseService)
@@ -36526,6 +36603,22 @@ partyService:setBlockReader(function(fromUserId: number, toUserId: number): bool
     return socialService:isSuppressed(fromUserId, toUserId)
 end)
 
+--[[
+    The one module allowed to touch a purchase API, and the only grant
+    authority in the game. Everything it decides is decided in the pure
+    Entitlements module; what it owns is the profile write, the mailbox and the
+    platform call.
+]]
+local commerceService = CommerceService.new(
+    logger,
+    Config,
+    CosmeticCatalog,
+    Entitlements,
+    profileService,
+    featureFlags,
+    analyticsService
+)
+
 local performanceService = PerformanceService.new(logger, Config, PerformanceBudget)
 local adminService = AdminService.new(
     logger,
@@ -36692,6 +36785,7 @@ services:register(defenseService)
 services:register(regionEncounterService)
 services:register(partyService)
 services:register(socialService)
+services:register(commerceService)
 -- Without this the departure countdown never reached a client: LobbyService
 -- published every whole second into a handler nobody had set, so the panel
 -- froze at "DEPARTING IN 10" while the server counted down and launched.
@@ -38100,6 +38194,101 @@ function AnalyticsService.quickChatSent(
     end
 end
 
+--[[
+    The commerce events the monetization taxonomy names. Nothing here carries a
+    price or a receipt id: the taxonomy asks what happened, and what happened is
+    a product id and an outcome.
+]]
+function AnalyticsService.storeView(self: AnalyticsService, player: Player, cardCount: number)
+    self._logger:info("store_view", { cards = cardCount, player = player.UserId })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "StoreView", math.max(1, cardCount), {})
+        end)
+    end
+end
+
+function AnalyticsService.productDetailView(
+    self: AnalyticsService,
+    player: Player,
+    productId: string
+)
+    self._logger:info("product_detail_view", {
+        player = player.UserId,
+        product = string.sub(productId, 1, 48),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "ProductDetailView", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = productId,
+            })
+        end)
+    end
+end
+
+function AnalyticsService.purchasePrompt(
+    self: AnalyticsService,
+    player: Player,
+    productId: string,
+    shown: boolean
+)
+    self._logger:info("purchase_prompt", {
+        player = player.UserId,
+        product = string.sub(productId, 1, 48),
+        shown = shown,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "PurchasePrompt", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = productId,
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = tostring(shown),
+            })
+        end)
+    end
+end
+
+function AnalyticsService.receiptResult(
+    self: AnalyticsService,
+    player: Player,
+    productId: string,
+    outcome: string
+)
+    self._logger:info("receipt_result", {
+        outcome = string.sub(outcome, 1, 24),
+        player = player.UserId,
+        product = string.sub(productId, 1, 48),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "ReceiptResult", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = productId,
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = outcome,
+            })
+        end)
+    end
+end
+
+function AnalyticsService.cosmeticEquipped(
+    self: AnalyticsService,
+    player: Player,
+    cosmeticId: string,
+    slot: string
+)
+    self._logger:info("cosmetic_equipped", {
+        cosmetic = string.sub(cosmeticId, 1, 48),
+        player = player.UserId,
+        slot = string.sub(slot, 1, 24),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "CosmeticEquipped", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = cosmeticId,
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = slot,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.eliteStarted(
     self: AnalyticsService,
     player: Player,
@@ -38907,6 +39096,478 @@ return table.freeze(BramblewakeBlackoutService)
         </Item>
         <Item class="ModuleScript" referent="124">
           <Properties>
+            <string name="Name">CommerceService</string>
+            <string name="Source"><![CDATA[--!strict
+
+--[[
+    The only module in this game that touches a purchase or ownership API.
+
+    `scripts/validate_monetization.py` allows exactly one, by name, and its
+    docstring says why the list is meant to stay short and to be read: a branch
+    on "does this player own X" is how a cosmetic quietly becomes a
+    requirement. So the shape of this file is the whole architecture:
+
+      * **It answers one question and writes down the answer.** What a player
+        owns is resolved here, once, and lands in `profile.commerce` as plain
+        data. Nothing downstream asks the platform anything, and nothing
+        downstream asks *this* anything either -- gameplay branches on what is
+        equipped, which is a profile field like every other.
+      * **The refusal to wear something unowned lives here**, not where
+        cosmetics are drawn. The drawing code takes an id and draws it. That
+        keeps the ownership question in one file and out of the HUD, the gear
+        visuals, and everything else.
+      * **Every decision it makes is somewhere else.** `Entitlements.route` is
+        pure and holds the branch a receipt takes; this is the shell that gives
+        it a profile, a mailbox and a durable write. `ProcessReceipt` cannot be
+        exercised in Studio -- the round trip needs a real purchase on a real
+        account -- so anything that decides has to be decidable without it.
+
+    **A receipt is acknowledged only after a durable write**, and that is the
+    rule everything else here bends around. Roblox retries until it is told the
+    grant is durable, so telling it early loses a purchase and telling it late
+    costs nothing but a retry. Two things count as durable: the buyer's profile
+    saved, or -- when this server does not hold that profile -- the mailbox
+    saved. A mailbox entry is a promise the next load will keep, and it is
+    stored outside the profile precisely because its reason for existing is the
+    moments when the profile is not ours to write.
+]]
+
+local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
+
+local CommerceService = {}
+CommerceService.__index = CommerceService
+CommerceService.Name = "CommerceService"
+
+export type Logger = {
+    info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+    warn: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+}
+
+export type CommerceService = typeof(setmetatable(
+    {} :: {
+        Name: string,
+        _logger: Logger,
+        _config: any,
+        _catalog: any,
+        _entitlements: any,
+        _profileService: any,
+        _featureFlags: any,
+        _analyticsService: any,
+        _persistent: boolean,
+        _mailboxStore: any,
+        --[[
+            Mailboxes for servers with no DataStore -- Studio, and any
+            environment running without persistence. In memory, which is the
+            same honest limitation the profile store has there: nothing
+            survives the session, and nothing pretends to.
+        ]]
+        _localMailboxes: { [number]: { any } },
+        _productInfo: { [string]: any },
+        _onGranted: ((Player, { string }) -> ())?,
+    },
+    CommerceService
+))
+
+local MAILBOX_STORE = "LastLightCommerceMailbox_v1"
+
+function CommerceService.new(
+    logger: Logger,
+    config: any,
+    cosmeticCatalog: any,
+    entitlements: any,
+    profileService: any,
+    featureFlags: any,
+    analyticsService: any
+): CommerceService
+    return setmetatable({
+        Name = CommerceService.Name,
+        _logger = logger,
+        _config = config,
+        _catalog = cosmeticCatalog,
+        _entitlements = entitlements,
+        _profileService = profileService,
+        _featureFlags = featureFlags,
+        _analyticsService = analyticsService,
+        _persistent = false,
+        _mailboxStore = nil,
+        _localMailboxes = {},
+        _productInfo = {},
+        _onGranted = nil,
+    }, CommerceService)
+end
+
+function CommerceService.Init(self: CommerceService, context: any)
+    local environmentConfig = context.config.Environments[context.environment]
+    self._persistent = environmentConfig ~= nil and environmentConfig.UsePersistentData == true
+    if self._persistent then
+        local DataStoreService = game:GetService("DataStoreService")
+        local ok, store = pcall(function()
+            return DataStoreService:GetDataStore(MAILBOX_STORE)
+        end)
+        if ok then
+            self._mailboxStore = store
+        else
+            self._logger:warn("commerce_mailbox_unavailable", { reason = tostring(store) })
+        end
+    end
+end
+
+function CommerceService.setGrantHandler(self: CommerceService, handler: (Player, { string }) -> ())
+    self._onGranted = handler
+end
+
+local function mailboxKey(userId: number): string
+    return string.format("mailbox_%d", userId)
+end
+
+function CommerceService._readMailbox(self: CommerceService, userId: number): { any }
+    if not self._persistent or self._mailboxStore == nil then
+        return self._entitlements.normalizeMailbox(self._localMailboxes[userId])
+    end
+    local ok, value = pcall(function()
+        return self._mailboxStore:GetAsync(mailboxKey(userId))
+    end)
+    if not ok then
+        self._logger:warn("commerce_mailbox_read_failed", { user = userId })
+        return self._entitlements.emptyMailbox()
+    end
+    return self._entitlements.normalizeMailbox(value)
+end
+
+--[[
+    Write a mailbox and say whether it landed.
+
+    The boolean is load-bearing: it is the difference between telling the
+    platform the purchase is safe and telling it to call again. A failed write
+    must never read as success.
+]]
+function CommerceService._writeMailbox(
+    self: CommerceService,
+    userId: number,
+    mailbox: { any }
+): boolean
+    if not self._persistent or self._mailboxStore == nil then
+        self._localMailboxes[userId] = mailbox
+        return true
+    end
+    local ok, err = pcall(function()
+        self._mailboxStore:SetAsync(mailboxKey(userId), mailbox)
+    end)
+    if not ok then
+        self._logger:warn(
+            "commerce_mailbox_write_failed",
+            { reason = tostring(err), user = userId }
+        )
+    end
+    return ok
+end
+
+--[[
+    The buyer's commerce state, if this server holds their profile and may
+    write it. Nil is a real answer and means "not ours": they are in another
+    server, or mid-load, or their profile is read-only because a lock could not
+    be taken. Writing anyway is how two servers overwrite one save.
+]]
+function CommerceService._writableState(self: CommerceService, userId: number): (Player?, any)
+    local player = Players:GetPlayerByUserId(userId)
+    if player == nil then
+        return nil, nil
+    end
+    if not self._profileService:isLoaded(player) or not self._profileService:isWritable(player) then
+        return player, nil
+    end
+    return player, self._profileService:commerce(player)
+end
+
+--[[
+    Apply one receipt. The single grant authority in the game.
+]]
+function CommerceService.applyReceipt(self: CommerceService, receipt: any): boolean
+    local userId = tonumber(receipt.userId) or 0
+    local player, state = self:_writableState(userId)
+    local mailbox = self:_readMailbox(userId)
+    local nextState, nextMailbox, verdict = self._entitlements.route(
+        state,
+        mailbox,
+        receipt,
+        function(productId: string): { string }
+            return self._catalog.grantsOf(productId)
+        end
+    )
+
+    if verdict == "granted" and player ~= nil and nextState ~= nil then
+        self._profileService:setCommerce(player, nextState)
+        -- The write, then the answer. Reversing these is the one ordering
+        -- mistake that costs a player a purchase they paid for.
+        if not self._profileService:save(player) then
+            self._logger:warn("commerce_grant_write_failed", { user = userId })
+            return false
+        end
+        local granted = self._catalog.grantsOf(receipt.productId)
+        self._logger:info("commerce_receipt_granted", {
+            product = tostring(receipt.productId),
+            purchase = tostring(receipt.purchaseId),
+            user = userId,
+        })
+        if self._analyticsService ~= nil then
+            self._analyticsService:receiptResult(player, tostring(receipt.productId), "granted")
+        end
+        local handler = self._onGranted
+        if handler ~= nil then
+            handler(player, granted)
+        end
+        return true
+    end
+
+    if verdict == "held" then
+        if not self:_writeMailbox(userId, nextMailbox) then
+            return false
+        end
+        self._logger:info("commerce_receipt_held", {
+            product = tostring(receipt.productId),
+            purchase = tostring(receipt.purchaseId),
+            user = userId,
+        })
+        return true
+    end
+
+    self._logger:warn("commerce_receipt_retry", {
+        product = tostring(receipt.productId),
+        purchase = tostring(receipt.purchaseId),
+        user = userId,
+    })
+    if self._analyticsService ~= nil and player ~= nil then
+        self._analyticsService:receiptResult(player, tostring(receipt.productId), "retry")
+    end
+    return false
+end
+
+--[[
+    Drain whatever was banked while this player was elsewhere.
+
+    Run at profile load. A receipt this build still cannot resolve stays in the
+    mailbox rather than being dropped, because the product may exist in the
+    next build and a purchase quietly discarded is a support ticket nobody can
+    answer.
+]]
+function CommerceService.drainFor(self: CommerceService, player: Player)
+    local mailbox = self:_readMailbox(player.UserId)
+    if #mailbox == 0 then
+        return
+    end
+    if not self._profileService:isWritable(player) then
+        return
+    end
+    local state, remaining, granted = self._entitlements.drain(
+        self._profileService:commerce(player),
+        mailbox,
+        function(productId: string): { string }
+            return self._catalog.grantsOf(productId)
+        end
+    )
+    if #granted == 0 then
+        return
+    end
+    self._profileService:setCommerce(player, state)
+    if not self._profileService:save(player) then
+        -- The mailbox is left exactly as it was. Clearing it before the
+        -- profile is safe is the one way a drained purchase disappears.
+        self._logger:warn("commerce_drain_write_failed", { user = player.UserId })
+        return
+    end
+    self:_writeMailbox(player.UserId, remaining)
+    self._logger:info("commerce_mailbox_drained", {
+        granted = #granted,
+        remaining = #remaining,
+        user = player.UserId,
+    })
+    local handler = self._onGranted
+    if handler ~= nil then
+        handler(player, granted)
+    end
+end
+
+--[[
+    Wear one. The single place ownership is asked about outside a receipt, and
+    therefore the reason no gameplay module ever has to.
+]]
+function CommerceService.equip(
+    self: CommerceService,
+    player: Player,
+    slot: any,
+    cosmeticId: any
+): any
+    if not self._profileService:isLoaded(player) then
+        return { applied = false, reason = "profile_loading" }
+    end
+    local state, result = self._entitlements.equip(
+        self._profileService:commerce(player),
+        slot,
+        cosmeticId,
+        function(id: string): string?
+            local cosmetic = self._catalog.get(id)
+            return if cosmetic == nil then nil else cosmetic.slot
+        end
+    )
+    if result.applied then
+        self._profileService:setCommerce(player, state)
+        if self._analyticsService ~= nil and cosmeticId ~= nil then
+            self._analyticsService:cosmeticEquipped(player, tostring(cosmeticId), tostring(slot))
+        end
+    end
+    return result
+end
+
+--[[
+    What a client may be told: what is worn, and what is owned.
+
+    Owned reaches the client because the store card has to show it -- a card
+    that cannot say "you already have this" sells a player the same thing
+    twice. It is a list of ids and nothing else; no price, no receipt, no
+    entitlement machinery.
+]]
+function CommerceService.snapshot(self: CommerceService, player: Player): any
+    if not self._profileService:isLoaded(player) then
+        return nil
+    end
+    local state = self._profileService:commerce(player)
+    local owned: { string } = {}
+    for _, cosmetic in self._catalog.list() do
+        if self._entitlements.owns(state, cosmetic.id) then
+            table.insert(owned, cosmetic.id)
+        end
+    end
+    table.sort(owned)
+    return {
+        enabled = self._featureFlags:isEnabled("cosmetic_store_enabled"),
+        owned = owned,
+        equipped = state.equipped,
+    }
+end
+
+--[[
+    The Robux price, read from the platform rather than from a constant.
+
+    A price in the source is a price that is wrong the first time the owner
+    changes it in the dashboard, and a card showing the wrong number is worse
+    than a card showing none. Cached per product for the life of the server:
+    prices do not change mid-session, and `GetProductInfo` is a web call.
+]]
+function CommerceService.productInfo(self: CommerceService, productId: any): any
+    if type(productId) ~= "string" then
+        return nil
+    end
+    local cached = self._productInfo[productId]
+    if cached ~= nil then
+        return cached
+    end
+    local robloxId = self._config.CommerceProductIds[productId]
+    if type(robloxId) ~= "number" then
+        return nil
+    end
+    local ok, info = pcall(function()
+        return MarketplaceService:GetProductInfo(robloxId, Enum.InfoType.Product)
+    end)
+    if not ok or type(info) ~= "table" then
+        self._logger:warn("commerce_product_info_failed", { product = productId })
+        return nil
+    end
+    local resolved = {
+        priceInRobux = tonumber(info.PriceInRobux) or 0,
+        name = tostring(info.Name or ""),
+    }
+    self._productInfo[productId] = resolved
+    return resolved
+end
+
+function CommerceService.promptPurchase(self: CommerceService, player: Player, productId: any): any
+    if not self._featureFlags:isEnabled("cosmetic_store_enabled") then
+        return { accepted = false, reason = "store_closed" }
+    end
+    local product = self._catalog.product(productId)
+    if product == nil then
+        return { accepted = false, reason = "unknown_product" }
+    end
+    local robloxId = self._config.CommerceProductIds[product.id]
+    if type(robloxId) ~= "number" then
+        -- The dashboard half does not exist yet. Refused with a reason rather
+        -- than prompting into nothing, which on a client looks like the button
+        -- being broken.
+        return { accepted = false, reason = "product_not_configured" }
+    end
+    local ok = pcall(function()
+        MarketplaceService:PromptProductPurchase(player, robloxId)
+    end)
+    if self._analyticsService ~= nil then
+        self._analyticsService:purchasePrompt(player, product.id, ok)
+    end
+    return { accepted = ok, reason = if ok then "prompted" else "prompt_failed" }
+end
+
+function CommerceService.Start(self: CommerceService)
+    --[[
+        The platform's own entry point, and the only one. Wrapped so an error
+        anywhere inside becomes NotProcessedYet rather than an unhandled throw
+        -- a throw is read by the platform as "no answer", which is the same as
+        a retry, but it loses the log line that says why.
+    ]]
+    MarketplaceService.ProcessReceipt = function(receiptInfo: any): Enum.ProductPurchaseDecision
+        local ok, granted = pcall(function(): boolean
+            return self:applyReceipt({
+                purchaseId = tostring(receiptInfo.PurchaseId),
+                productId = self:_productIdFor(receiptInfo.ProductId),
+                userId = receiptInfo.PlayerId,
+                at = os.time(),
+            })
+        end)
+        if not ok then
+            self._logger:warn("commerce_receipt_error", { reason = tostring(granted) })
+            return Enum.ProductPurchaseDecision.NotProcessedYet
+        end
+        return if granted
+            then Enum.ProductPurchaseDecision.PurchaseGranted
+            else Enum.ProductPurchaseDecision.NotProcessedYet
+    end
+
+    self._profileService:onLoaded(function(player: Player, _profile: any)
+        task.spawn(function()
+            self:drainFor(player)
+        end)
+    end)
+
+    self._logger:info("commerce_started", {
+        configured = self:_configuredCount(),
+        products = #self._catalog.products(),
+        storeEnabled = self._featureFlags:isEnabled("cosmetic_store_enabled"),
+    })
+end
+
+-- The dashboard number back to this game's own product id. A receipt names
+-- Roblox's id; everything here names ours.
+function CommerceService._productIdFor(self: CommerceService, robloxProductId: any): string
+    for productId, configured in self._config.CommerceProductIds do
+        if configured == robloxProductId then
+            return productId
+        end
+    end
+    return ""
+end
+
+function CommerceService._configuredCount(self: CommerceService): number
+    local count = 0
+    for _ in self._config.CommerceProductIds do
+        count += 1
+    end
+    return count
+end
+
+return table.freeze(CommerceService)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="125">
+          <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
 
@@ -39176,7 +39837,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="125">
+        <Item class="ModuleScript" referent="126">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -39596,7 +40257,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="126">
+        <Item class="ModuleScript" referent="127">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41280,7 +41941,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="127">
+        <Item class="ModuleScript" referent="128">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41994,7 +42655,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="128">
+        <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42098,7 +42759,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="129">
+        <Item class="ModuleScript" referent="130">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42407,7 +43068,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="130">
+        <Item class="ModuleScript" referent="131">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42863,7 +43524,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -42957,7 +43618,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43175,7 +43836,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -44045,7 +44706,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="134">
+        <Item class="ModuleScript" referent="135">
           <Properties>
             <string name="Name">PartyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -44729,7 +45390,7 @@ return PartyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="135">
+        <Item class="ModuleScript" referent="136">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -44984,7 +45645,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="136">
+        <Item class="ModuleScript" referent="137">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45163,7 +45824,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="137">
+        <Item class="ModuleScript" referent="138">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45779,7 +46440,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="138">
+        <Item class="ModuleScript" referent="139">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46892,7 +47553,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="139">
+        <Item class="ModuleScript" referent="140">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47517,7 +48178,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="140">
+        <Item class="ModuleScript" referent="141">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48537,6 +49198,35 @@ function ProfileService.setVisitPolicy(self: ProfileService, player: Player, pol
     return true
 end
 
+--[[
+    Commerce state, read and written whole.
+
+    Written only by CommerceService, which is the only module allowed to decide
+    what a player owns. The accessor is here rather than there because storage
+    is this service's job and ownership is that one's, and keeping the two
+    apart is what lets the monetization guard hold: nothing in this file knows
+    what an entitlement means.
+]]
+function ProfileService.commerce(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return self._saveSchema.commerce(profile)
+end
+
+function ProfileService.setCommerce(self: ProfileService, player: Player, commerce: any): boolean
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return false
+    end
+    self._profiles[player] = self._saveSchema.withCommerce(profile, commerce, os.time())
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    return true
+end
+
 function ProfileService.decorationsSnapshot(self: ProfileService, player: Player): any
     local profile = self._profiles[player]
     if profile == nil then
@@ -49404,7 +50094,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="141">
+        <Item class="ModuleScript" referent="142">
           <Properties>
             <string name="Name">RegionEncounterService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49702,7 +50392,7 @@ return table.freeze(RegionEncounterService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="142">
+        <Item class="ModuleScript" referent="143">
           <Properties>
             <string name="Name">SocialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49991,7 +50681,7 @@ return table.freeze(SocialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="143">
+        <Item class="ModuleScript" referent="144">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -50801,7 +51491,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="144">
+        <Item class="ModuleScript" referent="145">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -53134,7 +53824,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="145">
+        <Item class="ModuleScript" referent="146">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -54003,7 +54693,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="146">
+        <Item class="ModuleScript" referent="147">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -69185,11 +69875,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="147">
+      <Item class="Folder" referent="148">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="148">
+        <Item class="ModuleScript" referent="149">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -73503,7 +74193,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="149">
+        <Item class="ModuleScript" referent="150">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -74602,7 +75292,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="150">
+        <Item class="ModuleScript" referent="151">
           <Properties>
             <string name="Name">CinderfallBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -75469,7 +76159,7 @@ return table.freeze(CinderfallBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="151">
+        <Item class="ModuleScript" referent="152">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -76164,7 +76854,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="152">
+        <Item class="ModuleScript" referent="153">
           <Properties>
             <string name="Name">FrostmereBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -77213,7 +77903,7 @@ return table.freeze(FrostmereBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="153">
+        <Item class="ModuleScript" referent="154">
           <Properties>
             <string name="Name">IronrootBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -78228,7 +78918,7 @@ return table.freeze(IronrootBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="154">
+        <Item class="ModuleScript" referent="155">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -79087,7 +79777,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="155">
+        <Item class="ModuleScript" referent="156">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -79173,7 +79863,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="156">
+        <Item class="ModuleScript" referent="157">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -79547,7 +80237,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="157">
+        <Item class="ModuleScript" referent="158">
           <Properties>
             <string name="Name">MireglassBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -80303,7 +80993,7 @@ return table.freeze(MireglassBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="158">
+        <Item class="ModuleScript" referent="159">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -80483,7 +81173,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="159">
+        <Item class="ModuleScript" referent="160">
           <Properties>
             <string name="Name">RegionBuilders</string>
             <string name="Source"><![CDATA[--!strict
@@ -81249,7 +81939,7 @@ return table.freeze(RegionBuilders)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="160">
+        <Item class="ModuleScript" referent="161">
           <Properties>
             <string name="Name">TempestBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -82070,7 +82760,7 @@ return table.freeze(TempestBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="161">
+        <Item class="ModuleScript" referent="162">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -82666,7 +83356,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="162">
+        <Item class="ModuleScript" referent="163">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -82903,7 +83593,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="163">
+        <Item class="ModuleScript" referent="164">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -82992,7 +83682,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="164">
+        <Item class="ModuleScript" referent="165">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -83329,15 +84019,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="165">
+  <Item class="StarterPlayer" referent="166">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="166">
+    <Item class="StarterPlayerScripts" referent="167">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="167">
+      <Item class="LocalScript" referent="168">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -83707,11 +84397,11 @@ task.spawn(function()
 end)
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="168">
+        <Item class="Folder" referent="169">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="169">
+          <Item class="ModuleScript" referent="170">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -83842,7 +84532,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="170">
+          <Item class="ModuleScript" referent="171">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -87580,7 +88270,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="171">
+          <Item class="ModuleScript" referent="172">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -87948,7 +88638,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="172">
+          <Item class="ModuleScript" referent="173">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -88056,7 +88746,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="173">
+          <Item class="ModuleScript" referent="174">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -88175,7 +88865,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="174">
+          <Item class="ModuleScript" referent="175">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -88449,7 +89139,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="175">
+          <Item class="ModuleScript" referent="176">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -88549,7 +89239,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="176">
+          <Item class="ModuleScript" referent="177">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -88661,7 +89351,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="177">
+          <Item class="ModuleScript" referent="178">
             <Properties>
               <string name="Name">SocialPingController</string>
               <string name="Source"><![CDATA[--!strict
@@ -89043,7 +89733,7 @@ return table.freeze(SocialPingController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="178">
+          <Item class="ModuleScript" referent="179">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -89245,7 +89935,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="179">
+          <Item class="ModuleScript" referent="180">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -89454,7 +90144,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="180">
+          <Item class="ModuleScript" referent="181">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -89599,7 +90289,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="181">
+          <Item class="ModuleScript" referent="182">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -89899,13 +90589,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="182">
+  <Item class="TextChatService" referent="183">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="183">
+  <Item class="Workspace" referent="184">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

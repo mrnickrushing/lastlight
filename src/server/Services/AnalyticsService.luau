@@ -591,6 +591,101 @@ function AnalyticsService.quickChatSent(
     end
 end
 
+--[[
+    The commerce events the monetization taxonomy names. Nothing here carries a
+    price or a receipt id: the taxonomy asks what happened, and what happened is
+    a product id and an outcome.
+]]
+function AnalyticsService.storeView(self: AnalyticsService, player: Player, cardCount: number)
+    self._logger:info("store_view", { cards = cardCount, player = player.UserId })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "StoreView", math.max(1, cardCount), {})
+        end)
+    end
+end
+
+function AnalyticsService.productDetailView(
+    self: AnalyticsService,
+    player: Player,
+    productId: string
+)
+    self._logger:info("product_detail_view", {
+        player = player.UserId,
+        product = string.sub(productId, 1, 48),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "ProductDetailView", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = productId,
+            })
+        end)
+    end
+end
+
+function AnalyticsService.purchasePrompt(
+    self: AnalyticsService,
+    player: Player,
+    productId: string,
+    shown: boolean
+)
+    self._logger:info("purchase_prompt", {
+        player = player.UserId,
+        product = string.sub(productId, 1, 48),
+        shown = shown,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "PurchasePrompt", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = productId,
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = tostring(shown),
+            })
+        end)
+    end
+end
+
+function AnalyticsService.receiptResult(
+    self: AnalyticsService,
+    player: Player,
+    productId: string,
+    outcome: string
+)
+    self._logger:info("receipt_result", {
+        outcome = string.sub(outcome, 1, 24),
+        player = player.UserId,
+        product = string.sub(productId, 1, 48),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "ReceiptResult", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = productId,
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = outcome,
+            })
+        end)
+    end
+end
+
+function AnalyticsService.cosmeticEquipped(
+    self: AnalyticsService,
+    player: Player,
+    cosmeticId: string,
+    slot: string
+)
+    self._logger:info("cosmetic_equipped", {
+        cosmetic = string.sub(cosmeticId, 1, 48),
+        player = player.UserId,
+        slot = string.sub(slot, 1, 24),
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "CosmeticEquipped", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = cosmeticId,
+                [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = slot,
+            })
+        end)
+    end
+end
+
 function AnalyticsService.eliteStarted(
     self: AnalyticsService,
     player: Player,

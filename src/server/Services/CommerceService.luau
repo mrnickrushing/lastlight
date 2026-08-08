@@ -1,0 +1,466 @@
+--!strict
+
+--[[
+    The only module in this game that touches a purchase or ownership API.
+
+    `scripts/validate_monetization.py` allows exactly one, by name, and its
+    docstring says why the list is meant to stay short and to be read: a branch
+    on "does this player own X" is how a cosmetic quietly becomes a
+    requirement. So the shape of this file is the whole architecture:
+
+      * **It answers one question and writes down the answer.** What a player
+        owns is resolved here, once, and lands in `profile.commerce` as plain
+        data. Nothing downstream asks the platform anything, and nothing
+        downstream asks *this* anything either -- gameplay branches on what is
+        equipped, which is a profile field like every other.
+      * **The refusal to wear something unowned lives here**, not where
+        cosmetics are drawn. The drawing code takes an id and draws it. That
+        keeps the ownership question in one file and out of the HUD, the gear
+        visuals, and everything else.
+      * **Every decision it makes is somewhere else.** `Entitlements.route` is
+        pure and holds the branch a receipt takes; this is the shell that gives
+        it a profile, a mailbox and a durable write. `ProcessReceipt` cannot be
+        exercised in Studio -- the round trip needs a real purchase on a real
+        account -- so anything that decides has to be decidable without it.
+
+    **A receipt is acknowledged only after a durable write**, and that is the
+    rule everything else here bends around. Roblox retries until it is told the
+    grant is durable, so telling it early loses a purchase and telling it late
+    costs nothing but a retry. Two things count as durable: the buyer's profile
+    saved, or -- when this server does not hold that profile -- the mailbox
+    saved. A mailbox entry is a promise the next load will keep, and it is
+    stored outside the profile precisely because its reason for existing is the
+    moments when the profile is not ours to write.
+]]
+
+local MarketplaceService = game:GetService("MarketplaceService")
+local Players = game:GetService("Players")
+
+local CommerceService = {}
+CommerceService.__index = CommerceService
+CommerceService.Name = "CommerceService"
+
+export type Logger = {
+    info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+    warn: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+}
+
+export type CommerceService = typeof(setmetatable(
+    {} :: {
+        Name: string,
+        _logger: Logger,
+        _config: any,
+        _catalog: any,
+        _entitlements: any,
+        _profileService: any,
+        _featureFlags: any,
+        _analyticsService: any,
+        _persistent: boolean,
+        _mailboxStore: any,
+        --[[
+            Mailboxes for servers with no DataStore -- Studio, and any
+            environment running without persistence. In memory, which is the
+            same honest limitation the profile store has there: nothing
+            survives the session, and nothing pretends to.
+        ]]
+        _localMailboxes: { [number]: { any } },
+        _productInfo: { [string]: any },
+        _onGranted: ((Player, { string }) -> ())?,
+    },
+    CommerceService
+))
+
+local MAILBOX_STORE = "LastLightCommerceMailbox_v1"
+
+function CommerceService.new(
+    logger: Logger,
+    config: any,
+    cosmeticCatalog: any,
+    entitlements: any,
+    profileService: any,
+    featureFlags: any,
+    analyticsService: any
+): CommerceService
+    return setmetatable({
+        Name = CommerceService.Name,
+        _logger = logger,
+        _config = config,
+        _catalog = cosmeticCatalog,
+        _entitlements = entitlements,
+        _profileService = profileService,
+        _featureFlags = featureFlags,
+        _analyticsService = analyticsService,
+        _persistent = false,
+        _mailboxStore = nil,
+        _localMailboxes = {},
+        _productInfo = {},
+        _onGranted = nil,
+    }, CommerceService)
+end
+
+function CommerceService.Init(self: CommerceService, context: any)
+    local environmentConfig = context.config.Environments[context.environment]
+    self._persistent = environmentConfig ~= nil and environmentConfig.UsePersistentData == true
+    if self._persistent then
+        local DataStoreService = game:GetService("DataStoreService")
+        local ok, store = pcall(function()
+            return DataStoreService:GetDataStore(MAILBOX_STORE)
+        end)
+        if ok then
+            self._mailboxStore = store
+        else
+            self._logger:warn("commerce_mailbox_unavailable", { reason = tostring(store) })
+        end
+    end
+end
+
+function CommerceService.setGrantHandler(self: CommerceService, handler: (Player, { string }) -> ())
+    self._onGranted = handler
+end
+
+local function mailboxKey(userId: number): string
+    return string.format("mailbox_%d", userId)
+end
+
+function CommerceService._readMailbox(self: CommerceService, userId: number): { any }
+    if not self._persistent or self._mailboxStore == nil then
+        return self._entitlements.normalizeMailbox(self._localMailboxes[userId])
+    end
+    local ok, value = pcall(function()
+        return self._mailboxStore:GetAsync(mailboxKey(userId))
+    end)
+    if not ok then
+        self._logger:warn("commerce_mailbox_read_failed", { user = userId })
+        return self._entitlements.emptyMailbox()
+    end
+    return self._entitlements.normalizeMailbox(value)
+end
+
+--[[
+    Write a mailbox and say whether it landed.
+
+    The boolean is load-bearing: it is the difference between telling the
+    platform the purchase is safe and telling it to call again. A failed write
+    must never read as success.
+]]
+function CommerceService._writeMailbox(
+    self: CommerceService,
+    userId: number,
+    mailbox: { any }
+): boolean
+    if not self._persistent or self._mailboxStore == nil then
+        self._localMailboxes[userId] = mailbox
+        return true
+    end
+    local ok, err = pcall(function()
+        self._mailboxStore:SetAsync(mailboxKey(userId), mailbox)
+    end)
+    if not ok then
+        self._logger:warn(
+            "commerce_mailbox_write_failed",
+            { reason = tostring(err), user = userId }
+        )
+    end
+    return ok
+end
+
+--[[
+    The buyer's commerce state, if this server holds their profile and may
+    write it. Nil is a real answer and means "not ours": they are in another
+    server, or mid-load, or their profile is read-only because a lock could not
+    be taken. Writing anyway is how two servers overwrite one save.
+]]
+function CommerceService._writableState(self: CommerceService, userId: number): (Player?, any)
+    local player = Players:GetPlayerByUserId(userId)
+    if player == nil then
+        return nil, nil
+    end
+    if not self._profileService:isLoaded(player) or not self._profileService:isWritable(player) then
+        return player, nil
+    end
+    return player, self._profileService:commerce(player)
+end
+
+--[[
+    Apply one receipt. The single grant authority in the game.
+]]
+function CommerceService.applyReceipt(self: CommerceService, receipt: any): boolean
+    local userId = tonumber(receipt.userId) or 0
+    local player, state = self:_writableState(userId)
+    local mailbox = self:_readMailbox(userId)
+    local nextState, nextMailbox, verdict = self._entitlements.route(
+        state,
+        mailbox,
+        receipt,
+        function(productId: string): { string }
+            return self._catalog.grantsOf(productId)
+        end
+    )
+
+    if verdict == "granted" and player ~= nil and nextState ~= nil then
+        self._profileService:setCommerce(player, nextState)
+        -- The write, then the answer. Reversing these is the one ordering
+        -- mistake that costs a player a purchase they paid for.
+        if not self._profileService:save(player) then
+            self._logger:warn("commerce_grant_write_failed", { user = userId })
+            return false
+        end
+        local granted = self._catalog.grantsOf(receipt.productId)
+        self._logger:info("commerce_receipt_granted", {
+            product = tostring(receipt.productId),
+            purchase = tostring(receipt.purchaseId),
+            user = userId,
+        })
+        if self._analyticsService ~= nil then
+            self._analyticsService:receiptResult(player, tostring(receipt.productId), "granted")
+        end
+        local handler = self._onGranted
+        if handler ~= nil then
+            handler(player, granted)
+        end
+        return true
+    end
+
+    if verdict == "held" then
+        if not self:_writeMailbox(userId, nextMailbox) then
+            return false
+        end
+        self._logger:info("commerce_receipt_held", {
+            product = tostring(receipt.productId),
+            purchase = tostring(receipt.purchaseId),
+            user = userId,
+        })
+        return true
+    end
+
+    self._logger:warn("commerce_receipt_retry", {
+        product = tostring(receipt.productId),
+        purchase = tostring(receipt.purchaseId),
+        user = userId,
+    })
+    if self._analyticsService ~= nil and player ~= nil then
+        self._analyticsService:receiptResult(player, tostring(receipt.productId), "retry")
+    end
+    return false
+end
+
+--[[
+    Drain whatever was banked while this player was elsewhere.
+
+    Run at profile load. A receipt this build still cannot resolve stays in the
+    mailbox rather than being dropped, because the product may exist in the
+    next build and a purchase quietly discarded is a support ticket nobody can
+    answer.
+]]
+function CommerceService.drainFor(self: CommerceService, player: Player)
+    local mailbox = self:_readMailbox(player.UserId)
+    if #mailbox == 0 then
+        return
+    end
+    if not self._profileService:isWritable(player) then
+        return
+    end
+    local state, remaining, granted = self._entitlements.drain(
+        self._profileService:commerce(player),
+        mailbox,
+        function(productId: string): { string }
+            return self._catalog.grantsOf(productId)
+        end
+    )
+    if #granted == 0 then
+        return
+    end
+    self._profileService:setCommerce(player, state)
+    if not self._profileService:save(player) then
+        -- The mailbox is left exactly as it was. Clearing it before the
+        -- profile is safe is the one way a drained purchase disappears.
+        self._logger:warn("commerce_drain_write_failed", { user = player.UserId })
+        return
+    end
+    self:_writeMailbox(player.UserId, remaining)
+    self._logger:info("commerce_mailbox_drained", {
+        granted = #granted,
+        remaining = #remaining,
+        user = player.UserId,
+    })
+    local handler = self._onGranted
+    if handler ~= nil then
+        handler(player, granted)
+    end
+end
+
+--[[
+    Wear one. The single place ownership is asked about outside a receipt, and
+    therefore the reason no gameplay module ever has to.
+]]
+function CommerceService.equip(
+    self: CommerceService,
+    player: Player,
+    slot: any,
+    cosmeticId: any
+): any
+    if not self._profileService:isLoaded(player) then
+        return { applied = false, reason = "profile_loading" }
+    end
+    local state, result = self._entitlements.equip(
+        self._profileService:commerce(player),
+        slot,
+        cosmeticId,
+        function(id: string): string?
+            local cosmetic = self._catalog.get(id)
+            return if cosmetic == nil then nil else cosmetic.slot
+        end
+    )
+    if result.applied then
+        self._profileService:setCommerce(player, state)
+        if self._analyticsService ~= nil and cosmeticId ~= nil then
+            self._analyticsService:cosmeticEquipped(player, tostring(cosmeticId), tostring(slot))
+        end
+    end
+    return result
+end
+
+--[[
+    What a client may be told: what is worn, and what is owned.
+
+    Owned reaches the client because the store card has to show it -- a card
+    that cannot say "you already have this" sells a player the same thing
+    twice. It is a list of ids and nothing else; no price, no receipt, no
+    entitlement machinery.
+]]
+function CommerceService.snapshot(self: CommerceService, player: Player): any
+    if not self._profileService:isLoaded(player) then
+        return nil
+    end
+    local state = self._profileService:commerce(player)
+    local owned: { string } = {}
+    for _, cosmetic in self._catalog.list() do
+        if self._entitlements.owns(state, cosmetic.id) then
+            table.insert(owned, cosmetic.id)
+        end
+    end
+    table.sort(owned)
+    return {
+        enabled = self._featureFlags:isEnabled("cosmetic_store_enabled"),
+        owned = owned,
+        equipped = state.equipped,
+    }
+end
+
+--[[
+    The Robux price, read from the platform rather than from a constant.
+
+    A price in the source is a price that is wrong the first time the owner
+    changes it in the dashboard, and a card showing the wrong number is worse
+    than a card showing none. Cached per product for the life of the server:
+    prices do not change mid-session, and `GetProductInfo` is a web call.
+]]
+function CommerceService.productInfo(self: CommerceService, productId: any): any
+    if type(productId) ~= "string" then
+        return nil
+    end
+    local cached = self._productInfo[productId]
+    if cached ~= nil then
+        return cached
+    end
+    local robloxId = self._config.CommerceProductIds[productId]
+    if type(robloxId) ~= "number" then
+        return nil
+    end
+    local ok, info = pcall(function()
+        return MarketplaceService:GetProductInfo(robloxId, Enum.InfoType.Product)
+    end)
+    if not ok or type(info) ~= "table" then
+        self._logger:warn("commerce_product_info_failed", { product = productId })
+        return nil
+    end
+    local resolved = {
+        priceInRobux = tonumber(info.PriceInRobux) or 0,
+        name = tostring(info.Name or ""),
+    }
+    self._productInfo[productId] = resolved
+    return resolved
+end
+
+function CommerceService.promptPurchase(self: CommerceService, player: Player, productId: any): any
+    if not self._featureFlags:isEnabled("cosmetic_store_enabled") then
+        return { accepted = false, reason = "store_closed" }
+    end
+    local product = self._catalog.product(productId)
+    if product == nil then
+        return { accepted = false, reason = "unknown_product" }
+    end
+    local robloxId = self._config.CommerceProductIds[product.id]
+    if type(robloxId) ~= "number" then
+        -- The dashboard half does not exist yet. Refused with a reason rather
+        -- than prompting into nothing, which on a client looks like the button
+        -- being broken.
+        return { accepted = false, reason = "product_not_configured" }
+    end
+    local ok = pcall(function()
+        MarketplaceService:PromptProductPurchase(player, robloxId)
+    end)
+    if self._analyticsService ~= nil then
+        self._analyticsService:purchasePrompt(player, product.id, ok)
+    end
+    return { accepted = ok, reason = if ok then "prompted" else "prompt_failed" }
+end
+
+function CommerceService.Start(self: CommerceService)
+    --[[
+        The platform's own entry point, and the only one. Wrapped so an error
+        anywhere inside becomes NotProcessedYet rather than an unhandled throw
+        -- a throw is read by the platform as "no answer", which is the same as
+        a retry, but it loses the log line that says why.
+    ]]
+    MarketplaceService.ProcessReceipt = function(receiptInfo: any): Enum.ProductPurchaseDecision
+        local ok, granted = pcall(function(): boolean
+            return self:applyReceipt({
+                purchaseId = tostring(receiptInfo.PurchaseId),
+                productId = self:_productIdFor(receiptInfo.ProductId),
+                userId = receiptInfo.PlayerId,
+                at = os.time(),
+            })
+        end)
+        if not ok then
+            self._logger:warn("commerce_receipt_error", { reason = tostring(granted) })
+            return Enum.ProductPurchaseDecision.NotProcessedYet
+        end
+        return if granted
+            then Enum.ProductPurchaseDecision.PurchaseGranted
+            else Enum.ProductPurchaseDecision.NotProcessedYet
+    end
+
+    self._profileService:onLoaded(function(player: Player, _profile: any)
+        task.spawn(function()
+            self:drainFor(player)
+        end)
+    end)
+
+    self._logger:info("commerce_started", {
+        configured = self:_configuredCount(),
+        products = #self._catalog.products(),
+        storeEnabled = self._featureFlags:isEnabled("cosmetic_store_enabled"),
+    })
+end
+
+-- The dashboard number back to this game's own product id. A receipt names
+-- Roblox's id; everything here names ours.
+function CommerceService._productIdFor(self: CommerceService, robloxProductId: any): string
+    for productId, configured in self._config.CommerceProductIds do
+        if configured == robloxProductId then
+            return productId
+        end
+    end
+    return ""
+end
+
+function CommerceService._configuredCount(self: CommerceService): number
+    local count = 0
+    for _ in self._config.CommerceProductIds do
+        count += 1
+    end
+    return count
+end
+
+return table.freeze(CommerceService)
