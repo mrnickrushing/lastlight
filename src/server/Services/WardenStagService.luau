@@ -40,6 +40,7 @@ export type WardenStagService = typeof(setmetatable(
         _builder: any,
         _analyticsService: any,
         _featureFlags: any,
+        _config: any,
         _state: any,
         _arena: any,
         _model: Model?,
@@ -54,10 +55,6 @@ export type WardenStagService = typeof(setmetatable(
     },
     WardenStagService
 ))
-
-local ACTIVATION_RADIUS = 27
-local ENCOUNTER_RADIUS = 56
-local STRIKE_RANGE = 15
 
 local function rootPart(player: Player): BasePart?
     local character = player.Character
@@ -87,7 +84,8 @@ function WardenStagService.new(
     enemyCombatRules: any,
     builder: any,
     analyticsService: any,
-    featureFlags: any
+    featureFlags: any,
+    config: any
 ): WardenStagService
     return setmetatable({
         Name = WardenStagService.Name,
@@ -104,6 +102,7 @@ function WardenStagService.new(
         _builder = builder,
         _analyticsService = analyticsService,
         _featureFlags = featureFlags,
+        _config = config,
         _state = nil,
         _arena = nil,
         _model = nil,
@@ -474,7 +473,10 @@ end
 function WardenStagService._playersInArena(self: WardenStagService): { Player }
     local players = {}
     for _, player in Players:GetPlayers() do
-        if self:_inArena(player, ENCOUNTER_RADIUS) and self._survivalService:canAct(player) then
+        if
+            self:_inArena(player, self._config.BossEncounterRadius)
+            and self._survivalService:canAct(player)
+        then
             table.insert(players, player)
         end
     end
@@ -517,7 +519,8 @@ function WardenStagService._step(self: WardenStagService, now: number)
     if self._state.status == "dormant" then
         for _, player in Players:GetPlayers() do
             if
-                self:_inArena(player, ACTIVATION_RADIUS) and self._survivalService:canAct(player)
+                self:_inArena(player, self._config.BossActivationRadius)
+                and self._survivalService:canAct(player)
             then
                 local nextState, result = self._encounter.activate(self._state, player.UserId)
                 if result.accepted then
@@ -588,7 +591,10 @@ function WardenStagService.interact(
     player: Player,
     prompt: ProximityPrompt
 ): any
-    if not self:_inArena(player, ENCOUNTER_RADIUS) or not self._survivalService:canAct(player) then
+    if
+        not self:_inArena(player, self._config.BossEncounterRadius)
+        or not self._survivalService:canAct(player)
+    then
         return {
             accepted = false,
             message = "ENTER THE WARDEN'S SEAL WHILE ACTIVE",
@@ -689,7 +695,10 @@ function WardenStagService.damageNearest(self: WardenStagService, player: Player
     if self._state.status == "cleansing" then
         return false, "CLEANSE LIVING ROOTS OR ACCEPT THE ANTLER CONSEQUENCE"
     end
-    if not self:_inArena(player, ENCOUNTER_RADIUS) or not self._survivalService:canAct(player) then
+    if
+        not self:_inArena(player, self._config.BossEncounterRadius)
+        or not self._survivalService:canAct(player)
+    then
         return false, "Enter the Warden's Seal to strike."
     end
     local model = self._model
@@ -698,7 +707,7 @@ function WardenStagService.damageNearest(self: WardenStagService, player: Player
     if model == nil or root == nil or heart == nil then
         return false, "The Warden Stag is still taking shape."
     end
-    if (root.Position - heart.Position).Magnitude > STRIKE_RANGE then
+    if (root.Position - heart.Position).Magnitude > self._config.BossStrikeRange then
         return false, "Move closer to the memory heart."
     end
     if not self:_lineOfSight(player, model) then
@@ -785,7 +794,7 @@ function WardenStagService.canMarkNearest(
         or model == nil
         or model.PrimaryPart == nil
         or root == nil
-        or not self:_inArena(player, ENCOUNTER_RADIUS)
+        or not self:_inArena(player, self._config.BossEncounterRadius)
         or not self._survivalService:canAct(player)
     then
         return false, "NO BOSS THREAT CAN BE MARKED"
@@ -840,7 +849,7 @@ function WardenStagService.snapshot(self: WardenStagService, player: Player): an
     if self._state.status == "locked" or self._state.status == "dormant" then
         return nil
     end
-    if not self:_inArena(player, ENCOUNTER_RADIUS + 20) then
+    if not self:_inArena(player, self._config.BossEncounterRadius + 20) then
         return nil
     end
     return self._encounter.snapshot(self._state, player.UserId)

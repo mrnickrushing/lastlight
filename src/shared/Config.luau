@@ -142,6 +142,44 @@ return table.freeze({
     -- per the publishing runbook so environment checks can tell a real
     -- production place from an unregistered one.
     ProductionPlaceIds = table.freeze({ 115897110071287 }),
+    --[[
+        The knobs a closed beta turns.
+
+        BETA_TUNING.md's first table says which number each of Milestone 13's
+        five tuning decisions is read on; this is the other half of that
+        sentence -- what you actually change once you have read it. The values
+        below were locals in four services until this wave, which meant every
+        tuning pass was a code change, a rebuild and a publish, and the
+        practical consequence of that is not effort: it is that nobody tries a
+        second value.
+
+        The rule that keeps this honest is that a knob has exactly **one**
+        home. A service that reads `Config.EliteStrikeRange` and also keeps its
+        own `STRIKE_RANGE` is a knob somebody will turn and watch do nothing,
+        and `TuningKnobs.spec` refuses that shape.
+
+        Engagement distances, in studs. The elite and the boss carry their own
+        rather than sharing, because they are different fights: the Old Growth
+        is stationary and the Warden Stag closes, so the distance at which each
+        becomes unavoidable is a separate decision.
+    ]]
+    EliteActivationRadius = 28,
+    EliteEncounterRadius = 58,
+    EliteStrikeRange = 14,
+    BossActivationRadius = 27,
+    BossEncounterRadius = 56,
+    BossStrikeRange = 15,
+    -- The town watch's chip damage against anything that reaches the lantern:
+    -- how hard, how often, and from how far. The first difficulty dial anybody
+    -- reaches for when a night is too hard or too safe, because it changes the
+    -- floor of every night rather than one encounter.
+    TownWatchChipDamage = 3,
+    TownWatchChipEverySeconds = 7,
+    TownWatchChipRange = 26,
+    -- Where the First Lantern's health tops out. The town's whole difficulty
+    -- ceiling: every night is measured against it and every repair is a share
+    -- of it.
+    LanternHealthCeiling = 100,
     FeatureFlags = table.freeze({
         bounded_join = true,
         first_ten_minutes = true,

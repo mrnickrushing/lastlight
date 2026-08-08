@@ -40,6 +40,7 @@ export type OldGrowthService = typeof(setmetatable(
         _builder: any,
         _analyticsService: any,
         _featureFlags: any,
+        _config: any,
         _state: any,
         _arena: any,
         _model: Model?,
@@ -54,10 +55,6 @@ export type OldGrowthService = typeof(setmetatable(
     },
     OldGrowthService
 ))
-
-local ACTIVATION_RADIUS = 28
-local ENCOUNTER_RADIUS = 58
-local STRIKE_RANGE = 14
 
 local function rootPart(player: Player): BasePart?
     local character = player.Character
@@ -86,7 +83,8 @@ function OldGrowthService.new(
     enemyCombatRules: any,
     builder: any,
     analyticsService: any,
-    featureFlags: any
+    featureFlags: any,
+    config: any
 ): OldGrowthService
     return setmetatable({
         Name = OldGrowthService.Name,
@@ -102,6 +100,7 @@ function OldGrowthService.new(
         _builder = builder,
         _analyticsService = analyticsService,
         _featureFlags = featureFlags,
+        _config = config,
         _state = nil,
         _arena = nil,
         _model = nil,
@@ -485,7 +484,10 @@ end
 function OldGrowthService._playersInArena(self: OldGrowthService): { Player }
     local players = {}
     for _, player in Players:GetPlayers() do
-        if self:_inArena(player, ENCOUNTER_RADIUS) and self._survivalService:canAct(player) then
+        if
+            self:_inArena(player, self._config.EliteEncounterRadius)
+            and self._survivalService:canAct(player)
+        then
             table.insert(players, player)
         end
     end
@@ -526,7 +528,8 @@ function OldGrowthService._step(self: OldGrowthService, now: number)
     then
         for _, player in Players:GetPlayers() do
             if
-                self:_inArena(player, ACTIVATION_RADIUS) and self._survivalService:canAct(player)
+                self:_inArena(player, self._config.EliteActivationRadius)
+                and self._survivalService:canAct(player)
             then
                 local nextState, result = self._encounter.activate(self._state, player.UserId)
                 if result.accepted then
@@ -597,7 +600,10 @@ function OldGrowthService.interact(
     player: Player,
     prompt: ProximityPrompt
 ): any
-    if not self:_inArena(player, ENCOUNTER_RADIUS) or not self._survivalService:canAct(player) then
+    if
+        not self:_inArena(player, self._config.EliteEncounterRadius)
+        or not self._survivalService:canAct(player)
+    then
         return {
             accepted = false,
             message = "ENTER THE OLD GROWTH ARENA WHILE ACTIVE",
@@ -679,7 +685,10 @@ function OldGrowthService.damageNearest(self: OldGrowthService, player: Player):
     if self._state.status ~= "vulnerable" and self._state.status ~= "shielded" then
         return false, "No elite threat is active."
     end
-    if not self:_inArena(player, ENCOUNTER_RADIUS) or not self._survivalService:canAct(player) then
+    if
+        not self:_inArena(player, self._config.EliteEncounterRadius)
+        or not self._survivalService:canAct(player)
+    then
         return false, "Enter the Old Growth arena to strike."
     end
     local model = self._model
@@ -688,7 +697,7 @@ function OldGrowthService.damageNearest(self: OldGrowthService, player: Player):
     if model == nil or root == nil or heart == nil then
         return false, "Old Growth is still taking shape."
     end
-    if (root.Position - heart.Position).Magnitude > STRIKE_RANGE then
+    if (root.Position - heart.Position).Magnitude > self._config.EliteStrikeRange then
         return false, "Move closer to the amber heart."
     end
     if not self:_lineOfSight(player, model) then
@@ -776,7 +785,7 @@ function OldGrowthService.canMarkNearest(
         or model == nil
         or model.PrimaryPart == nil
         or root == nil
-        or not self:_inArena(player, ENCOUNTER_RADIUS)
+        or not self:_inArena(player, self._config.EliteEncounterRadius)
         or not self._survivalService:canAct(player)
     then
         return false, "NO ELITE THREAT CAN BE MARKED"
@@ -845,7 +854,10 @@ function OldGrowthService.snapshot(self: OldGrowthService, player: Player): any
     end
     local snapshot =
         self._encounter.snapshot(self._state, player.UserId, workspace:GetServerTimeNow())
-    if not self:_inArena(player, ENCOUNTER_RADIUS + 18) and not snapshot.carryingFire then
+    if
+        not self:_inArena(player, self._config.EliteEncounterRadius + 18)
+        and not snapshot.carryingFire
+    then
         return nil
     end
     return snapshot

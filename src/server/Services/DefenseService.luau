@@ -52,6 +52,7 @@ export type DefenseService = typeof(setmetatable(
         _worldService: any,
         _enemyService: any,
         _profileService: any,
+        _config: any,
         _plots: { [string]: Plot },
         _toastHandler: ((Player?, string) -> ())?,
         _nightActive: boolean,
@@ -69,16 +70,13 @@ local STONE = Color3.fromRGB(112, 108, 100)
 local STAKE_WOOD = Color3.fromRGB(94, 66, 40)
 local WATCH_COAT = Color3.fromRGB(52, 74, 92)
 
-local WATCH_CHIP_DAMAGE = 3
-local WATCH_CHIP_EVERY = 7
-local WATCH_CHIP_RANGE = 26
-
 function DefenseService.new(
     logger: Logger,
     defenseLanes: any,
     worldService: any,
     enemyService: any,
-    profileService: any
+    profileService: any,
+    config: any
 ): DefenseService
     return setmetatable({
         Name = DefenseService.Name,
@@ -87,6 +85,7 @@ function DefenseService.new(
         _worldService = worldService,
         _enemyService = enemyService,
         _profileService = profileService,
+        _config = config,
         _plots = {},
         _toastHandler = nil,
         _nightActive = false,
@@ -377,9 +376,9 @@ function DefenseService._step(self: DefenseService, now: number)
     if watchPosition ~= nil and now >= self._nextChipAt then
         local dx = ex - watchPosition.X
         local dz = ez - watchPosition.Z
-        if dx * dx + dz * dz <= WATCH_CHIP_RANGE ^ 2 then
-            if self._enemyService:residentChip(WATCH_CHIP_DAMAGE) then
-                self._nextChipAt = now + WATCH_CHIP_EVERY
+        if dx * dx + dz * dz <= self._config.TownWatchChipRange ^ 2 then
+            if self._enemyService:residentChip(self._config.TownWatchChipDamage) then
+                self._nextChipAt = now + self._config.TownWatchChipEverySeconds
             end
         end
     end

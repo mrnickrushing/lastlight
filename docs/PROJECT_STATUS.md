@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #346), build `0.53.0`,
-save schema 25, 27 services. Published to Roblox as place version 152,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #348), build `0.53.0`,
+save schema 25, 27 services. Published to Roblox as place version 154,
 matching this revision exactly. (#341 and #343 both left the built place
 byte-identical, because they add only specs and documentation and the built
 place carries no tests, so publishing either returned the version #340 had
@@ -67,6 +67,37 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#348** (v154) **M13 wave C: a number you cannot act on is an observation.** Wave B
+  gave every tuning decision a number; this is the other half of the sentence.
+  **Ten values came out of four services into `Config`** — the elite's and the
+  boss's engagement distances, the town watch's chip damage, rate and reach, and
+  the lantern's health ceiling — because while they were locals, every tuning pass
+  was a code change, a rebuild and a publish, and the practical cost of that is not
+  effort: it is that nobody tries a second value.
+
+  **A knob has exactly one home, and that rule prevents the worse failure rather
+  than the obvious one.** A service that reads `Config.EliteStrikeRange` and also
+  keeps its own `STRIKE_RANGE` is a knob somebody turns, reads their telemetry, and
+  concludes the number does not matter — a tuning pass producing a *wrong* answer
+  instead of no answer.
+
+  **The pairing is the load-bearing check.** Every decision in BETA_TUNING.md's
+  first table has at least one row in its second, and every knob names a decision
+  that exists, so a sixth tuning decision cannot arrive with an event and no way to
+  respond to it. Both directions, plus: every knob is a finite number in `Config`,
+  every knob is read somewhere outside it, and the four emptied services are
+  checked by name so a later refactor cannot quietly put a constant back while the
+  `Config` entry stays.
+
+  **The obvious version of the one-home rule cried wolf and had to be tightened.**
+  Matching on value alone, the first run reported `TerrainBuilder` reading
+  `Config.BootstrapTimeoutSeconds` beside its own `SURFACE_PATCH_DEPTH` — both 8,
+  and nothing else in common. A check that has to be argued with every time it
+  fires is a check somebody deletes, so a second home now has to be the same
+  **number** and the same **thing**: names normalized and compared as substrings,
+  so `STRIKE_RANGE` matches `EliteStrikeRange` and `SURFACE_PATCH_DEPTH` matches
+  nothing. Mutated afterwards by putting a copy of the strike range back, and both
+  the general rule and the by-name check caught it.
 - **#346** (v152) **M13 wave A: a flag can reach some players and not others, and the
   hard part is what happens when it reaches more.** Milestone 13's rollout is four
   rungs — team and trusted testers, a consented allowlist, a larger controlled
