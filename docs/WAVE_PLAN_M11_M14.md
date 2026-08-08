@@ -219,7 +219,7 @@ that keep a launch candidate from drifting after it is declared one.
 
 | Wave | Scope | Done when |
 |---|---|---|
-| A | **Schema freeze guard.** "Frozen save schema except blocker fixes" is a promise no one can keep by remembering. A marker in `Config` plus a validator that fails any bump while it is set, with an explicit override that has to be typed | Validator refuses a bump under freeze and says how to override deliberately |
+| A ✅ | **Schema freeze guard** (shipped #334). "Frozen save schema except blocker fixes" is a promise no one can keep by remembering. A marker in `Config` plus a validator that fails any bump while it is set, with an explicit override that has to be typed | Validator refuses a bump under freeze and says how to override deliberately |
 | B | **The launch checklist, executable.** QA_RELEASE_PLAN.md holds the checklist; a validator reads it and fails on an unchecked blocking item, so "complete launch checklist" is a check rather than a claim | `npm run check` fails while a blocking item is unticked |
 | C | **Original-asset provenance.** `validate_mesh_assets.py`, `validate_image_assets.py` and `validate_audio_assets.py` already assert that assets exist and are registered. Extend them to assert an origin is recorded for each, which is what an original-IP audit needs to read | Every registered asset has provenance; an asset without it fails the check |
 | D | **Release notes, known issues and dashboards, generated.** Release notes from the merged PR stream, known issues from the open-thread ledger the handoff already keeps, dashboards from the analytics taxonomy | The three documents build from the repository rather than being written from memory |
