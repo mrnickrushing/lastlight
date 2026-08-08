@@ -2,16 +2,19 @@
 """Keep functional progress free of monetization.
 
 Milestone 4's exit gate asks that "no functional progress requires premium
-cosmetics." Today that is true by absence -- the game contains no
-MarketplaceService call, no game pass, no developer product, and no premium
-membership check anywhere. Nothing to fix, which is exactly why this script
-exists: an exit-gate item that passes because a thing is missing goes on
-passing right up until someone adds the thing.
+cosmetics." It used to be true by absence -- the game contained no
+MarketplaceService call, no game pass, no developer product and no premium
+membership check anywhere. This script exists because that is the weakest way
+for a gate to pass: an exit-gate item that passes because a thing is missing
+goes on passing right up until someone adds the thing.
 
-Milestone 11 is "social and commerce readiness". When that work lands, this
-script is what forces the question to be answered deliberately -- add the
-module to ALLOWED and say in the pull request why the purchase cannot gate
-progress -- rather than answered by whoever happened to write the code.
+Milestone 11 added the thing. One module now touches a purchase API, it is on
+the list below with the reason, and the property the gate asks about is held by
+design rather than by absence: cosmetics are pure presentation, entitlements
+resolve outside gameplay into plain profile data, and gameplay branches on what
+is equipped rather than on what is owned. CosmeticNeutrality.spec is the half
+of that this script cannot see -- it refuses any module outside the catalog to
+so much as name a cosmetic id.
 
 Two rules, and neither is a judgement about monetization itself:
 
@@ -20,7 +23,8 @@ Two rules, and neither is a judgement about monetization itself:
      ownership state, because a branch on "does this player own X" is how a
      cosmetic quietly becomes a requirement.
 
-The allowlist is empty on purpose. It is meant to stay short and to be read.
+The allowlist holds exactly one module and is meant to stay that way. It is
+short so that it is read.
 """
 
 import pathlib
@@ -33,7 +37,21 @@ ROOTS = ["src/server", "src/client", "src/shared", "src/first"]
 # Modules permitted to touch a purchase or ownership API, each with the reason
 # it is allowed. Adding an entry is a deliberate act and should be reviewed as
 # one.
-ALLOWED: dict[str, str] = {}
+ALLOWED: dict[str, str] = {
+    "src/server/Services/CommerceService.luau": (
+        "The single grant authority. It resolves what a player owns once, at a "
+        "receipt or at profile load, and writes the answer into "
+        "profile.commerce as plain data; nothing downstream asks the platform "
+        "anything. Every purchase is cosmetic and every cosmetic is "
+        "presentation -- no cosmetic appears in a stat, a gate, a capacity, a "
+        "recipe, a drop table, a spawn rule or a reward, which "
+        "CosmeticNeutrality.spec asserts by walking the catalog and by "
+        "refusing any module outside it to even name a cosmetic id. Gameplay "
+        "branches on what is equipped, which is a profile field like every "
+        "other. A second entry on this list would be the design failing, not "
+        "the list being too short."
+    ),
+}
 
 PURCHASE_APIS = [
     "MarketplaceService",

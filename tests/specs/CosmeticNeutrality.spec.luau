@@ -219,6 +219,38 @@ return {
                 if #entries == 1 then
                     TestRunner.equal(entries[1], "src/server/Services/CommerceService.luau")
                 end
+                --[[
+                    And the other half of the same rule, which the script
+                    itself cannot check: exactly one file in the game touches a
+                    purchase API, and it is the one on the list. The script
+                    skips allowlisted files entirely, so without this a second
+                    module could be added to ALLOWED and to the codebase and
+                    both would pass.
+                ]]
+                local touching: { string } = {}
+                local files: { { path: string, source: string } } = {}
+                readTree("src", files)
+                for _, file in files do
+                    -- Comments stripped first, the same way the script does
+                    -- it: several modules discuss ProcessReceipt without
+                    -- calling anything, and a file that explains why a rule
+                    -- exists must not fail the rule.
+                    local code = string.gsub(file.source, "%-%-%[%[.-%]%]", "")
+                    code = string.gsub(code, "%-%-[^\n]*", "")
+                    if
+                        string.find(code, "MarketplaceService", 1, true) ~= nil
+                        or string.find(code, "ProcessReceipt", 1, true) ~= nil
+                    then
+                        table.insert(touching, file.path)
+                    end
+                end
+                TestRunner.truthy(
+                    #touching <= 1,
+                    "more than one module touches a purchase API: " .. table.concat(touching, ", ")
+                )
+                if #touching == 1 then
+                    TestRunner.equal(touching[1], "src/server/Services/CommerceService.luau")
+                end
             end,
         },
         {

@@ -96,6 +96,7 @@ TestRunner.run({
     require("./specs/QuickChat.spec"),
     require("./specs/SocialSafety.spec"),
     require("./specs/Entitlements.spec"),
+    require("./specs/CommerceReceipts.spec"),
     require("./specs/CosmeticNeutrality.spec"),
     require("./specs/CosmeticReachability.spec"),
     require("./specs/AdminInspectionReport.spec"),

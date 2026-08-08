@@ -65,6 +65,8 @@ local TownVisitPolicy = require(root.TownVisitPolicy)
 local RunHandoff = require(root.RunHandoff)
 local PartySession = require(root.PartySession)
 local QuickChat = require(root.QuickChat)
+local CosmeticCatalog = require(root.CosmeticCatalog)
+local Entitlements = require(root.Entitlements)
 local AdminRoster = require(root.AdminRoster)
 local TownDecorations = require(root.TownDecorations)
 local TownProgression = require(root.TownProgression)
@@ -91,6 +93,7 @@ local TownNightService = require(script.Services.TownNightService)
 local LobbyService = require(script.Services.LobbyService)
 local PartyService = require(script.Services.PartyService)
 local SocialService = require(script.Services.SocialService)
+local CommerceService = require(script.Services.CommerceService)
 local AdminService = require(script.Services.AdminService)
 local CompanionService = require(script.Services.CompanionService)
 local DefenseService = require(script.Services.DefenseService)
@@ -336,6 +339,22 @@ partyService:setBlockReader(function(fromUserId: number, toUserId: number): bool
     return socialService:isSuppressed(fromUserId, toUserId)
 end)
 
+--[[
+    The one module allowed to touch a purchase API, and the only grant
+    authority in the game. Everything it decides is decided in the pure
+    Entitlements module; what it owns is the profile write, the mailbox and the
+    platform call.
+]]
+local commerceService = CommerceService.new(
+    logger,
+    Config,
+    CosmeticCatalog,
+    Entitlements,
+    profileService,
+    featureFlags,
+    analyticsService
+)
+
 local performanceService = PerformanceService.new(logger, Config, PerformanceBudget)
 local adminService = AdminService.new(
     logger,
@@ -502,6 +521,7 @@ services:register(defenseService)
 services:register(regionEncounterService)
 services:register(partyService)
 services:register(socialService)
+services:register(commerceService)
 -- Without this the departure countdown never reached a client: LobbyService
 -- published every whole second into a handler nobody had set, so the panel
 -- froze at "DEPARTING IN 10" while the server counted down and launched.

@@ -398,4 +398,78 @@ function Entitlements.drain(
     return current, remaining, granted
 end
 
+--[[
+    The whole decision a receipt handler makes, in one pure place.
+
+    `ProcessReceipt` runs on a server that may or may not be holding the
+    buyer's profile, and the branch it takes decides whether a purchase is
+    delivered, held or lost. Keeping that branch here rather than inside the
+    service is what makes it testable at all: the platform call cannot be
+    exercised in Studio, so the decision must be exercisable without it.
+
+    `profileState` is the buyer's commerce state if this server holds their
+    profile and may write it, and nil otherwise. The three verdicts map onto
+    what the platform is told:
+
+      * `granted`  -- the grant is ours, durably, once the caller's write
+                      lands. The platform may stop retrying.
+      * `held`     -- we could not write the profile, so the receipt went to
+                      the mailbox instead. Also durable, also acknowledged: a
+                      mailbox entry is a promise a later load will keep.
+      * `retry`    -- nothing could be done with this receipt in this build.
+                      The platform must call again.
+
+    The distinction between `held` and `retry` is the one that costs money if
+    it is wrong. Holding an unknown product would tell the platform to stop
+    retrying a purchase this build cannot deliver; retrying a receipt we could
+    have banked leaves a player waiting on a coincidence.
+]]
+function Entitlements.route(
+    profileState: any,
+    mailbox: any,
+    receipt: any,
+    resolve: (string) -> { string }
+): (State?, { Receipt }, string)
+    local heldMailbox = Entitlements.normalizeMailbox(mailbox)
+    if
+        type(receipt) ~= "table"
+        or not validId(receipt.purchaseId)
+        or not validId(receipt.productId)
+    then
+        return nil, heldMailbox, "retry"
+    end
+
+    -- Nothing is held or granted for a product this build cannot resolve, in
+    -- either branch. A mailbox full of receipts nobody can ever apply is a
+    -- support queue with no answer at the end of it.
+    local granted = resolve(receipt.productId)
+    if type(granted) ~= "table" or #granted == 0 then
+        return nil, heldMailbox, "retry"
+    end
+
+    if profileState ~= nil then
+        local next, result = Entitlements.apply(profileState, receipt, resolve)
+        if result.acknowledge then
+            -- Includes the duplicate case, which is the platform retrying a
+            -- grant we already have. Returning the state either way lets the
+            -- caller write once and not think about which it was.
+            return next, heldMailbox, "granted"
+        end
+        return nil, heldMailbox, "retry"
+    end
+
+    -- Already waiting is already durable. A retry into a mailbox that holds
+    -- the purchase id is the same answer as the first time.
+    for _, alreadyHeld in heldMailbox do
+        if alreadyHeld.purchaseId == receipt.purchaseId then
+            return nil, heldMailbox, "held"
+        end
+    end
+    local nextMailbox, accepted = Entitlements.enqueue(heldMailbox, receipt)
+    if not accepted then
+        return nil, heldMailbox, "retry"
+    end
+    return nil, nextMailbox, "held"
+end
+
 return table.freeze(Entitlements)
