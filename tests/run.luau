@@ -108,4 +108,5 @@ TestRunner.run({
     require("./specs/GateMetrics.spec"),
     require("./specs/AdminInspectionReport.spec"),
     require("./specs/AdminRoster.spec"),
+    require("./specs/FullPathTraversal.spec"),
 })
