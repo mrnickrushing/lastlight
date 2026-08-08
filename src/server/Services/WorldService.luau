@@ -3122,6 +3122,21 @@ local function hideProceduralPlaceholder(placeholder: Instance)
         if removeSemanticGui and (instance:IsA("SurfaceGui") or instance:IsA("BillboardGui")) then
             instance:Destroy()
         elseif instance:IsA("BasePart") then
+            --[[
+                An interaction's tap target is not scenery, whatever it is
+                parented to. The barricade's click volume lives inside the
+                construction plot placeholder, so the blanket below turned
+                it off along with the plot -- and the tutorial's build
+                step stopped answering taps entirely. A part that exists
+                to be clicked keeps its queries.
+            ]]
+            if
+                string.find(instance.Name, "_ClickVolume", 1, true) ~= nil
+                or instance:FindFirstChildOfClass("ClickDetector") ~= nil
+                or instance:FindFirstChildOfClass("ProximityPrompt") ~= nil
+            then
+                continue
+            end
             instance.Transparency = 1
             instance.CastShadow = false
             --[[
@@ -4648,6 +4663,17 @@ function WorldService._buildMara(self: WorldService, world: Model)
 
     self._mara = model
     self._maraStandY = model:GetPivot().Position.Y
+    --[[
+        The whole deadfall takes the tap, not a box on Mara's torso.
+
+        The first live playthrough on a phone could not free her: the log
+        is what a player aims at -- it is the thing pinning her, and the
+        objective says to clear it -- but the target was seven studs
+        around her chest, half of it under the log, and the construction
+        plot six studs away answered most of the misses with a line about
+        heartwood. The volume now spans the fallen roots themselves, so
+        tapping anywhere on what looks tappable frees her.
+    ]]
     self:_registerInteraction(
         torso,
         self._runtimeIds.InteractionIds.Mara,
@@ -4656,7 +4682,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
         "Mara",
         nil,
         nil,
-        Vector3.new(7, 8, 7)
+        Vector3.new(16, 9, 12)
     )
 end
 
@@ -5453,10 +5479,18 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         "Barricade",
         nil,
         nil,
-        -- The plot is an 18 x 0.5 slab: almost impossible to hit, and the one
-        -- interaction players reported as simply not working. The volume
-        -- covers the whole worksite, posts and braces included.
-        Vector3.new(20, 12, 12)
+        --[[
+            The plot is an 18 x 0.5 slab: almost impossible to hit bare,
+            and the one interaction players reported as simply not
+            working, so the volume covers the whole worksite footprint.
+            What it must not do is stand up: the player approaches from
+            the south with the deadfall beyond it, so at twelve studs
+            tall this box was a wall across every tap aimed at the log,
+            and at twelve deep it reached the log besides. Wide and low:
+            generous for a tap aimed at the ground, invisible to a tap
+            aimed past it.
+        ]]
+        Vector3.new(20, 5, 9)
     )
 
     local firstLanternFallback = Instance.new("Model")
