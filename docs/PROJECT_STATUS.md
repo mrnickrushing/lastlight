@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #349), build `0.53.0`,
-save schema 25, 27 services. Published to Roblox as place version 155,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #351), build `0.53.0`,
+save schema 25, 27 services. Published to Roblox as place version 156,
 matching this revision exactly. (#341 and #343 both left the built place
 byte-identical, because they add only specs and documentation and the built
 place carries no tests, so publishing either returned the version #340 had
@@ -28,7 +28,7 @@ done: routing every player-visible string through one table touches nearly every
 file that speaks to a player, and the check that gives the wave its value — *no
 player-visible literal outside the table* — cannot be switched on until the
 migration is complete. A partial pass is a large diff with no guard on it.
-**Milestone 14 has wave A shipped and B through E still to build.**
+**Milestone 14 has waves A and B shipped and C through E still to build.**
 
 **Milestones 0 through 11 are complete, and so is Milestone 12's buildable
 half** — M11 waves A through J and M12 waves A through E all shipped. What M12
@@ -77,6 +77,49 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#351** (v156) **M14 wave B: a bullet cannot be unticked.** QA_RELEASE_PLAN.md
+  has ended in a release checklist since Milestone 1, and it was prose bullets, which
+  means "complete launch checklist" was completed by whoever said it was — normally
+  the person who most wants to ship. It is 39 rows now, and
+  `validate_launch_checklist.py` reads them in `npm run check`.
+
+  **The design decision that matters is when the gate is allowed to fail.** Nearly
+  every row is a Creator Dashboard field, a triage record or a human on a phone, so a
+  checklist enforced from the day it lands fails every build forever, and a check that
+  fails on every build is a check somebody comments out. `Config.LaunchCandidate` is
+  `nil` today for exactly the reason `Config.SaveSchemaFreeze` is, and setting it
+  turns the 38 blocking rows into a gate.
+
+  **What is live from day one is the structure**, and that half earns its place on
+  its own. A row's status is one of four words. **`check` means the repository
+  decides it** — the evidence column names something that runs in `npm run test`, and
+  the validator confirms it still exists, so an item whose spec was renamed away stops
+  being satisfiable on the day of the rename rather than on release day. `done` and
+  `n/a` both require evidence, because `n/a` is the cheap way past a blocker and an
+  unexplained one is an exemption nobody remembers granting. The three counts are
+  pinned the way RELEASE_GATES pins its `review` rows: 39 items, 38 blocking, 6
+  decided here. A blocker cannot be quietly downgraded and an owner row cannot be
+  quietly promoted.
+
+  **Declaring a candidate requires the schema freeze**, and the refusal says why: a
+  launch candidate whose save schema is still free to move is precisely the failure
+  wave A exists to prevent, so the two declarations are one act rather than two
+  somebody can do half of.
+
+  **The ten journey rows are ten rows rather than one**, because "smoke tested"
+  passing on six of seven is the shape of every launch-day surprise.
+
+  **Eight paths exercised against the real config and the real document** before it
+  shipped, since a gate that has never been seen to fail is a gate nobody has tested:
+  no candidate (passes, 32 blocking rows open); a candidate with no freeze (refused);
+  a candidate with a freeze and open rows (refused, naming each); every blocking row
+  answered (passes); a `check` row pointed at a renamed spec (refused); a row deleted
+  (refused on the pin); a blocker set to `n/a` with no reason (refused); and the same
+  id on two rows (refused).
+
+  `patch_notes_and_known_issues` is an owner row today and M14 wave D is the wave
+  that turns it into a `check` row, which is what a checklist getting stronger looks
+  like from the inside.
 - **#349** (v155) **M13 wave E: a switch you have to restart every server to use is not
   a switch.** [ROLLBACK.md](ROLLBACK.md) is the list M13's rollback drill needs to
   exist before it can be run: every flag, what turning it off leaves, and the build
