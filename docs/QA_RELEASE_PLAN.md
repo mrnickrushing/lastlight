@@ -367,7 +367,8 @@ have checked a thumbnail would be worse than one that says it cannot.
 | `incident_channel_and_template` | yes | open | Owner: incident channel and communication template |
 | `kill_switches_tested` | yes | open | Owner: content and offer kill switches exercised in a live server, per [ROLLBACK.md](ROLLBACK.md) |
 | `canary_cohort_selected` | yes | open | Owner: canary cohort and servers selected |
-| `patch_notes_and_known_issues` | yes | open | Owner: patch notes and known issues published |
+| `known_issues_published` | yes | check | `npm run notes` |
+| `patch_notes` | yes | open | Owner: patch notes in a player's language. [RELEASE_NOTES.md](RELEASE_NOTES.md) is a developer changelog and deliberately not this |
 
 ### Journey smoke tests on published candidate
 
