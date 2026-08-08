@@ -57641,53 +57641,29 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         },
     }
     --[[
-        Every other recipe gets a bench too.
+        The other hundred and twenty recipes do not get a bench here, and
+        the reason is worth keeping.
 
-        The ten above are authored: bespoke marker shapes, sizes and
-        materials, because they are the ten a player meets first and they
-        should look like the things they make. They were also, for one
-        milestone, the *only* benches -- the list was written when there
-        were ten recipes and did not grow with the catalog, so a hundred
-        and twenty recipes shipped that nobody could craft. Every spec
-        passed; a recipe existing and a recipe being reachable are
-        different facts, and only walking to the workshop found it.
+        They did, briefly. Deriving a bench per recipe closed a real gap
+        -- a hundred and twenty recipes existed that nobody could craft --
+        and it was verified by counting benches in a console, which is not
+        the same as looking at the town. Thirteen columns by ten rows put
+        them from z -128 to -11 across a plaza that spans -136 to -24. A
+        player spawned into a maze: colliding furniture everywhere, and
+        every bench carrying a ten-by-eleven click volume that swallowed
+        the taps meant for the tutorial's first interaction.
 
-        So the rest are derived rather than authored: same bench, same
-        prompt, a marker coloured from what the recipe makes -- a
-        consumable's own accent, or amber for gear -- laid out in rows
-        behind the front one. The interaction id is derived too
-        (`craft:<recipeId>`), which is what stops this list from ever
-        needing a hand-written constant again.
+        So the benches are the authored ten again, and the reachability
+        gap is open and recorded rather than papered over with geometry
+        nobody walked through. The real fix is a bench that lists what a
+        player can make rather than one physical bench per recipe: a
+        hundred and thirty pieces of furniture is the wrong shape for the
+        problem no matter where it is put.
+
+        Two lessons, both paid for: content counted is not content seen,
+        and a click volume is a wall for taps even when it is not one for
+        bodies.
     ]]
-    local authored: { [string]: boolean } = {}
-    for _, definition in craftingBenches do
-        authored[definition.recipeId] = true
-    end
-    local derivedIndex = 0
-    for _, recipe in self._craftingCatalog:list() do
-        if not authored[recipe.id] then
-            local column = derivedIndex % 13
-            local row = math.floor(derivedIndex / 13)
-            derivedIndex += 1
-            local consumable = self._consumables.get(recipe.outputItemId)
-            local accent = if consumable ~= nil
-                then Color3.fromRGB(
-                    consumable.accent[1],
-                    consumable.accent[2],
-                    consumable.accent[3]
-                )
-                else Color3.fromRGB(214, 172, 88)
-            table.insert(craftingBenches, {
-                color = accent,
-                id = "craft:" .. recipe.id,
-                label = recipe.displayName,
-                recipeId = recipe.id,
-                x = -72 + column * 12,
-                z = workshopZ + 14 + row * 13,
-            })
-        end
-    end
-
     for _, definition in craftingBenches do
         local benchZ = definition.z or workshopZ
         local display = Instance.new("Model")
