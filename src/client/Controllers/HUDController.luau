@@ -1753,6 +1753,16 @@ function HUDController.setProgressOpen(self: HUDController, open: boolean)
     local shouldOpen = open and not self._playerDowned
     self._progressOverlay.Visible = shouldOpen
     self._progressButton.AutoButtonColor = not shouldOpen
+    --[[
+        The equip buttons position themselves from the owned set inside
+        the state-driven update, and their visibility keys off this
+        overlay -- so opening the book on a quiet server showed an empty
+        page until the next push happened to arrive. The book fills
+        itself the moment it is opened.
+    ]]
+    if shouldOpen and self._currentState ~= nil then
+        self:_updateProgress()
+    end
 end
 
 function HUDController.setEquipHandler(self: HUDController, callback: (string) -> ())
