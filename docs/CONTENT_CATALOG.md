@@ -360,13 +360,17 @@ than an art pass, and each derived body says so. The census reads the
 source and refuses a return to the skip, because the skip is what made
 the gap invisible.
 
-Nineteen of the twenty-seven are authored above that floor: chapter
-one's three, and the sixteen who arrive with chapters II through V, each
+All twenty-seven are authored above that floor now: chapter one's three
+and the twenty-four who arrive with chapters II through VII, each
 standing at the building the roster gives them the job at with their own
-colours, their own prop and their own evening. The remaining eight — the
-Crown's four and the Hollow's four — still derive, and the census
-asserts the count of authored bodies so raising it stays a deliberate
-act rather than a drift.
+colours, their own prop and their own evening. Nothing takes the derived
+path any more, and it stays anyway — with the census inverted to match.
+It used to assert a count of authored bodies; it now walks the roster
+and demands a body for every name, so the derivation is the net under a
+resident somebody adds without one rather than the path eight people
+were standing on. The same wave removed the last silent fallback beside
+it: a prop name nothing builds used to render as the seedkeeper's
+basket, and now renders as nothing and fails a spec.
 
 **Recipes (fixed): 120 of the 130 could not be crafted.** The workshop's benches were a
 hardcoded list of ten in `WorldService`, each needing its own constant in

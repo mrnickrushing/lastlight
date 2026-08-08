@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-07, at `main` = `HEAD` (PR #319), build `0.53.0`,
-save schema 22, 24 services. Published to Roblox as place version 132,
+Last updated: 2026-08-07, at `main` = `HEAD` (PR #320), build `0.53.0`,
+save schema 22, 24 services. Published to Roblox as place version 133,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,6 +59,55 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#320** (v133) **all twenty-seven residents are authored, and the
+  derivation is a safety net rather than a path anybody stands on.**
+  Chapter VI's four out of the Crown and chapter VII's four out of the
+  Hollow finish what #316 and #318 started. Sabine will not blow
+  anything shaped like a person and breaks the day's casts at dusk
+  behind her own works; Theo copies the town board in the last of the
+  light and then the names scratched into the planks under it; Delia
+  reads the day's name out at the town rather than into the wall; Bran
+  counts beams nobody ordered. **Orin Vale is the one entry that reads
+  the ending** — the roster's only `requiresEnding` — so he is in town
+  for `ending_ended` and `ending_shared` and not for `ending_kept`,
+  because if the light was kept somebody is still down there tending it.
+  His day faces up the road at the First Lantern from the lamp house
+  door, his dusk is at its foot, and his night is a post in the middle
+  of the line rather than the lonely end of it, which is the entire
+  point of him.
+
+  **The census inverted with the wave, and that is the durable half.**
+  It used to assert a count of authored bodies; it now walks
+  `ResidentRoster.list()` and demands a body for every name, so a
+  twenty-eighth resident fails a spec on the day somebody adds them
+  rather than landing silently on the floor. The derivation is
+  untouched and now catches that case instead of carrying eight people.
+  The same pass removed the last silent fallback beside it: the prop
+  lookup's `or RESIDENT_PROPS.seed_basket` is gone (a mistyped prop
+  rendered as the seedkeeper's basket, which is the eight-names bug in
+  miniature), and a new case refuses a resident who names a prop
+  nothing builds.
+
+  **The camera threw out three of the eight props again.** The
+  glassblower's gather was a torch, because a rod with an opaque
+  fireball on the end is a torch whatever the rod is — it needed a
+  nearly clear skin over a bright core and a vessel profile rather than
+  a sphere. The framing square was a ruler with a handle: a try-square's
+  stock reads as the end of the long arm, so both arms became the same
+  steel at a right angle and the nine graduations came down to four.
+  The sounding lead was a bolt with nuts run down it, because a
+  straight line of even thickness is a shaft — the cord kinks now and
+  the weight is one long ellipsoid instead of a stack of discs. The
+  snare's teeth sat at the same radius as its jaws and it photographed
+  as a gear, so they moved inside the ring in bright steel against a
+  darkened pan. Hung on a real R15 rig, two more failed: the speaker's
+  staff ran straight through the upper arm and now leans 26 degrees off
+  the hand, and the vial's thong put its knot inside the forearm and
+  stops at the fist. Closest ground clearance is 0.98 (the lead).
+  Positions were checked in each phase against each other, Mara and
+  every footprint; the closest pair in town is still Ena and Pip at
+  9.06, and the tightest new footprint clearance is Ruth at 6.50 in
+  front of the celebration stage.
 - **#319** (v132) **M11 wave A: a party is a named thing now.** What the
   lodge has had since it shipped is a platform — whoever is standing on it
   when the countdown ends boards, in whatever order `Players:GetPlayers()`
