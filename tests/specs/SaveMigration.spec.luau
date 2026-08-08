@@ -263,6 +263,30 @@ local ERA_PROFILES: { [number]: any } = {
     -- OPEN -- every town before this schema was open to whoever the matchmaker
     -- sent, and migrating them shut would be a change of behaviour wearing a
     -- safe default's clothes.
+    -- Schema 23 shipped the town visit policy; 24 adds commerce. A 23-era save
+    -- carries a policy that must survive, and must arrive in 24 owning nothing
+    -- and wearing nothing -- there were no products, so there was nothing to
+    -- have bought.
+    [23] = {
+        schemaVersion = 23,
+        createdAt = 48,
+        updatedAt = 140,
+        revision = 220,
+        tutorial = { stage = "complete", complete = true, selectedTool = "pick" },
+        profession = { selectedId = "profession_scout" },
+        gear = { gear_thornwood_bow = 1 },
+        equipped = { weapon = "gear_thornwood_bow" },
+        social = { visitPolicy = "closed" },
+        story = {
+            chapterOne = {
+                completedAt = 50,
+                decision = "restore_farmland",
+                status = "complete",
+                transactionId = "chapter_1:era23:hash:2",
+                wardenOutcome = "preserved",
+            },
+        },
+    },
     [22] = {
         schemaVersion = 22,
         createdAt = 44,
@@ -469,6 +493,7 @@ local REQUIRED_FIELDS: { string } = {
     "gearTraits",
     "quests",
     "social",
+    "commerce",
 }
 
 local function assertCurrentShape(profile: any, label: string)

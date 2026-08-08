@@ -11,6 +11,8 @@ local NamelessNight = require("./NamelessNightEncounter")
 local MemoryFragments = require("./MemoryFragments")
 local PartySession = require("./PartySession")
 local TownVisitPolicy = require("./TownVisitPolicy")
+local Entitlements = require("./Entitlements")
+local CosmeticCatalog = require("./CosmeticCatalog")
 local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
@@ -117,6 +119,17 @@ export type Profile = {
         ]]
         visitPolicy: TownVisitPolicy.Policy,
     },
+    --[[
+        What this player owns, what they are wearing, and every purchase
+        already applied.
+
+        Stored on the profile because entitlements are resolved outside
+        gameplay and land as plain data -- nothing downstream asks the platform
+        anything. The distinction the whole design rests on: gameplay branches
+        on `equipped`, which is a profile field like every other, and never on
+        `entitlements`, which only the commerce seam is allowed to read.
+    ]]
+    commerce: Entitlements.State,
 }
 
 local MAX_NIGHT_NUMBER = 1_000_000
@@ -134,7 +147,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 23,
+        schemaVersion = 24,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -190,6 +203,7 @@ function SaveSchema.default(now: number): Profile
             rejoin = nil,
             visitPolicy = TownVisitPolicy.Default,
         },
+        commerce = Entitlements.default(),
     }
 end
 
@@ -483,7 +497,14 @@ function SaveSchema.normalize(value: any, now: number): Profile
         if type(value.social) == "table" then value.social.visitPolicy else nil
     )
 
-    profile.schemaVersion = 23
+    -- An era-23 save owns nothing and wears nothing, because there was nothing
+    -- to own: no product existed and no receipt had ever been processed. The
+    -- empty default is the honest migration rather than a conservative one.
+    profile.commerce = Entitlements.normalize(value.commerce, function(cosmeticId: string): boolean
+        return CosmeticCatalog.get(cosmeticId) ~= nil
+    end)
+
+    profile.schemaVersion = 24
     return profile
 end
 
@@ -992,6 +1013,29 @@ end
 
 function SaveSchema.visitPolicy(profile: Profile): TownVisitPolicy.Policy
     return TownVisitPolicy.normalize(profile.social.visitPolicy)
+end
+
+--[[
+    Commerce state, read and written whole.
+
+    Deliberately one accessor pair rather than a field-by-field API: every
+    change to what a player owns comes from a receipt, and a receipt is applied
+    by `Entitlements` in one step. Handing callers a way to set an entitlement
+    directly would be handing them a way to grant one.
+]]
+function SaveSchema.commerce(profile: Profile): Entitlements.State
+    return profile.commerce
+end
+
+function SaveSchema.withCommerce(profile: Profile, commerce: any, now: number): Profile
+    local bounded = Entitlements.normalize(commerce, function(cosmeticId: string): boolean
+        return CosmeticCatalog.get(cosmeticId) ~= nil
+    end)
+    local nextProfile = table.clone(profile)
+    nextProfile.commerce = bounded
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile
 end
 
 -- Whether two condition states describe the same town. Compared building by
