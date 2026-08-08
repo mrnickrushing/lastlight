@@ -329,13 +329,13 @@ end
     nothing is to know a cancel happened. Without this the metric is the
     absence of an event, which is indistinguishable from the store being shut.
 ]]
-function AnalyticsService.purchasePromptFinished(
+function AnalyticsService.purchasePlatformResult(
     self: AnalyticsService,
     userId: number,
     productId: string,
     purchased: boolean
 )
-    self._logger:info("purchase_prompt_finished", {
+    self._logger:info("purchase_platform_result", {
         product = string.sub(productId, 1, 48),
         purchased = purchased,
         user = userId,

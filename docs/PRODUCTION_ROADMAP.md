@@ -360,7 +360,8 @@ a published staging place.
 - reviewed trade system or explicit post-launch deferral;
 - cosmetic store, preview, entitlements, receipt processing, pending mailbox;
 - initial direct cosmetic catalog and private-server controls;
-- support/refund/removal procedures and commerce analytics.
+- support/refund/removal procedures ([COMMERCE_SUPPORT.md](COMMERCE_SUPPORT.md))
+  and commerce analytics.
 
 ### Exit gate
 

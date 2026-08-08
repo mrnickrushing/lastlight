@@ -142,7 +142,7 @@ dark patterns, confusing timers, coercive purchases, or inflated session length.
 |---|---|
 | 100% of completed platform receipts eventually reach exactly one durable grant and one archived purchase tombstone | `receipt_result` |
 | At least 99.5% of completed receipts reach the durable grant within 60 seconds | `receipt_result` |
-| Canceled prompts produce no receipt and no grant | `purchase_prompt_finished` |
+| Canceled prompts produce no receipt and no grant | `purchase_platform_result` |
 | Receipt retry, server shutdown, full inventory, and archive compaction produce no duplicate grants | `purchase_loss` |
 
 `receipt_result` carries `elapsedSeconds`, measured from the moment the platform
@@ -153,7 +153,7 @@ recognise.
 
 The canceled-prompt gate is a claim about something *not* happening, and the
 only way to check that a cancel produced nothing is to know a cancel happened.
-Without `purchase_prompt_finished` the metric is the absence of an event, which
+Without `purchase_platform_result` the metric is the absence of an event, which
 reads exactly the same as the store being shut.
 
 ## Promote, pause, and rollback

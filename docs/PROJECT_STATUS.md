@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #338), build `0.53.0`,
-save schema 25, 27 services. Published to Roblox as place version 148,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #340), build `0.53.0`,
+save schema 25, 27 services. Published to Roblox as place version 150,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -17,8 +17,8 @@ that makes that possible is
 available and driven from the terminal (launch recipe in the M7 runbook);
 Studio-facing checks not performed are recorded open rather than assumed.
 
-**Milestones 0 through 10 are complete.** Milestone 11 is in flight and its
-first wave has shipped. The plan is honest about the thing that makes M12–M14
+**Milestones 0 through 10 are complete, and so is Milestone 11** — waves A
+through J all shipped. The plan is honest about the thing that makes M12–M14
 different from everything before them: **an internal alpha needs players, a
 closed beta needs cohorts and devices, and a launch candidate needs store
 review** — so those milestones are mostly a list of owner-gated blockers with
@@ -59,7 +59,65 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
-- **#339** **M11 wave I: a private server can hold its own clock, and the price is
+- **#340** **M11 wave J: the taxonomy and the code named different events, and
+  Milestone 11 is complete.** The monetization document lists six commerce
+  events and the store-safety section says why they are six rather than one:
+  *purchase analytics separates prompt, platform completion, receipt grant, and
+  equip/use.* That separation exists for the support runbook rather than for a
+  dashboard — **a player writes one sentence, "I bought it and I do not have
+  it", and it can mean four different things with four different answers.** A
+  merged `purchase` event cannot tell a prompt nobody completed from a receipt
+  that never resolved, and those two are opposite.
+
+  `CommerceAnalytics.spec` is `GateMetrics.spec`'s three layers pointed at
+  commerce: every event the taxonomy lists has an emitter logging **that exact
+  name**, every emitter has a `COMMERCE-EVENT` call site where the fact is
+  produced, every marker is an event the taxonomy lists, and none may be
+  emitted from client or shared code — a store view a client reports is a store
+  view a client decides.
+
+  **Writing it caught the thing a spec like this is for.** The taxonomy said
+  `purchase_platform_result` and the code emitted `purchase_prompt_finished`.
+  Both existed, both were called, both were documented — in two documents naming
+  different events. A dashboard built from the taxonomy would have had one empty
+  panel and no way to tell it apart from a quiet week. Renamed to the document's
+  word, which is the taxonomy of record.
+
+  **A live pass then found a second gap that no spec could see:** pressing BUY
+  on a product with no dashboard id returned before the emitter, so the one case
+  where somebody actually pressed the button produced no telemetry at all. That
+  is this wave's own failure mode happening inside the wave. It emits now, with
+  `shown=false`.
+
+  [COMMERCE_SUPPORT.md](COMMERCE_SUPPORT.md) is the runbook
+  MONETIZATION_LIVEOPS_ANALYTICS requires to exist *before* anything is sold, and
+  it is written now for the reason it is required now: a support procedure
+  invented during the first incident is written by whoever is most upset at the
+  time. It is organised around that one sentence, with a table mapping which
+  events are present to which of the four things happened and what to say. The
+  refund policy is three bullets because **nothing sold here can be spent,
+  consumed, traded or lost** — a refunded cosmetic leaves a player exactly where
+  they were. Removing the entitlement must also unequip it (owning nothing and
+  wearing something is a free cosmetic for anyone who can get a refund), the
+  purchase id **stays** in the processed ledger (removing it makes the platform's
+  next retry grant it back), and deleting a sold cosmetic from the catalog is
+  data loss wearing a cleanup's clothes, because `normalize` correctly drops
+  entitlements it no longer knows.
+
+  **Verified live: the emitters fire, not merely exist.** `store_view cards=24`,
+  `product_detail_view product=product_lantern_keeper_coat` and `receipt_result`
+  all logged in a running server from a real interaction with the outfitter's
+  stand. The receipt came back `outcome=held` rather than granted, which is wave
+  I's latch working from the other side: a receipt arriving in a practice server
+  cannot be durably granted, so it waits in the mailbox instead of being banked
+  into a save that is never written. `cosmetic_equipped` and a `granted` receipt
+  were walked live in #337.
+
+  **Still owner-gated:** `purchase_platform_result` needs a real platform prompt
+  to come back, which no Studio session can produce; the Creator Dashboard
+  products, the prices, policy review, and the on-call contact the runbook's
+  escalation table hands to.
+- **#339** (v149) **M11 wave I: a private server can hold its own clock, and the price is
   that it stops paying.** MONETIZATION_LIVEOPS_ANALYTICS describes private-server
   controls as phase pause in non-reward practice, seed selection among already
   discovered seeds and cinematic tools, with one sentence attached that decides

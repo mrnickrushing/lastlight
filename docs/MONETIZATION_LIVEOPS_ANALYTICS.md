@@ -99,7 +99,8 @@ purchase.
 - Regional/platform policy and age suitability are reviewed before launch.
 - Purchase analytics separates prompt, platform completion, receipt grant, and
   equip/use.
-- Refund/removal and support procedures are documented before selling.
+- Refund/removal and support procedures are documented before selling:
+  [COMMERCE_SUPPORT.md](COMMERCE_SUPPORT.md).
 
 ## Economy
 
