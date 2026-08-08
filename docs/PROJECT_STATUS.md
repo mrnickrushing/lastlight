@@ -8,8 +8,10 @@ hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
 Last updated: 2026-08-08, at `main` = `HEAD` (PR #341), build `0.53.0`,
-save schema 25, 27 services. Published to Roblox as place version 151,
-matching this revision exactly. **The owner's standing directive: complete
+save schema 25, 27 services. Published to Roblox as place version 150,
+matching this revision exactly — #341 left the built place byte-identical,
+because it adds only specs and documentation and the built place carries no
+tests, so publishing it returned the version #340 had already produced. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
 that makes that possible is
@@ -59,7 +61,8 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
-- **#341** **M12 wave A: the fixtures were each normalized once, and a real save
+- **#341** (v150, unchanged — this wave adds only specs and docs, and the built
+  place carries no tests) **M12 wave A: the fixtures were each normalized once, and a real save
   is not.** `SaveMigration.spec` has held an era fixture per released schema
   since Milestone 4 and refuses a bump without one. What it does is normalize
   each fixture **straight to current** — one hop. A save played since schema 11
