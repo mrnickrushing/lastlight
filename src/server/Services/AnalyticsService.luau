@@ -75,6 +75,273 @@ function AnalyticsService.complete(self: AnalyticsService, player: Player)
     end
 end
 
+--[[
+    The events a release gate is read from.
+
+    RELEASE_GATES.md is the document a promotion decision is made against, and
+    every threshold in it names a rate: transaction success, crash-free
+    sessions, join failure, first-night completion, receipts that reached a
+    grant. A rate needs a numerator and a denominator, and until this block
+    existed most of them had neither -- which is the failure mode the gate
+    document is least able to detect, because a dashboard reading zero and a
+    dashboard reading nothing look identical to the person approving a
+    release. A gate nobody measures is a gate nobody can fail.
+
+    Each function below is the emitter one row of that document names, and the
+    document names it back. `GateMetrics.spec` holds the two lists against each
+    other in both directions, so a threshold added without an emitter fails on
+    the day it is written down and an emitter that stops being called fails on
+    the day its call site goes.
+
+    Two rules the shape follows. **Every one of these is a server event**: the
+    document says operational rates use authoritative server events and that
+    client telemetry cannot hide a server failure, so nothing here is a client
+    reporting its own success. And **every one carries the dimensions its
+    per-segment threshold is read on**, because a gate that can only be read
+    across the whole population is exactly the gate a phone-only failure hides
+    behind.
+]]
+
+--[[
+    One profile read or write, and whether it landed.
+
+    The denominator of "profile load/save transaction success at least 99.9%".
+    Both directions are the same event with a `kind`, because the gate is one
+    number over both and splitting it into two events would let a build pass by
+    counting only the easy half.
+]]
+function AnalyticsService.profileTransaction(
+    self: AnalyticsService,
+    userId: number,
+    kind: string,
+    ok: boolean,
+    reason: string?
+)
+    self._logger:info("profile_transaction", {
+        kind = string.sub(kind, 1, 24),
+        ok = ok,
+        reason = string.sub(reason or "ok", 1, 48),
+        user = userId,
+    })
+end
+
+--[[
+    A save that is gone, or a stored profile that could not be understood.
+
+    Zero-tolerance. This is deliberately not the same event as a failed
+    transaction: a failed write that the next write repairs costs a player
+    nothing, and folding the two together would bury the six-a-day event that
+    stops a release under the thousand-a-day one that does not.
+]]
+function AnalyticsService.saveLoss(
+    self: AnalyticsService,
+    userId: number,
+    kind: string,
+    reason: string
+)
+    self._logger:warn("save_loss", {
+        kind = string.sub(kind, 1, 24),
+        reason = string.sub(reason, 1, 64),
+        user = userId,
+    })
+end
+
+--[[
+    A session that reached play, with the two labels it is sliced by.
+
+    "An interactive session begins when the player can move and act in
+    Emberhollow, not when the client process starts" -- so this fires when the
+    profile is loaded and the world will answer, not at PlayerAdded. It is the
+    denominator of the crash-free gate, the sample it carries is the join p95
+    gate, and `daysSinceFirstSession` is what D1 and D7 return are counted from.
+]]
+function AnalyticsService.sessionStarted(
+    self: AnalyticsService,
+    player: Player,
+    joinSeconds: number,
+    platform: string,
+    daysSinceFirstSession: number
+)
+    self._logger:info("interactive_session", {
+        daysSinceFirstSession = daysSinceFirstSession,
+        joinSeconds = math.floor(joinSeconds * 100 + 0.5) / 100,
+        -- Their first day, which is what "eligible new players" means in the
+        -- gate document's denominators.
+        newPlayer = daysSinceFirstSession <= 0,
+        platform = platform,
+        player = player.UserId,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "InteractiveSession", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = platform,
+            })
+        end)
+    end
+end
+
+--[[
+    Somebody who joined and never got to play.
+
+    The numerator of the join failure gate. Its denominator is this plus
+    `interactive_session`, which is why both live in the same service and are
+    emitted from the same place: counting failures against a denominator
+    gathered somewhere else is how a rate quietly becomes a count.
+]]
+function AnalyticsService.joinFailed(
+    self: AnalyticsService,
+    player: Player,
+    reason: string,
+    waitedSeconds: number,
+    platform: string
+)
+    self._logger:warn("join_failed", {
+        platform = platform,
+        player = player.UserId,
+        reason = string.sub(reason, 1, 32),
+        waitedSeconds = math.floor(waitedSeconds * 100 + 0.5) / 100,
+    })
+end
+
+--[[
+    How a session finished, which is the only way a crash is ever counted.
+
+    Roblox has no crash signal. What a server can see is that a client stopped
+    talking to it before it disappeared: telemetry arrives on a fixed interval,
+    so a session whose last report is several intervals stale at the moment the
+    player leaves did not close, it stopped. That is an approximation and the
+    gate document says so; it is also the same approximation every crash-free
+    metric on this platform is built on, and it is strictly better than a
+    number nobody collects.
+]]
+function AnalyticsService.sessionEnded(
+    self: AnalyticsService,
+    userId: number,
+    reason: string,
+    durationSeconds: number,
+    interactive: boolean,
+    platform: string,
+    segment: string
+)
+    self._logger:info("session_ended", {
+        durationSeconds = math.floor(durationSeconds + 0.5),
+        interactive = interactive,
+        platform = platform,
+        reason = string.sub(reason, 1, 24),
+        segment = segment,
+        user = userId,
+    })
+end
+
+--[[
+    A seed whose generated manifest could not be validated, so the known-good
+    walk was handed out instead.
+
+    Two gates read this. The fallback rate is a reliability threshold; a
+    fallback on a *critical path* is zero-tolerance, because an impossible seed
+    on the road to a chapter is a player who cannot finish the game. The event
+    carries the region and the seed so the second can be reproduced rather than
+    described.
+]]
+function AnalyticsService.generatorFallback(
+    self: AnalyticsService,
+    regionId: string,
+    seed: number,
+    reason: string
+)
+    self._logger:warn("generator_fallback", {
+        reason = string.sub(reason, 1, 48),
+        region = string.sub(regionId, 1, 48),
+        seed = seed,
+    })
+end
+
+--[[
+    One player through their first night.
+
+    "First-night completion after onboarding" is a ratio against players who
+    finished onboarding, so it is emitted per player at the moment their own
+    tutorial advances past the night, rather than once per server when the
+    night resolves. A server-wide event would count a night, not a person, and
+    the gate is about people.
+]]
+function AnalyticsService.firstNightCompleted(self: AnalyticsService, player: Player)
+    self._logger:info("first_night_completed", { player = player.UserId })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "FirstNightCompleted", 1, {})
+        end)
+    end
+end
+
+--[[
+    A request that tried to change something it had no right to change.
+
+    Zero-tolerance covers "unauthorized economy, entitlement, admin, or
+    progression mutation", and the honest reading is that the gate is about
+    attempts that *succeeded*. Nothing here can emit that, because a mutation
+    this game let through is by definition one it did not notice. What it can
+    emit is every attempt it refused, which is the signal that says whether
+    anybody is trying -- and the rate at which a refusal fires is the first
+    place a hole shows up, since an exploit found is an exploit probed for
+    first.
+]]
+function AnalyticsService.unauthorizedMutation(
+    self: AnalyticsService,
+    userId: number,
+    surface: string,
+    reason: string
+)
+    self._logger:warn("unauthorized_mutation", {
+        reason = string.sub(reason, 1, 48),
+        surface = string.sub(surface, 1, 32),
+        user = userId,
+    })
+end
+
+--[[
+    Money taken and nothing handed over.
+
+    The other zero-tolerance commerce event, and the one that costs a real
+    person real currency: a receipt this build cannot resolve to a product, or
+    a grant whose durable write did not land. Both leave the platform holding a
+    completed purchase with no entitlement behind it. Neither is a retry --
+    `receipt_result` carries those -- because a retry is the system working.
+]]
+function AnalyticsService.purchaseLoss(
+    self: AnalyticsService,
+    userId: number,
+    productId: string,
+    reason: string
+)
+    self._logger:warn("purchase_loss", {
+        product = string.sub(productId, 1, 48),
+        reason = string.sub(reason, 1, 48),
+        user = userId,
+    })
+end
+
+--[[
+    What the platform's purchase prompt came back as.
+
+    "Canceled prompts produce no receipt and no grant" is a gate about
+    something *not* happening, and the only way to check that a cancel produced
+    nothing is to know a cancel happened. Without this the metric is the
+    absence of an event, which is indistinguishable from the store being shut.
+]]
+function AnalyticsService.purchasePromptFinished(
+    self: AnalyticsService,
+    userId: number,
+    productId: string,
+    purchased: boolean
+)
+    self._logger:info("purchase_prompt_finished", {
+        product = string.sub(productId, 1, 48),
+        purchased = purchased,
+        user = userId,
+    })
+end
+
 function AnalyticsService.expeditionStarted(self: AnalyticsService, player: Player, snapshot: any)
     if self._expeditionStarted[player] then
         return
@@ -644,13 +911,25 @@ function AnalyticsService.purchasePrompt(
     end
 end
 
+--[[
+    How one receipt settled, and how long it took.
+
+    The seconds are a release gate rather than a curiosity: "at least 99.5% of
+    completed receipts reach the durable grant within 60 seconds". Measured
+    from the moment the platform handed the receipt over, so a purchase that
+    waited in the mailbox while its buyer was in another server carries the
+    whole wait rather than the instant it was finally applied -- which is the
+    only version of the number a player would recognise.
+]]
 function AnalyticsService.receiptResult(
     self: AnalyticsService,
     player: Player,
     productId: string,
-    outcome: string
+    outcome: string,
+    elapsedSeconds: number
 )
     self._logger:info("receipt_result", {
+        elapsedSeconds = math.max(0, math.floor(elapsedSeconds + 0.5)),
         outcome = string.sub(outcome, 1, 24),
         player = player.UserId,
         product = string.sub(productId, 1, 48),

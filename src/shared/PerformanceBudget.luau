@@ -354,10 +354,18 @@ function PerformanceBudget.sanitizeClientReport(payload: any): any
         return nil
     end
 
-    local fieldCount = 0
+    -- Named rather than counted. A count was enough while the payload had four
+    -- fields and a fifth was by definition smuggled; adding the platform label
+    -- would have made room for one extra field of a client's choosing, which is
+    -- the one-extra-field rule failing in the direction it was written against.
     for key in payload do
-        fieldCount += 1
-        if fieldCount > 4 or type(key) ~= "string" then
+        if
+            key ~= "schemaVersion"
+            and key ~= "fps"
+            and key ~= "spikeMs"
+            and key ~= "memoryMb"
+            and key ~= "platform"
+        then
             return nil
         end
     end

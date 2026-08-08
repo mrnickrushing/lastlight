@@ -144,7 +144,11 @@ function PhaseService._finishFirstNight(self: PhaseService)
     self._worldService:setNight(false)
     self._worldService:setBeaconVisible(true)
     self:_notify("DAWN BREAKS — A MEMORY CALLS")
-    self._logger:info("first_night_completed")
+    -- The night resolving, which is a server fact. Each player's own crossing
+    -- is `first_night_completed` from the tutorial, and the two are named
+    -- apart on purpose: a gate that reads a completion rate per player must
+    -- not be able to read this one by accident.
+    self._logger:info("first_night_resolved")
 
     local callback = self._onComplete
     if callback ~= nil then

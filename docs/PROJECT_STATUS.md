@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #334), build `0.53.0`,
-save schema 24, 26 services. Published to Roblox as place version 145,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #336), build `0.53.0`,
+save schema 24, 26 services. Published to Roblox as place version 146,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,6 +59,76 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#336** (v146) **M12 wave D: the release gates stop being a list of numbers
+  nobody collects.** [RELEASE_GATES.md](RELEASE_GATES.md) has held the promotion
+  thresholds since Milestone 1 and most of them had **no emitter at all** —
+  profile transaction success, crash-free sessions, join failure, first-night
+  completion, canceled prompts. The reason that survived twelve milestones is
+  the failure mode the document is least able to detect on its own: **a
+  dashboard reading zero and a dashboard reading *nothing* look identical to
+  the person approving a release.** The first says the gate passed, the second
+  says nobody measured it, and the release goes out either way.
+
+  Eleven server events now, each named by the gate it feeds and naming it back,
+  and `GateMetrics.spec` holds the two lists against each other in **three
+  layers**: every gate in the document names an event with an emitter in
+  `AnalyticsService`; every emitter has a call site marked `GATE-METRIC: <id>`
+  where the fact is produced, because an emitter nobody calls *is* the
+  dashboard reading zero; and every marker in `src` is a gate the document
+  lists, so neither list may grow alone. It also refuses a gate emitted from
+  client code, which the measurement contract already forbade in prose.
+
+  **Two gates say `review` instead of naming an event, and the count is
+  pinned.** A blocker defect on the launch path is a triage decision and a
+  platform-policy failure arrives through Roblox's moderation; nothing this
+  game can emit produces either, and an event invented to stand in for one
+  would be a gate passing on a number that measures something else. Pinning the
+  count is what stops the cheap move — a threshold nobody wants to instrument
+  becoming a third one, and then a fifth.
+
+  **What each gate can and cannot honestly see is written down rather than
+  implied.** `unauthorized_mutation` counts *refused* attempts, because a
+  mutation this server let through is by definition one it did not notice; what
+  a refusal rate buys is the earlier signal, since an exploit found is an
+  exploit probed for first. A crash is derived rather than reported — Roblox
+  fires the same leave event for a player who quit and a player whose phone
+  died, so a session whose telemetry went stale three intervals before it
+  disappeared *stopped* rather than left, and a server shutdown is named
+  separately because counting a scheduled restart as fifty crashes is how a
+  gate gets ignored. And an impossible seed is caught here only where the
+  generator's own validation catches it; the seed that validates and is still
+  untraversable is wave C's job, and the document says so.
+
+  **Every per-segment threshold got the dimension it is read on**, which is
+  half of five gates: a threshold readable only across the whole population is
+  exactly where a phone-only failure hides. New `SessionSegment` (pure) decides
+  the platform class and the performance tier, the client says which of the
+  four it is **on its first frame rather than with its first sample** — a
+  session that ends in four seconds is precisely the kind the join and crash
+  gates are about, and one with no platform on it cannot be counted against the
+  threshold it failed — and nothing in the game reads the label for anything
+  but a label. The telemetry payload's field check became a **whitelist** in
+  the same commit: a count was enough while a fifth field was by definition
+  smuggled, and adding the platform would have made room for one extra field of
+  a client's choosing, which is the one-extra-field rule failing in the
+  direction it was written against.
+
+  Also this wave: `receipt_result` carries the seconds a purchase waited,
+  measured from when the platform handed the receipt over rather than from when
+  the grant landed — so a purchase that sat in the mailbox while its buyer was
+  in another server carries the whole wait, which is the only version of that
+  number a player would recognise.
+
+  **Open and not closed by this wave:** a live pass confirming the events
+  actually fire in a running server. Studio was launched from this session and
+  its window came up, but its MCP plugin never connected — the log shows no
+  connection attempt at all, which is the "Enable Studio as MCP server" toggle
+  needing a click in the Assistant menu. The spec proves a call site exists in
+  the source; it cannot prove the line runs, and that is exactly the
+  distinction this wave is about, so it is recorded open rather than assumed.
+  `profile_transaction` additionally cannot be seen in Studio at all: a
+  non-persistent session is not a DataStore round trip and deliberately emits
+  nothing.
 - **#334** (v145) **M14 wave A: the save schema freeze is a value now, not an
   intention.** M14's deliverable list says "frozen save schema except blocker
   fixes", and the cost of forgetting that is not a broken build — it is a

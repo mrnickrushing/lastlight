@@ -188,6 +188,30 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
     local userId = tonumber(receipt.userId) or 0
     local player, state = self:_writableState(userId)
     local mailbox = self:_readMailbox(userId)
+    -- Measured from when the platform handed the receipt over, not from now.
+    -- The gate asks how long a purchase took to become durable, and the wait
+    -- in a mailbox while the buyer was in another server is the part of that
+    -- wait a player would actually recognise.
+    local elapsed = math.max(0, os.time() - (tonumber(receipt.at) or os.time()))
+
+    --[[
+        A receipt for something this build cannot resolve.
+
+        Never consumed, correctly -- a later build may know the product, and
+        telling the platform a purchase is settled when nothing was granted is
+        the one mistake that cannot be undone. But an unconsumed receipt is
+        also a player who has paid and holds nothing, retried forever, and
+        that is the zero-tolerance case rather than the healthy retry that
+        `receipt_result` counts.
+    ]]
+    -- GATE-METRIC: purchase_loss
+    if type(receipt.productId) ~= "string" or #self._catalog.grantsOf(receipt.productId) == 0 then
+        self._analyticsService:purchaseLoss(
+            userId,
+            tostring(receipt.productId),
+            "unresolvable_product"
+        )
+    end
     local nextState, nextMailbox, verdict = self._entitlements.route(
         state,
         mailbox,
@@ -203,6 +227,14 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
         -- mistake that costs a player a purchase they paid for.
         if not self._profileService:save(player) then
             self._logger:warn("commerce_grant_write_failed", { user = userId })
+            -- The entitlement was decided and could not be made durable. The
+            -- platform will call again, but until one of those calls lands
+            -- this is a completed receipt with no grant behind it.
+            self._analyticsService:purchaseLoss(
+                userId,
+                tostring(receipt.productId),
+                "grant_write_failed"
+            )
             return false
         end
         local granted = self._catalog.grantsOf(receipt.productId)
@@ -211,9 +243,13 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
             purchase = tostring(receipt.purchaseId),
             user = userId,
         })
-        if self._analyticsService ~= nil then
-            self._analyticsService:receiptResult(player, tostring(receipt.productId), "granted")
-        end
+        -- GATE-METRIC: receipt_result
+        self._analyticsService:receiptResult(
+            player,
+            tostring(receipt.productId),
+            "granted",
+            elapsed
+        )
         local handler = self._onGranted
         if handler ~= nil then
             handler(player, granted)
@@ -238,8 +274,8 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
         purchase = tostring(receipt.purchaseId),
         user = userId,
     })
-    if self._analyticsService ~= nil and player ~= nil then
-        self._analyticsService:receiptResult(player, tostring(receipt.productId), "retry")
+    if player ~= nil then
+        self._analyticsService:receiptResult(player, tostring(receipt.productId), "retry", elapsed)
     end
     return false
 end
@@ -313,7 +349,7 @@ function CommerceService.equip(
     )
     if result.applied then
         self._profileService:setCommerce(player, state)
-        if self._analyticsService ~= nil and cosmeticId ~= nil then
+        if cosmeticId ~= nil then
             self._analyticsService:cosmeticEquipped(player, tostring(cosmeticId), tostring(slot))
         end
     end
@@ -400,9 +436,7 @@ function CommerceService.promptPurchase(self: CommerceService, player: Player, p
     local ok = pcall(function()
         MarketplaceService:PromptProductPurchase(player, robloxId)
     end)
-    if self._analyticsService ~= nil then
-        self._analyticsService:purchasePrompt(player, product.id, ok)
-    end
+    self._analyticsService:purchasePrompt(player, product.id, ok)
     return { accepted = ok, reason = if ok then "prompted" else "prompt_failed" }
 end
 
@@ -430,6 +464,26 @@ function CommerceService.Start(self: CommerceService)
             then Enum.ProductPurchaseDecision.PurchaseGranted
             else Enum.ProductPurchaseDecision.NotProcessedYet
     end
+
+    --[[
+        What the platform's own prompt came back as.
+
+        "Canceled prompts produce no receipt and no grant" is a gate about
+        something not happening, and the only way to check that a cancel
+        produced nothing is to know a cancel happened. Without this the metric
+        is the absence of an event, which reads exactly the same as the store
+        being shut.
+    ]]
+    -- GATE-METRIC: purchase_prompt_finished
+    MarketplaceService.PromptProductPurchaseFinished:Connect(
+        function(userId: number, robloxProductId: number, purchased: boolean)
+            self._analyticsService:purchasePromptFinished(
+                userId,
+                self:_productIdFor(robloxProductId),
+                purchased
+            )
+        end
+    )
 
     self._profileService:onLoaded(function(player: Player, _profile: any)
         task.spawn(function()

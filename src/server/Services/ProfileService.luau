@@ -17,6 +17,7 @@ export type ProfileService = typeof(setmetatable(
     {} :: {
         Name: string,
         _logger: Logger,
+        _analyticsService: any,
         _persistent: boolean,
         _profiles: { [Player]: any },
         _writable: { [Player]: boolean },
@@ -50,10 +51,15 @@ local LAUNCH_MATERIAL_IDS = table.freeze({
     "material_spring_clay",
 })
 
-function ProfileService.new(logger: Logger, persistent: boolean): ProfileService
+function ProfileService.new(
+    logger: Logger,
+    persistent: boolean,
+    analyticsService: any
+): ProfileService
     return setmetatable({
         Name = ProfileService.Name,
         _logger = logger,
+        _analyticsService = analyticsService,
         _persistent = persistent,
         _profiles = {},
         _writable = {},
@@ -202,6 +208,30 @@ function ProfileService._load(self: ProfileService, player: Player)
         local outcome = self._profilePersistence.loadOutcome(finished, ok, result)
         source = outcome.source
         writable = outcome.writable
+
+        --[[
+            Two ways a stored save is gone rather than merely unavailable, and
+            both are zero-tolerance rather than a failed transaction.
+
+            A stored value that is not a table cannot be folded into anything;
+            normalize hands back a default and the player restarts the game
+            with their own key overwritten on the next save. And a save stamped
+            with a schema this build has never heard of was written by a newer
+            one -- folding it down drops whatever that build added, silently,
+            and the player who rolled back is the one who pays.
+        ]]
+        -- GATE-METRIC: save_loss
+        if outcome.useStored then
+            if type(result) ~= "table" then
+                self._analyticsService:saveLoss(player.UserId, "load", "stored_value_not_a_table")
+            elseif
+                type(result.schemaVersion) == "number"
+                and result.schemaVersion > self._config.SaveSchemaVersion
+            then
+                self._analyticsService:saveLoss(player.UserId, "load", "schema_from_future")
+            end
+        end
+
         if outcome.useStored or outcome.source == "new" then
             -- Photograph the stored bytes *before* normalize folds them into
             -- the current shape. This is the moment TECHNICAL_ARCHITECTURE asks
@@ -253,6 +283,20 @@ function ProfileService._load(self: ProfileService, player: Player)
         end
     else
         source = "session"
+    end
+
+    -- The load half of the transaction-success gate, emitted only where there
+    -- was a store to reach: a Studio session with no persistence is not a
+    -- DataStore round trip, and counting it as a successful one would flatter
+    -- the number with results from a machine no player is on.
+    -- GATE-METRIC: profile_transaction
+    if self._persistent and self._store ~= nil then
+        self._analyticsService:profileTransaction(
+            player.UserId,
+            "load",
+            writable and (source == "datastore" or source == "new"),
+            source
+        )
     end
 
     if player.Parent == nil then
@@ -349,7 +393,14 @@ function ProfileService.Start(self: ProfileService)
     end)
 
     Players.PlayerRemoving:Connect(function(player: Player)
-        self:save(player)
+        -- The last save a session ever gets. Everything before it has another
+        -- beat coming to repair it; this one does not, so a failure here is
+        -- the session's progress gone rather than a retry pending -- which is
+        -- exactly what the zero-tolerance save-loss gate is counting.
+        local hadUnsavedWork = self._dirty[player] == true
+        if not self:save(player) and hadUnsavedWork and self._writable[player] == true then
+            self._analyticsService:saveLoss(player.UserId, "save", "final_save_failed")
+        end
         self._profiles[player] = nil
         self._writable[player] = nil
         self._dirty[player] = nil
@@ -1590,6 +1641,7 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
             player = player.UserId,
             reason = tostring(message),
         })
+        self._analyticsService:profileTransaction(player.UserId, "save", false, "store_error")
         return false
     end
 
@@ -1604,6 +1656,10 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
             attemptedRevision = profile.revision,
             storedRevision = newerProfile.revision,
         })
+        -- The round trip succeeded; what it declined to do was overwrite a
+        -- newer copy, which is the write resolver working rather than the
+        -- store failing.
+        self._analyticsService:profileTransaction(player.UserId, "save", true, "retained_stored")
         return true
     end
 
@@ -1627,6 +1683,7 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
         revision = profile.revision,
         stage = profile.tutorial.stage,
     })
+    self._analyticsService:profileTransaction(player.UserId, "save", true, "ok")
     return true
 end
 
