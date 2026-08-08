@@ -31918,16 +31918,43 @@ end
     to report for another five seconds. A session that ends inside those five
     seconds is precisely the session the join and crash gates are about, so its
     platform has to be known before its first sample rather than with it.
+
+    Bounded the same way the sample is, and for the same reason: this runs
+    *before* `sanitizeClientReport` on a payload a client composed, so if it
+    accepted a smuggled key the whitelist below it would never see one. The
+    schema version is checked here too -- a payload from a client build that
+    does not agree with this one about what the fields mean is not a label, it
+    is a guess.
 ]]
 function SessionSegment.platformOf(payload: any): string?
-    if type(payload) ~= "table" then
+    if type(payload) ~= "table" or payload.schemaVersion ~= 1 then
         return nil
+    end
+    for key in payload do
+        if
+            key ~= "schemaVersion"
+            and key ~= "fps"
+            and key ~= "spikeMs"
+            and key ~= "memoryMb"
+            and key ~= "platform"
+        then
+            return nil
+        end
     end
     local platform = payload.platform
     if not SessionSegment.isValidPlatform(platform) or platform == "unknown" then
         return nil
     end
     return platform
+end
+
+-- Whether a payload is a client introducing itself rather than reporting a
+-- sample. An introduction carries no frame data, which is the whole reason it
+-- exists: it is sent before there is any.
+function SessionSegment.isIntroduction(payload: any): boolean
+    return SessionSegment.platformOf(payload) ~= nil
+        and type(payload) == "table"
+        and payload.fps == nil
 end
 
 return table.freeze(SessionSegment)
@@ -38740,20 +38767,25 @@ end
 ]]
 function AnalyticsService.receiptResult(
     self: AnalyticsService,
-    player: Player,
+    userId: number,
     productId: string,
     outcome: string,
-    elapsedSeconds: number
+    elapsedSeconds: number,
+    player: Player?
 )
     self._logger:info("receipt_result", {
         elapsedSeconds = math.max(0, math.floor(elapsedSeconds + 0.5)),
         outcome = string.sub(outcome, 1, 24),
-        player = player.UserId,
+        player = userId,
         product = string.sub(productId, 1, 48),
     })
-    if not RunService:IsStudio() then
+    -- The buyer is a userId here rather than a Player because the receipt that
+    -- most needs counting is the one that arrived while they were somewhere
+    -- else. Roblox's own event needs an instance, so it takes the branch it
+    -- can and the log takes the one that always exists.
+    if player ~= nil and not RunService:IsStudio() then
         pcall(function()
-            RobloxAnalytics:LogCustomEvent(player, "ReceiptResult", 1, {
+            RobloxAnalytics:LogCustomEvent(player :: Player, "ReceiptResult", 1, {
                 [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = productId,
                 [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = outcome,
             })
@@ -39657,6 +39689,16 @@ export type CommerceService = typeof(setmetatable(
         ]]
         _localMailboxes: { [number]: { any } },
         _productInfo: { [string]: any },
+        --[[
+            Purchases already counted as lost, so one stuck receipt is one
+            event rather than one per redelivery. The platform retries an
+            unconsumed receipt for the life of the purchase, and a
+            zero-tolerance gate that reads a count would grow without a second
+            player being affected. Bounded in practice by how many purchases
+            can go wrong on one server, which is the number the gate is asking
+            about anyway.
+        ]]
+        _reportedLoss: { [string]: boolean },
         _onGranted: ((Player, { string }) -> ())?,
     },
     CommerceService
@@ -39686,6 +39728,7 @@ function CommerceService.new(
         _mailboxStore = nil,
         _localMailboxes = {},
         _productInfo = {},
+        _reportedLoss = {},
         _onGranted = nil,
     }, CommerceService)
 end
@@ -39797,7 +39840,12 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
         `receipt_result` counts.
     ]]
     -- GATE-METRIC: purchase_loss
-    if type(receipt.productId) ~= "string" or #self._catalog.grantsOf(receipt.productId) == 0 then
+    local purchaseKey = tostring(receipt.purchaseId)
+    if
+        (type(receipt.productId) ~= "string" or #self._catalog.grantsOf(receipt.productId) == 0)
+        and not self._reportedLoss[purchaseKey]
+    then
+        self._reportedLoss[purchaseKey] = true
         self._analyticsService:purchaseLoss(
             userId,
             tostring(receipt.productId),
@@ -39822,11 +39870,17 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
             -- The entitlement was decided and could not be made durable. The
             -- platform will call again, but until one of those calls lands
             -- this is a completed receipt with no grant behind it.
-            self._analyticsService:purchaseLoss(
-                userId,
-                tostring(receipt.productId),
-                "grant_write_failed"
-            )
+            -- Counted once per purchase for the same reason as above: the
+            -- retry is the system working, and a gate that counts retries
+            -- reads one stuck receipt as a growing incident.
+            if not self._reportedLoss[purchaseKey] then
+                self._reportedLoss[purchaseKey] = true
+                self._analyticsService:purchaseLoss(
+                    userId,
+                    tostring(receipt.productId),
+                    "grant_write_failed"
+                )
+            end
             return false
         end
         local granted = self._catalog.grantsOf(receipt.productId)
@@ -39837,10 +39891,11 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
         })
         -- GATE-METRIC: receipt_result
         self._analyticsService:receiptResult(
-            player,
+            userId,
             tostring(receipt.productId),
             "granted",
-            elapsed
+            elapsed,
+            player
         )
         local handler = self._onGranted
         if handler ~= nil then
@@ -39858,6 +39913,19 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
             purchase = tostring(receipt.purchaseId),
             user = userId,
         })
+        -- A held receipt is durable -- the mailbox saved, which is what this
+        -- branch just proved -- so it settles the commerce gate exactly as a
+        -- grant does. Leaving it out would make "100% of completed receipts
+        -- reach a durable grant" unreadable for every purchase made while its
+        -- buyer was in another server, which is the case the mailbox exists
+        -- for and therefore the case the gate most needs to see.
+        self._analyticsService:receiptResult(
+            userId,
+            tostring(receipt.productId),
+            "held",
+            elapsed,
+            player
+        )
         return true
     end
 
@@ -39866,9 +39934,13 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
         purchase = tostring(receipt.purchaseId),
         user = userId,
     })
-    if player ~= nil then
-        self._analyticsService:receiptResult(player, tostring(receipt.productId), "retry", elapsed)
-    end
+    self._analyticsService:receiptResult(
+        userId,
+        tostring(receipt.productId),
+        "retry",
+        elapsed,
+        player
+    )
     return false
 end
 
@@ -46013,6 +46085,8 @@ export type PerformanceService = typeof(setmetatable(
         _interactive: { [Player]: boolean },
         _actionCounts: { [Player]: number },
         _lastReportAt: { [Player]: number },
+        _lastHeardAt: { [Player]: number },
+        _lastIntroductionAt: { [Player]: number },
         _platform: { [Player]: string },
         _lastFps: { [Player]: number },
         _frames: number,
@@ -46044,6 +46118,8 @@ function PerformanceService.new(
         _interactive = {},
         _actionCounts = {},
         _lastReportAt = {},
+        _lastHeardAt = {},
+        _lastIntroductionAt = {},
         _platform = {},
         _lastFps = {},
         _frames = 0,
@@ -46108,10 +46184,14 @@ function PerformanceService._sessionEndReason(self: PerformanceService, player: 
     if self._shuttingDown then
         return "shutdown"
     end
-    local lastAt = self._lastReportAt[player]
+    -- Anything the client said, not only a sample. A player who becomes
+    -- interactive and quits inside the first reporting interval has sent an
+    -- introduction and no sample, and reading only samples would file that
+    -- perfectly ordinary exit as a crash.
+    local lastAt = self._lastHeardAt[player]
     if lastAt == nil then
-        -- Never reported at all. If they never became interactive this is a
-        -- join that did not finish; if they did, it is a client that went
+        -- Never said anything at all. If they never became interactive this is
+        -- a join that did not finish; if they did, it is a client that went
         -- quiet immediately, which is the same shape as a crash.
         return if self._interactive[player] then "dropped" else "left"
     end
@@ -46161,6 +46241,8 @@ function PerformanceService.Init(self: PerformanceService, _context: any)
         self._interactive[player] = nil
         self._actionCounts[player] = nil
         self._lastReportAt[player] = nil
+        self._lastHeardAt[player] = nil
+        self._lastIntroductionAt[player] = nil
         self._platform[player] = nil
         self._lastFps[player] = nil
     end)
@@ -46262,25 +46344,38 @@ function PerformanceService.acceptClientReport(
     player: Player,
     payload: any
 ): boolean
-    -- The platform label is taken before the rate limit and before the sample
-    -- check, because it arrives on its own message with no frame data in it:
-    -- a client says what it is on its first frame and has nothing to sample
-    -- for another whole interval.
+    local now = os.clock()
+    local interval = self._config.PerformanceReportIntervalSeconds
+
+    --[[
+        A client saying what it is, which arrives on its own message with no
+        frame data in it -- it is sent on the first frame and there is nothing
+        to sample for another whole interval.
+
+        It gets its own limit rather than skipping the sample one. Returning
+        early past a rate limit is how a bounded remote becomes an unbounded
+        one, and the shape a client would reach for is exactly this: a payload
+        the handler answers before it has counted it. Accepted rather than
+        rejected so a legitimate introduction does not print the warning that
+        means "a client is sending nonsense", which is the line somebody
+        hunting a real problem would be reading.
+    ]]
     local platform = self._sessionSegment.platformOf(payload)
+    if self._sessionSegment.isIntroduction(payload) then
+        local lastIntroductionAt = self._lastIntroductionAt[player]
+        if lastIntroductionAt ~= nil and now - lastIntroductionAt < interval then
+            return false
+        end
+        self._lastIntroductionAt[player] = now
+        self._lastHeardAt[player] = now
+        self._platform[player] = platform
+        return true
+    end
     if platform ~= nil then
         self._platform[player] = platform
-        if type(payload) == "table" and payload.fps == nil then
-            -- An introduction, not a sample. Answered as accepted rather than
-            -- rejected so it does not print the warning that means "a client
-            -- is sending nonsense", which is the line somebody hunting a real
-            -- problem would be reading.
-            return true
-        end
     end
 
-    local now = os.clock()
     local lastAt = self._lastReportAt[player]
-    local interval = self._config.PerformanceReportIntervalSeconds
     if lastAt ~= nil and now - lastAt < interval * 0.5 then
         return false
     end
@@ -46291,6 +46386,7 @@ function PerformanceService.acceptClientReport(
         return false
     end
     self._lastReportAt[player] = now
+    self._lastHeardAt[player] = now
     self._lastFps[player] = sample.fps
 
     self:_record("client_fps", sample.fps)
@@ -49277,7 +49373,18 @@ function ProfileService.Start(self: ProfileService)
         -- the session's progress gone rather than a retry pending -- which is
         -- exactly what the zero-tolerance save-loss gate is counting.
         local hadUnsavedWork = self._dirty[player] == true
-        if not self:save(player) and hadUnsavedWork and self._writable[player] == true then
+        -- A save already in flight is not a failure: `save` refuses a second
+        -- concurrent write and returns false for it, and the one that is
+        -- running may well land. Counting that as a lost save would put a
+        -- zero-tolerance event on the ordinary race between the autosave beat
+        -- and a player closing the app.
+        local saveInFlight = self._saving[player] == true
+        if
+            not self:save(player)
+            and hadUnsavedWork
+            and not saveInFlight
+            and self._writable[player] == true
+        then
             self._analyticsService:saveLoss(player.UserId, "save", "final_save_failed")
         end
         self._profiles[player] = nil

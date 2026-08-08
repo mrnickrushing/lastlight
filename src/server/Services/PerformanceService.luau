@@ -56,6 +56,8 @@ export type PerformanceService = typeof(setmetatable(
         _interactive: { [Player]: boolean },
         _actionCounts: { [Player]: number },
         _lastReportAt: { [Player]: number },
+        _lastHeardAt: { [Player]: number },
+        _lastIntroductionAt: { [Player]: number },
         _platform: { [Player]: string },
         _lastFps: { [Player]: number },
         _frames: number,
@@ -87,6 +89,8 @@ function PerformanceService.new(
         _interactive = {},
         _actionCounts = {},
         _lastReportAt = {},
+        _lastHeardAt = {},
+        _lastIntroductionAt = {},
         _platform = {},
         _lastFps = {},
         _frames = 0,
@@ -151,10 +155,14 @@ function PerformanceService._sessionEndReason(self: PerformanceService, player: 
     if self._shuttingDown then
         return "shutdown"
     end
-    local lastAt = self._lastReportAt[player]
+    -- Anything the client said, not only a sample. A player who becomes
+    -- interactive and quits inside the first reporting interval has sent an
+    -- introduction and no sample, and reading only samples would file that
+    -- perfectly ordinary exit as a crash.
+    local lastAt = self._lastHeardAt[player]
     if lastAt == nil then
-        -- Never reported at all. If they never became interactive this is a
-        -- join that did not finish; if they did, it is a client that went
+        -- Never said anything at all. If they never became interactive this is
+        -- a join that did not finish; if they did, it is a client that went
         -- quiet immediately, which is the same shape as a crash.
         return if self._interactive[player] then "dropped" else "left"
     end
@@ -204,6 +212,8 @@ function PerformanceService.Init(self: PerformanceService, _context: any)
         self._interactive[player] = nil
         self._actionCounts[player] = nil
         self._lastReportAt[player] = nil
+        self._lastHeardAt[player] = nil
+        self._lastIntroductionAt[player] = nil
         self._platform[player] = nil
         self._lastFps[player] = nil
     end)
@@ -305,25 +315,38 @@ function PerformanceService.acceptClientReport(
     player: Player,
     payload: any
 ): boolean
-    -- The platform label is taken before the rate limit and before the sample
-    -- check, because it arrives on its own message with no frame data in it:
-    -- a client says what it is on its first frame and has nothing to sample
-    -- for another whole interval.
+    local now = os.clock()
+    local interval = self._config.PerformanceReportIntervalSeconds
+
+    --[[
+        A client saying what it is, which arrives on its own message with no
+        frame data in it -- it is sent on the first frame and there is nothing
+        to sample for another whole interval.
+
+        It gets its own limit rather than skipping the sample one. Returning
+        early past a rate limit is how a bounded remote becomes an unbounded
+        one, and the shape a client would reach for is exactly this: a payload
+        the handler answers before it has counted it. Accepted rather than
+        rejected so a legitimate introduction does not print the warning that
+        means "a client is sending nonsense", which is the line somebody
+        hunting a real problem would be reading.
+    ]]
     local platform = self._sessionSegment.platformOf(payload)
+    if self._sessionSegment.isIntroduction(payload) then
+        local lastIntroductionAt = self._lastIntroductionAt[player]
+        if lastIntroductionAt ~= nil and now - lastIntroductionAt < interval then
+            return false
+        end
+        self._lastIntroductionAt[player] = now
+        self._lastHeardAt[player] = now
+        self._platform[player] = platform
+        return true
+    end
     if platform ~= nil then
         self._platform[player] = platform
-        if type(payload) == "table" and payload.fps == nil then
-            -- An introduction, not a sample. Answered as accepted rather than
-            -- rejected so it does not print the warning that means "a client
-            -- is sending nonsense", which is the line somebody hunting a real
-            -- problem would be reading.
-            return true
-        end
     end
 
-    local now = os.clock()
     local lastAt = self._lastReportAt[player]
-    local interval = self._config.PerformanceReportIntervalSeconds
     if lastAt ~= nil and now - lastAt < interval * 0.5 then
         return false
     end
@@ -334,6 +357,7 @@ function PerformanceService.acceptClientReport(
         return false
     end
     self._lastReportAt[player] = now
+    self._lastHeardAt[player] = now
     self._lastFps[player] = sample.fps
 
     self:_record("client_fps", sample.fps)

@@ -398,7 +398,18 @@ function ProfileService.Start(self: ProfileService)
         -- the session's progress gone rather than a retry pending -- which is
         -- exactly what the zero-tolerance save-loss gate is counting.
         local hadUnsavedWork = self._dirty[player] == true
-        if not self:save(player) and hadUnsavedWork and self._writable[player] == true then
+        -- A save already in flight is not a failure: `save` refuses a second
+        -- concurrent write and returns false for it, and the one that is
+        -- running may well land. Counting that as a lost save would put a
+        -- zero-tolerance event on the ordinary race between the autosave beat
+        -- and a player closing the app.
+        local saveInFlight = self._saving[player] == true
+        if
+            not self:save(player)
+            and hadUnsavedWork
+            and not saveInFlight
+            and self._writable[player] == true
+        then
             self._analyticsService:saveLoss(player.UserId, "save", "final_save_failed")
         end
         self._profiles[player] = nil

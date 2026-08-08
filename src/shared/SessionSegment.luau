@@ -142,16 +142,43 @@ end
     to report for another five seconds. A session that ends inside those five
     seconds is precisely the session the join and crash gates are about, so its
     platform has to be known before its first sample rather than with it.
+
+    Bounded the same way the sample is, and for the same reason: this runs
+    *before* `sanitizeClientReport` on a payload a client composed, so if it
+    accepted a smuggled key the whitelist below it would never see one. The
+    schema version is checked here too -- a payload from a client build that
+    does not agree with this one about what the fields mean is not a label, it
+    is a guess.
 ]]
 function SessionSegment.platformOf(payload: any): string?
-    if type(payload) ~= "table" then
+    if type(payload) ~= "table" or payload.schemaVersion ~= 1 then
         return nil
+    end
+    for key in payload do
+        if
+            key ~= "schemaVersion"
+            and key ~= "fps"
+            and key ~= "spikeMs"
+            and key ~= "memoryMb"
+            and key ~= "platform"
+        then
+            return nil
+        end
     end
     local platform = payload.platform
     if not SessionSegment.isValidPlatform(platform) or platform == "unknown" then
         return nil
     end
     return platform
+end
+
+-- Whether a payload is a client introducing itself rather than reporting a
+-- sample. An introduction carries no frame data, which is the whole reason it
+-- exists: it is sent before there is any.
+function SessionSegment.isIntroduction(payload: any): boolean
+    return SessionSegment.platformOf(payload) ~= nil
+        and type(payload) == "table"
+        and payload.fps == nil
 end
 
 return table.freeze(SessionSegment)

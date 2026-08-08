@@ -65,6 +65,16 @@ export type CommerceService = typeof(setmetatable(
         ]]
         _localMailboxes: { [number]: { any } },
         _productInfo: { [string]: any },
+        --[[
+            Purchases already counted as lost, so one stuck receipt is one
+            event rather than one per redelivery. The platform retries an
+            unconsumed receipt for the life of the purchase, and a
+            zero-tolerance gate that reads a count would grow without a second
+            player being affected. Bounded in practice by how many purchases
+            can go wrong on one server, which is the number the gate is asking
+            about anyway.
+        ]]
+        _reportedLoss: { [string]: boolean },
         _onGranted: ((Player, { string }) -> ())?,
     },
     CommerceService
@@ -94,6 +104,7 @@ function CommerceService.new(
         _mailboxStore = nil,
         _localMailboxes = {},
         _productInfo = {},
+        _reportedLoss = {},
         _onGranted = nil,
     }, CommerceService)
 end
@@ -205,7 +216,12 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
         `receipt_result` counts.
     ]]
     -- GATE-METRIC: purchase_loss
-    if type(receipt.productId) ~= "string" or #self._catalog.grantsOf(receipt.productId) == 0 then
+    local purchaseKey = tostring(receipt.purchaseId)
+    if
+        (type(receipt.productId) ~= "string" or #self._catalog.grantsOf(receipt.productId) == 0)
+        and not self._reportedLoss[purchaseKey]
+    then
+        self._reportedLoss[purchaseKey] = true
         self._analyticsService:purchaseLoss(
             userId,
             tostring(receipt.productId),
@@ -230,11 +246,17 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
             -- The entitlement was decided and could not be made durable. The
             -- platform will call again, but until one of those calls lands
             -- this is a completed receipt with no grant behind it.
-            self._analyticsService:purchaseLoss(
-                userId,
-                tostring(receipt.productId),
-                "grant_write_failed"
-            )
+            -- Counted once per purchase for the same reason as above: the
+            -- retry is the system working, and a gate that counts retries
+            -- reads one stuck receipt as a growing incident.
+            if not self._reportedLoss[purchaseKey] then
+                self._reportedLoss[purchaseKey] = true
+                self._analyticsService:purchaseLoss(
+                    userId,
+                    tostring(receipt.productId),
+                    "grant_write_failed"
+                )
+            end
             return false
         end
         local granted = self._catalog.grantsOf(receipt.productId)
@@ -245,10 +267,11 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
         })
         -- GATE-METRIC: receipt_result
         self._analyticsService:receiptResult(
-            player,
+            userId,
             tostring(receipt.productId),
             "granted",
-            elapsed
+            elapsed,
+            player
         )
         local handler = self._onGranted
         if handler ~= nil then
@@ -266,6 +289,19 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
             purchase = tostring(receipt.purchaseId),
             user = userId,
         })
+        -- A held receipt is durable -- the mailbox saved, which is what this
+        -- branch just proved -- so it settles the commerce gate exactly as a
+        -- grant does. Leaving it out would make "100% of completed receipts
+        -- reach a durable grant" unreadable for every purchase made while its
+        -- buyer was in another server, which is the case the mailbox exists
+        -- for and therefore the case the gate most needs to see.
+        self._analyticsService:receiptResult(
+            userId,
+            tostring(receipt.productId),
+            "held",
+            elapsed,
+            player
+        )
         return true
     end
 
@@ -274,9 +310,13 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
         purchase = tostring(receipt.purchaseId),
         user = userId,
     })
-    if player ~= nil then
-        self._analyticsService:receiptResult(player, tostring(receipt.productId), "retry", elapsed)
-    end
+    self._analyticsService:receiptResult(
+        userId,
+        tostring(receipt.productId),
+        "retry",
+        elapsed,
+        player
+    )
     return false
 end
 

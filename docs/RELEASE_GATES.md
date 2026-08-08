@@ -24,11 +24,16 @@ for a newly discovered safety, policy, data, or player-harm risk.
 - Operational rates use authoritative server events. Client telemetry is
   diagnostic and cannot hide a server failure.
 - Platform class and device/performance segment are labels on the session, not
-  gates of their own. `interactive_session` and `session_ended` carry them, and
-  every other gate is sliced by joining a player's session to it. The platform
-  class is the one fact in this list a server cannot see for itself — it sees a
-  userId and a connection, not a screen — so the client says which of the four
-  it is on its first frame, and nothing in the game ever reads the answer for
+  gates of their own, and every other gate is sliced by joining a player's
+  session to them. `session_ended` carries both. `interactive_session` carries
+  the platform class as known at the moment play began — the client introduces
+  itself on its first frame and a profile load is a DataStore round trip, so it
+  is normally in by then, and where it is not the session's own end event
+  supplies it. It carries no performance segment, because a segment is read
+  from a frame rate and at the moment a session begins there is not one yet.
+- The platform class is the one fact in this list a server cannot see for
+  itself — it sees a userId and a connection, not a screen — so the client says
+  which of the four it is, and nothing in the game ever reads the answer for
   anything but a label.
 
 ## What emits each gate
@@ -53,11 +58,10 @@ player-safety failure arrives through Roblox's own moderation. Nothing this game
 can emit produces either number, and an event invented to stand in for one would
 be a gate passing on telemetry that measures something else.
 
-Operational events are server events, as the measurement contract requires. Each
-carries the dimensions its per-segment threshold is read on: the session pair —
-`interactive_session` and `session_ended` — carries the platform class and the
-device/performance segment, and every other gate is sliced by joining a player's
-session to it.
+Operational events are server events, as the measurement contract requires, and
+the session pair — `interactive_session` and `session_ended` — carries the
+dimensions the per-segment thresholds are read on. Every other gate is sliced by
+joining a player's session to that pair.
 
 ## Zero-tolerance gates
 

@@ -103,10 +103,89 @@ return {
             run = function()
                 TestRunner.equal(SessionSegment.platformOf(nil), nil)
                 TestRunner.equal(SessionSegment.platformOf({}), nil)
-                TestRunner.equal(SessionSegment.platformOf({ platform = "unknown" }), nil)
-                TestRunner.equal(SessionSegment.platformOf({ platform = "PHONE" }), nil)
-                TestRunner.equal(SessionSegment.platformOf({ platform = 7 }), nil)
-                TestRunner.equal(SessionSegment.platformOf({ platform = "phone" }), "phone")
+                TestRunner.equal(
+                    SessionSegment.platformOf({ schemaVersion = 1, platform = "unknown" }),
+                    nil
+                )
+                TestRunner.equal(
+                    SessionSegment.platformOf({ schemaVersion = 1, platform = "PHONE" }),
+                    nil
+                )
+                TestRunner.equal(
+                    SessionSegment.platformOf({ schemaVersion = 1, platform = 7 }),
+                    nil
+                )
+                TestRunner.equal(
+                    SessionSegment.platformOf({ schemaVersion = 1, platform = "phone" }),
+                    "phone"
+                )
+            end,
+        },
+        {
+            --[[
+                This runs before the sample whitelist, on a payload a client
+                composed, so it has to do the whitelist's job itself. A version
+                it does not recognise is refused for the same reason: a payload
+                from a build that disagrees about what the fields mean is not a
+                label, it is a guess.
+            ]]
+            name = "an introduction is bounded and versioned like a sample",
+            run = function()
+                TestRunner.equal(
+                    SessionSegment.platformOf({ schemaVersion = 2, platform = "phone" }),
+                    nil
+                )
+                TestRunner.equal(SessionSegment.platformOf({ platform = "phone" }), nil)
+                TestRunner.equal(
+                    SessionSegment.platformOf({
+                        schemaVersion = 1,
+                        platform = "phone",
+                        extra = "smuggled",
+                    }),
+                    nil
+                )
+                -- A sample carries the same label, and must still be read for
+                -- it: an introduction can be lost to a race with the server's
+                -- handler, and every sample after it heals that.
+                TestRunner.equal(
+                    SessionSegment.platformOf({
+                        schemaVersion = 1,
+                        fps = 60,
+                        spikeMs = 10,
+                        memoryMb = 300,
+                        platform = "tablet",
+                    }),
+                    "tablet"
+                )
+            end,
+        },
+        {
+            --[[
+                An introduction is told from a sample by the absence of frame
+                data, which is the whole reason it exists: it is sent before
+                there is any. The distinction is load-bearing rather than
+                cosmetic -- the two take different rate limits, because a
+                message the handler answers before counting it is how a bounded
+                remote becomes an unbounded one.
+            ]]
+            name = "an introduction is a payload with no sample in it",
+            run = function()
+                TestRunner.equal(
+                    SessionSegment.isIntroduction({ schemaVersion = 1, platform = "phone" }),
+                    true
+                )
+                TestRunner.equal(
+                    SessionSegment.isIntroduction({
+                        schemaVersion = 1,
+                        fps = 60,
+                        spikeMs = 10,
+                        memoryMb = 300,
+                        platform = "phone",
+                    }),
+                    false
+                )
+                TestRunner.equal(SessionSegment.isIntroduction({ schemaVersion = 1 }), false)
+                TestRunner.equal(SessionSegment.isIntroduction(nil), false)
             end,
         },
         {

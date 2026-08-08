@@ -923,20 +923,25 @@ end
 ]]
 function AnalyticsService.receiptResult(
     self: AnalyticsService,
-    player: Player,
+    userId: number,
     productId: string,
     outcome: string,
-    elapsedSeconds: number
+    elapsedSeconds: number,
+    player: Player?
 )
     self._logger:info("receipt_result", {
         elapsedSeconds = math.max(0, math.floor(elapsedSeconds + 0.5)),
         outcome = string.sub(outcome, 1, 24),
-        player = player.UserId,
+        player = userId,
         product = string.sub(productId, 1, 48),
     })
-    if not RunService:IsStudio() then
+    -- The buyer is a userId here rather than a Player because the receipt that
+    -- most needs counting is the one that arrived while they were somewhere
+    -- else. Roblox's own event needs an instance, so it takes the branch it
+    -- can and the log takes the one that always exists.
+    if player ~= nil and not RunService:IsStudio() then
         pcall(function()
-            RobloxAnalytics:LogCustomEvent(player, "ReceiptResult", 1, {
+            RobloxAnalytics:LogCustomEvent(player :: Player, "ReceiptResult", 1, {
                 [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = productId,
                 [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = outcome,
             })

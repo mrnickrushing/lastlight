@@ -154,24 +154,56 @@ local function emittersInService(): { [string]: string }
     return byEvent
 end
 
--- Every `GATE-METRIC: <id>` marker in the source, with the files it sits in.
-local function markersInSource(): { [string]: { string } }
+export type Marker = {
+    id: string,
+    path: string,
+    -- The text immediately after the marker, which is what the emitter call
+    -- has to appear in. A marker checked against its whole file passes on a
+    -- marker left behind after its call moved, as long as anything else in
+    -- that file still calls the same emitter -- and a marker that points at
+    -- nothing is the same lie as a document that names an emitter that does
+    -- not exist.
+    block: string,
+}
+
+local MARKER_BLOCK = 900
+
+-- Every `GATE-METRIC: <id>` marker in the source, with the code it introduces.
+local function markersInSource(): { Marker }
     local files: { { path: string, source: string } } = {}
     readTree("src", files)
-    local found: { [string]: { string } } = {}
+    local found: { Marker } = {}
     for _, file in files do
-        for id in string.gmatch(file.source, "GATE%-METRIC: ([a-z_]+)") do
-            local paths = found[id]
-            if paths == nil then
-                paths = {}
-                found[id] = paths
+        local searchFrom = 1
+        while true do
+            local from, to, id = string.find(file.source, "GATE%-METRIC: ([a-z_]+)", searchFrom)
+            if from == nil or to == nil or id == nil then
+                break
             end
-            if table.find(paths, file.path) == nil then
-                table.insert(paths, file.path)
-            end
+            table.insert(found, {
+                id = id,
+                path = file.path,
+                block = string.sub(file.source, to, to + MARKER_BLOCK),
+            })
+            searchFrom = to + 1
         end
     end
     return found
+end
+
+local function markedIds(): { [string]: { string } }
+    local byId: { [string]: { string } } = {}
+    for _, marker in markersInSource() do
+        local paths = byId[marker.id]
+        if paths == nil then
+            paths = {}
+            byId[marker.id] = paths
+        end
+        if table.find(paths, marker.path) == nil then
+            table.insert(paths, marker.path)
+        end
+    end
+    return byId
 end
 
 return {
@@ -227,45 +259,39 @@ return {
                 An emitter is not a measurement. A function that logs a perfect
                 event and is called from nowhere produces exactly the dashboard
                 this suite exists to distinguish from a passing gate, so the
-                call site is checked as well -- and checked where the fact is
-                produced, not merely somewhere in the file.
+                call site is checked as well -- and checked in the code the
+                marker introduces rather than anywhere in its file, because a
+                marker left behind after its call moved away is the same lie as
+                a document naming an emitter that does not exist, and a
+                file-wide search would let any other call in the same file
+                cover for it.
             ]]
             name = "every gate emitter has a marked call site that calls it",
             run = function()
                 local emitters = emittersInService()
-                local markers = markersInSource()
-                local files: { { path: string, source: string } } = {}
-                readTree("src", files)
-                local sourceOf: { [string]: string } = {}
-                for _, file in files do
-                    sourceOf[file.path] = file.source
-                end
+                local marked = markedIds()
 
                 local problems: { string } = {}
                 for metric in emittedMetrics() do
-                    local paths = markers[metric]
-                    if paths == nil then
+                    if marked[metric] == nil then
                         table.insert(problems, metric .. " has no GATE-METRIC marker in src")
-                        continue
                     end
-                    local method = emitters[metric]
+                end
+                for _, marker in markersInSource() do
+                    local method = emitters[marker.id]
                     if method == nil then
                         continue
                     end
-                    for _, path in paths do
-                        if
-                            string.find(sourceOf[path] or "", ":" .. method .. "(", 1, true) == nil
-                        then
-                            table.insert(
-                                problems,
-                                string.format(
-                                    "%s is marked in %s but that file never calls :%s()",
-                                    metric,
-                                    path,
-                                    method
-                                )
+                    if string.find(marker.block, ":" .. method .. "(", 1, true) == nil then
+                        table.insert(
+                            problems,
+                            string.format(
+                                "the %s marker in %s introduces no call to :%s()",
+                                marker.id,
+                                marker.path,
+                                method
                             )
-                        end
+                        )
                     end
                 end
                 table.sort(problems)
@@ -283,7 +309,7 @@ return {
             run = function()
                 local metrics = emittedMetrics()
                 local orphans: { string } = {}
-                for id, paths in markersInSource() do
+                for id, paths in markedIds() do
                     if metrics[id] == nil then
                         table.insert(orphans, id .. " (" .. table.concat(paths, ", ") .. ")")
                     end
@@ -305,7 +331,7 @@ return {
             name = "no gate is emitted from client code",
             run = function()
                 local wrong: { string } = {}
-                for id, paths in markersInSource() do
+                for id, paths in markedIds() do
                     for _, path in paths do
                         if string.sub(path, 1, 11) ~= "src/server/" then
                             table.insert(wrong, id .. " in " .. path)
