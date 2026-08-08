@@ -98,6 +98,20 @@ Newest first since the last header:
   so `STRIKE_RANGE` matches `EliteStrikeRange` and `SURFACE_PATCH_DEPTH` matches
   nothing. Mutated afterwards by putting a copy of the strike range back, and both
   the general rule and the by-name check caught it.
+
+  **Verified live for waves B and C together**, in a running server on the built
+  place. The rewired services came up clean (`old_growth_ready`,
+  `warden_stag_ready`, `defense_plots_built lanes=3`,
+  `server_boot_complete services=27`) and the knobs read
+  `elite 28/58/14 · boss 27/56/15 · watch 3/7s/26 · lantern 100` from `Config`.
+  The five tuning emitters were then driven through the shipped
+  `AnalyticsService` inside Roblox's VM, and every accumulator carried: two downs
+  and one revive arrived on `first_night_outcome`, `difficulty_checkpoint` went
+  `attempt=1` then `attempt=2`, `repeat_activity` went `run=1` then `run=2`,
+  `group_outcome` carried `partySize=3 banked=12`, and `first_session_end` carried
+  `furthestStep=3 furthestStage=first_night` from a funnel step recorded eight
+  calls earlier. The residue counter read **8** for a departed player and **0**
+  after `clear`, which is the leak the soak metric now watches.
 - **#346** (v152) **M13 wave A: a flag can reach some players and not others, and the
   hard part is what happens when it reaches more.** Milestone 13's rollout is four
   rungs — team and trusted testers, a consented allowlist, a larger controlled
