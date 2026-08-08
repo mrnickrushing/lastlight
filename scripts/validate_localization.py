@@ -115,15 +115,6 @@ ALLOWED: dict[str, str] = {
     "src/server/Services/WardenStagService.luau": (
         "server announcements and toasts; 30 strings, migrating with the server batch"
     ),
-    "src/server/Services/WorldService.luau": (
-        "server announcements and toasts; 202 strings, migrating with the server batch"
-    ),
-    "src/server/World/BramblewakeBuilder.luau": (
-        "world signage and prop labels; 26 strings, migrating with the world batch"
-    ),
-    "src/server/World/RegionBuilders.luau": (
-        "world signage and prop labels; 3 strings, migrating with the world batch"
-    ),
     "src/server/init.server.luau": (
         "server announcements and toasts; 5 strings, migrating with the server batch"
     ),
@@ -331,7 +322,7 @@ ALLOWED: dict[str, str] = {
 }
 
 # Pinned. It shrinks; it does not grow.
-ALLOWLIST_SIZE = 91
+ALLOWLIST_SIZE = 88
 
 COMMENT = re.compile(r"--\[\[.*?\]\]|--[^\n]*", re.DOTALL)
 LITERAL = re.compile(r'"((?:[^"\\\n]|\\.)*)"')

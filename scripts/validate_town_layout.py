@@ -42,15 +42,20 @@ WORLD_SERVICE = ROOT / "src" / "server" / "Services" / "WorldService.luau"
 MINIMUM_CLEARANCE = 6.0
 
 VECTOR = r"Vector3\.new\(\s*(-?[\d.]+)\s*,\s*0\s*,\s*(-?[\d.]+)\s*\)"
+# A display name is either a literal or a lookup, since M13 wave D moved the
+# player-visible half of these call sites into the string table. Both shapes are
+# read here rather than only the newer one: this file is parsed as text, and a
+# reader that knew one shape reported zero buildings and said so.
+NAME = r'(?:"[^"]*"|Strings\.get\("[a-z0-9_.]+"\))'
 
 AUTHORED_BUILDING = re.compile(
-    r'authoredBuilding\(\s*"([a-z_]+)"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*'
+    r'authoredBuilding\(\s*"([a-z_]+)"\s*,\s*' + NAME + r"\s*,\s*" + NAME + r"\s*,\s*"
     + VECTOR
     + r"\s*,\s*"
     + VECTOR,
 )
 BUILDING_SHELL = re.compile(
-    r'buildingShell\(\s*"([a-z_]+)"\s*,\s*"[^"]*"\s*,\s*' + VECTOR + r"\s*,\s*" + VECTOR,
+    r'buildingShell\(\s*"([a-z_]+)"\s*,\s*' + NAME + r"\s*,\s*" + VECTOR + r"\s*,\s*" + VECTOR,
 )
 
 

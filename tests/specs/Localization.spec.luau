@@ -21,7 +21,22 @@
 local Strings = require("../../src/shared/Strings")
 local TestRunner = require("../TestRunner")
 
-local SURFACES = { hud = true, client = true, objective = true, common = true }
+--[[
+	The surfaces a key may name. A surface is where a string is *read*, not the
+	file it happens to live in, because a refactor moves a file and does not
+	move a label off a screen. New surfaces arrive with the batch that migrates
+	them, and the list is here rather than inferred so that a typo in a key
+	fails instead of inventing a fourteenth surface nobody meant.
+]]
+local SURFACES = {
+    hud = true,
+    client = true,
+    objective = true,
+    common = true,
+    world = true,
+    bramblewake = true,
+    region = true,
+}
 
 return {
     name = "Localization",

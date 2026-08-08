@@ -1,6 +1,7 @@
 --!strict
 
 local CollectionService = game:GetService("CollectionService")
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
 local WorldSignBuilder = require(script.Parent.WorldSignBuilder)
 
 local BramblewakeBuilder = {}
@@ -675,7 +676,7 @@ local function evacuationRoadMarker(
         parent,
         "EvacuationRoadMarker",
         CFrame.lookAt(base + Vector3.new(0, 5.4, 0), neighbor) * CFrame.Angles(0, 0, lean),
-        "EVACUATION ROAD",
+        Strings.get("bramblewake.evacuation_road"),
         CREAM
     )
     local board = sign.PrimaryPart
@@ -1081,7 +1082,7 @@ local function buildStoryLandmark(
 ): number
     assert(
         type(offset) == "table" and type(offset.x) == "number" and type(offset.z) == "number",
-        "Bramblewake story landmark is missing its authored offset"
+        Strings.get("bramblewake.bramblewake_story_landmark_is_missing_its")
     )
     local origin = center + Vector3.new(offset.x, 0, offset.z)
     local count = 0
@@ -1783,7 +1784,7 @@ local function buildModuleVisual(
         local beacon =
             orb(parent, "WayhomeLight", center + Vector3.new(0, 8, 0), 6, AMBER, Enum.Material.Neon)
         light(beacon, AMBER, 3, 36, true)
-        billboard(beacon, "WAYHOME GATE", CREAM)
+        billboard(beacon, Strings.get("bramblewake.wayhome_gate"), CREAM)
         objectIcon(beacon, "wayhome", AMBER)
     end
 end
@@ -3422,7 +3423,7 @@ local function buildWardenSeal(
     seal.CFrame *= CFrame.Angles(0, 0, math.rad(90))
     seal.Size = Vector3.new(1.2, 7, 7)
     seal.Transparency = 0.52
-    billboard(seal, "WARDEN'S SEAL · CLEANSE OLD GROWTH", CREAM)
+    billboard(seal, Strings.get("bramblewake.warden_s_seal_cleanse_old_growth"), CREAM)
     objectIcon(seal, "seal", FOXFIRE)
 
     local nodeDefinitions = {
@@ -3475,10 +3476,10 @@ local function buildWardenSeal(
         objectIcon(node, "root", FOXFIRE)
         nodes[definition.nodeId] = node
         table.insert(interactions, {
-            actionText = "CLEANSE ROOT",
+            actionText = Strings.get("bramblewake.cleanse_root"),
             holdDuration = 0.6,
             interactionId = definition.interactionId,
-            objectText = "Living Root Node",
+            objectText = Strings.get("bramblewake.living_root_node"),
             target = node,
         })
     end
@@ -3530,14 +3531,18 @@ local function buildWardenSeal(
         target:SetAttribute("BossInteraction", "break_antler")
         target:SetAttribute("BossAntlerId", definition.antlerId)
         CollectionService:AddTag(target, runtimeIds.ExpeditionBossTag)
-        billboard(target, "BREAK ANTLER · CHANGES FOREST", Color3.fromRGB(255, 166, 106))
+        billboard(
+            target,
+            Strings.get("bramblewake.break_antler_changes_forest"),
+            Color3.fromRGB(255, 166, 106)
+        )
         objectIcon(target, "antler", Color3.fromRGB(255, 166, 106))
         antlers[definition.antlerId] = target
         table.insert(interactions, {
-            actionText = "BREAK ANTLER",
+            actionText = Strings.get("bramblewake.break_antler"),
             holdDuration = 1.1,
             interactionId = definition.interactionId,
-            objectText = "Harmful Shortcut",
+            objectText = Strings.get("bramblewake.harmful_shortcut"),
             target = target,
         })
     end
@@ -3617,15 +3622,15 @@ local function buildBlackoutLayer(
     light(sourceFlame, AMBER, 1.8, 16, true)
     fireSource:SetAttribute("BlackoutInteraction", "take_fire")
     CollectionService:AddTag(fireSource, runtimeIds.ExpeditionBlackoutTag)
-    billboard(fireSource, "BLACKOUT FIRE · CARRY TO LIVING ROOTS", CREAM)
+    billboard(fireSource, Strings.get("bramblewake.blackout_fire_carry_to_living_roots"), CREAM)
     objectIcon(fireSource, "rootfire", AMBER)
 
     local interactions = {
         {
-            actionText = "TAKE ROOTFIRE",
+            actionText = Strings.get("world.take_rootfire"),
             holdDuration = 0.45,
             interactionId = runtimeIds.InteractionIds.BlackoutFireSource,
-            objectText = "Blackout Lantern",
+            objectText = Strings.get("bramblewake.blackout_lantern"),
             target = fireSource,
         },
     }
@@ -3635,19 +3640,19 @@ local function buildBlackoutLayer(
             {
                 center = assert(centers[3], "Blackout farm relay center is missing"),
                 interactionId = runtimeIds.InteractionIds.BlackoutRootFarm,
-                label = "FARM ROOT",
+                label = Strings.get("bramblewake.farm_root"),
                 nodeId = "blackout_root_farm",
             },
             {
                 center = assert(centers[7], "Blackout mill relay center is missing"),
                 interactionId = runtimeIds.InteractionIds.BlackoutRootMill,
-                label = "MILL ROOT",
+                label = Strings.get("bramblewake.mill_root"),
                 nodeId = "blackout_root_mill",
             },
             {
                 center = assert(centers[10], "Blackout cathedral relay center is missing"),
                 interactionId = runtimeIds.InteractionIds.BlackoutRootCathedral,
-                label = "CATHEDRAL ROOT",
+                label = Strings.get("bramblewake.cathedral_root"),
                 nodeId = "blackout_root_cathedral",
             },
         }
@@ -3681,7 +3686,7 @@ local function buildBlackoutLayer(
         objectIcon(node, "livingroot", FOXFIRE)
         relayNodes[definition.nodeId] = node
         table.insert(interactions, {
-            actionText = "DELIVER ROOTFIRE",
+            actionText = Strings.get("world.deliver_rootfire"),
             holdDuration = 0.7,
             interactionId = definition.interactionId,
             objectText = definition.label,
@@ -3720,21 +3725,21 @@ local function buildBlackoutLayer(
                 color = MEADOW,
                 decisionId = "restore_farmland",
                 interactionId = runtimeIds.InteractionIds.BlackoutDecisionFarmland,
-                label = "RESTORE FARMLAND",
+                label = Strings.get("bramblewake.restore_farmland"),
                 offset = Vector3.new(-18, 2.5, 34),
             },
             {
                 color = Color3.fromRGB(71, 139, 84),
                 decisionId = "wild_regrowth",
                 interactionId = runtimeIds.InteractionIds.BlackoutDecisionWild,
-                label = "ALLOW WILD REGROWTH",
+                label = Strings.get("bramblewake.allow_wild_regrowth"),
                 offset = Vector3.new(0, 2.5, 38),
             },
             {
                 color = FOXFIRE,
                 decisionId = "shared_agroforest",
                 interactionId = runtimeIds.InteractionIds.BlackoutDecisionShared,
-                label = "CREATE SHARED AGROFOREST",
+                label = Strings.get("bramblewake.create_shared_agroforest"),
                 offset = Vector3.new(18, 2.5, 34),
             },
         }
@@ -3749,10 +3754,10 @@ local function buildBlackoutLayer(
         billboard(seedling, definition.label, CREAM)
         decisions[definition.decisionId] = seedling
         table.insert(interactions, {
-            actionText = "VOTE " .. definition.label,
+            actionText = Strings.get("bramblewake.vote") .. definition.label,
             holdDuration = 1.1,
             interactionId = definition.interactionId,
-            objectText = "Permanent Greenward Choice",
+            objectText = Strings.get("bramblewake.permanent_greenward_choice"),
             target = seedling,
         })
     end
@@ -4011,7 +4016,7 @@ function BramblewakeBuilder.build(
             )
             assert(
                 landmarkParts == definition.storyPartCount,
-                "Bramblewake story landmark exceeded its authored part count"
+                Strings.get("bramblewake.bramblewake_story_landmark_exceeded_its_auth")
             )
             storyLandmarkCount += 1
             storyLandmarkPartCount += landmarkParts
@@ -4030,7 +4035,7 @@ function BramblewakeBuilder.build(
             cagedLanternShell(module, fireSource.Position, 0.86, "OldGrowthLantern")
             fireSource:SetAttribute("EliteId", definition.eliteId)
             fireSource:SetAttribute("EliteInteraction", "fire_source")
-            billboard(fireSource, "LANTERN FIRE", CREAM)
+            billboard(fireSource, Strings.get("bramblewake.lantern_fire"), CREAM)
             objectIcon(fireSource, "rootfire", AMBER)
 
             local rootHeart = orb(
@@ -4045,7 +4050,7 @@ function BramblewakeBuilder.build(
             livingRootShell(module, rootHeart.Position, 1.08, "OldGrowthHeart")
             rootHeart:SetAttribute("EliteId", definition.eliteId)
             rootHeart:SetAttribute("EliteInteraction", "root_heart")
-            billboard(rootHeart, "ROOT HEART", CREAM)
+            billboard(rootHeart, Strings.get("bramblewake.root_heart"), CREAM)
             objectIcon(rootHeart, "root", FOXFIRE)
             CollectionService:AddTag(fireSource, runtimeIds.ExpeditionEliteTag)
             CollectionService:AddTag(rootHeart, runtimeIds.ExpeditionEliteTag)
@@ -4077,7 +4082,7 @@ function BramblewakeBuilder.build(
             local target = module:FindFirstChild("WayhomeLight")
             assert(
                 target ~= nil and target:IsA("BasePart"),
-                "Wayhome Gate is missing its extraction target"
+                Strings.get("bramblewake.wayhome_gate_is_missing_its_extraction")
             )
             target:SetAttribute("ContentId", placement.moduleId)
             target:SetAttribute("ExtractionId", "extraction_bw_wayhome")
@@ -4178,7 +4183,7 @@ function BramblewakeBuilder.build(
                 module,
                 "BramblewakeArrival",
                 CFrame.new(center + Vector3.new(0, 5.4, -8)) * CFrame.Angles(0, math.pi, 0),
-                "BRAMBLEWAKE WOODS",
+                Strings.get("bramblewake.bramblewake_woods"),
                 CREAM
             )
             arrivalSign:SetAttribute("ArrivalLandmark", true)

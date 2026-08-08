@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = PR #355, build `0.53.0`,
-save schema 25, 27 services. Published to Roblox as place version 156,
+Last updated: 2026-08-08, at `main` = PR #356, build `0.53.0`,
+save schema 25, 27 services. Published to Roblox as place version 158,
 matching this revision exactly. (This line used to say ``at `main` = `HEAD` ``,
 and #354 is the wave that noticed `HEAD` is not a revision. The revision a
 rollback restores is recorded properly in
@@ -31,9 +31,8 @@ guarded.** A (cohort-scoped flags), B (tuning telemetry), C (tuning knobs) and E
 coverage, has its table, its guard and its first batch**, and the reason it sat
 unbuilt through two sessions was addressed rather than ignored: the guard landed
 *first*, with the 91 unmigrated files named individually and the count pinned so
-it can only shrink. The wave is finished when that list is empty; 2,854 strings
-are still on it, all of them in server announcements, world signage and content
-catalogs.
+it can only shrink. The wave is finished when that list is empty; after batch two it holds 88 files
+and 2,623 strings, all of them in server announcements and content catalogs.
 **Milestone 14's buildable half is complete — waves A through E all shipped.**
 
 **Milestones 0 through 11 are complete, and so is Milestone 12's buildable
@@ -83,6 +82,46 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#356** (v158) **M13 wave D, batch two: the world surface, chosen because it is the
+  batch you can read back out of a running server.** 227 strings out of
+  `WorldService`, `BramblewakeBuilder` and `RegionBuilders` — every proximity prompt,
+  every building name, every resident's name and trade, every sign in the town. The
+  reason to take this one second rather than the server toasts is that a broken
+  migration here is a **blank plank**, and a blank plank is visible: the whole batch
+  can be verified by walking the world and reading what it says, which is not true of
+  a toast that only fires on a failure path.
+
+  **A guard caught the migration blinding another guard**, which is the find worth
+  keeping. `validate_town_layout.py` reads the town's geometry out of `WorldService`
+  as text, matching `authoredBuilding("id", "NAME", ...)`. Replacing the name with
+  `Strings.get("world.bell_tower")` meant the pattern matched nothing, and the script
+  **refused rather than passing** — "found only 0 authored buildings, expected at
+  least 10... update the pattern rather than silently passing with fewer buildings
+  checked than exist". That refusal was written into it long before this wave, by
+  somebody thinking about exactly this: a text check quietly matching less is a check
+  that reports good news about a file it can no longer read. It reads both shapes now.
+
+  The allowlist is at **88 files and 2,623 strings**, down from 91 and 2,854, and
+  `ALLOWLIST_SIZE` moved with it — the only direction it moves.
+
+  **Verified live at 392 x 608 on the rebuilt place**, by reading the world back: 132
+  proximity prompts and 209 sign labels the server actually built, none of them empty
+  and none of them showing a key.
+
+  **And looking found a defect the migration did not cause and no spec could see.**
+  The starter tool pedestals passed `definition.tool` as the prompt's object text, so
+  a player standing at the fishing pedestal was shown the word **`fishing_kit`** — a
+  database key on a plank, which is #339's `THE WOOD IS REGION_BRAMBLEWAKE` in a new
+  place. Nothing about it was findable by counting: the string was never a literal, so
+  no localization check would ever have looked at it. Each pedestal carries a name out
+  of the table now, and the fishing one reads `FISHING KIT`.
+
+  **The first fix for it was wrong, and the same habit caught that too.** Reaching for
+  `definition.displayName` looked obvious and was nil — these pedestals are built from
+  a local list rather than from `ToolCatalog` — so `WorldService` **failed to
+  initialize** and the town did not build. 917 tests passed, `npm run check` passed,
+  and the world was 1,888 instances instead of 15,000 with one line in the log. The
+  only thing that found it was starting the game and counting what was in it.
 - **#355** (v157) **M13 wave D: the guard goes in before the migration, or the
   migration has no guard.** Routing every player-visible string through one table
   touches nearly every file that speaks to a player, and the check that gives the

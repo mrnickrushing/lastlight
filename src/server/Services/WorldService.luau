@@ -7,6 +7,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
 local BramblewakeBuilder = require(script.Parent.Parent.World.BramblewakeBuilder)
 local FoliageBuilder = require(script.Parent.Parent.World.FoliageBuilder)
 local MeshTemplateLoader = require(script.Parent.Parent.World.MeshTemplateLoader)
@@ -424,10 +425,10 @@ local function buildEmberhollowSanctuary(
         shell.Name = "ProceduralCabinShell"
         shell.Parent = cabinFolder
 
-        local wallColor = if name == "MARA'S SHELTER"
+        local wallColor = if name == Strings.get("world.mara_s_shelter")
             then Color3.fromRGB(69, 85, 66)
             else Color3.fromRGB(91, 63, 44)
-        local trimColor = if name == "MARA'S SHELTER"
+        local trimColor = if name == Strings.get("world.mara_s_shelter")
             then Color3.fromRGB(109, 126, 90)
             else Color3.fromRGB(137, 99, 61)
         local roofColor = Color3.fromRGB(48, 54, 49)
@@ -818,7 +819,7 @@ local function buildEmberhollowSanctuary(
             position = referenceCFrame(-9, -4.6, 12.2).Position,
             scale = 0.86,
             yaw = yaw,
-            seed = if name == "MARA'S SHELTER" then 9311 else 9312,
+            seed = if name == Strings.get("world.mara_s_shelter") then 9311 else 9312,
             swayTag = nil,
             parent = fireplace,
             fallbackInstance = hearthFallback,
@@ -864,7 +865,7 @@ local function buildEmberhollowSanctuary(
         signText.TextScaled = true
         signText.Parent = surface
 
-        if name == "MARA'S SHELTER" then
+        if name == Strings.get("world.mara_s_shelter") then
             local cotFallback = Instance.new("Model")
             cotFallback.Name = "MaraCotFallback"
             cotFallback.Parent = cabinFolder
@@ -1035,7 +1036,7 @@ local function buildEmberhollowSanctuary(
             "CabinWovenRug",
             Vector3.new(6.4, 0.12, 3.4),
             cabinCFrame(2.5, 0.68, -0.1),
-            if name == "MARA'S SHELTER"
+            if name == Strings.get("world.mara_s_shelter")
                 then Color3.fromRGB(70, 112, 102)
                 else Color3.fromRGB(132, 88, 54),
             Enum.Material.Fabric,
@@ -1056,11 +1057,15 @@ local function buildEmberhollowSanctuary(
         for supplyIndex = -1, 1 do
             local supply = part(
                 cabinFolder,
-                if name == "MARA'S SHELTER" then "MaraHerbBundle" else "WayfarerSupply",
+                if name == Strings.get("world.mara_s_shelter")
+                    then "MaraHerbBundle"
+                    else "WayfarerSupply",
                 Vector3.new(0.85, 1.05 + math.abs(supplyIndex) * 0.2, 0.75),
                 shelf.CFrame + Vector3.new(supplyIndex * 1.35, 0.7, 0),
                 if supplyIndex == 0 then accent else Color3.fromRGB(121, 96, 58),
-                if name == "MARA'S SHELTER" then Enum.Material.Grass else Enum.Material.Fabric,
+                if name == Strings.get("world.mara_s_shelter")
+                    then Enum.Material.Grass
+                    else Enum.Material.Fabric,
                 false
             )
             supply.CanQuery = false
@@ -1112,7 +1117,7 @@ local function buildEmberhollowSanctuary(
             position = cabinCFrame(-14.5, -1.75, 4).Position,
             scale = 1,
             yaw = yaw + math.rad(8),
-            seed = if name == "MARA'S SHELTER" then 9821 else 9822,
+            seed = if name == Strings.get("world.mara_s_shelter") then 9821 else 9822,
             swayTag = nil,
             parent = cabinFolder,
             fallbackInstance = woodpile,
@@ -1123,7 +1128,7 @@ local function buildEmberhollowSanctuary(
             position = cabinCFrame(13.8, -1.75, 4.4).Position,
             scale = 0.9,
             yaw = yaw + math.rad(-7),
-            seed = if name == "MARA'S SHELTER" then 9823 else 9824,
+            seed = if name == Strings.get("world.mara_s_shelter") then 9823 else 9824,
             swayTag = nil,
             parent = cabinFolder,
             fallbackInstance = nil,
@@ -1142,8 +1147,18 @@ local function buildEmberhollowSanctuary(
     end
 
     local shells = {
-        cabin(Vector3.new(-CABIN_X, 0, TOWN_CENTER.Z), math.rad(-90), "WAYFARER CABIN", AMBER),
-        cabin(Vector3.new(CABIN_X, 0, TOWN_CENTER.Z), math.rad(90), "MARA'S SHELTER", FOXFIRE),
+        cabin(
+            Vector3.new(-CABIN_X, 0, TOWN_CENTER.Z),
+            math.rad(-90),
+            Strings.get("world.wayfarer_cabin"),
+            AMBER
+        ),
+        cabin(
+            Vector3.new(CABIN_X, 0, TOWN_CENTER.Z),
+            math.rad(90),
+            Strings.get("world.mara_s_shelter"),
+            FOXFIRE
+        ),
     }
 
     local commons = Instance.new("Model")
@@ -1471,7 +1486,7 @@ local function buildEmberhollowSanctuary(
     local campSign = labelSign(
         parent,
         CFrame.new(0, 3.2, signZ) * CFrame.Angles(0, math.pi, 0),
-        "EMBERHOLLOW · SAFE CAMP"
+        Strings.get("world.emberhollow_safe_camp")
     )
     -- Same reason as the FOLLOW THE LANTERNS sign: the authored forest sign
     -- has its own two-board silhouette, and the surviving SurfaceGui projects
@@ -2836,7 +2851,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     local routeSign = labelSign(
         geometry,
         CFrame.new(7, 3, -14) * CFrame.Angles(0, math.pi, 0),
-        "FOLLOW THE LANTERNS"
+        Strings.get("world.follow_the_lanterns")
     )
     -- The sourced sign has its own two-board silhouette. Keeping the legacy
     -- fallback SurfaceGui after replacement projects one wide sentence across
@@ -3018,7 +3033,7 @@ function WorldService._buildEnvironment(_self: WorldService, world: Model)
     )
     WorldSignBuilder.dressBoard(
         warningBoard,
-        "NIGHT WATCH · HOLD THE LANTERN ROAD",
+        Strings.get("world.night_watch_hold_the_lantern_road"),
         CREAM,
         "warning"
     )
@@ -4114,7 +4129,7 @@ function WorldService._buildLobby(self: WorldService, world: Model)
         lampLight.Range = 14
         lampLight.Parent = lampGlow
     end
-    addBillboard(platform, "STAND HERE TO DEPART", AMBER, 120)
+    addBillboard(platform, Strings.get("world.stand_here_to_depart"), AMBER, 120)
 
     -- Everything a staging room needs, indoors: work surfaces, supplies, a
     -- table to gather at, beds along the back, and the notice board.
@@ -4483,7 +4498,7 @@ function WorldService._buildLobby(self: WorldService, world: Model)
         Color3.fromRGB(91, 65, 44),
         Enum.Material.WoodPlanks
     )
-    WorldSignBuilder.dressBoard(outfitterBoard, "THE OUTFITTER", CREAM)
+    WorldSignBuilder.dressBoard(outfitterBoard, Strings.get("hud.the_outfitter"), CREAM)
     --[[
         Registered on the plinth, not on the board.
 
@@ -4499,8 +4514,8 @@ function WorldService._buildLobby(self: WorldService, world: Model)
         outfitterPlinth,
         self._runtimeIds.InteractionIds.Outfitter,
         self._runtimeIds.Actions.OpenStore,
-        "BROWSE",
-        "The Outfitter",
+        Strings.get("world.browse"),
+        Strings.get("world.the_outfitter"),
         nil,
         nil,
         Vector3.new(7.5, 12, 9.5)
@@ -4510,7 +4525,7 @@ function WorldService._buildLobby(self: WorldService, world: Model)
         lobby,
         CFrame.new(LOBBY_CENTER + Vector3.new(10, 0, -halfDepth + 3))
             * CFrame.Angles(0, math.rad(180), 0),
-        "TO EMBERHOLLOW"
+        Strings.get("world.to_emberhollow")
     )
 
     -- Spawn at the back of the room, facing the platform and the doorway
@@ -4944,7 +4959,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
     model:SetAttribute("MotionKind", "resident")
     model:SetAttribute("MotionSpeed", 0.72)
     CollectionService:AddTag(model, self._runtimeIds.AmbientMotionTag)
-    addBillboard(head, "MARA · GREENWARD", AMBER, 46)
+    addBillboard(head, Strings.get("world.mara_greenward"), AMBER, 46)
 
     -- Mara has to look pinned, because the prompt on her reads FREE. The
     -- deadfall used to be placed at y = -0.2 -- lying flat on the ground
@@ -5025,7 +5040,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
         torso,
         self._runtimeIds.InteractionIds.Mara,
         self._runtimeIds.Actions.Rescue,
-        "FREE",
+        Strings.get("world.free"),
         "Mara",
         nil,
         nil,
@@ -5172,7 +5187,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     heartLight.Brightness = 1.5
     heartLight.Range = 18
     heartLight.Parent = heart
-    addBillboard(heart, "HEARTWOOD", AMBER, 18)
+    addBillboard(heart, Strings.get("world.heartwood"), AMBER, 18)
     table.insert(self._meshPlacements, {
         assetId = "mesh_heartwood_stump_a",
         fallbackKind = "asset_replacement",
@@ -5188,7 +5203,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         stump,
         self._runtimeIds.InteractionIds.Heartwood,
         self._runtimeIds.Actions.Gather,
-        "GATHER",
+        Strings.get("world.gather"),
         "Heartwood",
         nil,
         nil,
@@ -5283,6 +5298,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             id = self._runtimeIds.InteractionIds.ToolAxe,
             tool = "axe",
+            label = Strings.get("world.tool_axe"),
             position = TOOL_YARD_CENTER + Vector3.new(0, 0, 8),
             color = Color3.fromRGB(102, 154, 102),
             assetId = "mesh_hand_axe_a",
@@ -5291,6 +5307,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             id = self._runtimeIds.InteractionIds.ToolHammer,
             tool = "hammer",
+            label = Strings.get("world.tool_hammer"),
             position = TOOL_YARD_CENTER,
             color = AMBER,
             assetId = "mesh_blacksmith_hammer_a",
@@ -5299,6 +5316,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             id = self._runtimeIds.InteractionIds.ToolTorch,
             tool = "torch",
+            label = Strings.get("world.tool_torch"),
             position = TOOL_YARD_CENTER + Vector3.new(0, 0, -8),
             color = Color3.fromRGB(111, 154, 184),
             assetId = "mesh_creator_handheld_torch_a",
@@ -5314,6 +5332,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             id = self._runtimeIds.InteractionIds.ToolPick,
             tool = "pick",
+            label = Strings.get("world.tool_pick"),
             position = TOOL_YARD_CENTER + Vector3.new(-8, 0, 8),
             color = Color3.fromRGB(151, 116, 74),
             assetId = nil,
@@ -5322,6 +5341,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             id = self._runtimeIds.InteractionIds.ToolSickle,
             tool = "sickle",
+            label = Strings.get("world.tool_sickle"),
             position = TOOL_YARD_CENTER + Vector3.new(-8, 0, 0),
             color = Color3.fromRGB(133, 176, 108),
             assetId = nil,
@@ -5330,6 +5350,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             id = self._runtimeIds.InteractionIds.ToolFishingKit,
             tool = "fishing_kit",
+            label = Strings.get("world.tool_fishing_kit"),
             position = TOOL_YARD_CENTER + Vector3.new(-8, 0, -8),
             color = Color3.fromRGB(98, 148, 176),
             assetId = nil,
@@ -5338,6 +5359,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             id = self._runtimeIds.InteractionIds.ToolClimbingKit,
             tool = "climbing_kit",
+            label = Strings.get("world.tool_climbing_kit"),
             position = TOOL_YARD_CENTER + Vector3.new(-16, 0, 4),
             color = Color3.fromRGB(176, 134, 84),
             assetId = nil,
@@ -5346,6 +5368,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             id = self._runtimeIds.InteractionIds.ToolSurveyKit,
             tool = "survey_kit",
+            label = Strings.get("world.tool_survey_kit"),
             position = TOOL_YARD_CENTER + Vector3.new(-16, 0, -4),
             color = Color3.fromRGB(186, 168, 112),
             assetId = nil,
@@ -5711,16 +5734,22 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             live in TutorialService._strikeContext and ActionProgress.begin.
         ]]
         local toolBlurb = if definition.tool == "axe"
-            then "AXE\nHITS 25% HARDER"
-            elseif definition.tool == "hammer" then "HAMMER\nWORKS 25% FASTER"
-            else "TORCH\nLONGER REACH · LIGHTS THE DARK"
+            then Strings.get("world.axe_nhits_25narder")
+            elseif definition.tool == "hammer" then Strings.get("world.hammer_nworks_25naster")
+            else Strings.get("world.torch_nlonger_reach_lights_the_dark")
         addBillboard(labelAnchor, toolBlurb, definition.color)
         self:_registerInteraction(
             pedestal,
             definition.id,
             self._runtimeIds.Actions.ChooseTool,
-            "CHOOSE",
-            definition.tool,
+            Strings.get("world.choose"),
+            -- The prompt used to read `definition.tool`, which is a catalog
+            -- id: a player standing at the fishing pedestal was shown the
+            -- words `fishing_kit`. These pedestals are built from a local
+            -- list rather than from ToolCatalog, so the name is a field on
+            -- that list and it comes out of the string table like every
+            -- other word on a plank.
+            definition.label,
             definition.tool,
             nil,
             -- The axe, hammer, or torch stands above its crate, so the volume
@@ -5793,7 +5822,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             false
         )
     end
-    addBillboard(plot, "BARRICADE WORKSITE", CREAM, 18)
+    addBillboard(plot, Strings.get("world.barricade_worksite"), CREAM, 18)
     for index = -1, 1, 2 do
         table.insert(self._meshPlacements, {
             assetId = "mesh_creator_barricade_a",
@@ -5822,7 +5851,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         plot,
         self._runtimeIds.InteractionIds.Barricade,
         self._runtimeIds.Actions.Build,
-        "BUILD",
+        Strings.get("world.build"),
         "Barricade",
         nil,
         nil,
@@ -6088,7 +6117,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     light.Range = 30
     light.Shadows = true
     light.Parent = lanternCore
-    addBillboard(lanternCore, "THE FIRST LANTERN", AMBER, 32)
+    addBillboard(lanternCore, Strings.get("world.the_first_lantern"), AMBER, 32)
     CollectionService:AddTag(lanternCore, self._runtimeIds.AmbientLightTag)
     self._lantern = lanternCore
     table.insert(self._meshPlacements, {
@@ -6110,8 +6139,8 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         lanternBase,
         self._runtimeIds.InteractionIds.Lantern,
         self._runtimeIds.Actions.Prepare,
-        "LIGHT",
-        "First Lantern",
+        Strings.get("world.light"),
+        Strings.get("world.first_lantern"),
         nil,
         nil,
         Vector3.new(12, 16, 12)
@@ -6324,7 +6353,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         beacon,
         self._runtimeIds.InteractionIds.Beacon,
         self._runtimeIds.Actions.Reveal,
-        "REMEMBER",
+        Strings.get("world.remember"),
         "Bramblewake",
         nil,
         nil,
@@ -6450,8 +6479,8 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             title
         )
     end
-    workshopBay(-42, "ROOTWORKS", Color3.fromRGB(133, 176, 108))
-    workshopBay(42, "OUTFITTER", AMBER)
+    workshopBay(-42, Strings.get("world.rootworks"), Color3.fromRGB(133, 176, 108))
+    workshopBay(42, Strings.get("world.outfitter"), AMBER)
     for index, centerX in { -42, 42 } do
         table.insert(self._meshPlacements, {
             assetId = "mesh_creator_market_stall_a",
@@ -6473,35 +6502,35 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             id = self._runtimeIds.InteractionIds.CraftMeadowSatchel,
             recipeId = "recipe_meadow_satchel",
-            label = "MEADOW SATCHEL",
+            label = Strings.get("world.meadow_satchel"),
             x = -48,
             color = Color3.fromRGB(133, 176, 108),
         },
         {
             id = self._runtimeIds.InteractionIds.CraftAmberCharm,
             recipeId = "recipe_amber_charm",
-            label = "AMBER CHARM",
+            label = Strings.get("world.amber_charm"),
             x = 36,
             color = AMBER,
         },
         {
             id = self._runtimeIds.InteractionIds.CraftIronrootHood,
             recipeId = "recipe_ironroot_hood",
-            label = "IRONROOT HOOD",
+            label = Strings.get("world.ironroot_hood"),
             x = -36,
             color = Color3.fromRGB(122, 148, 132),
         },
         {
             id = self._runtimeIds.InteractionIds.CraftBrambleBoots,
             recipeId = "recipe_bramble_boots",
-            label = "BRAMBLE BOOTS",
+            label = Strings.get("world.bramble_boots"),
             x = 48,
             color = Color3.fromRGB(142, 112, 84),
         },
         {
             id = self._runtimeIds.InteractionIds.CraftThornwoodBow,
             recipeId = "recipe_thornwood_bow",
-            label = "THORNWOOD BOW",
+            label = Strings.get("world.thornwood_bow"),
             x = -60,
             color = Color3.fromRGB(164, 132, 78),
         },
@@ -6512,35 +6541,35 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             id = self._runtimeIds.InteractionIds.CraftHeartwoodMaul,
             recipeId = "recipe_heartwood_maul",
-            label = "HEARTWOOD MAUL",
+            label = Strings.get("world.heartwood_maul"),
             x = -72,
             color = Color3.fromRGB(139, 98, 54),
         },
         {
             id = self._runtimeIds.InteractionIds.CraftBriarLance,
             recipeId = "recipe_briar_lance",
-            label = "BRIAR LANCE",
+            label = Strings.get("world.briar_lance"),
             x = -24,
             color = Color3.fromRGB(104, 128, 68),
         },
         {
             id = self._runtimeIds.InteractionIds.CraftFoxfireSling,
             recipeId = "recipe_foxfire_sling",
-            label = "FOXFIRE SLING",
+            label = Strings.get("world.foxfire_sling"),
             x = 24,
             color = Color3.fromRGB(94, 206, 176),
         },
         {
             id = self._runtimeIds.InteractionIds.CraftAmberEdge,
             recipeId = "recipe_amber_edge",
-            label = "AMBER EDGE",
+            label = Strings.get("world.amber_edge"),
             x = 60,
             color = Color3.fromRGB(255, 181, 76),
         },
         {
             id = self._runtimeIds.InteractionIds.CraftWardenCudgel,
             recipeId = "recipe_warden_cudgel",
-            label = "WARDEN CUDGEL",
+            label = Strings.get("world.warden_cudgel"),
             x = 72,
             color = Color3.fromRGB(112, 151, 119),
         },
@@ -6853,7 +6882,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             bench,
             definition.id,
             self._runtimeIds.Actions.CraftItem,
-            "CRAFT",
+            Strings.get("world.craft"),
             definition.label,
             definition.recipeId
         )
@@ -6916,10 +6945,10 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         Enum.Material.Slate,
         false
     )
-    -- "FIELD BOOK" and nothing more: it is the name every prompt and HUD
+    -- Strings.get("hud.field_book") and nothing more: it is the name every prompt and HUD
     -- button already uses, and the previous five-word title shrank to
     -- unreadable wrapped mush on the header plank.
-    WorldSignBuilder.dressNoticeBoard(archive, "FIELD BOOK", CREAM, {
+    WorldSignBuilder.dressNoticeBoard(archive, Strings.get("hud.field_book"), CREAM, {
         "field_botany",
         "evacuation_route",
         "bramble_hazard",
@@ -6941,7 +6970,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         archive,
         self._runtimeIds.InteractionIds.QuestBoard,
         self._runtimeIds.Actions.OpenFieldBook,
-        "OPEN",
+        Strings.get("world.open"),
         "Field Book",
         nil
     )
@@ -7009,7 +7038,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         Color3.fromRGB(91, 65, 44),
         Enum.Material.WoodPlanks
     )
-    WorldSignBuilder.dressBoard(gateBoard, "TOWN GATE", CREAM)
+    WorldSignBuilder.dressBoard(gateBoard, Strings.get("world.town_gate"), CREAM)
     self:_registerInteraction(
         gateBoard,
         self._runtimeIds.InteractionIds.TownGate,
@@ -7072,7 +7101,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         Color3.fromRGB(91, 65, 44),
         Enum.Material.WoodPlanks
     )
-    WorldSignBuilder.dressBoard(railHead, "PRIVATE SERVER CONTROLS", CREAM)
+    WorldSignBuilder.dressBoard(railHead, Strings.get("world.private_server_controls"), CREAM)
     for index, control in controls do
         --[[
             Boards face the square, because a board's Front face is its -Z and
@@ -7094,7 +7123,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             board,
             self._runtimeIds.PrivateControlInteractionIds[control.id],
             self._runtimeIds.Actions.PrivateControl,
-            "WORK",
+            Strings.get("world.work"),
             control.label,
             -- Which board this is, written onto the prompt rather than sent by
             -- the client. The payload the client sends names nothing, so a
@@ -7110,41 +7139,50 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             center = Vector3.new(-78, 0, -76),
             color = FOXFIRE,
-            name = "SCOUT",
+            name = Strings.get("world.scout"),
             paths = {
-                { id = "specialization_pathfinder", name = "PATHFINDER" },
-                { id = "specialization_foxfire_trapper", name = "FOXFIRE TRAPPER" },
-                { id = "specialization_trailseer", name = "TRAILSEER" },
+                { id = "specialization_pathfinder", name = Strings.get("world.pathfinder") },
+                {
+                    id = "specialization_foxfire_trapper",
+                    name = Strings.get("world.foxfire_trapper"),
+                },
+                { id = "specialization_trailseer", name = Strings.get("world.trailseer") },
             },
         },
         {
             center = Vector3.new(78, 0, -76),
             color = Color3.fromRGB(112, 151, 119),
-            name = "WARDEN",
+            name = Strings.get("world.warden"),
             paths = {
-                { id = "specialization_bulwark", name = "BULWARK" },
-                { id = "specialization_greenkeeper", name = "GREENKEEPER" },
-                { id = "specialization_oathbound", name = "OATHBOUND" },
+                { id = "specialization_bulwark", name = Strings.get("world.bulwark") },
+                { id = "specialization_greenkeeper", name = Strings.get("world.greenkeeper") },
+                { id = "specialization_oathbound", name = Strings.get("world.oathbound") },
             },
         },
         {
             center = Vector3.new(-78, 0, -168),
             color = Color3.fromRGB(191, 137, 73),
-            name = "ENGINEER",
+            name = Strings.get("world.engineer"),
             paths = {
-                { id = "specialization_lamplighter", name = "LAMPLIGHTER" },
-                { id = "specialization_rootwright", name = "ROOTWRIGHT" },
-                { id = "specialization_salvager", name = "SALVAGER" },
+                { id = "specialization_lamplighter", name = Strings.get("world.lamplighter") },
+                { id = "specialization_rootwright", name = Strings.get("world.rootwright") },
+                { id = "specialization_salvager", name = Strings.get("world.salvager") },
             },
         },
         {
             center = Vector3.new(78, 0, -168),
             color = Color3.fromRGB(176, 108, 112),
-            name = "MEDIC",
+            name = Strings.get("world.medic"),
             paths = {
-                { id = "specialization_dawnmender", name = "DAWNMENDER" },
-                { id = "specialization_wayhome_tender", name = "WAYHOME TENDER" },
-                { id = "specialization_brightcap_herbalist", name = "BRIGHTCAP HERBALIST" },
+                { id = "specialization_dawnmender", name = Strings.get("world.dawnmender") },
+                {
+                    id = "specialization_wayhome_tender",
+                    name = Strings.get("world.wayhome_tender"),
+                },
+                {
+                    id = "specialization_brightcap_herbalist",
+                    name = Strings.get("world.brightcap_herbalist"),
+                },
             },
         },
         --[[
@@ -7160,31 +7198,31 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             center = Vector3.new(-78, 0, -122),
             color = Color3.fromRGB(154, 187, 92),
-            name = "ALCHEMIST",
+            name = Strings.get("world.alchemist"),
             paths = {
-                { id = "specialization_brewer", name = "BREWER" },
-                { id = "specialization_catalyst", name = "CATALYST" },
-                { id = "specialization_forager", name = "FORAGER" },
+                { id = "specialization_brewer", name = Strings.get("world.brewer") },
+                { id = "specialization_catalyst", name = Strings.get("world.catalyst") },
+                { id = "specialization_forager", name = Strings.get("world.forager") },
             },
         },
         {
             center = Vector3.new(78, 0, -214),
             color = Color3.fromRGB(196, 120, 60),
-            name = "BEASTKEEPER",
+            name = Strings.get("world.beastkeeper"),
             paths = {
-                { id = "specialization_handler", name = "HANDLER" },
-                { id = "specialization_bondkeeper", name = "BONDKEEPER" },
-                { id = "specialization_wildspeaker", name = "WILDSPEAKER" },
+                { id = "specialization_handler", name = Strings.get("world.handler") },
+                { id = "specialization_bondkeeper", name = Strings.get("world.bondkeeper") },
+                { id = "specialization_wildspeaker", name = Strings.get("world.wildspeaker") },
             },
         },
         {
             center = Vector3.new(-78, 0, -214),
             color = Color3.fromRGB(132, 150, 224),
-            name = "RUNEBINDER",
+            name = Strings.get("world.runebinder"),
             paths = {
-                { id = "specialization_scribe", name = "SCRIBE" },
-                { id = "specialization_channeler", name = "CHANNELER" },
-                { id = "specialization_veilwalker", name = "VEILWALKER" },
+                { id = "specialization_scribe", name = Strings.get("world.scribe") },
+                { id = "specialization_channeler", name = Strings.get("world.channeler") },
+                { id = "specialization_veilwalker", name = Strings.get("world.veilwalker") },
             },
         },
     }
@@ -7453,7 +7491,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 stone,
                 interactionId,
                 self._runtimeIds.Actions.SelectProfessionSpecialization,
-                "CHOOSE PATH",
+                Strings.get("world.choose_path"),
                 path.name,
                 path.id,
                 1.1
@@ -7461,20 +7499,23 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         end
         dais:SetAttribute("ProfessionId", "profession_" .. string.lower(altar.name))
         table.insert(self._meshPlacements, {
-            assetId = if altar.name == "ENGINEER"
+            assetId = if altar.name == Strings.get("world.engineer")
                 then "mesh_creator_workbench_a"
                 else "mesh_creator_stump_a",
             fallbackKind = "asset_dressing",
             position = altar.center + Vector3.new(0, 0.85, 2.1),
-            scale = if altar.name == "ENGINEER" then 0.58 else 0.44,
+            scale = if altar.name == Strings.get("world.engineer") then 0.58 else 0.44,
             yaw = math.rad(
-                if altar.name == "SCOUT" then -11 elseif altar.name == "MEDIC" then 14 else 4
+                if altar.name == Strings.get("world.scout")
+                    then -11
+                    elseif altar.name == Strings.get("world.medic") then 14
+                    else 4
             ),
             seed = 9970 + #altar.name,
             swayTag = nil,
             parent = masteryGrove,
             fallbackInstance = nil,
-            profileScale = if altar.name == "WARDEN"
+            profileScale = if altar.name == Strings.get("world.warden")
                 then Vector3.new(1.12, 0.92, 0.88)
                 else Vector3.one,
         })
@@ -8057,7 +8098,7 @@ function WorldService.setTownDecorations(self: WorldService, snapshot: any)
                 marker,
                 "decor_place_" .. slot.id,
                 self._runtimeIds.Actions.PlaceDecoration,
-                "PLACE",
+                Strings.get("world.place"),
                 slot.displayName .. " · " .. table.concat(costText, " + "),
                 slot.id
             )
@@ -9728,14 +9769,18 @@ local function buildTownProgressionBuildings(
     local archiveStage = stageFor("building_archive")
     local archive = buildingShell(
         "building_archive",
-        "MEMORY ARCHIVE",
+        Strings.get("world.memory_archive"),
         Vector3.new(-92, 0, -144),
         Vector3.new(17, 0, 14),
         archiveStage,
         FOXFIRE,
         yawToward(Vector3.new(-92, 0, -144), Vector3.new(0, 0, -144))
     )
-    noteConstructionTarget("building_archive", "MEMORY ARCHIVE", signAnchor(archive))
+    noteConstructionTarget(
+        "building_archive",
+        Strings.get("world.memory_archive"),
+        signAnchor(archive)
+    )
     if archiveStage > 0 then
         local archivePropsFallback = Instance.new("Model")
         archivePropsFallback.Name = "ArchivePropsFallback"
@@ -9788,14 +9833,18 @@ local function buildTownProgressionBuildings(
     local workbenchStage = stageFor("building_workbench")
     local workshop = buildingShell(
         "building_workbench",
-        "LANTERN WORKBENCH",
+        Strings.get("world.lantern_workbench"),
         Vector3.new(92, 0, -126),
         Vector3.new(18, 0, 14),
         workbenchStage,
         AMBER,
         yawToward(Vector3.new(92, 0, -126), Vector3.new(0, 0, -126))
     )
-    noteConstructionTarget("building_workbench", "LANTERN WORKBENCH", signAnchor(workshop))
+    noteConstructionTarget(
+        "building_workbench",
+        Strings.get("world.lantern_workbench"),
+        signAnchor(workshop)
+    )
     if workbenchStage > 0 then
         local workbenchFallback = Instance.new("Model")
         workbenchFallback.Name = "TownWorkbenchFallback"
@@ -9883,11 +9932,11 @@ local function buildTownProgressionBuildings(
     )
     WorldSignBuilder.dressNoticeBoard(
         board,
-        string.format("EMBERHOLLOW · TIER %d", consequence.tier or 0),
+        string.format(Strings.get("world.emberhollow_tier_n"), consequence.tier or 0),
         CREAM,
         { "community_watch", "lantern_maintenance", "supply_inventory" }
     )
-    noteConstructionTarget("building_town_board", "TOWN BOARD", board)
+    noteConstructionTarget("building_town_board", Strings.get("world.town_board"), board)
     table.insert(meshPlacements, {
         assetId = "mesh_creator_notice_board_a",
         fallbackKind = "asset_replacement",
@@ -9903,14 +9952,14 @@ local function buildTownProgressionBuildings(
     local innStage = stageFor("building_inn")
     local inn = buildingShell(
         "building_inn",
-        "WAYFARER INN",
+        Strings.get("world.wayfarer_inn"),
         Vector3.new(-92, 0, -184),
         Vector3.new(18, 0, 14),
         innStage,
         Color3.fromRGB(219, 151, 77),
         yawToward(Vector3.new(-92, 0, -184), Vector3.new(0, 0, -184))
     )
-    noteConstructionTarget("building_inn", "WAYFARER INN", signAnchor(inn))
+    noteConstructionTarget("building_inn", Strings.get("world.wayfarer_inn"), signAnchor(inn))
     if innStage > 0 then
         local innFurnitureFallback = Instance.new("Model")
         innFurnitureFallback.Name = "InnFurnitureFallback"
@@ -10006,7 +10055,7 @@ local function buildTownProgressionBuildings(
 
     local celebrationStage = authoredBuilding(
         "building_celebration_stage",
-        "CELEBRATION STAGE",
+        Strings.get("world.celebration_stage"),
         "mesh_celebration_stage_a",
         Vector3.new(0, 0, -226),
         Vector3.new(22, 0, 17),
@@ -10016,7 +10065,7 @@ local function buildTownProgressionBuildings(
     )
     noteConstructionTarget(
         "building_celebration_stage",
-        "CELEBRATION STAGE",
+        Strings.get("world.celebration_stage"),
         signAnchor(celebrationStage)
     )
 
@@ -10024,7 +10073,7 @@ local function buildTownProgressionBuildings(
     -- the existing workbench.
     local sawmill = authoredBuilding(
         "building_sawmill",
-        "SAWMILL",
+        Strings.get("world.sawmill"),
         "mesh_sawmill_a",
         Vector3.new(150, 0, -100),
         Vector3.new(24, 0, 22),
@@ -10032,10 +10081,10 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(150, 0, -100), PLAZA),
         10201
     )
-    noteConstructionTarget("building_sawmill", "SAWMILL", signAnchor(sawmill))
+    noteConstructionTarget("building_sawmill", Strings.get("world.sawmill"), signAnchor(sawmill))
     local forge = authoredBuilding(
         "building_forge",
-        "UNION FORGE",
+        Strings.get("world.union_forge"),
         "mesh_union_forge_a",
         Vector3.new(150, 0, -140),
         Vector3.new(20, 0, 13),
@@ -10043,10 +10092,10 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(150, 0, -140), PLAZA),
         10202
     )
-    noteConstructionTarget("building_forge", "UNION FORGE", signAnchor(forge))
+    noteConstructionTarget("building_forge", Strings.get("world.union_forge"), signAnchor(forge))
     local engineerYard = authoredBuilding(
         "building_engineer_yard",
-        "ENGINEER YARD",
+        Strings.get("world.engineer_yard"),
         "mesh_engineer_yard_a",
         Vector3.new(150, 0, -180),
         Vector3.new(17, 0, 20),
@@ -10054,12 +10103,16 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(150, 0, -180), PLAZA),
         10203
     )
-    noteConstructionTarget("building_engineer_yard", "ENGINEER YARD", signAnchor(engineerYard))
+    noteConstructionTarget(
+        "building_engineer_yard",
+        Strings.get("world.engineer_yard"),
+        signAnchor(engineerYard)
+    )
 
     -- Hearthmarket: the mirrored line on the western edge, past the inn.
     local kitchen = authoredBuilding(
         "building_kitchen",
-        "COMMON KITCHEN",
+        Strings.get("world.common_kitchen"),
         "mesh_common_kitchen_a",
         Vector3.new(-150, 0, -158),
         Vector3.new(20, 0, 20),
@@ -10067,10 +10120,14 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(-150, 0, -158), PLAZA),
         10204
     )
-    noteConstructionTarget("building_kitchen", "COMMON KITCHEN", signAnchor(kitchen))
+    noteConstructionTarget(
+        "building_kitchen",
+        Strings.get("world.common_kitchen"),
+        signAnchor(kitchen)
+    )
     local market = authoredBuilding(
         "building_market",
-        "HEARTHMARKET STALLS",
+        Strings.get("world.hearthmarket_stalls"),
         "mesh_hearthmarket_stalls_a",
         Vector3.new(-150, 0, -196),
         Vector3.new(24, 0, 12),
@@ -10078,10 +10135,14 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(-150, 0, -196), PLAZA),
         10205
     )
-    noteConstructionTarget("building_market", "HEARTHMARKET STALLS", signAnchor(market))
+    noteConstructionTarget(
+        "building_market",
+        Strings.get("world.hearthmarket_stalls"),
+        signAnchor(market)
+    )
     local tradePost = authoredBuilding(
         "building_trade_post",
-        "TRADE POST",
+        Strings.get("world.trade_post"),
         "mesh_trade_post_a",
         Vector3.new(-150, 0, -232),
         Vector3.new(16, 0, 10),
@@ -10089,12 +10150,16 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(-150, 0, -232), PLAZA),
         10206
     )
-    noteConstructionTarget("building_trade_post", "TRADE POST", signAnchor(tradePost))
+    noteConstructionTarget(
+        "building_trade_post",
+        Strings.get("world.trade_post"),
+        signAnchor(tradePost)
+    )
 
     -- Waterworks, tucked south of the existing Greenward garden.
     local waterworks = authoredBuilding(
         "building_waterworks",
-        "WATERWORKS",
+        Strings.get("world.waterworks"),
         "mesh_waterworks_a",
         Vector3.new(110, 0, -212),
         Vector3.new(18, 0, 15),
@@ -10102,12 +10167,16 @@ local function buildTownProgressionBuildings(
         yawToward(Vector3.new(110, 0, -212), PLAZA),
         10207
     )
-    noteConstructionTarget("building_waterworks", "WATERWORKS", signAnchor(waterworks))
+    noteConstructionTarget(
+        "building_waterworks",
+        Strings.get("world.waterworks"),
+        signAnchor(waterworks)
+    )
 
     -- The Watch Ring: the town's southern perimeter, facing outward.
     local guardhouse = authoredBuilding(
         "building_guardhouse",
-        "GUARDHOUSE",
+        Strings.get("world.guardhouse"),
         "mesh_guardhouse_a",
         Vector3.new(-70, 0, -262),
         Vector3.new(16, 0, 14),
@@ -10115,10 +10184,14 @@ local function buildTownProgressionBuildings(
         facingAwayFromTown(Vector3.new(-70, 0, -262)),
         10208
     )
-    noteConstructionTarget("building_guardhouse", "GUARDHOUSE", signAnchor(guardhouse))
+    noteConstructionTarget(
+        "building_guardhouse",
+        Strings.get("world.guardhouse"),
+        signAnchor(guardhouse)
+    )
     local watchtower = authoredBuilding(
         "building_watchtower",
-        "WATCHTOWER",
+        Strings.get("world.watchtower"),
         "mesh_watchtower_a",
         Vector3.new(70, 0, -262),
         Vector3.new(7, 0, 7),
@@ -10126,10 +10199,14 @@ local function buildTownProgressionBuildings(
         facingAwayFromTown(Vector3.new(70, 0, -262)),
         10209
     )
-    noteConstructionTarget("building_watchtower", "WATCHTOWER", signAnchor(watchtower))
+    noteConstructionTarget(
+        "building_watchtower",
+        Strings.get("world.watchtower"),
+        signAnchor(watchtower)
+    )
     local trapworks = authoredBuilding(
         "building_trapworks",
-        "TRAPWORKS",
+        Strings.get("world.trapworks"),
         "mesh_trapworks_a",
         Vector3.new(0, 0, -270),
         Vector3.new(16, 0, 14),
@@ -10137,7 +10214,11 @@ local function buildTownProgressionBuildings(
         facingAwayFromTown(Vector3.new(0, 0, -270)),
         10210
     )
-    noteConstructionTarget("building_trapworks", "TRAPWORKS", signAnchor(trapworks))
+    noteConstructionTarget(
+        "building_trapworks",
+        Strings.get("world.trapworks"),
+        signAnchor(trapworks)
+    )
 
     --[[
         Tiers four and five: the six buildings a town only reaches once its
@@ -10159,64 +10240,84 @@ local function buildTownProgressionBuildings(
     ]]
     local signalHouse = buildingShell(
         "building_signal_house",
-        "SIGNAL HOUSE",
+        Strings.get("world.signal_house"),
         Vector3.new(150, 0, -220),
         Vector3.new(18, 0, 14),
         stageFor("building_signal_house"),
         Color3.fromRGB(212, 176, 108),
         yawToward(Vector3.new(150, 0, -220), PLAZA)
     )
-    noteConstructionTarget("building_signal_house", "SIGNAL HOUSE", signAnchor(signalHouse))
+    noteConstructionTarget(
+        "building_signal_house",
+        Strings.get("world.signal_house"),
+        signAnchor(signalHouse)
+    )
     local coldStore = buildingShell(
         "building_cold_store",
-        "COLD STORE",
+        Strings.get("world.cold_store"),
         Vector3.new(-110, 0, -212),
         Vector3.new(16, 0, 12),
         stageFor("building_cold_store"),
         Color3.fromRGB(148, 178, 190),
         yawToward(Vector3.new(-110, 0, -212), PLAZA)
     )
-    noteConstructionTarget("building_cold_store", "COLD STORE", signAnchor(coldStore))
+    noteConstructionTarget(
+        "building_cold_store",
+        Strings.get("world.cold_store"),
+        signAnchor(coldStore)
+    )
     local almshouse = buildingShell(
         "building_almshouse",
-        "ALMSHOUSE",
+        Strings.get("world.almshouse"),
         Vector3.new(-40, 0, -226),
         Vector3.new(14, 0, 12),
         stageFor("building_almshouse"),
         Color3.fromRGB(198, 146, 96),
         yawToward(Vector3.new(-40, 0, -226), PLAZA)
     )
-    noteConstructionTarget("building_almshouse", "ALMSHOUSE", signAnchor(almshouse))
+    noteConstructionTarget(
+        "building_almshouse",
+        Strings.get("world.almshouse"),
+        signAnchor(almshouse)
+    )
     local ropewalk = buildingShell(
         "building_ropewalk",
-        "ROPEWALK",
+        Strings.get("world.ropewalk"),
         Vector3.new(150, 0, -258),
         Vector3.new(16, 0, 12),
         stageFor("building_ropewalk"),
         Color3.fromRGB(158, 142, 106),
         yawToward(Vector3.new(150, 0, -258), PLAZA)
     )
-    noteConstructionTarget("building_ropewalk", "ROPEWALK", signAnchor(ropewalk))
+    noteConstructionTarget("building_ropewalk", Strings.get("world.ropewalk"), signAnchor(ropewalk))
     local bellTower = buildingShell(
         "building_bell_tower",
-        "BELL TOWER",
+        Strings.get("world.bell_tower"),
         Vector3.new(40, 0, -226),
         Vector3.new(12, 0, 12),
         stageFor("building_bell_tower"),
         Color3.fromRGB(148, 124, 78),
         yawToward(Vector3.new(40, 0, -226), PLAZA)
     )
-    noteConstructionTarget("building_bell_tower", "BELL TOWER", signAnchor(bellTower))
+    noteConstructionTarget(
+        "building_bell_tower",
+        Strings.get("world.bell_tower"),
+        signAnchor(bellTower)
+    )
     local infirmary = buildingShell(
         "building_infirmary",
-        "INFIRMARY",
+        Strings.get("world.infirmary"),
         Vector3.new(-150, 0, -268),
         Vector3.new(18, 0, 14),
         stageFor("building_infirmary"),
         Color3.fromRGB(206, 206, 198),
         yawToward(Vector3.new(-150, 0, -268), PLAZA)
     )
-    noteConstructionTarget("building_infirmary", "INFIRMARY", signAnchor(infirmary))
+    noteConstructionTarget(
+        "building_infirmary",
+        Strings.get("world.infirmary"),
+        signAnchor(infirmary)
+    )
 
     --[[
         Tiers six and seven: the last six, and the only ones a town builds
@@ -10227,64 +10328,88 @@ local function buildTownProgressionBuildings(
     ]]
     local glassworks = buildingShell(
         "building_glassworks",
-        "GLASSWORKS",
+        Strings.get("world.glassworks"),
         Vector3.new(150, 0, -60),
         Vector3.new(18, 0, 14),
         stageFor("building_glassworks"),
         Color3.fromRGB(180, 196, 206),
         yawToward(Vector3.new(150, 0, -60), PLAZA)
     )
-    noteConstructionTarget("building_glassworks", "GLASSWORKS", signAnchor(glassworks))
+    noteConstructionTarget(
+        "building_glassworks",
+        Strings.get("world.glassworks"),
+        signAnchor(glassworks)
+    )
     local memorialHall = buildingShell(
         "building_memorial_hall",
-        "MEMORIAL HALL",
+        Strings.get("world.memorial_hall"),
         Vector3.new(-150, 0, -120),
         Vector3.new(18, 0, 14),
         stageFor("building_memorial_hall"),
         Color3.fromRGB(148, 142, 134),
         yawToward(Vector3.new(-150, 0, -120), PLAZA)
     )
-    noteConstructionTarget("building_memorial_hall", "MEMORIAL HALL", signAnchor(memorialHall))
+    noteConstructionTarget(
+        "building_memorial_hall",
+        Strings.get("world.memorial_hall"),
+        signAnchor(memorialHall)
+    )
     local recordsOffice = buildingShell(
         "building_records_office",
-        "RECORDS OFFICE",
+        Strings.get("world.records_office"),
         Vector3.new(92, 0, -166),
         Vector3.new(16, 0, 12),
         stageFor("building_records_office"),
         Color3.fromRGB(160, 138, 100),
         yawToward(Vector3.new(92, 0, -166), PLAZA)
     )
-    noteConstructionTarget("building_records_office", "RECORDS OFFICE", signAnchor(recordsOffice))
+    noteConstructionTarget(
+        "building_records_office",
+        Strings.get("world.records_office"),
+        signAnchor(recordsOffice)
+    )
     local lampHouse = buildingShell(
         "building_lamp_house",
-        "LAMP HOUSE",
+        Strings.get("world.lamp_house"),
         Vector3.new(-70, 0, -226),
         Vector3.new(16, 0, 12),
         stageFor("building_lamp_house"),
         Color3.fromRGB(255, 216, 150),
         yawToward(Vector3.new(-70, 0, -226), PLAZA)
     )
-    noteConstructionTarget("building_lamp_house", "LAMP HOUSE", signAnchor(lampHouse))
+    noteConstructionTarget(
+        "building_lamp_house",
+        Strings.get("world.lamp_house"),
+        signAnchor(lampHouse)
+    )
     local deepWell = buildingShell(
         "building_deep_well",
-        "DEEP WELL",
+        Strings.get("world.deep_well"),
         Vector3.new(-30, 0, -190),
         Vector3.new(12, 0, 12),
         stageFor("building_deep_well"),
         Color3.fromRGB(96, 118, 128),
         yawToward(Vector3.new(-30, 0, -190), PLAZA)
     )
-    noteConstructionTarget("building_deep_well", "DEEP WELL", signAnchor(deepWell))
+    noteConstructionTarget(
+        "building_deep_well",
+        Strings.get("world.deep_well"),
+        signAnchor(deepWell)
+    )
     local meetingHall = buildingShell(
         "building_meeting_hall",
-        "MEETING HALL",
+        Strings.get("world.meeting_hall"),
         Vector3.new(110, 0, -258),
         Vector3.new(18, 0, 14),
         stageFor("building_meeting_hall"),
         Color3.fromRGB(196, 140, 79),
         yawToward(Vector3.new(110, 0, -258), PLAZA)
     )
-    noteConstructionTarget("building_meeting_hall", "MEETING HALL", signAnchor(meetingHall))
+    noteConstructionTarget(
+        "building_meeting_hall",
+        Strings.get("world.meeting_hall"),
+        signAnchor(meetingHall)
+    )
 
     --[[
         A palette per region, for residents whose bodies are derived. Each
@@ -12174,8 +12299,8 @@ local function buildTownProgressionBuildings(
 
     local residentDefinitions = {
         npc_tomas_reed = {
-            displayName = "TOMAS REED",
-            role = "QUARTERMASTER",
+            displayName = Strings.get("world.tomas_reed"),
+            role = Strings.get("world.quartermaster"),
             coat = Color3.fromRGB(116, 72, 49),
             accent = Color3.fromRGB(221, 154, 78),
             skin = Color3.fromRGB(177, 124, 87),
@@ -12184,11 +12309,11 @@ local function buildTownProgressionBuildings(
             day = CFrame.new(-92, 3, -178) * CFrame.Angles(0, math.rad(180), 0),
             dusk = CFrame.new(-10, 3, -128) * CFrame.Angles(0, math.rad(-10), 0),
             night = CFrame.new(-9, 3, -138) * CFrame.Angles(0, math.rad(-15), 0),
-            dayDuty = "PREPARING SUPPLIES",
+            dayDuty = Strings.get("world.preparing_supplies"),
         },
         npc_pip_wren = {
-            displayName = "PIP WREN",
-            role = "COURIER",
+            displayName = Strings.get("world.pip_wren"),
+            role = Strings.get("world.courier"),
             coat = Color3.fromRGB(61, 88, 92),
             accent = Color3.fromRGB(112, 192, 176),
             skin = Color3.fromRGB(210, 157, 112),
@@ -12197,11 +12322,11 @@ local function buildTownProgressionBuildings(
             day = CFrame.new(0, 3, -151) * CFrame.Angles(0, math.rad(180), 0),
             dusk = CFrame.new(0, 3, -128),
             night = CFrame.new(0, 3, -139),
-            dayDuty = "MAPPING SAFE ROUTES",
+            dayDuty = Strings.get("world.mapping_safe_routes"),
         },
         npc_ena_moss = {
-            displayName = "ENA MOSS",
-            role = "SEEDKEEPER",
+            displayName = Strings.get("world.ena_moss"),
+            role = Strings.get("world.seedkeeper"),
             coat = Color3.fromRGB(72, 103, 62),
             accent = Color3.fromRGB(191, 178, 82),
             skin = Color3.fromRGB(126, 87, 65),
@@ -12210,7 +12335,7 @@ local function buildTownProgressionBuildings(
             day = CFrame.new(96, 3, -146) * CFrame.Angles(0, math.rad(180), 0),
             dusk = CFrame.new(10, 3, -128) * CFrame.Angles(0, math.rad(10), 0),
             night = CFrame.new(9, 3, -138) * CFrame.Angles(0, math.rad(15), 0),
-            dayDuty = "TENDING THE GREENWARD",
+            dayDuty = Strings.get("world.tending_the_greenward"),
         },
 
         --[[
@@ -12244,8 +12369,8 @@ local function buildTownProgressionBuildings(
             watch.
         ]]
         npc_hesper_vane = {
-            displayName = "HESPER VANE",
-            role = "SHIFT SMITH",
+            displayName = Strings.get("world.hesper_vane"),
+            role = Strings.get("world.shift_smith"),
             coat = Color3.fromRGB(92, 60, 44),
             accent = Color3.fromRGB(236, 132, 58),
             skin = Color3.fromRGB(166, 118, 84),
@@ -12254,11 +12379,11 @@ local function buildTownProgressionBuildings(
             day = CFrame.new(134, 3, -132) * CFrame.Angles(0, math.rad(-63), 0),
             dusk = CFrame.new(128, 3, -126) * CFrame.Angles(0, math.rad(110), 0),
             night = CFrame.new(11, 3, -122) * CFrame.Angles(0, math.rad(-90), 0),
-            dayDuty = "KEEPING THE FORGE IN",
+            dayDuty = Strings.get("world.keeping_the_forge_in"),
         },
         npc_odell_crane = {
-            displayName = "ODELL CRANE",
-            role = "RAIL KEEPER",
+            displayName = Strings.get("world.odell_crane"),
+            role = Strings.get("world.rail_keeper"),
             coat = Color3.fromRGB(86, 92, 98),
             accent = Color3.fromRGB(208, 166, 84),
             skin = Color3.fromRGB(188, 140, 102),
@@ -12267,11 +12392,11 @@ local function buildTownProgressionBuildings(
             day = CFrame.new(-134, 3, -190) * CFrame.Angles(0, math.rad(69), 0),
             dusk = CFrame.new(-70, 3, -184) * CFrame.Angles(0, math.rad(-90), 0),
             night = CFrame.new(-11, 3, -180) * CFrame.Angles(0, math.rad(90), 0),
-            dayDuty = "WORKING THE HAULAGE LINES",
+            dayDuty = Strings.get("world.working_the_haulage_lines"),
         },
         npc_junie_falk = {
-            displayName = "JUNIE FALK",
-            role = "LAMP TRIMMER",
+            displayName = Strings.get("world.junie_falk"),
+            role = Strings.get("world.lamp_trimmer"),
             coat = Color3.fromRGB(68, 74, 66),
             accent = Color3.fromRGB(255, 186, 92),
             skin = Color3.fromRGB(150, 106, 78),
@@ -12286,11 +12411,11 @@ local function buildTownProgressionBuildings(
                 she will not sit with her back to a dark doorway.
             ]]
             night = CFrame.new(0, 3, -92),
-            dayDuty = "TRIMMING THE FIRST LANTERN",
+            dayDuty = Strings.get("world.trimming_the_first_lantern"),
         },
         npc_bartram_hoke = {
-            displayName = "BARTRAM HOKE",
-            role = "PIT COOK",
+            displayName = Strings.get("world.bartram_hoke"),
+            role = Strings.get("world.pit_cook"),
             coat = Color3.fromRGB(118, 92, 62),
             accent = Color3.fromRGB(226, 206, 166),
             skin = Color3.fromRGB(176, 126, 92),
@@ -12299,11 +12424,11 @@ local function buildTownProgressionBuildings(
             day = CFrame.new(-136, 3, -152) * CFrame.Angles(0, math.rad(67), 0),
             dusk = CFrame.new(-60, 3, -144) * CFrame.Angles(0, math.rad(-90), 0),
             night = CFrame.new(-12, 3, -128) * CFrame.Angles(0, math.rad(90), 0),
-            dayDuty = "COOKING FOR A LONGER SHIFT THAN THIS ONE",
+            dayDuty = Strings.get("world.cooking_for_a_longer_shift_than"),
         },
         npc_saoirse_quill = {
-            displayName = "SAOIRSE QUILL",
-            role = "LEDGER KEEPER",
+            displayName = Strings.get("world.saoirse_quill"),
+            role = Strings.get("world.ledger_keeper"),
             coat = Color3.fromRGB(58, 74, 78),
             accent = Color3.fromRGB(214, 198, 158),
             skin = Color3.fromRGB(178, 132, 96),
@@ -12314,11 +12439,11 @@ local function buildTownProgressionBuildings(
             -- Facing back up the road, which is the direction the people
             -- she is counting come from.
             night = CFrame.new(12, 3, -160) * CFrame.Angles(0, math.rad(180), 0),
-            dayDuty = "KEEPING THE STORES LEDGER",
+            dayDuty = Strings.get("world.keeping_the_stores_ledger"),
         },
         npc_wren_dabbler = {
-            displayName = "WREN DABBLER",
-            role = "REED WEAVER",
+            displayName = Strings.get("world.wren_dabbler"),
+            role = Strings.get("world.reed_weaver"),
             coat = Color3.fromRGB(84, 102, 72),
             accent = Color3.fromRGB(198, 176, 110),
             skin = Color3.fromRGB(196, 148, 108),
@@ -12329,11 +12454,11 @@ local function buildTownProgressionBuildings(
             -- leaves for a house ends up.
             dusk = CFrame.new(-82, 3, -174) * CFrame.Angles(0, math.rad(45), 0),
             night = CFrame.new(12, 3, -192) * CFrame.Angles(0, math.rad(-90), 0),
-            dayDuty = "WEAVING FOR THE STAGE",
+            dayDuty = Strings.get("world.weaving_for_the_stage"),
         },
         npc_marek_still = {
-            displayName = "MAREK STILL",
-            role = "GLASS READER",
+            displayName = Strings.get("world.marek_still"),
+            role = Strings.get("world.glass_reader"),
             coat = Color3.fromRGB(72, 84, 88),
             accent = Color3.fromRGB(146, 214, 226),
             skin = Color3.fromRGB(162, 120, 90),
@@ -12346,11 +12471,11 @@ local function buildTownProgressionBuildings(
             -- The far end of the road facing out, since naming a tell
             -- before the night uses it means seeing it first.
             night = CFrame.new(0, 3, -204),
-            dayDuty = "READING THE GLASS FROM THE TOWER",
+            dayDuty = Strings.get("world.reading_the_glass_from_the_tower"),
         },
         npc_lissen_ford = {
-            displayName = "LISSEN FORD",
-            role = "FEN HEALER",
+            displayName = Strings.get("world.lissen_ford"),
+            role = Strings.get("world.fen_healer"),
             coat = Color3.fromRGB(108, 120, 104),
             accent = Color3.fromRGB(232, 226, 208),
             skin = Color3.fromRGB(152, 108, 80),
@@ -12361,7 +12486,7 @@ local function buildTownProgressionBuildings(
             -- she is doing at dusk is counting the people in it.
             dusk = CFrame.new(-20, 3, -126) * CFrame.Angles(0, math.rad(-84), 0),
             night = CFrame.new(-13, 3, -148) * CFrame.Angles(0, math.rad(-90), 0),
-            dayDuty = "KEEPING THE GUARDHOUSE INFIRMARY",
+            dayDuty = Strings.get("world.keeping_the_guardhouse_infirmary"),
         },
 
         --[[
@@ -12393,8 +12518,8 @@ local function buildTownProgressionBuildings(
             warning, and Isolde at the bottom facing out.
         ]]
         npc_isolde_maren = {
-            displayName = "ISOLDE MAREN",
-            role = "SIGNAL KEEPER",
+            displayName = Strings.get("world.isolde_maren"),
+            role = Strings.get("world.signal_keeper"),
             coat = Color3.fromRGB(52, 76, 92),
             accent = Color3.fromRGB(250, 168, 78),
             skin = Color3.fromRGB(196, 148, 108),
@@ -12407,11 +12532,11 @@ local function buildTownProgressionBuildings(
             -- front of it. Nobody is coming; she keeps it anyway.
             dusk = CFrame.new(150, 3, -238),
             night = CFrame.new(-13, 3, -196),
-            dayDuty = "KEEPING THE SIGNAL LIT",
+            dayDuty = Strings.get("world.keeping_the_signal_lit"),
         },
         npc_cass_pell = {
-            displayName = "CASS PELL",
-            role = "ROPEMAKER",
+            displayName = Strings.get("world.cass_pell"),
+            role = Strings.get("world.ropemaker"),
             coat = Color3.fromRGB(98, 86, 70),
             accent = Color3.fromRGB(198, 176, 118),
             skin = Color3.fromRGB(208, 158, 116),
@@ -12423,11 +12548,11 @@ local function buildTownProgressionBuildings(
             day = CFrame.new(132, 3, -258) * CFrame.Angles(0, math.rad(-90), 0),
             dusk = CFrame.new(14, 3, -80) * CFrame.Angles(0, math.rad(90), 0),
             night = CFrame.new(11, 3, -148) * CFrame.Angles(0, math.rad(-90), 0),
-            dayDuty = "WALKING OUT A NEW ROPE",
+            dayDuty = Strings.get("world.walking_out_a_new_rope"),
         },
         npc_alder_kine = {
-            displayName = "ALDER KINE",
-            role = "HARBOURMASTER",
+            displayName = Strings.get("world.alder_kine"),
+            role = Strings.get("world.harbourmaster"),
             coat = Color3.fromRGB(40, 46, 58),
             accent = Color3.fromRGB(216, 178, 92),
             skin = Color3.fromRGB(172, 126, 92),
@@ -12438,11 +12563,11 @@ local function buildTownProgressionBuildings(
             -- sitting out where a man can count it.
             dusk = CFrame.new(-134, 3, -196) * CFrame.Angles(0, math.rad(90), 0),
             night = CFrame.new(13, 3, -172) * CFrame.Angles(0, math.rad(-90), 0),
-            dayDuty = "COUNTING WHAT CAME IN",
+            dayDuty = Strings.get("world.counting_what_came_in"),
         },
         npc_nell_barrow = {
-            displayName = "NELL BARROW",
-            role = "SALVAGE DIVER",
+            displayName = Strings.get("world.nell_barrow"),
+            role = Strings.get("world.salvage_diver"),
             coat = Color3.fromRGB(60, 88, 84),
             accent = Color3.fromRGB(118, 178, 154),
             skin = Color3.fromRGB(188, 138, 100),
@@ -12451,11 +12576,11 @@ local function buildTownProgressionBuildings(
             day = CFrame.new(106, 3, -227) * CFrame.Angles(0, math.rad(-165), 0),
             dusk = CFrame.new(94, 3, -198) * CFrame.Angles(0, math.rad(-49), 0),
             night = CFrame.new(13, 3, -110) * CFrame.Angles(0, math.rad(-90), 0),
-            dayDuty = "WORKING THE WATER FOR SALVAGE",
+            dayDuty = Strings.get("world.working_the_water_for_salvage"),
         },
         npc_anselm_rill = {
-            displayName = "ANSELM RILL",
-            role = "BELLKEEPER",
+            displayName = Strings.get("world.anselm_rill"),
+            role = Strings.get("world.bellkeeper"),
             coat = Color3.fromRGB(74, 70, 92),
             accent = Color3.fromRGB(164, 128, 76),
             skin = Color3.fromRGB(206, 158, 118),
@@ -12467,11 +12592,11 @@ local function buildTownProgressionBuildings(
             -- front of him. An announcement made from the back of a crowd
             -- is not one.
             night = CFrame.new(-12, 3, -94),
-            dayDuty = "KEEPING THE HOURS ON THE BELL",
+            dayDuty = Strings.get("world.keeping_the_hours_on_the_bell"),
         },
         npc_ivy_thorn = {
-            displayName = "IVY THORN",
-            role = "INFIRMARIAN",
+            displayName = Strings.get("world.ivy_thorn"),
+            role = Strings.get("world.infirmarian"),
             coat = Color3.fromRGB(206, 198, 180),
             accent = Color3.fromRGB(152, 190, 208),
             skin = Color3.fromRGB(214, 166, 124),
@@ -12482,11 +12607,11 @@ local function buildTownProgressionBuildings(
             -- Facing the dark end, because that is the direction people
             -- get carried in from and she would rather see them early.
             night = CFrame.new(-4, 3, -158),
-            dayDuty = "WALKING THE INFIRMARY BEDS",
+            dayDuty = Strings.get("world.walking_the_infirmary_beds"),
         },
         npc_halvard_sunn = {
-            displayName = "HALVARD SUNN",
-            role = "STOREKEEPER",
+            displayName = Strings.get("world.halvard_sunn"),
+            role = Strings.get("world.storekeeper"),
             coat = Color3.fromRGB(96, 112, 126),
             accent = Color3.fromRGB(206, 214, 220),
             skin = Color3.fromRGB(204, 154, 112),
@@ -12497,11 +12622,11 @@ local function buildTownProgressionBuildings(
             day = CFrame.new(-94, 3, -214) * CFrame.Angles(0, math.rad(-90), 0),
             dusk = CFrame.new(-95, 3, -201) * CFrame.Angles(0, math.rad(54), 0),
             night = CFrame.new(-11, 3, -106) * CFrame.Angles(0, math.rad(90), 0),
-            dayDuty = "KEEPING THE COLD STORE SHUT",
+            dayDuty = Strings.get("world.keeping_the_cold_store_shut"),
         },
         npc_maud_ferrow = {
-            displayName = "MAUD FERROW",
-            role = "ALMONER",
+            displayName = Strings.get("world.maud_ferrow"),
+            role = Strings.get("world.almoner"),
             coat = Color3.fromRGB(188, 170, 142),
             accent = Color3.fromRGB(228, 140, 92),
             skin = Color3.fromRGB(198, 148, 110),
@@ -12513,7 +12638,7 @@ local function buildTownProgressionBuildings(
             -- giving away.
             dusk = CFrame.new(-27, 3, -226) * CFrame.Angles(0, math.rad(-90), 0),
             night = CFrame.new(-2, 3, -186) * CFrame.Angles(0, math.rad(180), 0),
-            dayDuty = "FINDING BEDS FOR WHOEVER NEEDS ONE",
+            dayDuty = Strings.get("world.finding_beds_for_whoever_needs_one"),
         },
 
         --[[
@@ -12548,8 +12673,8 @@ local function buildTownProgressionBuildings(
             carries all twenty-seven down its length.
         ]]
         npc_sabine_ash = {
-            displayName = "SABINE ASH",
-            role = "GLASSWRIGHT",
+            displayName = Strings.get("world.sabine_ash"),
+            role = Strings.get("world.glasswright"),
             coat = Color3.fromRGB(122, 116, 110),
             accent = Color3.fromRGB(232, 154, 78),
             skin = Color3.fromRGB(172, 124, 92),
@@ -12565,11 +12690,11 @@ local function buildTownProgressionBuildings(
             ]]
             dusk = CFrame.new(166, 3, -60) * CFrame.Angles(0, math.rad(90), 0),
             night = CFrame.new(-13, 3, -168),
-            dayDuty = "BLOWING GLASS THAT IS NOT SHAPED LIKE ANYBODY",
+            dayDuty = Strings.get("world.blowing_glass_that_is_not_shaped"),
         },
         npc_theo_marl = {
-            displayName = "THEO MARL",
-            role = "RECORDKEEPER",
+            displayName = Strings.get("world.theo_marl"),
+            role = Strings.get("world.recordkeeper"),
             coat = Color3.fromRGB(64, 62, 74),
             accent = Color3.fromRGB(206, 190, 152),
             skin = Color3.fromRGB(186, 138, 102),
@@ -12582,11 +12707,11 @@ local function buildTownProgressionBuildings(
             -- him the second is the half that is true.
             dusk = CFrame.new(-24, 3, -162) * CFrame.Angles(0, math.rad(90), 0),
             night = CFrame.new(5, 3, -179),
-            dayDuty = "COPYING OUT THE NAMES NOBODY ASKED FOR",
+            dayDuty = Strings.get("world.copying_out_the_names_nobody_asked"),
         },
         npc_delia_kass = {
-            displayName = "DELIA KASS",
-            role = "MEMORIALIST",
+            displayName = Strings.get("world.delia_kass"),
+            role = Strings.get("world.memorialist"),
             coat = Color3.fromRGB(88, 68, 82),
             accent = Color3.fromRGB(222, 196, 128),
             skin = Color3.fromRGB(160, 114, 86),
@@ -12598,11 +12723,11 @@ local function buildTownProgressionBuildings(
             -- between a memorial and a filing cabinet.
             dusk = CFrame.new(-134, 3, -120) * CFrame.Angles(0, math.rad(-90), 0),
             night = CFrame.new(2, 3, -168),
-            dayDuty = "PUTTING NAMES BACK ON THE STONES",
+            dayDuty = Strings.get("world.putting_names_back_on_the_stones"),
         },
         npc_bran_holt = {
-            displayName = "BRAN HOLT",
-            role = "TIMBERWRIGHT",
+            displayName = Strings.get("world.bran_holt"),
+            role = Strings.get("world.timberwright"),
             coat = Color3.fromRGB(96, 78, 56),
             accent = Color3.fromRGB(198, 96, 68),
             skin = Color3.fromRGB(190, 140, 104),
@@ -12613,7 +12738,7 @@ local function buildTownProgressionBuildings(
             -- counting beams nobody ordered and nobody has asked about.
             dusk = CFrame.new(150, 3, -119) * CFrame.Angles(0, math.rad(180), 0),
             night = CFrame.new(3, 3, -104),
-            dayDuty = "CUTTING EVERY BEAM LONGER THAN THE DRAWING",
+            dayDuty = Strings.get("world.cutting_every_beam_longer_than_the"),
         },
 
         --[[
@@ -12643,8 +12768,8 @@ local function buildTownProgressionBuildings(
             somebody would have to count to find.
         ]]
         npc_orin_vale = {
-            displayName = "ORIN VALE",
-            role = "LANTERN KEEPER",
+            displayName = Strings.get("world.orin_vale"),
+            role = Strings.get("world.lantern_keeper"),
             coat = Color3.fromRGB(74, 70, 84),
             accent = Color3.fromRGB(255, 216, 150),
             -- Older than he should be, and it did not happen the ordinary
@@ -12656,11 +12781,11 @@ local function buildTownProgressionBuildings(
             day = CFrame.new(-70, 3, -212) * CFrame.Angles(0, math.rad(-152), 0),
             dusk = CFrame.new(-13, 3, -74) * CFrame.Angles(0, math.rad(-65), 0),
             night = CFrame.new(12, 3, -98),
-            dayDuty = "FILLING EVERY LAMP IN TOWN BEFORE DARK",
+            dayDuty = Strings.get("world.filling_every_lamp_in_town_before"),
         },
         npc_signe_marr = {
-            displayName = "SIGNE MARR",
-            role = "WELLKEEPER",
+            displayName = Strings.get("world.signe_marr"),
+            role = Strings.get("world.wellkeeper"),
             coat = Color3.fromRGB(56, 72, 84),
             accent = Color3.fromRGB(150, 190, 196),
             skin = Color3.fromRGB(192, 144, 106),
@@ -12673,11 +12798,11 @@ local function buildTownProgressionBuildings(
             -- The only watcher on the road facing back up it. Whatever
             -- she is watching for, she does not think it is outside.
             night = CFrame.new(-2, 3, -116) * CFrame.Angles(0, math.rad(180), 0),
-            dayDuty = "SOUNDING THE WELL FOR A BOTTOM",
+            dayDuty = Strings.get("world.sounding_the_well_for_a_bottom"),
         },
         npc_ruth_calder = {
-            displayName = "RUTH CALDER",
-            role = "SPEAKER",
+            displayName = Strings.get("world.ruth_calder"),
+            role = Strings.get("world.speaker"),
             coat = Color3.fromRGB(102, 62, 58),
             accent = Color3.fromRGB(226, 202, 148),
             skin = Color3.fromRGB(148, 104, 78),
@@ -12693,11 +12818,11 @@ local function buildTownProgressionBuildings(
             -- the watch are in front of her. She has never once addressed
             -- a room from the back of it.
             night = CFrame.new(1, 3, -150) * CFrame.Angles(0, math.rad(180), 0),
-            dayDuty = "CALLING THE MEETING WHETHER ANYONE COMES",
+            dayDuty = Strings.get("world.calling_the_meeting_whether_anyone_comes"),
         },
         npc_edda_pyne = {
-            displayName = "EDDA PYNE",
-            role = "TRAPWRIGHT",
+            displayName = Strings.get("world.edda_pyne"),
+            role = Strings.get("world.trapwright"),
             coat = Color3.fromRGB(78, 88, 70),
             accent = Color3.fromRGB(184, 154, 88),
             skin = Color3.fromRGB(204, 156, 116),
@@ -12715,7 +12840,7 @@ local function buildTownProgressionBuildings(
             -- The last position on the line, past even the glass reader,
             -- standing among her own wards where the first bite lands.
             night = CFrame.new(-13, 3, -210),
-            dayDuty = "BUILDING SMALLER TRAPS FOR A QUIETER ROAD",
+            dayDuty = Strings.get("world.building_smaller_traps_for_a_quieter"),
         },
     }
 
@@ -13070,8 +13195,10 @@ function WorldService._setTownResidentRoutine(self: WorldService, phase: string)
                 "CurrentDuty",
                 if normalized == "Day"
                     then resident.dayDuty
-                    elseif normalized == "Dusk" then "REPORTING TO THE NIGHT WATCH"
-                    else "DEFENDING THE LANTERN ROAD"
+                    elseif normalized == "Dusk" then Strings.get(
+                        "world.reporting_to_the_night_watch"
+                    )
+                    else Strings.get("world.defending_the_lantern_road")
             )
             local lanternPart = model:FindFirstChild("NightWatchLantern")
             if lanternPart ~= nil and lanternPart:IsA("BasePart") then
@@ -13173,7 +13300,7 @@ function WorldService._rebuildTownProgression(self: WorldService)
                 resident.interactionTarget,
                 interactionId,
                 self._runtimeIds.Actions.TalkResident,
-                "TALK",
+                Strings.get("world.talk"),
                 resident.displayName,
                 residentId,
                 nil,
@@ -13191,7 +13318,7 @@ function WorldService._rebuildTownProgression(self: WorldService)
                 buildingTarget.target,
                 interactionId,
                 self._runtimeIds.Actions.ContributeConstruction,
-                "BUILD",
+                Strings.get("world.build"),
                 buildingTarget.displayName,
                 buildingId
             )
@@ -13366,7 +13493,7 @@ function WorldService.setTownCondition(self: WorldService, condition: any)
             target,
             interactionId,
             self._runtimeIds.Actions.RepairTown,
-            "REPAIR",
+            Strings.get("world.repair"),
             string.format("%s · %d%%", self:_buildingDisplayName(buildingId), buildingIntegrity),
             -- The building this prompt repairs, baked in at build time. The
             -- client only ever sends the interaction ID, exactly as it does for
@@ -13520,7 +13647,7 @@ function WorldService.showExtractionPayoff(
         warning.CanQuery = false
         addBillboard(
             warning,
-            string.format("STORES FULL · %d SURPLUS TURNED AWAY", overflowLost),
+            string.format(Strings.get("world.stores_full_n_surplus_turned_away"), overflowLost),
             Color3.fromRGB(255, 138, 92),
             60
         )
@@ -13729,7 +13856,7 @@ function WorldService.buildBramblewake(
             node.target,
             node.interactionId,
             self._runtimeIds.Actions.GatherResource,
-            "HARVEST",
+            Strings.get("world.harvest"),
             node.objectText,
             nil,
             nil,
@@ -13944,7 +14071,7 @@ function WorldService.buildBramblewake(
                 target,
                 interactionId,
                 self._runtimeIds.Actions.RecoverMemoryFragment,
-                "REMEMBER",
+                Strings.get("world.remember"),
                 fragment.title,
                 nil,
                 nil,
@@ -13982,7 +14109,7 @@ function WorldService.buildBramblewake(
         result.eliteArena.fireSource,
         self._runtimeIds.InteractionIds.OldGrowthFireSource,
         self._runtimeIds.Actions.OldGrowthFire,
-        "TAKE FIRE",
+        Strings.get("world.take_fire"),
         "Lantern Fire",
         nil,
         nil
@@ -13991,7 +14118,7 @@ function WorldService.buildBramblewake(
         result.eliteArena.rootHeart,
         self._runtimeIds.InteractionIds.OldGrowthHeart,
         self._runtimeIds.Actions.OldGrowthFire,
-        "BURN SHIELD",
+        Strings.get("world.burn_shield"),
         "Root Heart",
         nil,
         nil
@@ -14113,14 +14240,14 @@ function WorldService.showRecoveryCache(self: WorldService, player: Player, cach
         false
     )
     clasp.Shape = Enum.PartType.Ball
-    addBillboard(body, "LOST SATCHEL · " .. string.upper(player.DisplayName), CREAM)
+    addBillboard(body, Strings.get("world.lost_satchel") .. string.upper(player.DisplayName), CREAM)
     local interactionId = string.format("recovery_cache:%d", player.UserId)
     self:_registerInteraction(
         body,
         interactionId,
         self._runtimeIds.Actions.RecoverExpeditionCache,
-        "RECOVER",
-        "Lost Expedition Satchel",
+        Strings.get("world.recover"),
+        Strings.get("world.lost_expedition_satchel"),
         cache.cacheId,
         1.2
     )
@@ -14175,8 +14302,12 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
         local prompt = target:FindFirstChildOfClass("ProximityPrompt")
         if prompt ~= nil then
             prompt.Enabled = relay
-            prompt.ActionText = if delivered then "TAKE ROOTFIRE" else "DELIVER ROOTFIRE"
-            prompt.ObjectText = if delivered then "Lit Living Root" else "Unlit Living Root"
+            prompt.ActionText = if delivered
+                then Strings.get("world.take_rootfire")
+                else Strings.get("world.deliver_rootfire")
+            prompt.ObjectText = if delivered
+                then Strings.get("world.lit_living_root")
+                else Strings.get("world.unlit_living_root")
         end
         local nextMarker = target:FindFirstChild("BlackoutNextMarker")
         if nodeId == state.nextNodeId and relay and not delivered then
@@ -14619,10 +14750,10 @@ function WorldService._setDuskSignals(self: WorldService, visible: boolean)
 end
 
 local function nightThemeColor(theme: string?): Color3
-    return if theme == "MIRETIDE"
+    return if theme == Strings.get("world.miretide")
         then Color3.fromRGB(90, 192, 170)
-        elseif theme == "ROOTMOON" then Color3.fromRGB(174, 128, 205)
-        elseif theme == "ASHEN VEIL" then Color3.fromRGB(218, 132, 91)
+        elseif theme == Strings.get("world.rootmoon") then Color3.fromRGB(174, 128, 205)
+        elseif theme == Strings.get("world.ashen_veil") then Color3.fromRGB(218, 132, 91)
         else AMBER
 end
 
@@ -14633,7 +14764,7 @@ local function buildNightThemeDressing(parent: Instance, theme: string): Model
     model.Parent = parent
     local accent = nightThemeColor(theme)
 
-    if theme == "EMBERFALL" then
+    if theme == Strings.get("world.emberfall") then
         for row = 0, 2 do
             for side = -1, 1, 2 do
                 local center = Vector3.new(side * 7.5, 0.45, -144 + row * 12)
@@ -14662,7 +14793,7 @@ local function buildNightThemeDressing(parent: Instance, theme: string): Model
                 coal.Transparency = 0.18
             end
         end
-    elseif theme == "MIRETIDE" then
+    elseif theme == Strings.get("world.miretide") then
         for poolIndex = 0, 4 do
             local side = if poolIndex % 2 == 0 then -1 else 1
             local pool = part(
@@ -14687,7 +14818,7 @@ local function buildNightThemeDressing(parent: Instance, theme: string): Model
             )
             reed.CFrame *= CFrame.Angles(0, 0, math.rad(side * 8))
         end
-    elseif theme == "ROOTMOON" then
+    elseif theme == Strings.get("world.rootmoon") then
         for archIndex = 0, 2 do
             local z = -145 + archIndex * 13
             for side = -1, 1, 2 do
@@ -14817,7 +14948,11 @@ function WorldService.signalNightWave(
     lane:SetAttribute("Wave", wave or 0)
     local enemyLabel = string.upper(string.gsub(enemyId or "forest threat", "enemy_", ""))
     enemyLabel = string.gsub(enemyLabel, "_", " ")
-    addBillboard(lane, string.format("WAVE %d · %s INBOUND", wave or 0, enemyLabel), accent)
+    addBillboard(
+        lane,
+        string.format(Strings.get("world.wave_n_n_inbound"), wave or 0, enemyLabel),
+        accent
+    )
     TweenService:Create(
         lane,
         TweenInfo.new(1.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
@@ -15251,7 +15386,7 @@ function WorldService.resolveTownIncidentSite(self: WorldService, siteId: string
                     oldLabel:Destroy()
                 end
                 target.Color = Color3.fromRGB(72, 96, 66)
-                addBillboard(target, "SECURED", FOXFIRE)
+                addBillboard(target, Strings.get("world.secured"), FOXFIRE)
             end
             break
         end
@@ -15415,7 +15550,8 @@ function WorldService.setNight(self: WorldService, enabled: boolean, theme: stri
         self._nightThemeDressing = nil
     end
     if enabled and self._world ~= nil then
-        self._nightThemeDressing = buildNightThemeDressing(self._world, theme or "EMBERFALL")
+        self._nightThemeDressing =
+            buildNightThemeDressing(self._world, theme or Strings.get("world.emberfall"))
     end
     self:_setNightDefenseState(if enabled then "night" else "day", theme)
     self:_setTownResidentRoutine(if enabled then "night" elseif self._dusk then "dusk" else "day")

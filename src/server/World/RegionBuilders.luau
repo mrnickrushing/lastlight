@@ -17,6 +17,7 @@
     the missing pieces should ever change it.
 ]]
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
 local BramblewakeBuilder = require(script.Parent.BramblewakeBuilder)
 local IronrootBuilder = require(script.Parent.IronrootBuilder)
 local MireglassBuilder = require(script.Parent.MireglassBuilder)
@@ -279,7 +280,7 @@ RegionBuilders.NodeMaterials = table.freeze({
     region_frostmere = table.freeze({
         table.freeze({
             id = "material_frostmere_ice",
-            label = "Frostmere Ice",
+            label = Strings.get("region.frostmere_ice"),
             color = Color3.fromRGB(168, 202, 216),
         }),
         table.freeze({
@@ -289,7 +290,7 @@ RegionBuilders.NodeMaterials = table.freeze({
         }),
         table.freeze({
             id = "material_frostmere_wool",
-            label = "Frostmere Wool",
+            label = Strings.get("region.frostmere_wool"),
             color = Color3.fromRGB(214, 206, 188),
         }),
         table.freeze({
@@ -328,7 +329,7 @@ RegionBuilders.NodeMaterials = table.freeze({
         }),
         table.freeze({
             id = "material_witchlight_pollen",
-            label = "Witchlight Pollen",
+            label = Strings.get("region.witchlight_pollen"),
             color = Color3.fromRGB(146, 214, 226),
         }),
     }),
