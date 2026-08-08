@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #333), build `0.53.0`,
-save schema 24, 26 services. Published to Roblox as place version 145,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #334), build `0.53.0`,
+save schema 24, 26 services. Published to Roblox as place version 144,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,7 +59,32 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
-- **#333** (v145) **M12 wave B: the exploit suite can now say something it
+- **#334** (v144, unchanged — a validator and a config field, no place
+  content) **M14 wave A: the save schema freeze is a value now, not an
+  intention.** M14's deliverable list says "frozen save schema except blocker
+  fixes", and the cost of forgetting that is not a broken build — it is a
+  player's save. A launch candidate is declared, a bump lands two weeks later
+  for a reason that felt small, and the migration path validated against the
+  candidate is no longer the one that runs.
+
+  `Config.SaveSchemaFreeze` is `nil` today, which is the correct state: **a
+  freeze that is on while the schema is still moving is a freeze somebody turns
+  off and forgets to turn back on.** When a launch candidate is declared it is
+  set to that candidate's version, and `validate_schema_freeze.py` refuses any
+  bump past it from that moment.
+
+  Two ways through, both deliberate acts, and the refusal names them: raise the
+  freeze (which *is* unfreezing, and belongs in a pull request that says so), or
+  set `SaveSchemaFreezeOverride` to the exact version being allowed and say why
+  the fix is a blocker. The override has to be typed out, because a number that
+  has to be typed is a number somebody looked at. It also refuses an override
+  more than one version past the freeze — several at once is unfreezing wearing
+  an override's clothes — and refuses a **stale** override left behind after the
+  freeze moves, because an exemption nobody remembers granting is the failure
+  mode a guard like this actually has. All six paths were exercised against the
+  real config before the wave shipped.
+- **#333** (v144, unchanged — the place is byte-identical, because this wave
+  adds only specs and the built place carries no tests) **M12 wave B: the exploit suite can now say something it
   could not before — *every* action kind has a refusal, not only a handler.**
   `ExploitGate` covered the remote surface as it was in Milestone 3. It now
   covers all forty-three action kinds by name, each filed under where its

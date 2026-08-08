@@ -4836,6 +4836,26 @@ return table.freeze({
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
     SaveSchemaVersion = 24,
+    --[[
+        The save schema freeze.
+
+        Milestone 14's deliverable list says "frozen save schema except blocker
+        fixes", and that is a promise nobody can keep by remembering. Setting
+        this to the version the launch candidate ships on makes
+        `validate_schema_freeze.py` refuse any bump past it, and the refusal
+        names the two ways through: raise the freeze deliberately, or set
+        SaveSchemaFreezeOverride to the exact version being allowed and say in
+        the pull request why the fix is a blocker.
+
+        `nil` means not frozen, which is the correct state until a launch
+        candidate is declared. A freeze that is on during development is a
+        freeze somebody turns off and forgets to turn back on.
+    ]]
+    SaveSchemaFreeze = nil :: number?,
+    -- The one version a bump is allowed to reach while the freeze is set. Has
+    -- to be typed out, so a blocker fix is a deliberate act rather than a
+    -- number quietly incrementing past a guard.
+    SaveSchemaFreezeOverride = nil :: number?,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
