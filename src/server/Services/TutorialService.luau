@@ -2015,7 +2015,22 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             end
         end
     end
-    local phase = if self._phaseService:hasCompletedFirstNight()
+    --[[
+        Which clock the HUD pill shows follows the player's own progress and
+        whether the town cycle is actually turning -- not whether the tutorial's
+        First Night happened to run in this server session.
+
+        PhaseService only leaves its initial "day" by running that night, so a
+        player who arrives with a finished profile (or skips the tutorial in
+        Studio) never moves it: hasCompletedFirstNight stayed false forever and
+        the pill read DAY / MORNING through every night the town actually held,
+        with nightActive false beside it. The town's clock is the one that is
+        running for anyone past First Light, so that is the one they are shown.
+    ]]
+    local pastFirstLight = session.stage == "reveal"
+        or session.stage == "complete"
+        or self._phaseService:hasCompletedFirstNight()
+    local phase = if pastFirstLight and self._townNightService:isRunning()
         then self._townNightService:snapshot()
         else self._phaseService:snapshot()
     local survival = self._survivalService:snapshot(player)

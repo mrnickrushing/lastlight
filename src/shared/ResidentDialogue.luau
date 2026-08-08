@@ -42,23 +42,33 @@ table.freeze(RESIDENT_NAMES)
     is handled below; these four-and-four answer to the places they came
     from, and each one is a person rather than a job title.
 ]]
--- What each resident asks for, in their own words.
+--[[
+    What each resident asks for, in their own words.
+
+    The four asks built on `bramblewake_settlements` name the pouch on purpose.
+    That signal counts settled Wayhome deliveries -- a trip that banks nothing
+    records no settlement, because there is nothing to settle -- and every one
+    of these lines used to describe it as a trip or a return, which promises
+    credit for walking out and back empty-handed and never pays it. A player
+    who does exactly what the words say and still reads 0/3 has been told the
+    quest is broken by the quest itself.
+]]
 local GUIDANCE = table.freeze({
     npc_tomas_reed = "CRAFT ONE USEFUL ITEM AT THE WORKBENCH",
     npc_pip_wren = "HELP THE LANTERN ROAD SURVIVE THREE NIGHTS",
-    npc_ena_moss = "RETURN SAFELY FROM BRAMBLEWAKE THREE TIMES",
+    npc_ena_moss = "BANK A POUCH FROM BRAMBLEWAKE THREE TIMES",
     npc_hesper_vane = "BRING ME GEAR THAT HAS FOUND ITS OWN CHARACTER",
     npc_odell_crane = "FILL THE STORES — SIXTY OF ANYTHING WILL DO",
     npc_junie_falk = "KEEP THE LIGHT LIT FOR SEVEN NIGHTS",
     npc_bartram_hoke = "RAISE FOUR BUILDINGS SO THERE IS SOMEWHERE TO COOK",
-    npc_saoirse_quill = "COME BACK FROM BRAMBLEWAKE EIGHT TIMES, AND I WILL RULE THE COLUMN",
+    npc_saoirse_quill = "BANK EIGHT POUCHES FROM BRAMBLEWAKE AND I WILL RULE THE COLUMN",
     npc_wren_dabbler = "PUT UP THREE DECORATIONS — THIS TOWN SHOULD LOOK LIVED IN",
     npc_marek_still = "CRAFT SIX THINGS AND LOOK TWICE AT EACH",
     npc_lissen_ford = "BE TRUSTED BY THREE RESIDENTS — CHECK ON THEM",
     npc_isolde_maren = "KEEP THE LIGHT LIT FOURTEEN NIGHTS. I HAVE DONE LONGER FOR LESS",
     npc_cass_pell = "MAKE TWENTY THINGS WITH YOUR HANDS AND I WILL TEACH YOU ROPE",
     npc_alder_kine = "TWO HUNDRED IN THE STORES. I WANT TO SEE THE COLUMN IN BLACK ONCE",
-    npc_nell_barrow = "FOURTEEN TRIPS BACK FROM BRAMBLEWAKE — BACK IS THE PART THAT COUNTS",
+    npc_nell_barrow = "FOURTEEN LOADS BANKED FROM BRAMBLEWAKE — THE LOAD IS THE PART THAT COUNTS",
     npc_anselm_rill = "FIND FOUR OF WHAT THIS PLACE REMEMBERS. SOMEBODY SHOULD KEEP IT",
     npc_ivy_thorn = "BE TRUSTED BY EIGHT OF US. I COUNT BY NAME, NOT BY HEAD",
     npc_halvard_sunn = "CLOSE EVERY CHAPTER. A STORE IS ONLY FULL WHEN NOTHING IS STILL OPEN",
@@ -109,7 +119,7 @@ local ARRIVAL_LINES = table.freeze({
 local STAGE_GUIDANCE = table.freeze({
     quest_tomas_second_bench = "TWELVE THINGS MADE. I WANT A BENCH THAT LOOKS WORKED AT",
     quest_tomas_full_house = "TEN PEOPLE WHO TRUST YOU. THEN EVERY BED HERE IS FULL",
-    quest_pip_further_roads = "SIX RUNS OUT AND BACK. I WANT THE FAR ROADS ON THE BOARD",
+    quest_pip_further_roads = "SIX LOADS BANKED FROM BRAMBLEWAKE. I WANT THE FAR ROADS ON THE BOARD",
     quest_pip_every_night = "TWENTY-ONE NIGHTS POSTED BEFORE THEY ARRIVED. NOT ONE SURPRISE",
     quest_ena_first_growth = "FIVE THINGS PLANTED OR HUNG. THIS PLACE SHOULD LOOK TENDED",
     quest_ena_the_archive = "SIX OF WHAT THE FOREST KEPT. IT IS A STORY, NOT A COLLECTION",
@@ -229,9 +239,12 @@ function ResidentDialogue.respond(residentId: any, quests: any, consequence: any
 
     local current = math.max(0, math.floor(tonumber(quest.progress) or 0))
     local threshold = math.max(1, math.floor(tonumber(quest.threshold) or 1))
+    -- The default names nothing in particular, because a resident with no
+    -- authored ask used to borrow Ena's and tell a player to go to Bramblewake
+    -- for a quest that counts something else entirely.
     local guidance = STAGE_GUIDANCE[currentQuestId]
         or GUIDANCE[residentId]
-        or "RETURN SAFELY FROM BRAMBLEWAKE THREE TIMES"
+        or "THERE IS WORK HERE WHEN YOU ARE READY"
     return {
         message = string.format(
             "%s: %s — %d/%d. I WILL MARK IT WHEN IT IS DONE.",

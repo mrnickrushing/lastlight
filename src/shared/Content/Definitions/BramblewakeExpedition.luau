@@ -905,12 +905,22 @@ local events = {
         soloVariant = { guidance = "Seal each marked break before the flame crosses." },
         groupVariant = { guidance = "Hold separate firebreaks at the same time." },
         reward = { materialId = "material_heartwood", amount = 4 },
+        --[[
+            A step's `y` is measured from the event socket's own anchor, which
+            stands half a stud above the module floor on a plate seven studs
+            across. These three were all written at y = 1, which seats a break
+            on that plate -- and only the road break is on it. The farm and
+            grove breaks are seven studs out over bare ground, so y = 1 left
+            them, and the road stones the mesh pass seats on their underside,
+            hanging 0.9 studs in the air. A 1.2-stud-tall marker needs y = 0.1
+            to have its bottom on the floor.
+        ]]
         steps = {
             {
                 id = "seal_farm_break",
                 actionText = "SEAL",
                 objectText = "Farm Firebreak",
-                offset = { x = -7, y = 1, z = 1 },
+                offset = { x = -7, y = 0.1, z = 1 },
             },
             {
                 id = "seal_road_break",
@@ -922,7 +932,7 @@ local events = {
                 id = "seal_grove_break",
                 actionText = "SEAL",
                 objectText = "Grove Firebreak",
-                offset = { x = 7, y = 1, z = 1 },
+                offset = { x = 7, y = 0.1, z = 1 },
             },
         },
     }),

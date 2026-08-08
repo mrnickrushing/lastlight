@@ -600,6 +600,18 @@ function TownNightService.isNightActive(self: TownNightService): boolean
     return self._phase == "night"
 end
 
+--[[
+    Whether this clock is the one that is running.
+
+    "dormant" is the phase before ensureStarted, and it is also what the
+    service reports when the kill switch is off, so a caller choosing between
+    the tutorial's clock and this one can tell whether there is a town cycle to
+    read at all rather than guessing from the player's stage.
+]]
+function TownNightService.isRunning(self: TownNightService): boolean
+    return self._phase ~= "dormant"
+end
+
 function TownNightService.snapshot(self: TownNightService): any
     return {
         blackoutDue = self:_isBlackoutDue(),

@@ -295,6 +295,26 @@ local function actionButton(
     return button
 end
 
+--[[
+    The canvas is a 720-point-tall design surface stretched over the real
+    viewport, and it is WIDER than the screen by exactly 1/scale -- so what a
+    hardcoded offset has to fit inside is the canvas's width in points, not
+    the viewport's in pixels. On the owner's portrait phone that width is
+    about 500 points, which is a third of what the desktop clusters in here
+    were written against. Both the scale rule and the width it implies live
+    in one place so no caller can measure against a different screen.
+]]
+local function canvasMetrics(): (Vector2, number, number, number)
+    local camera = workspace.CurrentCamera
+    local viewport = if camera == nil then Vector2.new(1280, 720) else camera.ViewportSize
+    local scale = math.clamp(math.min(viewport.X, viewport.Y) / 720, 0.78, 1)
+    return viewport, scale, viewport.X / scale, viewport.Y / scale
+end
+
+-- Tall enough for the largest button in the run (the 116-point primary) plus
+-- a gap, so a wrapped row can never be drawn through the row below it.
+local ACTION_ROW_PITCH = 128
+
 export type HUDController = typeof(setmetatable(
     {} :: {
         _gui: ScreenGui,
@@ -367,8 +387,12 @@ export type HUDController = typeof(setmetatable(
         _professionOrder: { string },
         _professionClose: TextButton,
         _progressOverlay: Frame,
+        _progressPanel: Frame,
+        _progressScroll: ScrollingFrame,
+        _progressClose: TextButton,
         _progressText: TextLabel,
         _equipmentButtons: { [string]: TextButton },
+        _loadoutButtons: { [string]: TextButton },
         _whetButton: TextButton,
         _whetItemId: string?,
         _onWhet: ((string) -> ())?,
@@ -385,6 +409,7 @@ export type HUDController = typeof(setmetatable(
         _professionSwitchable: boolean,
         _lastToastRevision: number,
         _lastPhase: string?,
+        _actionClusterSignature: string?,
         _onCompact: ((boolean) -> ())?,
         _onProfessionSelected: ((string) -> ())?,
         _onEquip: ((string) -> ())?,
@@ -1097,6 +1122,9 @@ function HUDController.new(
     progressPanel.Name = "ProgressPanel"
     progressPanel.AnchorPoint = Vector2.new(0.5, 0.5)
     progressPanel.Position = UDim2.fromScale(0.5, 0.5)
+    -- A starting size only. _layoutLoadout narrows the panel to whatever the
+    -- canvas actually holds, because 620 points is wider than a portrait
+    -- phone's entire canvas and the panel hung off both edges of it.
     progressPanel.Size = UDim2.fromOffset(620, 500)
     progressPanel.BackgroundColor3 = COLORS.panel
     progressPanel.ZIndex = 51
@@ -1133,6 +1161,13 @@ function HUDController.new(
     progressScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
     progressScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     progressScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+    --[[
+        Selectable because nothing inside a text window is: the notes are one
+        label, so a controller had no target anywhere in the book and could
+        neither read past the first screen nor reach the recipes at all.
+        Selecting the window hands the D-pad and thumbstick to its canvas.
+    ]]
+    progressScroll.Selectable = true
     progressScroll.ZIndex = 52
     progressScroll.Parent = progressPanel
     local progressText = textLabel(
@@ -1160,7 +1195,8 @@ function HUDController.new(
 
         Buttons are created hidden and positioned at update time from the
         set a player actually owns, so a fresh save still sees an empty
-        margin rather than a wall.
+        margin rather than a wall. Their grid comes from _layoutLoadout;
+        the size here is a placeholder it overwrites.
     ]]
     for _, entry in Equipment.list() do
         local definition = Equipment.get(entry.itemId) :: any
@@ -1190,9 +1226,9 @@ function HUDController.new(
             local button = Instance.new("TextButton")
             button.Name = string.format("Loadout_%s_%d", kind, slot)
             -- Above the scrolling notes, not over them: the rows sit
-            -- between the title and the DetailsScroll window.
-            button.Position =
-                UDim2.fromOffset(20 + (slot - 1) * 190 + (if kind == "apply" then 92 else 0), 58)
+            -- between the title and the DetailsScroll window. The pitch is
+            -- measured in _layoutLoadout; these are placeholders.
+            button.Position = UDim2.fromOffset(20, 58)
             button.Size = UDim2.fromOffset(if kind == "apply" then 84 else 88, 30)
             button.BackgroundColor3 = COLORS.panelSoft
             button.Font = Enum.Font.GothamBold
@@ -1214,6 +1250,7 @@ function HUDController.new(
     local whetButton = Instance.new("TextButton")
     whetButton.Name = "Whet"
     whetButton.Position = UDim2.fromOffset(20, 94)
+    -- Narrowed with the panel by _layoutLoadout when the canvas is small.
     whetButton.Size = UDim2.fromOffset(220, 30)
     whetButton.BackgroundColor3 = COLORS.panelSoft
     whetButton.Font = Enum.Font.GothamBold
@@ -1616,6 +1653,9 @@ function HUDController.new(
         _professionOrder = professionOrder,
         _professionClose = professionClose,
         _progressOverlay = progressOverlay,
+        _progressPanel = progressPanel,
+        _progressScroll = progressScroll,
+        _progressClose = progressClose,
         _progressText = progressText,
         _equipmentButtons = equipmentButtons,
         _whetButton = whetButton,
@@ -1635,6 +1675,7 @@ function HUDController.new(
         _professionSwitchable = false,
         _lastToastRevision = 0,
         _lastPhase = nil,
+        _actionClusterSignature = nil,
         _onCompact = nil,
         _onProfessionSelected = nil,
         _onEquip = nil,
@@ -1787,6 +1828,60 @@ function HUDController.setProgressOpen(self: HUDController, open: boolean)
     if shouldOpen and self._currentState ~= nil then
         self:_updateProgress()
     end
+    self:_focusProgressBook(shouldOpen)
+end
+
+--[[
+    Controller focus for the field book.
+
+    The recipes moved into a ScrollingFrame when 130 of them stopped fitting on
+    one page, and a scrolling text window is the one HUD surface a gamepad
+    cannot reach by accident -- the notes are a single label, so there was no
+    selectable target anywhere inside the book and a controller player could
+    neither scroll it nor read past the first screen.
+
+    Waiting for a real AbsoluteSize is the lesson the loading screen already
+    paid for: assigning SelectedObject to a GuiObject the layout has not
+    measured yet logs "Setting GuiService.SelectedObject to invalid GuiObject"
+    and the focus silently does not take.
+]]
+function HUDController._focusProgressBook(self: HUDController, open: boolean)
+    if not open then
+        local selected = GuiService.SelectedObject
+        if selected ~= nil and selected:IsDescendantOf(self._progressOverlay) then
+            GuiService.SelectedObject = nil
+        end
+        return
+    end
+
+    local scroll = self._progressScroll
+    -- A way back out, so the D-pad is not a one-way trip into the notes.
+    scroll.NextSelectionUp = self._progressClose
+    scroll.NextSelectionDown = self._loadoutButtons["apply_1"]
+    self._progressClose.NextSelectionDown = scroll
+    --[[
+        Both ways this can fail say so. A controller player who silently loses
+        the book has no way to report anything but "the recipes do not work",
+        and the D-pad half of this path is still unconfirmed on a real pad.
+    ]]
+    task.spawn(function()
+        for _ = 1, 30 do
+            if not self._progressOverlay.Visible then
+                return
+            end
+            if scroll.AbsoluteSize.X >= 1 and scroll.AbsoluteSize.Y >= 1 then
+                local selected, err = pcall(function()
+                    GuiService.SelectedObject = scroll
+                end)
+                if not selected then
+                    warn(string.format("[Last Light] field book focus refused: %s", tostring(err)))
+                end
+                return
+            end
+            task.wait()
+        end
+        warn("[Last Light] field book scroll never measured; controller focus skipped")
+    end)
 end
 
 function HUDController.setEquipHandler(self: HUDController, callback: (string) -> ())
@@ -1973,6 +2068,32 @@ function HUDController._maraLineIsFresh(self: HUDController): boolean
     return self._maraShownAt > 0 and (os.clock() - self._maraShownAt) < MARA_LINE_SECONDS
 end
 
+--[[
+    Re-measure the thumb cluster when, and only when, the set of controls
+    visible in it changes.
+
+    The run in _layout gives a slot only to a button a player can see, so it has
+    to be told: which of them show changes with combat, with the hound, with
+    being downed and with the input device. And the local clock asks ten times a
+    second, so an unchanged cluster must cost a string comparison rather than a
+    relayout.
+]]
+function HUDController._refreshActionCluster(self: HUDController)
+    local signature = table.concat({
+        if self._primary.Visible then "1" else "0",
+        if self._sprint.Visible then "1" else "0",
+        if self._tool.Visible then "1" else "0",
+        if self._ability.Visible then "1" else "0",
+        if self._companion.Visible then "1" else "0",
+        if self._dodge.Visible then "1" else "0",
+    })
+    if signature == self._actionClusterSignature then
+        return
+    end
+    self._actionClusterSignature = signature
+    self:_layout()
+end
+
 function HUDController._updateLobby(self: HUDController, state: any)
     local lobby = state.lobby
     if type(lobby) ~= "table" or state.departed == true then
@@ -2105,6 +2226,7 @@ function HUDController.setInputMode(self: HUDController, mode: string)
         else "STRIKE"
     self:_updateCombatClock()
     self:_updateProfessionClock()
+    self:_refreshActionCluster()
 end
 
 function HUDController._updateCombatClock(self: HUDController)
@@ -2516,22 +2638,14 @@ function HUDController._updateProgress(self: HUDController)
     self._progressText.Text = table.concat(lines, "\n")
     local gear = state.gear or {}
     local care = if type(state.gearCare) == "table" then state.gearCare else {}
-    -- Position from the owned set, in catalog order, three per row
-    -- stacking upward -- so the panel holds however many a player has
-    -- actually made rather than reserving space for the whole catalog.
-    local visibleIndex = 0
+    -- What a player owns decides which buttons exist; the canvas decides
+    -- where they go, so the grid is laid out afterwards by _layoutLoadout
+    -- rather than counted out here against an assumed screen width.
     for _, entry in Equipment.list() do
         local itemId = entry.itemId
         local button = self._equipmentButtons[itemId]
         local count = tonumber(gear[itemId]) or 0
-        local visible = self._progressOverlay.Visible and count > 0
-        button.Visible = visible
-        if visible then
-            local buttonRow = math.floor(visibleIndex / 3)
-            local buttonColumn = visibleIndex % 3
-            button.Position = UDim2.new(0, 20 + buttonColumn * 190, 1, -58 - buttonRow * 46)
-            visibleIndex += 1
-        end
+        button.Visible = self._progressOverlay.Visible and count > 0
         local label =
             string.format("%s ×%d", tostring(button:GetAttribute("BaseLabel") or "EQUIP"), count)
         local note = care[itemId]
@@ -2556,6 +2670,95 @@ function HUDController._updateProgress(self: HUDController)
         self._whetItemId = nil
         self._whetButton.Visible = false
     end
+    self:_layoutLoadout()
+end
+
+--[[
+    The field book's panel and everything pinned inside it or to the screen's
+    bottom-left corner, measured against the canvas rather than written down.
+
+    The loadout row was three buttons 176 wide at a 190-point pitch starting
+    at 20, which needs about 590 points of width. A portrait phone gives the
+    canvas roughly 500, so the third button hung off the screen -- and the
+    panel the kit rows live in was itself wider than the whole canvas. Rows,
+    pitch, button width and the panel all come from the measurement now, so
+    one layout fills a desktop and fits a phone.
+]]
+function HUDController._layoutLoadout(self: HUDController)
+    local _viewport, _scale, canvasWidth, canvasHeight = canvasMetrics()
+    local margin = 20
+    local gap = 14
+
+    --[[
+        Equip buttons stack upward from the bottom-left of the SCREEN, not the
+        panel, so the canvas bounds their grid. Columns come from the width
+        that is really there; a player who owns more gear than that grid holds
+        without running off the top gets narrower buttons instead, because a
+        button nobody can reach is how ninety craftable items once went
+        unwearable with every spec green.
+
+        Measured first because the panel has to sit above whatever this grows
+        to: on a portrait canvas the panel is as wide as the screen allows, so
+        the grid no longer has a margin to sit in beside it and lands on the
+        recipes instead. It did that on a desktop too, over the panel's
+        bottom-left corner, where it was easier to miss.
+    ]]
+    local owned = 0
+    for _, entry in Equipment.list() do
+        if self._equipmentButtons[entry.itemId].Visible then
+            owned += 1
+        end
+    end
+    local rowPitch = 46
+    local available = math.max(120, canvasWidth - margin * 2)
+    local maxRows = math.max(1, math.floor((canvasHeight - 58) / rowPitch))
+    local columns = math.clamp(math.floor((available + gap) / (176 + gap)), 1, 3)
+    if owned > columns * maxRows then
+        columns = math.min(
+            math.ceil(owned / maxRows),
+            math.max(columns, math.floor((available + gap) / (88 + gap)))
+        )
+    end
+    local buttonWidth = math.min(176, math.floor((available - gap * (columns - 1)) / columns))
+    local visibleIndex = 0
+    for _, entry in Equipment.list() do
+        local button = self._equipmentButtons[entry.itemId]
+        if button.Visible then
+            button.Size = UDim2.fromOffset(buttonWidth, 38)
+            button.Position = UDim2.new(
+                0,
+                margin + (visibleIndex % columns) * (buttonWidth + gap),
+                1,
+                -58 - math.floor(visibleIndex / columns) * rowPitch
+            )
+            visibleIndex += 1
+        end
+    end
+
+    -- The grid's own top edge, measured up from the bottom of the canvas.
+    local gridTop = 58 + math.max(0, math.ceil(owned / columns) - 1) * rowPitch
+    local panelFloor = gridTop + 10
+    local panelWidth = math.min(620, math.max(280, canvasWidth - margin * 2))
+    local panelHeight = math.min(500, math.max(280, canvasHeight - panelFloor - 20))
+    self._progressPanel.AnchorPoint = Vector2.new(0.5, 1)
+    self._progressPanel.Position = UDim2.new(0.5, 0, 1, -panelFloor)
+    self._progressPanel.Size = UDim2.fromOffset(panelWidth, panelHeight)
+
+    -- One save/apply pair per kit, three kits across the panel's inner width.
+    -- The pair keeps its authored 88/4/84 split at full width.
+    local pairWidth =
+        math.max(72, math.min(176, math.floor((panelWidth - margin * 2 - gap * 2) / 3)))
+    local saveWidth = math.floor(pairWidth / 2)
+    for slot = 1, 3 do
+        local left = margin + (slot - 1) * (pairWidth + gap)
+        local save = self._loadoutButtons["save_" .. slot]
+        local apply = self._loadoutButtons["apply_" .. slot]
+        save.Position = UDim2.fromOffset(left, 58)
+        save.Size = UDim2.fromOffset(saveWidth, 30)
+        apply.Position = UDim2.fromOffset(left + saveWidth + 4, 58)
+        apply.Size = UDim2.fromOffset(pairWidth - saveWidth - 4, 30)
+    end
+    self._whetButton.Size = UDim2.fromOffset(math.min(220, panelWidth - margin * 2), 30)
 end
 
 function HUDController.setInteraction(self: HUDController, label: string?, available: boolean)
@@ -2625,8 +2828,7 @@ function HUDController._applyCompact(self: HUDController)
 end
 
 function HUDController._layout(self: HUDController)
-    local camera = workspace.CurrentCamera
-    local viewport = if camera == nil then Vector2.new(1280, 720) else camera.ViewportSize
+    local viewport, scale, canvasWidth, _canvasHeight = canvasMetrics()
     --[[
         Treat any touch device, and any short viewport, as the touch layout.
 
@@ -2636,13 +2838,19 @@ function HUDController._layout(self: HUDController)
         buttons already occupy.
     ]]
     local narrow = viewport.X < 700 or viewport.Y < 560 or UserInputService.TouchEnabled
-    local scale = math.clamp(math.min(viewport.X, viewport.Y) / 720, 0.78, 1)
     self._scale.Scale = scale
     self._canvas.Size = UDim2.fromScale(1 / scale, 1 / scale)
+    -- The departure panel is centred, so its own width is the only thing that
+    -- can push it off a narrow screen.
+    self._lobbyFrame.Size = UDim2.fromOffset(math.min(420, canvasWidth - 24), 246)
 
     if narrow then
+        -- 470 is a tablet's card, not a phone's: capped to the canvas so the
+        -- objective text cannot run past the right edge on a small screen.
+        local cardWidth = math.min(470, canvasWidth - 36)
         self._objectiveFrame.Position = UDim2.fromOffset(18, 70)
-        self._objectiveFrame.Size = UDim2.fromOffset(470, if self._compactEnabled then 78 else 112)
+        self._objectiveFrame.Size =
+            UDim2.fromOffset(cardWidth, if self._compactEnabled then 78 else 112)
         self._resource.Position = UDim2.fromOffset(18, if self._compactEnabled then 158 else 218)
         self._compact.Size = UDim2.fromOffset(44, 38)
         self._compact.Text = if self._compactEnabled then "+" else "−"
@@ -2661,7 +2869,7 @@ function HUDController._layout(self: HUDController)
         -- the screen at eye level. At full width it sat straight across the
         -- middle of the view for the whole nine minutes of a Blackout.
         self._blackoutFrame.Position = UDim2.fromOffset(18, 196)
-        self._blackoutFrame.Size = UDim2.fromOffset(470, 70)
+        self._blackoutFrame.Size = UDim2.fromOffset(cardWidth, 70)
         self._blackoutFrame.AnchorPoint = Vector2.new(0, 0)
         self._eliteFrame.Position =
             UDim2.new(0.5, 0, 0, if self._blackoutFrame.Visible then 222 else 150)
@@ -2684,10 +2892,10 @@ function HUDController._layout(self: HUDController)
             middle of the fight -- the owner's screenshot had it lying
             across the Old Growth's trunk. The band above the action row is
             dead space on touch, and a warning about your feet belongs near
-            them.
+            them. Its height is settled below, once the cluster has been
+            measured and there is something to sit above.
         ]]
         self._threatFrame.AnchorPoint = Vector2.new(0.5, 1)
-        self._threatFrame.Position = UDim2.new(0.5, 0, 1, -206)
         self._threatFrame.Size = UDim2.new(1, -36, 0, 60)
         self._downedFrame.Size = UDim2.new(1, -36, 0, 90)
         local professionY = if self._compactEnabled then 158 else 218
@@ -2697,41 +2905,69 @@ function HUDController._layout(self: HUDController)
         end
         self._professionPanel.Size = UDim2.new(1, -24, 0, 440)
         --[[
-            Thumb cluster, bottom-right, stacked in two rows.
+            The thumb cluster is measured, not written down.
 
-            Laid out in one row these ran far enough across the screen to sit
-            over the character and the ground the player is aiming at. The
-            primary action keeps the corner; strike, dodge, and ability sit
-            inboard and one row up, which keeps every control inside a right
-            thumb's reach without any of them covering the play area. Run stays
-            on the left, clear of Roblox's own thumbstick.
-        ]]
-        --[[
-            One bottom row, inset from BOTH corners.
+            Roblox owns both bottom corners on touch -- the jump button on the
+            right, the thumbstick on the left -- and the five action buttons
+            that have to sit between them need about 500 points of row. The
+            offsets that used to be here (-300 through -630) were picked on a
+            canvas over a thousand points wide; a portrait phone's canvas is
+            about 500 points in total, so FIND sat with its left half off the
+            screen, STRIKE and DODGE were entirely off it, and HOUND -- which
+            nothing ever repositioned for touch at all -- was drawn straight on
+            top of FIND. The run now starts inboard of jump and steps left by
+            each button's own width, wrapping up a row when the next one would
+            reach the thumbstick, and both insets scale with the canvas because
+            Roblox's own controls do.
 
-            Roblox owns the bottom corners on touch: the thumbstick sits
-            bottom-left and the jump button bottom-right. Putting the primary
-            action in the bottom-right corner stacked it directly on top of
-            jump. The row starts well inboard of jump and ends well inboard of
-            the thumbstick, so every control is thumb-reachable without
-            fighting a Roblox one, and none of them sit over the character.
+            The primary action leads the run, so it is the one that keeps the
+            corner nearest the thumb on every screen, and RUN follows it -- the
+            thumb that jumps is the thumb that sprints, which is where the
+            owner asked for it. RUN is inside the run rather than on a line of
+            its own because a line of its own is a fixed offset again, and on a
+            wrapped cluster a fixed offset lands on another button.
+
+            Only what a player can see takes a slot. FIND and STRIKE keep their
+            place in the order but are hidden for good -- both moved onto the
+            world objects -- so counting them reserves the two best positions
+            in the whole cluster for nothing, and pushes RUN, ABILITY and HOUND
+            up out of the thumb zone on a portrait screen. _updateHud runs this
+            again after it settles which of them are showing.
         ]]
-        -- Run sits immediately left of Roblox's jump button, where a right
-        -- thumb already is. Ability keeps the next slot along. Dodge is gone
-        -- on touch: it is still LeftAlt on a keyboard, but as a button it was
-        -- one more thing to find mid-telegraph on a small screen.
-        -- Clear of Roblox's jump button, which owns roughly the rightmost 200
-        -- points. The canvas is scaled by 0.78, so these offsets shrink by
-        -- that much on screen -- -170 looked clear here and landed on top of
-        -- jump on the device.
-        -- Run sits hard against Roblox's jump button on the right, where the
-        -- owner asked for it: the thumb that jumps is the thumb that sprints.
-        -- Everything else steps further inboard from there.
-        self._sprint.Position = UDim2.new(1, -212, 1, -150)
-        self._ability.Position = UDim2.new(1, -300, 1, -34)
-        self._primary.Position = UDim2.new(1, -410, 1, -34)
-        self._tool.Position = UDim2.new(1, -520, 1, -34)
-        self._dodge.Position = UDim2.new(1, -630, 1, -34)
+        local jumpInset = math.clamp(canvasWidth * 0.28, 150, 300)
+        local stickInset = math.clamp(canvasWidth * 0.34, 120, 190)
+        local cursor = jumpInset
+        local actionRow = 0
+        -- RUN is built anchored to the left edge for the desktop layout; the
+        -- run measures from the right, so it joins on the same terms.
+        self._sprint.AnchorPoint = Vector2.new(1, 1)
+        for _, entry in
+            {
+                { button = self._primary, width = 116 },
+                { button = self._sprint, width = 80 },
+                { button = self._tool, width = 84 },
+                { button = self._ability, width = 84 },
+                { button = self._companion, width = 84 },
+                { button = self._dodge, width = 84 },
+            }
+        do
+            if entry.button.Visible then
+                -- Only the bottom row has to clear the thumbstick; the band
+                -- above it is dead space on touch.
+                local leftLimit = if actionRow == 0 then stickInset else 24
+                if cursor > jumpInset and cursor + entry.width > canvasWidth - leftLimit then
+                    actionRow += 1
+                    cursor = jumpInset
+                end
+                entry.button.Position = UDim2.new(1, -cursor, 1, -34 - actionRow * ACTION_ROW_PITCH)
+                cursor += entry.width + 12
+            end
+        end
+        -- Above the cluster's topmost row rather than at a fixed 206, which on
+        -- a portrait phone lands across the upper half of STRIKE and ABILITY.
+        -- A cluster that fits one row keeps the 206 the tablet pass settled on.
+        self._threatFrame.Position =
+            UDim2.new(0.5, 0, 1, -math.max(206, 34 + actionRow * ACTION_ROW_PITCH + 84 + 10))
     else
         self._objectiveFrame.Position = UDim2.fromOffset(18, 18)
         self._objectiveFrame.Size = if self._compactEnabled
@@ -2766,8 +3002,23 @@ function HUDController._layout(self: HUDController)
             button.Position = UDim2.new(1, -18, 0, 110 + (index - 1) * 46)
         end
         self._professionPanel.Size = UDim2.fromOffset(640, 440)
+        --[[
+            The desktop run, restated rather than left to the values the
+            buttons were created with: a window dragged narrow and back wide
+            again has to undo the wrapped cluster, and four of these five used
+            to be positioned nowhere but at construction.
+        ]]
+        self._primary.Position = UDim2.new(1, -28, 1, -30)
+        self._tool.Position = UDim2.new(1, -158, 1, -40)
+        self._dodge.Position = UDim2.new(1, -252, 1, -40)
         self._ability.Position = UDim2.new(1, -346, 1, -40)
+        self._companion.Position = UDim2.new(1, -440, 1, -40)
+        -- RUN stays where it was built on a desktop: left of the row, clear of
+        -- the mouse-driven cluster on the right.
+        self._sprint.Position = UDim2.new(0, 166, 1, -34)
+        self._sprint.AnchorPoint = Vector2.new(0, 1)
     end
+    self:_layoutLoadout()
 end
 
 function HUDController._presentPhase(self: HUDController, phase: string)
@@ -2845,6 +3096,7 @@ function HUDController._updateClock(self: HUDController)
     end
     self:_updateCombatClock()
     self:_updateProfessionClock()
+    self:_refreshActionCluster()
 
     if blackoutVisible then
         local duration = math.max(1, tonumber(blackout.duration) or 1)
@@ -3150,6 +3402,7 @@ function HUDController.update(self: HUDController, state: any)
     self._sprint.Visible = self._inputMode == "touch" and not self._playerDowned
     self._dodge.Visible = self:_dodgeButtonVisible()
     self:_updateProfessionClock()
+    self:_refreshActionCluster()
     self:_updateGear()
     self:_updateProgress()
     local eliteVisible = (type(boss) == "table" and (boss.active == true or boss.complete == true))
