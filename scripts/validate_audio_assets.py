@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import asset_provenance
+
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "assets" / "audio" / "manifest.json"
@@ -53,6 +55,8 @@ def main() -> None:
     assert ids.__contains__("music_blackout_pulse"), "Blackout score is missing"
     for region_id, phases in coverage.items():
         assert phases == PHASES, f"incomplete score for {region_id}: {sorted(phases)}"
+    asset_provenance.check("audio", tracks)
+    asset_provenance.check_totals()
     print("Validated 25 decoded, reviewed Roblox music assets across 8 worlds.")
 
 

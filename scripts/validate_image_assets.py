@@ -7,6 +7,8 @@ import json
 import struct
 from pathlib import Path
 
+import asset_provenance
+
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_PATH = ROOT / "assets" / "images" / "manifest.json"
@@ -47,6 +49,8 @@ def main() -> None:
         panels = layout.get("panels") or []
         if len(panels) != int(layout.get("columns", 0)) * int(layout.get("rows", 0)):
             raise RuntimeError(f"{asset_id}: atlas panel count does not match its grid")
+    asset_provenance.check("image", manifest["assets"])
+    asset_provenance.check_totals()
     print(f"Validated {len(seen_ids)} source image asset(s) and Roblox mappings.")
 
 

@@ -7,9 +7,11 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #351), build `0.53.0`,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #352), build `0.53.0`,
 save schema 25, 27 services. Published to Roblox as place version 156,
-matching this revision exactly. (#341 and #343 both left the built place
+matching this revision exactly. (#352 leaves the built place
+byte-identical, because it changes only manifests, validators and
+documentation.) (#341 and #343 both left the built place
 byte-identical, because they add only specs and documentation and the built
 place carries no tests, so publishing either returned the version #340 had
 already produced.) **The owner's standing directive: complete
@@ -28,7 +30,7 @@ done: routing every player-visible string through one table touches nearly every
 file that speaks to a player, and the check that gives the wave its value — *no
 player-visible literal outside the table* — cannot be switched on until the
 migration is complete. A partial pass is a large diff with no guard on it.
-**Milestone 14 has waves A and B shipped and C through E still to build.**
+**Milestone 14 has waves A, B and C shipped and D and E still to build.**
 
 **Milestones 0 through 11 are complete, and so is Milestone 12's buildable
 half** — M11 waves A through J and M12 waves A through E all shipped. What M12
@@ -77,6 +79,49 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#352** (v156, unchanged — this wave changes only manifests, validators and
+  documentation, and none of the three is in the built place) **M14 wave C: a claim
+  made once over a whole registry stops being true one asset at a time.** The three
+  asset validators proved an asset exists, decodes and is registered, and could not
+  say where it came from. The manifests each said something about origin in a
+  different vocabulary, and **the audio manifest said it once, at the top of the file,
+  covering all twenty-five tracks at the same time.**
+
+  That is the shape of the failure rather than a gap in rigour. A heading reading
+  "free public-domain audio from verified providers" is a claim the twenty-sixth track
+  inherits without anybody making it, and nothing anywhere fails. An original-IP audit
+  reads one list; three vocabularies is three lists.
+
+  **Origin is a per-asset field from a closed three-word vocabulary now**, and the
+  evidence a class requires is a property of the class rather than of whoever added
+  the asset. `authored_here` needs a sentence and nothing else — nobody has to be
+  asked about a thing this repository made. `generated_then_authored_here` needs the
+  tool named, because "we made it" and "a model made it and we normalized it" are
+  different answers and only one is interesting to an audit.
+  `licensed_platform_library` needs the two facts a licence question actually turns
+  on: who published it and where it lives. 10, 34 and 51.
+
+  **The third count is pinned harder than the other two**, because everything in it
+  belongs to somebody else and somebody else's work entering the game should be a
+  decision rather than a diff nobody sized.
+
+  [ASSET_PROVENANCE.md](ASSET_PROVENANCE.md) is the artifact the review reads, and its
+  51-row inventory is held against the manifests in both directions — an asset missing
+  from it is an asset nobody reviews, and a row for an asset no manifest ships is a
+  licence somebody is still paying attention to for nothing.
+
+  **What the check refuses to do is read a licence.** Whether Roblox's terms cover
+  this game's use of a particular Creator Store model is a human question, and a
+  script claiming to have settled it would be worse than one that says it cannot. The
+  document states the terms each class is used under and names the reading as the
+  owner's.
+
+  **Nothing here was invented.** Every publisher name was already in the mesh
+  manifest's own provenance sentences and every audio publisher in its `creator`
+  field; the wave moved facts into fields rather than writing new ones. Four mutations
+  run before it shipped: a licensed asset dropped from the inventory, a publisher
+  changed in the manifest only, an original quietly reclassified as licensed, and a
+  class deleted from the document. Each failed, and each named what was wrong.
 - **#351** (v156) **M14 wave B: a bullet cannot be unticked.** QA_RELEASE_PLAN.md
   has ended in a release checklist since Milestone 1, and it was prose bullets, which
   means "complete launch checklist" was completed by whoever said it was — normally

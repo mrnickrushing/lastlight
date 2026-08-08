@@ -6,6 +6,8 @@ import json
 import struct
 from pathlib import Path
 
+import asset_provenance
+
 
 ROOT = Path(__file__).resolve().parents[1]
 MESH_ROOT = ROOT / "assets" / "meshes"
@@ -122,7 +124,9 @@ def main() -> None:
 
     if len(roblox_ids) != len(set(roblox_ids)):
         fail("mesh manifest reuses a Roblox asset ID")
+    asset_provenance.check("mesh", assets)
     print(f"Validated {len(assets)} measured source models and Roblox asset mappings.")
+    print(asset_provenance.check_totals())
 
 
 if __name__ == "__main__":

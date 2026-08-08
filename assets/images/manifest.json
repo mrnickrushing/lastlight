@@ -6,6 +6,7 @@
       "displayName": "Last Light First World Notice Atlas V1",
       "role": "physical_notice_board_art",
       "source": "original_openai_image_generation",
+      "origin": "generated_then_authored_here",
       "provenance": "Original Last Light art generated for this repository from the visual quality standard; no third-party characters, logos, or locations.",
       "file": "source/first-world-notice-atlas-v1.png",
       "width": 1254,
