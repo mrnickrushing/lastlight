@@ -190,10 +190,18 @@ needs the forced scenario suite to exist before anybody can claim it.
 | D ✅ | **The metrics a gate reads** (shipped #336). Eleven server emitters, each named by the gate it feeds in RELEASE_GATES.md and naming it back, plus `SessionSegment` for the platform class and performance tier every per-segment threshold is read on. Two gates are `review` — a blocker defect is a triage decision and a policy failure comes through Roblox's moderation — and the count of those is pinned so a threshold cannot be quietly downgraded into "a human will look at it" | `GateMetrics.spec`: every gate names an event with an emitter, every emitter has a `GATE-METRIC` call site that calls it, every marker is a gate in the document, and no gate is emitted from client code |
 | E ✅ | **Soak instrumentation** (shipped #344). `SoakProbe` (pure) owns every rule about what a series of per-cycle counts means, and all three of them exist because the obvious subtraction passes on a leaking build: **the first cycle is not a baseline** (a server builds its world between sample one and sample two, and widening the tolerance until that stops hides a real leak), **a sample is only comparable to one taken at the same point in the cycle** (a series that drifts across phases is refused, not averaged), and **a leak's signature is that it does not stop** (growth is judged per cycle, and a metric still climbing at every step is a breach under its own tolerance — that run passed and a longer one would not have). `PerformanceService` samples once per town cycle at dawn from counters injected in `init.server`; `LastLightSoak` is the sixth Studio-only attribute and grants nothing. **Connection count is declared unobservable** — Roblox exposes no API, so `player_residue` watches the tables a leaked connection would keep alive instead, and the count of unobservable metrics is pinned | Soak spec: N cycles leave the same counts they started with, within a declared tolerance |
 
+**Every buildable M12 wave has shipped** — A through E. What is left of the
+milestone is the half that needs people, and naming it here rather than in a
+verdict somewhere is the point of the split.
+
 **Owner-gated for M12:** daily full-path playtests, the device lab,
 long-session soak on hardware, narrative continuity and content sensitivity
 review, production-like services, representative concurrency, and the defect
-triage the exit gate describes.
+triage the exit gate describes. Two smaller ones the waves themselves turned
+up: `profile_bytes` has never been soaked under a profile that is actually
+being written (driving cycles from a session latches practice), and the six
+regions' `enabled` flags are still the whole distance between the traversal
+walk and a live playthrough.
 
 ## Milestone 13 — Closed beta
 

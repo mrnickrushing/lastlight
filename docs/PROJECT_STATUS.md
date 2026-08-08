@@ -20,8 +20,13 @@ that makes that possible is
 available and driven from the terminal (launch recipe in the M7 runbook);
 Studio-facing checks not performed are recorded open rather than assumed.
 
-**Milestones 0 through 10 are complete, and so is Milestone 11** — waves A
-through J all shipped. The plan is honest about the thing that makes M12–M14
+**Milestones 0 through 11 are complete, and so is Milestone 12's buildable
+half** — M11 waves A through J and M12 waves A through E all shipped. What M12
+still owes is the part no code produces, and the wave plan has said so since it
+was written: daily full-path playtests with humans in them, the device lab, a
+long-session soak on real hardware, narrative and content review,
+production-like services and representative concurrency. The waves built the
+instruments those gates are read from; the readings are the owner's. The plan is honest about the thing that makes M12–M14
 different from everything before them: **an internal alpha needs players, a
 closed beta needs cohorts and devices, and a launch candidate needs store
 review** — so those milestones are mostly a list of owner-gated blockers with
