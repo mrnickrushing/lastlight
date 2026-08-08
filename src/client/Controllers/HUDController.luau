@@ -357,6 +357,8 @@ export type HUDController = typeof(setmetatable(
         _selectedContractId: string,
         _onLobbyDepart: ((number) -> ())?,
         _selectedPartySize: number?,
+        _partyLine: TextLabel,
+        _partyButtons: { [string]: TextButton },
         _progressButton: TextButton,
         _useButtons: { TextButton },
         _professionOverlay: Frame,
@@ -1279,7 +1281,7 @@ function HUDController.new(
     lobbyFrame.Name = "LobbyPanel"
     lobbyFrame.AnchorPoint = Vector2.new(0.5, 1)
     lobbyFrame.Position = UDim2.new(0.5, 0, 1, -104)
-    lobbyFrame.Size = UDim2.fromOffset(420, 186)
+    lobbyFrame.Size = UDim2.fromOffset(420, 246)
     lobbyFrame.BackgroundColor3 = Color3.fromRGB(16, 22, 26)
     lobbyFrame.BackgroundTransparency = 0.12
     lobbyFrame.BorderSizePixel = 0
@@ -1400,6 +1402,71 @@ function HUDController.new(
         contractButtons[contract.id] = contractButton
     end
 
+    --[[
+        The party row: who is travelling with you, and the way back to them.
+
+        It lives in the departure panel because that is where the decision is
+        made -- you gather at the platform, ask the people standing on it, and
+        leave together. The rejoin offer is here for the same reason: a player
+        who dropped out of a run comes back to the lodge, and the platform is
+        the thing they are looking at.
+    ]]
+    local partyLine = Instance.new("TextLabel")
+    partyLine.Name = "LobbyPartyLine"
+    partyLine.BackgroundTransparency = 1
+    partyLine.Position = UDim2.fromOffset(14, 180)
+    partyLine.Size = UDim2.new(1, -28, 0, 16)
+    partyLine.Font = Enum.Font.Gotham
+    partyLine.Text = "TRAVELLING ALONE"
+    partyLine.TextColor3 = Color3.fromRGB(178, 194, 183)
+    partyLine.TextSize = 14
+    partyLine.TextXAlignment = Enum.TextXAlignment.Left
+    partyLine.ZIndex = 41
+    partyLine.Parent = lobbyFrame
+
+    local partyRow = Instance.new("Frame")
+    partyRow.Name = "LobbyParty"
+    partyRow.BackgroundTransparency = 1
+    partyRow.Position = UDim2.fromOffset(14, 200)
+    partyRow.Size = UDim2.new(1, -28, 0, 36)
+    partyRow.ZIndex = 41
+    partyRow.Parent = lobbyFrame
+    local partyLayout = Instance.new("UIListLayout")
+    partyLayout.FillDirection = Enum.FillDirection.Horizontal
+    partyLayout.Padding = UDim.new(0, 6)
+    partyLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    partyLayout.Parent = partyRow
+
+    local partyButtons: { [string]: TextButton } = {}
+    for order, entry in
+        {
+            { key = "rejoin", label = "REJOIN" },
+            { key = "accept", label = "JOIN" },
+            { key = "decline", label = "DECLINE" },
+            { key = "invite", label = "INVITE" },
+            { key = "leave", label = "LEAVE" },
+        }
+    do
+        local partyButton = Instance.new("TextButton")
+        partyButton.Name = "Party_" .. entry.key
+        partyButton.LayoutOrder = order
+        partyButton.Size = UDim2.new(0, 92, 1, 0)
+        partyButton.BackgroundColor3 = Color3.fromRGB(31, 40, 44)
+        partyButton.AutoButtonColor = true
+        partyButton.Font = Enum.Font.GothamBold
+        partyButton.Text = entry.label
+        partyButton.TextColor3 = Color3.fromRGB(244, 230, 197)
+        partyButton.TextSize = 13
+        partyButton.Selectable = true
+        partyButton.Visible = false
+        partyButton.ZIndex = 42
+        partyButton.Parent = partyRow
+        local partyCorner = Instance.new("UICorner")
+        partyCorner.CornerRadius = UDim.new(0, 8)
+        partyCorner.Parent = partyButton
+        partyButtons[entry.key] = partyButton
+    end
+
     -- Action progress: what a timed gather or build looks like while it runs.
     local actionFrame = Instance.new("Frame")
     actionFrame.Name = "ActionProgress"
@@ -1462,6 +1529,8 @@ function HUDController.new(
         _lobbyDetail = lobbyDetail,
         _lobbySizes = lobbySizes,
         _lobbySizeButtons = lobbySizeButtons,
+        _partyLine = partyLine,
+        _partyButtons = partyButtons,
         _contractButtons = contractButtons,
         _selectedContractId = "contract_standard",
         _departurePlatformPart = nil,
@@ -1757,6 +1826,94 @@ function HUDController.setLobbyDepartHandler(self: HUDController, callback: (num
     end
 end
 
+--[[
+    The five party presses, wired in one call.
+
+    Each button sends one thing and nothing else: INVITE asks whoever is
+    standing on the platform, JOIN and DECLINE answer the one invitation a
+    player can be holding, LEAVE steps out, REJOIN spends the ticket back to a
+    run. None of them carries a name, and the reply carries only yes or no,
+    which is what keeps every one of them inside the payload contract's single
+    extra field.
+]]
+function HUDController.setPartyHandlers(
+    self: HUDController,
+    onInvite: () -> (),
+    onReply: (boolean) -> (),
+    onLeave: () -> (),
+    onRejoin: () -> ()
+)
+    self._partyButtons.invite.Activated:Connect(onInvite)
+    self._partyButtons.leave.Activated:Connect(onLeave)
+    self._partyButtons.rejoin.Activated:Connect(onRejoin)
+    self._partyButtons.accept.Activated:Connect(function()
+        onReply(true)
+    end)
+    self._partyButtons.decline.Activated:Connect(function()
+        onReply(false)
+    end)
+end
+
+--[[
+    What the party row says, and which of its buttons exist right now.
+
+    Everything here comes off the snapshot rather than from local memory: the
+    party is server state, and a client that remembered its own idea of who
+    was in it would be a second answer to a question with one authority. An
+    absent `party` block means the server has no party service, and the whole
+    row goes away rather than showing an empty one.
+]]
+function HUDController._updateParty(self: HUDController, state: any)
+    local party = state.party
+    local buttons = self._partyButtons
+    if type(party) ~= "table" then
+        self._partyLine.Visible = false
+        for _, button in buttons do
+            button.Visible = false
+        end
+        return
+    end
+
+    local rejoin = party.rejoin
+    local hasRejoin = type(rejoin) == "table" and rejoin.available == true
+    local invitedBy = if type(party.inviteFrom) == "string" then party.inviteFrom else nil
+    local size = if type(party.size) == "number" then party.size else 0
+    -- Guarded like every other field this reads, and for a sharper reason:
+    -- `string.format` with %d raises on a nil, and this runs off the render
+    -- loop, so one bad field would break the panel on every frame rather
+    -- than once.
+    local rejoinSize = if hasRejoin and type(rejoin.partySize) == "number"
+        then rejoin.partySize
+        else 0
+
+    self._partyLine.Visible = true
+    self._partyLine.Text = if hasRejoin
+        then string.format("YOUR PARTY OF %d IS STILL OUT THERE", rejoinSize)
+        elseif invitedBy ~= nil then string.format(
+            "%s ASKS YOU TO TRAVEL WITH THEM",
+            invitedBy
+        )
+        elseif party.inParty == true and party.leader == true then string.format(
+            "PARTY OF %d · YOU LEAD",
+            size
+        )
+        elseif party.inParty == true then string.format(
+            "PARTY OF %d · LED BY %s",
+            size,
+            tostring(party.leaderName or "SOMEONE")
+        )
+        else "TRAVELLING ALONE"
+
+    buttons.rejoin.Visible = hasRejoin
+    buttons.accept.Visible = invitedBy ~= nil
+    buttons.decline.Visible = invitedBy ~= nil
+    -- An invitation is answered before another is offered: three choices in a
+    -- row where two of them are about different parties is a way to press the
+    -- wrong one.
+    buttons.invite.Visible = invitedBy == nil
+    buttons.leave.Visible = invitedBy == nil and party.inParty == true
+end
+
 -- Mara's last line stays up for a few seconds. Long enough to read at a
 -- glance, short enough that it never becomes furniture.
 local MARA_LINE_SECONDS = 7
@@ -1822,6 +1979,7 @@ function HUDController._updateLobby(self: HUDController, state: any)
         end
     end
     self._lobbyFrame.Visible = true
+    self:_updateParty(state)
     if lobby.counting then
         self._lobbyTitle.Text = string.format("DEPARTING IN %d", lobby.secondsRemaining)
         self._lobbyDetail.Text =

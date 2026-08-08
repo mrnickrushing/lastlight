@@ -8,12 +8,25 @@ hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
 Last updated: 2026-08-07, at `main` = `HEAD` (PR #320), build `0.53.0`,
-save schema 21, 23 services. Published to Roblox as place version 132,
+save schema 22, 24 services. Published to Roblox as place version 133,
 matching this revision exactly. **The owner's standing directive: complete
-Milestones 7 through 10 continuously, wave by wave, each implemented,
-tested, merged and published, with no check-in between waves.** Studio is
+Milestones 11 through 14 continuously, wave by wave, each implemented,
+tested, merged and published, with no check-in between waves.** The queue
+that makes that possible is
+[WAVE_PLAN_M11_M14.md](WAVE_PLAN_M11_M14.md); read it second. Studio is
 available and driven from the terminal (launch recipe in the M7 runbook);
 Studio-facing checks not performed are recorded open rather than assumed.
+
+**Milestones 0 through 10 are complete.** Milestone 11 is in flight and its
+first wave has shipped. The plan is honest about the thing that makes M12–M14
+different from everything before them: **an internal alpha needs players, a
+closed beta needs cohorts and devices, and a launch candidate needs store
+review** — so those milestones are mostly a list of owner-gated blockers with
+a smaller list of buildable waves whose whole job is to make the human half
+measurable. It also settles the cosmetic store's architecture before any store
+code exists, because `scripts/validate_monetization.py` asserts there is no
+purchase or ownership branch in gameplay code and that guard has to survive
+M11 rather than be widened by it.
 
 **Milestones 7, 8 and 9 are complete.** The story runs end to end: seven
 chapters, seven regions, an authored finale with three endings, an
@@ -46,7 +59,7 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
-- **#320** (v132) **all twenty-seven residents are authored, and the
+- **#320** (v133) **all twenty-seven residents are authored, and the
   derivation is a safety net rather than a path anybody stands on.**
   Chapter VI's four out of the Crown and chapter VII's four out of the
   Hollow finish what #316 and #318 started. Sabine will not blow
@@ -95,6 +108,37 @@ Newest first since the last header:
   every footprint; the closest pair in town is still Ena and Pip at
   9.06, and the tightest new footprint clearance is Ruth at 6.50 in
   front of the celebration stage.
+- **#319** (v132) **M11 wave A: a party is a named thing now.** What the
+  lodge has had since it shipped is a platform — whoever is standing on it
+  when the countdown ends boards, in whatever order `Players:GetPlayers()`
+  returned them. That is several people leaving at once, not a party, and it
+  survives nothing: not a bystander who wandered onto the dais and took the
+  fourth seat, and not a disconnect, because a run server is reserved and a
+  player who drops out of one has **no way to name the world their friends
+  are still in**. `PartySession` (pure) owns identity, roster, invitations
+  and the ticket home; `PartyService` owns the live parties and the teleport
+  that spends one; the departure payload carries the party id, so a run
+  server recognises its own returning members instead of forwarding them into
+  the world they are standing in.
+
+  Three decisions worth carrying forward. **The invite press names nobody**
+  — it offers a seat to whoever the server can see on the platform, measured
+  by LobbyService's own occupancy reading, so a press cannot be forged into
+  naming a stranger across the map and an invitation can never disagree with
+  a boarding pass about who was on the dais. **The travelling party is the
+  boarding list, not the friendship group**, because a party of three that
+  chose four seats picks up a stranger and the stranger is in that reserved
+  world too; a ticket has to name the world's population or they have no way
+  home. And **the ticket the server holds and the fact the client sees are
+  different objects**: the stored ticket carries a reserved-server access
+  code, which is the entire key to a private world, and
+  `PartySession.publicTicket` builds the client's half by construction rather
+  than by remembering to omit a field. Save schema 21 → 22 with an era-21
+  fixture; a rejoin ticket is the one saved field that resolves to a
+  teleport, so a forged one is refused outright.
+
+  Also written this wave: **[WAVE_PLAN_M11_M14.md](WAVE_PLAN_M11_M14.md)**,
+  the queue for the rest of the roadmap.
 - **#318** (v131) **nineteen residents are authored now, not eleven.**
   Chapters IV and V's eight — the Reach's four and the Vale's four — get
   what #316 gave chapters II and III. That is the whole cast of the half
