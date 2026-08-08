@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #340), build `0.53.0`,
-save schema 25, 27 services. Published to Roblox as place version 150,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #341), build `0.53.0`,
+save schema 25, 27 services. Published to Roblox as place version 151,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,7 +59,45 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
-- **#340** **M11 wave J: the taxonomy and the code named different events, and
+- **#341** **M12 wave A: the fixtures were each normalized once, and a real save
+  is not.** `SaveMigration.spec` has held an era fixture per released schema
+  since Milestone 4 and refuses a bump without one. What it does is normalize
+  each fixture **straight to current** — one hop. A save played since schema 11
+  has been through fourteen migrations *in sequence*, each one reading what the
+  one before it wrote, and that is a different question: a migration written
+  against the fixture beside it can be correct about that fixture and wrong
+  about the shape its predecessor actually produces. `SaveRehearsal.spec` walks
+  one profile era by era, checking at every step that the tutorial is still
+  finished, the tool still chosen, the profession still picked, twelve nights
+  still survived, the chapter still resolved with its transaction id, and the
+  pouch still full — and that the **revision has not moved**, because a
+  migration that rewrites it has quietly created a save that outranks the one in
+  the store.
+
+  **And the forced-scenario suite M12's exit gate needs in order to be
+  claimable at all.** "Save-loss and purchase-loss rate is zero in a forced
+  scenario suite" is a sentence about a suite, and the suite did not exist. Four
+  ways a real save is lost, each expressed against the pure module that already
+  decides it, because the decision is where the loss happens and the DataStore
+  call around it is Roblox's: a **disconnect mid-write** (the older copy has to
+  survive, and the interrupted write has to still outrank it if it lands late);
+  a **profile lock** (read-only rather than refused, and reclaimable once it
+  stops beating, or a server crash ends somebody's game permanently); a **failed
+  read** (the one that must not be mistaken for a new player, because that
+  mistake hands out a default and then writes it over everything); and a
+  **restore from backup** (which has to outrank the live save, or the operator
+  is told a rollback worked that was silently refused as stale).
+
+  **Then all of it again with money in it.** The mailbox lives outside the
+  profile by construction, and this is the case that construction exists for: a
+  receipt held while the profile could not be written survives the profile being
+  rolled back, refused or replaced, drains into it when it can, and grants
+  exactly once when the platform retries. Purchase loss is its own gate for this
+  reason — a suite watching only the profile would pass on a build where every
+  rollback dropped a paid-for cosmetic. The entitlement is walked era by era
+  too, since it is the one field on the profile that cost a real person real
+  currency.
+- **#340** (v150) **M11 wave J: the taxonomy and the code named different events, and
   Milestone 11 is complete.** The monetization document lists six commerce
   events and the store-safety section says why they are six rather than one:
   *purchase analytics separates prompt, platform completion, receipt grant, and
