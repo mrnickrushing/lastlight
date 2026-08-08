@@ -46221,6 +46221,17 @@ function ExpeditionService._buildRegion(self: ExpeditionService, seed: number)
     local result = self._worldService:buildBramblewake(manifest, self._generator, self._catalog)
     self._manifest = manifest
     self._partCount = result.partCount
+    --[[
+        Read at every build rather than once at boot.
+
+        A private server owner can ask for a different seed at runtime and this
+        function runs again, so a flag turned off during an incident takes hold
+        on the next wood rather than waiting for a restart. The event states
+        below are created from it, which is why it is stored as well as read:
+        the states have to agree with each other for the life of one manifest,
+        and a flag flipping between two module placements would build a wood
+        where half the events are dormant and half are disabled.
+    ]]
     self._eventsEnabled = self._featureFlags:isEnabled("bramblewake_events_enabled")
     self._worldService:setExpeditionEventsEnabled(self._eventsEnabled)
     self._eventStates = {}
@@ -56009,7 +56020,7 @@ export type TownNightService = typeof(setmetatable(
         _duskSeconds: number,
         _nightSeconds: number,
         _blackoutInterval: number,
-        _enabled: boolean,
+        _featureFlags: any,
         _started: boolean,
         _nightNumber: number,
         _activeNightNumber: number,
@@ -56066,7 +56077,7 @@ function TownNightService.new(
         _duskSeconds = config.DuskSeconds,
         _nightSeconds = config.NormalNightSeconds,
         _blackoutInterval = config.BlackoutInterval,
-        _enabled = featureFlags:isEnabled("town_night_cycle_enabled"),
+        _featureFlags = featureFlags,
         _started = false,
         _nightNumber = 1,
         _activeNightNumber = 0,
@@ -56375,7 +56386,22 @@ function TownNightService.ensureStarted(
     if condition ~= nil and actorUserId ~= nil then
         self:_considerContribution(actorUserId, condition)
     end
-    if not self._enabled or self._started then
+    --[[
+        Read here rather than kept from construction.
+
+        This is the town cycle's kill switch, and a kill switch you have to
+        restart every server to use is not one you would reach for during an
+        incident -- which is the only moment it exists for. Read at the door a
+        new cycle comes through, turning it off stops the next night on every
+        server that is already running, and leaves the one in progress alone.
+        That is the correct half to stop: a night that vanishes underneath the
+        people fighting it is a worse outage than the one being rolled back.
+
+        The soak wave paid for the same lesson from the other side (#344): a
+        switch read once at boot could never be turned on in the only place
+        anybody drives it, and nothing failed while it could not.
+    ]]
+    if not self._featureFlags:isEnabled("town_night_cycle_enabled") or self._started then
         return
     end
     self._started = true

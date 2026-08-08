@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #348), build `0.53.0`,
-save schema 25, 27 services. Published to Roblox as place version 154,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #349), build `0.53.0`,
+save schema 25, 27 services. Published to Roblox as place version 155,
 matching this revision exactly. (#341 and #343 both left the built place
 byte-identical, because they add only specs and documentation and the built
 place carries no tests, so publishing either returned the version #340 had
@@ -67,6 +67,45 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#349** (v155) **M13 wave E: a switch you have to restart every server to use is not
+  a switch.** [ROLLBACK.md](ROLLBACK.md) is the list M13's rollback drill needs to
+  exist before it can be run: every flag, what turning it off leaves, and the build
+  and flag state a rollback restores. The interesting column is **scope**, and it
+  is load-bearing rather than descriptive — the only moment a kill switch exists
+  for is an incident, and during an incident the servers are already running with
+  players in them.
+
+  **`TownNightService` cached the town cycle's flag at construction**, so the off
+  switch for the whole night loop needed a full server restart to take effect.
+  Nothing failed; every snapshot reported the right value. It is read at the door a
+  new cycle comes through now, which also settles what off *means*: **stop starting
+  new ones, not delete what is running.** A night that vanishes underneath the
+  people fighting it is a worse outage than the one being rolled back. This is
+  #344's lesson from the other side, and the spec refuses a `live` switch stored in
+  a field.
+
+  **Writing the list found four flags that nothing reads at all** —
+  `bounded_join`, `first_ten_minutes`, `input_action_system` and
+  `content_registry`, Milestone 1 staging switches for systems that have since
+  become the game. They are declared `none` with the reason rather than wired into
+  a fiction: a kill switch for the input action system leaves a world nobody can
+  touch, which is not a rollback, it is an outage. **That count is pinned harder
+  than the restart count**, because a switch that turns nothing off looks exactly
+  like one that works right up until somebody reaches for it.
+
+  Three encounter switches are `restart`-scoped and pinned, one is `rebuild`-scoped
+  because the event states created from it have to agree with each other for the
+  life of one manifest, and the scope column is what licenses a cache — declare a
+  switch `live` and store it, and the spec fails.
+
+  **The honest limit is written down rather than implied:** production refuses flag
+  overrides, so step one of a rollback is a config change and a publish there
+  today. Making it genuinely live needs a server-side flag store, which is
+  owner-gated infrastructure.
+
+  **M13 wave D (localization source coverage) is the one wave of this milestone
+  still to build**, and it was taken out of order deliberately rather than started
+  and abandoned; the wave plan records why.
 - **#348** (v154) **M13 wave C: a number you cannot act on is an observation.** Wave B
   gave every tuning decision a number; this is the other half of the sentence.
   **Ten values came out of four services into `Config`** — the elite's and the

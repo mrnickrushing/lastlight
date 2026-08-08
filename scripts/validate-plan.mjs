@@ -24,6 +24,7 @@ const requiredFiles = [
   "docs/SOCIAL_SAFETY_REVIEW.md",
   "docs/BETA_ROLLOUT.md",
   "docs/BETA_TUNING.md",
+  "docs/ROLLBACK.md",
   "src/shared/RolloutCohorts.luau",
   "docs/RELEASE_GATES.md",
   "docs/DEVELOPMENT.md",

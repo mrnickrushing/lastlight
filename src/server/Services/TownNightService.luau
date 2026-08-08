@@ -50,7 +50,7 @@ export type TownNightService = typeof(setmetatable(
         _duskSeconds: number,
         _nightSeconds: number,
         _blackoutInterval: number,
-        _enabled: boolean,
+        _featureFlags: any,
         _started: boolean,
         _nightNumber: number,
         _activeNightNumber: number,
@@ -107,7 +107,7 @@ function TownNightService.new(
         _duskSeconds = config.DuskSeconds,
         _nightSeconds = config.NormalNightSeconds,
         _blackoutInterval = config.BlackoutInterval,
-        _enabled = featureFlags:isEnabled("town_night_cycle_enabled"),
+        _featureFlags = featureFlags,
         _started = false,
         _nightNumber = 1,
         _activeNightNumber = 0,
@@ -416,7 +416,22 @@ function TownNightService.ensureStarted(
     if condition ~= nil and actorUserId ~= nil then
         self:_considerContribution(actorUserId, condition)
     end
-    if not self._enabled or self._started then
+    --[[
+        Read here rather than kept from construction.
+
+        This is the town cycle's kill switch, and a kill switch you have to
+        restart every server to use is not one you would reach for during an
+        incident -- which is the only moment it exists for. Read at the door a
+        new cycle comes through, turning it off stops the next night on every
+        server that is already running, and leaves the one in progress alone.
+        That is the correct half to stop: a night that vanishes underneath the
+        people fighting it is a worse outage than the one being rolled back.
+
+        The soak wave paid for the same lesson from the other side (#344): a
+        switch read once at boot could never be turned on in the only place
+        anybody drives it, and nothing failed while it could not.
+    ]]
+    if not self._featureFlags:isEnabled("town_night_cycle_enabled") or self._started then
         return
     end
     self._started = true
