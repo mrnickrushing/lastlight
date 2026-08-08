@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-07, at `main` = `HEAD` (PR #320), build `0.53.0`,
-save schema 22, 24 services. Published to Roblox as place version 133,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #325), build `0.53.0`,
+save schema 22, 24 services. Published to Roblox as place version 138,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,6 +59,80 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#325** (v138) **the third leg of the click-everything walkthrough:
+  Bramblewake's whole chapter arc, walked with real mouse input.** All
+  eight expedition events (seven completed, one deliberately left to its
+  timer to see the failure path), a harvest node, two memory fragments,
+  the rootfire relay, the Old Growth through both shield phases, the
+  Warden Stag through all three with the Greenward vote resolving
+  chapter one, six real bleedouts through the recovery-satchel loop,
+  the Wayhome out, a snare armed by click that bit a pathing Briarback
+  on night 2, and dawn resolving clean. What the walk caught:
+
+  **A mouse click was three server requests.** TapController duplicated
+  the engine ClickDetector on mouse and InputController swung the tool
+  on the same press — so every one-shot interaction's success toast
+  died to MOVE CLOSER TO THE MARKED OBJECT or "The tool is calm in
+  daylight." The elite's, the boss's and the chapter's completion lines
+  all went unseen in the same run that earned them. Mouse taps now
+  defer to a detector that will fire and only speak when it won't.
+
+  **Invisible click volumes fought each other, one fight a soft-block.**
+  The wild-regrowth vote shrine capped the Warden's south root node
+  completely — phase 3 needs all four roots, so the boss could not be
+  finished by tap. Module 9's nodes sat five studs off the elite's fire
+  and heart; the bell fragment's volume lay across the Wayhome gate.
+  All repositioned, and spent nodes stop answering raycasts.
+
+  **Every landmark label died with the art pass** — billboards were
+  disabled with the scenery lights when authored meshes replaced their
+  placeholders, so POI names, LANTERN FIRE / ROOT HEART and the whole
+  Blackout relay guidance never rendered in a dressed world. Billboards
+  are semantics now and survive replacement.
+
+  **The town never re-rendered in the session that changed it.** The
+  consequence pushed only at profile load, so chapter results and
+  night-earned tiers waited for a rejoin the single-place topology
+  never provides. Chapter resolution and dawn both push now, deduped by
+  signature.
+
+  **The Studio skip left the world half-woken** — beacon dark, night
+  cycle never started. It now runs the same setup a loaded complete
+  profile gets. And the banked polish: the field book's 130 recipes
+  scroll inside the panel, completion toasts precede the blackout's
+  announcement, the RootCrown reads as wood, the backdrop ranks floor
+  their shade above black, and the road stones sit on the roads (the
+  placement helper hard-clamped Y to 0.42 over every caller's ask).
+
+  **Every fix was verified live on the rebuilt place** in a second
+  session: the skip now wakes the beacon and the night cycle, an event
+  step click reads POLLEN STORM — 1/3 and keeps it, all 33 landmark
+  labels render, the field book scrolls under its own buttons, the
+  stones sit on their roads, and — the one that matters — at dawn 4
+  the tier flipped to 1 and Tomas, Pip and Ena walked into a running
+  session, talked with live quest progress, and Tomas's arc advanced
+  to 1/12 after a real crafted satchel claimed his first stage. The
+  same session armed the Meadow Gate snare by click (2 fiber + 1
+  heartwood spent exactly) and watched it bite a pathing Briarback on
+  night 2, with DAWN BREAKS — NIGHT 2 HELD CLEAN closing it.
+
+  Known debt from review, deliberately deferred: the loadout row's
+  fixed offsets overflow a portrait phone panel (predates this PR),
+  and the new DetailsScroll has no gamepad focus path. One cosmetic
+  mismatch noticed live: the HUD phase pill reads DAY · MORNING during
+  repeating town nights — it follows the tutorial's PhaseService, not
+  TownNightService.
+- **#321–#324** (v134–v137) **the first two legs of the walkthrough,
+  recorded here after the fact** — these merged from a parallel session
+  without a status entry. #321 took the hundred and twenty benches back
+  out of the plaza (the crafting maze made the town unplayable), #322
+  stopped the world being solid where a phone cannot see it yet
+  (tap-eating placeholders and mobile mesh streaming), #323 fixed what
+  the first real playthrough hit (Mara's rescue, the plot shadow, click
+  volumes, the title screen), and #324 the second (consumable buttons
+  anchored off-screen, the field book opening empty between server
+  pushes). Together they walked title → lodge → departure → full
+  tutorial → town crafting and equipping → expedition entry.
 - **#320** (v133) **all twenty-seven residents are authored, and the
   derivation is a safety net rather than a path anybody stands on.**
   Chapter VI's four out of the Crown and chapter VII's four out of the
