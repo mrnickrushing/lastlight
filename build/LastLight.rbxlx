@@ -1488,6 +1488,12 @@ return table.freeze(AdminInspectionReport)
         same outcome: refused. Nothing partially applies.
       * These commands exist to make testing possible, not to hand out power.
         Everything they do, the game already does on its own schedule.
+
+    SAFETY-CHANNEL: admin_command -- the one channel where a player's typed
+    text reaches the game at all. Bounded by a two-name roster of user IDs, by
+    a parser that refuses anything it does not recognise, and by a feature flag
+    that is a complete off switch including the roster. It carries commands,
+    never messages: nothing typed here is shown to another player.
 ]]
 
 local AdminRoster = {}
@@ -24216,6 +24222,11 @@ end
     people were in the party, how long the offer lasts. The access code is
     absent by construction rather than by remembering to omit it, which is the
     only version of that rule that survives somebody adding a field later.
+
+    SAFETY-CHANNEL: rejoin_ticket -- a reserved-server access code is a door
+    into a private world, and this is the wall between it and any client. Not a
+    block-suppressed channel: it never reaches a player other than the one it
+    was issued to at all.
 ]]
 function PartySession.publicTicket(ticket: any, now: any, currentPartyId: any): any?
     local read = PartySession.readTicket(ticket, now, currentPartyId)
@@ -35551,6 +35562,17 @@ lobbyService:setPartyService(partyService)
 ]]
 local socialService =
     SocialService.new(logger, Config, QuickChat, RateLimiter, featureFlags, analyticsService)
+--[[
+    One block reader for the whole game. PartyService asks the same authority
+    quick chat asks, rather than reaching for the platform a second time: a
+    suppression rule with two homes is a rule that stops being true in one of
+    them, and the safety review's whole claim is that every channel consults
+    the same list.
+]]
+partyService:setBlockReader(function(fromUserId: number, toUserId: number): boolean
+    return socialService:isSuppressed(fromUserId, toUserId)
+end)
+
 local performanceService = PerformanceService.new(logger, Config, PerformanceBudget)
 local adminService = AdminService.new(
     logger,
@@ -43136,6 +43158,7 @@ export type PartyService = typeof(setmetatable(
         _runPartyId: string?,
         _onToast: ((Player?, string) -> ())?,
         _platformProvider: (() -> { Player })?,
+        _blockReader: ((number, number) -> boolean)?,
     },
     PartyService
 ))
@@ -43161,6 +43184,7 @@ function PartyService.new(
         _runPartyId = nil,
         _onToast = nil,
         _platformProvider = nil,
+        _blockReader = nil,
     }, PartyService)
 end
 
@@ -43240,6 +43264,27 @@ function PartyService.sharesPartyWith(
     return theirs ~= nil and self._inviteByUser[firstUserId] == theirs
 end
 
+--[[
+    Whether these two may be put in a party together.
+
+    Asked of the same authority quick chat asks -- one block reader for the
+    whole game, because a suppression rule with two homes is a rule that stops
+    being true in one of them. Absent a reader (a server built without the
+    social service) nobody is blocked, which is the state this game shipped in
+    before there was a reader at all.
+]]
+function PartyService._blocked(self: PartyService, first: Player, second: Player): boolean
+    local reader = self._blockReader
+    if reader == nil then
+        return false
+    end
+    return reader(first.UserId, second.UserId) or reader(second.UserId, first.UserId)
+end
+
+function PartyService.setBlockReader(self: PartyService, reader: (number, number) -> boolean)
+    self._blockReader = reader
+end
+
 function PartyService._store(self: PartyService, partyId: string, state: any)
     if state == nil then
         self._parties[partyId] = nil
@@ -43272,6 +43317,12 @@ end
     Anyone already in a party is skipped rather than refused. Two overlapping
     parties is a problem with no good answer at the platform, and the simplest
     honest rule is that you leave the one you are in before you join another.
+
+    SAFETY-CHANNEL: party_invite -- a block skips a player here, silently and
+    in both directions. Silently because the alternative tells the presser who
+    has blocked them, which is a disclosure the platform deliberately does not
+    make; both directions because an invitation is a two-way relationship and a
+    seat offered to somebody you blocked is a seat beside them.
 ]]
 function PartyService.invite(self: PartyService, player: Player): any
     local provider = self._platformProvider
@@ -43285,7 +43336,7 @@ function PartyService.invite(self: PartyService, player: Player): any
     for _, other in standing do
         if other == player then
             onPlatform = true
-        elseif self._partyByUser[other.UserId] == nil then
+        elseif self._partyByUser[other.UserId] == nil and not self:_blocked(player, other) then
             table.insert(eligible, other)
         end
     end
@@ -43645,6 +43696,13 @@ end
     Every field here is presentation. The rejoin half comes from
     PartySession.publicTicket rather than from the stored ticket, so the access
     code is absent by construction rather than by omission.
+
+    SAFETY-CHANNEL: party_roster -- the only party information that reaches a
+    player: a size, whether they lead, and two display names. No user IDs, no
+    text anybody wrote, and no way to see a roster of a party you are not in or
+    have not been asked into. A player cannot be put in a party with somebody
+    they blocked by that person's action, because the invite that would do it
+    is skipped upstream.
 ]]
 function PartyService.snapshot(self: PartyService, player: Player): any
     local _, state = self:_partyOf(player)
@@ -48932,6 +48990,16 @@ function SocialService.say(self: SocialService, player: Player, phraseId: any): 
     return { accepted = true, call = call }
 end
 
+--[[
+    SAFETY-CHANNEL: quick_chat_phrase -- what somebody said, filtered per
+    recipient for expiry and for who has blocked whom.
+    SAFETY-CHANNEL: quick_chat_ping -- the marker that phrase left, filtered by
+    the same block rule and additionally by distance.
+
+    Both filters live in the pure module and are applied here, at the one door
+    a snapshot is built through. Filtering at the four places a snapshot is
+    read would be four places to forget.
+]]
 function SocialService.snapshot(self: SocialService, player: Player): any
     local now = workspace:GetServerTimeNow()
     local suppressed = self:_suppressionFor(player)
@@ -49345,6 +49413,9 @@ function TownNightService._considerContribution(
     end)
 end
 
+-- SAFETY-CHANNEL: town_visit_adoption -- the only path by which one player's
+-- saved town can reach another player's town, and the only place a visit
+-- policy can refuse it.
 function TownNightService._applyContribution(
     self: TownNightService,
     actorUserId: number,
@@ -52054,6 +52125,9 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             end
             local hostPlayer = Players:GetPlayerByUserId(info.hostUserId)
             --[[
+                SAFETY-CHANNEL: town_showcase -- one player's town record read
+                by another, gated on the role the visit policy decided.
+
                 The showcase: the host's own town record, and the reason a
                 policy is worth having. It is attached only for a host or an
                 admitted visitor -- an outsider gets the role and nothing else,

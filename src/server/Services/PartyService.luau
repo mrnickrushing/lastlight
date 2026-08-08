@@ -61,6 +61,7 @@ export type PartyService = typeof(setmetatable(
         _runPartyId: string?,
         _onToast: ((Player?, string) -> ())?,
         _platformProvider: (() -> { Player })?,
+        _blockReader: ((number, number) -> boolean)?,
     },
     PartyService
 ))
@@ -86,6 +87,7 @@ function PartyService.new(
         _runPartyId = nil,
         _onToast = nil,
         _platformProvider = nil,
+        _blockReader = nil,
     }, PartyService)
 end
 
@@ -165,6 +167,27 @@ function PartyService.sharesPartyWith(
     return theirs ~= nil and self._inviteByUser[firstUserId] == theirs
 end
 
+--[[
+    Whether these two may be put in a party together.
+
+    Asked of the same authority quick chat asks -- one block reader for the
+    whole game, because a suppression rule with two homes is a rule that stops
+    being true in one of them. Absent a reader (a server built without the
+    social service) nobody is blocked, which is the state this game shipped in
+    before there was a reader at all.
+]]
+function PartyService._blocked(self: PartyService, first: Player, second: Player): boolean
+    local reader = self._blockReader
+    if reader == nil then
+        return false
+    end
+    return reader(first.UserId, second.UserId) or reader(second.UserId, first.UserId)
+end
+
+function PartyService.setBlockReader(self: PartyService, reader: (number, number) -> boolean)
+    self._blockReader = reader
+end
+
 function PartyService._store(self: PartyService, partyId: string, state: any)
     if state == nil then
         self._parties[partyId] = nil
@@ -197,6 +220,12 @@ end
     Anyone already in a party is skipped rather than refused. Two overlapping
     parties is a problem with no good answer at the platform, and the simplest
     honest rule is that you leave the one you are in before you join another.
+
+    SAFETY-CHANNEL: party_invite -- a block skips a player here, silently and
+    in both directions. Silently because the alternative tells the presser who
+    has blocked them, which is a disclosure the platform deliberately does not
+    make; both directions because an invitation is a two-way relationship and a
+    seat offered to somebody you blocked is a seat beside them.
 ]]
 function PartyService.invite(self: PartyService, player: Player): any
     local provider = self._platformProvider
@@ -210,7 +239,7 @@ function PartyService.invite(self: PartyService, player: Player): any
     for _, other in standing do
         if other == player then
             onPlatform = true
-        elseif self._partyByUser[other.UserId] == nil then
+        elseif self._partyByUser[other.UserId] == nil and not self:_blocked(player, other) then
             table.insert(eligible, other)
         end
     end
@@ -570,6 +599,13 @@ end
     Every field here is presentation. The rejoin half comes from
     PartySession.publicTicket rather than from the stored ticket, so the access
     code is absent by construction rather than by omission.
+
+    SAFETY-CHANNEL: party_roster -- the only party information that reaches a
+    player: a size, whether they lead, and two display names. No user IDs, no
+    text anybody wrote, and no way to see a roster of a party you are not in or
+    have not been asked into. A player cannot be put in a party with somebody
+    they blocked by that person's action, because the invite that would do it
+    is skipped upstream.
 ]]
 function PartyService.snapshot(self: PartyService, player: Player): any
     local _, state = self:_partyOf(player)

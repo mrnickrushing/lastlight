@@ -325,6 +325,17 @@ lobbyService:setPartyService(partyService)
 ]]
 local socialService =
     SocialService.new(logger, Config, QuickChat, RateLimiter, featureFlags, analyticsService)
+--[[
+    One block reader for the whole game. PartyService asks the same authority
+    quick chat asks, rather than reaching for the platform a second time: a
+    suppression rule with two homes is a rule that stops being true in one of
+    them, and the safety review's whole claim is that every channel consults
+    the same list.
+]]
+partyService:setBlockReader(function(fromUserId: number, toUserId: number): boolean
+    return socialService:isSuppressed(fromUserId, toUserId)
+end)
+
 local performanceService = PerformanceService.new(logger, Config, PerformanceBudget)
 local adminService = AdminService.new(
     logger,

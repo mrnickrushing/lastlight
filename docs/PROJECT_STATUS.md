@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #329), build `0.53.0`,
-save schema 23, 25 services. Published to Roblox as place version 141,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #330), build `0.53.0`,
+save schema 23, 25 services. Published to Roblox as place version 142,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,6 +59,41 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#330** (v142) **M11 wave D: the artifact the privacy and abuse review
+  reads, and a check that keeps it honest.**
+  [SOCIAL_SAFETY_REVIEW.md](SOCIAL_SAFETY_REVIEW.md) lists **every way one
+  player can reach another** — ten channels — what bounds each, and what a
+  block does to it. A document like that is worth exactly its agreement with
+  the code, and documents drift; this project's whole handoff exists because of
+  what goes missing between sessions. So the agreement is a check.
+  `SocialSafety.spec` reads `SAFETY-CHANNEL: <id>` markers out of `src` and the
+  channel table out of the doc and fails if either set has an entry the other
+  lacks. **Neither list may grow alone**: a channel added to the game and not
+  written down fails, and a bound the document claims that nothing implements
+  fails — which is the worse of the two, because that is a review passing on a
+  promise.
+
+  **Block became one reader that everything asks.** Quick chat already
+  consulted `Chat:CanUsersChatAsync`; party invites now ask the same
+  `SocialService` rather than the platform a second time, and a blocked player
+  is skipped **silently and in both directions** — silently because the
+  alternative tells the presser who has blocked them, which is a disclosure the
+  platform deliberately does not make. Two specs pin the call count at one,
+  from different files, so deleting either suite does not free the other rule.
+
+  **Reporting is the platform's, deliberately, and that is now a recorded
+  decision rather than an omission.** Every Roblox client carries a report menu
+  that reaches Roblox's moderation with the experience and both accounts
+  attached. A game-authored report button would either duplicate that into an
+  inbox nobody staffs or look like it did something it did not. Same for
+  blocking: Roblox's list is the list, because a second one is a list a player
+  maintains twice and that travels with them nowhere.
+
+  **The largest social surface in the experience is not in this repository**,
+  and the review says so in the `platform` rows: whether Roblox's own text chat
+  is enabled is a Creator Dashboard setting. Everything this game implements is
+  a closed vocabulary; that would not be. It is the single biggest social
+  decision left and it is the owner's.
 - **#329** (v141) **M11 wave C: a town has a gate now, and somebody decides
   who comes through it.** `TownPermissions` settled the host/visitor split in
   Milestone 4 and its invariant has held since — a visit improves a town or

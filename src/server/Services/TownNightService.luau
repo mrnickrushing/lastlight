@@ -370,6 +370,9 @@ function TownNightService._considerContribution(
     end)
 end
 
+-- SAFETY-CHANNEL: town_visit_adoption -- the only path by which one player's
+-- saved town can reach another player's town, and the only place a visit
+-- policy can refuse it.
 function TownNightService._applyContribution(
     self: TownNightService,
     actorUserId: number,

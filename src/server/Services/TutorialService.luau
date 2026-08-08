@@ -2272,6 +2272,9 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             end
             local hostPlayer = Players:GetPlayerByUserId(info.hostUserId)
             --[[
+                SAFETY-CHANNEL: town_showcase -- one player's town record read
+                by another, gated on the role the visit policy decided.
+
                 The showcase: the host's own town record, and the reason a
                 policy is worth having. It is attached only for a host or an
                 admitted visitor -- an outsider gets the role and nothing else,
