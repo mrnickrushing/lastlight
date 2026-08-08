@@ -566,6 +566,25 @@ function ProfileService.beginPractice(self: ProfileService, reason: string): boo
             self:_releaseLock(player)
         end
     end
+
+    --[[
+        And the bookkeeping goes with the claim, because leaving it behind
+        makes this latch write to a zero-tolerance gate.
+
+        `_writable` still true and `_dirty` still set is a server that says it
+        may write and never does. The leave path reads exactly those two -- a
+        failed save plus unsaved work plus a writable profile -- and files
+        `save_loss`, so every departure from a practice server would report lost
+        progress against the one metric RELEASE_GATES.md allows no failures on.
+        Nothing was lost: the flush above is the whole of it. The heartbeat has
+        the smaller version of the same bug, respawning a save task for every
+        still-dirty player forever, because `save` now returns before anything
+        can clear the flag.
+    ]]
+    for player in self._profiles do
+        self._writable[player] = false
+        self._dirty[player] = nil
+    end
     return true
 end
 

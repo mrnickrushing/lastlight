@@ -234,8 +234,13 @@ function PrivateServerControls.apply(state: any, controlId: any, seeds: any): Re
     local effect: string? = nil
 
     if control.kind == "toggle" then
+        -- Named rather than written as a parenthesised cast on its own line:
+        -- a statement that begins with `(` is the one shape Luau's parser has
+        -- to guess at, and a guess that happens to be right today is not a
+        -- thing to leave in a file somebody will edit.
         local field = control.field :: string
-        (next_ :: any)[field] = not (current :: any)[field]
+        local mutable = next_ :: any
+        mutable[field] = not (current :: any)[field]
     elseif control.kind == "moment" then
         effect = control.id
     elseif control.kind == "seed" then

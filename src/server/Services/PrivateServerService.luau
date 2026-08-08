@@ -1,7 +1,5 @@
 --!strict
 
-local Players = game:GetService("Players")
-
 --[[
     The private server's control rail, and the latch behind it.
 
@@ -17,10 +15,11 @@ local Players = game:GetService("Players")
     file and nothing else reaches them, which is what keeps "a practice phase
     grants nothing" a statement about one path rather than about five.
 
-    The order inside `press` is load-bearing and runs latch-first: the profile
-    goes read-only *before* the world is touched. The other order has a window
-    -- narrow, real, and exactly the width of a DataStore round trip -- in
-    which the clock is already stopped and the rewards are not yet off.
+    The order inside `press` is load-bearing: refuse, then latch, then move the
+    world. Latching before the world is touched closes a window the width of a
+    DataStore round trip in which the clock is already stopped and the rewards
+    are not yet off; asking the refusal before either keeps a press that cannot
+    land from latching anything at all.
 ]]
 
 local PrivateServerService = {}
@@ -145,10 +144,30 @@ function PrivateServerService.press(
     end
 
     local control = self._controls.byId(controlId)
-    local firstPress = self._controls.rewardsAllowed(self._state)
-    self._state = result.state
 
-    -- The latch, before anything in the world moves.
+    --[[
+        Asked before anything is committed, and the ordering here is the whole
+        of the review's finding about it.
+
+        Two properties have to hold at once and they pull in opposite
+        directions. A press whose world effect never lands must not advance the
+        state or latch practice -- otherwise a refused seed press leaves
+        `seedIndex` naming a seed the wood is not built on, and the readout
+        starts lying about which wood you are standing next to. But the latch
+        must also come *before* the world moves, or there is a window the width
+        of a DataStore round trip in which the clock is already stopped and the
+        rewards are not yet off.
+
+        Both hold if the refusal is asked first: nothing is committed for a
+        press that cannot land, and nothing can be written between the latch and
+        the change it pays for.
+    ]]
+    local ready, refusal = self:_ready(control)
+    if not ready then
+        return false, refusal
+    end
+
+    local firstPress = self._controls.rewardsAllowed(self._state)
     if firstPress then
         self._profileService:beginPractice("private_server_control:" .. tostring(controlId))
         self._logger:warn("private_server_practice_engaged", {
@@ -156,12 +175,32 @@ function PrivateServerService.press(
             owner = player.UserId,
         })
     end
+    self._state = result.state
 
     local message = self:_engage(player, control, result, seeds)
     if firstPress then
         message ..= " · THIS SERVER NO LONGER SAVES"
     end
     return true, message
+end
+
+-- Whether this control's world effect can land right now. Only the two that
+-- can fail have anything to say; a toggle is a field and always can.
+function PrivateServerService._ready(self: PrivateServerService, control: any): (boolean, string)
+    if control.id == "call_phase" then
+        if not self._townNightService:isRunning() then
+            return false, "THERE IS NO CLOCK TO CALL ON YET"
+        end
+    elseif control.id == "choose_seed" then
+        local expeditionService = self._expeditionService
+        if expeditionService == nil then
+            return false, "THE WOOD IS NOT STANDING YET"
+        end
+        if expeditionService:occupied() then
+            return false, "SOMEBODY IS STILL IN THE WOOD"
+        end
+    end
+    return true, ""
 end
 
 function PrivateServerService._engage(
@@ -178,16 +217,11 @@ function PrivateServerService._engage(
         self._enemyService:setStillness(result.state.still)
         return if result.state.still then "THE DARK HOLDS STILL" else "THE DARK MOVES AGAIN"
     elseif control.id == "call_phase" then
-        if not self._townNightService:stepPhase() then
-            return "THERE IS NO CLOCK TO CALL ON YET"
-        end
+        self._townNightService:stepPhase()
         return "THE PHASE IS CALLED"
     elseif control.id == "choose_seed" then
         local chosen = self._controls.chosenSeed(result.state, seeds)
-        local expeditionService = self._expeditionService
-        if expeditionService == nil then
-            return "THE WOOD IS NOT STANDING YET"
-        end
+        local expeditionService = self._expeditionService :: any
         --[[
             Cycling back past the end of the history is a return to the seed
             this server rolled for itself, which has to mean rebuilding to it
@@ -230,18 +264,6 @@ function PrivateServerService.snapshot(self: PrivateServerService, player: Playe
         practice = self:isPractice(),
         boards = boards,
     }
-end
-
--- Whether anybody in this server is standing in the expedition, which the seed
--- board refuses over. Exposed for the same reason the readout is: a refusal a
--- player can predict is a refusal that does not read as a broken board.
-function PrivateServerService.expeditionOccupied(_self: PrivateServerService): boolean
-    for _, player in Players:GetPlayers() do
-        if player:GetAttribute("LastLightInExpedition") == true then
-            return true
-        end
-    end
-    return false
 end
 
 return PrivateServerService

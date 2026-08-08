@@ -27,6 +27,7 @@ export type ExpeditionService = typeof(setmetatable(
         _analyticsService: any,
         _seed: number,
         _regionId: string,
+        _rebuilding: boolean,
         _manifest: any,
         _partCount: number,
         _eventStates: { [string]: any },
@@ -71,6 +72,7 @@ function ExpeditionService.new(
         _analyticsService = analyticsService,
         _seed = seed,
         _regionId = "region_bramblewake",
+        _rebuilding = false,
         _manifest = nil,
         _partCount = 0,
         _eventStates = {},
@@ -179,12 +181,28 @@ function ExpeditionService.rebuildWithSeed(self: ExpeditionService, seed: any): 
     if numericSeed == nil then
         return false, "invalid_seed"
     end
-    for _, player in Players:GetPlayers() do
-        if player:GetAttribute("LastLightInExpedition") == true then
-            return false, "expedition_occupied"
-        end
+    if self:occupied() then
+        return false, "expedition_occupied"
     end
-    self:_buildRegion(numericSeed)
+    --[[
+        The flag, and it is the whole safety argument rather than bookkeeping.
+
+        `_buildRegion` yields -- the generator and the world builder both run
+        across frames -- so the check above and the finished wood are not the
+        same moment. Without this, `enter` can admit somebody in between and
+        put them on a model that is about to be destroyed under them, which is
+        precisely the failure the refusal exists to prevent, arrived at through
+        the door the refusal is guarding.
+    ]]
+    self._rebuilding = true
+    local ok, err = pcall(function()
+        self:_buildRegion(numericSeed)
+    end)
+    self._rebuilding = false
+    if not ok then
+        self._logger:warn("expedition_rebuild_failed", { reason = tostring(err) })
+        return false, "invalid_seed"
+    end
     local manifest = assert(self._manifest, "expedition manifest was not initialized")
     self._logger:warn("expedition_rebuilt", {
         hash = manifest.hash,
@@ -238,7 +256,24 @@ function ExpeditionService.Start(self: ExpeditionService)
     end)
 end
 
+-- Whether anybody is standing in the wood. Read by the rebuild and by the
+-- control that asks for one, so the refusal a player is shown and the refusal
+-- the service enforces are the same question rather than two copies of it.
+function ExpeditionService.occupied(_self: ExpeditionService): boolean
+    for _, player in Players:GetPlayers() do
+        if player:GetAttribute("LastLightInExpedition") == true then
+            return true
+        end
+    end
+    return false
+end
+
 function ExpeditionService.enter(self: ExpeditionService, player: Player): boolean
+    if self._rebuilding then
+        -- The wood is being torn down and stood up again. Admitting somebody
+        -- now would drop them onto a model that is about to be destroyed.
+        return false
+    end
     local entered = self._worldService:enterBramblewake(player)
     if entered then
         --[[

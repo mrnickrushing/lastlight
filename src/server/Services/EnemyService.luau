@@ -80,6 +80,7 @@ export type EnemyService = typeof(setmetatable(
         _onChanged: ((string?) -> ())?,
         _heartbeat: RBXScriptConnection?,
         _still: boolean,
+        _stillSince: number,
     },
     EnemyService
 ))
@@ -143,6 +144,7 @@ function EnemyService.new(
         _onChanged = nil,
         _heartbeat = nil,
         _still = false,
+        _stillSince = 0,
     }, EnemyService)
 end
 
@@ -174,10 +176,53 @@ function EnemyService.Start(self: EnemyService)
     end)
 end
 
--- Only a practice server reaches this: PrivateServerService is the sole caller
--- and it has already latched profile writes off before it gets here.
+--[[
+    Only a practice server reaches this: PrivateServerService is the sole caller
+    and it has already latched profile writes off before it gets here.
+
+    Releasing has to move every deadline forward by the held duration, and the
+    review caught that not doing so makes the comment above `_step` a lie. Not
+    calling `_step` freezes the poses and the walking; it does not freeze the
+    wall clock those deadlines are measured against. Held for thirty seconds,
+    an attack cooldown and the spawn timer are both long satisfied by the time
+    the world moves again, so the creature swings on the first frame and the
+    queue drains at once -- the statues all waking together. Worse, a telegraph
+    that was in flight has an `endsAt` in the past and resolves with no windup
+    left, which is a cinematic tool that hits you for using it.
+]]
 function EnemyService.setStillness(self: EnemyService, still: boolean)
-    self._still = still == true
+    local next_ = still == true
+    if next_ == self._still then
+        return
+    end
+    self._still = next_
+    local now = workspace:GetServerTimeNow()
+    if next_ then
+        self._stillSince = now
+        return
+    end
+
+    local heldFor = math.max(0, now - self._stillSince)
+    self._stillSince = 0
+    self._nextSpawnAt += heldFor
+    local enemy = self._active
+    if enemy ~= nil then
+        -- `spawnedAt` rides along too: it is the pose clock's origin, so
+        -- leaving it behind would snap the animation forward by the whole hold
+        -- on the frame the world resumes.
+        enemy.spawnedAt += heldFor
+        enemy.lastAttackAt += heldFor
+        enemy.luredUntil += heldFor
+        enemy.markedUntil += heldFor
+        enemy.snaredUntil += heldFor
+        enemy.stilledUntil += heldFor
+        local attack = enemy.attack
+        if attack ~= nil and type(attack.flow) == "table" then
+            attack.flow.startedAt += heldFor
+            attack.flow.endsAt += heldFor
+        end
+    end
+    self._lureUntil += heldFor
 end
 
 function EnemyService.isStill(self: EnemyService): boolean
