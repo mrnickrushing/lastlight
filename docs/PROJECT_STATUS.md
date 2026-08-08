@@ -20,6 +20,16 @@ that makes that possible is
 available and driven from the terminal (launch recipe in the M7 runbook);
 Studio-facing checks not performed are recorded open rather than assumed.
 
+**Milestone 13's buildable half is four of five waves done** — A (cohort-scoped
+flags), B (tuning telemetry), C (tuning knobs) and E (kill switches and the
+rollback list) all shipped this session. **D, localization source coverage, is
+the one buildable wave left in M13**, and it is left whole rather than half
+done: routing every player-visible string through one table touches nearly every
+file that speaks to a player, and the check that gives the wave its value — *no
+player-visible literal outside the table* — cannot be switched on until the
+migration is complete. A partial pass is a large diff with no guard on it.
+**Milestone 14 has wave A shipped and B through E still to build.**
+
 **Milestones 0 through 11 are complete, and so is Milestone 12's buildable
 half** — M11 waves A through J and M12 waves A through E all shipped. What M12
 still owes is the part no code produces, and the wave plan has said so since it
@@ -102,6 +112,14 @@ Newest first since the last header:
   overrides, so step one of a rollback is a config change and a publish there
   today. Making it genuinely live needs a server-side flag store, which is
   owner-gated infrastructure.
+
+  **Verified on the built place**: the shipped `TownNightService` no longer reads
+  the flag in its constructor, `ensureStarted` reads it live, and the cached form
+  is gone from the place file — checked by reading the module's own `Source` in a
+  running server rather than by reading the working tree. The server booted clean
+  with the rewired service (`world_started interactions=122`,
+  `defense_plots_built lanes=3`, `town_mesh_dressing_ready`,
+  `server_boot_complete services=27`).
 
   **M13 wave D (localization source coverage) is the one wave of this milestone
   still to build**, and it was taken out of order deliberately rather than started

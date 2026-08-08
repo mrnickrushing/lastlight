@@ -281,3 +281,55 @@ seven launch journeys, and the Roblox publishing/review configuration.
   somebody else's, ninety craftable items could not be equipped. All of them
   passed every spec. A silent fallback is what makes that class of gap
   invisible, and a store is full of silent fallbacks waiting to happen.
+
+## What only the owner can do — the consolidated list
+
+Written at the end of the session that finished M13 waves A, B, C and E, so
+the next person does not have to reassemble it from four sections. Nothing
+below is blocked on code, and none of it blocks the two waves that remain
+(M13 D, M14 B–E).
+
+**People and populations (M12–M13).** Every cohort in the rollout: trusted
+testers, the age-range allowlist and the guardian consent that makes it legal,
+the larger flagged cohort, the creator and community test. The two rosters in
+`Config.RolloutRoster` stay empty until those people exist. Then the
+measurement window itself — every threshold in RELEASE_GATES.md is read across
+a population, and the minimums are in its measurement contract.
+
+**Play that a human has to do.** Daily full-path playtests; human completion
+coverage of every quest (automated traversal proves reachability, not
+comprehension); the device lab; a long-session soak on real hardware;
+narrative continuity and content sensitivity review; production-like services
+at representative concurrency. Two smaller ones the waves themselves turned
+up: `profile_bytes` has never been soaked under a profile that is actually
+being written, and the seed board's SOMEBODY IS STILL IN THE WOOD refusal
+needs a second person in the server, as does every two-player case M11 waves C
+and D left open.
+
+**Decisions.** Which of the six regions' `enabled` flags to flip, once a live
+session has walked each end to end — that flag is the whole remaining distance
+between the traversal spec and a real playthrough. What to remove for
+recurring confusion. Which languages ship. The final catalog and prices. Every
+tuning decision BETA_TUNING.md now has numbers and knobs for; the numbers do
+not choose themselves.
+
+**Commerce, all of it.** Creator Dashboard products and their IDs (until they
+exist `Config.CommerceProductIds` is empty and `promptPurchase` correctly
+refuses), price research, platform policy review, a live purchase with a real
+receipt, and the on-call contact COMMERCE_SUPPORT.md's escalation table hands
+to. Also whether Roblox's own text chat is enabled — a dashboard setting, and
+the single largest social decision left, per SOCIAL_SAFETY_REVIEW.md.
+
+**Art.** The gear art pass (82 of 90 craftable items draw a derived plan), the
+four cosmetic outfits that read as a detailed torso block at card size, and
+M14's launch assets: icon, thumbnails, trailer, description, age and content
+disclosures.
+
+**Operations.** All five drills — moderation, support, incident, rollback,
+communication. ROLLBACK.md holds the code half of the fourth. Production
+places and universe links, permissions, private servers, canary and scale
+tests, and the seven launch journeys.
+
+**One piece of infrastructure rather than a decision:** production refuses
+flag overrides, so the first step of a rollback is a config change and a
+publish. Making it genuinely live needs a server-side flag store.
