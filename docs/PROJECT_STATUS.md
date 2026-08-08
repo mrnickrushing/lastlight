@@ -86,9 +86,16 @@ Newest first since the last header:
   controls scale too. FIND leads the run and RUN follows it, so the
   primary action and the sprint the owner asked to sit beside jump share
   the corner column on every screen; the red telegraph banner rides above
-  the topmost row. Verified after, on the portrait viewport: nothing
-  off-screen, a rectangle-intersection test over all six controls returns
-  no overlaps, and the banner clears every one of them.
+  the topmost row. **Only a control a player can see takes a slot**, which
+  CodeRabbit caught and which matters more than it sounds: counting the
+  two permanently hidden ones reserved the bottom row — the thumb zone —
+  for nothing and pushed everything real up out of reach.
+  `_refreshActionCluster` re-measures when that set changes, guarded by a
+  signature because the local clock asks ten times a second. Verified
+  after, on the portrait viewport: nothing off-screen, a
+  rectangle-intersection test over the visible controls returns no
+  overlaps, the banner clears them all, and DODGE appearing mid-Blackout
+  took the bottom-right corner rather than a leftover slot three rows up.
 
   **The field book was 46 points wider than the screen on each side, and
   CLOSE was 57% off it.** Baseline: the panel spanned x −46..438 of a
@@ -98,13 +105,20 @@ Newest first since the last header:
   CLOSE that was still on screen — which is how the session discovered it,
   because a modal overlay nobody can close eats every world click behind
   it. Panel width, kit pitch, whet width and the equip grid's column count
-  all derive from the canvas now. A desktop is pixel-identical to before
-  (columns at 20/210/400, a 190 pitch, an 88/4/84 kit pair); the portrait
-  canvas gets two columns, and the grid adds columns rather than rows if a
-  player owns more gear than the height holds, because a button nobody can
-  reach is how ninety craftable items once went unwearable with every spec
-  green. Verified after: panel x 16..376, CLOSE x 306..362 and clicked by
-  its own instance path, all eight equip buttons inside the viewport.
+  all derive from the canvas now. A desktop keeps its horizontal figures
+  exactly (columns at 20/210/400, a 190 pitch, an 88/4/84 kit pair); the
+  portrait canvas gets two columns, and the grid adds columns rather than
+  rows if a player owns more gear than the height holds, because a button
+  nobody can reach is how ninety craftable items once went unwearable with
+  every spec green. **The panel is measured above the grid rather than
+  centred**, which CodeRabbit caught: the equip buttons position from the
+  canvas bottom, so on a portrait canvas the third row onward landed
+  inside the panel and covered the recipes at a higher ZIndex — and it did
+  the same on a desktop over the panel's bottom-left corner, where it was
+  easier to miss. Verified after: panel x 16..376, CLOSE x 306..362 and
+  clicked by its own instance path, all eight equip buttons inside the
+  viewport, and with four owned the panel's bottom edge sits 7.8 pixels
+  above the grid's top with nothing overlapping.
 
   **The HUD phase pill followed a clock that had stopped.** PhaseService
   only leaves its initial `day` by running the tutorial's First Night, so a
@@ -127,13 +141,16 @@ Newest first since the last header:
   after waiting for a real `AbsoluteSize` (the lesson the loading screen
   already paid for), with `NextSelectionUp`/`Down` wiring so the D-pad is
   not a one-way trip into the notes, and the selection is released on
-  close. Verified live: opening the book by mouse click leaves the
-  DetailsScroll selected at a real size, and closing it clears the
-  selection. **The D-pad scroll itself could not be driven** — this machine
-  reports zero connected gamepads, so `UserInputService.GamepadEnabled` is
-  false and the engine's navigation never runs. Selecting a `Selectable`
-  ScrollingFrame is what gives its canvas the stick; that half is engine
-  behaviour and remains unconfirmed on a real pad.
+  close, and both ways the assignment can fail now warn rather than pass in
+  silence — a controller player who loses the book can otherwise only
+  report that the recipes do not work. Verified live: opening the book by
+  mouse click leaves the DetailsScroll selected at a real size, and closing
+  it clears the selection. **The D-pad scroll itself could not be driven**
+  — this machine reports zero connected gamepads, so
+  `UserInputService.GamepadEnabled` is false and the engine's navigation
+  never runs. Selecting a `Selectable` ScrollingFrame is what gives its
+  canvas the stick; that half is engine behaviour and remains unconfirmed
+  on a real pad.
 
   **The floating stone was a genuinely separate literal, not #325's
   helper.** The road-stone helper that used to clamp Y to 0.42 is not
@@ -172,7 +189,10 @@ Newest first since the last header:
   none. Changing the signal instead would mean a new counter on the
   profile, and a resident quest must not be the thing that introduces
   tracking. Verified live after the extraction: "ENA: BANK A POUCH FROM
-  BRAMBLEWAKE THREE TIMES — 1/3."
+  BRAMBLEWAKE THREE TIMES — 1/3." And verified in the other direction on
+  the reviewed build: a round trip out and back with nothing in the pouch
+  reports RETURNING TO EMBERHOLLOW — POUCH EMPTY and leaves her at 0/3,
+  which is exactly the trip the old words promised credit for.
 
   Not closed by this wave: none of the five items. Open live checks it
   leaves behind are the gamepad D-pad scroll (needs a controller), FIND

@@ -83716,6 +83716,7 @@ export type HUDController = typeof(setmetatable(
         _professionSwitchable: boolean,
         _lastToastRevision: number,
         _lastPhase: string?,
+        _actionClusterSignature: string?,
         _onCompact: ((boolean) -> ())?,
         _onProfessionSelected: ((string) -> ())?,
         _onEquip: ((string) -> ())?,
@@ -84981,6 +84982,7 @@ function HUDController.new(
         _professionSwitchable = false,
         _lastToastRevision = 0,
         _lastPhase = nil,
+        _actionClusterSignature = nil,
         _onCompact = nil,
         _onProfessionSelected = nil,
         _onEquip = nil,
@@ -85164,19 +85166,28 @@ function HUDController._focusProgressBook(self: HUDController, open: boolean)
     scroll.NextSelectionUp = self._progressClose
     scroll.NextSelectionDown = self._loadoutButtons["apply_1"]
     self._progressClose.NextSelectionDown = scroll
+    --[[
+        Both ways this can fail say so. A controller player who silently loses
+        the book has no way to report anything but "the recipes do not work",
+        and the D-pad half of this path is still unconfirmed on a real pad.
+    ]]
     task.spawn(function()
         for _ = 1, 30 do
             if not self._progressOverlay.Visible then
                 return
             end
             if scroll.AbsoluteSize.X >= 1 and scroll.AbsoluteSize.Y >= 1 then
-                pcall(function()
+                local selected, err = pcall(function()
                     GuiService.SelectedObject = scroll
                 end)
+                if not selected then
+                    warn(string.format("[Last Light] field book focus refused: %s", tostring(err)))
+                end
                 return
             end
             task.wait()
         end
+        warn("[Last Light] field book scroll never measured; controller focus skipped")
     end)
 end
 
@@ -85364,6 +85375,32 @@ function HUDController._maraLineIsFresh(self: HUDController): boolean
     return self._maraShownAt > 0 and (os.clock() - self._maraShownAt) < MARA_LINE_SECONDS
 end
 
+--[[
+    Re-measure the thumb cluster when, and only when, the set of controls
+    visible in it changes.
+
+    The run in _layout gives a slot only to a button a player can see, so it has
+    to be told: which of them show changes with combat, with the hound, with
+    being downed and with the input device. And the local clock asks ten times a
+    second, so an unchanged cluster must cost a string comparison rather than a
+    relayout.
+]]
+function HUDController._refreshActionCluster(self: HUDController)
+    local signature = table.concat({
+        if self._primary.Visible then "1" else "0",
+        if self._sprint.Visible then "1" else "0",
+        if self._tool.Visible then "1" else "0",
+        if self._ability.Visible then "1" else "0",
+        if self._companion.Visible then "1" else "0",
+        if self._dodge.Visible then "1" else "0",
+    })
+    if signature == self._actionClusterSignature then
+        return
+    end
+    self._actionClusterSignature = signature
+    self:_layout()
+end
+
 function HUDController._updateLobby(self: HUDController, state: any)
     local lobby = state.lobby
     if type(lobby) ~= "table" or state.departed == true then
@@ -85496,6 +85533,7 @@ function HUDController.setInputMode(self: HUDController, mode: string)
         else "STRIKE"
     self:_updateCombatClock()
     self:_updateProfessionClock()
+    self:_refreshActionCluster()
 end
 
 function HUDController._updateCombatClock(self: HUDController)
@@ -85958,26 +85996,6 @@ function HUDController._layoutLoadout(self: HUDController)
     local margin = 20
     local gap = 14
 
-    local panelWidth = math.min(620, math.max(280, canvasWidth - margin * 2))
-    local panelHeight = math.min(500, math.max(300, canvasHeight - 40))
-    self._progressPanel.Size = UDim2.fromOffset(panelWidth, panelHeight)
-
-    -- One save/apply pair per kit, three kits across the panel's inner width.
-    -- The pair keeps its authored 88/4/84 split at full width.
-    local pairWidth =
-        math.max(72, math.min(176, math.floor((panelWidth - margin * 2 - gap * 2) / 3)))
-    local saveWidth = math.floor(pairWidth / 2)
-    for slot = 1, 3 do
-        local left = margin + (slot - 1) * (pairWidth + gap)
-        local save = self._loadoutButtons["save_" .. slot]
-        local apply = self._loadoutButtons["apply_" .. slot]
-        save.Position = UDim2.fromOffset(left, 58)
-        save.Size = UDim2.fromOffset(saveWidth, 30)
-        apply.Position = UDim2.fromOffset(left + saveWidth + 4, 58)
-        apply.Size = UDim2.fromOffset(pairWidth - saveWidth - 4, 30)
-    end
-    self._whetButton.Size = UDim2.fromOffset(math.min(220, panelWidth - margin * 2), 30)
-
     --[[
         Equip buttons stack upward from the bottom-left of the SCREEN, not the
         panel, so the canvas bounds their grid. Columns come from the width
@@ -85985,6 +86003,12 @@ function HUDController._layoutLoadout(self: HUDController)
         without running off the top gets narrower buttons instead, because a
         button nobody can reach is how ninety craftable items once went
         unwearable with every spec green.
+
+        Measured first because the panel has to sit above whatever this grows
+        to: on a portrait canvas the panel is as wide as the screen allows, so
+        the grid no longer has a margin to sit in beside it and lands on the
+        recipes instead. It did that on a desktop too, over the panel's
+        bottom-left corner, where it was easier to miss.
     ]]
     local owned = 0
     for _, entry in Equipment.list() do
@@ -86017,6 +86041,31 @@ function HUDController._layoutLoadout(self: HUDController)
             visibleIndex += 1
         end
     end
+
+    -- The grid's own top edge, measured up from the bottom of the canvas.
+    local gridTop = 58 + math.max(0, math.ceil(owned / columns) - 1) * rowPitch
+    local panelFloor = gridTop + 10
+    local panelWidth = math.min(620, math.max(280, canvasWidth - margin * 2))
+    local panelHeight = math.min(500, math.max(280, canvasHeight - panelFloor - 20))
+    self._progressPanel.AnchorPoint = Vector2.new(0.5, 1)
+    self._progressPanel.Position = UDim2.new(0.5, 0, 1, -panelFloor)
+    self._progressPanel.Size = UDim2.fromOffset(panelWidth, panelHeight)
+
+    -- One save/apply pair per kit, three kits across the panel's inner width.
+    -- The pair keeps its authored 88/4/84 split at full width.
+    local pairWidth =
+        math.max(72, math.min(176, math.floor((panelWidth - margin * 2 - gap * 2) / 3)))
+    local saveWidth = math.floor(pairWidth / 2)
+    for slot = 1, 3 do
+        local left = margin + (slot - 1) * (pairWidth + gap)
+        local save = self._loadoutButtons["save_" .. slot]
+        local apply = self._loadoutButtons["apply_" .. slot]
+        save.Position = UDim2.fromOffset(left, 58)
+        save.Size = UDim2.fromOffset(saveWidth, 30)
+        apply.Position = UDim2.fromOffset(left + saveWidth + 4, 58)
+        apply.Size = UDim2.fromOffset(pairWidth - saveWidth - 4, 30)
+    end
+    self._whetButton.Size = UDim2.fromOffset(math.min(220, panelWidth - margin * 2), 30)
 end
 
 function HUDController.setInteraction(self: HUDController, label: string?, available: boolean)
@@ -86184,6 +86233,13 @@ function HUDController._layout(self: HUDController)
             owner asked for it. RUN is inside the run rather than on a line of
             its own because a line of its own is a fixed offset again, and on a
             wrapped cluster a fixed offset lands on another button.
+
+            Only what a player can see takes a slot. FIND and STRIKE keep their
+            place in the order but are hidden for good -- both moved onto the
+            world objects -- so counting them reserves the two best positions
+            in the whole cluster for nothing, and pushes RUN, ABILITY and HOUND
+            up out of the thumb zone on a portrait screen. _updateHud runs this
+            again after it settles which of them are showing.
         ]]
         local jumpInset = math.clamp(canvasWidth * 0.28, 150, 300)
         local stickInset = math.clamp(canvasWidth * 0.34, 120, 190)
@@ -86202,15 +86258,17 @@ function HUDController._layout(self: HUDController)
                 { button = self._dodge, width = 84 },
             }
         do
-            -- Only the bottom row has to clear the thumbstick; the band above
-            -- it is dead space on touch.
-            local leftLimit = if actionRow == 0 then stickInset else 24
-            if cursor > jumpInset and cursor + entry.width > canvasWidth - leftLimit then
-                actionRow += 1
-                cursor = jumpInset
+            if entry.button.Visible then
+                -- Only the bottom row has to clear the thumbstick; the band
+                -- above it is dead space on touch.
+                local leftLimit = if actionRow == 0 then stickInset else 24
+                if cursor > jumpInset and cursor + entry.width > canvasWidth - leftLimit then
+                    actionRow += 1
+                    cursor = jumpInset
+                end
+                entry.button.Position = UDim2.new(1, -cursor, 1, -34 - actionRow * ACTION_ROW_PITCH)
+                cursor += entry.width + 12
             end
-            entry.button.Position = UDim2.new(1, -cursor, 1, -34 - actionRow * ACTION_ROW_PITCH)
-            cursor += entry.width + 12
         end
         -- Above the cluster's topmost row rather than at a fixed 206, which on
         -- a portrait phone lands across the upper half of STRIKE and ABILITY.
@@ -86345,6 +86403,7 @@ function HUDController._updateClock(self: HUDController)
     end
     self:_updateCombatClock()
     self:_updateProfessionClock()
+    self:_refreshActionCluster()
 
     if blackoutVisible then
         local duration = math.max(1, tonumber(blackout.duration) or 1)
@@ -86650,6 +86709,7 @@ function HUDController.update(self: HUDController, state: any)
     self._sprint.Visible = self._inputMode == "touch" and not self._playerDowned
     self._dodge.Visible = self:_dodgeButtonVisible()
     self:_updateProfessionClock()
+    self:_refreshActionCluster()
     self:_updateGear()
     self:_updateProgress()
     local eliteVisible = (type(boss) == "table" and (boss.active == true or boss.complete == true))
