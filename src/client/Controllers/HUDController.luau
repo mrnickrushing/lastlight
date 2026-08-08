@@ -4197,13 +4197,55 @@ function HUDController._updateClock(self: HUDController)
     elseif blackoutVisible then
         clockText = "DAWN · CHAPTER I"
     elseif phaseEndsAt > 0 then
-        local remaining = math.max(0, math.ceil(phaseEndsAt - workspace:GetServerTimeNow()))
+        --[[
+            A held clock reads its seconds off the server rather than deriving
+            them, and says HELD rather than LEFT.
+
+            Derived is the default because this label refreshes ten times a
+            second between pushes; but a hold moves the deadline on the server
+            and pushes nothing, so the derived version counts down through a
+            clock that has stopped. Found by pressing the board and watching:
+            the server held at 543.8 seconds for six seconds while the pill
+            went 08:38 to 08:32. And the word has to change too, because a
+            number that has simply stopped is what a frozen game looks like.
+        ]]
+        local held = state.phaseHeld == true
+        local remaining = if held
+            then math.max(0, math.ceil(tonumber(state.phaseRemaining) or 0))
+            else math.max(0, math.ceil(phaseEndsAt - workspace:GetServerTimeNow()))
         -- "LEFT" because "DAY · 02:58" reads as three in the morning, not as
         -- a countdown. Two glyphs of clarity beat two glyphs of mystery.
-        clockText =
-            string.format("%s · %02d:%02d LEFT", phase, math.floor(remaining / 60), remaining % 60)
+        clockText = string.format(
+            "%s · %02d:%02d %s",
+            phase,
+            math.floor(remaining / 60),
+            remaining % 60,
+            if held then "HELD" else "LEFT"
+        )
     else
         clockText = if phase == "REVEAL" then "DAWN · FIRST LIGHT" else phase .. " · MORNING"
+    end
+    --[[
+        A practice server says so on the clock, and it says so to everybody.
+
+        Folded into the capsule rather than given a strip of its own because
+        that capsule is the one HUD element that is centred, and centred is the
+        only position on this canvas that is provably on-screen at every aspect
+        -- #327 found four controls off a portrait phone by exactly the offsets
+        a new strip would have been written with. Widening a centred pill
+        cannot push anything off an edge.
+
+        Worth saying at all because the alternative is silent: a guest in
+        somebody's practice server sees the same town, the same toasts and the
+        same numbers, and only finds out when a save did not move.
+    ]]
+    local practice = state.practice == true
+    if practice then
+        clockText = "PRACTICE · " .. clockText
+    end
+    local pillWidth = if practice then 300 else 206
+    if self._phaseFrame.Size.X.Offset ~= pillWidth then
+        self._phaseFrame.Size = UDim2.fromOffset(pillWidth, 46)
     end
     if self._phase.Text ~= clockText then
         self._phase.Text = clockText

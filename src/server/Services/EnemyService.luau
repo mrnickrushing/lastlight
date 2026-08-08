@@ -79,6 +79,7 @@ export type EnemyService = typeof(setmetatable(
         _engineerBraceState: any,
         _onChanged: ((string?) -> ())?,
         _heartbeat: RBXScriptConnection?,
+        _still: boolean,
     },
     EnemyService
 ))
@@ -141,6 +142,7 @@ function EnemyService.new(
         _engineerBraceState = engineerBrace.default(),
         _onChanged = nil,
         _heartbeat = nil,
+        _still = false,
     }, EnemyService)
 end
 
@@ -153,10 +155,33 @@ function EnemyService.Start(self: EnemyService)
         if accumulator < 0.05 then
             return
         end
+        --[[
+            Stillness is the whole simulation stopping, not the walk cycle.
+
+            A creature that stopped moving and went on winding up an attack
+            would be a cinematic tool that kills you for using it, and one that
+            stopped attacking while the spawn timers ran would fill the town
+            with statues that all wake at once. `_step` is the only thing that
+            advances any of it, so not calling it is the honest version.
+        ]]
+        if self._still then
+            accumulator = 0
+            return
+        end
         local elapsed = accumulator
         accumulator = 0
         self:_step(elapsed)
     end)
+end
+
+-- Only a practice server reaches this: PrivateServerService is the sole caller
+-- and it has already latched profile writes off before it gets here.
+function EnemyService.setStillness(self: EnemyService, still: boolean)
+    self._still = still == true
+end
+
+function EnemyService.isStill(self: EnemyService): boolean
+    return self._still
 end
 
 function EnemyService.setChangedHandler(self: EnemyService, callback: (string?) -> ())

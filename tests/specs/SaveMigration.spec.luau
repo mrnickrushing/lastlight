@@ -267,6 +267,36 @@ local ERA_PROFILES: { [number]: any } = {
     -- carries a policy that must survive, and must arrive in 24 owning nothing
     -- and wearing nothing -- there were no products, so there was nothing to
     -- have bought.
+    -- Schema 24 shipped commerce; 25 adds the discovered-seed history. A
+    -- 24-era save carries entitlements that must survive, and must arrive in
+    -- 25 remembering no seeds at all -- nothing recorded one before this
+    -- schema, so an empty history is what that player actually has rather than
+    -- something migration lost.
+    [24] = {
+        schemaVersion = 24,
+        createdAt = 52,
+        updatedAt = 150,
+        revision = 230,
+        tutorial = { stage = "complete", complete = true, selectedTool = "axe" },
+        profession = { selectedId = "profession_forager" },
+        gear = { gear_amber_edge = 1 },
+        equipped = { weapon = "gear_amber_edge" },
+        social = { visitPolicy = "friends" },
+        commerce = {
+            entitlements = { cosmetic_foxfire_shell = true },
+            processed = { ["purchase_era24"] = true },
+            equipped = { lantern_shell = "cosmetic_foxfire_shell" },
+        },
+        story = {
+            chapterOne = {
+                completedAt = 54,
+                decision = "shared_agroforest",
+                status = "complete",
+                transactionId = "chapter_1:era24:hash:4",
+                wardenOutcome = "scarred",
+            },
+        },
+    },
     [23] = {
         schemaVersion = 23,
         createdAt = 48,
@@ -494,6 +524,7 @@ local REQUIRED_FIELDS: { string } = {
     "quests",
     "social",
     "commerce",
+    "expeditions",
 }
 
 local function assertCurrentShape(profile: any, label: string)

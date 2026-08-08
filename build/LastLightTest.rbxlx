@@ -4846,7 +4846,7 @@ return table.freeze({
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 24,
+    SaveSchemaVersion = 25,
     --[[
         The save schema freeze.
 
@@ -26840,6 +26840,324 @@ return table.freeze(PerformanceBudget)
       </Item>
       <Item class="ModuleScript" referent="76">
         <Properties>
+          <string name="Name">PrivateServerControls</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    What the owner of a private server may do to it, and what it costs.
+
+    Milestone 11's deliverable list names "private-server controls", and
+    MONETIZATION_LIVEOPS_ANALYTICS describes them as phase pause in non-reward
+    practice, seed selection among already-discovered seeds, and cinematic
+    tools -- with one sentence attached that decides this entire module:
+    **reward-bearing modifiers remain server-defined.**
+
+    There are two ways to keep that promise. The usual way is to sort the
+    controls into the ones that touch rewards and the ones that do not, and
+    trust the sorting. That sorting is a judgement call made once, by whoever
+    adds the fifth control, about a system they are not thinking about; this
+    project has a written history of exactly that shape going wrong quietly.
+
+    So this module does not sort. **Every control forces practice, and practice
+    is a one-way latch on the whole server.** The argument is short enough to
+    hold in one line: a control that changes nothing about the world does not
+    need a private server to house it, and a control that changes the world
+    changes the run. Hiding your own HUD is not a private-server privilege --
+    it is a HUD feature, and it belongs on the HUD. What is left, once that is
+    taken out, is a list where every entry is reward-bearing, and the honest
+    answer to a reward-bearing modifier is that this run no longer pays.
+
+    That makes the exit-gate line ("no private-server setting changes a
+    reward") true structurally rather than by inspection: there is no reward
+    left for a setting to change. `apply` sets `practice` on every accepted
+    change with no per-control branch, so a control added tomorrow is latched
+    by the same line as the four here, and the spec drives the whole catalog
+    through it rather than holding a case per entry.
+
+    The latch never lifts. A practice server that could go back to paying
+    would let somebody hold the clock, arrange a night, release it and bank --
+    which is the modifier the promise is about, arrived at in two presses. It
+    lifts when the server restarts, which is a real act with a real cost.
+
+    Nothing here is a purchase. Authority is a property of the *server* --
+    Roblox's own `PrivateServerOwnerId` -- and not an entitlement of the
+    player, which is what keeps it outside the monetization guard's reach: no
+    gameplay branch reads what anybody owns. If this ever becomes a paid pass,
+    the entitlement resolves outside gameplay into plain profile data like
+    every other one, and this file still asks the same question.
+]]
+
+local PrivateServerControls = {}
+
+export type Control = {
+    id: string,
+    label: string,
+    -- The state key a toggle latches, or nil for a control that happens once
+    -- and remembers nothing.
+    field: string?,
+    kind: string,
+    -- Why this one is a practice control, said per entry rather than in one
+    -- paragraph, because the four reasons are genuinely different and the
+    -- fifth author needs to be able to tell whether theirs is one of them.
+    why: string,
+}
+
+export type State = {
+    practice: boolean,
+    hold: boolean,
+    still: boolean,
+    seedIndex: number,
+}
+
+export type Server = {
+    privateServerId: string,
+    privateServerOwnerId: number,
+}
+
+export type Seed = {
+    regionId: string,
+    seed: number,
+}
+
+export type Result = {
+    ok: boolean,
+    state: State,
+    -- What the server should do once, now, beyond storing the state. A
+    -- momentary control has no state to store, so an effect is the only trace
+    -- it leaves.
+    effect: string?,
+    reason: string,
+}
+
+local CONTROLS: { Control } = {
+    {
+        id = "hold_clock",
+        label = "HOLD THE CLOCK",
+        field = "hold",
+        kind = "toggle",
+        why = "A clock you can stop is a night you can wait out.",
+    },
+    {
+        id = "call_phase",
+        label = "CALL THE NEXT PHASE",
+        field = nil,
+        kind = "moment",
+        why = "Skipping to night is choosing which night you fight.",
+    },
+    {
+        id = "still_dark",
+        label = "STILL THE DARK",
+        field = "still",
+        kind = "toggle",
+        why = "Creatures that hold still are creatures that are not fighting back.",
+    },
+    {
+        id = "choose_seed",
+        label = "CHOOSE A SEED",
+        field = "seed",
+        kind = "seed",
+        why = "A seed you choose is a drop table you chose.",
+    },
+}
+
+local CONTROL_BY_ID: { [string]: Control } = {}
+for _, control in CONTROLS do
+    assert(CONTROL_BY_ID[control.id] == nil, "duplicate private server control: " .. control.id)
+    CONTROL_BY_ID[control.id] = control
+end
+
+table.freeze(CONTROLS)
+table.freeze(CONTROL_BY_ID)
+
+function PrivateServerControls.controls(): { Control }
+    return CONTROLS
+end
+
+function PrivateServerControls.byId(controlId: any): Control?
+    if type(controlId) ~= "string" then
+        return nil
+    end
+    return CONTROL_BY_ID[controlId]
+end
+
+function PrivateServerControls.default(): State
+    return {
+        practice = false,
+        hold = false,
+        still = false,
+        -- 0 is the server's own roll, which is what every ordinary server
+        -- runs. A chosen seed is 1..#seeds into the player's own history.
+        seedIndex = 0,
+    }
+end
+
+function PrivateServerControls.normalize(value: any): State
+    local state = PrivateServerControls.default()
+    if type(value) ~= "table" then
+        return state
+    end
+    state.practice = value.practice == true
+    state.hold = value.hold == true
+    state.still = value.still == true
+    local index = tonumber(value.seedIndex)
+    if type(index) == "number" and index == index and index >= 0 then
+        state.seedIndex = math.floor(index)
+    end
+    return state
+end
+
+--[[
+    Who may work these controls.
+
+    Three refusals rather than one, because they mean different things to the
+    person pressing and only one of them is about them.
+
+    A **reserved** server is the interesting case. `PartyService` launches every
+    expedition into one, and Roblox reports a reserved server with a non-empty
+    `PrivateServerId` and an owner of zero -- so the naive test ("is this a
+    private server") is true of every run this game has ever launched. Treating
+    a party's run world as a private town would put a clock-holding, dark-
+    stilling control rail inside the reward-bearing half of the game, which is
+    precisely the thing the promise forbids. Nobody bought a reserved server, so
+    nobody sets it.
+]]
+function PrivateServerControls.authority(server: any, actorUserId: any): (boolean, string)
+    if type(server) ~= "table" then
+        return false, "not_private_server"
+    end
+    local id = server.privateServerId
+    if type(id) ~= "string" or id == "" then
+        return false, "not_private_server"
+    end
+    local ownerId = tonumber(server.privateServerOwnerId) or 0
+    if ownerId <= 0 then
+        return false, "reserved_server"
+    end
+    if tonumber(actorUserId) ~= ownerId then
+        return false, "not_server_owner"
+    end
+    return true, "owner"
+end
+
+local REFUSALS: { [string]: string } = {
+    not_private_server = "THESE CONTROLS ONLY ANSWER IN A PRIVATE SERVER",
+    reserved_server = "AN EXPEDITION WORLD HAS NO OWNER TO SET THEM",
+    not_server_owner = "ONLY THIS SERVER'S OWNER WORKS THE RAIL",
+    unknown_control = "NOTHING IS WRITTEN ON THAT BOARD",
+    no_seeds_discovered = "YOU HAVE NOT WALKED A SEED WORTH KEEPING YET",
+}
+
+function PrivateServerControls.refusal(reason: any): string
+    return REFUSALS[reason] or "THE RAIL DID NOT ANSWER"
+end
+
+--[[
+    Press a board.
+
+    `seeds` is the presser's own discovered-seed history, newest first, and it
+    is the only thing seed selection may reach: a seed the player has already
+    walked unlocks no region, reveals no layout they have not seen, and cannot
+    name a place the generator would otherwise have refused them. Selection
+    cycles rather than naming an index, so the payload carries nothing and the
+    board cannot be asked for the fortieth seed of a history that holds four.
+]]
+function PrivateServerControls.apply(state: any, controlId: any, seeds: any): Result
+    local current = PrivateServerControls.normalize(state)
+    local control = PrivateServerControls.byId(controlId)
+    if control == nil then
+        return { ok = false, state = current, effect = nil, reason = "unknown_control" }
+    end
+
+    local next_: State = {
+        practice = current.practice,
+        hold = current.hold,
+        still = current.still,
+        seedIndex = current.seedIndex,
+    }
+    local effect: string? = nil
+
+    if control.kind == "toggle" then
+        local field = control.field :: string
+        (next_ :: any)[field] = not (current :: any)[field]
+    elseif control.kind == "moment" then
+        effect = control.id
+    elseif control.kind == "seed" then
+        local history = if type(seeds) == "table" then seeds else {}
+        if #history == 0 then
+            return { ok = false, state = current, effect = nil, reason = "no_seeds_discovered" }
+        end
+        local index = current.seedIndex + 1
+        if index > #history then
+            index = 0
+        end
+        next_.seedIndex = index
+    end
+
+    --[[
+        The one line the whole module is about, and it has no branch in it on
+        purpose. Every accepted press latches practice; nothing anywhere clears
+        it. A per-control exemption would be one `if` away from existing, and
+        the author of the fifth control is exactly the person who would write
+        it, in the commit where it looked harmless.
+    ]]
+    next_.practice = true
+    return { ok = true, state = next_, effect = effect, reason = "applied" }
+end
+
+function PrivateServerControls.rewardsAllowed(state: any): boolean
+    return not PrivateServerControls.normalize(state).practice
+end
+
+-- The seed this state has chosen out of a history, or nil for the server's own
+-- roll. An index past the end of a shortened history reads as nil rather than
+-- as the last entry: a history that lost its tail should stop choosing, not
+-- silently choose something else.
+function PrivateServerControls.chosenSeed(state: any, seeds: any): Seed?
+    local current = PrivateServerControls.normalize(state)
+    if current.seedIndex <= 0 or type(seeds) ~= "table" then
+        return nil
+    end
+    local entry = seeds[current.seedIndex]
+    if type(entry) ~= "table" then
+        return nil
+    end
+    local seed = tonumber(entry.seed)
+    if type(entry.regionId) ~= "string" or seed == nil then
+        return nil
+    end
+    return { regionId = entry.regionId, seed = seed }
+end
+
+-- What a board reads once its control has been worked, so the rail says the
+-- state of the world rather than only the name of the lever.
+function PrivateServerControls.readout(state: any, controlId: any, seeds: any): string
+    local control = PrivateServerControls.byId(controlId)
+    if control == nil then
+        return ""
+    end
+    local current = PrivateServerControls.normalize(state)
+    if control.kind == "toggle" then
+        return if (current :: any)[control.field :: string] then "ON" else "OFF"
+    elseif control.kind == "seed" then
+        local chosen = PrivateServerControls.chosenSeed(current, seeds)
+        if chosen == nil then
+            return "THIS SERVER'S OWN"
+        end
+        -- The catalog's id with its namespace taken off. Read live, the raw
+        -- form came back as THE WOOD IS REGION_BRAMBLEWAKE · 32693, which is
+        -- a database key shouted at a player standing in front of a plank.
+        local name = string.gsub(chosen.regionId, "^region_", "")
+        return string.format("%s · %d", string.upper(name), chosen.seed)
+    end
+    return "READY"
+end
+
+return table.freeze(PrivateServerControls)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="77">
+        <Properties>
           <string name="Name">ProfessionAbilityVisuals</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -26932,7 +27250,7 @@ return table.freeze(ProfessionAbilityVisuals)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="77">
+      <Item class="ModuleScript" referent="78">
         <Properties>
           <string name="Name">ProfessionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -27098,7 +27416,7 @@ return table.freeze(ProfessionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="78">
+      <Item class="ModuleScript" referent="79">
         <Properties>
           <string name="Name">ProfessionMastery</string>
           <string name="Source"><![CDATA[--!strict
@@ -27539,7 +27857,7 @@ return table.freeze(ProfessionMastery)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="79">
+      <Item class="ModuleScript" referent="80">
         <Properties>
           <string name="Name">ProfessionRescue</string>
           <string name="Source"><![CDATA[--!strict
@@ -27618,7 +27936,7 @@ return table.freeze(ProfessionRescue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="80">
+      <Item class="ModuleScript" referent="81">
         <Properties>
           <string name="Name">ProfessionState</string>
           <string name="Source"><![CDATA[--!strict
@@ -27785,7 +28103,7 @@ return table.freeze(ProfessionState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="81">
+      <Item class="ModuleScript" referent="82">
         <Properties>
           <string name="Name">ProfileBackup</string>
           <string name="Source"><![CDATA[--!strict
@@ -28099,7 +28417,7 @@ return table.freeze(ProfileBackup)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="82">
+      <Item class="ModuleScript" referent="83">
         <Properties>
           <string name="Name">ProfilePersistence</string>
           <string name="Source"><![CDATA[--!strict
@@ -28273,7 +28591,7 @@ return table.freeze(ProfilePersistence)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="83">
+      <Item class="ModuleScript" referent="84">
         <Properties>
           <string name="Name">QuestCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -28832,7 +29150,7 @@ return table.freeze(QuestCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="84">
+      <Item class="ModuleScript" referent="85">
         <Properties>
           <string name="Name">Quests</string>
           <string name="Source"><![CDATA[--!strict
@@ -29024,7 +29342,7 @@ return table.freeze(Quests)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="85">
+      <Item class="ModuleScript" referent="86">
         <Properties>
           <string name="Name">QuickChat</string>
           <string name="Source"><![CDATA[--!strict
@@ -29411,7 +29729,7 @@ return table.freeze(QuickChat)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="86">
+      <Item class="ModuleScript" referent="87">
         <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
@@ -29470,7 +29788,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="87">
+      <Item class="ModuleScript" referent="88">
         <Properties>
           <string name="Name">RegionAccess</string>
           <string name="Source"><![CDATA[--!strict
@@ -29614,7 +29932,7 @@ return table.freeze(RegionAccess)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="88">
+      <Item class="ModuleScript" referent="89">
         <Properties>
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
@@ -29881,7 +30199,7 @@ return table.freeze(ResidentDialogue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="89">
+      <Item class="ModuleScript" referent="90">
         <Properties>
           <string name="Name">ResidentLife</string>
           <string name="Source"><![CDATA[--!strict
@@ -30204,7 +30522,7 @@ return table.freeze(ResidentLife)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="90">
+      <Item class="ModuleScript" referent="91">
         <Properties>
           <string name="Name">ResidentRoster</string>
           <string name="Source"><![CDATA[--!strict
@@ -30838,7 +31156,7 @@ return table.freeze(ResidentRoster)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="91">
+      <Item class="ModuleScript" referent="92">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -30953,7 +31271,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="92">
+      <Item class="ModuleScript" referent="93">
         <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -31120,12 +31438,13 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="93">
+      <Item class="ModuleScript" referent="94">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
 
 local ExpeditionEventFlow = require("./ExpeditionEventFlow")
+local PrivateServerControls = require("./PrivateServerControls")
 local ProfessionMastery = require("./ProfessionMastery")
 local TownProgression = require("./TownProgression")
 
@@ -31154,6 +31473,16 @@ local townRepairInteractionIds = {}
 for _, buildingId in TownProgression.buildingIds() do
     constructionInteractionIds[buildingId] = "construction_" .. buildingId
     townRepairInteractionIds[buildingId] = "town_repair_" .. buildingId
+end
+
+-- One board per private-server control, generated from the control list rather
+-- than written out, for the reason the construction prompts are generated: a
+-- control added to the catalog gets a board it can be pressed on instead of
+-- needing somebody to remember to add one. The rail is the only place these
+-- exist, so a control with no board is a control nobody can reach.
+local privateControlInteractionIds: { [string]: string } = {}
+for _, control in PrivateServerControls.controls() do
+    privateControlInteractionIds[control.id] = "private_control_" .. control.id
 end
 
 local RuntimeIds = {
@@ -31275,6 +31604,19 @@ local RuntimeIds = {
         StoreDetail = "store_detail",
         StorePurchase = "store_purchase",
         EquipCosmetic = "equip_cosmetic",
+        --[[
+            A board on the private server's control rail, and it carries no
+            payload at all -- not even which board.
+
+            Which control was pressed is an attribute on the prompt the player
+            is standing at, read server-side, the same way a profession
+            specialization's is. That is deliberate rather than tidy: these
+            controls end a server's rewards permanently, and a payload naming
+            one would let a client end them from anywhere, at any moment, with
+            no rail in front of it. There is nothing to forge because there is
+            nothing in the payload.
+        ]]
+        PrivateControl = "private_control",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -31344,6 +31686,7 @@ local RuntimeIds = {
         npc_pip_wren = "resident_pip_wren",
         npc_ena_moss = "resident_ena_moss",
     }),
+    PrivateControlInteractionIds = table.freeze(privateControlInteractionIds),
     ConstructionInteractionIds = table.freeze(constructionInteractionIds),
     TownRepairInteractionIdByBuilding = table.freeze(townRepairInteractionIds),
     ProfessionSpecializationInteractionIds = table.freeze(professionSpecializationInteractionIds),
@@ -31356,7 +31699,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="94">
+      <Item class="ModuleScript" referent="95">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -31491,9 +31834,30 @@ export type Profile = {
         `entitlements`, which only the commerce seam is allowed to read.
     ]]
     commerce: Entitlements.State,
+    --[[
+        The seeds this player has already walked, newest first.
+
+        It exists for one reader: a private server's owner choosing which
+        expedition to run again. "Among already-discovered seeds" is the whole
+        bound in MONETIZATION_LIVEOPS_ANALYTICS' description of the control,
+        and a bound that cannot be checked against anything is not a bound --
+        so the history is a save field rather than a session's memory, because
+        a player who found a layout on Tuesday means it on Thursday.
+
+        Capped, and the cap is the point rather than tidiness: an unbounded
+        list on a profile grows for the life of an account, and M12's soak gate
+        asks in as many words that profile size not grow without bound. A
+        history long enough to find a run you remember is short.
+    ]]
+    expeditions: {
+        seeds: { { regionId: string, seed: number, walkedAt: number } },
+    },
 }
 
 local MAX_NIGHT_NUMBER = 1_000_000
+-- Long enough to hold a run somebody remembers, short enough that the list is
+-- a fixed cost on every save rather than a growing one.
+local MAX_DISCOVERED_SEEDS = 24
 
 local CHAPTER_ONE_DECISIONS = table.freeze({
     restore_farmland = true,
@@ -31508,7 +31872,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 24,
+        schemaVersion = 25,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -31565,7 +31929,48 @@ function SaveSchema.default(now: number): Profile
             visitPolicy = TownVisitPolicy.Default,
         },
         commerce = Entitlements.default(),
+        expeditions = { seeds = {} },
     }
+end
+
+-- Newest first, deduplicated by region and seed, capped. Deduplicating matters
+-- more than it looks: the same seed walked twice is one layout, and a history
+-- that counted it twice would push a genuinely different run off the end.
+local function normalizeSeeds(value: any): { { regionId: string, seed: number, walkedAt: number } }
+    local seeds = {}
+    if type(value) ~= "table" then
+        return seeds
+    end
+    local seen: { [string]: boolean } = {}
+    for _, entry in value do
+        if
+            type(entry) == "table"
+            and type(entry.regionId) == "string"
+            and #entry.regionId <= 48
+        then
+            local seed = tonumber(entry.seed)
+            local walkedAt = tonumber(entry.walkedAt)
+            if seed ~= nil and seed == seed and seed >= 0 and seed < math.huge then
+                local key = entry.regionId .. ":" .. tostring(math.floor(seed))
+                if not seen[key] then
+                    seen[key] = true
+                    table.insert(seeds, {
+                        regionId = entry.regionId,
+                        seed = math.floor(seed),
+                        walkedAt = if walkedAt ~= nil
+                                and walkedAt == walkedAt
+                                and walkedAt >= 0
+                            then math.floor(walkedAt)
+                            else 0,
+                    })
+                    if #seeds >= MAX_DISCOVERED_SEEDS then
+                        break
+                    end
+                end
+            end
+        end
+    end
+    return seeds
 end
 
 function SaveSchema.normalize(value: any, now: number): Profile
@@ -31865,8 +32270,58 @@ function SaveSchema.normalize(value: any, now: number): Profile
         return CosmeticCatalog.get(cosmeticId) ~= nil
     end)
 
-    profile.schemaVersion = 24
+    -- An era-24 save has walked expeditions and remembers none of them, which
+    -- is the truth rather than a loss: nothing recorded a seed before this
+    -- schema, so an empty history is exactly what that player has. It fills up
+    -- again on the next run they walk.
+    profile.expeditions = {
+        seeds = normalizeSeeds(
+            if type(value.expeditions) == "table" then value.expeditions.seeds else nil
+        ),
+    }
+
+    profile.schemaVersion = 25
     return profile
+end
+
+--[[
+    Record a seed this player has now walked.
+
+    Called where a manifest is actually built for somebody rather than where a
+    departure is requested, because a seed nobody reached is not a seed they
+    discovered -- and "already-discovered" is the only bound seed selection
+    has.
+]]
+function SaveSchema.withDiscoveredSeed(
+    profile: Profile,
+    regionId: any,
+    seed: any,
+    now: number
+): Profile
+    local numericSeed = tonumber(seed)
+    if type(regionId) ~= "string" or numericSeed == nil then
+        return profile
+    end
+    local nextProfile = table.clone(profile)
+    local seeds = { { regionId = regionId, seed = numericSeed, walkedAt = now } }
+    for _, entry in profile.expeditions.seeds do
+        table.insert(seeds, entry)
+    end
+    nextProfile.expeditions = { seeds = normalizeSeeds(seeds) }
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile
+end
+
+-- A copy, for the same reason `commerce` hands back copies: a caller that
+-- edited the profile's own table in place would change a save with no
+-- normalization, no revision bump and nothing written.
+function SaveSchema.discoveredSeeds(profile: Profile): { { regionId: string, seed: number } }
+    local seeds = {}
+    for _, entry in profile.expeditions.seeds do
+        table.insert(seeds, { regionId = entry.regionId, seed = entry.seed })
+    end
+    return seeds
 end
 
 function SaveSchema.withTutorial(
@@ -33015,7 +33470,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="95">
+      <Item class="ModuleScript" referent="96">
         <Properties>
           <string name="Name">SessionSegment</string>
           <string name="Source"><![CDATA[--!strict
@@ -33205,7 +33660,7 @@ return table.freeze(SessionSegment)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="96">
+      <Item class="ModuleScript" referent="97">
         <Properties>
           <string name="Name">SfxCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -33372,7 +33827,7 @@ return table.freeze(SfxCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="97">
+      <Item class="ModuleScript" referent="98">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -33516,7 +33971,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="98">
+      <Item class="ModuleScript" referent="99">
         <Properties>
           <string name="Name">StoreAvailability</string>
           <string name="Source"><![CDATA[--!strict
@@ -33650,7 +34105,7 @@ return table.freeze(StoreAvailability)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="99">
+      <Item class="ModuleScript" referent="100">
         <Properties>
           <string name="Name">StoreCard</string>
           <string name="Source"><![CDATA[--!strict
@@ -33887,7 +34342,7 @@ return table.freeze(StoreCard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="100">
+      <Item class="ModuleScript" referent="101">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -34144,7 +34599,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="101">
+      <Item class="ModuleScript" referent="102">
         <Properties>
           <string name="Name">TempestEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -34422,7 +34877,7 @@ return table.freeze(TempestEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="102">
+      <Item class="ModuleScript" referent="103">
         <Properties>
           <string name="Name">TideboundTitanEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -34853,7 +35308,7 @@ return table.freeze(TideboundTitanEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="103">
+      <Item class="ModuleScript" referent="104">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -34997,7 +35452,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="104">
+      <Item class="ModuleScript" referent="105">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -35407,7 +35862,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="105">
+      <Item class="ModuleScript" referent="106">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -35588,7 +36043,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="106">
+      <Item class="ModuleScript" referent="107">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -35652,7 +36107,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="107">
+      <Item class="ModuleScript" referent="108">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -35826,7 +36281,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="108">
+      <Item class="ModuleScript" referent="109">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -35918,7 +36373,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="109">
+      <Item class="ModuleScript" referent="110">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -36130,7 +36585,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="110">
+      <Item class="ModuleScript" referent="111">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -36308,7 +36763,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="111">
+      <Item class="ModuleScript" referent="112">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -36461,7 +36916,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="112">
+      <Item class="ModuleScript" referent="113">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -36794,7 +37249,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="113">
+      <Item class="ModuleScript" referent="114">
         <Properties>
           <string name="Name">TownVisitPolicy</string>
           <string name="Source"><![CDATA[--!strict
@@ -36967,7 +37422,7 @@ return table.freeze(TownVisitPolicy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="114">
+      <Item class="ModuleScript" referent="115">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -37129,7 +37584,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="115">
+      <Item class="ModuleScript" referent="116">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -37165,7 +37620,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="116">
+      <Item class="ModuleScript" referent="117">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -37547,7 +38002,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="117">
+      <Item class="ModuleScript" referent="118">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -37617,7 +38072,7 @@ return table.freeze(WeatherProfile)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="118">
+      <Item class="ModuleScript" referent="119">
         <Properties>
           <string name="Name">WhiteHowlerEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -38081,11 +38536,11 @@ return table.freeze(WhiteHowlerEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="119">
+  <Item class="ServerScriptService" referent="120">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="120">
+    <Item class="Script" referent="121">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -38156,6 +38611,7 @@ local TownPermissions = require(root.TownPermissions)
 local TownVisitPolicy = require(root.TownVisitPolicy)
 local RunHandoff = require(root.RunHandoff)
 local PartySession = require(root.PartySession)
+local PrivateServerControls = require(root.PrivateServerControls)
 local QuickChat = require(root.QuickChat)
 local CosmeticCatalog = require(root.CosmeticCatalog)
 local Entitlements = require(root.Entitlements)
@@ -38188,6 +38644,7 @@ local LobbyService = require(script.Services.LobbyService)
 local PartyService = require(script.Services.PartyService)
 local SocialService = require(script.Services.SocialService)
 local CommerceService = require(script.Services.CommerceService)
+local PrivateServerService = require(script.Services.PrivateServerService)
 local AdminService = require(script.Services.AdminService)
 local CompanionService = require(script.Services.CompanionService)
 local DefenseService = require(script.Services.DefenseService)
@@ -38484,6 +38941,25 @@ local townNightService = TownNightService.new(
 )
 townNightService:setDefense(defenseService, DefenseLanes)
 --[[
+    The private server's control rail.
+
+    Constructed after the three things it can hold still, and it is the only
+    caller of any of them: the profile write latch, the town clock's hold, the
+    creature simulation's stillness and the expedition's rebuild all exist for
+    this service. Keeping the callers to one is what makes "no private-server
+    setting changes a reward" a claim about a single file rather than about
+    however many places learned to stop the clock.
+]]
+local privateServerService = PrivateServerService.new(
+    logger,
+    PrivateServerControls,
+    profileService,
+    townNightService,
+    enemyService,
+    analyticsService
+)
+privateServerService:setExpeditionService(expeditionService)
+--[[
     Who may visit this town, in the two pieces the service cannot supply
     itself.
 
@@ -38597,6 +39073,7 @@ local services = ServiceRegistry.new({
     adminInspectionReport = AdminInspectionReport,
     profilePersistence = ProfilePersistence,
     townVisitPolicy = TownVisitPolicy,
+    privateServerControls = PrivateServerControls,
     profileBackup = ProfileBackup,
     config = Config,
 })
@@ -38624,6 +39101,7 @@ services:register(regionEncounterService)
 services:register(partyService)
 services:register(socialService)
 services:register(commerceService)
+services:register(privateServerService)
 -- Without this the departure countdown never reached a client: LobbyService
 -- published every whole second into a handler nobody had set, so the panel
 -- froze at "DEPARTING IN 10" while the server counted down and launched.
@@ -38637,6 +39115,7 @@ tutorialService:setCompanionService(companionService)
 tutorialService:setPartyService(partyService)
 tutorialService:setSocialService(socialService)
 tutorialService:setCommerceService(commerceService)
+tutorialService:setPrivateServerService(privateServerService)
 --[[
     A grant has to arrive somewhere the buyer can see.
 
@@ -38743,7 +39222,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="121">
+      <Item class="ModuleScript" referent="122">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -38841,11 +39320,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="122">
+      <Item class="Folder" referent="123">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="123">
+        <Item class="ModuleScript" referent="124">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -39482,7 +39961,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="124">
+        <Item class="ModuleScript" referent="125">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -40761,7 +41240,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="125">
+        <Item class="ModuleScript" referent="126">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41262,7 +41741,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="126">
+        <Item class="ModuleScript" referent="127">
           <Properties>
             <string name="Name">CommerceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42071,7 +42550,7 @@ return table.freeze(CommerceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="127">
+        <Item class="ModuleScript" referent="128">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42342,7 +42821,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="128">
+        <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42762,7 +43241,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="129">
+        <Item class="ModuleScript" referent="130">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42846,6 +43325,7 @@ export type EnemyService = typeof(setmetatable(
         _engineerBraceState: any,
         _onChanged: ((string?) -> ())?,
         _heartbeat: RBXScriptConnection?,
+        _still: boolean,
     },
     EnemyService
 ))
@@ -42908,6 +43388,7 @@ function EnemyService.new(
         _engineerBraceState = engineerBrace.default(),
         _onChanged = nil,
         _heartbeat = nil,
+        _still = false,
     }, EnemyService)
 end
 
@@ -42920,10 +43401,33 @@ function EnemyService.Start(self: EnemyService)
         if accumulator < 0.05 then
             return
         end
+        --[[
+            Stillness is the whole simulation stopping, not the walk cycle.
+
+            A creature that stopped moving and went on winding up an attack
+            would be a cinematic tool that kills you for using it, and one that
+            stopped attacking while the spawn timers ran would fill the town
+            with statues that all wake at once. `_step` is the only thing that
+            advances any of it, so not calling it is the honest version.
+        ]]
+        if self._still then
+            accumulator = 0
+            return
+        end
         local elapsed = accumulator
         accumulator = 0
         self:_step(elapsed)
     end)
+end
+
+-- Only a practice server reaches this: PrivateServerService is the sole caller
+-- and it has already latched profile writes off before it gets here.
+function EnemyService.setStillness(self: EnemyService, still: boolean)
+    self._still = still == true
+end
+
+function EnemyService.isStill(self: EnemyService): boolean
+    return self._still
 end
 
 function EnemyService.setChangedHandler(self: EnemyService, callback: (string?) -> ())
@@ -44446,7 +44950,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="130">
+        <Item class="ModuleScript" referent="131">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -44477,6 +44981,7 @@ export type ExpeditionService = typeof(setmetatable(
         _profileService: any,
         _analyticsService: any,
         _seed: number,
+        _regionId: string,
         _manifest: any,
         _partCount: number,
         _eventStates: { [string]: any },
@@ -44520,6 +45025,7 @@ function ExpeditionService.new(
         _profileService = profileService,
         _analyticsService = analyticsService,
         _seed = seed,
+        _regionId = "region_bramblewake",
         _manifest = nil,
         _partCount = 0,
         _eventStates = {},
@@ -44562,6 +45068,22 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
         "region " .. tostring(regionId) .. " is enabled but has no builder wired"
     )
     self._catalog = catalog
+    self._regionId = regionId
+    self:_buildRegion(seed)
+end
+
+--[[
+    Roll a seed into a walkable wood and stand it up.
+
+    Split out of Init because a private server's owner can ask for a different
+    one at runtime, and the alternative -- a second copy of this sequence in the
+    rebuild path -- is how a manifest gets built without its event states, or
+    dressed without its fallback metric. `BramblewakeBuilder.build` already
+    destroys whatever it finds before it builds, which is what makes calling
+    this twice safe rather than merely possible.
+]]
+function ExpeditionService._buildRegion(self: ExpeditionService, seed: number)
+    local regionId = self._regionId
     local manifest = self._generator.generate(seed, false, nil, regionId)
     local valid, issues = self._generator.validate(manifest)
     assert(valid, "expedition manifest is invalid: " .. table.concat(issues, "; "))
@@ -44586,6 +45108,7 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
     self._partCount = result.partCount
     self._eventsEnabled = self._featureFlags:isEnabled("bramblewake_events_enabled")
     self._worldService:setExpeditionEventsEnabled(self._eventsEnabled)
+    self._eventStates = {}
     for _, placement in manifest.modules do
         if placement.eventId ~= nil then
             local definition = self._generator.eventDefinition(placement.eventId)
@@ -44595,6 +45118,40 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
             self._worldService:setExpeditionEventState(placement.eventId, state)
         end
     end
+end
+
+--[[
+    Walk a different seed, in a server that has already given up on rewards.
+
+    Refused while anybody is inside, and that refusal is the whole safety
+    argument: rebuilding the wood destroys the model the people in it are
+    standing on. Refused too when the seed is one this build cannot resolve, so
+    a history entry from an older catalog fails here rather than half-way
+    through a rebuild.
+]]
+function ExpeditionService.rebuildWithSeed(self: ExpeditionService, seed: any): (boolean, string)
+    local numericSeed = tonumber(seed)
+    if numericSeed == nil then
+        return false, "invalid_seed"
+    end
+    for _, player in Players:GetPlayers() do
+        if player:GetAttribute("LastLightInExpedition") == true then
+            return false, "expedition_occupied"
+        end
+    end
+    self:_buildRegion(numericSeed)
+    local manifest = assert(self._manifest, "expedition manifest was not initialized")
+    self._logger:warn("expedition_rebuilt", {
+        hash = manifest.hash,
+        seed = manifest.seed,
+        source = manifest.source,
+    })
+    return true, "rebuilt"
+end
+
+function ExpeditionService.currentSeed(self: ExpeditionService): (string, number)
+    local manifest = assert(self._manifest, "expedition manifest was not initialized")
+    return self._regionId, manifest.seed
 end
 
 function ExpeditionService.Start(self: ExpeditionService)
@@ -44639,6 +45196,20 @@ end
 function ExpeditionService.enter(self: ExpeditionService, player: Player): boolean
     local entered = self._worldService:enterBramblewake(player)
     if entered then
+        --[[
+            A seed is discovered by being walked, not by being rolled.
+
+            Recorded here rather than at departure because a run somebody never
+            reached is a layout they have never seen, and "among already
+            discovered seeds" is the only bound private-server seed selection
+            has. A practice server records nothing, which is correct twice
+            over: the profile is read-only there anyway, and a seed handed to
+            you by a control is not one you found.
+        ]]
+        local manifest = self._manifest
+        if manifest ~= nil then
+            self._profileService:recordDiscoveredSeed(player, self._regionId, manifest.seed)
+        end
         local cache = self._profileService:recoveryCache(player)
         if cache ~= nil then
             self._worldService:showRecoveryCache(player, cache)
@@ -45175,7 +45746,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45279,7 +45850,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45588,7 +46159,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46044,7 +46615,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="134">
+        <Item class="ModuleScript" referent="135">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -46138,7 +46709,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="135">
+        <Item class="ModuleScript" referent="136">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46356,7 +46927,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="136">
+        <Item class="ModuleScript" referent="137">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47226,7 +47797,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="137">
+        <Item class="ModuleScript" referent="138">
           <Properties>
             <string name="Name">PartyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47910,7 +48481,7 @@ return PartyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="138">
+        <Item class="ModuleScript" referent="139">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48319,7 +48890,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="139">
+        <Item class="ModuleScript" referent="140">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48502,7 +49073,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="140">
+        <Item class="ModuleScript" referent="141">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49118,7 +49689,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="141">
+        <Item class="ModuleScript" referent="142">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -50260,7 +50831,260 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="142">
+        <Item class="ModuleScript" referent="143">
+          <Properties>
+            <string name="Name">PrivateServerService</string>
+            <string name="Source"><![CDATA[--!strict
+
+local Players = game:GetService("Players")
+
+--[[
+    The private server's control rail, and the latch behind it.
+
+    `PrivateServerControls` decides everything decidable without a running
+    server -- who may press, what a press does to the state, and the one rule
+    that every press ends this server's rewards. This service is the shell: it
+    holds the state, asks the pure module, and turns the answer into the three
+    things in this game that can be held still.
+
+    It is deliberately the only caller of `ProfileService:beginPractice`,
+    `TownNightService:setHold`/`stepPhase`, `EnemyService:setStillness` and
+    `ExpeditionService:rebuildWithSeed`. Those five entry points exist for this
+    file and nothing else reaches them, which is what keeps "a practice phase
+    grants nothing" a statement about one path rather than about five.
+
+    The order inside `press` is load-bearing and runs latch-first: the profile
+    goes read-only *before* the world is touched. The other order has a window
+    -- narrow, real, and exactly the width of a DataStore round trip -- in
+    which the clock is already stopped and the rewards are not yet off.
+]]
+
+local PrivateServerService = {}
+PrivateServerService.__index = PrivateServerService
+PrivateServerService.Name = "PrivateServerService"
+
+export type Logger = {
+    info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+    warn: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+}
+
+export type PrivateServerService = typeof(setmetatable(
+    {} :: {
+        Name: string,
+        _logger: Logger,
+        _controls: any,
+        _profileService: any,
+        _townNightService: any,
+        _enemyService: any,
+        _expeditionService: any,
+        _analyticsService: any,
+        _state: any,
+    },
+    PrivateServerService
+))
+
+function PrivateServerService.new(
+    logger: Logger,
+    privateServerControls: any,
+    profileService: any,
+    townNightService: any,
+    enemyService: any,
+    analyticsService: any
+): PrivateServerService
+    return setmetatable({
+        Name = PrivateServerService.Name,
+        _logger = logger,
+        _controls = privateServerControls,
+        _profileService = profileService,
+        _townNightService = townNightService,
+        _enemyService = enemyService,
+        _expeditionService = nil,
+        _analyticsService = analyticsService,
+        _state = privateServerControls.default(),
+    }, PrivateServerService)
+end
+
+function PrivateServerService.Init(_self: PrivateServerService, _context: any) end
+
+function PrivateServerService.Start(_self: PrivateServerService) end
+
+function PrivateServerService.setExpeditionService(
+    self: PrivateServerService,
+    expeditionService: any
+)
+    self._expeditionService = expeditionService
+end
+
+--[[
+    What Roblox says about this server, in the shape the pure module reads.
+
+    A Studio session is neither a private server nor a reserved one, so the
+    attribute is the only way to reach this rail from a playtest at all --
+    the same reason `LastLightStudioStore` exists, and it fakes exactly one
+    thing: the owner. Every refusal, every latch and every consequence below
+    is the real path.
+]]
+function PrivateServerService.server(_self: PrivateServerService): any
+    local studioOwner = tonumber(game:GetAttribute("LastLightStudioPrivateServer"))
+    if studioOwner ~= nil and studioOwner > 0 then
+        return { privateServerId = "studio", privateServerOwnerId = studioOwner }
+    end
+    return {
+        privateServerId = game.PrivateServerId,
+        privateServerOwnerId = game.PrivateServerOwnerId,
+    }
+end
+
+function PrivateServerService.state(self: PrivateServerService): any
+    return self._controls.normalize(self._state)
+end
+
+function PrivateServerService.isPractice(self: PrivateServerService): boolean
+    return not self._controls.rewardsAllowed(self._state)
+end
+
+function PrivateServerService.readout(
+    self: PrivateServerService,
+    player: Player,
+    controlId: string
+): string
+    return self._controls.readout(
+        self._state,
+        controlId,
+        self._profileService:discoveredSeeds(player)
+    )
+end
+
+--[[
+    Press one of the boards.
+
+    Returns a message rather than a boolean because every path here has
+    something worth saying: a refusal names which of the three reasons it is,
+    and an acceptance names what the world now does. A control that changed
+    the server and said nothing would be indistinguishable from a dead board,
+    which is the failure #337 found on the store's BUY button.
+]]
+function PrivateServerService.press(
+    self: PrivateServerService,
+    player: Player,
+    controlId: any
+): (boolean, string)
+    local allowed, reason = self._controls.authority(self:server(), player.UserId)
+    if not allowed then
+        return false, self._controls.refusal(reason)
+    end
+
+    local seeds = self._profileService:discoveredSeeds(player)
+    local result = self._controls.apply(self._state, controlId, seeds)
+    if not result.ok then
+        return false, self._controls.refusal(result.reason)
+    end
+
+    local control = self._controls.byId(controlId)
+    local firstPress = self._controls.rewardsAllowed(self._state)
+    self._state = result.state
+
+    -- The latch, before anything in the world moves.
+    if firstPress then
+        self._profileService:beginPractice("private_server_control:" .. tostring(controlId))
+        self._logger:warn("private_server_practice_engaged", {
+            control = controlId,
+            owner = player.UserId,
+        })
+    end
+
+    local message = self:_engage(player, control, result, seeds)
+    if firstPress then
+        message ..= " · THIS SERVER NO LONGER SAVES"
+    end
+    return true, message
+end
+
+function PrivateServerService._engage(
+    self: PrivateServerService,
+    player: Player,
+    control: any,
+    result: any,
+    seeds: any
+): string
+    if control.id == "hold_clock" then
+        self._townNightService:setHold(result.state.hold)
+        return if result.state.hold then "THE CLOCK IS HELD" else "THE CLOCK RUNS AGAIN"
+    elseif control.id == "still_dark" then
+        self._enemyService:setStillness(result.state.still)
+        return if result.state.still then "THE DARK HOLDS STILL" else "THE DARK MOVES AGAIN"
+    elseif control.id == "call_phase" then
+        if not self._townNightService:stepPhase() then
+            return "THERE IS NO CLOCK TO CALL ON YET"
+        end
+        return "THE PHASE IS CALLED"
+    elseif control.id == "choose_seed" then
+        local chosen = self._controls.chosenSeed(result.state, seeds)
+        local expeditionService = self._expeditionService
+        if expeditionService == nil then
+            return "THE WOOD IS NOT STANDING YET"
+        end
+        --[[
+            Cycling back past the end of the history is a return to the seed
+            this server rolled for itself, which has to mean rebuilding to it
+            rather than leaving the last chosen one standing. A control that
+            said THIS SERVER'S OWN over somebody else's wood would be lying in
+            the one place the readout is all the player has.
+        ]]
+        local _, ownSeed = expeditionService:currentSeed()
+        local seed = if chosen == nil then ownSeed else chosen.seed
+        local rebuilt, why = expeditionService:rebuildWithSeed(seed)
+        if not rebuilt then
+            return if why == "expedition_occupied"
+                then "SOMEBODY IS STILL IN THE WOOD"
+                else "THAT SEED DOES NOT ANSWER"
+        end
+        return "THE WOOD IS " .. self:readout(player, control.id)
+    end
+    return "SET"
+end
+
+--[[
+    Everything the rail's boards read, for the snapshot.
+
+    Built per player because the seed board reads that player's own history,
+    and a rail that showed the owner's chosen seed to a guest would be showing
+    them a number out of a save they cannot see.
+]]
+function PrivateServerService.snapshot(self: PrivateServerService, player: Player): any
+    local allowed = self._controls.authority(self:server(), player.UserId)
+    local boards = {}
+    for _, control in self._controls.controls() do
+        table.insert(boards, {
+            id = control.id,
+            label = control.label,
+            readout = self:readout(player, control.id),
+        })
+    end
+    return {
+        available = allowed,
+        practice = self:isPractice(),
+        boards = boards,
+    }
+end
+
+-- Whether anybody in this server is standing in the expedition, which the seed
+-- board refuses over. Exposed for the same reason the readout is: a refusal a
+-- player can predict is a refusal that does not read as a broken board.
+function PrivateServerService.expeditionOccupied(_self: PrivateServerService): boolean
+    for _, player in Players:GetPlayers() do
+        if player:GetAttribute("LastLightInExpedition") == true then
+            return true
+        end
+    end
+    return false
+end
+
+return PrivateServerService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="144">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -50885,7 +51709,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="143">
+        <Item class="ModuleScript" referent="145">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -50927,6 +51751,7 @@ export type ProfileService = typeof(setmetatable(
         _store: GlobalDataStore?,
         _backupStore: GlobalDataStore?,
         _lastBackupAt: { [number]: number },
+        _practice: boolean,
     },
     ProfileService
 ))
@@ -50969,6 +51794,7 @@ function ProfileService.new(
         _store = nil,
         _backupStore = nil,
         _lastBackupAt = {},
+        _practice = false,
     }, ProfileService)
 end
 
@@ -51145,6 +51971,15 @@ function ProfileService._load(self: ProfileService, player: Player)
             })
         else
             self._logger:warn("profile_load_timed_out", { player = player.UserId })
+        end
+
+        -- A profile arriving into a practice server is read-only from its
+        -- first frame, and never claims a lock. Claiming one would make this
+        -- server the sole writer of a save it has already promised never to
+        -- write, which is the hostage the release above is about.
+        if self._practice then
+            writable = false
+            source = "practice_read_only"
         end
 
         -- A profile another live server still holds is played read-only rather
@@ -51395,7 +52230,127 @@ end
 
 function ProfileService.isWritable(self: ProfileService, player: Player): boolean
     return self._profiles[player] ~= nil
+        and not self._practice
         and (not self._persistent or self._writable[player] == true)
+end
+
+--[[
+    Turn this server into a practice server, for good.
+
+    Every mutation in the game funnels through `isWritable` and every durable
+    write through `save`, which is why practice is two lines rather than an
+    audit of forty reward paths. That matters more than the line count: "a
+    practice phase grants nothing" is the exit-gate claim, and a claim held at
+    one seam can be checked, while a claim held at forty is a claim somebody
+    will add a forty-first path beside.
+
+    Three things happen in an order that is not arbitrary.
+
+    **One last honest save.** Progress earned before the latch was earned under
+    ordinary rules and belongs to the player. Dropping it would make engaging a
+    control a punishment for everything that came before it, which is not what
+    practice means.
+
+    **Then the latch**, before any lock is released, so nothing can be written
+    between the flush and the renunciation.
+
+    **Then the locks go back.** A session lock is this server's claim to be the
+    only writer of a profile. A server that has renounced writing forever and
+    still holds the claim is holding somebody's save hostage: they would leave,
+    join a real server, and play their own game read-only until a lock that will
+    never beat again goes stale. So practice gives the locks back, and a profile
+    that arrives after the latch never claims one at all.
+]]
+function ProfileService.beginPractice(self: ProfileService, reason: string): boolean
+    if self._practice then
+        return false
+    end
+
+    for player in self._profiles do
+        if self._persistent and self._writable[player] == true then
+            self:save(player)
+        end
+    end
+
+    self._practice = true
+    self._logger:warn("profile_practice_engaged", { reason = reason })
+
+    for player in self._profiles do
+        if self._persistent and self._writable[player] == true then
+            self:_releaseLock(player)
+        end
+    end
+    return true
+end
+
+function ProfileService.isPractice(self: ProfileService): boolean
+    return self._practice
+end
+
+function ProfileService.recordDiscoveredSeed(
+    self: ProfileService,
+    player: Player,
+    regionId: any,
+    seed: any
+): boolean
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return false
+    end
+    local nextProfile = self._saveSchema.withDiscoveredSeed(profile, regionId, seed, os.time())
+    if nextProfile == profile then
+        return false
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent and self._writable[player] == true then
+        self._dirty[player] = true
+    end
+    return true
+end
+
+function ProfileService.discoveredSeeds(self: ProfileService, player: Player): { any }
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {}
+    end
+    return self._saveSchema.discoveredSeeds(profile)
+end
+
+--[[
+    Hand a profile's session lock back without touching the profile.
+
+    Deliberately not a save: the stored copy is whatever the flush above left,
+    and writing the in-memory profile again here would be the practice server
+    persisting one more time on its way out of the business of persisting.
+]]
+function ProfileService._releaseLock(self: ProfileService, player: Player)
+    local store = self._store
+    if store == nil then
+        return
+    end
+    local jobId = self._jobId
+    local ok, message = pcall(function()
+        store:UpdateAsync(string.format("player_%d", player.UserId), function(current: any)
+            if type(current) ~= "table" then
+                return current
+            end
+            local held = current.sessionLock
+            -- Only ours. A lock some other server claimed while this one was
+            -- flushing is not this one's to give away.
+            if type(held) ~= "table" or held.jobId ~= jobId then
+                return current
+            end
+            local written = table.clone(current)
+            written.sessionLock = nil
+            return written
+        end)
+    end)
+    if not ok then
+        self._logger:warn("profile_lock_release_failed", {
+            player = player.UserId,
+            reason = tostring(message),
+        })
+    end
 end
 
 function ProfileService.setTutorial(
@@ -52500,6 +53455,18 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
     if not self._persistent then
         return true
     end
+    --[[
+        The second of practice's two seams, and the one that is not obvious.
+
+        `save` does not consult the dirty flag -- the leave path and the lock
+        heartbeat both call it outright -- so gating mutations alone would leave
+        a practice server writing the whole in-memory profile on the way out.
+        That is the loss this latch exists to prevent, arriving through the one
+        door that never asked whether anything had changed.
+    ]]
+    if self._practice then
+        return false
+    end
     if self._store == nil or self._writable[player] ~= true then
         self._logger:warn("profile_save_skipped_read_only", {
             player = player.UserId,
@@ -52869,7 +53836,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="144">
+        <Item class="ModuleScript" referent="146">
           <Properties>
             <string name="Name">RegionEncounterService</string>
             <string name="Source"><![CDATA[--!strict
@@ -53167,7 +54134,7 @@ return table.freeze(RegionEncounterService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="145">
+        <Item class="ModuleScript" referent="147">
           <Properties>
             <string name="Name">SocialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -53456,7 +54423,7 @@ return table.freeze(SocialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="146">
+        <Item class="ModuleScript" referent="148">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -53521,6 +54488,9 @@ export type TownNightService = typeof(setmetatable(
         _relationResolver: ((number, number, (string) -> ()) -> ())?,
         _onNightCompleted: ((number, number, any) -> ())?,
         _incident: any,
+        _hold: boolean,
+        _skip: boolean,
+        _heldSeconds: number,
     },
     TownNightService
 ))
@@ -53574,6 +54544,9 @@ function TownNightService.new(
         _relationResolver = nil,
         _onNightCompleted = nil,
         _incident = nil,
+        _hold = false,
+        _skip = false,
+        _heldSeconds = 0,
     }, TownNightService)
 end
 
@@ -53728,10 +54701,77 @@ function TownNightService.resolveIncident(
     }
 end
 
-local function waitUntilTime(target: number)
-    while workspace:GetServerTimeNow() < target do
+--[[
+    A held clock stops rather than stretches.
+
+    Every wait in the cycle pushes its own deadline forward by exactly the time
+    that passed while the hold was on, so releasing it leaves the phase with
+    the seconds it had left rather than with a number somebody guessed. The
+    same push lands on the night's beat offsets through `_heldSeconds`, because
+    a night whose clock stopped and whose waves did not would spend its hold
+    quietly emptying the schedule.
+
+    Both of these only exist in a practice server -- `PrivateServerService` is
+    the only caller and it has already latched the profile writes off by the
+    time it calls either.
+]]
+local function pushHold(self: TownNightService, since: number)
+    local delta = workspace:GetServerTimeNow() - since
+    self._phaseEndsAt += delta
+    self._heldSeconds += delta
+end
+
+function TownNightService._waitForPhaseEnd(self: TownNightService)
+    while true do
+        if self._skip then
+            self._skip = false
+            return
+        end
+        local now = workspace:GetServerTimeNow()
+        if not self._hold and now >= self._phaseEndsAt then
+            return
+        end
         task.wait(0.15)
+        if self._hold then
+            pushHold(self, now)
+        end
     end
+end
+
+-- Returns whether the phase was called on rather than the beat arriving. The
+-- flag is peeked rather than consumed, because the loop that breaks on it is
+-- not the wait that ends the phase.
+function TownNightService._waitForBeat(self: TownNightService, target: number): boolean
+    while not self._skip do
+        local now = workspace:GetServerTimeNow()
+        if not self._hold and now >= target + self._heldSeconds then
+            return false
+        end
+        task.wait(0.15)
+        if self._hold then
+            pushHold(self, now)
+        end
+    end
+    return true
+end
+
+function TownNightService.setHold(self: TownNightService, held: boolean)
+    self._hold = held == true
+end
+
+function TownNightService.isHeld(self: TownNightService): boolean
+    return self._hold
+end
+
+-- End the phase now. Refused while the cycle is dormant, because there is no
+-- phase to end and a skip banked against a clock that has not started would
+-- fire at whatever the first wait turned out to be.
+function TownNightService.stepPhase(self: TownNightService): boolean
+    if self._phase == "dormant" then
+        return false
+    end
+    self._skip = true
+    return true
 end
 
 -- Called once for every player in this server session known to be past
@@ -53933,14 +54973,16 @@ function TownNightService._runCycle(self: TownNightService)
         self._phase = "day"
         self._activeNightNumber = 0
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._daySeconds
+        self._heldSeconds = 0
         self._worldService:setDusk(false)
         self._worldService:setTownRepairEnabled(true)
         self:_notify(nil)
         self._logger:info("town_day_started", { night = self._nightNumber })
-        waitUntilTime(self._phaseEndsAt)
+        self:_waitForPhaseEnd()
 
         self._phase = "dusk"
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._duskSeconds
+        self._heldSeconds = 0
         self._worldService:setDusk(true)
         self._worldService:setTownRepairEnabled(false)
         self:_notify(
@@ -53950,12 +54992,13 @@ function TownNightService._runCycle(self: TownNightService)
                 self._nightNumber
             )
         )
-        waitUntilTime(self._phaseEndsAt)
+        self:_waitForPhaseEnd()
 
         self._phase = "night"
         self._incident = nil
         local nightStartedAt = workspace:GetServerTimeNow()
         self._phaseEndsAt = nightStartedAt + self._nightSeconds
+        self._heldSeconds = 0
         -- Frozen for the rest of this night: a higher number from a veteran
         -- who joins mid-night (ensureStarted always raises self._nightNumber
         -- to the max seen) must not retroactively change the wave schedule,
@@ -54011,7 +55054,14 @@ function TownNightService._runCycle(self: TownNightService)
         end
 
         for _, beat in self._townNightSchedule.beats(self._nightSeconds, activeNight, partySize) do
-            waitUntilTime(nightStartedAt + beat.at)
+            if self:_waitForBeat(nightStartedAt + beat.at) then
+                -- The phase was called on early. The beats left in this night
+                -- are dropped rather than run at once: a skip that fired six
+                -- queued waves the instant it was pressed would be a control
+                -- that made the night harder, and every control here is
+                -- supposed to make it optional.
+                break
+            end
             if beat.kind == "spawn" then
                 self._worldService:signalNightWave(beat.enemyId, beat.wave, theme)
                 local laneId = if self._defenseLanes ~= nil
@@ -54033,7 +55083,7 @@ function TownNightService._runCycle(self: TownNightService)
             end
         end
 
-        waitUntilTime(self._phaseEndsAt)
+        self:_waitForPhaseEnd()
         local endingIncident = self._incident
         if endingIncident ~= nil and endingIncident.status == "active" then
             self:_expireIncident(activeNight, endingIncident.definition.id)
@@ -54258,6 +55308,20 @@ function TownNightService.snapshot(self: TownNightService): any
         theme = self._townNightSchedule.theme(self._nightNumber),
         phase = self._phase,
         phaseEndsAt = self._phaseEndsAt,
+        --[[
+            A held clock needs both of these, and the live pass is why.
+
+            The HUD counts down locally between pushes -- ten times a second,
+            off its own copy of `phaseEndsAt` -- so a hold that only moves the
+            deadline on the server leaves the pill running on through a clock
+            that has stopped. Pressed once and watched: the server sat at
+            543.8 seconds left for six seconds while the pill went 08:38 to
+            08:32. Every spec passed. The seconds are therefore measured here,
+            where the clock actually is, and the flag tells the client to show
+            that number rather than derive one.
+        ]]
+        phaseHeld = self._hold,
+        phaseRemaining = math.max(0, self._phaseEndsAt - workspace:GetServerTimeNow()),
         incident = self._townNightIncident.snapshot(self._incident),
     }
 end
@@ -54266,7 +55330,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="147">
+        <Item class="ModuleScript" referent="149">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -54341,6 +55405,7 @@ export type TutorialService = typeof(setmetatable(
         _partyService: any,
         _socialService: any,
         _commerceService: any,
+        _privateServerService: any,
         --[[
             Which store view each player is on, so the panel can be told to
             open by the world rather than by a HUD button. It is a revision
@@ -54430,6 +55495,7 @@ function TutorialService.new(
         _partyService = nil,
         _socialService = nil,
         _commerceService = nil,
+        _privateServerService = nil,
         _storeRevision = {},
         _actions = {},
         _sessions = {},
@@ -55252,6 +56318,10 @@ function TutorialService.setCommerceService(self: TutorialService, commerceServi
     self._commerceService = commerceService
 end
 
+function TutorialService.setPrivateServerService(self: TutorialService, privateServerService: any)
+    self._privateServerService = privateServerService
+end
+
 --[[
     Whether the store may open for this player, right now.
 
@@ -55613,6 +56683,29 @@ function TutorialService._interact(
         -- Everyone, not just the presser: closing a gate changes what the
         -- people already standing in the town may read, and a snapshot they
         -- do not receive is a showcase they keep looking at.
+        self:_publishAll()
+        return
+    end
+    if actionId == self._runtimeIds.Actions.PrivateControl then
+        --[[
+            A board on the private server's rail.
+
+            Which board is the prompt's own attribute, read here, so nothing a
+            client sends decides it. That matters more here than it does for
+            the profession altars this pattern came from: working any of these
+            ends the server's rewards permanently, and a payload that could
+            name a control would be a one-line request that ends them from
+            anywhere, with no rail in front of it and nobody standing at it.
+        ]]
+        local controlId = prompt:GetAttribute("Payload")
+        if type(controlId) ~= "string" or self._privateServerService == nil then
+            return
+        end
+        local _, message = self._privateServerService:press(player, controlId)
+        self:_setToast(player, message)
+        -- Everyone, because a held clock and a still night are facts about the
+        -- server rather than about the presser, and a player watching the
+        -- phase pill stop with no word for it is a player reporting a bug.
         self:_publishAll()
         return
     end
@@ -56700,6 +57793,10 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         toastRevision = session.toastRevision,
         phase = phase.phase,
         phaseEndsAt = phase.phaseEndsAt,
+        -- Only the town clock can be held, so the tutorial's own snapshot has
+        -- neither field and both read nil there, which is the right answer.
+        phaseHeld = phase.phaseHeld,
+        phaseRemaining = phase.phaseRemaining,
         nightActive = phase.nightActive,
         lanternHealth = phase.lanternHealth,
         enemyCount = phase.enemyCount,
@@ -56745,6 +57842,19 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             store.revision = self._storeRevision[player] or 0
             return store
         end)(),
+        --[[
+            Whether this server still pays, and it is pushed to everyone rather
+            than to the owner who latched it.
+
+            A guest in somebody's practice server has no way to tell from the
+            world that nothing they do is being kept -- the town looks the same,
+            the toasts read the same, and the loss only shows up as a save that
+            did not move. Saying it on the HUD is the difference between a
+            practice server and a silently broken one.
+        ]]
+        practice = if self._privateServerService ~= nil
+            then self._privateServerService:isPractice()
+            else false,
         gearCare = gearCare,
         whetTarget = whetTarget,
         equipped = self._profileService:equippedSnapshot(player),
@@ -56821,7 +57931,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="148">
+        <Item class="ModuleScript" referent="150">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -57690,7 +58800,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="149">
+        <Item class="ModuleScript" referent="151">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -57720,6 +58830,7 @@ export type WorldService = typeof(setmetatable(
     {} :: {
         Name: string,
         _logger: Logger,
+        _privateServerControls: any,
         _extractionPayoff: any,
         _memoryFragments: any,
         _memoryFragmentTargets: { [string]: any },
@@ -59635,6 +60746,7 @@ function WorldService.new(
     return setmetatable({
         Name = WorldService.Name,
         _logger = logger,
+        _privateServerControls = nil,
         _extractionPayoff = extractionPayoff,
         _townProgression = townProgression,
         _professionAbilityVisuals = professionAbilityVisuals,
@@ -64712,6 +65824,90 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         nil
     )
 
+    --[[
+        The private server's control rail, just inside the gate.
+
+        Built in every server rather than only in a private one, which is a
+        decision and not laziness. A rail that appeared only where it works is
+        a feature nobody knows the private server has until they already have
+        one; a rail that is always there and says why it will not answer is how
+        a player finds out what a private server is for. The town gate settled
+        the same argument -- it stands in a visitor's way too, and tells them
+        whose latch it is.
+
+        Four boards on one beam because they are one setting with four levers,
+        and because each has to be pressable on its own: a single cycling board
+        would make holding the clock a thing you reach by pressing past
+        stilling the dark, which is a control changing the world on the way to
+        another control.
+
+        Placed inside the gate rather than out in the square for the reason the
+        gate itself is placed at the road: this is a thing you do to the whole
+        server, and it belongs where you arrive rather than where you live.
+    ]]
+    local railFolder = Instance.new("Folder")
+    railFolder.Name = "PrivateControlRail"
+    railFolder.Parent = interactables
+    local railX, railZ = 21.5, -186
+    local controls = self._privateServerControls.controls()
+    local railSpan = 5.6 * #controls
+    for side = -1, 1, 2 do
+        part(
+            railFolder,
+            "RailPost",
+            Vector3.new(1.1, 7.6, 1.1),
+            CFrame.new(railX + side * (railSpan / 2), 3.8, railZ),
+            BARK,
+            Enum.Material.Wood
+        )
+    end
+    part(
+        railFolder,
+        "RailBeam",
+        Vector3.new(railSpan + 1.1, 1.1, 1.5),
+        CFrame.new(railX, 7.1, railZ),
+        WET_BARK,
+        Enum.Material.WoodPlanks
+    )
+    local railHead = part(
+        railFolder,
+        "RailHead",
+        Vector3.new(railSpan - 0.6, 1.5, 0.5),
+        CFrame.new(railX, 8.3, railZ + 0.4) * CFrame.Angles(0, math.rad(180), 0),
+        Color3.fromRGB(91, 65, 44),
+        Enum.Material.WoodPlanks
+    )
+    WorldSignBuilder.dressBoard(railHead, "PRIVATE SERVER CONTROLS", CREAM)
+    for index, control in controls do
+        --[[
+            Boards face the square, because a board's Front face is its -Z and
+            everything that reads this rail walks down to it from the town.
+            #329 shipped the town gate's sign reading out into the trees and
+            the camera caught it; the same 180 is the same fix.
+        ]]
+        local boardX = railX - railSpan / 2 + 5.6 * (index - 0.5)
+        local board = part(
+            railFolder,
+            "RailBoard",
+            Vector3.new(4.6, 3.2, 0.55),
+            CFrame.new(boardX, 5.1, railZ + 0.5) * CFrame.Angles(0, math.rad(180), 0),
+            Color3.fromRGB(78, 56, 38),
+            Enum.Material.WoodPlanks
+        )
+        WorldSignBuilder.dressBoard(board, control.label, CREAM)
+        self:_registerInteraction(
+            board,
+            self._runtimeIds.PrivateControlInteractionIds[control.id],
+            self._runtimeIds.Actions.PrivateControl,
+            "WORK",
+            control.label,
+            -- Which board this is, written onto the prompt rather than sent by
+            -- the client. The payload the client sends names nothing, so a
+            -- control cannot be worked from anywhere but the plank it is on.
+            control.id
+        )
+    end
+
     local masteryGrove = Instance.new("Folder")
     masteryGrove.Name = "GreenwardMasteryGrove"
     masteryGrove.Parent = interactables
@@ -65092,6 +66288,7 @@ end
 
 function WorldService.Init(self: WorldService, context: any)
     self._runtimeIds = context.runtimeIds
+    self._privateServerControls = context.privateServerControls
     self:_configureLighting()
 
     local existing = workspace:FindFirstChild(self._runtimeIds.WorldName)
@@ -73191,11 +74388,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="150">
+      <Item class="Folder" referent="152">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="151">
+        <Item class="ModuleScript" referent="153">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -77509,7 +78706,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="152">
+        <Item class="ModuleScript" referent="154">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -78608,7 +79805,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="153">
+        <Item class="ModuleScript" referent="155">
           <Properties>
             <string name="Name">CinderfallBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -79475,7 +80672,7 @@ return table.freeze(CinderfallBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="154">
+        <Item class="ModuleScript" referent="156">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -80170,7 +81367,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="155">
+        <Item class="ModuleScript" referent="157">
           <Properties>
             <string name="Name">FrostmereBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -81219,7 +82416,7 @@ return table.freeze(FrostmereBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="156">
+        <Item class="ModuleScript" referent="158">
           <Properties>
             <string name="Name">IronrootBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -82234,7 +83431,7 @@ return table.freeze(IronrootBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="157">
+        <Item class="ModuleScript" referent="159">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -83093,7 +84290,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="158">
+        <Item class="ModuleScript" referent="160">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -83179,7 +84376,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="159">
+        <Item class="ModuleScript" referent="161">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -83553,7 +84750,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="160">
+        <Item class="ModuleScript" referent="162">
           <Properties>
             <string name="Name">MireglassBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -84309,7 +85506,7 @@ return table.freeze(MireglassBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="161">
+        <Item class="ModuleScript" referent="163">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -84489,7 +85686,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="162">
+        <Item class="ModuleScript" referent="164">
           <Properties>
             <string name="Name">RegionBuilders</string>
             <string name="Source"><![CDATA[--!strict
@@ -85255,7 +86452,7 @@ return table.freeze(RegionBuilders)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="163">
+        <Item class="ModuleScript" referent="165">
           <Properties>
             <string name="Name">TempestBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -86076,7 +87273,7 @@ return table.freeze(TempestBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="164">
+        <Item class="ModuleScript" referent="166">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -86672,7 +87869,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="165">
+        <Item class="ModuleScript" referent="167">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -86909,7 +88106,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="166">
+        <Item class="ModuleScript" referent="168">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -86998,7 +88195,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="167">
+        <Item class="ModuleScript" referent="169">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -87334,11 +88531,11 @@ return table.freeze(WorldSignBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="168">
+    <Item class="Folder" referent="170">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="169">
+      <Item class="Script" referent="171">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -87391,7 +88588,7 @@ local WardenStagBuilder = require(serverRoot.World.WardenStagBuilder)
 local TerrainBuilder = require(serverRoot.World.TerrainBuilder)
 
 local content = Registry.new(Regions)
-assert(Config.SaveSchemaVersion == 24, "unexpected save schema version")
+assert(Config.SaveSchemaVersion == 25, "unexpected save schema version")
 assert(Config.BuildVersion == "0.53.0", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
@@ -89175,7 +90372,7 @@ print("[Last Light] PASS FoundationIntegration")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Script" referent="170">
+      <Item class="Script" referent="172">
         <Properties>
           <string name="Name">ModuleGallery</string>
           <token name="RunContext">0</token>
@@ -89266,15 +90463,15 @@ end
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="171">
+  <Item class="StarterPlayer" referent="173">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="172">
+    <Item class="StarterPlayerScripts" referent="174">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="173">
+      <Item class="LocalScript" referent="175">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -89661,11 +90858,11 @@ task.spawn(function()
 end)
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="174">
+        <Item class="Folder" referent="176">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="175">
+          <Item class="ModuleScript" referent="177">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -89796,7 +90993,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="176">
+          <Item class="ModuleScript" referent="178">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -93998,13 +95195,55 @@ function HUDController._updateClock(self: HUDController)
     elseif blackoutVisible then
         clockText = "DAWN · CHAPTER I"
     elseif phaseEndsAt > 0 then
-        local remaining = math.max(0, math.ceil(phaseEndsAt - workspace:GetServerTimeNow()))
+        --[[
+            A held clock reads its seconds off the server rather than deriving
+            them, and says HELD rather than LEFT.
+
+            Derived is the default because this label refreshes ten times a
+            second between pushes; but a hold moves the deadline on the server
+            and pushes nothing, so the derived version counts down through a
+            clock that has stopped. Found by pressing the board and watching:
+            the server held at 543.8 seconds for six seconds while the pill
+            went 08:38 to 08:32. And the word has to change too, because a
+            number that has simply stopped is what a frozen game looks like.
+        ]]
+        local held = state.phaseHeld == true
+        local remaining = if held
+            then math.max(0, math.ceil(tonumber(state.phaseRemaining) or 0))
+            else math.max(0, math.ceil(phaseEndsAt - workspace:GetServerTimeNow()))
         -- "LEFT" because "DAY · 02:58" reads as three in the morning, not as
         -- a countdown. Two glyphs of clarity beat two glyphs of mystery.
-        clockText =
-            string.format("%s · %02d:%02d LEFT", phase, math.floor(remaining / 60), remaining % 60)
+        clockText = string.format(
+            "%s · %02d:%02d %s",
+            phase,
+            math.floor(remaining / 60),
+            remaining % 60,
+            if held then "HELD" else "LEFT"
+        )
     else
         clockText = if phase == "REVEAL" then "DAWN · FIRST LIGHT" else phase .. " · MORNING"
+    end
+    --[[
+        A practice server says so on the clock, and it says so to everybody.
+
+        Folded into the capsule rather than given a strip of its own because
+        that capsule is the one HUD element that is centred, and centred is the
+        only position on this canvas that is provably on-screen at every aspect
+        -- #327 found four controls off a portrait phone by exactly the offsets
+        a new strip would have been written with. Widening a centred pill
+        cannot push anything off an edge.
+
+        Worth saying at all because the alternative is silent: a guest in
+        somebody's practice server sees the same town, the same toasts and the
+        same numbers, and only finds out when a save did not move.
+    ]]
+    local practice = state.practice == true
+    if practice then
+        clockText = "PRACTICE · " .. clockText
+    end
+    local pillWidth = if practice then 300 else 206
+    if self._phaseFrame.Size.X.Offset ~= pillWidth then
+        self._phaseFrame.Size = UDim2.fromOffset(pillWidth, 46)
     end
     if self._phase.Text ~= clockText then
         self._phase.Text = clockText
@@ -94368,7 +95607,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="177">
+          <Item class="ModuleScript" referent="179">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -94736,7 +95975,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="178">
+          <Item class="ModuleScript" referent="180">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -94844,7 +96083,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="179">
+          <Item class="ModuleScript" referent="181">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -94963,7 +96202,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="180">
+          <Item class="ModuleScript" referent="182">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -95237,7 +96476,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="181">
+          <Item class="ModuleScript" referent="183">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -95392,7 +96631,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="182">
+          <Item class="ModuleScript" referent="184">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -95504,7 +96743,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="183">
+          <Item class="ModuleScript" referent="185">
             <Properties>
               <string name="Name">SocialPingController</string>
               <string name="Source"><![CDATA[--!strict
@@ -95886,7 +97125,7 @@ return table.freeze(SocialPingController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="184">
+          <Item class="ModuleScript" referent="186">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -96088,7 +97327,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="185">
+          <Item class="ModuleScript" referent="187">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -96297,7 +97536,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="186">
+          <Item class="ModuleScript" referent="188">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -96442,7 +97681,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="187">
+          <Item class="ModuleScript" referent="189">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -96742,13 +97981,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="188">
+  <Item class="TextChatService" referent="190">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="189">
+  <Item class="Workspace" referent="191">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

@@ -130,9 +130,30 @@ export type Profile = {
         `entitlements`, which only the commerce seam is allowed to read.
     ]]
     commerce: Entitlements.State,
+    --[[
+        The seeds this player has already walked, newest first.
+
+        It exists for one reader: a private server's owner choosing which
+        expedition to run again. "Among already-discovered seeds" is the whole
+        bound in MONETIZATION_LIVEOPS_ANALYTICS' description of the control,
+        and a bound that cannot be checked against anything is not a bound --
+        so the history is a save field rather than a session's memory, because
+        a player who found a layout on Tuesday means it on Thursday.
+
+        Capped, and the cap is the point rather than tidiness: an unbounded
+        list on a profile grows for the life of an account, and M12's soak gate
+        asks in as many words that profile size not grow without bound. A
+        history long enough to find a run you remember is short.
+    ]]
+    expeditions: {
+        seeds: { { regionId: string, seed: number, walkedAt: number } },
+    },
 }
 
 local MAX_NIGHT_NUMBER = 1_000_000
+-- Long enough to hold a run somebody remembers, short enough that the list is
+-- a fixed cost on every save rather than a growing one.
+local MAX_DISCOVERED_SEEDS = 24
 
 local CHAPTER_ONE_DECISIONS = table.freeze({
     restore_farmland = true,
@@ -147,7 +168,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 24,
+        schemaVersion = 25,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -204,7 +225,48 @@ function SaveSchema.default(now: number): Profile
             visitPolicy = TownVisitPolicy.Default,
         },
         commerce = Entitlements.default(),
+        expeditions = { seeds = {} },
     }
+end
+
+-- Newest first, deduplicated by region and seed, capped. Deduplicating matters
+-- more than it looks: the same seed walked twice is one layout, and a history
+-- that counted it twice would push a genuinely different run off the end.
+local function normalizeSeeds(value: any): { { regionId: string, seed: number, walkedAt: number } }
+    local seeds = {}
+    if type(value) ~= "table" then
+        return seeds
+    end
+    local seen: { [string]: boolean } = {}
+    for _, entry in value do
+        if
+            type(entry) == "table"
+            and type(entry.regionId) == "string"
+            and #entry.regionId <= 48
+        then
+            local seed = tonumber(entry.seed)
+            local walkedAt = tonumber(entry.walkedAt)
+            if seed ~= nil and seed == seed and seed >= 0 and seed < math.huge then
+                local key = entry.regionId .. ":" .. tostring(math.floor(seed))
+                if not seen[key] then
+                    seen[key] = true
+                    table.insert(seeds, {
+                        regionId = entry.regionId,
+                        seed = math.floor(seed),
+                        walkedAt = if walkedAt ~= nil
+                                and walkedAt == walkedAt
+                                and walkedAt >= 0
+                            then math.floor(walkedAt)
+                            else 0,
+                    })
+                    if #seeds >= MAX_DISCOVERED_SEEDS then
+                        break
+                    end
+                end
+            end
+        end
+    end
+    return seeds
 end
 
 function SaveSchema.normalize(value: any, now: number): Profile
@@ -504,8 +566,58 @@ function SaveSchema.normalize(value: any, now: number): Profile
         return CosmeticCatalog.get(cosmeticId) ~= nil
     end)
 
-    profile.schemaVersion = 24
+    -- An era-24 save has walked expeditions and remembers none of them, which
+    -- is the truth rather than a loss: nothing recorded a seed before this
+    -- schema, so an empty history is exactly what that player has. It fills up
+    -- again on the next run they walk.
+    profile.expeditions = {
+        seeds = normalizeSeeds(
+            if type(value.expeditions) == "table" then value.expeditions.seeds else nil
+        ),
+    }
+
+    profile.schemaVersion = 25
     return profile
+end
+
+--[[
+    Record a seed this player has now walked.
+
+    Called where a manifest is actually built for somebody rather than where a
+    departure is requested, because a seed nobody reached is not a seed they
+    discovered -- and "already-discovered" is the only bound seed selection
+    has.
+]]
+function SaveSchema.withDiscoveredSeed(
+    profile: Profile,
+    regionId: any,
+    seed: any,
+    now: number
+): Profile
+    local numericSeed = tonumber(seed)
+    if type(regionId) ~= "string" or numericSeed == nil then
+        return profile
+    end
+    local nextProfile = table.clone(profile)
+    local seeds = { { regionId = regionId, seed = numericSeed, walkedAt = now } }
+    for _, entry in profile.expeditions.seeds do
+        table.insert(seeds, entry)
+    end
+    nextProfile.expeditions = { seeds = normalizeSeeds(seeds) }
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile
+end
+
+-- A copy, for the same reason `commerce` hands back copies: a caller that
+-- edited the profile's own table in place would change a save with no
+-- normalization, no revision bump and nothing written.
+function SaveSchema.discoveredSeeds(profile: Profile): { { regionId: string, seed: number } }
+    local seeds = {}
+    for _, entry in profile.expeditions.seeds do
+        table.insert(seeds, { regionId = entry.regionId, seed = entry.seed })
+    end
+    return seeds
 end
 
 function SaveSchema.withTutorial(

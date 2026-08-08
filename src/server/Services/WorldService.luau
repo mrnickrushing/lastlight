@@ -25,6 +25,7 @@ export type WorldService = typeof(setmetatable(
     {} :: {
         Name: string,
         _logger: Logger,
+        _privateServerControls: any,
         _extractionPayoff: any,
         _memoryFragments: any,
         _memoryFragmentTargets: { [string]: any },
@@ -1940,6 +1941,7 @@ function WorldService.new(
     return setmetatable({
         Name = WorldService.Name,
         _logger = logger,
+        _privateServerControls = nil,
         _extractionPayoff = extractionPayoff,
         _townProgression = townProgression,
         _professionAbilityVisuals = professionAbilityVisuals,
@@ -7017,6 +7019,90 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         nil
     )
 
+    --[[
+        The private server's control rail, just inside the gate.
+
+        Built in every server rather than only in a private one, which is a
+        decision and not laziness. A rail that appeared only where it works is
+        a feature nobody knows the private server has until they already have
+        one; a rail that is always there and says why it will not answer is how
+        a player finds out what a private server is for. The town gate settled
+        the same argument -- it stands in a visitor's way too, and tells them
+        whose latch it is.
+
+        Four boards on one beam because they are one setting with four levers,
+        and because each has to be pressable on its own: a single cycling board
+        would make holding the clock a thing you reach by pressing past
+        stilling the dark, which is a control changing the world on the way to
+        another control.
+
+        Placed inside the gate rather than out in the square for the reason the
+        gate itself is placed at the road: this is a thing you do to the whole
+        server, and it belongs where you arrive rather than where you live.
+    ]]
+    local railFolder = Instance.new("Folder")
+    railFolder.Name = "PrivateControlRail"
+    railFolder.Parent = interactables
+    local railX, railZ = 21.5, -186
+    local controls = self._privateServerControls.controls()
+    local railSpan = 5.6 * #controls
+    for side = -1, 1, 2 do
+        part(
+            railFolder,
+            "RailPost",
+            Vector3.new(1.1, 7.6, 1.1),
+            CFrame.new(railX + side * (railSpan / 2), 3.8, railZ),
+            BARK,
+            Enum.Material.Wood
+        )
+    end
+    part(
+        railFolder,
+        "RailBeam",
+        Vector3.new(railSpan + 1.1, 1.1, 1.5),
+        CFrame.new(railX, 7.1, railZ),
+        WET_BARK,
+        Enum.Material.WoodPlanks
+    )
+    local railHead = part(
+        railFolder,
+        "RailHead",
+        Vector3.new(railSpan - 0.6, 1.5, 0.5),
+        CFrame.new(railX, 8.3, railZ + 0.4) * CFrame.Angles(0, math.rad(180), 0),
+        Color3.fromRGB(91, 65, 44),
+        Enum.Material.WoodPlanks
+    )
+    WorldSignBuilder.dressBoard(railHead, "PRIVATE SERVER CONTROLS", CREAM)
+    for index, control in controls do
+        --[[
+            Boards face the square, because a board's Front face is its -Z and
+            everything that reads this rail walks down to it from the town.
+            #329 shipped the town gate's sign reading out into the trees and
+            the camera caught it; the same 180 is the same fix.
+        ]]
+        local boardX = railX - railSpan / 2 + 5.6 * (index - 0.5)
+        local board = part(
+            railFolder,
+            "RailBoard",
+            Vector3.new(4.6, 3.2, 0.55),
+            CFrame.new(boardX, 5.1, railZ + 0.5) * CFrame.Angles(0, math.rad(180), 0),
+            Color3.fromRGB(78, 56, 38),
+            Enum.Material.WoodPlanks
+        )
+        WorldSignBuilder.dressBoard(board, control.label, CREAM)
+        self:_registerInteraction(
+            board,
+            self._runtimeIds.PrivateControlInteractionIds[control.id],
+            self._runtimeIds.Actions.PrivateControl,
+            "WORK",
+            control.label,
+            -- Which board this is, written onto the prompt rather than sent by
+            -- the client. The payload the client sends names nothing, so a
+            -- control cannot be worked from anywhere but the plank it is on.
+            control.id
+        )
+    end
+
     local masteryGrove = Instance.new("Folder")
     masteryGrove.Name = "GreenwardMasteryGrove"
     masteryGrove.Parent = interactables
@@ -7397,6 +7483,7 @@ end
 
 function WorldService.Init(self: WorldService, context: any)
     self._runtimeIds = context.runtimeIds
+    self._privateServerControls = context.privateServerControls
     self:_configureLighting()
 
     local existing = workspace:FindFirstChild(self._runtimeIds.WorldName)

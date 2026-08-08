@@ -9,7 +9,7 @@ return table.freeze({
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 24,
+    SaveSchemaVersion = 25,
     --[[
         The save schema freeze.
 

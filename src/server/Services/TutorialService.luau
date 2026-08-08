@@ -70,6 +70,7 @@ export type TutorialService = typeof(setmetatable(
         _partyService: any,
         _socialService: any,
         _commerceService: any,
+        _privateServerService: any,
         --[[
             Which store view each player is on, so the panel can be told to
             open by the world rather than by a HUD button. It is a revision
@@ -159,6 +160,7 @@ function TutorialService.new(
         _partyService = nil,
         _socialService = nil,
         _commerceService = nil,
+        _privateServerService = nil,
         _storeRevision = {},
         _actions = {},
         _sessions = {},
@@ -981,6 +983,10 @@ function TutorialService.setCommerceService(self: TutorialService, commerceServi
     self._commerceService = commerceService
 end
 
+function TutorialService.setPrivateServerService(self: TutorialService, privateServerService: any)
+    self._privateServerService = privateServerService
+end
+
 --[[
     Whether the store may open for this player, right now.
 
@@ -1342,6 +1348,29 @@ function TutorialService._interact(
         -- Everyone, not just the presser: closing a gate changes what the
         -- people already standing in the town may read, and a snapshot they
         -- do not receive is a showcase they keep looking at.
+        self:_publishAll()
+        return
+    end
+    if actionId == self._runtimeIds.Actions.PrivateControl then
+        --[[
+            A board on the private server's rail.
+
+            Which board is the prompt's own attribute, read here, so nothing a
+            client sends decides it. That matters more here than it does for
+            the profession altars this pattern came from: working any of these
+            ends the server's rewards permanently, and a payload that could
+            name a control would be a one-line request that ends them from
+            anywhere, with no rail in front of it and nobody standing at it.
+        ]]
+        local controlId = prompt:GetAttribute("Payload")
+        if type(controlId) ~= "string" or self._privateServerService == nil then
+            return
+        end
+        local _, message = self._privateServerService:press(player, controlId)
+        self:_setToast(player, message)
+        -- Everyone, because a held clock and a still night are facts about the
+        -- server rather than about the presser, and a player watching the
+        -- phase pill stop with no word for it is a player reporting a bug.
         self:_publishAll()
         return
     end
@@ -2429,6 +2458,10 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         toastRevision = session.toastRevision,
         phase = phase.phase,
         phaseEndsAt = phase.phaseEndsAt,
+        -- Only the town clock can be held, so the tutorial's own snapshot has
+        -- neither field and both read nil there, which is the right answer.
+        phaseHeld = phase.phaseHeld,
+        phaseRemaining = phase.phaseRemaining,
         nightActive = phase.nightActive,
         lanternHealth = phase.lanternHealth,
         enemyCount = phase.enemyCount,
@@ -2474,6 +2507,19 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             store.revision = self._storeRevision[player] or 0
             return store
         end)(),
+        --[[
+            Whether this server still pays, and it is pushed to everyone rather
+            than to the owner who latched it.
+
+            A guest in somebody's practice server has no way to tell from the
+            world that nothing they do is being kept -- the town looks the same,
+            the toasts read the same, and the loss only shows up as a save that
+            did not move. Saying it on the HUD is the difference between a
+            practice server and a silently broken one.
+        ]]
+        practice = if self._privateServerService ~= nil
+            then self._privateServerService:isPractice()
+            else false,
         gearCare = gearCare,
         whetTarget = whetTarget,
         equipped = self._profileService:equippedSnapshot(player),
