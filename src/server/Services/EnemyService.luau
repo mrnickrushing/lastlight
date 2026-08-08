@@ -225,6 +225,17 @@ function EnemyService.setStillness(self: EnemyService, still: boolean)
     self._lureUntil += heldFor
 end
 
+--[[
+    How many creatures this server still believes are in the world: the one
+    being fought plus everything queued behind it. A soak reads this at
+    dawn, when the honest answer is zero -- a night ends by clearing its
+    queue, so anything counted here at dawn outlived the night it belonged
+    to.
+]]
+function EnemyService.trackedCount(self: EnemyService): number
+    return (if self._active ~= nil then 1 else 0) + #self._queue
+end
+
 function EnemyService.isStill(self: EnemyService): boolean
     return self._still
 end

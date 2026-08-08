@@ -66,6 +66,9 @@ export type PerformanceService = typeof(setmetatable(
         _startedAt: number,
         _lastBreachLogAt: { [string]: number },
         _shuttingDown: boolean,
+        _soakProbe: any,
+        _soakRun: any,
+        _soakCounters: { [string]: () -> number? },
     },
     PerformanceService
 ))
@@ -75,7 +78,8 @@ function PerformanceService.new(
     config: any,
     performanceBudget: any,
     sessionSegment: any,
-    analyticsService: any
+    analyticsService: any,
+    soakProbe: any
 ): PerformanceService
     return setmetatable({
         Name = PerformanceService.Name,
@@ -99,7 +103,102 @@ function PerformanceService.new(
         _startedAt = 0,
         _lastBreachLogAt = {},
         _shuttingDown = false,
+        _soakProbe = soakProbe,
+        _soakRun = nil,
+        _soakCounters = {},
     }, PerformanceService)
+end
+
+--[[
+    The soak half, which asks a different question from everything above.
+
+    The budgets judge whether a run felt good. A soak asks whether the
+    server is holding on to things, and that only shows up over cycles --
+    so this samples once per town cycle at one fixed phase and hands the
+    series to SoakProbe, which owns every rule about what a series means.
+
+    The counters are injected rather than reached for. This service has no
+    business knowing how many creatures EnemyService believes in or how
+    large a profile encodes to, and a soak that reached across the whole
+    server for its own numbers would be a second copy of every service's
+    internals, going stale on its own schedule.
+
+    It is off unless something turns it on. Reading instance counts costs a
+    full descendant walk, which is affordable once a cycle and not
+    affordable as a thing that happens on every server forever for a
+    measurement nobody is reading.
+]]
+function PerformanceService.setSoakCounters(
+    self: PerformanceService,
+    counters: { [string]: () -> number? }
+)
+    self._soakCounters = counters
+end
+
+function PerformanceService.beginSoak(self: PerformanceService, phase: string): boolean
+    if self._soakProbe == nil then
+        return false
+    end
+    self._soakRun = self._soakProbe.begin(phase)
+    self._logger:info("soak_started", { phase = phase })
+    return true
+end
+
+function PerformanceService.isSoaking(self: PerformanceService): boolean
+    return self._soakRun ~= nil
+end
+
+--[[
+    One cycle's reading. A counter that errors or answers with something
+    that is not a number is left out of the sample entirely rather than
+    filled in with a zero -- a zero is a reading, and an absent metric is
+    what SoakProbe's `missing` list exists to report.
+]]
+function PerformanceService.sampleSoak(self: PerformanceService, cycle: number, phase: string): any
+    local run = self._soakRun
+    if run == nil then
+        return nil
+    end
+
+    local counts: { [string]: number } = {}
+    for metricId, counter in self._soakCounters do
+        local ok, value = pcall(counter)
+        if ok and type(value) == "number" then
+            counts[metricId] = value
+        else
+            self._logger:warn("soak_counter_failed", { metric = metricId })
+        end
+    end
+
+    local nextRun, result = self._soakProbe.record(run, cycle, phase, counts)
+    if not result.accepted then
+        -- Loudly, because a refused sample is a sampler wired to the wrong
+        -- hook, and a soak quietly collecting nothing is the exact shape of
+        -- a gate that passes because nobody measured it.
+        self._logger:warn("soak_sample_refused", { cycle = cycle, reason = result.reason })
+        return nil
+    end
+    self._soakRun = nextRun
+
+    local report = self._soakProbe.report(nextRun)
+    self._logger:info("soak_sample", {
+        cycle = cycle,
+        verdict = report.verdict,
+        cycles = report.cycles,
+        instances = counts.instances,
+        enemies = counts.tracked_enemies,
+        residue = counts.player_residue,
+        profileBytes = counts.profile_bytes,
+    })
+    return report
+end
+
+function PerformanceService.soakReport(self: PerformanceService): any
+    local run = self._soakRun
+    if run == nil then
+        return nil
+    end
+    return self._soakProbe.report(run)
 end
 
 function PerformanceService._record(self: PerformanceService, metricId: string, value: number)

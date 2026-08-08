@@ -165,9 +165,22 @@ logged loudly when it fires:
 | `LastLightStockProfile` | a number | Fills the purse so crafting and equipping can be driven without playing an hour. |
 | `LastLightStudioStore` | Robux price | Turns the `cosmetic_store_enabled` flag on and gives every product that price, so the outfitter's cards render. It is a **price**, not a product id — `promptPurchase` still refuses with `product_not_configured`, because a Creator Dashboard product genuinely does not exist. |
 | `LastLightStudioGrant` | a product id | Pushes a synthetic receipt through `applyReceipt`, the real and only grant authority, for every player in the server. The platform's own `ProcessReceipt` cannot be driven in Studio; this is the closest honest thing to it. |
+| `LastLightSoak` | `true` | Turns on the soak: one sample per town cycle at dawn, into `SoakProbe`. Read **every cycle** rather than at boot, because a Play session starts from a fresh DataModel that does not carry attributes set in Edit mode -- a boot read is unreachable from a playtest, which is how it shipped broken once. Grants nothing and changes no rule; it only makes the server write down what it is holding. |
 | `LastLightStudioPrivateServer` | a user ID | Makes the private-server control rail answer to that user. A Studio session is neither a private server nor a reserved one, so this is the only way to reach the rail from a playtest at all. It fakes exactly one thing — the owner — and every refusal, the practice latch and all four consequences are the real path. |
 
-The reason the last two exist is written into the wave that added them: a live
+Driving several town cycles quickly, which the soak needs and a 20-minute
+cycle does not give you: set `LastLightStudioPrivateServer`, then fire
+`Interact` with `interactionId = "private_control_call_phase"` on a loop, once
+every five seconds or so, standing at the rail (pivot the character to about
+`21.5, 6, -182`). Three presses is one cycle. Two things to know about the
+result. The rail latches **practice** on the first press, so the profile is
+never written and `profile_bytes` will read flat for a reason that is not the
+profile holding steady. And `private_control` is a *kind* with no payload field
+of its own -- the rail is reached through `Interact`, so sending
+`kind = PrivateControl` is refused as a smuggled field.
+
+The reason the store and grant attributes exist is written into the wave that
+added them: a live
 pass on a store with no priced products sees an empty panel, and an empty panel
 and a broken panel look identical. That is the same failure `LastLightSkipTutorial`
 was written against.

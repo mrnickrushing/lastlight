@@ -8,6 +8,7 @@ TownNightService.Name = "TownNightService"
 
 export type Logger = {
     info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+    warn: (self: Logger, event: string, fields: { [string]: any }?) -> (),
 }
 
 export type TownNightService = typeof(setmetatable(
@@ -59,6 +60,7 @@ export type TownNightService = typeof(setmetatable(
         _visitPolicyProvider: ((number) -> string)?,
         _relationResolver: ((number, number, (string) -> ()) -> ())?,
         _onNightCompleted: ((number, number, any) -> ())?,
+        _onCycle: ((number, string) -> ())?,
         _incident: any,
         _hold: boolean,
         _skip: boolean,
@@ -115,6 +117,7 @@ function TownNightService.new(
         _visitPolicyProvider = nil,
         _relationResolver = nil,
         _onNightCompleted = nil,
+        _onCycle = nil,
         _incident = nil,
         _hold = false,
         _skip = false,
@@ -143,6 +146,33 @@ function TownNightService.setNightCompletedHandler(
     callback: (number, number, any) -> ()
 )
     self._onNightCompleted = callback
+end
+
+--[[
+    Fires once at the top of each day, before anything about the new cycle
+    is built, with the cycle number. Its own slot rather than a second use
+    of the night-completed handler, because those are different moments: a
+    night completing is a fact about the night that just ended, and a soak
+    sample has to be taken at the same point in every cycle including the
+    first one, which no night has ended before.
+]]
+function TownNightService.setCycleObserver(
+    self: TownNightService,
+    callback: ((number, string) -> ())?
+)
+    self._onCycle = callback
+end
+
+function TownNightService._observeCycle(self: TownNightService, cycle: number, phase: string)
+    local callback = self._onCycle
+    if callback == nil then
+        return
+    end
+    -- A soak observer that throws must not take the town's clock with it.
+    local ok, err = pcall(callback, cycle, phase)
+    if not ok then
+        self._logger:warn("town_cycle_observer_failed", { cycle = cycle, error = tostring(err) })
+    end
 end
 
 function TownNightService._notify(self: TownNightService, toast: string?)
@@ -541,7 +571,9 @@ function TownNightService.nightNumber(self: TownNightService): number
 end
 
 function TownNightService._runCycle(self: TownNightService)
+    local cycle = 0
     while true do
+        cycle += 1
         self._phase = "day"
         self._activeNightNumber = 0
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._daySeconds
@@ -550,6 +582,10 @@ function TownNightService._runCycle(self: TownNightService)
         self._worldService:setTownRepairEnabled(true)
         self:_notify(nil)
         self._logger:info("town_day_started", { night = self._nightNumber })
+        -- Sampled here, at the top of the day, because a soak reading is
+        -- only comparable to one taken at the same point in every cycle
+        -- and this is the only moment the world is quiet in all of them.
+        self:_observeCycle(cycle, "day")
         self:_waitForPhaseEnd()
 
         self._phase = "dusk"

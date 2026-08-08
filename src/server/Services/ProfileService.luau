@@ -506,6 +506,60 @@ function ProfileService.onEquipmentChanged(
     return self._equipmentChangedEvent.Event:Connect(callback)
 end
 
+--[[
+    Entries this service is still holding for players who are no longer in
+    the server.
+
+    Roblox exposes no count of live script connections, so this is the
+    observable half of the same question: a connection that outlived a
+    player kept its closure alive, and a closure that outlived a player
+    kept its table entry alive too. Every per-player table is walked rather
+    than a representative one, because a cleanup that forgets a single
+    table is exactly the shape this is looking for.
+]]
+function ProfileService.playerResidue(self: ProfileService): number
+    local present: { [Player]: boolean } = {}
+    for _, player in Players:GetPlayers() do
+        present[player] = true
+    end
+    local residue = 0
+    local tables: { { [Player]: any } } = {
+        self._profiles,
+        self._writable,
+        self._dirty,
+        self._saving,
+        self._loading,
+        self._lockHeartbeat,
+    }
+    for _, held in tables do
+        for player in held do
+            if not present[player] then
+                residue += 1
+            end
+        end
+    end
+    return residue
+end
+
+--[[
+    The largest profile this server is holding, in the bytes a DataStore
+    would charge for it. The largest rather than the average, because the
+    save that stops fitting is one player's, and an average over a lobby of
+    fresh profiles hides it.
+]]
+function ProfileService.largestProfileBytes(self: ProfileService): number
+    local largest = 0
+    for _, profile in self._profiles do
+        local ok, encoded = pcall(function()
+            return game:GetService("HttpService"):JSONEncode(profile)
+        end)
+        if ok and type(encoded) == "string" then
+            largest = math.max(largest, #encoded)
+        end
+    end
+    return largest
+end
+
 function ProfileService.get(self: ProfileService, player: Player): any
     return self._profiles[player]
 end

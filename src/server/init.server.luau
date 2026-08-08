@@ -59,6 +59,7 @@ local ActionPayloadContract = require(root.ActionPayloadContract)
 local AdminInspectionReport = require(root.AdminInspectionReport)
 local PerformanceBudget = require(root.PerformanceBudget)
 local SessionSegment = require(root.SessionSegment)
+local SoakProbe = require(root.SoakProbe)
 local ProfilePersistence = require(root.ProfilePersistence)
 local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
@@ -365,8 +366,14 @@ local commerceService = CommerceService.new(
     analyticsService
 )
 
-local performanceService =
-    PerformanceService.new(logger, Config, PerformanceBudget, SessionSegment, analyticsService)
+local performanceService = PerformanceService.new(
+    logger,
+    Config,
+    PerformanceBudget,
+    SessionSegment,
+    analyticsService,
+    SoakProbe
+)
 local adminService = AdminService.new(
     logger,
     AdminRoster,
@@ -394,6 +401,52 @@ local townNightService = TownNightService.new(
     featureFlags
 )
 townNightService:setDefense(defenseService, DefenseLanes)
+
+--[[
+    The soak, wired here because this is the only file that can see all
+    three things it reads and none of them should learn about each other.
+
+    The counters are injected rather than reached for. This service has no
+    business knowing how many creatures EnemyService believes in or how
+    large a profile encodes to, and a soak that reached across the server
+    for its own numbers would be a second copy of every service's
+    internals going stale on its own schedule.
+
+    `LastLightSoak` is read **inside the observer, every cycle**, and that
+    is not a style choice. A Studio Play session starts from a fresh
+    DataModel that does not carry attributes set in Edit mode, so a check
+    made once at boot can never be true in the only place this is ever
+    driven from: the wiring existed, ran on every server, and was
+    unreachable. Read per cycle it can also be turned on partway through a
+    session, which is what a soak actually gets used like.
+
+    Registering a counter costs nothing; running one costs a full
+    descendant walk of the world. That is why the list is always installed
+    and the sampling is not.
+]]
+performanceService:setSoakCounters({
+    instances = function(): number
+        return #workspace:GetDescendants()
+    end,
+    tracked_enemies = function(): number
+        return enemyService:trackedCount()
+    end,
+    player_residue = function(): number
+        return profileService:playerResidue()
+    end,
+    profile_bytes = function(): number
+        return profileService:largestProfileBytes()
+    end,
+})
+townNightService:setCycleObserver(function(cycle: number, phase: string)
+    if game:GetAttribute("LastLightSoak") ~= true then
+        return
+    end
+    if not performanceService:isSoaking() then
+        performanceService:beginSoak(phase)
+    end
+    performanceService:sampleSoak(cycle, phase)
+end)
 --[[
     The private server's control rail.
 
