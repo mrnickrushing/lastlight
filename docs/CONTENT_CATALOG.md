@@ -550,6 +550,35 @@ from disconnect between objective completion and reward.
 
 ## Cosmetics and expression
 
+### The direct catalog at launch
+
+**20 cosmetics across four lines**, five slots each, and 24 products: one per
+cosmetic plus one set per line. A line is one look carried across every slot,
+because nobody wants a lantern shell -- they want the look the lantern shell
+finishes. The counts are asserted by `CosmeticReachability.spec`, which also
+refuses a line missing a slot: a set product with four of five in it has a hole
+that is invisible until somebody wears it.
+
+| Line | Name | Cosmetics |
+|---|---|---:|
+| line_greenward | The Greenward | 5 |
+| line_ironroot | The Ironroot | 5 |
+| line_mireglass | The Mireglass | 5 |
+| line_cinderfall | The Cinderfall | 5 |
+
+The five slots are `outfit`, `weapon_skin`, `tool_skin`, `lantern_shell` and
+`banner`. **Emotes are not a slot yet**, and the omission is the honest one: an
+emote is a motion rather than a shape, the only geometry a plan could offer for
+one is a glow, and VISUAL_QUALITY_STANDARD names a glow directly as not being
+construction. The slot arrives with the animation pipeline that makes an emote
+possible.
+
+Every plan is `derived = true` -- real geometry a player can see, marked so that
+nothing here claims to be an art pass. Replacing a derived plan with authored
+art is an art pass and it is the owner's. **Prices and Creator Dashboard product
+IDs are the owner's too**; `Config.CommerceProductIds` is empty, so no product
+can be bought and no card renders a price it was not given.
+
 Earned and premium catalogs may include:
 
 - avatar-compatible outfits and accessories;
