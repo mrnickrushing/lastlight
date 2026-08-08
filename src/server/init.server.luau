@@ -58,6 +58,7 @@ local CompanionMotion = require(root.CompanionMotion)
 local ActionPayloadContract = require(root.ActionPayloadContract)
 local AdminInspectionReport = require(root.AdminInspectionReport)
 local PerformanceBudget = require(root.PerformanceBudget)
+local SessionSegment = require(root.SessionSegment)
 local ProfilePersistence = require(root.ProfilePersistence)
 local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
@@ -122,9 +123,13 @@ local featureFlags =
     FeatureFlagService.new(Config.FeatureFlags, environmentConfig.AllowFlagOverrides, logger)
 local content = Registry.new(Regions)
 local networkService = NetworkService.new(logger)
-local profileService = ProfileService.new(logger, environmentConfig.UsePersistentData)
-local gearVisualService = GearVisualService.new(logger, profileService, GearVisualPlan)
+-- Analytics before the profile service, because a profile transaction is one
+-- of the release gates and the thing that measures it cannot be built after
+-- the thing it measures.
 local analyticsService = AnalyticsService.new(logger)
+local profileService =
+    ProfileService.new(logger, environmentConfig.UsePersistentData, analyticsService)
+local gearVisualService = GearVisualService.new(logger, profileService, GearVisualPlan)
 local worldService = WorldService.new(
     logger,
     ExtractionPayoff,
@@ -355,7 +360,8 @@ local commerceService = CommerceService.new(
     analyticsService
 )
 
-local performanceService = PerformanceService.new(logger, Config, PerformanceBudget)
+local performanceService =
+    PerformanceService.new(logger, Config, PerformanceBudget, SessionSegment, analyticsService)
 local adminService = AdminService.new(
     logger,
     AdminRoster,
@@ -365,7 +371,8 @@ local adminService = AdminService.new(
     combatService,
     worldService,
     expeditionService,
-    performanceService
+    performanceService,
+    analyticsService
 )
 local townNightService = TownNightService.new(
     logger,
@@ -597,8 +604,8 @@ end)
 networkService:setPerformanceHandler(function(player: Player, payload: any)
     performanceService:acceptClientReport(player, payload)
 end)
-profileService:onLoaded(function(player: Player, _profile: any)
-    performanceService:markInteractive(player)
+profileService:onLoaded(function(player: Player, profile: any)
+    performanceService:markInteractive(player, profile.createdAt)
 end)
 networkService:setActionObserver(function(player: Player)
     performanceService:noteAction(player)

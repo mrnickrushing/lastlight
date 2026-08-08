@@ -46,6 +46,7 @@ export type AdminService = typeof(setmetatable(
         _worldService: any,
         _expeditionService: any,
         _performanceService: any,
+        _analyticsService: any,
     },
     AdminService
 ))
@@ -59,7 +60,8 @@ function AdminService.new(
     combatService: any,
     worldService: any,
     expeditionService: any,
-    performanceService: any
+    performanceService: any,
+    analyticsService: any
 ): AdminService
     return setmetatable({
         Name = AdminService.Name,
@@ -73,6 +75,7 @@ function AdminService.new(
         _worldService = worldService,
         _expeditionService = expeditionService,
         _performanceService = performanceService,
+        _analyticsService = analyticsService,
     }, AdminService)
 end
 
@@ -504,6 +507,25 @@ function AdminService._onChatted(self: AdminService, player: Player, message: st
             self:_reply(player, "THAT COMMAND FAILED")
         end
         return
+    end
+
+    --[[
+        Somebody who is not on the roster typing a real command.
+
+        This is the one refusal worth counting, and it is deliberately counted
+        *before* the silence rule below: they still hear nothing, because a
+        reply is how a roster gets probed, but a stranger reaching for /restore
+        is exactly the "unauthorized admin mutation" the zero-tolerance gate
+        names and it must not be invisible to the people watching. Ordinary
+        chat is not counted, because ordinary chat is not an attempt.
+    ]]
+    -- GATE-METRIC: unauthorized_mutation
+    if decision.reason == "not_an_admin" then
+        self._analyticsService:unauthorizedMutation(
+            player.UserId,
+            "admin_command",
+            tostring(decision.command)
+        )
     end
 
     -- Ordinary chat produces nothing at all. Only someone who typed a real

@@ -25596,10 +25596,18 @@ function PerformanceBudget.sanitizeClientReport(payload: any): any
         return nil
     end
 
-    local fieldCount = 0
+    -- Named rather than counted. A count was enough while the payload had four
+    -- fields and a fifth was by definition smuggled; adding the platform label
+    -- would have made room for one extra field of a client's choosing, which is
+    -- the one-extra-field rule failing in the direction it was written against.
     for key in payload do
-        fieldCount += 1
-        if fieldCount > 4 or type(key) ~= "string" then
+        if
+            key ~= "schemaVersion"
+            and key ~= "fps"
+            and key ~= "spikeMs"
+            and key ~= "memoryMb"
+            and key ~= "platform"
+        then
             return nil
         end
     end
@@ -31771,6 +31779,196 @@ return table.freeze(SaveSchema)
       </Item>
       <Item class="ModuleScript" referent="96">
         <Properties>
+          <string name="Name">SessionSegment</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    The two slices every per-segment release gate is read on.
+
+    RELEASE_GATES.md sets a second, looser threshold for every reliability and
+    comprehension gate and then says who it applies to: "each advertised
+    platform class -- phone, tablet, desktop, and console" and "each supported
+    device/performance segment". A threshold that can only be read across the
+    whole population is half a gate, because the whole population is exactly
+    where a phone-only failure hides.
+
+    So a session carries two labels, and both are decided here:
+
+      * **platform class** is what the player is holding. It is a client fact
+        and nothing else can know it -- a server sees a userId and a network
+        connection, not a screen. It arrives over the telemetry remote as one
+        of four bounded words and is never trusted for anything but a label; no
+        rule, reward or refusal in this game reads it.
+      * **performance tier** is how well that device is actually running,
+        taken from the frame rate the client reports. Two phones are not one
+        segment: the gate that matters is whether the game is playable on the
+        slow half of them, and averaging the slow half into the fast half is
+        the arithmetic that hides it.
+
+    Pure and free of Roblox datatypes, because the Lune runner has none: the
+    caller passes booleans and numbers and gets a word back.
+]]
+
+local SessionSegment = {}
+
+-- The four classes RELEASE_GATES.md advertises, plus the honest fifth. A
+-- session whose client has not introduced itself yet is `unknown` rather than
+-- being guessed into `desktop`, which is the class it would be assumed into by
+-- a "has a keyboard" test run against no data at all.
+local PLATFORMS = table.freeze({
+    console = true,
+    desktop = true,
+    phone = true,
+    tablet = true,
+    unknown = true,
+})
+
+local TIERS = table.freeze({
+    high = true,
+    low = true,
+    mid = true,
+    unknown = true,
+})
+
+-- Where a touch screen stops being a phone. Measured on the shorter edge in
+-- points, because a phone held sideways is still a phone; 600 is the width at
+-- which the HUD's portrait rules stop applying and is therefore the same line
+-- the layout already draws.
+local TABLET_MIN_SHORT_EDGE = 600
+
+function SessionSegment.isValidPlatform(value: any): boolean
+    return type(value) == "string" and PLATFORMS[value] == true
+end
+
+function SessionSegment.isValidTier(value: any): boolean
+    return type(value) == "string" and TIERS[value] == true
+end
+
+--[[
+    What the player is holding, from what the client can see about itself.
+
+    Order matters. A console reports a ten-foot interface and also a gamepad; a
+    Windows tablet reports touch and a keyboard. The first question is always
+    the most specific one, so a device that answers yes to two tests is filed
+    under the narrower.
+]]
+function SessionSegment.platformClass(
+    tenFootInterface: boolean,
+    touchEnabled: boolean,
+    keyboardEnabled: boolean,
+    viewportWidth: number,
+    viewportHeight: number
+): string
+    if tenFootInterface then
+        return "console"
+    end
+    if not touchEnabled then
+        return "desktop"
+    end
+    -- A touch screen with a keyboard attached is a laptop or a Windows tablet
+    -- being used as one. It is filed by its screen rather than its keyboard,
+    -- because the reach and safe-area problems the mobile gates exist for are
+    -- a property of the screen.
+    if
+        viewportWidth <= 0
+        or viewportHeight <= 0
+        or viewportWidth ~= viewportWidth
+        or viewportHeight ~= viewportHeight
+    then
+        return if keyboardEnabled then "desktop" else "unknown"
+    end
+    local shortEdge = math.min(viewportWidth, viewportHeight)
+    if shortEdge >= TABLET_MIN_SHORT_EDGE then
+        return "tablet"
+    end
+    return "phone"
+end
+
+--[[
+    How well it is running, from the frame rate the client reported.
+
+    The boundaries are the two numbers the performance budget already treats as
+    meaningful -- 30 is the floor a session is expected to hold and 50 is
+    comfortably above it -- so a tier cannot disagree with a budget verdict
+    about the same device.
+]]
+function SessionSegment.tier(fps: any): string
+    if type(fps) ~= "number" or fps ~= fps or fps <= 0 then
+        return "unknown"
+    end
+    if fps >= 50 then
+        return "high"
+    end
+    if fps >= 30 then
+        return "mid"
+    end
+    return "low"
+end
+
+-- The device/performance segment as one word, which is the unit the sample
+-- minimum is counted in: "each supported device/performance segment needs at
+-- least 50 first-session samples".
+function SessionSegment.id(platform: any, tier: any): string
+    local resolvedPlatform = if SessionSegment.isValidPlatform(platform)
+        then platform
+        else "unknown"
+    local resolvedTier = if SessionSegment.isValidTier(tier) then tier else "unknown"
+    return resolvedPlatform .. "/" .. resolvedTier
+end
+
+--[[
+    The platform a telemetry payload claims, or nil.
+
+    Read separately from the frame samples because it arrives separately: a
+    client says what it is on its first frame and does not have a frame rate
+    to report for another five seconds. A session that ends inside those five
+    seconds is precisely the session the join and crash gates are about, so its
+    platform has to be known before its first sample rather than with it.
+
+    Bounded the same way the sample is, and for the same reason: this runs
+    *before* `sanitizeClientReport` on a payload a client composed, so if it
+    accepted a smuggled key the whitelist below it would never see one. The
+    schema version is checked here too -- a payload from a client build that
+    does not agree with this one about what the fields mean is not a label, it
+    is a guess.
+]]
+function SessionSegment.platformOf(payload: any): string?
+    if type(payload) ~= "table" or payload.schemaVersion ~= 1 then
+        return nil
+    end
+    for key in payload do
+        if
+            key ~= "schemaVersion"
+            and key ~= "fps"
+            and key ~= "spikeMs"
+            and key ~= "memoryMb"
+            and key ~= "platform"
+        then
+            return nil
+        end
+    end
+    local platform = payload.platform
+    if not SessionSegment.isValidPlatform(platform) or platform == "unknown" then
+        return nil
+    end
+    return platform
+end
+
+-- Whether a payload is a client introducing itself rather than reporting a
+-- sample. An introduction carries no frame data, which is the whole reason it
+-- exists: it is sent before there is any.
+function SessionSegment.isIntroduction(payload: any): boolean
+    return SessionSegment.platformOf(payload) ~= nil
+        and type(payload) == "table"
+        and payload.fps == nil
+end
+
+return table.freeze(SessionSegment)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="97">
+        <Properties>
           <string name="Name">SfxCatalog</string>
           <string name="Source"><![CDATA[--!strict
 --[[
@@ -31936,7 +32134,7 @@ return table.freeze(SfxCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="97">
+      <Item class="ModuleScript" referent="98">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -32080,7 +32278,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="98">
+      <Item class="ModuleScript" referent="99">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -32337,7 +32535,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="99">
+      <Item class="ModuleScript" referent="100">
         <Properties>
           <string name="Name">TempestEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -32615,7 +32813,7 @@ return table.freeze(TempestEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="100">
+      <Item class="ModuleScript" referent="101">
         <Properties>
           <string name="Name">TideboundTitanEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -33046,7 +33244,7 @@ return table.freeze(TideboundTitanEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="101">
+      <Item class="ModuleScript" referent="102">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -33190,7 +33388,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="102">
+      <Item class="ModuleScript" referent="103">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -33600,7 +33798,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="103">
+      <Item class="ModuleScript" referent="104">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -33781,7 +33979,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="104">
+      <Item class="ModuleScript" referent="105">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -33845,7 +34043,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="105">
+      <Item class="ModuleScript" referent="106">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -34019,7 +34217,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="106">
+      <Item class="ModuleScript" referent="107">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -34111,7 +34309,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="107">
+      <Item class="ModuleScript" referent="108">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -34323,7 +34521,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="108">
+      <Item class="ModuleScript" referent="109">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -34501,7 +34699,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="109">
+      <Item class="ModuleScript" referent="110">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -34654,7 +34852,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="110">
+      <Item class="ModuleScript" referent="111">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -34987,7 +35185,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="111">
+      <Item class="ModuleScript" referent="112">
         <Properties>
           <string name="Name">TownVisitPolicy</string>
           <string name="Source"><![CDATA[--!strict
@@ -35160,7 +35358,7 @@ return table.freeze(TownVisitPolicy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="112">
+      <Item class="ModuleScript" referent="113">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -35322,7 +35520,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="113">
+      <Item class="ModuleScript" referent="114">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -35358,7 +35556,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="114">
+      <Item class="ModuleScript" referent="115">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -35740,7 +35938,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="115">
+      <Item class="ModuleScript" referent="116">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -35810,7 +36008,7 @@ return table.freeze(WeatherProfile)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="116">
+      <Item class="ModuleScript" referent="117">
         <Properties>
           <string name="Name">WhiteHowlerEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -36274,11 +36472,11 @@ return table.freeze(WhiteHowlerEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="117">
+  <Item class="ServerScriptService" referent="118">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="118">
+    <Item class="Script" referent="119">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -36342,6 +36540,7 @@ local CompanionMotion = require(root.CompanionMotion)
 local ActionPayloadContract = require(root.ActionPayloadContract)
 local AdminInspectionReport = require(root.AdminInspectionReport)
 local PerformanceBudget = require(root.PerformanceBudget)
+local SessionSegment = require(root.SessionSegment)
 local ProfilePersistence = require(root.ProfilePersistence)
 local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
@@ -36406,9 +36605,13 @@ local featureFlags =
     FeatureFlagService.new(Config.FeatureFlags, environmentConfig.AllowFlagOverrides, logger)
 local content = Registry.new(Regions)
 local networkService = NetworkService.new(logger)
-local profileService = ProfileService.new(logger, environmentConfig.UsePersistentData)
-local gearVisualService = GearVisualService.new(logger, profileService, GearVisualPlan)
+-- Analytics before the profile service, because a profile transaction is one
+-- of the release gates and the thing that measures it cannot be built after
+-- the thing it measures.
 local analyticsService = AnalyticsService.new(logger)
+local profileService =
+    ProfileService.new(logger, environmentConfig.UsePersistentData, analyticsService)
+local gearVisualService = GearVisualService.new(logger, profileService, GearVisualPlan)
 local worldService = WorldService.new(
     logger,
     ExtractionPayoff,
@@ -36639,7 +36842,8 @@ local commerceService = CommerceService.new(
     analyticsService
 )
 
-local performanceService = PerformanceService.new(logger, Config, PerformanceBudget)
+local performanceService =
+    PerformanceService.new(logger, Config, PerformanceBudget, SessionSegment, analyticsService)
 local adminService = AdminService.new(
     logger,
     AdminRoster,
@@ -36649,7 +36853,8 @@ local adminService = AdminService.new(
     combatService,
     worldService,
     expeditionService,
-    performanceService
+    performanceService,
+    analyticsService
 )
 local townNightService = TownNightService.new(
     logger,
@@ -36881,8 +37086,8 @@ end)
 networkService:setPerformanceHandler(function(player: Player, payload: any)
     performanceService:acceptClientReport(player, payload)
 end)
-profileService:onLoaded(function(player: Player, _profile: any)
-    performanceService:markInteractive(player)
+profileService:onLoaded(function(player: Player, profile: any)
+    performanceService:markInteractive(player, profile.createdAt)
 end)
 networkService:setActionObserver(function(player: Player)
     performanceService:noteAction(player)
@@ -36901,7 +37106,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="119">
+      <Item class="ModuleScript" referent="120">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -36999,11 +37204,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="120">
+      <Item class="Folder" referent="121">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="121">
+        <Item class="ModuleScript" referent="122">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -37054,6 +37259,7 @@ export type AdminService = typeof(setmetatable(
         _worldService: any,
         _expeditionService: any,
         _performanceService: any,
+        _analyticsService: any,
     },
     AdminService
 ))
@@ -37067,7 +37273,8 @@ function AdminService.new(
     combatService: any,
     worldService: any,
     expeditionService: any,
-    performanceService: any
+    performanceService: any,
+    analyticsService: any
 ): AdminService
     return setmetatable({
         Name = AdminService.Name,
@@ -37081,6 +37288,7 @@ function AdminService.new(
         _worldService = worldService,
         _expeditionService = expeditionService,
         _performanceService = performanceService,
+        _analyticsService = analyticsService,
     }, AdminService)
 end
 
@@ -37514,6 +37722,25 @@ function AdminService._onChatted(self: AdminService, player: Player, message: st
         return
     end
 
+    --[[
+        Somebody who is not on the roster typing a real command.
+
+        This is the one refusal worth counting, and it is deliberately counted
+        *before* the silence rule below: they still hear nothing, because a
+        reply is how a roster gets probed, but a stranger reaching for /restore
+        is exactly the "unauthorized admin mutation" the zero-tolerance gate
+        names and it must not be invisible to the people watching. Ordinary
+        chat is not counted, because ordinary chat is not an attempt.
+    ]]
+    -- GATE-METRIC: unauthorized_mutation
+    if decision.reason == "not_an_admin" then
+        self._analyticsService:unauthorizedMutation(
+            player.UserId,
+            "admin_command",
+            tostring(decision.command)
+        )
+    end
+
     -- Ordinary chat produces nothing at all. Only someone who typed a real
     -- command and is on the roster hears why it was refused, so the roster
     -- stays invisible to everyone else.
@@ -37618,7 +37845,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="122">
+        <Item class="ModuleScript" referent="123">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -37696,6 +37923,273 @@ function AnalyticsService.complete(self: AnalyticsService, player: Player)
             RobloxAnalytics:LogCustomEvent(player, "FirstLightCompleted", math.max(1, elapsed), {})
         end)
     end
+end
+
+--[[
+    The events a release gate is read from.
+
+    RELEASE_GATES.md is the document a promotion decision is made against, and
+    every threshold in it names a rate: transaction success, crash-free
+    sessions, join failure, first-night completion, receipts that reached a
+    grant. A rate needs a numerator and a denominator, and until this block
+    existed most of them had neither -- which is the failure mode the gate
+    document is least able to detect, because a dashboard reading zero and a
+    dashboard reading nothing look identical to the person approving a
+    release. A gate nobody measures is a gate nobody can fail.
+
+    Each function below is the emitter one row of that document names, and the
+    document names it back. `GateMetrics.spec` holds the two lists against each
+    other in both directions, so a threshold added without an emitter fails on
+    the day it is written down and an emitter that stops being called fails on
+    the day its call site goes.
+
+    Two rules the shape follows. **Every one of these is a server event**: the
+    document says operational rates use authoritative server events and that
+    client telemetry cannot hide a server failure, so nothing here is a client
+    reporting its own success. And **every one carries the dimensions its
+    per-segment threshold is read on**, because a gate that can only be read
+    across the whole population is exactly the gate a phone-only failure hides
+    behind.
+]]
+
+--[[
+    One profile read or write, and whether it landed.
+
+    The denominator of "profile load/save transaction success at least 99.9%".
+    Both directions are the same event with a `kind`, because the gate is one
+    number over both and splitting it into two events would let a build pass by
+    counting only the easy half.
+]]
+function AnalyticsService.profileTransaction(
+    self: AnalyticsService,
+    userId: number,
+    kind: string,
+    ok: boolean,
+    reason: string?
+)
+    self._logger:info("profile_transaction", {
+        kind = string.sub(kind, 1, 24),
+        ok = ok,
+        reason = string.sub(reason or "ok", 1, 48),
+        user = userId,
+    })
+end
+
+--[[
+    A save that is gone, or a stored profile that could not be understood.
+
+    Zero-tolerance. This is deliberately not the same event as a failed
+    transaction: a failed write that the next write repairs costs a player
+    nothing, and folding the two together would bury the six-a-day event that
+    stops a release under the thousand-a-day one that does not.
+]]
+function AnalyticsService.saveLoss(
+    self: AnalyticsService,
+    userId: number,
+    kind: string,
+    reason: string
+)
+    self._logger:warn("save_loss", {
+        kind = string.sub(kind, 1, 24),
+        reason = string.sub(reason, 1, 64),
+        user = userId,
+    })
+end
+
+--[[
+    A session that reached play, with the two labels it is sliced by.
+
+    "An interactive session begins when the player can move and act in
+    Emberhollow, not when the client process starts" -- so this fires when the
+    profile is loaded and the world will answer, not at PlayerAdded. It is the
+    denominator of the crash-free gate, the sample it carries is the join p95
+    gate, and `daysSinceFirstSession` is what D1 and D7 return are counted from.
+]]
+function AnalyticsService.sessionStarted(
+    self: AnalyticsService,
+    player: Player,
+    joinSeconds: number,
+    platform: string,
+    daysSinceFirstSession: number
+)
+    self._logger:info("interactive_session", {
+        daysSinceFirstSession = daysSinceFirstSession,
+        joinSeconds = math.floor(joinSeconds * 100 + 0.5) / 100,
+        -- Their first day, which is what "eligible new players" means in the
+        -- gate document's denominators.
+        newPlayer = daysSinceFirstSession <= 0,
+        platform = platform,
+        player = player.UserId,
+    })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "InteractiveSession", 1, {
+                [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = platform,
+            })
+        end)
+    end
+end
+
+--[[
+    Somebody who joined and never got to play.
+
+    The numerator of the join failure gate. Its denominator is this plus
+    `interactive_session`, which is why both live in the same service and are
+    emitted from the same place: counting failures against a denominator
+    gathered somewhere else is how a rate quietly becomes a count.
+]]
+function AnalyticsService.joinFailed(
+    self: AnalyticsService,
+    player: Player,
+    reason: string,
+    waitedSeconds: number,
+    platform: string
+)
+    self._logger:warn("join_failed", {
+        platform = platform,
+        player = player.UserId,
+        reason = string.sub(reason, 1, 32),
+        waitedSeconds = math.floor(waitedSeconds * 100 + 0.5) / 100,
+    })
+end
+
+--[[
+    How a session finished, which is the only way a crash is ever counted.
+
+    Roblox has no crash signal. What a server can see is that a client stopped
+    talking to it before it disappeared: telemetry arrives on a fixed interval,
+    so a session whose last report is several intervals stale at the moment the
+    player leaves did not close, it stopped. That is an approximation and the
+    gate document says so; it is also the same approximation every crash-free
+    metric on this platform is built on, and it is strictly better than a
+    number nobody collects.
+]]
+function AnalyticsService.sessionEnded(
+    self: AnalyticsService,
+    userId: number,
+    reason: string,
+    durationSeconds: number,
+    interactive: boolean,
+    platform: string,
+    segment: string
+)
+    self._logger:info("session_ended", {
+        durationSeconds = math.floor(durationSeconds + 0.5),
+        interactive = interactive,
+        platform = platform,
+        reason = string.sub(reason, 1, 24),
+        segment = segment,
+        user = userId,
+    })
+end
+
+--[[
+    A seed whose generated manifest could not be validated, so the known-good
+    walk was handed out instead.
+
+    Two gates read this. The fallback rate is a reliability threshold; a
+    fallback on a *critical path* is zero-tolerance, because an impossible seed
+    on the road to a chapter is a player who cannot finish the game. The event
+    carries the region and the seed so the second can be reproduced rather than
+    described.
+]]
+function AnalyticsService.generatorFallback(
+    self: AnalyticsService,
+    regionId: string,
+    seed: number,
+    reason: string
+)
+    self._logger:warn("generator_fallback", {
+        reason = string.sub(reason, 1, 48),
+        region = string.sub(regionId, 1, 48),
+        seed = seed,
+    })
+end
+
+--[[
+    One player through their first night.
+
+    "First-night completion after onboarding" is a ratio against players who
+    finished onboarding, so it is emitted per player at the moment their own
+    tutorial advances past the night, rather than once per server when the
+    night resolves. A server-wide event would count a night, not a person, and
+    the gate is about people.
+]]
+function AnalyticsService.firstNightCompleted(self: AnalyticsService, player: Player)
+    self._logger:info("first_night_completed", { player = player.UserId })
+    if not RunService:IsStudio() then
+        pcall(function()
+            RobloxAnalytics:LogCustomEvent(player, "FirstNightCompleted", 1, {})
+        end)
+    end
+end
+
+--[[
+    A request that tried to change something it had no right to change.
+
+    Zero-tolerance covers "unauthorized economy, entitlement, admin, or
+    progression mutation", and the honest reading is that the gate is about
+    attempts that *succeeded*. Nothing here can emit that, because a mutation
+    this game let through is by definition one it did not notice. What it can
+    emit is every attempt it refused, which is the signal that says whether
+    anybody is trying -- and the rate at which a refusal fires is the first
+    place a hole shows up, since an exploit found is an exploit probed for
+    first.
+]]
+function AnalyticsService.unauthorizedMutation(
+    self: AnalyticsService,
+    userId: number,
+    surface: string,
+    reason: string
+)
+    self._logger:warn("unauthorized_mutation", {
+        reason = string.sub(reason, 1, 48),
+        surface = string.sub(surface, 1, 32),
+        user = userId,
+    })
+end
+
+--[[
+    Money taken and nothing handed over.
+
+    The other zero-tolerance commerce event, and the one that costs a real
+    person real currency: a receipt this build cannot resolve to a product, or
+    a grant whose durable write did not land. Both leave the platform holding a
+    completed purchase with no entitlement behind it. Neither is a retry --
+    `receipt_result` carries those -- because a retry is the system working.
+]]
+function AnalyticsService.purchaseLoss(
+    self: AnalyticsService,
+    userId: number,
+    productId: string,
+    reason: string
+)
+    self._logger:warn("purchase_loss", {
+        product = string.sub(productId, 1, 48),
+        reason = string.sub(reason, 1, 48),
+        user = userId,
+    })
+end
+
+--[[
+    What the platform's purchase prompt came back as.
+
+    "Canceled prompts produce no receipt and no grant" is a gate about
+    something *not* happening, and the only way to check that a cancel produced
+    nothing is to know a cancel happened. Without this the metric is the
+    absence of an event, which is indistinguishable from the store being shut.
+]]
+function AnalyticsService.purchasePromptFinished(
+    self: AnalyticsService,
+    userId: number,
+    productId: string,
+    purchased: boolean
+)
+    self._logger:info("purchase_prompt_finished", {
+        product = string.sub(productId, 1, 48),
+        purchased = purchased,
+        user = userId,
+    })
 end
 
 function AnalyticsService.expeditionStarted(self: AnalyticsService, player: Player, snapshot: any)
@@ -38267,20 +38761,37 @@ function AnalyticsService.purchasePrompt(
     end
 end
 
+--[[
+    How one receipt settled, and how long it took.
+
+    The seconds are a release gate rather than a curiosity: "at least 99.5% of
+    completed receipts reach the durable grant within 60 seconds". Measured
+    from the moment the platform handed the receipt over, so a purchase that
+    waited in the mailbox while its buyer was in another server carries the
+    whole wait rather than the instant it was finally applied -- which is the
+    only version of the number a player would recognise.
+]]
 function AnalyticsService.receiptResult(
     self: AnalyticsService,
-    player: Player,
+    userId: number,
     productId: string,
-    outcome: string
+    outcome: string,
+    elapsedSeconds: number,
+    player: Player?
 )
     self._logger:info("receipt_result", {
+        elapsedSeconds = math.max(0, math.floor(elapsedSeconds + 0.5)),
         outcome = string.sub(outcome, 1, 24),
-        player = player.UserId,
+        player = userId,
         product = string.sub(productId, 1, 48),
     })
-    if not RunService:IsStudio() then
+    -- The buyer is a userId here rather than a Player because the receipt that
+    -- most needs counting is the one that arrived while they were somewhere
+    -- else. Roblox's own event needs an instance, so it takes the branch it
+    -- can and the log takes the one that always exists.
+    if player ~= nil and not RunService:IsStudio() then
         pcall(function()
-            RobloxAnalytics:LogCustomEvent(player, "ReceiptResult", 1, {
+            RobloxAnalytics:LogCustomEvent(player :: Player, "ReceiptResult", 1, {
                 [Enum.AnalyticsCustomFieldKeys.CustomField01.Name] = productId,
                 [Enum.AnalyticsCustomFieldKeys.CustomField02.Name] = outcome,
             })
@@ -38613,7 +39124,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="123">
+        <Item class="ModuleScript" referent="124">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -39114,7 +39625,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="124">
+        <Item class="ModuleScript" referent="125">
           <Properties>
             <string name="Name">CommerceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -39184,6 +39695,16 @@ export type CommerceService = typeof(setmetatable(
         ]]
         _localMailboxes: { [number]: { any } },
         _productInfo: { [string]: any },
+        --[[
+            Purchases already counted as lost, so one stuck receipt is one
+            event rather than one per redelivery. The platform retries an
+            unconsumed receipt for the life of the purchase, and a
+            zero-tolerance gate that reads a count would grow without a second
+            player being affected. Bounded in practice by how many purchases
+            can go wrong on one server, which is the number the gate is asking
+            about anyway.
+        ]]
+        _reportedLoss: { [string]: boolean },
         _onGranted: ((Player, { string }) -> ())?,
     },
     CommerceService
@@ -39213,6 +39734,7 @@ function CommerceService.new(
         _mailboxStore = nil,
         _localMailboxes = {},
         _productInfo = {},
+        _reportedLoss = {},
         _onGranted = nil,
     }, CommerceService)
 end
@@ -39307,6 +39829,35 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
     local userId = tonumber(receipt.userId) or 0
     local player, state = self:_writableState(userId)
     local mailbox = self:_readMailbox(userId)
+    -- Measured from when the platform handed the receipt over, not from now.
+    -- The gate asks how long a purchase took to become durable, and the wait
+    -- in a mailbox while the buyer was in another server is the part of that
+    -- wait a player would actually recognise.
+    local elapsed = math.max(0, os.time() - (tonumber(receipt.at) or os.time()))
+
+    --[[
+        A receipt for something this build cannot resolve.
+
+        Never consumed, correctly -- a later build may know the product, and
+        telling the platform a purchase is settled when nothing was granted is
+        the one mistake that cannot be undone. But an unconsumed receipt is
+        also a player who has paid and holds nothing, retried forever, and
+        that is the zero-tolerance case rather than the healthy retry that
+        `receipt_result` counts.
+    ]]
+    -- GATE-METRIC: purchase_loss
+    local purchaseKey = tostring(receipt.purchaseId)
+    if
+        (type(receipt.productId) ~= "string" or #self._catalog.grantsOf(receipt.productId) == 0)
+        and not self._reportedLoss[purchaseKey]
+    then
+        self._reportedLoss[purchaseKey] = true
+        self._analyticsService:purchaseLoss(
+            userId,
+            tostring(receipt.productId),
+            "unresolvable_product"
+        )
+    end
     local nextState, nextMailbox, verdict = self._entitlements.route(
         state,
         mailbox,
@@ -39322,6 +39873,20 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
         -- mistake that costs a player a purchase they paid for.
         if not self._profileService:save(player) then
             self._logger:warn("commerce_grant_write_failed", { user = userId })
+            -- The entitlement was decided and could not be made durable. The
+            -- platform will call again, but until one of those calls lands
+            -- this is a completed receipt with no grant behind it.
+            -- Counted once per purchase for the same reason as above: the
+            -- retry is the system working, and a gate that counts retries
+            -- reads one stuck receipt as a growing incident.
+            if not self._reportedLoss[purchaseKey] then
+                self._reportedLoss[purchaseKey] = true
+                self._analyticsService:purchaseLoss(
+                    userId,
+                    tostring(receipt.productId),
+                    "grant_write_failed"
+                )
+            end
             return false
         end
         local granted = self._catalog.grantsOf(receipt.productId)
@@ -39330,9 +39895,14 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
             purchase = tostring(receipt.purchaseId),
             user = userId,
         })
-        if self._analyticsService ~= nil then
-            self._analyticsService:receiptResult(player, tostring(receipt.productId), "granted")
-        end
+        -- GATE-METRIC: receipt_result
+        self._analyticsService:receiptResult(
+            userId,
+            tostring(receipt.productId),
+            "granted",
+            elapsed,
+            player
+        )
         local handler = self._onGranted
         if handler ~= nil then
             handler(player, granted)
@@ -39349,6 +39919,19 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
             purchase = tostring(receipt.purchaseId),
             user = userId,
         })
+        -- A held receipt is durable -- the mailbox saved, which is what this
+        -- branch just proved -- so it settles the commerce gate exactly as a
+        -- grant does. Leaving it out would make "100% of completed receipts
+        -- reach a durable grant" unreadable for every purchase made while its
+        -- buyer was in another server, which is the case the mailbox exists
+        -- for and therefore the case the gate most needs to see.
+        self._analyticsService:receiptResult(
+            userId,
+            tostring(receipt.productId),
+            "held",
+            elapsed,
+            player
+        )
         return true
     end
 
@@ -39357,9 +39940,13 @@ function CommerceService.applyReceipt(self: CommerceService, receipt: any): bool
         purchase = tostring(receipt.purchaseId),
         user = userId,
     })
-    if self._analyticsService ~= nil and player ~= nil then
-        self._analyticsService:receiptResult(player, tostring(receipt.productId), "retry")
-    end
+    self._analyticsService:receiptResult(
+        userId,
+        tostring(receipt.productId),
+        "retry",
+        elapsed,
+        player
+    )
     return false
 end
 
@@ -39432,7 +40019,7 @@ function CommerceService.equip(
     )
     if result.applied then
         self._profileService:setCommerce(player, state)
-        if self._analyticsService ~= nil and cosmeticId ~= nil then
+        if cosmeticId ~= nil then
             self._analyticsService:cosmeticEquipped(player, tostring(cosmeticId), tostring(slot))
         end
     end
@@ -39519,9 +40106,7 @@ function CommerceService.promptPurchase(self: CommerceService, player: Player, p
     local ok = pcall(function()
         MarketplaceService:PromptProductPurchase(player, robloxId)
     end)
-    if self._analyticsService ~= nil then
-        self._analyticsService:purchasePrompt(player, product.id, ok)
-    end
+    self._analyticsService:purchasePrompt(player, product.id, ok)
     return { accepted = ok, reason = if ok then "prompted" else "prompt_failed" }
 end
 
@@ -39549,6 +40134,26 @@ function CommerceService.Start(self: CommerceService)
             then Enum.ProductPurchaseDecision.PurchaseGranted
             else Enum.ProductPurchaseDecision.NotProcessedYet
     end
+
+    --[[
+        What the platform's own prompt came back as.
+
+        "Canceled prompts produce no receipt and no grant" is a gate about
+        something not happening, and the only way to check that a cancel
+        produced nothing is to know a cancel happened. Without this the metric
+        is the absence of an event, which reads exactly the same as the store
+        being shut.
+    ]]
+    -- GATE-METRIC: purchase_prompt_finished
+    MarketplaceService.PromptProductPurchaseFinished:Connect(
+        function(userId: number, robloxProductId: number, purchased: boolean)
+            self._analyticsService:purchasePromptFinished(
+                userId,
+                self:_productIdFor(robloxProductId),
+                purchased
+            )
+        end
+    )
 
     self._profileService:onLoaded(function(player: Player, _profile: any)
         task.spawn(function()
@@ -39586,7 +40191,7 @@ return table.freeze(CommerceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="125">
+        <Item class="ModuleScript" referent="126">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -39857,7 +40462,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="126">
+        <Item class="ModuleScript" referent="127">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -40277,7 +40882,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="127">
+        <Item class="ModuleScript" referent="128">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41961,7 +42566,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="128">
+        <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42080,6 +42685,21 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
     local manifest = self._generator.generate(seed, false, nil, regionId)
     local valid, issues = self._generator.validate(manifest)
     assert(valid, "expedition manifest is invalid: " .. table.concat(issues, "; "))
+
+    --[[
+        A seed that could not produce a walkable manifest, said out loud.
+
+        The generator already handles this correctly -- it hands back the
+        known-good walk rather than a broken world -- and that is exactly why
+        it needed an emitter: the recovery is silent, so without this the
+        fallback rate threshold in RELEASE_GATES.md reads zero whether the
+        generator is perfect or broken. Nobody in a live session would notice
+        either, because both look like an expedition.
+    ]]
+    -- GATE-METRIC: generator_fallback
+    if manifest.source ~= "generated" then
+        self._analyticsService:generatorFallback(regionId, manifest.seed, manifest.source)
+    end
 
     local result = self._worldService:buildBramblewake(manifest, self._generator, self._catalog)
     self._manifest = manifest
@@ -42675,7 +43295,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="129">
+        <Item class="ModuleScript" referent="130">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42779,7 +43399,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="130">
+        <Item class="ModuleScript" referent="131">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43088,7 +43708,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43544,7 +44164,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -43638,7 +44258,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43856,7 +44476,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="134">
+        <Item class="ModuleScript" referent="135">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -44726,7 +45346,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="135">
+        <Item class="ModuleScript" referent="136">
           <Properties>
             <string name="Name">PartyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45410,7 +46030,7 @@ return PartyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="136">
+        <Item class="ModuleScript" referent="137">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45435,6 +46055,13 @@ return PartyService
     Samples are capped so a server left running overnight cannot grow this into
     a leak. The cap drops the oldest, which keeps the recent run intact -- the
     30 minutes anyone is actually reporting on.
+
+    It also owns the **session lifecycle** the release gates are read from, and
+    that is not a second job: join-to-interactive was already measured here,
+    and a session's start, its end and the fact that it never started are the
+    same clock read at three moments. Splitting them across services is how a
+    join failure rate ends up counted against a denominator gathered somewhere
+    else.
 ]]
 
 local Players = game:GetService("Players")
@@ -45457,16 +46084,23 @@ export type PerformanceService = typeof(setmetatable(
         _logger: Logger,
         _config: any,
         _performanceBudget: any,
+        _sessionSegment: any,
+        _analyticsService: any,
         _samples: { [string]: { number } },
         _joinedAt: { [Player]: number },
         _interactive: { [Player]: boolean },
         _actionCounts: { [Player]: number },
         _lastReportAt: { [Player]: number },
+        _lastHeardAt: { [Player]: number },
+        _lastIntroductionAt: { [Player]: number },
+        _platform: { [Player]: string },
+        _lastFps: { [Player]: number },
         _frames: number,
         _windowStartedAt: number,
         _heartbeat: RBXScriptConnection?,
         _startedAt: number,
         _lastBreachLogAt: { [string]: number },
+        _shuttingDown: boolean,
     },
     PerformanceService
 ))
@@ -45474,23 +46108,32 @@ export type PerformanceService = typeof(setmetatable(
 function PerformanceService.new(
     logger: Logger,
     config: any,
-    performanceBudget: any
+    performanceBudget: any,
+    sessionSegment: any,
+    analyticsService: any
 ): PerformanceService
     return setmetatable({
         Name = PerformanceService.Name,
         _logger = logger,
         _config = config,
         _performanceBudget = performanceBudget,
+        _sessionSegment = sessionSegment,
+        _analyticsService = analyticsService,
         _samples = {},
         _joinedAt = {},
         _interactive = {},
         _actionCounts = {},
         _lastReportAt = {},
+        _lastHeardAt = {},
+        _lastIntroductionAt = {},
+        _platform = {},
+        _lastFps = {},
         _frames = 0,
         _windowStartedAt = 0,
         _heartbeat = nil,
         _startedAt = 0,
         _lastBreachLogAt = {},
+        _shuttingDown = false,
     }, PerformanceService)
 end
 
@@ -45527,16 +46170,87 @@ function PerformanceService._record(self: PerformanceService, metricId: string, 
     end
 end
 
+--[[
+    How a session finished, decided from what a server can actually see.
+
+    Roblox does not tell a server that a client crashed; PlayerRemoving fires
+    the same way for a player who quit and a player whose phone died. What
+    differs is the telemetry: a client reports on a fixed interval right up to
+    the moment it closes, so a session whose last report is several intervals
+    stale at the moment the player disappears stopped rather than left.
+
+    Three intervals of slack, deliberately generous. A client that missed one
+    report to a stall is not a crash, and calling it one would fail the
+    crash-free gate on the devices the gate exists to protect. A shutdown is
+    named separately because a server closing is not a player's session ending
+    badly, and counting a scheduled restart as fifty crashes is how a gate
+    gets ignored.
+]]
+function PerformanceService._sessionEndReason(self: PerformanceService, player: Player): string
+    if self._shuttingDown then
+        return "shutdown"
+    end
+    -- Anything the client said, not only a sample. A player who becomes
+    -- interactive and quits inside the first reporting interval has sent an
+    -- introduction and no sample, and reading only samples would file that
+    -- perfectly ordinary exit as a crash.
+    local lastAt = self._lastHeardAt[player]
+    if lastAt == nil then
+        -- Never said anything at all. If they never became interactive this is
+        -- a join that did not finish; if they did, it is a client that went
+        -- quiet immediately, which is the same shape as a crash.
+        return if self._interactive[player] then "dropped" else "left"
+    end
+    if os.clock() - lastAt > self._config.PerformanceReportIntervalSeconds * 3 then
+        return "dropped"
+    end
+    return "left"
+end
+
+function PerformanceService._closeSession(self: PerformanceService, player: Player)
+    local joinedAt = self._joinedAt[player]
+    if joinedAt == nil then
+        return
+    end
+    local interactive = self._interactive[player] == true
+    local duration = os.clock() - joinedAt
+    local platform = self._platform[player] or "unknown"
+    local reason = self:_sessionEndReason(player)
+
+    -- A player who left before the world would answer them never had a
+    -- session, and counting them as one that ended cleanly hides the join
+    -- failure rate inside the crash-free rate.
+    -- GATE-METRIC: join_failed
+    if not interactive and reason ~= "shutdown" then
+        self._analyticsService:joinFailed(player, "left_before_interactive", duration, platform)
+    end
+
+    -- GATE-METRIC: session_ended
+    self._analyticsService:sessionEnded(
+        player.UserId,
+        reason,
+        duration,
+        interactive,
+        platform,
+        self._sessionSegment.id(platform, self._sessionSegment.tier(self._lastFps[player]))
+    )
+end
+
 function PerformanceService.Init(self: PerformanceService, _context: any)
     Players.PlayerAdded:Connect(function(player: Player)
         self._joinedAt[player] = os.clock()
         self._actionCounts[player] = 0
     end)
     Players.PlayerRemoving:Connect(function(player: Player)
+        self:_closeSession(player)
         self._joinedAt[player] = nil
         self._interactive[player] = nil
         self._actionCounts[player] = nil
         self._lastReportAt[player] = nil
+        self._lastHeardAt[player] = nil
+        self._lastIntroductionAt[player] = nil
+        self._platform[player] = nil
+        self._lastFps[player] = nil
     end)
 end
 
@@ -45568,14 +46282,31 @@ function PerformanceService.Start(self: PerformanceService)
         self._windowStartedAt = now
     end)
 
+    -- A server closing is not fifty players crashing, and the only moment that
+    -- distinction can be drawn is before the PlayerRemoving storm that follows.
+    game:BindToClose(function()
+        self._shuttingDown = true
+    end)
+
     self._logger:info("performance_service_started", {
         memoryCeilingMb = self._config.BaselinePhoneMemoryCeilingMb,
     })
 end
 
--- Called when a player reaches interactive play. Only the first call counts:
--- the budget is join-to-interactive, not every later state load.
-function PerformanceService.markInteractive(self: PerformanceService, player: Player)
+--[[
+    Called when a player reaches interactive play. Only the first call counts:
+    the budget is join-to-interactive, not every later state load.
+
+    `createdAt` is the profile's own first-seen stamp and turns into the number
+    D1 and D7 return are counted from. It is passed in rather than looked up
+    because this service has no business holding a profile; the caller is
+    already inside the load that produced one.
+]]
+function PerformanceService.markInteractive(
+    self: PerformanceService,
+    player: Player,
+    createdAt: number?
+)
     if self._interactive[player] then
         return
     end
@@ -45584,7 +46315,19 @@ function PerformanceService.markInteractive(self: PerformanceService, player: Pl
         return
     end
     self._interactive[player] = true
-    self:_record("join_seconds", os.clock() - joinedAt)
+    local joinSeconds = os.clock() - joinedAt
+    self:_record("join_seconds", joinSeconds)
+
+    local elapsedDays = if createdAt == nil or createdAt <= 0
+        then 0
+        else math.max(0, math.floor((os.time() - createdAt) / 86400))
+    -- GATE-METRIC: interactive_session
+    self._analyticsService:sessionStarted(
+        player,
+        joinSeconds,
+        self._platform[player] or "unknown",
+        elapsedDays
+    )
 end
 
 function PerformanceService.noteAction(self: PerformanceService, player: Player)
@@ -45608,8 +46351,37 @@ function PerformanceService.acceptClientReport(
     payload: any
 ): boolean
     local now = os.clock()
-    local lastAt = self._lastReportAt[player]
     local interval = self._config.PerformanceReportIntervalSeconds
+
+    --[[
+        A client saying what it is, which arrives on its own message with no
+        frame data in it -- it is sent on the first frame and there is nothing
+        to sample for another whole interval.
+
+        It gets its own limit rather than skipping the sample one. Returning
+        early past a rate limit is how a bounded remote becomes an unbounded
+        one, and the shape a client would reach for is exactly this: a payload
+        the handler answers before it has counted it. Accepted rather than
+        rejected so a legitimate introduction does not print the warning that
+        means "a client is sending nonsense", which is the line somebody
+        hunting a real problem would be reading.
+    ]]
+    local platform = self._sessionSegment.platformOf(payload)
+    if self._sessionSegment.isIntroduction(payload) then
+        local lastIntroductionAt = self._lastIntroductionAt[player]
+        if lastIntroductionAt ~= nil and now - lastIntroductionAt < interval then
+            return false
+        end
+        self._lastIntroductionAt[player] = now
+        self._lastHeardAt[player] = now
+        self._platform[player] = platform
+        return true
+    end
+    if platform ~= nil then
+        self._platform[player] = platform
+    end
+
+    local lastAt = self._lastReportAt[player]
     if lastAt ~= nil and now - lastAt < interval * 0.5 then
         return false
     end
@@ -45620,6 +46392,8 @@ function PerformanceService.acceptClientReport(
         return false
     end
     self._lastReportAt[player] = now
+    self._lastHeardAt[player] = now
+    self._lastFps[player] = sample.fps
 
     self:_record("client_fps", sample.fps)
     self:_record("frame_spike_ms", sample.spikeMs)
@@ -45665,7 +46439,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="137">
+        <Item class="ModuleScript" referent="138">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45814,7 +46588,11 @@ function PhaseService._finishFirstNight(self: PhaseService)
     self._worldService:setNight(false)
     self._worldService:setBeaconVisible(true)
     self:_notify("DAWN BREAKS — A MEMORY CALLS")
-    self._logger:info("first_night_completed")
+    -- The night resolving, which is a server fact. Each player's own crossing
+    -- is `first_night_completed` from the tutorial, and the two are named
+    -- apart on purpose: a gate that reads a completion rate per player must
+    -- not be able to read this one by accident.
+    self._logger:info("first_night_resolved")
 
     local callback = self._onComplete
     if callback ~= nil then
@@ -45844,7 +46622,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="138">
+        <Item class="ModuleScript" referent="139">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46460,7 +47238,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="139">
+        <Item class="ModuleScript" referent="140">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47573,7 +48351,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="140">
+        <Item class="ModuleScript" referent="141">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48198,7 +48976,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="141">
+        <Item class="ModuleScript" referent="142">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48220,6 +48998,7 @@ export type ProfileService = typeof(setmetatable(
     {} :: {
         Name: string,
         _logger: Logger,
+        _analyticsService: any,
         _persistent: boolean,
         _profiles: { [Player]: any },
         _writable: { [Player]: boolean },
@@ -48253,10 +49032,15 @@ local LAUNCH_MATERIAL_IDS = table.freeze({
     "material_spring_clay",
 })
 
-function ProfileService.new(logger: Logger, persistent: boolean): ProfileService
+function ProfileService.new(
+    logger: Logger,
+    persistent: boolean,
+    analyticsService: any
+): ProfileService
     return setmetatable({
         Name = ProfileService.Name,
         _logger = logger,
+        _analyticsService = analyticsService,
         _persistent = persistent,
         _profiles = {},
         _writable = {},
@@ -48405,6 +49189,30 @@ function ProfileService._load(self: ProfileService, player: Player)
         local outcome = self._profilePersistence.loadOutcome(finished, ok, result)
         source = outcome.source
         writable = outcome.writable
+
+        --[[
+            Two ways a stored save is gone rather than merely unavailable, and
+            both are zero-tolerance rather than a failed transaction.
+
+            A stored value that is not a table cannot be folded into anything;
+            normalize hands back a default and the player restarts the game
+            with their own key overwritten on the next save. And a save stamped
+            with a schema this build has never heard of was written by a newer
+            one -- folding it down drops whatever that build added, silently,
+            and the player who rolled back is the one who pays.
+        ]]
+        -- GATE-METRIC: save_loss
+        if outcome.useStored then
+            if type(result) ~= "table" then
+                self._analyticsService:saveLoss(player.UserId, "load", "stored_value_not_a_table")
+            elseif
+                type(result.schemaVersion) == "number"
+                and result.schemaVersion > self._config.SaveSchemaVersion
+            then
+                self._analyticsService:saveLoss(player.UserId, "load", "schema_from_future")
+            end
+        end
+
         if outcome.useStored or outcome.source == "new" then
             -- Photograph the stored bytes *before* normalize folds them into
             -- the current shape. This is the moment TECHNICAL_ARCHITECTURE asks
@@ -48456,6 +49264,20 @@ function ProfileService._load(self: ProfileService, player: Player)
         end
     else
         source = "session"
+    end
+
+    -- The load half of the transaction-success gate, emitted only where there
+    -- was a store to reach: a Studio session with no persistence is not a
+    -- DataStore round trip, and counting it as a successful one would flatter
+    -- the number with results from a machine no player is on.
+    -- GATE-METRIC: profile_transaction
+    if self._persistent and self._store ~= nil then
+        self._analyticsService:profileTransaction(
+            player.UserId,
+            "load",
+            writable and (source == "datastore" or source == "new"),
+            source
+        )
     end
 
     if player.Parent == nil then
@@ -48552,7 +49374,25 @@ function ProfileService.Start(self: ProfileService)
     end)
 
     Players.PlayerRemoving:Connect(function(player: Player)
-        self:save(player)
+        -- The last save a session ever gets. Everything before it has another
+        -- beat coming to repair it; this one does not, so a failure here is
+        -- the session's progress gone rather than a retry pending -- which is
+        -- exactly what the zero-tolerance save-loss gate is counting.
+        local hadUnsavedWork = self._dirty[player] == true
+        -- A save already in flight is not a failure: `save` refuses a second
+        -- concurrent write and returns false for it, and the one that is
+        -- running may well land. Counting that as a lost save would put a
+        -- zero-tolerance event on the ordinary race between the autosave beat
+        -- and a player closing the app.
+        local saveInFlight = self._saving[player] == true
+        if
+            not self:save(player)
+            and hadUnsavedWork
+            and not saveInFlight
+            and self._writable[player] == true
+        then
+            self._analyticsService:saveLoss(player.UserId, "save", "final_save_failed")
+        end
         self._profiles[player] = nil
         self._writable[player] = nil
         self._dirty[player] = nil
@@ -49793,6 +50633,7 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
             player = player.UserId,
             reason = tostring(message),
         })
+        self._analyticsService:profileTransaction(player.UserId, "save", false, "store_error")
         return false
     end
 
@@ -49807,6 +50648,10 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
             attemptedRevision = profile.revision,
             storedRevision = newerProfile.revision,
         })
+        -- The round trip succeeded; what it declined to do was overwrite a
+        -- newer copy, which is the write resolver working rather than the
+        -- store failing.
+        self._analyticsService:profileTransaction(player.UserId, "save", true, "retained_stored")
         return true
     end
 
@@ -49830,6 +50675,7 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
         revision = profile.revision,
         stage = profile.tutorial.stage,
     })
+    self._analyticsService:profileTransaction(player.UserId, "save", true, "ok")
     return true
 end
 
@@ -50114,7 +50960,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="142">
+        <Item class="ModuleScript" referent="143">
           <Properties>
             <string name="Name">RegionEncounterService</string>
             <string name="Source"><![CDATA[--!strict
@@ -50412,7 +51258,7 @@ return table.freeze(RegionEncounterService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="143">
+        <Item class="ModuleScript" referent="144">
           <Properties>
             <string name="Name">SocialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -50701,7 +51547,7 @@ return table.freeze(SocialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="144">
+        <Item class="ModuleScript" referent="145">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -51511,7 +52357,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="145">
+        <Item class="ModuleScript" referent="146">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -53040,6 +53886,7 @@ function TutorialService._interact(
         else
             self:_setToast(player, "FIRST LIGHT COMPLETE")
         end
+        -- GATE-METRIC: tutorial_completed
         self._analyticsService:complete(player)
     end
 
@@ -53066,6 +53913,11 @@ function TutorialService._advanceSurvivorToReveal(
     self._profileService:setTutorial(player, nextStage, session.selectedTool)
     local definition = self._tutorialFlow.definition(nextStage)
     self._analyticsService:stage(player, definition.index, nextStage)
+    -- GATE-METRIC: first_night_completed
+    -- Per player, at the moment this player's own tutorial leaves the night.
+    -- The night itself resolves once for the whole server, and a gate that
+    -- reads "first-night completion after onboarding" is counting people.
+    self._analyticsService:firstNightCompleted(player)
     return true
 end
 
@@ -53183,6 +54035,24 @@ end
 function TutorialService._handleAction(self: TutorialService, player: Player, payload: any)
     local contract = self._actionPayloadContract
     if not contract.isValidForKind(self._runtimeIds, payload) then
+        --[[
+            A request the payload contract refused, counted rather than only
+            dropped.
+
+            Every action in the game arrives through this door, so this is the
+            one place that can say whether anybody is trying to send something
+            they should not. The zero-tolerance gate is about a mutation that
+            got through, which nothing can emit -- a mutation this server let
+            through is by definition one it did not notice. What it can emit is
+            the refusals, and a refusal rate that moves is the first sign a
+            hole is being looked for.
+        ]]
+        -- GATE-METRIC: unauthorized_mutation
+        self._analyticsService:unauthorizedMutation(
+            player.UserId,
+            "action_payload",
+            if type(payload) == "table" then tostring(payload.kind) else "malformed"
+        )
         return
     end
     local kind = payload.kind
@@ -53844,7 +54714,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="146">
+        <Item class="ModuleScript" referent="147">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -54713,7 +55583,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="147">
+        <Item class="ModuleScript" referent="148">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -69895,11 +70765,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="148">
+      <Item class="Folder" referent="149">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="149">
+        <Item class="ModuleScript" referent="150">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -74213,7 +75083,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="150">
+        <Item class="ModuleScript" referent="151">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -75312,7 +76182,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="151">
+        <Item class="ModuleScript" referent="152">
           <Properties>
             <string name="Name">CinderfallBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -76179,7 +77049,7 @@ return table.freeze(CinderfallBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="152">
+        <Item class="ModuleScript" referent="153">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -76874,7 +77744,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="153">
+        <Item class="ModuleScript" referent="154">
           <Properties>
             <string name="Name">FrostmereBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -77923,7 +78793,7 @@ return table.freeze(FrostmereBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="154">
+        <Item class="ModuleScript" referent="155">
           <Properties>
             <string name="Name">IronrootBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -78938,7 +79808,7 @@ return table.freeze(IronrootBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="155">
+        <Item class="ModuleScript" referent="156">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -79797,7 +80667,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="156">
+        <Item class="ModuleScript" referent="157">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -79883,7 +80753,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="157">
+        <Item class="ModuleScript" referent="158">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -80257,7 +81127,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="158">
+        <Item class="ModuleScript" referent="159">
           <Properties>
             <string name="Name">MireglassBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -81013,7 +81883,7 @@ return table.freeze(MireglassBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="159">
+        <Item class="ModuleScript" referent="160">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -81193,7 +82063,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="160">
+        <Item class="ModuleScript" referent="161">
           <Properties>
             <string name="Name">RegionBuilders</string>
             <string name="Source"><![CDATA[--!strict
@@ -81959,7 +82829,7 @@ return table.freeze(RegionBuilders)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="161">
+        <Item class="ModuleScript" referent="162">
           <Properties>
             <string name="Name">TempestBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -82780,7 +83650,7 @@ return table.freeze(TempestBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="162">
+        <Item class="ModuleScript" referent="163">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -83376,7 +84246,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="163">
+        <Item class="ModuleScript" referent="164">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -83613,7 +84483,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="164">
+        <Item class="ModuleScript" referent="165">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -83702,7 +84572,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="165">
+        <Item class="ModuleScript" referent="166">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -84039,15 +84909,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="166">
+  <Item class="StarterPlayer" referent="167">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="167">
+    <Item class="StarterPlayerScripts" referent="168">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="168">
+      <Item class="LocalScript" referent="169">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -84417,11 +85287,11 @@ task.spawn(function()
 end)
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="169">
+        <Item class="Folder" referent="170">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="170">
+          <Item class="ModuleScript" referent="171">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -84552,7 +85422,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="171">
+          <Item class="ModuleScript" referent="172">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -88290,7 +89160,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="172">
+          <Item class="ModuleScript" referent="173">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -88658,7 +89528,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="173">
+          <Item class="ModuleScript" referent="174">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -88766,7 +89636,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="174">
+          <Item class="ModuleScript" referent="175">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -88885,7 +89755,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="175">
+          <Item class="ModuleScript" referent="176">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -89159,7 +90029,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="176">
+          <Item class="ModuleScript" referent="177">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -89184,10 +90054,29 @@ return table.freeze(ObjectiveMarkerController)
 
     The interval matters: sampling every frame and sending it would itself be
     the network problem this is supposed to measure.
+
+    It also says what kind of device it is, once on the first frame and then on
+    every sample. RELEASE_GATES.md sets a per-segment threshold on five gates
+    and names phone, tablet, desktop and console as the slices, and a server
+    cannot see a screen. The introduction is sent on its own because the first
+    *sample* is a whole interval away: a session that ends in four seconds is
+    exactly the kind the join and crash gates are about, and one with no
+    platform on it cannot be counted against the phone threshold it failed.
+    Repeating the label on every sample is what heals an introduction that
+    raced the server's handler into existence.
+
+    Nothing in the game reads the label. It is a dimension on a metric.
 ]]
 
+local GuiService = game:GetService("GuiService")
 local RunService = game:GetService("RunService")
 local Stats = game:GetService("Stats")
+local UserInputService = game:GetService("UserInputService")
+local Workspace = game:GetService("Workspace")
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local SessionSegment = require(ReplicatedStorage:WaitForChild("LastLight").SessionSegment)
 
 local PerformanceController = {}
 PerformanceController.__index = PerformanceController
@@ -89199,10 +90088,31 @@ export type PerformanceController = typeof(setmetatable(
         _frames: number,
         _elapsed: number,
         _worstFrameMs: number,
+        _platform: string,
         _connection: RBXScriptConnection?,
     },
     PerformanceController
 ))
+
+--[[
+    The four words the gates are sliced by, decided once.
+
+    Viewport comes from the camera rather than from the screen, because the
+    camera's size is what every layout in this game is measured against and a
+    label that disagrees with the layout would send a portrait bug to the
+    tablet column.
+]]
+local function platformClass(): string
+    local camera = Workspace.CurrentCamera
+    local viewport = if camera ~= nil then camera.ViewportSize else Vector2.zero
+    return SessionSegment.platformClass(
+        GuiService:IsTenFootInterface(),
+        UserInputService.TouchEnabled,
+        UserInputService.KeyboardEnabled,
+        viewport.X,
+        viewport.Y
+    )
+end
 
 function PerformanceController.new(remote: RemoteEvent, interval: number): PerformanceController
     local self = setmetatable({
@@ -89211,8 +90121,22 @@ function PerformanceController.new(remote: RemoteEvent, interval: number): Perfo
         _frames = 0,
         _elapsed = 0,
         _worstFrameMs = 0,
+        _platform = "unknown",
         _connection = nil,
     }, PerformanceController)
+
+    local ok, resolved = pcall(platformClass)
+    self._platform = if ok then resolved else "unknown"
+
+    -- The introduction, before there is anything to sample. A report with no
+    -- frame data is a client saying what it is, and the server treats it as
+    -- exactly that.
+    pcall(function()
+        self._remote:FireServer({
+            schemaVersion = 1,
+            platform = self._platform,
+        })
+    end)
 
     self._connection = RunService.RenderStepped:Connect(function(deltaTime: number)
         self:_step(deltaTime)
@@ -89241,6 +90165,7 @@ function PerformanceController._step(self: PerformanceController, deltaTime: num
         self._remote:FireServer({
             schemaVersion = 1,
             fps = fps,
+            platform = self._platform,
             spikeMs = worstFrameMs,
             memoryMb = Stats:GetTotalMemoryUsageMb(),
         })
@@ -89259,7 +90184,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="177">
+          <Item class="ModuleScript" referent="178">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -89371,7 +90296,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="178">
+          <Item class="ModuleScript" referent="179">
             <Properties>
               <string name="Name">SocialPingController</string>
               <string name="Source"><![CDATA[--!strict
@@ -89753,7 +90678,7 @@ return table.freeze(SocialPingController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="179">
+          <Item class="ModuleScript" referent="180">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -89955,7 +90880,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="180">
+          <Item class="ModuleScript" referent="181">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -90164,7 +91089,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="181">
+          <Item class="ModuleScript" referent="182">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -90309,7 +91234,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="182">
+          <Item class="ModuleScript" referent="183">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -90609,13 +91534,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="183">
+  <Item class="TextChatService" referent="184">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="184">
+  <Item class="Workspace" referent="185">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

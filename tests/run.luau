@@ -99,6 +99,8 @@ TestRunner.run({
     require("./specs/CommerceReceipts.spec"),
     require("./specs/CosmeticNeutrality.spec"),
     require("./specs/CosmeticReachability.spec"),
+    require("./specs/SessionSegment.spec"),
+    require("./specs/GateMetrics.spec"),
     require("./specs/AdminInspectionReport.spec"),
     require("./specs/AdminRoster.spec"),
 })

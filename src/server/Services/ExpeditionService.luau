@@ -115,6 +115,21 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
     local valid, issues = self._generator.validate(manifest)
     assert(valid, "expedition manifest is invalid: " .. table.concat(issues, "; "))
 
+    --[[
+        A seed that could not produce a walkable manifest, said out loud.
+
+        The generator already handles this correctly -- it hands back the
+        known-good walk rather than a broken world -- and that is exactly why
+        it needed an emitter: the recovery is silent, so without this the
+        fallback rate threshold in RELEASE_GATES.md reads zero whether the
+        generator is perfect or broken. Nobody in a live session would notice
+        either, because both look like an expedition.
+    ]]
+    -- GATE-METRIC: generator_fallback
+    if manifest.source ~= "generated" then
+        self._analyticsService:generatorFallback(regionId, manifest.seed, manifest.source)
+    end
+
     local result = self._worldService:buildBramblewake(manifest, self._generator, self._catalog)
     self._manifest = manifest
     self._partCount = result.partCount

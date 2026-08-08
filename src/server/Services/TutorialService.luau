@@ -1524,6 +1524,7 @@ function TutorialService._interact(
         else
             self:_setToast(player, "FIRST LIGHT COMPLETE")
         end
+        -- GATE-METRIC: tutorial_completed
         self._analyticsService:complete(player)
     end
 
@@ -1550,6 +1551,11 @@ function TutorialService._advanceSurvivorToReveal(
     self._profileService:setTutorial(player, nextStage, session.selectedTool)
     local definition = self._tutorialFlow.definition(nextStage)
     self._analyticsService:stage(player, definition.index, nextStage)
+    -- GATE-METRIC: first_night_completed
+    -- Per player, at the moment this player's own tutorial leaves the night.
+    -- The night itself resolves once for the whole server, and a gate that
+    -- reads "first-night completion after onboarding" is counting people.
+    self._analyticsService:firstNightCompleted(player)
     return true
 end
 
@@ -1667,6 +1673,24 @@ end
 function TutorialService._handleAction(self: TutorialService, player: Player, payload: any)
     local contract = self._actionPayloadContract
     if not contract.isValidForKind(self._runtimeIds, payload) then
+        --[[
+            A request the payload contract refused, counted rather than only
+            dropped.
+
+            Every action in the game arrives through this door, so this is the
+            one place that can say whether anybody is trying to send something
+            they should not. The zero-tolerance gate is about a mutation that
+            got through, which nothing can emit -- a mutation this server let
+            through is by definition one it did not notice. What it can emit is
+            the refusals, and a refusal rate that moves is the first sign a
+            hole is being looked for.
+        ]]
+        -- GATE-METRIC: unauthorized_mutation
+        self._analyticsService:unauthorizedMutation(
+            player.UserId,
+            "action_payload",
+            if type(payload) == "table" then tostring(payload.kind) else "malformed"
+        )
         return
     end
     local kind = payload.kind

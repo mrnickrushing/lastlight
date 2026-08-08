@@ -20,6 +20,13 @@
     Samples are capped so a server left running overnight cannot grow this into
     a leak. The cap drops the oldest, which keeps the recent run intact -- the
     30 minutes anyone is actually reporting on.
+
+    It also owns the **session lifecycle** the release gates are read from, and
+    that is not a second job: join-to-interactive was already measured here,
+    and a session's start, its end and the fact that it never started are the
+    same clock read at three moments. Splitting them across services is how a
+    join failure rate ends up counted against a denominator gathered somewhere
+    else.
 ]]
 
 local Players = game:GetService("Players")
@@ -42,16 +49,23 @@ export type PerformanceService = typeof(setmetatable(
         _logger: Logger,
         _config: any,
         _performanceBudget: any,
+        _sessionSegment: any,
+        _analyticsService: any,
         _samples: { [string]: { number } },
         _joinedAt: { [Player]: number },
         _interactive: { [Player]: boolean },
         _actionCounts: { [Player]: number },
         _lastReportAt: { [Player]: number },
+        _lastHeardAt: { [Player]: number },
+        _lastIntroductionAt: { [Player]: number },
+        _platform: { [Player]: string },
+        _lastFps: { [Player]: number },
         _frames: number,
         _windowStartedAt: number,
         _heartbeat: RBXScriptConnection?,
         _startedAt: number,
         _lastBreachLogAt: { [string]: number },
+        _shuttingDown: boolean,
     },
     PerformanceService
 ))
@@ -59,23 +73,32 @@ export type PerformanceService = typeof(setmetatable(
 function PerformanceService.new(
     logger: Logger,
     config: any,
-    performanceBudget: any
+    performanceBudget: any,
+    sessionSegment: any,
+    analyticsService: any
 ): PerformanceService
     return setmetatable({
         Name = PerformanceService.Name,
         _logger = logger,
         _config = config,
         _performanceBudget = performanceBudget,
+        _sessionSegment = sessionSegment,
+        _analyticsService = analyticsService,
         _samples = {},
         _joinedAt = {},
         _interactive = {},
         _actionCounts = {},
         _lastReportAt = {},
+        _lastHeardAt = {},
+        _lastIntroductionAt = {},
+        _platform = {},
+        _lastFps = {},
         _frames = 0,
         _windowStartedAt = 0,
         _heartbeat = nil,
         _startedAt = 0,
         _lastBreachLogAt = {},
+        _shuttingDown = false,
     }, PerformanceService)
 end
 
@@ -112,16 +135,87 @@ function PerformanceService._record(self: PerformanceService, metricId: string, 
     end
 end
 
+--[[
+    How a session finished, decided from what a server can actually see.
+
+    Roblox does not tell a server that a client crashed; PlayerRemoving fires
+    the same way for a player who quit and a player whose phone died. What
+    differs is the telemetry: a client reports on a fixed interval right up to
+    the moment it closes, so a session whose last report is several intervals
+    stale at the moment the player disappears stopped rather than left.
+
+    Three intervals of slack, deliberately generous. A client that missed one
+    report to a stall is not a crash, and calling it one would fail the
+    crash-free gate on the devices the gate exists to protect. A shutdown is
+    named separately because a server closing is not a player's session ending
+    badly, and counting a scheduled restart as fifty crashes is how a gate
+    gets ignored.
+]]
+function PerformanceService._sessionEndReason(self: PerformanceService, player: Player): string
+    if self._shuttingDown then
+        return "shutdown"
+    end
+    -- Anything the client said, not only a sample. A player who becomes
+    -- interactive and quits inside the first reporting interval has sent an
+    -- introduction and no sample, and reading only samples would file that
+    -- perfectly ordinary exit as a crash.
+    local lastAt = self._lastHeardAt[player]
+    if lastAt == nil then
+        -- Never said anything at all. If they never became interactive this is
+        -- a join that did not finish; if they did, it is a client that went
+        -- quiet immediately, which is the same shape as a crash.
+        return if self._interactive[player] then "dropped" else "left"
+    end
+    if os.clock() - lastAt > self._config.PerformanceReportIntervalSeconds * 3 then
+        return "dropped"
+    end
+    return "left"
+end
+
+function PerformanceService._closeSession(self: PerformanceService, player: Player)
+    local joinedAt = self._joinedAt[player]
+    if joinedAt == nil then
+        return
+    end
+    local interactive = self._interactive[player] == true
+    local duration = os.clock() - joinedAt
+    local platform = self._platform[player] or "unknown"
+    local reason = self:_sessionEndReason(player)
+
+    -- A player who left before the world would answer them never had a
+    -- session, and counting them as one that ended cleanly hides the join
+    -- failure rate inside the crash-free rate.
+    -- GATE-METRIC: join_failed
+    if not interactive and reason ~= "shutdown" then
+        self._analyticsService:joinFailed(player, "left_before_interactive", duration, platform)
+    end
+
+    -- GATE-METRIC: session_ended
+    self._analyticsService:sessionEnded(
+        player.UserId,
+        reason,
+        duration,
+        interactive,
+        platform,
+        self._sessionSegment.id(platform, self._sessionSegment.tier(self._lastFps[player]))
+    )
+end
+
 function PerformanceService.Init(self: PerformanceService, _context: any)
     Players.PlayerAdded:Connect(function(player: Player)
         self._joinedAt[player] = os.clock()
         self._actionCounts[player] = 0
     end)
     Players.PlayerRemoving:Connect(function(player: Player)
+        self:_closeSession(player)
         self._joinedAt[player] = nil
         self._interactive[player] = nil
         self._actionCounts[player] = nil
         self._lastReportAt[player] = nil
+        self._lastHeardAt[player] = nil
+        self._lastIntroductionAt[player] = nil
+        self._platform[player] = nil
+        self._lastFps[player] = nil
     end)
 end
 
@@ -153,14 +247,31 @@ function PerformanceService.Start(self: PerformanceService)
         self._windowStartedAt = now
     end)
 
+    -- A server closing is not fifty players crashing, and the only moment that
+    -- distinction can be drawn is before the PlayerRemoving storm that follows.
+    game:BindToClose(function()
+        self._shuttingDown = true
+    end)
+
     self._logger:info("performance_service_started", {
         memoryCeilingMb = self._config.BaselinePhoneMemoryCeilingMb,
     })
 end
 
--- Called when a player reaches interactive play. Only the first call counts:
--- the budget is join-to-interactive, not every later state load.
-function PerformanceService.markInteractive(self: PerformanceService, player: Player)
+--[[
+    Called when a player reaches interactive play. Only the first call counts:
+    the budget is join-to-interactive, not every later state load.
+
+    `createdAt` is the profile's own first-seen stamp and turns into the number
+    D1 and D7 return are counted from. It is passed in rather than looked up
+    because this service has no business holding a profile; the caller is
+    already inside the load that produced one.
+]]
+function PerformanceService.markInteractive(
+    self: PerformanceService,
+    player: Player,
+    createdAt: number?
+)
     if self._interactive[player] then
         return
     end
@@ -169,7 +280,19 @@ function PerformanceService.markInteractive(self: PerformanceService, player: Pl
         return
     end
     self._interactive[player] = true
-    self:_record("join_seconds", os.clock() - joinedAt)
+    local joinSeconds = os.clock() - joinedAt
+    self:_record("join_seconds", joinSeconds)
+
+    local elapsedDays = if createdAt == nil or createdAt <= 0
+        then 0
+        else math.max(0, math.floor((os.time() - createdAt) / 86400))
+    -- GATE-METRIC: interactive_session
+    self._analyticsService:sessionStarted(
+        player,
+        joinSeconds,
+        self._platform[player] or "unknown",
+        elapsedDays
+    )
 end
 
 function PerformanceService.noteAction(self: PerformanceService, player: Player)
@@ -193,8 +316,37 @@ function PerformanceService.acceptClientReport(
     payload: any
 ): boolean
     local now = os.clock()
-    local lastAt = self._lastReportAt[player]
     local interval = self._config.PerformanceReportIntervalSeconds
+
+    --[[
+        A client saying what it is, which arrives on its own message with no
+        frame data in it -- it is sent on the first frame and there is nothing
+        to sample for another whole interval.
+
+        It gets its own limit rather than skipping the sample one. Returning
+        early past a rate limit is how a bounded remote becomes an unbounded
+        one, and the shape a client would reach for is exactly this: a payload
+        the handler answers before it has counted it. Accepted rather than
+        rejected so a legitimate introduction does not print the warning that
+        means "a client is sending nonsense", which is the line somebody
+        hunting a real problem would be reading.
+    ]]
+    local platform = self._sessionSegment.platformOf(payload)
+    if self._sessionSegment.isIntroduction(payload) then
+        local lastIntroductionAt = self._lastIntroductionAt[player]
+        if lastIntroductionAt ~= nil and now - lastIntroductionAt < interval then
+            return false
+        end
+        self._lastIntroductionAt[player] = now
+        self._lastHeardAt[player] = now
+        self._platform[player] = platform
+        return true
+    end
+    if platform ~= nil then
+        self._platform[player] = platform
+    end
+
+    local lastAt = self._lastReportAt[player]
     if lastAt ~= nil and now - lastAt < interval * 0.5 then
         return false
     end
@@ -205,6 +357,8 @@ function PerformanceService.acceptClientReport(
         return false
     end
     self._lastReportAt[player] = now
+    self._lastHeardAt[player] = now
+    self._lastFps[player] = sample.fps
 
     self:_record("client_fps", sample.fps)
     self:_record("frame_spike_ms", sample.spikeMs)
