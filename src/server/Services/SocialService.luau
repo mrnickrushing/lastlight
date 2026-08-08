@@ -236,6 +236,16 @@ function SocialService.say(self: SocialService, player: Player, phraseId: any): 
     return { accepted = true, call = call }
 end
 
+--[[
+    SAFETY-CHANNEL: quick_chat_phrase -- what somebody said, filtered per
+    recipient for expiry and for who has blocked whom.
+    SAFETY-CHANNEL: quick_chat_ping -- the marker that phrase left, filtered by
+    the same block rule and additionally by distance.
+
+    Both filters live in the pure module and are applied here, at the one door
+    a snapshot is built through. Filtering at the four places a snapshot is
+    read would be four places to forget.
+]]
 function SocialService.snapshot(self: SocialService, player: Player): any
     local now = workspace:GetServerTimeNow()
     local suppressed = self:_suppressionFor(player)

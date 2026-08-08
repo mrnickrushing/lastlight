@@ -21,6 +21,7 @@ const requiredFiles = [
   "docs/MONETIZATION_LIVEOPS_ANALYTICS.md",
   "docs/PRODUCTION_ROADMAP.md",
   "docs/QA_RELEASE_PLAN.md",
+  "docs/SOCIAL_SAFETY_REVIEW.md",
   "docs/RELEASE_GATES.md",
   "docs/DEVELOPMENT.md",
   "docs/PROJECT_STATUS.md",

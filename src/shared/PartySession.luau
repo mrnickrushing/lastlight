@@ -681,6 +681,11 @@ end
     people were in the party, how long the offer lasts. The access code is
     absent by construction rather than by remembering to omit it, which is the
     only version of that rule that survives somebody adding a field later.
+
+    SAFETY-CHANNEL: rejoin_ticket -- a reserved-server access code is a door
+    into a private world, and this is the wall between it and any client. Not a
+    block-suppressed channel: it never reaches a player other than the one it
+    was issued to at all.
 ]]
 function PartySession.publicTicket(ticket: any, now: any, currentPartyId: any): any?
     local read = PartySession.readTicket(ticket, now, currentPartyId)

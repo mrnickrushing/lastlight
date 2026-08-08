@@ -19,6 +19,12 @@
         same outcome: refused. Nothing partially applies.
       * These commands exist to make testing possible, not to hand out power.
         Everything they do, the game already does on its own schedule.
+
+    SAFETY-CHANNEL: admin_command -- the one channel where a player's typed
+    text reaches the game at all. Bounded by a two-name roster of user IDs, by
+    a parser that refuses anything it does not recognise, and by a feature flag
+    that is a complete off switch including the roster. It carries commands,
+    never messages: nothing typed here is shown to another player.
 ]]
 
 local AdminRoster = {}

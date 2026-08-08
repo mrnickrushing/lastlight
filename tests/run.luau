@@ -94,6 +94,7 @@ TestRunner.run({
     require("./specs/RunHandoff.spec"),
     require("./specs/PartySession.spec"),
     require("./specs/QuickChat.spec"),
+    require("./specs/SocialSafety.spec"),
     require("./specs/AdminInspectionReport.spec"),
     require("./specs/AdminRoster.spec"),
 })
