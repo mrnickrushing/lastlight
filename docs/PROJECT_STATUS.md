@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #325), build `0.53.0`,
-save schema 22, 24 services. Published to Roblox as place version 138,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #327), build `0.53.0`,
+save schema 22, 24 services. Published to Roblox as place version 139,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,6 +59,134 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#327** (v139) **the walkthrough's deferred list, cleared on a portrait
+  viewport — because the owner plays this game on a phone, in portrait, and
+  every bug report that started this effort was a phone screenshot.** The
+  session drove Studio at a 392 x 608 viewport, which is a HUD canvas 502
+  points wide: the same width a 390-point portrait phone gives, and a third
+  of what the offsets in HUDController were written against. Every control
+  was measured against the real screen before and after, and the numbers
+  below are all from that measurement.
+
+  **Four of the six thumb-cluster controls were off the screen by
+  position, and the one a phone player actually sees there was gone
+  entirely.** Baseline, at viewport width 392: HOUND spanned x −16..48,
+  DODGE −164..−99, STRIKE −79..−13, FIND −18..72. Two of those are latent
+  rather than felt — FIND and STRIKE carry positions but are deliberately
+  never rendered any more, having moved onto the world objects themselves
+  — and DODGE only shows on a keyboard, so it costs a narrow desktop
+  window rather than a phone. **HOUND is the one that mattered:** it is
+  visible on every platform the moment a briar hound is summoned, nothing
+  had ever repositioned it for touch at all, and at x −16..48 the
+  companion order button was unreachable again — the same button #325
+  found had never been wired to anything. The thumb cluster is a measured
+  run now: it starts inboard of Roblox's jump button, steps left by each
+  button's own width, and wraps up a row when the next one would reach the
+  thumbstick, with both insets scaled from the canvas because Roblox's own
+  controls scale too. FIND leads the run and RUN follows it, so the
+  primary action and the sprint the owner asked to sit beside jump share
+  the corner column on every screen; the red telegraph banner rides above
+  the topmost row. Verified after, on the portrait viewport: nothing
+  off-screen, a rectangle-intersection test over all six controls returns
+  no overlaps, and the banner clears every one of them.
+
+  **The field book was 46 points wider than the screen on each side, and
+  CLOSE was 57% off it.** Baseline: the panel spanned x −46..438 of a
+  392-wide viewport, the title read "O BOOK · RECIPES", SAVE 1 was clipped
+  to "AVE1", KIT 3 ran off the right, and two of eight equip buttons sat at
+  x 312..449. The book could only be shut by hitting the 24-pixel sliver of
+  CLOSE that was still on screen — which is how the session discovered it,
+  because a modal overlay nobody can close eats every world click behind
+  it. Panel width, kit pitch, whet width and the equip grid's column count
+  all derive from the canvas now. A desktop is pixel-identical to before
+  (columns at 20/210/400, a 190 pitch, an 88/4/84 kit pair); the portrait
+  canvas gets two columns, and the grid adds columns rather than rows if a
+  player owns more gear than the height holds, because a button nobody can
+  reach is how ninety craftable items once went unwearable with every spec
+  green. Verified after: panel x 16..376, CLOSE x 306..362 and clicked by
+  its own instance path, all eight equip buttons inside the viewport.
+
+  **The HUD phase pill followed a clock that had stopped.** PhaseService
+  only leaves its initial `day` by running the tutorial's First Night, so a
+  player who arrives with a finished profile — or skips the tutorial in
+  Studio — never moves it: `hasCompletedFirstNight` stayed false forever,
+  the pill read DAY · MORNING through every night the town actually held,
+  and `nightActive` was false beside it. Whose clock the pill shows now
+  follows the player's own stage and whether the town cycle is turning
+  (`TownNightService.isRunning`), not whether a particular night happened
+  to run in this server session. Walked live through a whole town cycle on
+  the fixed build: DAY · 11:48 LEFT, then DUSK · 01:35 LEFT as the dusk
+  toast landed, then NIGHT · 05:10 LEFT with `nightActive` true, one
+  creature walking and the lantern down to 4.
+
+  **The gamepad had no way into the recipes.** The 130 recipes moved into a
+  ScrollingFrame in #325, and a scrolling text window is the one HUD
+  surface a controller cannot reach by accident — the notes are a single
+  label, so there was no selectable target anywhere inside the book.
+  Opening it now hands `GuiService.SelectedObject` to the window itself,
+  after waiting for a real `AbsoluteSize` (the lesson the loading screen
+  already paid for), with `NextSelectionUp`/`Down` wiring so the D-pad is
+  not a one-way trip into the notes, and the selection is released on
+  close. Verified live: opening the book by mouse click leaves the
+  DetailsScroll selected at a real size, and closing it clears the
+  selection. **The D-pad scroll itself could not be driven** — this machine
+  reports zero connected gamepads, so `UserInputService.GamepadEnabled` is
+  false and the engine's navigation never runs. Selecting a `Selectable`
+  ScrollingFrame is what gives its canvas the stick; that half is engine
+  behaviour and remains unconfirmed on a real pad.
+
+  **The floating stone was a genuinely separate literal, not #325's
+  helper.** The road-stone helper that used to clamp Y to 0.42 is not
+  involved: `queueItemAsset` seats a replacement mesh on the *primitive it
+  replaces*, which is right, and the primitive was the thing in the air. A
+  step's `y` offset is measured from an event socket anchor standing half a
+  stud above the module floor on a plate seven studs across, and all three
+  of `event_bw_wildfire_choice`'s breaks were authored at `y = 1` — which
+  seats a break on that plate, and only the road break is on it. The farm
+  and grove breaks are seven studs out over bare ground, so their markers
+  and the road stones dressing them hung 0.90 studs up. Both are `y = 0.1`
+  now. Verified by raycast on the fixed build: gap 0.90 → 0.00 for both,
+  the road break still seated 0.10 into its plate, and — the part that
+  matters after #325 — both moved click volumes still answer a real mouse
+  click, with all three steps sealed by tap and THE FIRE TURNS FROM THE
+  HOMES — +4 HEARTWOOD closing the event. Measured and deliberately left:
+  the two Warden-sign ground prints sit 0.98 and 1.07 studs up, and four
+  crate/screen markers 0.35–0.80. Lowering those means lowering a
+  0.45-stud-tall pancake of a click volume onto the floor, which is how
+  #325's capped root node happened; the honest fix is to give
+  `queueItemAsset` a per-caller ground seat, and that is its own change.
+
+  **Ena's 0/3 was the words, not the data.** A real extraction does append
+  to `inventory.settlementOrder` and the quest snapshot reads it live: the
+  session harvested a node by tap, sealed the wildfire event, banked at the
+  Wayhome gate and watched the quest go 0/3 → 1/3 in the same push, twice
+  over. What is wrong is that the signal counts **settled deliveries** —
+  a trip that banks nothing records no settlement, because there is nothing
+  to settle — while all four asks built on it described it as a trip or a
+  return. A player who does exactly what the words say and still reads 0/3
+  has been told the quest is broken by the quest itself. So the words moved
+  to the measurement: Ena asks to BANK A POUCH FROM BRAMBLEWAKE THREE
+  TIMES, Saoirse for eight pouches, Nell for fourteen loads, Pip's second
+  stage for six, and FOURTEEN TRIPS BACK is FOURTEEN LOADS BANKED. The
+  fallback guidance no longer borrows Ena's line for residents who have
+  none. Changing the signal instead would mean a new counter on the
+  profile, and a resident quest must not be the thing that introduces
+  tracking. Verified live after the extraction: "ENA: BANK A POUCH FROM
+  BRAMBLEWAKE THREE TIMES — 1/3."
+
+  Not closed by this wave: none of the five items. Open live checks it
+  leaves behind are the gamepad D-pad scroll (needs a controller), FIND
+  and STRIKE pressed as buttons (they are never rendered, so their new
+  positions are geometry only), and the six event markers recorded above.
+
+  **Worth carrying forward from the method**: a hardcoded pixel offset in
+  HUDController is measured against the *canvas*, which is `viewport.X /
+  scale` wide — 502 points on the owner's phone, over 1,200 on the desktop
+  the offsets were written on. Anything written as a literal there is a
+  bet on a screen. And the field book's own CLOSE button being off-screen
+  is worth remembering as a shape: a modal overlay that cannot be closed
+  swallows every world click behind it, which reads in play as "the game
+  stopped responding" rather than as a layout bug.
 - **#325** (v138) **the third leg of the click-everything walkthrough:
   Bramblewake's whole chapter arc, walked with real mouse input.** All
   eight expedition events (seven completed, one deliberately left to its
@@ -121,7 +249,8 @@ Newest first since the last header:
   and the new DetailsScroll has no gamepad focus path. One cosmetic
   mismatch noticed live: the HUD phase pill reads DAY · MORNING during
   repeating town nights — it follows the tutorial's PhaseService, not
-  TownNightService.
+  TownNightService. **All of that is closed by #327 above**, along with
+  three action buttons that were off a portrait screen entirely.
 - **#321–#324** (v134–v137) **the first two legs of the walkthrough,
   recorded here after the fact** — these merged from a parallel session
   without a status entry. #321 took the hundred and twenty benches back

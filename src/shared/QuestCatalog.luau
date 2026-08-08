@@ -235,7 +235,9 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_salvage_runs = table.freeze({
         id = "quest_salvage_runs",
         residentId = "npc_nell_barrow",
-        displayName = "FOURTEEN TRIPS BACK",
+        -- "LOADS", not "TRIPS": the objective counts banked Wayhome
+        -- deliveries, and a trip that carries nothing settles nothing.
+        displayName = "FOURTEEN LOADS BANKED",
         objective = table.freeze({ kind = "bramblewake_settlements", threshold = 14 }),
         reward = table.freeze({ materialId = "material_storm_glass", amount = 8 }),
     }),
