@@ -3124,6 +3124,24 @@ local function hideProceduralPlaceholder(placeholder: Instance)
         elseif instance:IsA("BasePart") then
             instance.Transparency = 1
             instance.CastShadow = false
+            --[[
+                A hidden placeholder keeps its collision and loses its
+                claim on taps.
+
+                Collision has to stay: 408 of the 424 authored meshes in
+                this world do not collide at all, so the primitive
+                underneath is the only floor a player stands on and the
+                only wall they cannot walk through. Turning it off drops
+                everybody through the workshop.
+
+                Queries are the opposite. An invisible part that answers a
+                raycast is a tap nobody can aim past, and this world puts
+                one under every replaced mesh -- which is how a player
+                ends up unable to tap the log they can plainly see, with
+                nothing on screen to explain why. The mesh above it, or
+                the interaction's own click volume, should take that tap.
+            ]]
+            instance.CanQuery = false
         elseif
             instance:IsA("Light")
             or instance:IsA("ParticleEmitter")
