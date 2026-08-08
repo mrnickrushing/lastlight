@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #330), build `0.53.0`,
-save schema 23, 25 services. Published to Roblox as place version 142,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #331), build `0.53.0`,
+save schema 24, 25 services. Published to Roblox as place version 143,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,6 +59,70 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#331** (v143) **M11 wave E: the cosmetic spine, built before the platform
+  call so the platform call has nowhere to put a decision.** `CosmeticCatalog`
+  (presentation only, five slots), `Entitlements` (pure: what a grant is, idempotency by
+  purchase id, the mailbox), `profile.commerce`, and the two specs the wave
+  plan settled the architecture around. **No `MarketplaceService` in this
+  wave** — the whole spine is testable without the platform, and that is the
+  point: `ProcessReceipt` cannot be exercised in Studio, so everything that
+  *decides* anything about a purchase has to be decidable without it.
+
+  **`validate_monetization.py` still passes with an empty allowlist**, which is
+  the load-bearing fact. Its own docstring names the risk it lives under: "an
+  exit-gate item that passes because a thing is missing goes on passing right
+  up until someone adds the thing." This wave adds the thing and the guard
+  holds, because nothing here touches a purchase or ownership API.
+
+  **A cosmetic carries no number that is not presentation**, and the check is a
+  whitelist rather than a blacklist of stat names — `power`, `bonus`,
+  `capacity` need no naming, because anything that is not a colour, a size, an
+  offset or a rotation fails whatever it is called. **And nothing outside the
+  catalog may name a cosmetic id at all**, walked over every file in `src`: a
+  gameplay branch on a cosmetic is not merely absent, it is unwriteable.
+
+  **A plan is a list of shapes, not a case in a renderer**, following
+  `GearVisualPlan`. That designs out the class of bug this project has paid for
+  four times — 120 recipes with no bench, 24 residents with no body, eight
+  props that would have rendered as somebody else's, ninety craftable items
+  with no equip button. There is no per-cosmetic drawing case that can be
+  missing because there is no per-cosmetic drawing case.
+
+  Three rules hold the receipt logic up, and all three are ways a real game
+  loses a real purchase. **A retry is a success**: the platform calls again
+  until told the grant is durable, so a purchase id already in the ledger
+  answers "we have it" without granting twice — granting twice hands out two of
+  something bought once, and refusing to acknowledge retries forever. **An
+  unknown product is never consumed**: telling the platform a purchase is
+  settled when this build cannot resolve it leaves a player holding a receipt
+  for nothing, so it stays pending for a build that knows it. **A receipt that
+  arrives while the profile is locked goes in a mailbox** that lives outside
+  the profile by construction, because its entire reason for existing is the
+  moments when the profile does not.
+
+  **Review found four real holes and one standards call.** `table.freeze` is
+  shallow, so a frozen catalog entry pointed at a mutable parts array;
+  `normalize` kept entitlements for cosmetics the catalog no longer sells and
+  kept a slot worn by somebody who did not own it (a free cosmetic for anyone
+  who can write a save field, and also exactly the state a refund leaves);
+  `equip` let any owned cosmetic go in any slot, so an outfit could be worn as
+  a lantern shell; and `SaveSchema.commerce` handed back the profile's own
+  table, which a caller could edit in place — granting an entitlement with no
+  normalization, no revision bump and no save. All four fixed. **And the emote
+  slot came back out**: an emote is a motion rather than a shape, the only
+  geometry this file could offer for one is a glow, and
+  VISUAL_QUALITY_STANDARD names a glow directly as not being construction. It
+  arrives with the animation pipeline that makes an emote possible, not as a
+  lit sphere called a salute. The tool grip and the banner were thickened for
+  the same reason — a wrap reads as cord when you can count the turns, and a
+  banner reads as a standard when it hangs from a crossbar.
+
+  Save schema 23 → 24 with an era-23 fixture. `Config.CommerceProductIds` is
+  empty and `cosmetic_store_enabled` is false, both correctly: a developer
+  product does not exist until somebody creates it in the Creator Dashboard.
+  The spec does not demand the table be full — it demands it cannot be wrong,
+  so a number pasted against a product the catalog does not know fails the day
+  it is pasted rather than the day a player presses buy.
 - **#330** (v142) **M11 wave D: the artifact the privacy and abuse review
   reads, and a check that keeps it honest.**
   [SOCIAL_SAFETY_REVIEW.md](SOCIAL_SAFETY_REVIEW.md) lists **every way one

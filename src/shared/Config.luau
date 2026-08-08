@@ -9,7 +9,7 @@ return table.freeze({
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 23,
+    SaveSchemaVersion = 24,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -103,6 +103,21 @@ return table.freeze({
     -- floor the server enforces on that remote. Telemetry only: nothing a
     -- client reports here grants it anything.
     PerformanceReportIntervalSeconds = 5,
+    --[[
+        Creator Dashboard product IDs, keyed by this game's own product id.
+
+        Empty, and that is the correct state: a developer product does not
+        exist until somebody creates it in the dashboard and copies the number
+        back. A product with no ID here cannot be bought, which is true of all
+        of them today. The store flag below is off for the same reason -- there
+        is nothing behind it yet.
+
+        The spec that reads this table does not require it to be full. It
+        requires that every key in it names a product the catalog knows, so a
+        number pasted against a product that does not exist fails on the day it
+        is pasted rather than on the day somebody presses buy.
+    ]]
+    CommerceProductIds = table.freeze({}),
     -- The Last Light universe (10611704810) and its start place. Registered
     -- per the publishing runbook so environment checks can tell a real
     -- production place from an unregistered one.
@@ -159,6 +174,14 @@ return table.freeze({
             actually has.
         ]]
         quick_chat_enabled = true,
+        --[[
+            The cosmetic store. Off, and it stays off until there are products
+            in the Creator Dashboard, prices the owner has decided, and a
+            purchase that has been made once with a real receipt. A store that
+            is on with an empty catalog is a store that shows a player an empty
+            room and asks them to trust it.
+        ]]
+        cosmetic_store_enabled = false,
     }),
     Environments = table.freeze({
         ["local"] = table.freeze({

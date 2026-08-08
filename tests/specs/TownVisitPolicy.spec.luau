@@ -201,7 +201,7 @@ return {
                     }, 1400)),
                     "open"
                 )
-                TestRunner.equal(Config.SaveSchemaVersion, 23)
+                TestRunner.equal(Config.SaveSchemaVersion, 24)
             end,
         },
         {
