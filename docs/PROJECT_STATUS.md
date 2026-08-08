@@ -7,11 +7,12 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #341), build `0.53.0`,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #343), build `0.53.0`,
 save schema 25, 27 services. Published to Roblox as place version 150,
-matching this revision exactly — #341 left the built place byte-identical,
-because it adds only specs and documentation and the built place carries no
-tests, so publishing it returned the version #340 had already produced. **The owner's standing directive: complete
+matching this revision exactly — #341 and #343 both left the built place
+byte-identical, because they add only specs and documentation and the built
+place carries no tests, so publishing either returned the version #340 had
+already produced. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
 that makes that possible is
@@ -61,6 +62,61 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#343** (v150, unchanged — this wave adds only a spec and docs) **M12 wave C:
+  every content spec counts, and none of them walks.** `ContentCensus` counts the
+  catalog, `ChapterProgress` checks a chapter against the chapter beside it,
+  `Quests` drives one arc, `MemoryFragments` checks that a fragment is anchored
+  somewhere. All true, and not one of them takes a profile from the first dawn
+  to the epilogue — which is the only question a player is actually asking.
+  **Counting is not looking**, and this codebase has paid four times for a
+  catalog whose entries were each individually reachable and whose path through
+  them stopped.
+
+  `FullPathTraversal.spec` makes **one** profile and takes it the whole way:
+  `SaveSchema.default`, seven chapters through the real mutators in order, and
+  the epilogue read back out of the save it just wrote. **Nothing in it is a
+  fixture** — every state it asserts against is the state the previous assertion
+  produced, so a break anywhere on the path fails at the step that broke rather
+  than leaving a suite passing around it.
+
+  At every step the region underfoot is open and the one after it is shut, and
+  then the sharper version of the same question: **every chapter still ahead is
+  offered and refuses.** That is the difference between a walk that works and
+  the only walk there is. Two orderings had never been held against each other
+  either — the chapters' `requires` chain and the region registry's
+  `dependencies` — and a region added to one and not the other hands a player
+  either a region the story cannot open or a chapter with no ground under it.
+
+  **The quest catalog is emptied rather than sampled.** Saturated signals answer
+  "can this be claimed at all"; the number of passes answers the sequencing
+  question by itself, because it is one stage per arc per pass and therefore the
+  depth of the deepest arc and nothing else. 46 quests, three passes.
+
+  **The crafting tree turned out to hold a property worth pinning rather than
+  merely checking.** Each of the six worked regions pays exactly five materials,
+  no two regions pay the same one, and **no recipe reaches across regions** — so
+  a material names the chapter it becomes obtainable at, and every one of the
+  130 recipes is craftable the moment its own region is walkable. The tree is
+  exactly as deep as the story and never deeper. The Hollow pays nothing, which
+  is asserted rather than assumed: it is the finale, and a material dropping
+  there would make the last chapter somewhere to farm. Both directions of the
+  economy are checked because they fail differently — an input nothing pays out
+  is a recipe nobody can craft, a payout nothing spends is a number that climbs
+  in a pouch and buys nothing.
+
+  **The one thing the walk cannot do is a case instead of a sentence in a
+  document.** Six regions are `enabled = false` and flipping one is the owner's
+  call after a live session walks it end to end. What is checkable is that the
+  flag is the whole of the remaining distance: a fully resolved story refuses
+  each of them with `region_not_built`, never with a missing dependency and
+  never with an unreached chapter.
+
+  **Four mutations were run against the finished spec before it shipped**,
+  because a traversal check that passes on a broken tree is worse than none: a
+  recipe made to reach across regions, a region dependency made to skip a
+  chapter, an arc stage pointed at a quest that does not exist, and a chapter's
+  prerequisite dropped. Each failed, and each failed in the case meant to catch
+  it.
 - **#341** (v150, unchanged — this wave adds only specs and docs, and the built
   place carries no tests) **M12 wave A: the fixtures were each normalized once, and a real save
   is not.** `SaveMigration.spec` has held an era fixture per released schema
