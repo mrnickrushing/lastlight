@@ -7,7 +7,6 @@ local TweenService = game:GetService("TweenService")
 local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
 
 -- The lantern starts every night here and can never be pushed past it.
-local LANTERN_CEILING = 100
 
 local EnemyService = {}
 EnemyService.__index = EnemyService
@@ -1720,12 +1719,12 @@ function EnemyService.restoreLanternStrength(
     if amount ~= amount or amount <= 0 or amount ~= math.floor(amount) then
         return { applied = false, health = self._lanternHealth, reason = "invalid_amount" }
     end
-    if self._lanternHealth >= LANTERN_CEILING then
+    if self._lanternHealth >= self._config.LanternHealthCeiling then
         return { applied = false, health = self._lanternHealth, reason = "lantern_full" }
     end
     local bounded = math.clamp(amount, 1, 40)
     local previous = self._lanternHealth
-    self._lanternHealth = math.min(LANTERN_CEILING, self._lanternHealth + bounded)
+    self._lanternHealth = math.min(self._config.LanternHealthCeiling, self._lanternHealth + bounded)
     local restored = self._lanternHealth - previous
     self._logger:info("lantern_restored", {
         health = self._lanternHealth,
@@ -1741,7 +1740,7 @@ function EnemyService.restoreLanternStrength(
 end
 
 function EnemyService.lanternFull(self: EnemyService): boolean
-    return self._lanternHealth >= LANTERN_CEILING
+    return self._lanternHealth >= self._config.LanternHealthCeiling
 end
 
 function EnemyService.lanternHealth(self: EnemyService): number

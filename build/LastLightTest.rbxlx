@@ -4979,6 +4979,44 @@ return table.freeze({
     -- per the publishing runbook so environment checks can tell a real
     -- production place from an unregistered one.
     ProductionPlaceIds = table.freeze({ 115897110071287 }),
+    --[[
+        The knobs a closed beta turns.
+
+        BETA_TUNING.md's first table says which number each of Milestone 13's
+        five tuning decisions is read on; this is the other half of that
+        sentence -- what you actually change once you have read it. The values
+        below were locals in four services until this wave, which meant every
+        tuning pass was a code change, a rebuild and a publish, and the
+        practical consequence of that is not effort: it is that nobody tries a
+        second value.
+
+        The rule that keeps this honest is that a knob has exactly **one**
+        home. A service that reads `Config.EliteStrikeRange` and also keeps its
+        own `STRIKE_RANGE` is a knob somebody will turn and watch do nothing,
+        and `TuningKnobs.spec` refuses that shape.
+
+        Engagement distances, in studs. The elite and the boss carry their own
+        rather than sharing, because they are different fights: the Old Growth
+        is stationary and the Warden Stag closes, so the distance at which each
+        becomes unavoidable is a separate decision.
+    ]]
+    EliteActivationRadius = 28,
+    EliteEncounterRadius = 58,
+    EliteStrikeRange = 14,
+    BossActivationRadius = 27,
+    BossEncounterRadius = 56,
+    BossStrikeRange = 15,
+    -- The town watch's chip damage against anything that reaches the lantern:
+    -- how hard, how often, and from how far. The first difficulty dial anybody
+    -- reaches for when a night is too hard or too safe, because it changes the
+    -- floor of every night rather than one encounter.
+    TownWatchChipDamage = 3,
+    TownWatchChipEverySeconds = 7,
+    TownWatchChipRange = 26,
+    -- Where the First Lantern's health tops out. The town's whole difficulty
+    -- ceiling: every night is measured against it and every repair is a share
+    -- of it.
+    LanternHealthCeiling = 100,
     FeatureFlags = table.freeze({
         bounded_join = true,
         first_ten_minutes = true,
@@ -39491,7 +39529,7 @@ local companionService = CompanionService.new(logger, CompanionMotion)
 local regionEncounterService =
     RegionEncounterService.new(logger, profileService, survivalService, featureFlags)
 local defenseService =
-    DefenseService.new(logger, DefenseLanes, worldService, enemyService, profileService)
+    DefenseService.new(logger, DefenseLanes, worldService, enemyService, profileService, Config)
 enemyService:setDefenseLanes(DefenseLanes)
 local oldGrowthService = OldGrowthService.new(
     logger,
@@ -39505,7 +39543,8 @@ local oldGrowthService = OldGrowthService.new(
     EnemyCombatRules,
     OldGrowthBuilder,
     analyticsService,
-    featureFlags
+    featureFlags,
+    Config
 )
 enemyService:setEliteService(oldGrowthService)
 local wardenStagService = WardenStagService.new(
@@ -39521,7 +39560,8 @@ local wardenStagService = WardenStagService.new(
     EnemyCombatRules,
     WardenStagBuilder,
     analyticsService,
-    featureFlags
+    featureFlags,
+    Config
 )
 enemyService:setBossService(wardenStagService)
 local blackoutService = BramblewakeBlackoutService.new(
@@ -43897,6 +43937,7 @@ export type DefenseService = typeof(setmetatable(
         _worldService: any,
         _enemyService: any,
         _profileService: any,
+        _config: any,
         _plots: { [string]: Plot },
         _toastHandler: ((Player?, string) -> ())?,
         _nightActive: boolean,
@@ -43914,16 +43955,13 @@ local STONE = Color3.fromRGB(112, 108, 100)
 local STAKE_WOOD = Color3.fromRGB(94, 66, 40)
 local WATCH_COAT = Color3.fromRGB(52, 74, 92)
 
-local WATCH_CHIP_DAMAGE = 3
-local WATCH_CHIP_EVERY = 7
-local WATCH_CHIP_RANGE = 26
-
 function DefenseService.new(
     logger: Logger,
     defenseLanes: any,
     worldService: any,
     enemyService: any,
-    profileService: any
+    profileService: any,
+    config: any
 ): DefenseService
     return setmetatable({
         Name = DefenseService.Name,
@@ -43932,6 +43970,7 @@ function DefenseService.new(
         _worldService = worldService,
         _enemyService = enemyService,
         _profileService = profileService,
+        _config = config,
         _plots = {},
         _toastHandler = nil,
         _nightActive = false,
@@ -44222,9 +44261,9 @@ function DefenseService._step(self: DefenseService, now: number)
     if watchPosition ~= nil and now >= self._nextChipAt then
         local dx = ex - watchPosition.X
         local dz = ez - watchPosition.Z
-        if dx * dx + dz * dz <= WATCH_CHIP_RANGE ^ 2 then
-            if self._enemyService:residentChip(WATCH_CHIP_DAMAGE) then
-                self._nextChipAt = now + WATCH_CHIP_EVERY
+        if dx * dx + dz * dz <= self._config.TownWatchChipRange ^ 2 then
+            if self._enemyService:residentChip(self._config.TownWatchChipDamage) then
+                self._nextChipAt = now + self._config.TownWatchChipEverySeconds
             end
         end
     end
@@ -44272,7 +44311,6 @@ local TweenService = game:GetService("TweenService")
 local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
 
 -- The lantern starts every night here and can never be pushed past it.
-local LANTERN_CEILING = 100
 
 local EnemyService = {}
 EnemyService.__index = EnemyService
@@ -45985,12 +46023,12 @@ function EnemyService.restoreLanternStrength(
     if amount ~= amount or amount <= 0 or amount ~= math.floor(amount) then
         return { applied = false, health = self._lanternHealth, reason = "invalid_amount" }
     end
-    if self._lanternHealth >= LANTERN_CEILING then
+    if self._lanternHealth >= self._config.LanternHealthCeiling then
         return { applied = false, health = self._lanternHealth, reason = "lantern_full" }
     end
     local bounded = math.clamp(amount, 1, 40)
     local previous = self._lanternHealth
-    self._lanternHealth = math.min(LANTERN_CEILING, self._lanternHealth + bounded)
+    self._lanternHealth = math.min(self._config.LanternHealthCeiling, self._lanternHealth + bounded)
     local restored = self._lanternHealth - previous
     self._logger:info("lantern_restored", {
         health = self._lanternHealth,
@@ -46006,7 +46044,7 @@ function EnemyService.restoreLanternStrength(
 end
 
 function EnemyService.lanternFull(self: EnemyService): boolean
-    return self._lanternHealth >= LANTERN_CEILING
+    return self._lanternHealth >= self._config.LanternHealthCeiling
 end
 
 function EnemyService.lanternHealth(self: EnemyService): number
@@ -48244,6 +48282,7 @@ export type OldGrowthService = typeof(setmetatable(
         _builder: any,
         _analyticsService: any,
         _featureFlags: any,
+        _config: any,
         _state: any,
         _arena: any,
         _model: Model?,
@@ -48258,10 +48297,6 @@ export type OldGrowthService = typeof(setmetatable(
     },
     OldGrowthService
 ))
-
-local ACTIVATION_RADIUS = 28
-local ENCOUNTER_RADIUS = 58
-local STRIKE_RANGE = 14
 
 local function rootPart(player: Player): BasePart?
     local character = player.Character
@@ -48290,7 +48325,8 @@ function OldGrowthService.new(
     enemyCombatRules: any,
     builder: any,
     analyticsService: any,
-    featureFlags: any
+    featureFlags: any,
+    config: any
 ): OldGrowthService
     return setmetatable({
         Name = OldGrowthService.Name,
@@ -48306,6 +48342,7 @@ function OldGrowthService.new(
         _builder = builder,
         _analyticsService = analyticsService,
         _featureFlags = featureFlags,
+        _config = config,
         _state = nil,
         _arena = nil,
         _model = nil,
@@ -48689,7 +48726,10 @@ end
 function OldGrowthService._playersInArena(self: OldGrowthService): { Player }
     local players = {}
     for _, player in Players:GetPlayers() do
-        if self:_inArena(player, ENCOUNTER_RADIUS) and self._survivalService:canAct(player) then
+        if
+            self:_inArena(player, self._config.EliteEncounterRadius)
+            and self._survivalService:canAct(player)
+        then
             table.insert(players, player)
         end
     end
@@ -48730,7 +48770,8 @@ function OldGrowthService._step(self: OldGrowthService, now: number)
     then
         for _, player in Players:GetPlayers() do
             if
-                self:_inArena(player, ACTIVATION_RADIUS) and self._survivalService:canAct(player)
+                self:_inArena(player, self._config.EliteActivationRadius)
+                and self._survivalService:canAct(player)
             then
                 local nextState, result = self._encounter.activate(self._state, player.UserId)
                 if result.accepted then
@@ -48801,7 +48842,10 @@ function OldGrowthService.interact(
     player: Player,
     prompt: ProximityPrompt
 ): any
-    if not self:_inArena(player, ENCOUNTER_RADIUS) or not self._survivalService:canAct(player) then
+    if
+        not self:_inArena(player, self._config.EliteEncounterRadius)
+        or not self._survivalService:canAct(player)
+    then
         return {
             accepted = false,
             message = "ENTER THE OLD GROWTH ARENA WHILE ACTIVE",
@@ -48883,7 +48927,10 @@ function OldGrowthService.damageNearest(self: OldGrowthService, player: Player):
     if self._state.status ~= "vulnerable" and self._state.status ~= "shielded" then
         return false, "No elite threat is active."
     end
-    if not self:_inArena(player, ENCOUNTER_RADIUS) or not self._survivalService:canAct(player) then
+    if
+        not self:_inArena(player, self._config.EliteEncounterRadius)
+        or not self._survivalService:canAct(player)
+    then
         return false, "Enter the Old Growth arena to strike."
     end
     local model = self._model
@@ -48892,7 +48939,7 @@ function OldGrowthService.damageNearest(self: OldGrowthService, player: Player):
     if model == nil or root == nil or heart == nil then
         return false, "Old Growth is still taking shape."
     end
-    if (root.Position - heart.Position).Magnitude > STRIKE_RANGE then
+    if (root.Position - heart.Position).Magnitude > self._config.EliteStrikeRange then
         return false, "Move closer to the amber heart."
     end
     if not self:_lineOfSight(player, model) then
@@ -48980,7 +49027,7 @@ function OldGrowthService.canMarkNearest(
         or model == nil
         or model.PrimaryPart == nil
         or root == nil
-        or not self:_inArena(player, ENCOUNTER_RADIUS)
+        or not self:_inArena(player, self._config.EliteEncounterRadius)
         or not self._survivalService:canAct(player)
     then
         return false, "NO ELITE THREAT CAN BE MARKED"
@@ -49049,7 +49096,10 @@ function OldGrowthService.snapshot(self: OldGrowthService, player: Player): any
     end
     local snapshot =
         self._encounter.snapshot(self._state, player.UserId, workspace:GetServerTimeNow())
-    if not self:_inArena(player, ENCOUNTER_RADIUS + 18) and not snapshot.carryingFire then
+    if
+        not self:_inArena(player, self._config.EliteEncounterRadius + 18)
+        and not snapshot.carryingFire
+    then
         return nil
     end
     return snapshot
@@ -59502,6 +59552,7 @@ export type WardenStagService = typeof(setmetatable(
         _builder: any,
         _analyticsService: any,
         _featureFlags: any,
+        _config: any,
         _state: any,
         _arena: any,
         _model: Model?,
@@ -59516,10 +59567,6 @@ export type WardenStagService = typeof(setmetatable(
     },
     WardenStagService
 ))
-
-local ACTIVATION_RADIUS = 27
-local ENCOUNTER_RADIUS = 56
-local STRIKE_RANGE = 15
 
 local function rootPart(player: Player): BasePart?
     local character = player.Character
@@ -59549,7 +59596,8 @@ function WardenStagService.new(
     enemyCombatRules: any,
     builder: any,
     analyticsService: any,
-    featureFlags: any
+    featureFlags: any,
+    config: any
 ): WardenStagService
     return setmetatable({
         Name = WardenStagService.Name,
@@ -59566,6 +59614,7 @@ function WardenStagService.new(
         _builder = builder,
         _analyticsService = analyticsService,
         _featureFlags = featureFlags,
+        _config = config,
         _state = nil,
         _arena = nil,
         _model = nil,
@@ -59936,7 +59985,10 @@ end
 function WardenStagService._playersInArena(self: WardenStagService): { Player }
     local players = {}
     for _, player in Players:GetPlayers() do
-        if self:_inArena(player, ENCOUNTER_RADIUS) and self._survivalService:canAct(player) then
+        if
+            self:_inArena(player, self._config.BossEncounterRadius)
+            and self._survivalService:canAct(player)
+        then
             table.insert(players, player)
         end
     end
@@ -59979,7 +60031,8 @@ function WardenStagService._step(self: WardenStagService, now: number)
     if self._state.status == "dormant" then
         for _, player in Players:GetPlayers() do
             if
-                self:_inArena(player, ACTIVATION_RADIUS) and self._survivalService:canAct(player)
+                self:_inArena(player, self._config.BossActivationRadius)
+                and self._survivalService:canAct(player)
             then
                 local nextState, result = self._encounter.activate(self._state, player.UserId)
                 if result.accepted then
@@ -60050,7 +60103,10 @@ function WardenStagService.interact(
     player: Player,
     prompt: ProximityPrompt
 ): any
-    if not self:_inArena(player, ENCOUNTER_RADIUS) or not self._survivalService:canAct(player) then
+    if
+        not self:_inArena(player, self._config.BossEncounterRadius)
+        or not self._survivalService:canAct(player)
+    then
         return {
             accepted = false,
             message = "ENTER THE WARDEN'S SEAL WHILE ACTIVE",
@@ -60151,7 +60207,10 @@ function WardenStagService.damageNearest(self: WardenStagService, player: Player
     if self._state.status == "cleansing" then
         return false, "CLEANSE LIVING ROOTS OR ACCEPT THE ANTLER CONSEQUENCE"
     end
-    if not self:_inArena(player, ENCOUNTER_RADIUS) or not self._survivalService:canAct(player) then
+    if
+        not self:_inArena(player, self._config.BossEncounterRadius)
+        or not self._survivalService:canAct(player)
+    then
         return false, "Enter the Warden's Seal to strike."
     end
     local model = self._model
@@ -60160,7 +60219,7 @@ function WardenStagService.damageNearest(self: WardenStagService, player: Player
     if model == nil or root == nil or heart == nil then
         return false, "The Warden Stag is still taking shape."
     end
-    if (root.Position - heart.Position).Magnitude > STRIKE_RANGE then
+    if (root.Position - heart.Position).Magnitude > self._config.BossStrikeRange then
         return false, "Move closer to the memory heart."
     end
     if not self:_lineOfSight(player, model) then
@@ -60247,7 +60306,7 @@ function WardenStagService.canMarkNearest(
         or model == nil
         or model.PrimaryPart == nil
         or root == nil
-        or not self:_inArena(player, ENCOUNTER_RADIUS)
+        or not self:_inArena(player, self._config.BossEncounterRadius)
         or not self._survivalService:canAct(player)
     then
         return false, "NO BOSS THREAT CAN BE MARKED"
@@ -60302,7 +60361,7 @@ function WardenStagService.snapshot(self: WardenStagService, player: Player): an
     if self._state.status == "locked" or self._state.status == "dormant" then
         return nil
     end
-    if not self:_inArena(player, ENCOUNTER_RADIUS + 20) then
+    if not self:_inArena(player, self._config.BossEncounterRadius + 20) then
         return nil
     end
     return self._encounter.snapshot(self._state, player.UserId)

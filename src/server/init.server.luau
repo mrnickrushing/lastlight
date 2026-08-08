@@ -254,7 +254,7 @@ local companionService = CompanionService.new(logger, CompanionMotion)
 local regionEncounterService =
     RegionEncounterService.new(logger, profileService, survivalService, featureFlags)
 local defenseService =
-    DefenseService.new(logger, DefenseLanes, worldService, enemyService, profileService)
+    DefenseService.new(logger, DefenseLanes, worldService, enemyService, profileService, Config)
 enemyService:setDefenseLanes(DefenseLanes)
 local oldGrowthService = OldGrowthService.new(
     logger,
@@ -268,7 +268,8 @@ local oldGrowthService = OldGrowthService.new(
     EnemyCombatRules,
     OldGrowthBuilder,
     analyticsService,
-    featureFlags
+    featureFlags,
+    Config
 )
 enemyService:setEliteService(oldGrowthService)
 local wardenStagService = WardenStagService.new(
@@ -284,7 +285,8 @@ local wardenStagService = WardenStagService.new(
     EnemyCombatRules,
     WardenStagBuilder,
     analyticsService,
-    featureFlags
+    featureFlags,
+    Config
 )
 enemyService:setBossService(wardenStagService)
 local blackoutService = BramblewakeBlackoutService.new(

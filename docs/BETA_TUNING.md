@@ -54,6 +54,45 @@ Two rules the events follow, and both are ways a tuning number lies:
 | Tune group scaling | the same outcome with the size of the group that ran it, per player | `group_outcome` | `ExpeditionService`, at extraction and at a failed extraction |
 | Tune repetition | the nth time this player has done the same activity, and whether they finished it that time | `repeat_activity` | `ExpeditionService`, at the end of each attempt |
 
+## The knobs
+
+The table above says what each decision is read on. This one says what you
+*turn* once you have read it, and the two exist as a pair on purpose: **a
+decision with a number and no knob is a measurement you cannot act on.**
+`TuningKnobs.spec` asserts exactly that — every decision row has at least one
+knob row, so a sixth tuning decision cannot arrive with an event and no way to
+respond to it.
+
+Every value here lives in `Config` and has **one** home. Ten of them were
+locals inside four services until Milestone 13 wave C, which meant every tuning
+pass was a code change, a rebuild and a publish; the practical cost of that is
+not effort, it is that nobody tries a second value. A service that reads
+`Config.EliteStrikeRange` and also keeps its own `STRIKE_RANGE` is a knob
+somebody turns and watches do nothing, and the spec refuses that shape.
+
+| Decision | Knob | What turning it does |
+|---|---|---|
+| Tune the first session | `FirstNightDuskSeconds` | how long the sky has to change before the first night starts |
+| Tune the first session | `BootstrapTimeoutSeconds` | how long a client waits for the world before it gives up |
+| Tune the first night | `FirstNightSeconds` | how long the first night lasts, which is the whole of its difficulty for a player who is still learning to swing |
+| Tune the first night | `DownedSeconds` | how long somebody has on the ground before it is over |
+| Tune the first night | `ReviveChannelSeconds` | how long picking a friend up leaves you both standing still |
+| Find difficulty cliffs | `EliteActivationRadius` | how close you get to the Old Growth before it wakes |
+| Find difficulty cliffs | `EliteEncounterRadius` | how far the elite's fight reaches |
+| Find difficulty cliffs | `EliteStrikeRange` | how close you have to be to hit its heart |
+| Find difficulty cliffs | `BossActivationRadius` | how close you get to the Warden Stag before it turns |
+| Find difficulty cliffs | `BossEncounterRadius` | how far the boss fight reaches |
+| Find difficulty cliffs | `BossStrikeRange` | how close you have to be to hit its heart |
+| Find difficulty cliffs | `TownWatchChipDamage` | how hard the watch hits what reaches the lantern |
+| Find difficulty cliffs | `TownWatchChipEverySeconds` | how often it does |
+| Find difficulty cliffs | `TownWatchChipRange` | how far out it will reach to do it |
+| Find difficulty cliffs | `LanternHealthCeiling` | the town's whole difficulty ceiling: every night is measured against it |
+| Tune group scaling | `MaxExpeditionPlayers` | the largest group the wood will hold |
+| Tune group scaling | `EngineerBraceCapacity` | how much one player's brace absorbs for everybody behind it |
+| Tune repetition | `BlackoutInterval` | how many nights apart the blackout comes round |
+| Tune repetition | `NormalDaySeconds` | how long one loop's daylight half is |
+| Tune repetition | `NormalNightSeconds` | how long its night half is |
+
 ## What each event can and cannot honestly see
 
 - **`first_session_end` fires only for a first-day player.** A returning player

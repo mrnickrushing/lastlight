@@ -56,6 +56,7 @@ TestRunner.run({
     require("./specs/FeatureFlagService.spec"),
     require("./specs/RolloutCohorts.spec"),
     require("./specs/TuningMetrics.spec"),
+    require("./specs/TuningKnobs.spec"),
     require("./specs/NightSchedule.spec"),
     require("./specs/PerformanceBudget.spec"),
     require("./specs/OldGrowthEncounter.spec"),
