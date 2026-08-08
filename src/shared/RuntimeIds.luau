@@ -96,6 +96,22 @@ local RuntimeIds = {
         SelectProfessionSpecialization = "select_profession_specialization",
         ContributeConstruction = "contribute_construction",
         RecoverMemoryFragment = "recover_memory_fragment",
+        --[[
+            Parties. Four kinds rather than one because they are four
+            different questions, and folding them into a mode field would
+            put a target and a verb in the same payload -- which is two
+            extra fields, and the one-extra-field rule is the wall that
+            #219 was found against.
+
+            PartyInvite carries nothing at all on purpose: it offers a seat
+            to whoever is standing on the departure platform, measured
+            server-side, so a press cannot name a stranger across the map
+            and cannot be forged into naming one.
+        ]]
+        PartyInvite = "party_invite",
+        PartyReply = "party_reply",
+        PartyLeave = "party_leave",
+        PartyRejoin = "party_rejoin",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",

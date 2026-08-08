@@ -9,6 +9,7 @@ local Crafting = require("./Crafting")
 local HollowFinale = require("./Content/Definitions/HollowFinale")
 local NamelessNight = require("./NamelessNightEncounter")
 local MemoryFragments = require("./MemoryFragments")
+local PartySession = require("./PartySession")
 local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
@@ -91,6 +92,22 @@ export type Profile = {
     quests: {
         claimed: { [string]: boolean },
     },
+    --[[
+        Everything about this player's relationship to other players. One
+        field so far: the ticket back to the party they were with when they
+        dropped. It is a block rather than a bare `rejoin` because the rest of
+        Milestone 11 arrives here too -- a visit policy, a block list -- and a
+        second migration to make room for them would be a migration spent on
+        tidying.
+
+        The ticket holds a reserved-server access code, which is the whole key
+        to a private world. It is written here because a profile is server-
+        owned storage; it must never be put in a snapshot. PartySession's
+        `publicTicket` is the shape a client may see.
+    ]]
+    social: {
+        rejoin: PartySession.Ticket?,
+    },
 }
 
 local MAX_NIGHT_NUMBER = 1_000_000
@@ -108,7 +125,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 21,
+        schemaVersion = 22,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -159,6 +176,9 @@ function SaveSchema.default(now: number): Profile
         equipped = Equipment.default(),
         quests = {
             claimed = Quests.default(),
+        },
+        social = {
+            rejoin = nil,
         },
     }
 end
@@ -431,7 +451,22 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 21
+    --[[
+        Schema 22: the rejoin ticket. A pre-22 save arrives with none, which
+        is the truthful migration -- there were no parties to be a member of,
+        so there is nothing anyone should be sent back to.
+
+        The bounding is PartySession's, not a copy of it, and it is strict:
+        an unreadable ticket is no ticket. A ticket is the one saved field
+        that resolves to a teleport, so the cost of accepting a bad one is a
+        player thrown at a world that may not be theirs, and the cost of
+        refusing a good one is that they walk to the platform again.
+    ]]
+    profile.social.rejoin = PartySession.normalizeTicket(
+        if type(value.social) == "table" then value.social.rejoin else nil
+    )
+
+    profile.schemaVersion = 22
     return profile
 end
 
@@ -880,6 +915,44 @@ end
 
 function SaveSchema.nightNumber(profile: Profile): number
     return profile.town.nightNumber
+end
+
+--[[
+    Write, or clear, the ticket back to the party this player left with.
+
+    Passing nil clears it, which is the call made the moment a rejoin is
+    spent or refused: a ticket that outlives its usefulness is an offer the
+    lodge keeps making for a world that has emptied out.
+
+    The ticket is bounded on the way in as well as on the way out. It is
+    handed over by a service that built it from a teleport call's return
+    value, and a reserved-server code that came back as something other than
+    a string should stop here rather than at the next load.
+
+    Clearing is nil and only nil. A malformed ticket is refused outright
+    rather than treated as a clear, because those two look identical here and
+    are opposite in effect: one is a player who has arrived home, the other is
+    a bad write that would silently take away the way back from a player who
+    still has one.
+]]
+function SaveSchema.withRejoinTicket(profile: Profile, ticket: any, now: number): Profile
+    local bounded = if ticket == nil then nil else PartySession.normalizeTicket(ticket)
+    if ticket ~= nil and bounded == nil then
+        return profile
+    end
+    if bounded == nil and profile.social.rejoin == nil then
+        return profile
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.social = table.clone(profile.social)
+    nextProfile.social.rejoin = bounded
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile
+end
+
+function SaveSchema.rejoinTicket(profile: Profile): any
+    return profile.social.rejoin
 end
 
 -- Whether two condition states describe the same town. Compared building by

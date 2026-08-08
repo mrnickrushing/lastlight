@@ -65,6 +65,7 @@ export type TutorialService = typeof(setmetatable(
         _gearTraits: any,
         _consumables: any,
         _companionService: any,
+        _partyService: any,
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -139,6 +140,7 @@ function TutorialService.new(
         _gearTraits = gearTraits,
         _consumables = consumables,
         _companionService = nil,
+        _partyService = nil,
         _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -902,6 +904,10 @@ end
 
 function TutorialService.setCompanionService(self: TutorialService, companionService: any)
     self._companionService = companionService
+end
+
+function TutorialService.setPartyService(self: TutorialService, partyService: any)
+    self._partyService = partyService
 end
 
 function TutorialService.strike(self: TutorialService, player: Player)
@@ -1682,6 +1688,33 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             )
             self:_publish(player)
         end
+    elseif kind == self._runtimeIds.Actions.PartyInvite then
+        --[[
+            The press names nobody. PartyService asks the platform who is
+            standing there, which is the same reading the departure countdown
+            works from, so an invitation and a boarding pass can never
+            disagree about who was on the dais.
+        ]]
+        if self._partyService ~= nil then
+            self._partyService:invite(player)
+            self:_publishAll()
+        end
+    elseif kind == self._runtimeIds.Actions.PartyReply then
+        local accept = payload.accept
+        if self._partyService ~= nil and type(accept) == "boolean" then
+            self._partyService:reply(player, accept)
+            self:_publishAll()
+        end
+    elseif kind == self._runtimeIds.Actions.PartyLeave then
+        if self._partyService ~= nil then
+            self._partyService:leave(player)
+            self:_publishAll()
+        end
+    elseif kind == self._runtimeIds.Actions.PartyRejoin then
+        if self._partyService ~= nil then
+            self._partyService:rejoin(player)
+            self:_publish(player)
+        end
     elseif kind == self._runtimeIds.Actions.CompanionCommand then
         local mode = payload.mode
         if self._companionService ~= nil and type(mode) == "string" and #mode <= 12 then
@@ -2076,6 +2109,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         companion = if self._companionService ~= nil
             then self._companionService:snapshot(player)
             else nil,
+        party = if self._partyService ~= nil then self._partyService:snapshot(player) else nil,
         gearCare = gearCare,
         whetTarget = whetTarget,
         equipped = self._profileService:equippedSnapshot(player),

@@ -38,6 +38,7 @@ export type LobbyService = typeof(setmetatable(
         _featureFlags: any,
         _worldService: any,
         _analyticsService: any,
+        _partyService: any,
         _state: any,
         _departed: { [Player]: boolean },
         _onChanged: ((string?) -> ())?,
@@ -68,6 +69,7 @@ function LobbyService.new(
         _featureFlags = featureFlags,
         _worldService = worldService,
         _analyticsService = analyticsService,
+        _partyService = nil,
         _state = lobbyDeparture.create(),
         _departed = {},
         _onChanged = nil,
@@ -80,6 +82,19 @@ function LobbyService.Init(_self: LobbyService, _context: any) end
 
 function LobbyService.setChangedHandler(self: LobbyService, callback: (string?) -> ())
     self._onChanged = callback
+end
+
+--[[
+    Parties, if this server has them.
+
+    Optional on purpose. Everything below works without a party service and
+    behaves exactly as it did before parties existed: seats are spent in the
+    order the platform reports them, a departure carries no party ID, and
+    nobody is issued a ticket home. What a party adds is an ordering and a way
+    back, not a requirement.
+]]
+function LobbyService.setPartyService(self: LobbyService, partyService: any)
+    self._partyService = partyService
 end
 
 function LobbyService._notify(self: LobbyService, message: string?)
@@ -233,6 +248,13 @@ function LobbyService._adoptArrival(self: LobbyService, player: Player)
         self._isRunServer = true
         self._logger:info("run_server_adopted", { partySize = read.partySize })
     end
+    -- A run server that knows which party it belongs to can recognise one of
+    -- its own members coming back on a rejoin ticket and leave them where
+    -- they landed, rather than forwarding them into the world they are
+    -- already standing in.
+    if read.partyId ~= nil and self._partyService ~= nil then
+        self._partyService:adoptRun(read.partyId)
+    end
     -- Departed players skip the lodge: the existing respawn path puts them at
     -- the arrival clearing and keeps them there.
     self._departed[player] = true
@@ -258,7 +280,20 @@ function LobbyService._teleportParty(self: LobbyService, boarding: { Player }): 
         return false
     end
 
-    local payload, built = self._runHandoff.buildPayload(#boarding, workspace:GetServerTimeNow())
+    --[[
+        The party is formed before the server is reserved, because its ID has
+        to ride the payload, and the tickets are written after the code comes
+        back but before anybody is sent. That order is load-bearing in both
+        directions: a ticket written after the teleport is written to a
+        profile nobody is holding any more.
+    ]]
+    local partyId: string? = nil
+    if self._partyService ~= nil then
+        partyId = self._partyService:formDeparture(boarding)
+    end
+
+    local payload, built =
+        self._runHandoff.buildPayload(#boarding, workspace:GetServerTimeNow(), partyId)
     if payload == nil then
         self._logger:warn("run_teleport_payload_invalid", { reason = built.reason })
         return false
@@ -270,6 +305,10 @@ function LobbyService._teleportParty(self: LobbyService, boarding: { Player }): 
     if not reserved or type(accessCode) ~= "string" then
         self:_recoverFromTeleportFailure(boarding, "reserve_failed")
         return true
+    end
+
+    if partyId ~= nil and self._partyService ~= nil then
+        self._partyService:issueTickets(partyId, boarding, accessCode)
     end
 
     local options = Instance.new("TeleportOptions")
@@ -372,9 +411,20 @@ function LobbyService.Start(self: LobbyService)
         self._state = nextState
 
         if result.launch then
+            --[[
+                Seats used to be spent in whatever order the engine listed
+                players, so a bystander standing on the dais could take one
+                from somebody's party. A party is asked first now; without
+                one this is the same list it always was.
+            ]]
+            local capacity = math.min(result.capacity, #ready)
             local boarding = {}
-            for index = 1, math.min(result.capacity, #ready) do
-                table.insert(boarding, ready[index])
+            if self._partyService ~= nil then
+                boarding = self._partyService:boardingOrder(ready, capacity)
+            else
+                for index = 1, capacity do
+                    table.insert(boarding, ready[index])
+                end
             end
             self:_launch(boarding)
             self._lastPublishedSeconds = -1

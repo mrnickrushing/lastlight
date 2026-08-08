@@ -254,6 +254,36 @@ local ERA_PROFILES: { [number]: any } = {
     -- record. A 20-era save carries chapters that must survive, and must
     -- arrive in 21 with an unresolved finale and its light untouched --
     -- nobody had been down there, because there was no down there.
+    -- Schema 21 shipped the finale; 22 adds the rejoin ticket. A 21-era save
+    -- carries a resolved finale that must survive, and must arrive in 22 with
+    -- no ticket -- there were no parties to be a member of, so there is
+    -- nothing to be sent back to.
+    [21] = {
+        schemaVersion = 21,
+        createdAt = 40,
+        updatedAt = 120,
+        revision = 190,
+        tutorial = { stage = "complete", complete = true, selectedTool = "hammer" },
+        profession = { selectedId = "profession_warden" },
+        gear = { gear_warden_cudgel = 1 },
+        equipped = { weapon = "gear_warden_cudgel" },
+        story = {
+            chapterOne = {
+                completedAt = 44,
+                decision = "wild_regrowth",
+                status = "complete",
+                transactionId = "chapter_1:era21:hash:3",
+                wardenOutcome = "scarred",
+            },
+            finale = {
+                completedAt = 110,
+                ending = "ending_shared",
+                light = 40,
+                status = "complete",
+                transactionId = "finale:era21:hash:3",
+            },
+        },
+    },
     [20] = {
         schemaVersion = 20,
         createdAt = 36,
@@ -398,6 +428,7 @@ local REQUIRED_FIELDS: { string } = {
     "gearWear",
     "gearTraits",
     "quests",
+    "social",
 }
 
 local function assertCurrentShape(profile: any, label: string)
@@ -574,6 +605,36 @@ return {
                         label .. ": an invented tutorial stage survived migration"
                     )
                 end
+            end,
+        },
+        {
+            --[[
+                The rejoin ticket is the only saved field that resolves to a
+                teleport, so a forged one is a door into a world the forger
+                names. It has to arrive absent from every save written before
+                it existed, and unreadable from any save that invents one.
+            ]]
+            name = "no save written before parties arrives holding a rejoin ticket",
+            run = function()
+                for version = 1, Config.SaveSchemaVersion - 1 do
+                    local profile = SaveSchema.normalize(ERA_PROFILES[version], NOW)
+                    TestRunner.equal(
+                        SaveSchema.rejoinTicket(profile),
+                        nil,
+                        string.format("schema %d arrived holding a ticket", version)
+                    )
+                end
+
+                local forged = table.clone(ERA_PROFILES[21])
+                forged.social = {
+                    rejoin = {
+                        partyId = "party_1_1",
+                        accessCode = "",
+                        issuedAt = NOW,
+                        expiresAt = NOW + 10,
+                    },
+                }
+                TestRunner.equal(SaveSchema.rejoinTicket(SaveSchema.normalize(forged, NOW)), nil)
             end,
         },
         {

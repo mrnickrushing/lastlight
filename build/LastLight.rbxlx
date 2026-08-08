@@ -1068,6 +1068,11 @@ function ActionPayloadContract.extraField(runtimeIds: any, kind: string): string
         return "slot"
     elseif kind == actions.CompanionCommand then
         return "mode"
+    elseif kind == actions.PartyReply then
+        -- Yes or no to the one invitation a player can be holding. A player
+        -- holds at most one at a time, so the reply does not have to name
+        -- which -- which is what keeps this to a single field.
+        return "accept"
     end
     return nil
 end
@@ -4817,7 +4822,7 @@ return table.freeze({
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 21,
+    SaveSchemaVersion = 22,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -23476,6 +23481,710 @@ return table.freeze(OldGrowthEncounter)
       </Item>
       <Item class="ModuleScript" referent="73">
         <Properties>
+          <string name="Name">PartySession</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    A party is a named thing, and until now it was not one.
+
+    What the game has had since the lodge shipped is a platform: whoever is
+    standing on it when the countdown reaches zero boards, in whatever order
+    `Players:GetPlayers()` happened to return them, up to the size somebody
+    tapped. That is a party in the sense that several people left at once. It
+    is not a party in any sense that survives anything -- not a bystander who
+    wandered onto the dais and took the fourth seat, and certainly not a
+    disconnect, because a run server is reserved and a player who drops out of
+    one has no way to name the world their friends are still in.
+
+    So this module gives a departure an identity and a roster, and then gives
+    each member a ticket back to it.
+
+    Pure logic: no players, no TeleportService, no clock of its own. The
+    service layer owns who is physically present and what a user ID belongs
+    to; every rule about who may join, who boards first, and whether a
+    returning player may be sent back lives here so it can be tested without a
+    live game -- which matters more than usual, because reserved-server
+    teleports cannot be exercised in Studio at all.
+
+    The rules:
+
+      * **Membership is by invitation and acceptance, both.** An invite alone
+        does not put anyone in a party. This is the difference between a party
+        and the set of people standing near you, and it is also what makes a
+        block meaningful later: there is a moment where somebody says yes.
+      * **A party boards ahead of bystanders.** Capacity is spent on members
+        first, in roster order, and only then on whoever else is standing
+        there. A party of three that chose four seats can still pick up a
+        stranger; a party of four never loses a seat to one.
+      * **A leader who leaves hands over.** Dissolving a party because one
+        person stepped away punishes everyone else for it. The longest-
+        standing remaining member takes it, and only the last member out
+        dissolves anything.
+      * **The ticket the server holds and the fact the client sees are
+        different objects.** The ticket carries a reserved-server access code,
+        which is the whole key to a private world; the client is told only
+        that a rejoin is available and how big the party was. `publicTicket`
+        exists so that split is a function rather than a habit.
+      * **A stale ticket returns you to the lodge rather than into an empty
+        world.** Reserved servers outlive their parties; a code that still
+        resolves an hour after everybody left teleports a player alone into a
+        world with no one in it, which is a worse answer than the lobby.
+]]
+
+local PartySession = {}
+
+export type Member = {
+    userId: number,
+    joinedAt: number,
+}
+
+export type Invite = {
+    toUserId: number,
+    fromUserId: number,
+    expiresAt: number,
+}
+
+export type State = {
+    partyId: string,
+    leaderUserId: number,
+    members: { Member },
+    invites: { Invite },
+    departedAt: number,
+}
+
+export type Ticket = {
+    partyId: string,
+    accessCode: string,
+    partySize: number,
+    issuedAt: number,
+    expiresAt: number,
+}
+
+-- An invite that nobody answers should stop being an offer. Long enough to
+-- notice a toast and reach the button, short enough that a party formed
+-- twenty minutes ago is not still holding a seat open for somebody who walked
+-- away.
+local INVITE_SECONDS = 45
+
+--[[
+    How long a rejoin ticket is worth trying.
+
+    A run is not short, and a player who drops on a phone may take several
+    minutes to get back, so this is generous. It is not unbounded because the
+    failure mode at the far end is the bad one: a reserved server that has
+    emptied out still accepts a teleport, and arriving alone in the world your
+    party left an hour ago reads as the game breaking rather than as a rejoin.
+]]
+local REJOIN_SECONDS = 5400
+
+local MAX_ACCESS_CODE_LENGTH = 128
+local MAX_PARTY_ID_LENGTH = 64
+
+local function finite(value: any): boolean
+    return type(value) == "number" and value == value and value > -math.huge and value < math.huge
+end
+
+local function wholeAtLeast(value: any, minimum: number): boolean
+    return finite(value) and value >= minimum and value == math.floor(value)
+end
+
+local function isUserId(value: any): boolean
+    return wholeAtLeast(value, 1)
+end
+
+function PartySession.inviteSeconds(): number
+    return INVITE_SECONDS
+end
+
+function PartySession.rejoinSeconds(): number
+    return REJOIN_SECONDS
+end
+
+--[[
+    Start a party with one member, its leader.
+
+    The ID is derived rather than random so the module stays pure and its
+    tests stay readable. A leader can hold only one party at a time, so the
+    only way to collide is for the same person to form two parties inside the
+    same second, which the service layer refuses on its own by looking them up
+    before creating.
+]]
+function PartySession.create(leaderUserId: any, now: any): (State?, any)
+    if not isUserId(leaderUserId) then
+        return nil, { accepted = false, reason = "invalid_leader" }
+    end
+    if not finite(now) or now < 0 then
+        return nil, { accepted = false, reason = "invalid_time" }
+    end
+    return {
+        partyId = string.format("party_%d_%d", leaderUserId, math.floor(now)),
+        leaderUserId = leaderUserId,
+        members = { { userId = leaderUserId, joinedAt = now } },
+        invites = {},
+        departedAt = 0,
+    }, { accepted = true }
+end
+
+--[[
+    The party a departure forms out of whoever actually boarded.
+
+    This is the one path into a roster that does not go through an invitation,
+    and it is not a back door: standing on the dais while the countdown runs
+    out is the older and more physical form of the same consent, and it is the
+    one the game shipped with. What the invitation system decides is who
+    boards *first* and who gets asked at all -- not who is allowed to travel.
+
+    It matters that the travelling party is the boarding list rather than the
+    party formed at the lodge, because those can differ: a party of three that
+    chose four seats picks up a stranger, and the stranger is in that world
+    with them. A rejoin ticket has to name the world's population, not the
+    friendship group's, or the stranger has no way home.
+]]
+function PartySession.createForDeparture(userIds: any, now: any): (State?, any)
+    if type(userIds) ~= "table" then
+        return nil, { accepted = false, reason = "invalid_roster" }
+    end
+    if not finite(now) or now < 0 then
+        return nil, { accepted = false, reason = "invalid_time" }
+    end
+
+    local members: { Member } = {}
+    local seen: { [number]: boolean } = {}
+    for _, userId in userIds do
+        if isUserId(userId) and not seen[userId] then
+            seen[userId] = true
+            table.insert(members, { userId = userId, joinedAt = now })
+        end
+    end
+    if #members == 0 then
+        return nil, { accepted = false, reason = "empty_roster" }
+    end
+
+    return {
+        partyId = string.format("party_%d_%d", members[1].userId, math.floor(now)),
+        leaderUserId = members[1].userId,
+        members = members,
+        invites = {},
+        departedAt = 0,
+    }, { accepted = true, size = #members }
+end
+
+--[[
+    Bound whatever a caller hands in.
+
+    Party state never leaves the server and is never persisted, so this is not
+    guarding against a forged save -- it is guarding against a service passing
+    a table it built itself and got slightly wrong, which is the failure this
+    codebase has actually had. A state that cannot be read is empty, and an
+    empty party admits nobody.
+]]
+function PartySession.normalize(value: any): State?
+    if type(value) ~= "table" then
+        return nil
+    end
+    --[[
+        Bounded to the same length a ticket can carry. Without that agreement
+        a party could hold an ID it is able to issue tickets for and unable to
+        read them back, which is a way home that works right up until the
+        player uses it.
+    ]]
+    if
+        type(value.partyId) ~= "string"
+        or #value.partyId == 0
+        or #value.partyId > MAX_PARTY_ID_LENGTH
+    then
+        return nil
+    end
+    if not isUserId(value.leaderUserId) then
+        return nil
+    end
+    if type(value.members) ~= "table" then
+        return nil
+    end
+
+    local members: { Member } = {}
+    local seen: { [number]: boolean } = {}
+    for _, member in value.members do
+        if
+            type(member) == "table"
+            and isUserId(member.userId)
+            and finite(member.joinedAt)
+            and not seen[member.userId]
+        then
+            seen[member.userId] = true
+            table.insert(members, { userId = member.userId, joinedAt = member.joinedAt })
+        end
+    end
+    if not seen[value.leaderUserId] then
+        return nil
+    end
+
+    local invites: { Invite } = {}
+    if type(value.invites) == "table" then
+        local invited: { [number]: boolean } = {}
+        for _, invite in value.invites do
+            if
+                type(invite) == "table"
+                and isUserId(invite.toUserId)
+                and isUserId(invite.fromUserId)
+                and finite(invite.expiresAt)
+                and not invited[invite.toUserId]
+                and not seen[invite.toUserId]
+            then
+                invited[invite.toUserId] = true
+                table.insert(invites, {
+                    toUserId = invite.toUserId,
+                    fromUserId = invite.fromUserId,
+                    expiresAt = invite.expiresAt,
+                })
+            end
+        end
+    end
+
+    return {
+        partyId = value.partyId,
+        leaderUserId = value.leaderUserId,
+        members = members,
+        invites = invites,
+        departedAt = if finite(value.departedAt) and value.departedAt > 0
+            then value.departedAt
+            else 0,
+    }
+end
+
+function PartySession.isMember(state: any, userId: any): boolean
+    local current = PartySession.normalize(state)
+    if current == nil or not isUserId(userId) then
+        return false
+    end
+    for _, member in current.members do
+        if member.userId == userId then
+            return true
+        end
+    end
+    return false
+end
+
+function PartySession.size(state: any): number
+    local current = PartySession.normalize(state)
+    return if current == nil then 0 else #current.members
+end
+
+-- Roster order, leader first. This is the order capacity is spent in, so it
+-- is deliberately not the order people happened to accept in: whoever formed
+-- the party is the one person guaranteed a seat on it.
+function PartySession.memberIds(state: any): { number }
+    local current = PartySession.normalize(state)
+    if current == nil then
+        return {}
+    end
+    local ids = { current.leaderUserId }
+    for _, member in current.members do
+        if member.userId ~= current.leaderUserId then
+            table.insert(ids, member.userId)
+        end
+    end
+    return ids
+end
+
+function PartySession.pendingInvite(state: any, userId: any, now: any): Invite?
+    local current = PartySession.normalize(state)
+    if current == nil or not isUserId(userId) or not finite(now) then
+        return nil
+    end
+    for _, invite in current.invites do
+        if invite.toUserId == userId and invite.expiresAt > now then
+            return invite
+        end
+    end
+    return nil
+end
+
+local function withoutInvite(invites: { Invite }, userId: number, now: number): { Invite }
+    local kept: { Invite } = {}
+    for _, invite in invites do
+        -- Expired invites are swept here rather than by a timer. Nothing else
+        -- needs a tick, and an offer that has run out is indistinguishable
+        -- from one that was never made.
+        if invite.toUserId ~= userId and invite.expiresAt > now then
+            table.insert(kept, invite)
+        end
+    end
+    return kept
+end
+
+--[[
+    Offer a seat to somebody.
+
+    Any member may invite, not only the leader: a party at a departure
+    platform is a group of people standing together, and making three of them
+    route every introduction through a fourth is ceremony the situation does
+    not have. What only the leader can do is nothing, which is the point --
+    leadership here decides boarding order and nothing else.
+
+    A full party refuses rather than queueing. Invites deliberately do not
+    reserve seats, so two people accepting the last one is resolved at accept
+    time by whoever gets there first, and the loser is told the party is full
+    rather than being silently dropped.
+]]
+function PartySession.invite(
+    state: any,
+    fromUserId: any,
+    toUserId: any,
+    now: any,
+    maxSize: any
+): (State?, any)
+    local current = PartySession.normalize(state)
+    if current == nil then
+        return nil, { accepted = false, reason = "no_party" }
+    end
+    if not finite(now) or now < 0 then
+        return current, { accepted = false, reason = "invalid_time" }
+    end
+    if not wholeAtLeast(maxSize, 1) then
+        return current, { accepted = false, reason = "invalid_capacity" }
+    end
+    if not isUserId(toUserId) then
+        return current, { accepted = false, reason = "invalid_target" }
+    end
+    if not PartySession.isMember(current, fromUserId) then
+        return current, { accepted = false, reason = "not_a_member" }
+    end
+    if current.departedAt > 0 then
+        return current, { accepted = false, reason = "already_departed" }
+    end
+    if PartySession.isMember(current, toUserId) then
+        return current, { accepted = false, reason = "already_a_member" }
+    end
+    if #current.members >= maxSize then
+        return current, { accepted = false, reason = "party_full" }
+    end
+
+    local invites = withoutInvite(current.invites, toUserId, now)
+    table.insert(invites, {
+        toUserId = toUserId,
+        fromUserId = fromUserId,
+        expiresAt = now + INVITE_SECONDS,
+    })
+    return {
+        partyId = current.partyId,
+        leaderUserId = current.leaderUserId,
+        members = current.members,
+        invites = invites,
+        departedAt = current.departedAt,
+    }, { accepted = true, expiresAt = now + INVITE_SECONDS }
+end
+
+function PartySession.accept(state: any, userId: any, now: any, maxSize: any): (State?, any)
+    local current = PartySession.normalize(state)
+    if current == nil then
+        return nil, { accepted = false, reason = "no_party" }
+    end
+    if not finite(now) or now < 0 then
+        return current, { accepted = false, reason = "invalid_time" }
+    end
+    if not wholeAtLeast(maxSize, 1) then
+        return current, { accepted = false, reason = "invalid_capacity" }
+    end
+    if PartySession.pendingInvite(current, userId, now) == nil then
+        return current, { accepted = false, reason = "no_invite" }
+    end
+    if current.departedAt > 0 then
+        return current, { accepted = false, reason = "already_departed" }
+    end
+    if #current.members >= maxSize then
+        return current, { accepted = false, reason = "party_full" }
+    end
+
+    local members = table.clone(current.members)
+    table.insert(members, { userId = userId, joinedAt = now })
+    return {
+        partyId = current.partyId,
+        leaderUserId = current.leaderUserId,
+        members = members,
+        invites = withoutInvite(current.invites, userId, now),
+        departedAt = current.departedAt,
+    }, { accepted = true, size = #members }
+end
+
+function PartySession.decline(state: any, userId: any, now: any): (State?, any)
+    local current = PartySession.normalize(state)
+    if current == nil then
+        return nil, { accepted = false, reason = "no_party" }
+    end
+    if not finite(now) or not isUserId(userId) then
+        return current, { accepted = false, reason = "invalid_time" }
+    end
+    if PartySession.pendingInvite(current, userId, now) == nil then
+        return current, { accepted = false, reason = "no_invite" }
+    end
+    return {
+        partyId = current.partyId,
+        leaderUserId = current.leaderUserId,
+        members = current.members,
+        invites = withoutInvite(current.invites, userId, now),
+        departedAt = current.departedAt,
+    }, { accepted = true }
+end
+
+--[[
+    Leave, including as the leader.
+
+    Handover goes to the longest-standing remaining member rather than to
+    whoever is alphabetically first or last to arrive, because the party's own
+    history is the only ordering that means anything: the person who has been
+    in it longest is the one most likely to know what it was formed to do.
+
+    The last member out dissolves the party, and `dissolved` says so, so the
+    service can drop it rather than keeping an empty roster that would gladly
+    accept an invite.
+]]
+function PartySession.leave(state: any, userId: any, now: any): (State?, any)
+    local current = PartySession.normalize(state)
+    if current == nil then
+        return nil, { accepted = false, reason = "no_party" }
+    end
+    if not finite(now) then
+        return current, { accepted = false, reason = "invalid_time" }
+    end
+    if not PartySession.isMember(current, userId) then
+        return current, { accepted = false, reason = "not_a_member" }
+    end
+
+    local members: { Member } = {}
+    for _, member in current.members do
+        if member.userId ~= userId then
+            table.insert(members, member)
+        end
+    end
+    if #members == 0 then
+        return nil, { accepted = true, dissolved = true }
+    end
+
+    local leaderUserId = current.leaderUserId
+    local handedTo: number? = nil
+    if leaderUserId == userId then
+        local longest = members[1]
+        for _, member in members do
+            if member.joinedAt < longest.joinedAt then
+                longest = member
+            end
+        end
+        leaderUserId = longest.userId
+        handedTo = leaderUserId
+    end
+
+    return {
+        partyId = current.partyId,
+        leaderUserId = leaderUserId,
+        members = members,
+        invites = withoutInvite(current.invites, if isUserId(userId) then userId else 0, now),
+        departedAt = current.departedAt,
+    }, { accepted = true, dissolved = false, handedTo = handedTo }
+end
+
+--[[
+    Seal a party at the moment it leaves.
+
+    A departed party stops taking invitations for the obvious reason -- there
+    is no longer any way to reach it from the lodge -- but the roster stays
+    intact, because that is what the rejoin tickets are checked against.
+]]
+function PartySession.depart(state: any, now: any): (State?, any)
+    local current = PartySession.normalize(state)
+    if current == nil then
+        return nil, { accepted = false, reason = "no_party" }
+    end
+    if not finite(now) or now < 0 then
+        return current, { accepted = false, reason = "invalid_time" }
+    end
+    if current.departedAt > 0 then
+        return current, { accepted = false, reason = "already_departed" }
+    end
+    return {
+        partyId = current.partyId,
+        leaderUserId = current.leaderUserId,
+        members = current.members,
+        invites = {},
+        departedAt = now,
+    }, { accepted = true }
+end
+
+--[[
+    Who boards, in what order, out of everyone standing on the platform.
+
+    `candidates` is the service's own reading of the dais, in whatever order
+    it found them; `capacity` is what the chosen party size allows. Members go
+    first in roster order, then everyone else in the order given. Nobody who
+    is not standing there is ever returned, whatever the roster says: the
+    platform is still the authority on presence, and this only re-orders what
+    it reports.
+]]
+function PartySession.boardingOrder(state: any, candidates: any, capacity: any): { number }
+    local ordered: { number } = {}
+    if type(candidates) ~= "table" or not wholeAtLeast(capacity, 0) then
+        return ordered
+    end
+
+    local present: { [number]: boolean } = {}
+    for _, userId in candidates do
+        if isUserId(userId) then
+            present[userId] = true
+        end
+    end
+
+    local taken: { [number]: boolean } = {}
+    for _, userId in PartySession.memberIds(state) do
+        if present[userId] and not taken[userId] and #ordered < capacity then
+            taken[userId] = true
+            table.insert(ordered, userId)
+        end
+    end
+    for _, userId in candidates do
+        if isUserId(userId) and not taken[userId] and #ordered < capacity then
+            taken[userId] = true
+            table.insert(ordered, userId)
+        end
+    end
+    return ordered
+end
+
+--[[
+    The ticket a member carries home.
+
+    `accessCode` is a reserved-server access code: the entire key to a private
+    world. It is written to the profile, which is server-owned storage, and it
+    must never reach a client -- see `publicTicket`, which is the shape that
+    may. Issuing one for a non-member is refused rather than clamped, because
+    a ticket handed to the wrong person is a door into somebody else's run.
+]]
+function PartySession.issueTicket(
+    state: any,
+    userId: any,
+    accessCode: any,
+    now: any
+): (Ticket?, any)
+    local current = PartySession.normalize(state)
+    if current == nil then
+        return nil, { accepted = false, reason = "no_party" }
+    end
+    if not PartySession.isMember(current, userId) then
+        return nil, { accepted = false, reason = "not_a_member" }
+    end
+    if type(accessCode) ~= "string" or #accessCode == 0 or #accessCode > MAX_ACCESS_CODE_LENGTH then
+        return nil, { accepted = false, reason = "invalid_access_code" }
+    end
+    if not finite(now) or now < 0 then
+        return nil, { accepted = false, reason = "invalid_time" }
+    end
+    return {
+        partyId = current.partyId,
+        accessCode = accessCode,
+        partySize = #current.members,
+        issuedAt = now,
+        expiresAt = now + REJOIN_SECONDS,
+    }, { accepted = true }
+end
+
+--[[
+    Bound a ticket read back off a save.
+
+    This one IS guarding against a forged profile, unlike `normalize` above:
+    the ticket persists, so it comes back through the same door every other
+    saved field does. Anything malformed is no ticket at all, which lands the
+    player in the lodge -- the same safe direction `RunHandoff` takes with an
+    unreadable teleport payload, and for the same reason.
+]]
+function PartySession.normalizeTicket(value: any): Ticket?
+    if type(value) ~= "table" then
+        return nil
+    end
+    if
+        type(value.partyId) ~= "string"
+        or #value.partyId == 0
+        or #value.partyId > MAX_PARTY_ID_LENGTH
+    then
+        return nil
+    end
+    if
+        type(value.accessCode) ~= "string"
+        or #value.accessCode == 0
+        or #value.accessCode > MAX_ACCESS_CODE_LENGTH
+    then
+        return nil
+    end
+    if not finite(value.issuedAt) or value.issuedAt < 0 then
+        return nil
+    end
+    if not finite(value.expiresAt) or value.expiresAt <= value.issuedAt then
+        return nil
+    end
+    return {
+        partyId = value.partyId,
+        accessCode = value.accessCode,
+        partySize = if wholeAtLeast(value.partySize, 1) then value.partySize else 1,
+        issuedAt = value.issuedAt,
+        expiresAt = value.expiresAt,
+    }
+end
+
+--[[
+    Whether a returning player may be sent back, and where.
+
+    `currentPartyId` is the party this server already belongs to, if any: a
+    run server adopts its identity from the teleport payload, so a member
+    landing back in the world their ticket names has arrived rather than
+    needing to be sent, and forwarding them again would be a loop.
+]]
+function PartySession.readTicket(ticket: any, now: any, currentPartyId: any): any
+    local bounded = PartySession.normalizeTicket(ticket)
+    if bounded == nil then
+        return { rejoin = false, reason = "no_ticket" }
+    end
+    if not finite(now) then
+        return { rejoin = false, reason = "invalid_time" }
+    end
+    if bounded.expiresAt <= now then
+        return { rejoin = false, reason = "expired" }
+    end
+    if type(currentPartyId) == "string" and currentPartyId == bounded.partyId then
+        return { rejoin = false, reason = "already_here" }
+    end
+    return {
+        rejoin = true,
+        partyId = bounded.partyId,
+        accessCode = bounded.accessCode,
+        partySize = bounded.partySize,
+    }
+end
+
+--[[
+    The half of a ticket a client may be told.
+
+    Everything here is presentation: that a rejoin is on offer, how many
+    people were in the party, how long the offer lasts. The access code is
+    absent by construction rather than by remembering to omit it, which is the
+    only version of that rule that survives somebody adding a field later.
+]]
+function PartySession.publicTicket(ticket: any, now: any, currentPartyId: any): any?
+    local read = PartySession.readTicket(ticket, now, currentPartyId)
+    if not read.rejoin then
+        return nil
+    end
+    local bounded = PartySession.normalizeTicket(ticket) :: Ticket
+    return {
+        available = true,
+        partySize = read.partySize,
+        secondsRemaining = math.max(0, math.floor(bounded.expiresAt - now)),
+    }
+end
+
+return table.freeze(PartySession)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="74">
+        <Properties>
           <string name="Name">PerformanceBudget</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -23863,7 +24572,7 @@ return table.freeze(PerformanceBudget)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="74">
+      <Item class="ModuleScript" referent="75">
         <Properties>
           <string name="Name">ProfessionAbilityVisuals</string>
           <string name="Source"><![CDATA[--!strict
@@ -23957,7 +24666,7 @@ return table.freeze(ProfessionAbilityVisuals)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="75">
+      <Item class="ModuleScript" referent="76">
         <Properties>
           <string name="Name">ProfessionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -24123,7 +24832,7 @@ return table.freeze(ProfessionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="76">
+      <Item class="ModuleScript" referent="77">
         <Properties>
           <string name="Name">ProfessionMastery</string>
           <string name="Source"><![CDATA[--!strict
@@ -24564,7 +25273,7 @@ return table.freeze(ProfessionMastery)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="77">
+      <Item class="ModuleScript" referent="78">
         <Properties>
           <string name="Name">ProfessionRescue</string>
           <string name="Source"><![CDATA[--!strict
@@ -24643,7 +25352,7 @@ return table.freeze(ProfessionRescue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="78">
+      <Item class="ModuleScript" referent="79">
         <Properties>
           <string name="Name">ProfessionState</string>
           <string name="Source"><![CDATA[--!strict
@@ -24810,7 +25519,7 @@ return table.freeze(ProfessionState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="79">
+      <Item class="ModuleScript" referent="80">
         <Properties>
           <string name="Name">ProfileBackup</string>
           <string name="Source"><![CDATA[--!strict
@@ -25124,7 +25833,7 @@ return table.freeze(ProfileBackup)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="80">
+      <Item class="ModuleScript" referent="81">
         <Properties>
           <string name="Name">ProfilePersistence</string>
           <string name="Source"><![CDATA[--!strict
@@ -25298,7 +26007,7 @@ return table.freeze(ProfilePersistence)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="81">
+      <Item class="ModuleScript" referent="82">
         <Properties>
           <string name="Name">QuestCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -25855,7 +26564,7 @@ return table.freeze(QuestCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="82">
+      <Item class="ModuleScript" referent="83">
         <Properties>
           <string name="Name">Quests</string>
           <string name="Source"><![CDATA[--!strict
@@ -26047,7 +26756,7 @@ return table.freeze(Quests)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="83">
+      <Item class="ModuleScript" referent="84">
         <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
@@ -26106,7 +26815,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="84">
+      <Item class="ModuleScript" referent="85">
         <Properties>
           <string name="Name">RegionAccess</string>
           <string name="Source"><![CDATA[--!strict
@@ -26250,7 +26959,7 @@ return table.freeze(RegionAccess)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="85">
+      <Item class="ModuleScript" referent="86">
         <Properties>
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
@@ -26504,7 +27213,7 @@ return table.freeze(ResidentDialogue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="86">
+      <Item class="ModuleScript" referent="87">
         <Properties>
           <string name="Name">ResidentLife</string>
           <string name="Source"><![CDATA[--!strict
@@ -26827,7 +27536,7 @@ return table.freeze(ResidentLife)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="87">
+      <Item class="ModuleScript" referent="88">
         <Properties>
           <string name="Name">ResidentRoster</string>
           <string name="Source"><![CDATA[--!strict
@@ -27461,7 +28170,7 @@ return table.freeze(ResidentRoster)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="88">
+      <Item class="ModuleScript" referent="89">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -27576,7 +28285,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="89">
+      <Item class="ModuleScript" referent="90">
         <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -27604,6 +28313,12 @@ return table.freeze(ReviveFlow)
         staging state is worse than a party that never left.
       * The party size that was chosen travels with the payload so the run
         server can bound its own population without asking the lobby.
+      * **The party's ID travels too, and is the only reason it is here.** A
+        run server that knows which party it belongs to can recognise one of
+        its own members arriving on a rejoin ticket and leave them where they
+        landed, instead of forwarding them to the world they are standing in.
+        Like everything else in the payload it is inert: it names a party, it
+        does not prove membership of one, and nothing is granted on it.
 ]]
 
 local RunHandoff = {}
@@ -27613,11 +28328,19 @@ export type Payload = {
     kind: string,
     partySize: number,
     departedAt: number,
+    partyId: string?,
 }
 
-local SCHEMA_VERSION = 1
+--[[
+    Bumped to 2 when the party ID joined the payload. A server mid-flight
+    across a deploy carries a version-1 payload, which now reads as a
+    mismatch and resolves to a lobby -- the safe direction the whole module
+    is built on, and the reason the version is checked before anything else.
+]]
+local SCHEMA_VERSION = 2
 local RUN_KIND = "last_light_run"
 local MAX_PARTY_SIZE = 8
+local MAX_PARTY_ID_LENGTH = 64
 
 local function finite(value: any): boolean
     return type(value) == "number" and value == value and value > -math.huge and value < math.huge
@@ -27635,25 +28358,38 @@ function RunHandoff.runKind(): string
     return RUN_KIND
 end
 
+local function isPartyId(value: any): boolean
+    return type(value) == "string" and #value > 0 and #value <= MAX_PARTY_ID_LENGTH
+end
+
 --[[
     Build the payload a departing party carries to its run server.
 
     `partySize` is the size the lobby actually launched, not the size that was
     requested, so a party that shrank on the platform arrives described
     correctly.
+
+    `partyId` is optional because this module has to keep working for a
+    departure that formed no party -- one player stepping onto the platform
+    and tapping a number is still a run, and refusing it for want of a roster
+    would be the party system taking something away.
 ]]
-function RunHandoff.buildPayload(partySize: any, now: any): (Payload?, any)
+function RunHandoff.buildPayload(partySize: any, now: any, partyId: any): (Payload?, any)
     if not wholeBetween(partySize, 1, MAX_PARTY_SIZE) then
         return nil, { accepted = false, reason = "invalid_party_size" }
     end
     if not finite(now) or now < 0 then
         return nil, { accepted = false, reason = "invalid_time" }
     end
+    if partyId ~= nil and not isPartyId(partyId) then
+        return nil, { accepted = false, reason = "invalid_party_id" }
+    end
     return {
         schemaVersion = SCHEMA_VERSION,
         kind = RUN_KIND,
         partySize = partySize,
         departedAt = now,
+        partyId = partyId,
     }, { accepted = true }
 end
 
@@ -27681,7 +28417,18 @@ function RunHandoff.readPayload(value: any): any
     if not finite(value.departedAt) or value.departedAt < 0 then
         return { isRun = false, reason = "invalid_time" }
     end
-    return { isRun = true, partySize = value.partySize, departedAt = value.departedAt }
+    --[[
+        An unreadable party ID is dropped rather than rejected. The run is
+        still a run; what is lost is only the server's ability to recognise
+        its own returning members, and refusing the whole payload over that
+        would strand a party in the lodge to protect a convenience.
+    ]]
+    return {
+        isRun = true,
+        partySize = value.partySize,
+        departedAt = value.departedAt,
+        partyId = if isPartyId(value.partyId) then value.partyId else nil,
+    }
 end
 
 --[[
@@ -27705,7 +28452,7 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="90">
+      <Item class="ModuleScript" referent="91">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -27806,6 +28553,22 @@ local RuntimeIds = {
         SelectProfessionSpecialization = "select_profession_specialization",
         ContributeConstruction = "contribute_construction",
         RecoverMemoryFragment = "recover_memory_fragment",
+        --[[
+            Parties. Four kinds rather than one because they are four
+            different questions, and folding them into a mode field would
+            put a target and a verb in the same payload -- which is two
+            extra fields, and the one-extra-field rule is the wall that
+            #219 was found against.
+
+            PartyInvite carries nothing at all on purpose: it offers a seat
+            to whoever is standing on the departure platform, measured
+            server-side, so a press cannot name a stranger across the map
+            and cannot be forged into naming one.
+        ]]
+        PartyInvite = "party_invite",
+        PartyReply = "party_reply",
+        PartyLeave = "party_leave",
+        PartyRejoin = "party_rejoin",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -27866,7 +28629,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="91">
+      <Item class="ModuleScript" referent="92">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -27880,6 +28643,7 @@ local Crafting = require("./Crafting")
 local HollowFinale = require("./Content/Definitions/HollowFinale")
 local NamelessNight = require("./NamelessNightEncounter")
 local MemoryFragments = require("./MemoryFragments")
+local PartySession = require("./PartySession")
 local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
@@ -27962,6 +28726,22 @@ export type Profile = {
     quests: {
         claimed: { [string]: boolean },
     },
+    --[[
+        Everything about this player's relationship to other players. One
+        field so far: the ticket back to the party they were with when they
+        dropped. It is a block rather than a bare `rejoin` because the rest of
+        Milestone 11 arrives here too -- a visit policy, a block list -- and a
+        second migration to make room for them would be a migration spent on
+        tidying.
+
+        The ticket holds a reserved-server access code, which is the whole key
+        to a private world. It is written here because a profile is server-
+        owned storage; it must never be put in a snapshot. PartySession's
+        `publicTicket` is the shape a client may see.
+    ]]
+    social: {
+        rejoin: PartySession.Ticket?,
+    },
 }
 
 local MAX_NIGHT_NUMBER = 1_000_000
@@ -27979,7 +28759,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 21,
+        schemaVersion = 22,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -28030,6 +28810,9 @@ function SaveSchema.default(now: number): Profile
         equipped = Equipment.default(),
         quests = {
             claimed = Quests.default(),
+        },
+        social = {
+            rejoin = nil,
         },
     }
 end
@@ -28302,7 +29085,22 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.quests.claimed =
         Quests.normalizeClaimed(if type(quests) == "table" then quests.claimed else nil)
 
-    profile.schemaVersion = 21
+    --[[
+        Schema 22: the rejoin ticket. A pre-22 save arrives with none, which
+        is the truthful migration -- there were no parties to be a member of,
+        so there is nothing anyone should be sent back to.
+
+        The bounding is PartySession's, not a copy of it, and it is strict:
+        an unreadable ticket is no ticket. A ticket is the one saved field
+        that resolves to a teleport, so the cost of accepting a bad one is a
+        player thrown at a world that may not be theirs, and the cost of
+        refusing a good one is that they walk to the platform again.
+    ]]
+    profile.social.rejoin = PartySession.normalizeTicket(
+        if type(value.social) == "table" then value.social.rejoin else nil
+    )
+
+    profile.schemaVersion = 22
     return profile
 end
 
@@ -28751,6 +29549,44 @@ end
 
 function SaveSchema.nightNumber(profile: Profile): number
     return profile.town.nightNumber
+end
+
+--[[
+    Write, or clear, the ticket back to the party this player left with.
+
+    Passing nil clears it, which is the call made the moment a rejoin is
+    spent or refused: a ticket that outlives its usefulness is an offer the
+    lodge keeps making for a world that has emptied out.
+
+    The ticket is bounded on the way in as well as on the way out. It is
+    handed over by a service that built it from a teleport call's return
+    value, and a reserved-server code that came back as something other than
+    a string should stop here rather than at the next load.
+
+    Clearing is nil and only nil. A malformed ticket is refused outright
+    rather than treated as a clear, because those two look identical here and
+    are opposite in effect: one is a player who has arrived home, the other is
+    a bad write that would silently take away the way back from a player who
+    still has one.
+]]
+function SaveSchema.withRejoinTicket(profile: Profile, ticket: any, now: number): Profile
+    local bounded = if ticket == nil then nil else PartySession.normalizeTicket(ticket)
+    if ticket ~= nil and bounded == nil then
+        return profile
+    end
+    if bounded == nil and profile.social.rejoin == nil then
+        return profile
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.social = table.clone(profile.social)
+    nextProfile.social.rejoin = bounded
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile
+end
+
+function SaveSchema.rejoinTicket(profile: Profile): any
+    return profile.social.rejoin
 end
 
 -- Whether two condition states describe the same town. Compared building by
@@ -29358,7 +30194,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="92">
+      <Item class="ModuleScript" referent="93">
         <Properties>
           <string name="Name">SfxCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -29525,7 +30361,7 @@ return table.freeze(SfxCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="93">
+      <Item class="ModuleScript" referent="94">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -29669,7 +30505,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="94">
+      <Item class="ModuleScript" referent="95">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -29926,7 +30762,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="95">
+      <Item class="ModuleScript" referent="96">
         <Properties>
           <string name="Name">TempestEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -30204,7 +31040,7 @@ return table.freeze(TempestEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="96">
+      <Item class="ModuleScript" referent="97">
         <Properties>
           <string name="Name">TideboundTitanEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -30635,7 +31471,7 @@ return table.freeze(TideboundTitanEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="97">
+      <Item class="ModuleScript" referent="98">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -30779,7 +31615,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="98">
+      <Item class="ModuleScript" referent="99">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -31189,7 +32025,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="99">
+      <Item class="ModuleScript" referent="100">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -31370,7 +32206,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="100">
+      <Item class="ModuleScript" referent="101">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -31434,7 +32270,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="101">
+      <Item class="ModuleScript" referent="102">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -31608,7 +32444,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="102">
+      <Item class="ModuleScript" referent="103">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -31700,7 +32536,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="103">
+      <Item class="ModuleScript" referent="104">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -31912,7 +32748,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="104">
+      <Item class="ModuleScript" referent="105">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -32090,7 +32926,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="105">
+      <Item class="ModuleScript" referent="106">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -32243,7 +33079,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="106">
+      <Item class="ModuleScript" referent="107">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -32576,7 +33412,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="107">
+      <Item class="ModuleScript" referent="108">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -32738,7 +33574,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="108">
+      <Item class="ModuleScript" referent="109">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -32774,7 +33610,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="109">
+      <Item class="ModuleScript" referent="110">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -33156,7 +33992,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="110">
+      <Item class="ModuleScript" referent="111">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -33226,7 +34062,7 @@ return table.freeze(WeatherProfile)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="111">
+      <Item class="ModuleScript" referent="112">
         <Properties>
           <string name="Name">WhiteHowlerEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -33690,11 +34526,11 @@ return table.freeze(WhiteHowlerEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="112">
+  <Item class="ServerScriptService" referent="113">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="113">
+    <Item class="Script" referent="114">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -33761,6 +34597,7 @@ local ProfilePersistence = require(root.ProfilePersistence)
 local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
 local RunHandoff = require(root.RunHandoff)
+local PartySession = require(root.PartySession)
 local AdminRoster = require(root.AdminRoster)
 local TownDecorations = require(root.TownDecorations)
 local TownProgression = require(root.TownProgression)
@@ -33785,6 +34622,7 @@ local PhaseService = require(script.Services.PhaseService)
 local ProfileService = require(script.Services.ProfileService)
 local TownNightService = require(script.Services.TownNightService)
 local LobbyService = require(script.Services.LobbyService)
+local PartyService = require(script.Services.PartyService)
 local AdminService = require(script.Services.AdminService)
 local CompanionService = require(script.Services.CompanionService)
 local DefenseService = require(script.Services.DefenseService)
@@ -33997,6 +34835,19 @@ local lobbyService = LobbyService.new(
     worldService,
     analyticsService
 )
+--[[
+    Parties, and the way back to one. LobbyService measures who is standing on
+    the departure platform every tick already, so the party service reads that
+    rather than measuring the dais a second time: an invitation and a boarding
+    pass have to agree about who was there, and two independent measurements
+    is how they stop agreeing.
+]]
+local partyService =
+    PartyService.new(logger, Config, PartySession, profileService, analyticsService)
+partyService:setPlatformProvider(function(): { Player }
+    return lobbyService:readyPlayers(lobbyService)
+end)
+lobbyService:setPartyService(partyService)
 local performanceService = PerformanceService.new(logger, Config, PerformanceBudget)
 local adminService = AdminService.new(
     logger,
@@ -34107,6 +34958,7 @@ services:register(townNightService)
 services:register(companionService)
 services:register(defenseService)
 services:register(regionEncounterService)
+services:register(partyService)
 -- Without this the departure countdown never reached a client: LobbyService
 -- published every whole second into a handler nobody had set, so the panel
 -- froze at "DEPARTING IN 10" while the server counted down and launched.
@@ -34117,6 +34969,14 @@ worldService:setClickHandler(function(clicker: Player, interactionId: string)
     tutorialService:interactFromClick(clicker, interactionId)
 end)
 tutorialService:setCompanionService(companionService)
+tutorialService:setPartyService(partyService)
+partyService:setToastHandler(function(player: Player?, message: string)
+    if player ~= nil then
+        tutorialService:toastPlayer(player, message)
+    else
+        tutorialService:toastEveryone(message)
+    end
+end)
 --[[
     Passive gear wears from the blows it softens: one point per mitigated
     hit, against the weapon's two per landed strike -- you strike more
@@ -34193,7 +35053,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="114">
+      <Item class="ModuleScript" referent="115">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -34291,11 +35151,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="115">
+      <Item class="Folder" referent="116">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="116">
+        <Item class="ModuleScript" referent="117">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -34910,7 +35770,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="117">
+        <Item class="ModuleScript" referent="118">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -35781,7 +36641,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="118">
+        <Item class="ModuleScript" referent="119">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -36282,7 +37142,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="119">
+        <Item class="ModuleScript" referent="120">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -36553,7 +37413,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="120">
+        <Item class="ModuleScript" referent="121">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -36973,7 +37833,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="121">
+        <Item class="ModuleScript" referent="122">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -38657,7 +39517,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="122">
+        <Item class="ModuleScript" referent="123">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -39371,7 +40231,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="123">
+        <Item class="ModuleScript" referent="124">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -39475,7 +40335,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="124">
+        <Item class="ModuleScript" referent="125">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -39784,7 +40644,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="125">
+        <Item class="ModuleScript" referent="126">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -39827,6 +40687,7 @@ export type LobbyService = typeof(setmetatable(
         _featureFlags: any,
         _worldService: any,
         _analyticsService: any,
+        _partyService: any,
         _state: any,
         _departed: { [Player]: boolean },
         _onChanged: ((string?) -> ())?,
@@ -39857,6 +40718,7 @@ function LobbyService.new(
         _featureFlags = featureFlags,
         _worldService = worldService,
         _analyticsService = analyticsService,
+        _partyService = nil,
         _state = lobbyDeparture.create(),
         _departed = {},
         _onChanged = nil,
@@ -39869,6 +40731,19 @@ function LobbyService.Init(_self: LobbyService, _context: any) end
 
 function LobbyService.setChangedHandler(self: LobbyService, callback: (string?) -> ())
     self._onChanged = callback
+end
+
+--[[
+    Parties, if this server has them.
+
+    Optional on purpose. Everything below works without a party service and
+    behaves exactly as it did before parties existed: seats are spent in the
+    order the platform reports them, a departure carries no party ID, and
+    nobody is issued a ticket home. What a party adds is an ordering and a way
+    back, not a requirement.
+]]
+function LobbyService.setPartyService(self: LobbyService, partyService: any)
+    self._partyService = partyService
 end
 
 function LobbyService._notify(self: LobbyService, message: string?)
@@ -40022,6 +40897,13 @@ function LobbyService._adoptArrival(self: LobbyService, player: Player)
         self._isRunServer = true
         self._logger:info("run_server_adopted", { partySize = read.partySize })
     end
+    -- A run server that knows which party it belongs to can recognise one of
+    -- its own members coming back on a rejoin ticket and leave them where
+    -- they landed, rather than forwarding them into the world they are
+    -- already standing in.
+    if read.partyId ~= nil and self._partyService ~= nil then
+        self._partyService:adoptRun(read.partyId)
+    end
     -- Departed players skip the lodge: the existing respawn path puts them at
     -- the arrival clearing and keeps them there.
     self._departed[player] = true
@@ -40047,7 +40929,20 @@ function LobbyService._teleportParty(self: LobbyService, boarding: { Player }): 
         return false
     end
 
-    local payload, built = self._runHandoff.buildPayload(#boarding, workspace:GetServerTimeNow())
+    --[[
+        The party is formed before the server is reserved, because its ID has
+        to ride the payload, and the tickets are written after the code comes
+        back but before anybody is sent. That order is load-bearing in both
+        directions: a ticket written after the teleport is written to a
+        profile nobody is holding any more.
+    ]]
+    local partyId: string? = nil
+    if self._partyService ~= nil then
+        partyId = self._partyService:formDeparture(boarding)
+    end
+
+    local payload, built =
+        self._runHandoff.buildPayload(#boarding, workspace:GetServerTimeNow(), partyId)
     if payload == nil then
         self._logger:warn("run_teleport_payload_invalid", { reason = built.reason })
         return false
@@ -40059,6 +40954,10 @@ function LobbyService._teleportParty(self: LobbyService, boarding: { Player }): 
     if not reserved or type(accessCode) ~= "string" then
         self:_recoverFromTeleportFailure(boarding, "reserve_failed")
         return true
+    end
+
+    if partyId ~= nil and self._partyService ~= nil then
+        self._partyService:issueTickets(partyId, boarding, accessCode)
     end
 
     local options = Instance.new("TeleportOptions")
@@ -40161,9 +41060,20 @@ function LobbyService.Start(self: LobbyService)
         self._state = nextState
 
         if result.launch then
+            --[[
+                Seats used to be spent in whatever order the engine listed
+                players, so a bystander standing on the dais could take one
+                from somebody's party. A party is asked first now; without
+                one this is the same list it always was.
+            ]]
+            local capacity = math.min(result.capacity, #ready)
             local boarding = {}
-            for index = 1, math.min(result.capacity, #ready) do
-                table.insert(boarding, ready[index])
+            if self._partyService ~= nil then
+                boarding = self._partyService:boardingOrder(ready, capacity)
+            else
+                for index = 1, capacity do
+                    table.insert(boarding, ready[index])
+                end
             end
             self:_launch(boarding)
             self._lastPublishedSeconds = -1
@@ -40190,7 +41100,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="126">
+        <Item class="ModuleScript" referent="127">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -40284,7 +41194,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="127">
+        <Item class="ModuleScript" referent="128">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -40502,7 +41412,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="128">
+        <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41372,7 +42282,622 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="129">
+        <Item class="ModuleScript" referent="130">
+          <Properties>
+            <string name="Name">PartyService</string>
+            <string name="Source"><![CDATA[--!strict
+
+--[[
+    Parties at the lodge, and the way back to one.
+
+    All the rules about who may join, who boards first and whether a returning
+    player may be sent anywhere live in the pure PartySession module. This
+    service owns only the parts that need the running game: which Player owns
+    which user ID, who is physically standing on the departure platform, the
+    profile write that persists a rejoin ticket, and the teleport that spends
+    one.
+
+    Two things it is deliberately careful about:
+
+      * **The access code never leaves the server.** A rejoin ticket carries
+        a reserved-server access code, which is the entire key to a private
+        world. It is written to the profile, which is server-owned storage,
+        and the only thing that reaches a client is PartySession.publicTicket
+        -- available, party size, seconds left. Nothing here builds a snapshot
+        field by hand out of a ticket, because that is the version of this
+        rule that stops being true the first time somebody adds a field.
+      * **An invitation names nobody.** The invite press carries no payload at
+        all: it offers a seat to whoever the server can see standing on the
+        platform. A press cannot be forged into naming a stranger across the
+        map, because there is no name in it to forge.
+]]
+
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+
+local PartyService = {}
+PartyService.__index = PartyService
+PartyService.Name = "PartyService"
+
+export type Logger = {
+    info: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+    warn: (self: Logger, event: string, fields: { [string]: any }?) -> (),
+}
+
+export type PartyService = typeof(setmetatable(
+    {} :: {
+        Name: string,
+        _logger: Logger,
+        _config: any,
+        _partySession: any,
+        _profileService: any,
+        _analyticsService: any,
+        _parties: { [string]: any },
+        _partyByUser: { [number]: string },
+        _inviteByUser: { [number]: string },
+        --[[
+            The party that is mid-launch, held in one slot rather than added
+            to `_parties`. A departure is sealed and then never touched again,
+            so filing it with the live rosters would grow that table by one
+            per launch for the life of the server and nothing would ever read
+            the entries. One slot is enough because the platform launches one
+            party at a time, and an unclaimed one is simply overwritten by the
+            next.
+        ]]
+        _departing: any,
+        _runPartyId: string?,
+        _onToast: ((Player?, string) -> ())?,
+        _platformProvider: (() -> { Player })?,
+    },
+    PartyService
+))
+
+function PartyService.new(
+    logger: Logger,
+    config: any,
+    partySession: any,
+    profileService: any,
+    analyticsService: any
+): PartyService
+    return setmetatable({
+        Name = PartyService.Name,
+        _logger = logger,
+        _config = config,
+        _partySession = partySession,
+        _profileService = profileService,
+        _analyticsService = analyticsService,
+        _parties = {},
+        _partyByUser = {},
+        _inviteByUser = {},
+        _departing = nil,
+        _runPartyId = nil,
+        _onToast = nil,
+        _platformProvider = nil,
+    }, PartyService)
+end
+
+function PartyService.Init(_self: PartyService, _context: any) end
+
+function PartyService.setToastHandler(self: PartyService, callback: (Player?, string) -> ())
+    self._onToast = callback
+end
+
+--[[
+    Who the server can see standing on the departure platform.
+
+    Supplied by LobbyService, which already measures occupancy from character
+    positions every tick. Asking it rather than measuring again means an
+    invitation and a boarding pass always agree about who is on the dais.
+]]
+function PartyService.setPlatformProvider(self: PartyService, provider: () -> { Player })
+    self._platformProvider = provider
+end
+
+function PartyService._toast(self: PartyService, player: Player?, message: string)
+    local handler = self._onToast
+    if handler ~= nil then
+        handler(player, message)
+    end
+end
+
+local function now(): number
+    return workspace:GetServerTimeNow()
+end
+
+function PartyService._partyOf(self: PartyService, player: Player): (string?, any)
+    local partyId = self._partyByUser[player.UserId]
+    if partyId == nil then
+        return nil, nil
+    end
+    local state = self._parties[partyId]
+    if state == nil then
+        -- A roster that dissolved out from under a stale index. Clear rather
+        -- than resurrect: an empty party would gladly accept an invitation.
+        self._partyByUser[player.UserId] = nil
+        return nil, nil
+    end
+    return partyId, state
+end
+
+function PartyService._store(self: PartyService, partyId: string, state: any)
+    if state == nil then
+        self._parties[partyId] = nil
+        for userId, held in self._partyByUser do
+            if held == partyId then
+                self._partyByUser[userId] = nil
+            end
+        end
+        for userId, held in self._inviteByUser do
+            if held == partyId then
+                self._inviteByUser[userId] = nil
+            end
+        end
+        return
+    end
+    self._parties[partyId] = state
+    for _, userId in self._partySession.memberIds(state) do
+        self._partyByUser[userId] = partyId
+    end
+end
+
+--[[
+    Offer a seat to everyone else standing on the platform.
+
+    A party is created only if there is somebody to ask. Pressing invite on an
+    empty dais leaves no roster lying around, which matters because an
+    existing party changes who boards first -- a party of one would quietly
+    outrank the friend who walks up thirty seconds later.
+
+    Anyone already in a party is skipped rather than refused. Two overlapping
+    parties is a problem with no good answer at the platform, and the simplest
+    honest rule is that you leave the one you are in before you join another.
+]]
+function PartyService.invite(self: PartyService, player: Player): any
+    local provider = self._platformProvider
+    if provider == nil then
+        return { accepted = false, reason = "no_platform" }
+    end
+
+    local standing = provider()
+    local onPlatform = false
+    local eligible: { Player } = {}
+    for _, other in standing do
+        if other == player then
+            onPlatform = true
+        elseif self._partyByUser[other.UserId] == nil then
+            table.insert(eligible, other)
+        end
+    end
+
+    if not onPlatform then
+        self:_toast(player, "STAND ON THE PLATFORM TO GATHER A PARTY")
+        return { accepted = false, reason = "not_on_platform" }
+    end
+    if #eligible == 0 then
+        self:_toast(player, "NOBODY ELSE IS STANDING HERE TO ASK")
+        return { accepted = false, reason = "nobody_to_ask" }
+    end
+
+    local partyId, state = self:_partyOf(player)
+    local createdHere = false
+    if state == nil then
+        local created, result = self._partySession.create(player.UserId, now())
+        if created == nil then
+            return { accepted = false, reason = result.reason }
+        end
+        partyId = created.partyId
+        state = created
+        createdHere = true
+        self:_store(created.partyId, created)
+    end
+
+    local asked = 0
+    local refusal: string? = nil
+    for _, other in eligible do
+        local nextState, result = self._partySession.invite(
+            state,
+            player.UserId,
+            other.UserId,
+            now(),
+            self._config.MaxExpeditionPlayers
+        )
+        if result.accepted then
+            state = nextState
+            asked += 1
+            self._inviteByUser[other.UserId] = partyId :: string
+            self:_toast(
+                other,
+                string.format(
+                    "%s ASKS YOU TO TRAVEL WITH THEM — JOIN OR DECLINE",
+                    player.DisplayName
+                )
+            )
+        else
+            refusal = result.reason
+        end
+    end
+    self:_store(partyId :: string, state)
+
+    if asked == 0 then
+        --[[
+            A roster nobody joined must not survive the press. The paragraph
+            above is only true if the party created a moment ago is taken
+            back when every invitation was refused, because a stray party of
+            one still outranks the friend who walks up thirty seconds later.
+
+            The refusal is reported rather than assumed, too. "No room" was
+            being said for every reason a party can turn somebody down, which
+            makes the one message that will ever be read the one least likely
+            to be true.
+        ]]
+        if createdHere then
+            self:_store(partyId :: string, nil)
+        end
+        self:_toast(
+            player,
+            if refusal == "party_full"
+                then "THERE IS NO ROOM LEFT IN YOUR PARTY"
+                else "NOBODY HERE CAN BE ASKED RIGHT NOW"
+        )
+        return { accepted = false, reason = refusal or "nobody_to_ask" }
+    end
+    self:_toast(player, string.format("ASKED %d TO TRAVEL WITH YOU", asked))
+    self._logger:info("party_invited", { partyId = partyId, asked = asked })
+    return { accepted = true, asked = asked }
+end
+
+function PartyService.reply(self: PartyService, player: Player, accept: boolean): any
+    local partyId = self._inviteByUser[player.UserId]
+    local state = if partyId == nil then nil else self._parties[partyId]
+    if state == nil then
+        self._inviteByUser[player.UserId] = nil
+        self:_toast(player, "NOBODY HAS ASKED YOU TO TRAVEL WITH THEM")
+        return { accepted = false, reason = "no_invite" }
+    end
+
+    if not accept then
+        local nextState = self._partySession.decline(state, player.UserId, now())
+        self._inviteByUser[player.UserId] = nil
+        self:_store(partyId :: string, nextState)
+        self:_toast(player, "YOU TRAVEL ALONE")
+        return { accepted = true, joined = false }
+    end
+
+    local nextState, result =
+        self._partySession.accept(state, player.UserId, now(), self._config.MaxExpeditionPlayers)
+    if not result.accepted then
+        self._inviteByUser[player.UserId] = nil
+        self:_toast(
+            player,
+            if result.reason == "party_full"
+                then "THAT PARTY FILLED BEFORE YOU ANSWERED"
+                else "THAT INVITATION HAS PASSED"
+        )
+        return { accepted = false, reason = result.reason }
+    end
+
+    self._inviteByUser[player.UserId] = nil
+    self:_store(partyId :: string, nextState)
+    for _, userId in self._partySession.memberIds(nextState) do
+        local member = Players:GetPlayerByUserId(userId)
+        if member ~= nil then
+            self:_toast(
+                member,
+                string.format("PARTY OF %d — %s IS WITH YOU", result.size, player.DisplayName)
+            )
+        end
+    end
+    self._logger:info("party_joined", { partyId = partyId, size = result.size })
+    return { accepted = true, joined = true }
+end
+
+function PartyService.leave(self: PartyService, player: Player): any
+    local partyId, state = self:_partyOf(player)
+    if state == nil then
+        self:_toast(player, "YOU ARE NOT IN A PARTY")
+        return { accepted = false, reason = "not_in_party" }
+    end
+
+    local nextState, result = self._partySession.leave(state, player.UserId, now())
+    if not result.accepted then
+        return { accepted = false, reason = result.reason }
+    end
+    self._partyByUser[player.UserId] = nil
+    self:_store(partyId :: string, nextState)
+    self:_toast(player, "YOU TRAVEL ALONE")
+
+    if result.handedTo ~= nil then
+        local leader = Players:GetPlayerByUserId(result.handedTo)
+        if leader ~= nil then
+            self:_toast(leader, "THE PARTY IS YOURS TO LEAD NOW")
+        end
+    end
+    return { accepted = true, dissolved = result.dissolved == true }
+end
+
+--[[
+    Re-order a boarding list so the party goes first.
+
+    Called by LobbyService with everyone standing on the dais and the number
+    of seats the chosen size allows. Before this, seats were spent in whatever
+    order `Players:GetPlayers()` returned, so a bystander who wandered onto
+    the platform could take one from somebody's party. Presence is still the
+    platform's business: this only re-orders what it reports.
+]]
+function PartyService.boardingOrder(
+    self: PartyService,
+    ready: { Player },
+    capacity: number
+): { Player }
+    local byUserId: { [number]: Player } = {}
+    local userIds: { number } = {}
+    for _, player in ready do
+        byUserId[player.UserId] = player
+        table.insert(userIds, player.UserId)
+    end
+
+    -- Whichever party has the most people on the dais is the one being
+    -- boarded. With two parties standing on one platform somebody's run is
+    -- going to be interrupted, and the larger group is the less bad answer.
+    local best: any = nil
+    local bestPresent = 0
+    for _, partyId in self._partyByUser do
+        local state = self._parties[partyId]
+        if state ~= nil then
+            local present = 0
+            for _, userId in self._partySession.memberIds(state) do
+                if byUserId[userId] ~= nil then
+                    present += 1
+                end
+            end
+            if present > bestPresent then
+                best = state
+                bestPresent = present
+            end
+        end
+    end
+
+    local ordered: { Player } = {}
+    for _, userId in self._partySession.boardingOrder(best, userIds, capacity) do
+        local player = byUserId[userId]
+        if player ~= nil then
+            table.insert(ordered, player)
+        end
+    end
+    return ordered
+end
+
+--[[
+    Form the party that is actually leaving, and name it.
+
+    Called before the reserved server is asked for, because the ID has to ride
+    the teleport payload. The party formed here is the boarding list rather
+    than whatever roster existed at the lodge -- see PartySession's own note on
+    why: a stranger who boarded is in that world too, and needs a way home
+    from it.
+]]
+function PartyService.formDeparture(self: PartyService, boarding: { Player }): string?
+    local userIds: { number } = {}
+    for _, player in boarding do
+        table.insert(userIds, player.UserId)
+    end
+
+    local formed, result = self._partySession.createForDeparture(userIds, now())
+    if formed == nil then
+        self._logger:warn("party_departure_unformed", { reason = result.reason })
+        return nil
+    end
+    local sealed = self._partySession.depart(formed, now())
+
+    -- The lodge-side parties these people were in are finished: they have
+    -- left, and the rosters that decided their boarding order have nothing
+    -- left to decide.
+    for _, player in boarding do
+        local partyId = self._partyByUser[player.UserId]
+        self._partyByUser[player.UserId] = nil
+        self._inviteByUser[player.UserId] = nil
+        if partyId ~= nil and self._parties[partyId] ~= nil then
+            local remaining = self._partySession.leave(self._parties[partyId], player.UserId, now())
+            self:_store(partyId, remaining)
+        end
+    end
+
+    --[[
+        Held in the one departing slot, not filed with the live rosters. A
+        sealed party is read exactly once, by issueTickets a moment later, and
+        adding it to `_parties` would grow that table by one entry per launch
+        for the life of the server with nothing ever reading them again.
+    ]]
+    self._departing = sealed
+    self._logger:info("party_departed", { partyId = sealed.partyId, size = #userIds })
+    return sealed.partyId
+end
+
+--[[
+    Write each traveller their way back.
+
+    Called after the reserved server exists and before the teleport, because
+    a profile is saved when its player leaves and a ticket written afterwards
+    would be a ticket written to a profile nobody is holding.
+]]
+function PartyService.issueTickets(
+    self: PartyService,
+    partyId: string,
+    boarding: { Player },
+    accessCode: string
+)
+    local state = self._departing
+    if state == nil or state.partyId ~= partyId then
+        self._logger:warn("party_tickets_unissued", { partyId = partyId })
+        return
+    end
+    -- The slot is spent whether or not every write lands. A departure is read
+    -- once, and leaving it filled would hand the next launch's tickets to the
+    -- party before it.
+    self._departing = nil
+
+    local issued = 0
+    for _, player in boarding do
+        local ticket, result =
+            self._partySession.issueTicket(state, player.UserId, accessCode, now())
+        if ticket == nil then
+            self._logger:warn("party_ticket_refused", { reason = result.reason })
+        elseif self._profileService:setRejoinTicket(player, ticket) then
+            issued += 1
+        else
+            --[[
+                A traveller who boards without a ticket has no way back and no
+                sign that anything went wrong, which is the quietest failure
+                in this whole wave. It is worth a line each rather than only
+                a total, because the total looks fine until somebody counts.
+            ]]
+            self._logger:warn("party_ticket_unwritten", { partyId = partyId })
+        end
+    end
+    self._logger:info(
+        "party_tickets_issued",
+        { partyId = partyId, issued = issued, boarded = #boarding }
+    )
+end
+
+--[[
+    Tell this server which party's run it is.
+
+    Read from the teleport payload by LobbyService. Without it a member who
+    dropped and came back to the same reserved server would be offered a
+    rejoin into the world they are standing in, forever.
+]]
+function PartyService.adoptRun(self: PartyService, partyId: string)
+    if self._runPartyId == nil then
+        self._runPartyId = partyId
+        self._logger:info("party_run_adopted", { partyId = partyId })
+    end
+end
+
+function PartyService.rejoin(self: PartyService, player: Player): any
+    local read = self._partySession.readTicket(
+        self._profileService:rejoinTicket(player),
+        now(),
+        self._runPartyId
+    )
+    if not read.rejoin then
+        if read.reason == "expired" then
+            self._profileService:setRejoinTicket(player, nil)
+            self:_toast(player, "THAT ROAD HAS GONE COLD — THE PLATFORM IS STILL HERE")
+        else
+            self:_toast(player, "THERE IS NOWHERE TO GO BACK TO")
+        end
+        return { accepted = false, reason = read.reason }
+    end
+
+    local placeId = game.PlaceId
+    if placeId == 0 then
+        -- Studio and unpublished builds cannot resolve a reserved server, the
+        -- same limit the departure teleport lives with.
+        self._logger:info("party_rejoin_skipped", { reason = "unpublished_place" })
+        self:_toast(player, "THE ROAD BACK NEEDS A PUBLISHED WORLD")
+        return { accepted = false, reason = "unpublished_place" }
+    end
+
+    local sent = pcall(function()
+        TeleportService:TeleportToPrivateServer(placeId, read.accessCode, { player })
+    end)
+    if not sent then
+        --[[
+            The ticket is kept. A teleport can fail for a minute and succeed
+            on the next press, and throwing away the only way back to punish a
+            transient failure is the worse of the two mistakes. It expires on
+            its own soon enough.
+        ]]
+        self._logger:warn("party_rejoin_failed", { partyId = read.partyId })
+        self:_toast(player, "THE ROAD DID NOT OPEN — TRY AGAIN")
+        return { accepted = false, reason = "teleport_failed" }
+    end
+
+    self._logger:info("party_rejoin_started", { partyId = read.partyId })
+    return { accepted = true }
+end
+
+--[[
+    What a client may be told about parties.
+
+    Every field here is presentation. The rejoin half comes from
+    PartySession.publicTicket rather than from the stored ticket, so the access
+    code is absent by construction rather than by omission.
+]]
+function PartyService.snapshot(self: PartyService, player: Player): any
+    local _, state = self:_partyOf(player)
+    local inviteFrom: string? = nil
+    local invitePartyId = self._inviteByUser[player.UserId]
+    if invitePartyId ~= nil then
+        local inviteState = self._parties[invitePartyId]
+        local invite = self._partySession.pendingInvite(inviteState, player.UserId, now())
+        if invite == nil then
+            self._inviteByUser[player.UserId] = nil
+        else
+            local from = Players:GetPlayerByUserId(invite.fromUserId)
+            inviteFrom = if from ~= nil then from.DisplayName else "SOMEONE"
+        end
+    end
+
+    local leaderName: string? = nil
+    if state ~= nil then
+        local leader = Players:GetPlayerByUserId(state.leaderUserId)
+        leaderName = if leader ~= nil then leader.DisplayName else nil
+    end
+
+    return {
+        inParty = state ~= nil,
+        size = self._partySession.size(state),
+        leader = state ~= nil and state.leaderUserId == player.UserId,
+        leaderName = leaderName,
+        inviteFrom = inviteFrom,
+        rejoin = self._partySession.publicTicket(
+            self._profileService:rejoinTicket(player),
+            now(),
+            self._runPartyId
+        ),
+    }
+end
+
+function PartyService.Start(self: PartyService)
+    Players.PlayerRemoving:Connect(function(player: Player)
+        local partyId, state = self:_partyOf(player)
+        if state ~= nil then
+            self:_store(partyId :: string, self._partySession.leave(state, player.UserId, now()))
+        end
+        self._partyByUser[player.UserId] = nil
+        self._inviteByUser[player.UserId] = nil
+    end)
+
+    --[[
+        The offer is made once, when the profile is loaded, because that is
+        the first moment the ticket can be read at all. It is a toast and a
+        button rather than an automatic teleport: a player who deliberately
+        left a run and came back to town should not be dragged out of it by
+        the game deciding it knows better.
+    ]]
+    self._profileService:onLoaded(function(player: Player)
+        local public = self._partySession.publicTicket(
+            self._profileService:rejoinTicket(player),
+            now(),
+            self._runPartyId
+        )
+        if public == nil then
+            return
+        end
+        self:_toast(
+            player,
+            string.format("YOUR PARTY OF %d IS STILL OUT THERE — REJOIN THEM", public.partySize)
+        )
+    end)
+end
+
+return PartyService
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="131">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41627,7 +43152,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="130">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41806,7 +43331,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42422,7 +43947,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43535,7 +45060,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="135">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -44160,7 +45685,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="134">
+        <Item class="ModuleScript" referent="136">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45113,6 +46638,38 @@ function ProfileService.placeDecoration(
     return result
 end
 
+--[[
+    The ticket back to the party this player left with.
+
+    Deliberately two plain accessors rather than a snapshot: this is the one
+    profile field that must never be published, so nothing here shapes it for
+    a client. PartyService reads it to decide whether a rejoin is on offer and
+    hands the presentable half to the snapshot itself.
+]]
+function ProfileService.setRejoinTicket(self: ProfileService, player: Player, ticket: any): boolean
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return false
+    end
+    local nextProfile = self._saveSchema.withRejoinTicket(profile, ticket, os.time())
+    if nextProfile == profile then
+        return false
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    return true
+end
+
+function ProfileService.rejoinTicket(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return self._saveSchema.rejoinTicket(profile)
+end
+
 function ProfileService.decorationsSnapshot(self: ProfileService, player: Player): any
     local profile = self._profiles[player]
     if profile == nil then
@@ -45980,7 +47537,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="135">
+        <Item class="ModuleScript" referent="137">
           <Properties>
             <string name="Name">RegionEncounterService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46278,7 +47835,7 @@ return table.freeze(RegionEncounterService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="136">
+        <Item class="ModuleScript" referent="138">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46903,7 +48460,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="137">
+        <Item class="ModuleScript" referent="139">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46973,6 +48530,7 @@ export type TutorialService = typeof(setmetatable(
         _gearTraits: any,
         _consumables: any,
         _companionService: any,
+        _partyService: any,
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -47047,6 +48605,7 @@ function TutorialService.new(
         _gearTraits = gearTraits,
         _consumables = consumables,
         _companionService = nil,
+        _partyService = nil,
         _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -47810,6 +49369,10 @@ end
 
 function TutorialService.setCompanionService(self: TutorialService, companionService: any)
     self._companionService = companionService
+end
+
+function TutorialService.setPartyService(self: TutorialService, partyService: any)
+    self._partyService = partyService
 end
 
 function TutorialService.strike(self: TutorialService, player: Player)
@@ -48590,6 +50153,33 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             )
             self:_publish(player)
         end
+    elseif kind == self._runtimeIds.Actions.PartyInvite then
+        --[[
+            The press names nobody. PartyService asks the platform who is
+            standing there, which is the same reading the departure countdown
+            works from, so an invitation and a boarding pass can never
+            disagree about who was on the dais.
+        ]]
+        if self._partyService ~= nil then
+            self._partyService:invite(player)
+            self:_publishAll()
+        end
+    elseif kind == self._runtimeIds.Actions.PartyReply then
+        local accept = payload.accept
+        if self._partyService ~= nil and type(accept) == "boolean" then
+            self._partyService:reply(player, accept)
+            self:_publishAll()
+        end
+    elseif kind == self._runtimeIds.Actions.PartyLeave then
+        if self._partyService ~= nil then
+            self._partyService:leave(player)
+            self:_publishAll()
+        end
+    elseif kind == self._runtimeIds.Actions.PartyRejoin then
+        if self._partyService ~= nil then
+            self._partyService:rejoin(player)
+            self:_publish(player)
+        end
     elseif kind == self._runtimeIds.Actions.CompanionCommand then
         local mode = payload.mode
         if self._companionService ~= nil and type(mode) == "string" and #mode <= 12 then
@@ -48984,6 +50574,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         companion = if self._companionService ~= nil
             then self._companionService:snapshot(player)
             else nil,
+        party = if self._partyService ~= nil then self._partyService:snapshot(player) else nil,
         gearCare = gearCare,
         whetTarget = whetTarget,
         equipped = self._profileService:equippedSnapshot(player),
@@ -49035,7 +50626,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="138">
+        <Item class="ModuleScript" referent="140">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49904,7 +51495,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="139">
+        <Item class="ModuleScript" referent="141">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -63886,11 +65477,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="140">
+      <Item class="Folder" referent="142">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="141">
+        <Item class="ModuleScript" referent="143">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -68165,7 +69756,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="142">
+        <Item class="ModuleScript" referent="144">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -69264,7 +70855,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="143">
+        <Item class="ModuleScript" referent="145">
           <Properties>
             <string name="Name">CinderfallBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -70131,7 +71722,7 @@ return table.freeze(CinderfallBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="144">
+        <Item class="ModuleScript" referent="146">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -70826,7 +72417,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="145">
+        <Item class="ModuleScript" referent="147">
           <Properties>
             <string name="Name">FrostmereBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -71875,7 +73466,7 @@ return table.freeze(FrostmereBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="146">
+        <Item class="ModuleScript" referent="148">
           <Properties>
             <string name="Name">IronrootBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -72890,7 +74481,7 @@ return table.freeze(IronrootBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="147">
+        <Item class="ModuleScript" referent="149">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -73749,7 +75340,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="148">
+        <Item class="ModuleScript" referent="150">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -73835,7 +75426,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="149">
+        <Item class="ModuleScript" referent="151">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -74209,7 +75800,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="150">
+        <Item class="ModuleScript" referent="152">
           <Properties>
             <string name="Name">MireglassBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -74965,7 +76556,7 @@ return table.freeze(MireglassBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="151">
+        <Item class="ModuleScript" referent="153">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -75145,7 +76736,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="152">
+        <Item class="ModuleScript" referent="154">
           <Properties>
             <string name="Name">RegionBuilders</string>
             <string name="Source"><![CDATA[--!strict
@@ -75911,7 +77502,7 @@ return table.freeze(RegionBuilders)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="153">
+        <Item class="ModuleScript" referent="155">
           <Properties>
             <string name="Name">TempestBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -76732,7 +78323,7 @@ return table.freeze(TempestBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="154">
+        <Item class="ModuleScript" referent="156">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -77328,7 +78919,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="155">
+        <Item class="ModuleScript" referent="157">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -77565,7 +79156,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="156">
+        <Item class="ModuleScript" referent="158">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -77654,7 +79245,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="157">
+        <Item class="ModuleScript" referent="159">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -77991,15 +79582,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="158">
+  <Item class="StarterPlayer" referent="160">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="159">
+    <Item class="StarterPlayerScripts" referent="161">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="160">
+      <Item class="LocalScript" referent="162">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -78122,6 +79713,16 @@ end)
 
 hud:setLobbyDepartHandler(function(partySize: number, contractId: string)
     send(RuntimeIds.Actions.LobbyDepart, { partySize = partySize, contractId = contractId })
+end)
+
+hud:setPartyHandlers(function()
+    send(RuntimeIds.Actions.PartyInvite)
+end, function(accept: boolean)
+    send(RuntimeIds.Actions.PartyReply, { accept = accept })
+end, function()
+    send(RuntimeIds.Actions.PartyLeave)
+end, function()
+    send(RuntimeIds.Actions.PartyRejoin)
 end)
 
 hud:setLoadoutHandlers(function(slot: number)
@@ -78296,11 +79897,11 @@ end)
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="161">
+        <Item class="Folder" referent="163">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="162">
+          <Item class="ModuleScript" referent="164">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -78431,7 +80032,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="163">
+          <Item class="ModuleScript" referent="165">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -78793,6 +80394,8 @@ export type HUDController = typeof(setmetatable(
         _selectedContractId: string,
         _onLobbyDepart: ((number) -> ())?,
         _selectedPartySize: number?,
+        _partyLine: TextLabel,
+        _partyButtons: { [string]: TextButton },
         _progressButton: TextButton,
         _useButtons: { TextButton },
         _professionOverlay: Frame,
@@ -79715,7 +81318,7 @@ function HUDController.new(
     lobbyFrame.Name = "LobbyPanel"
     lobbyFrame.AnchorPoint = Vector2.new(0.5, 1)
     lobbyFrame.Position = UDim2.new(0.5, 0, 1, -104)
-    lobbyFrame.Size = UDim2.fromOffset(420, 186)
+    lobbyFrame.Size = UDim2.fromOffset(420, 246)
     lobbyFrame.BackgroundColor3 = Color3.fromRGB(16, 22, 26)
     lobbyFrame.BackgroundTransparency = 0.12
     lobbyFrame.BorderSizePixel = 0
@@ -79836,6 +81439,71 @@ function HUDController.new(
         contractButtons[contract.id] = contractButton
     end
 
+    --[[
+        The party row: who is travelling with you, and the way back to them.
+
+        It lives in the departure panel because that is where the decision is
+        made -- you gather at the platform, ask the people standing on it, and
+        leave together. The rejoin offer is here for the same reason: a player
+        who dropped out of a run comes back to the lodge, and the platform is
+        the thing they are looking at.
+    ]]
+    local partyLine = Instance.new("TextLabel")
+    partyLine.Name = "LobbyPartyLine"
+    partyLine.BackgroundTransparency = 1
+    partyLine.Position = UDim2.fromOffset(14, 180)
+    partyLine.Size = UDim2.new(1, -28, 0, 16)
+    partyLine.Font = Enum.Font.Gotham
+    partyLine.Text = "TRAVELLING ALONE"
+    partyLine.TextColor3 = Color3.fromRGB(178, 194, 183)
+    partyLine.TextSize = 14
+    partyLine.TextXAlignment = Enum.TextXAlignment.Left
+    partyLine.ZIndex = 41
+    partyLine.Parent = lobbyFrame
+
+    local partyRow = Instance.new("Frame")
+    partyRow.Name = "LobbyParty"
+    partyRow.BackgroundTransparency = 1
+    partyRow.Position = UDim2.fromOffset(14, 200)
+    partyRow.Size = UDim2.new(1, -28, 0, 36)
+    partyRow.ZIndex = 41
+    partyRow.Parent = lobbyFrame
+    local partyLayout = Instance.new("UIListLayout")
+    partyLayout.FillDirection = Enum.FillDirection.Horizontal
+    partyLayout.Padding = UDim.new(0, 6)
+    partyLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    partyLayout.Parent = partyRow
+
+    local partyButtons: { [string]: TextButton } = {}
+    for order, entry in
+        {
+            { key = "rejoin", label = "REJOIN" },
+            { key = "accept", label = "JOIN" },
+            { key = "decline", label = "DECLINE" },
+            { key = "invite", label = "INVITE" },
+            { key = "leave", label = "LEAVE" },
+        }
+    do
+        local partyButton = Instance.new("TextButton")
+        partyButton.Name = "Party_" .. entry.key
+        partyButton.LayoutOrder = order
+        partyButton.Size = UDim2.new(0, 92, 1, 0)
+        partyButton.BackgroundColor3 = Color3.fromRGB(31, 40, 44)
+        partyButton.AutoButtonColor = true
+        partyButton.Font = Enum.Font.GothamBold
+        partyButton.Text = entry.label
+        partyButton.TextColor3 = Color3.fromRGB(244, 230, 197)
+        partyButton.TextSize = 13
+        partyButton.Selectable = true
+        partyButton.Visible = false
+        partyButton.ZIndex = 42
+        partyButton.Parent = partyRow
+        local partyCorner = Instance.new("UICorner")
+        partyCorner.CornerRadius = UDim.new(0, 8)
+        partyCorner.Parent = partyButton
+        partyButtons[entry.key] = partyButton
+    end
+
     -- Action progress: what a timed gather or build looks like while it runs.
     local actionFrame = Instance.new("Frame")
     actionFrame.Name = "ActionProgress"
@@ -79898,6 +81566,8 @@ function HUDController.new(
         _lobbyDetail = lobbyDetail,
         _lobbySizes = lobbySizes,
         _lobbySizeButtons = lobbySizeButtons,
+        _partyLine = partyLine,
+        _partyButtons = partyButtons,
         _contractButtons = contractButtons,
         _selectedContractId = "contract_standard",
         _departurePlatformPart = nil,
@@ -80193,6 +81863,94 @@ function HUDController.setLobbyDepartHandler(self: HUDController, callback: (num
     end
 end
 
+--[[
+    The five party presses, wired in one call.
+
+    Each button sends one thing and nothing else: INVITE asks whoever is
+    standing on the platform, JOIN and DECLINE answer the one invitation a
+    player can be holding, LEAVE steps out, REJOIN spends the ticket back to a
+    run. None of them carries a name, and the reply carries only yes or no,
+    which is what keeps every one of them inside the payload contract's single
+    extra field.
+]]
+function HUDController.setPartyHandlers(
+    self: HUDController,
+    onInvite: () -> (),
+    onReply: (boolean) -> (),
+    onLeave: () -> (),
+    onRejoin: () -> ()
+)
+    self._partyButtons.invite.Activated:Connect(onInvite)
+    self._partyButtons.leave.Activated:Connect(onLeave)
+    self._partyButtons.rejoin.Activated:Connect(onRejoin)
+    self._partyButtons.accept.Activated:Connect(function()
+        onReply(true)
+    end)
+    self._partyButtons.decline.Activated:Connect(function()
+        onReply(false)
+    end)
+end
+
+--[[
+    What the party row says, and which of its buttons exist right now.
+
+    Everything here comes off the snapshot rather than from local memory: the
+    party is server state, and a client that remembered its own idea of who
+    was in it would be a second answer to a question with one authority. An
+    absent `party` block means the server has no party service, and the whole
+    row goes away rather than showing an empty one.
+]]
+function HUDController._updateParty(self: HUDController, state: any)
+    local party = state.party
+    local buttons = self._partyButtons
+    if type(party) ~= "table" then
+        self._partyLine.Visible = false
+        for _, button in buttons do
+            button.Visible = false
+        end
+        return
+    end
+
+    local rejoin = party.rejoin
+    local hasRejoin = type(rejoin) == "table" and rejoin.available == true
+    local invitedBy = if type(party.inviteFrom) == "string" then party.inviteFrom else nil
+    local size = if type(party.size) == "number" then party.size else 0
+    -- Guarded like every other field this reads, and for a sharper reason:
+    -- `string.format` with %d raises on a nil, and this runs off the render
+    -- loop, so one bad field would break the panel on every frame rather
+    -- than once.
+    local rejoinSize = if hasRejoin and type(rejoin.partySize) == "number"
+        then rejoin.partySize
+        else 0
+
+    self._partyLine.Visible = true
+    self._partyLine.Text = if hasRejoin
+        then string.format("YOUR PARTY OF %d IS STILL OUT THERE", rejoinSize)
+        elseif invitedBy ~= nil then string.format(
+            "%s ASKS YOU TO TRAVEL WITH THEM",
+            invitedBy
+        )
+        elseif party.inParty == true and party.leader == true then string.format(
+            "PARTY OF %d · YOU LEAD",
+            size
+        )
+        elseif party.inParty == true then string.format(
+            "PARTY OF %d · LED BY %s",
+            size,
+            tostring(party.leaderName or "SOMEONE")
+        )
+        else "TRAVELLING ALONE"
+
+    buttons.rejoin.Visible = hasRejoin
+    buttons.accept.Visible = invitedBy ~= nil
+    buttons.decline.Visible = invitedBy ~= nil
+    -- An invitation is answered before another is offered: three choices in a
+    -- row where two of them are about different parties is a way to press the
+    -- wrong one.
+    buttons.invite.Visible = invitedBy == nil
+    buttons.leave.Visible = invitedBy == nil and party.inParty == true
+end
+
 -- Mara's last line stays up for a few seconds. Long enough to read at a
 -- glance, short enough that it never becomes furniture.
 local MARA_LINE_SECONDS = 7
@@ -80258,6 +82016,7 @@ function HUDController._updateLobby(self: HUDController, state: any)
         end
     end
     self._lobbyFrame.Visible = true
+    self:_updateParty(state)
     if lobby.counting then
         self._lobbyTitle.Text = string.format("DEPARTING IN %d", lobby.secondsRemaining)
         self._lobbyDetail.Text =
@@ -81443,7 +83202,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="164">
+          <Item class="ModuleScript" referent="166">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -81776,7 +83535,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="165">
+          <Item class="ModuleScript" referent="167">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -81884,7 +83643,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="166">
+          <Item class="ModuleScript" referent="168">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -82003,7 +83762,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="167">
+          <Item class="ModuleScript" referent="169">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -82277,7 +84036,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="168">
+          <Item class="ModuleScript" referent="170">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -82377,7 +84136,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="169">
+          <Item class="ModuleScript" referent="171">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -82489,7 +84248,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="170">
+          <Item class="ModuleScript" referent="172">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -82649,7 +84408,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="171">
+          <Item class="ModuleScript" referent="173">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -82858,7 +84617,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="172">
+          <Item class="ModuleScript" referent="174">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -83003,7 +84762,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="173">
+          <Item class="ModuleScript" referent="175">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -83303,13 +85062,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="174">
+  <Item class="TextChatService" referent="176">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="175">
+  <Item class="Workspace" referent="177">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

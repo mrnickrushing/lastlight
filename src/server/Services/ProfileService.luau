@@ -948,6 +948,38 @@ function ProfileService.placeDecoration(
     return result
 end
 
+--[[
+    The ticket back to the party this player left with.
+
+    Deliberately two plain accessors rather than a snapshot: this is the one
+    profile field that must never be published, so nothing here shapes it for
+    a client. PartyService reads it to decide whether a rejoin is on offer and
+    hands the presentable half to the snapshot itself.
+]]
+function ProfileService.setRejoinTicket(self: ProfileService, player: Player, ticket: any): boolean
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return false
+    end
+    local nextProfile = self._saveSchema.withRejoinTicket(profile, ticket, os.time())
+    if nextProfile == profile then
+        return false
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    return true
+end
+
+function ProfileService.rejoinTicket(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    return self._saveSchema.rejoinTicket(profile)
+end
+
 function ProfileService.decorationsSnapshot(self: ProfileService, player: Player): any
     local profile = self._profiles[player]
     if profile == nil then

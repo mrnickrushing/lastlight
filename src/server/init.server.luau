@@ -61,6 +61,7 @@ local ProfilePersistence = require(root.ProfilePersistence)
 local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
 local RunHandoff = require(root.RunHandoff)
+local PartySession = require(root.PartySession)
 local AdminRoster = require(root.AdminRoster)
 local TownDecorations = require(root.TownDecorations)
 local TownProgression = require(root.TownProgression)
@@ -85,6 +86,7 @@ local PhaseService = require(script.Services.PhaseService)
 local ProfileService = require(script.Services.ProfileService)
 local TownNightService = require(script.Services.TownNightService)
 local LobbyService = require(script.Services.LobbyService)
+local PartyService = require(script.Services.PartyService)
 local AdminService = require(script.Services.AdminService)
 local CompanionService = require(script.Services.CompanionService)
 local DefenseService = require(script.Services.DefenseService)
@@ -297,6 +299,19 @@ local lobbyService = LobbyService.new(
     worldService,
     analyticsService
 )
+--[[
+    Parties, and the way back to one. LobbyService measures who is standing on
+    the departure platform every tick already, so the party service reads that
+    rather than measuring the dais a second time: an invitation and a boarding
+    pass have to agree about who was there, and two independent measurements
+    is how they stop agreeing.
+]]
+local partyService =
+    PartyService.new(logger, Config, PartySession, profileService, analyticsService)
+partyService:setPlatformProvider(function(): { Player }
+    return lobbyService:readyPlayers(lobbyService)
+end)
+lobbyService:setPartyService(partyService)
 local performanceService = PerformanceService.new(logger, Config, PerformanceBudget)
 local adminService = AdminService.new(
     logger,
@@ -407,6 +422,7 @@ services:register(townNightService)
 services:register(companionService)
 services:register(defenseService)
 services:register(regionEncounterService)
+services:register(partyService)
 -- Without this the departure countdown never reached a client: LobbyService
 -- published every whole second into a handler nobody had set, so the panel
 -- froze at "DEPARTING IN 10" while the server counted down and launched.
@@ -417,6 +433,14 @@ worldService:setClickHandler(function(clicker: Player, interactionId: string)
     tutorialService:interactFromClick(clicker, interactionId)
 end)
 tutorialService:setCompanionService(companionService)
+tutorialService:setPartyService(partyService)
+partyService:setToastHandler(function(player: Player?, message: string)
+    if player ~= nil then
+        tutorialService:toastPlayer(player, message)
+    else
+        tutorialService:toastEveryone(message)
+    end
+end)
 --[[
     Passive gear wears from the blows it softens: one point per mitigated
     hit, against the weapon's two per landed strike -- you strike more
