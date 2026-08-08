@@ -125,6 +125,14 @@ end
 
 local backdrop = newFrame(gui, "Backdrop", 1)
 backdrop.Size = UDim2.fromScale(1, 1)
+--[[
+    The title screen swallows input until it is dismissed. Without this a
+    tap anywhere on it fell through to the world behind it -- a full
+    tutorial was once played to the survive stage entirely through this
+    screen without anybody pressing PLAY, every objective triggered by
+    taps the player believed were landing on a menu.
+]]
+backdrop.Active = true
 local skyGradient = Instance.new("UIGradient")
 skyGradient.Rotation = 90
 skyGradient.Color = ColorSequence.new({
@@ -82893,6 +82901,16 @@ function HUDController.setProgressOpen(self: HUDController, open: boolean)
     local shouldOpen = open and not self._playerDowned
     self._progressOverlay.Visible = shouldOpen
     self._progressButton.AutoButtonColor = not shouldOpen
+    --[[
+        The equip buttons position themselves from the owned set inside
+        the state-driven update, and their visibility keys off this
+        overlay -- so opening the book on a quiet server showed an empty
+        page until the next push happened to arrive. The book fills
+        itself the moment it is opened.
+    ]]
+    if shouldOpen and self._currentState ~= nil then
+        self:_updateProgress()
+    end
 end
 
 function HUDController.setEquipHandler(self: HUDController, callback: (string) -> ())
