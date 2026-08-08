@@ -35094,6 +35094,192 @@ return table.freeze(StoreCard)
       </Item>
       <Item class="ModuleScript" referent="104">
         <Properties>
+          <string name="Name">Strings</string>
+          <string name="Source"><![CDATA[--!strict
+--[[
+	Every string a player reads, in one place.
+
+	Milestone 13 asks for localization source coverage so that "finalize
+	supported languages from localization QA capacity" is a capacity decision
+	rather than an archaeology project. A capacity decision needs a number, and
+	the number is the size of this table.
+
+	Keys are lowercase and dotted, and the first segment names the surface the
+	string is read on rather than the file it happens to live in, because a
+	refactor moves a file and does not move a label off a screen.
+
+	`get` throws on a key nobody defined, and that is the whole of its error
+	handling on purpose. The alternative is returning the key, or returning an
+	empty string, and both of those ship: a label reading `hud.close` looks like
+	a bug somebody will file, and a label reading nothing looks like a design.
+	This project has paid four times for a silent fallback hiding a gap, so a
+	missing string fails where it is asked for.
+
+	`scripts/validate_localization.py` holds this table and the source against
+	each other in both directions: a key nothing reads is a string a translator
+	is paid for and nobody sees, and a key nothing defines is a label wired to
+	nothing.
+]]
+
+local Strings = {}
+
+local SOURCE: { [string]: string } = {
+    ["hud.day_morning"] = "DAY · MORNING",
+    ["hud.first_light_1_8"] = "FIRST LIGHT · 1 / 8",
+    ["hud.free_mara"] = "FREE MARA",
+    ["hud.follow_the_lantern_path"] = "Follow the lantern path.",
+    ["hud.mara_follow_the_light"] = "Mara: Follow the light.",
+    ["hud.heartwood_0"] = "HEARTWOOD · 0",
+    ["hud.health_100_100"] = "HEALTH · 100 / 100",
+    ["hud.stamina_100"] = "STAMINA · 100",
+    ["hud.light_100"] = "LIGHT · 100%",
+    ["hud.bramblewake_blackout_stage_1_4"] = "BRAMBLEWAKE BLACKOUT · STAGE 1/4",
+    ["hud.rootfire_relay_0_3"] = "ROOTFIRE RELAY · 0/3",
+    ["hud.old_growth_phase_1_3"] = "OLD GROWTH · PHASE 1/3",
+    ["hud.exposed_strike_the_amber_heart"] = "EXPOSED · STRIKE THE AMBER HEART",
+    ["hud.ahead_14m_23s"] = "AHEAD · 14m · 23s",
+    ["hud.dodge_out_of_the_ring_0"] = "DODGE OUT OF THE RING · 0.9s",
+    ["hud.downed_crawl_toward_light"] = "DOWNED · CRAWL TOWARD LIGHT",
+    ["hud.help_signal_active_no_ally_nearby"] = "HELP SIGNAL ACTIVE · NO ALLY NEARBY",
+    ["hud.find"] = "FIND",
+    ["hud.strike"] = "STRIKE",
+    ["hud.dodge"] = "DODGE",
+    ["hud.ability"] = "ABILITY",
+    ["hud.hound"] = "HOUND",
+    ["hud.call"] = "CALL",
+    ["hud.close"] = "CLOSE",
+    ["hud.compact"] = "COMPACT",
+    ["hud.profession"] = "PROFESSION",
+    ["hud.field_book"] = "FIELD BOOK",
+    ["hud.choose_your_profession"] = "CHOOSE YOUR PROFESSION",
+    ["hud.switch_freely_in_emberhollow_every_traveler"] = "Switch freely in Emberhollow. Every traveler keeps core combat, building, and rescue.",
+    ["hud.field_book_recipes_quests_mastery"] = "FIELD BOOK · RECIPES · QUESTS · MASTERY",
+    ["hud.loading_field_notes"] = "Loading field notes…",
+    ["hud.whet"] = "WHET",
+    ["hud.the_outfitter"] = "THE OUTFITTER",
+    ["hud.cosmetic_only_abilities_are_earned_in"] = "COSMETIC ONLY — ABILITIES ARE EARNED IN PLAY",
+    ["hud.nothing_is_on_the_rail_yet"] = "NOTHING IS ON THE RAIL YET.",
+    ["hud.your_wardrobe"] = "YOUR WARDROBE",
+    ["hud.wear"] = "WEAR",
+    ["hud.departure"] = "DEPARTURE",
+    ["hud.stand_on_the_platform_to_depart"] = "STAND ON THE PLATFORM TO DEPART",
+    ["hud.travelling_alone"] = "TRAVELLING ALONE",
+    ["hud.rejoin"] = "REJOIN",
+    ["hud.join"] = "JOIN",
+    ["hud.decline"] = "DECLINE",
+    ["hud.invite"] = "INVITE",
+    ["hud.leave"] = "LEAVE",
+    ["hud.nothing_is_priced_yet_n_waiting"] = "NOTHING IS PRICED YET — %d WAITING ON THE TILL.",
+    ["hud.your_party_of_n_is_still"] = "YOUR PARTY OF %d IS STILL OUT THERE",
+    ["hud.party_of_n_you_lead"] = "PARTY OF %d · YOU LEAD",
+    ["hud.party_of_n_led_by_n"] = "PARTY OF %d · LED BY %s",
+    ["hud.someone"] = "SOMEONE",
+    ["hud.departing_in_n"] = "DEPARTING IN %d",
+    ["hud.party_of_n_stand_on_the"] = "PARTY OF %d * STAND ON THE PLATFORM",
+    ["hud.rooted_ns_stamina_n"] = "ROOTED %.1fs · STAMINA %d",
+    ["hud.drowsy_ns_stamina_n"] = "DROWSY %.1fs · STAMINA %d",
+    ["hud.low_stamina_n"] = "LOW STAMINA · %d",
+    ["hud.stay"] = "STAY",
+    ["hud.follow"] = "FOLLOW",
+    ["hud.role"] = "ROLE · ",
+    ["hud.recipes"] = "RECIPES",
+    ["hud.nothing_learned_yet_find_a_workbench"] = "Nothing learned yet — find a workbench.",
+    ["hud.quests"] = "QUESTS",
+    ["hud.no_open_quests"] = "No open quests.",
+    ["hud.claimed"] = "CLAIMED",
+    ["hud.memory_archive_n_n_recovered"] = "MEMORY ARCHIVE · %d / %d RECOVERED",
+    ["hud.residents"] = "RESIDENTS",
+    ["hud.you_are_a_guest_in_n"] = "You are a guest in %s's Emberhollow — your help carries, your damage doesn't.",
+    ["hud.resting_check_on_them"] = "RESTING — check on them",
+    ["hud.decorations_placed_n_n_marked_spots"] = "Decorations placed · %d / %d — marked spots around town take materials.",
+    ["hud.profession_mastery"] = "PROFESSION MASTERY",
+    ["hud.loadout"] = "LOADOUT",
+    ["hud.nothing_equipped_yet_craft_gear_at"] = "Nothing equipped yet — craft gear at the workbenches.",
+    ["hud.equip"] = "EQUIP",
+    ["hud.downed"] = "DOWNED",
+    ["hud.expand"] = "EXPAND",
+    ["hud.dusk"] = "DUSK",
+    ["hud.night"] = "NIGHT",
+    ["hud.reveal"] = "REVEAL",
+    ["hud.blackout_n_n"] = "BLACKOUT · %02d:%02d",
+    ["hud.blackout_overtime"] = "BLACKOUT · OVERTIME",
+    ["hud.dawn_chapter_i"] = "DAWN · CHAPTER I",
+    ["hud.held"] = "HELD",
+    ["hud.left"] = "LEFT",
+    ["hud.dawn_first_light"] = "DAWN · FIRST LIGHT",
+    ["hud.practice"] = "PRACTICE · ",
+    ["hud.bramblewake_blackout_n_n_n"] = "BRAMBLEWAKE BLACKOUT · %s · %d/%d",
+    ["hud.stage"] = "STAGE",
+    ["hud.carry_rootfire_ns_n_n_n"] = "CARRY ROOTFIRE %.1fs → %s · %d/%d",
+    ["hud.next_root"] = "NEXT ROOT",
+    ["hud.take_rootfire_n_n_n"] = "TAKE ROOTFIRE → %s · %d/%d",
+    ["hud.rooted_walls_cleanse_old_growth"] = "ROOTED WALLS · CLEANSE OLD GROWTH",
+    ["hud.warden_s_seal_cleanse_or_break"] = "WARDEN'S SEAL · CLEANSE OR BREAK ANTLERS",
+    ["hud.vote_farmland_wild_shared_agroforest"] = "VOTE: FARMLAND · WILD · SHARED AGROFOREST",
+    ["hud.vote_recorded_waiting_for_active_travelers"] = "VOTE RECORDED · WAITING FOR ACTIVE TRAVELERS",
+    ["hud.warden_stag"] = "WARDEN STAG",
+    ["common.old_growth"] = "OLD GROWTH",
+    ["hud.cleansed_continue_to_wayhome"] = "CLEANSED · CONTINUE TO WAYHOME",
+    ["hud.heart_exposed_strike_the_memory_seal"] = "HEART EXPOSED · STRIKE THE MEMORY SEAL",
+    ["hud.roots_n_n_preserve_cleanse_antlers"] = "ROOTS %d/%d · PRESERVE: CLEANSE · ANTLERS %d/2",
+    ["hud.fire_ns_reach_the_root_heart"] = "FIRE %.1fs · REACH THE ROOT HEART",
+    ["hud.shielded_take_lantern_fire"] = "SHIELDED · TAKE LANTERN FIRE",
+    ["hud.threat"] = "THREAT",
+    ["hud.attack"] = "ATTACK",
+    ["hud.lane"] = "LANE",
+    ["hud.ring"] = "RING",
+    ["hud.move"] = "MOVE",
+    ["hud.help_active_n_nm_n"] = "HELP ACTIVE · %s %dm · %s",
+    ["hud.unknown"] = "UNKNOWN",
+    ["hud.ally"] = "ALLY",
+    ["hud.running"] = "RUNNING",
+    ["hud.first_light"] = "FIRST LIGHT",
+    ["hud.heartwood_nn"] = "HEARTWOOD · %d%s",
+    ["hud.health_n_n"] = "HEALTH · %d / %d",
+    ["client.the_first_night"] = "THE FIRST NIGHT",
+    ["client.keep_the_light_alive"] = "KEEP THE LIGHT ALIVE",
+    ["client.night_n_n"] = "NIGHT %d · %s",
+    ["client.the_blackout"] = "THE BLACKOUT",
+    ["client.carry_the_rootfire"] = "CARRY THE ROOTFIRE",
+    ["client.strike_the_amber_heart"] = "STRIKE THE AMBER HEART",
+    ["client.the_warden_stag"] = "THE WARDEN STAG",
+    ["client.cleanse_the_living_roots"] = "CLEANSE THE LIVING ROOTS",
+    ["objective.objective"] = "OBJECTIVE",
+}
+
+function Strings.get(key: string): string
+    local value = SOURCE[key]
+    if value == nil then
+        error(`Strings.get: no source string for key "{key}"`, 2)
+    end
+    return value
+end
+
+-- The count a language decision is made on. Exposed rather than derived at the
+-- call site so nothing has to walk the table to answer "how big is this".
+function Strings.count(): number
+    local total = 0
+    for _ in SOURCE do
+        total += 1
+    end
+    return total
+end
+
+function Strings.keys(): { string }
+    local keys = {}
+    for key in SOURCE do
+        table.insert(keys, key)
+    end
+    table.sort(keys)
+    return keys
+end
+
+return Strings
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="105">
+        <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -35349,7 +35535,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="105">
+      <Item class="ModuleScript" referent="106">
         <Properties>
           <string name="Name">TempestEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -35627,7 +35813,7 @@ return table.freeze(TempestEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="106">
+      <Item class="ModuleScript" referent="107">
         <Properties>
           <string name="Name">TideboundTitanEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -36058,7 +36244,7 @@ return table.freeze(TideboundTitanEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="107">
+      <Item class="ModuleScript" referent="108">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -36202,7 +36388,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="108">
+      <Item class="ModuleScript" referent="109">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -36612,7 +36798,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="109">
+      <Item class="ModuleScript" referent="110">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -36793,7 +36979,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="110">
+      <Item class="ModuleScript" referent="111">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -36857,7 +37043,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="111">
+      <Item class="ModuleScript" referent="112">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -37031,7 +37217,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="112">
+      <Item class="ModuleScript" referent="113">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -37123,7 +37309,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="113">
+      <Item class="ModuleScript" referent="114">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -37335,7 +37521,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="114">
+      <Item class="ModuleScript" referent="115">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -37513,7 +37699,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="115">
+      <Item class="ModuleScript" referent="116">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -37666,7 +37852,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="116">
+      <Item class="ModuleScript" referent="117">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -37999,7 +38185,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="117">
+      <Item class="ModuleScript" referent="118">
         <Properties>
           <string name="Name">TownVisitPolicy</string>
           <string name="Source"><![CDATA[--!strict
@@ -38172,7 +38358,7 @@ return table.freeze(TownVisitPolicy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="118">
+      <Item class="ModuleScript" referent="119">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -38334,7 +38520,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="119">
+      <Item class="ModuleScript" referent="120">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -38370,7 +38556,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="120">
+      <Item class="ModuleScript" referent="121">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -38752,7 +38938,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="121">
+      <Item class="ModuleScript" referent="122">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -38822,7 +39008,7 @@ return table.freeze(WeatherProfile)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="122">
+      <Item class="ModuleScript" referent="123">
         <Properties>
           <string name="Name">WhiteHowlerEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -39286,11 +39472,11 @@ return table.freeze(WhiteHowlerEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="123">
+  <Item class="ServerScriptService" referent="124">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="124">
+    <Item class="Script" referent="125">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -40047,7 +40233,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="125">
+      <Item class="ModuleScript" referent="126">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -40145,11 +40331,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="126">
+      <Item class="Folder" referent="127">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="127">
+        <Item class="ModuleScript" referent="128">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -40786,7 +40972,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="128">
+        <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42302,7 +42488,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="129">
+        <Item class="ModuleScript" referent="130">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42805,7 +42991,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="130">
+        <Item class="ModuleScript" referent="131">
           <Properties>
             <string name="Name">CommerceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43630,7 +43816,7 @@ return table.freeze(CommerceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43901,7 +44087,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -44320,7 +44506,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46084,7 +46270,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="134">
+        <Item class="ModuleScript" referent="135">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46968,7 +47154,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="135">
+        <Item class="ModuleScript" referent="136">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47192,7 +47378,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="136">
+        <Item class="ModuleScript" referent="137">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47501,7 +47687,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="137">
+        <Item class="ModuleScript" referent="138">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47957,7 +48143,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="138">
+        <Item class="ModuleScript" referent="139">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -48051,7 +48237,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="139">
+        <Item class="ModuleScript" referent="140">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48269,7 +48455,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="140">
+        <Item class="ModuleScript" referent="141">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49153,7 +49339,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="141">
+        <Item class="ModuleScript" referent="142">
           <Properties>
             <string name="Name">PartyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49837,7 +50023,7 @@ return PartyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="142">
+        <Item class="ModuleScript" referent="143">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -50358,7 +50544,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="143">
+        <Item class="ModuleScript" referent="144">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -50541,7 +50727,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="144">
+        <Item class="ModuleScript" referent="145">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -51157,7 +51343,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="145">
+        <Item class="ModuleScript" referent="146">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -52299,7 +52485,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="146">
+        <Item class="ModuleScript" referent="147">
           <Properties>
             <string name="Name">PrivateServerService</string>
             <string name="Source"><![CDATA[--!strict
@@ -52574,7 +52760,7 @@ return PrivateServerService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="147">
+        <Item class="ModuleScript" referent="148">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -53199,7 +53385,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="148">
+        <Item class="ModuleScript" referent="149">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -55399,7 +55585,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="149">
+        <Item class="ModuleScript" referent="150">
           <Properties>
             <string name="Name">RegionEncounterService</string>
             <string name="Source"><![CDATA[--!strict
@@ -55697,7 +55883,7 @@ return table.freeze(RegionEncounterService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="150">
+        <Item class="ModuleScript" referent="151">
           <Properties>
             <string name="Name">SocialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -55986,7 +56172,7 @@ return table.freeze(SocialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="151">
+        <Item class="ModuleScript" referent="152">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -56944,7 +57130,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="152">
+        <Item class="ModuleScript" referent="153">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -59554,7 +59740,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="153">
+        <Item class="ModuleScript" referent="154">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -60434,7 +60620,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="154">
+        <Item class="ModuleScript" referent="155">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -76022,11 +76208,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="155">
+      <Item class="Folder" referent="156">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="156">
+        <Item class="ModuleScript" referent="157">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -80340,7 +80526,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="157">
+        <Item class="ModuleScript" referent="158">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -81439,7 +81625,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="158">
+        <Item class="ModuleScript" referent="159">
           <Properties>
             <string name="Name">CinderfallBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -82306,7 +82492,7 @@ return table.freeze(CinderfallBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="159">
+        <Item class="ModuleScript" referent="160">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -83001,7 +83187,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="160">
+        <Item class="ModuleScript" referent="161">
           <Properties>
             <string name="Name">FrostmereBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -84050,7 +84236,7 @@ return table.freeze(FrostmereBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="161">
+        <Item class="ModuleScript" referent="162">
           <Properties>
             <string name="Name">IronrootBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -85065,7 +85251,7 @@ return table.freeze(IronrootBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="162">
+        <Item class="ModuleScript" referent="163">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -85924,7 +86110,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="163">
+        <Item class="ModuleScript" referent="164">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -86010,7 +86196,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="164">
+        <Item class="ModuleScript" referent="165">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -86384,7 +86570,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="165">
+        <Item class="ModuleScript" referent="166">
           <Properties>
             <string name="Name">MireglassBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -87140,7 +87326,7 @@ return table.freeze(MireglassBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="166">
+        <Item class="ModuleScript" referent="167">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -87320,7 +87506,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="167">
+        <Item class="ModuleScript" referent="168">
           <Properties>
             <string name="Name">RegionBuilders</string>
             <string name="Source"><![CDATA[--!strict
@@ -88086,7 +88272,7 @@ return table.freeze(RegionBuilders)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="168">
+        <Item class="ModuleScript" referent="169">
           <Properties>
             <string name="Name">TempestBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -88907,7 +89093,7 @@ return table.freeze(TempestBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="169">
+        <Item class="ModuleScript" referent="170">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -89503,7 +89689,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="170">
+        <Item class="ModuleScript" referent="171">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -89740,7 +89926,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="171">
+        <Item class="ModuleScript" referent="172">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -89829,7 +90015,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="172">
+        <Item class="ModuleScript" referent="173">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -90166,15 +90352,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="173">
+  <Item class="StarterPlayer" referent="174">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="174">
+    <Item class="StarterPlayerScripts" referent="175">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="175">
+      <Item class="LocalScript" referent="176">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -90186,6 +90372,7 @@ local root = ReplicatedStorage:WaitForChild("LastLight", 8)
 assert(root ~= nil, "Last Light shared root did not replicate before client bootstrap timeout")
 
 local Config = require(root.Config)
+local Strings = require(root.Strings)
 local AmbientMotion = require(root.AmbientMotion)
 local ExpeditionContracts = require(root.ExpeditionContracts)
 local MusicCatalog = require(root.MusicCatalog)
@@ -90395,12 +90582,12 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
     end
     if nightActive and not lastNightActive and snapshot.expeditionActive ~= true then
         local nightNumber = tonumber(snapshot.nightNumber) or 0
-        local title = "THE FIRST NIGHT"
-        local subtitle = "KEEP THE LIGHT ALIVE"
+        local title = Strings.get("client.the_first_night")
+        local subtitle = Strings.get("client.keep_the_light_alive")
         if nightNumber >= 1 then
             local theme = TownNightSchedule.theme(nightNumber)
             local profile = TownNightSchedule.profile(nightNumber)
-            title = string.format("NIGHT %d · %s", nightNumber, theme)
+            title = string.format(Strings.get("client.night_n_n"), nightNumber, theme)
             subtitle = tostring(profile.instruction)
         end
         local focus = focusPart("FirstLantern")
@@ -90421,8 +90608,8 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
         local focus = focusPart("BlackoutLanternFire")
         if focus ~= nil then
             vignette:play({
-                title = "THE BLACKOUT",
-                subtitle = "CARRY THE ROOTFIRE",
+                title = Strings.get("client.the_blackout"),
+                subtitle = Strings.get("client.carry_the_rootfire"),
                 focus = focus,
                 duration = 5.5,
             })
@@ -90436,8 +90623,8 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
         local focus = focusPart("OldGrowthElite")
         if focus ~= nil then
             vignette:play({
-                title = "OLD GROWTH",
-                subtitle = "STRIKE THE AMBER HEART",
+                title = Strings.get("common.old_growth"),
+                subtitle = Strings.get("client.strike_the_amber_heart"),
                 focus = focus,
                 duration = 4.5,
             })
@@ -90451,8 +90638,8 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
         local focus = focusPart("WardenStagBoss")
         if focus ~= nil then
             vignette:play({
-                title = "THE WARDEN STAG",
-                subtitle = "CLEANSE THE LIVING ROOTS",
+                title = Strings.get("client.the_warden_stag"),
+                subtitle = Strings.get("client.cleanse_the_living_roots"),
                 focus = focus,
                 duration = 4.5,
             })
@@ -90561,11 +90748,11 @@ task.spawn(function()
 end)
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="176">
+        <Item class="Folder" referent="177">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="177">
+          <Item class="ModuleScript" referent="178">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -90696,7 +90883,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="178">
+          <Item class="ModuleScript" referent="179">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -90713,6 +90900,7 @@ local CosmeticCatalog = require(sharedRoot.CosmeticCatalog)
 local Equipment = require(sharedRoot.Equipment)
 local QuickChat = require(sharedRoot.QuickChat)
 local StoreAvailability = require(sharedRoot.StoreAvailability)
+local Strings = require(sharedRoot.Strings)
 
 -- How many consumables the column shows at once. There are more than a
 -- phone screen has room for, so the HUD shows what a player is actually
@@ -91323,7 +91511,7 @@ function HUDController.new(
     local phase = textLabel(
         phaseFrame,
         "Phase",
-        "DAY · MORNING",
+        Strings.get("hud.day_morning"),
         UDim2.fromScale(1, 1),
         UDim2.fromScale(0, 0),
         17,
@@ -91345,7 +91533,7 @@ function HUDController.new(
     local progress = textLabel(
         objectiveFrame,
         "Progress",
-        "FIRST LIGHT · 1 / 8",
+        Strings.get("hud.first_light_1_8"),
         UDim2.new(1, -28, 0, 24),
         UDim2.fromOffset(14, 8),
         12,
@@ -91355,7 +91543,7 @@ function HUDController.new(
     local objective = textLabel(
         objectiveFrame,
         "Objective",
-        "FREE MARA",
+        Strings.get("hud.free_mara"),
         UDim2.new(1, -28, 0, 44),
         UDim2.fromOffset(14, 28),
         26,
@@ -91376,7 +91564,7 @@ function HUDController.new(
     local detail = textLabel(
         objectiveFrame,
         "Detail",
-        "Follow the lantern path.",
+        Strings.get("hud.follow_the_lantern_path"),
         UDim2.new(1, -28, 0, 42),
         UDim2.fromOffset(14, 76),
         18,
@@ -91387,7 +91575,7 @@ function HUDController.new(
     local mara = textLabel(
         canvas,
         "MaraGuide",
-        "Mara: Follow the light.",
+        Strings.get("hud.mara_follow_the_light"),
         UDim2.fromOffset(430, 48),
         UDim2.new(0.5, 0, 1, -164),
         15,
@@ -91403,7 +91591,7 @@ function HUDController.new(
     local resource = textLabel(
         canvas,
         "ResourcePill",
-        "HEARTWOOD · 0",
+        Strings.get("hud.heartwood_0"),
         UDim2.fromOffset(176, 40),
         UDim2.fromOffset(18, 164),
         14,
@@ -91418,7 +91606,7 @@ function HUDController.new(
     local health = textLabel(
         canvas,
         "HealthPill",
-        "HEALTH · 100 / 100",
+        Strings.get("hud.health_100_100"),
         UDim2.fromOffset(150, 40),
         UDim2.new(0, 18, 1, -100),
         13,
@@ -91456,7 +91644,7 @@ function HUDController.new(
     local staminaText = textLabel(
         staminaFrame,
         "Text",
-        "STAMINA · 100",
+        Strings.get("hud.stamina_100"),
         UDim2.fromScale(1, 1),
         UDim2.fromScale(0, 0),
         13,
@@ -91518,7 +91706,7 @@ function HUDController.new(
     local lanternText = textLabel(
         lanternFrame,
         "Text",
-        "LIGHT · 100%",
+        Strings.get("hud.light_100"),
         UDim2.fromScale(1, 1),
         UDim2.fromScale(0, 0),
         13,
@@ -91563,7 +91751,7 @@ function HUDController.new(
     local blackoutTitle = textLabel(
         blackoutFrame,
         "Title",
-        "BRAMBLEWAKE BLACKOUT · STAGE 1/4",
+        Strings.get("hud.bramblewake_blackout_stage_1_4"),
         UDim2.new(1, -20, 0, 24),
         UDim2.fromOffset(10, 4),
         14,
@@ -91575,7 +91763,7 @@ function HUDController.new(
     local blackoutDetail = textLabel(
         blackoutFrame,
         "Detail",
-        "ROOTFIRE RELAY · 0/3",
+        Strings.get("hud.rootfire_relay_0_3"),
         UDim2.new(1, -20, 0, 20),
         UDim2.fromOffset(10, 27),
         11,
@@ -91620,7 +91808,7 @@ function HUDController.new(
     local eliteTitle = textLabel(
         eliteFrame,
         "Title",
-        "OLD GROWTH · PHASE 1/3",
+        Strings.get("hud.old_growth_phase_1_3"),
         UDim2.new(1, -20, 0, 26),
         UDim2.fromOffset(10, 5),
         15,
@@ -91632,7 +91820,7 @@ function HUDController.new(
     local eliteDetail = textLabel(
         eliteFrame,
         "Detail",
-        "EXPOSED · STRIKE THE AMBER HEART",
+        Strings.get("hud.exposed_strike_the_amber_heart"),
         UDim2.new(1, -20, 0, 21),
         UDim2.fromOffset(10, 45),
         12,
@@ -91669,7 +91857,7 @@ function HUDController.new(
     local allyDetail = textLabel(
         allyFrame,
         "Detail",
-        "AHEAD · 14m · 23s",
+        Strings.get("hud.ahead_14m_23s"),
         UDim2.new(1, -24, 0, 24),
         UDim2.fromOffset(12, 33),
         13,
@@ -91706,7 +91894,7 @@ function HUDController.new(
     local threatDetail = textLabel(
         threatFrame,
         "Detail",
-        "DODGE OUT OF THE RING · 0.9s",
+        Strings.get("hud.dodge_out_of_the_ring_0"),
         UDim2.new(1, -24, 0, 25),
         UDim2.fromOffset(12, 34),
         13,
@@ -91762,7 +91950,7 @@ function HUDController.new(
     local downedDetail = textLabel(
         downedFrame,
         "Detail",
-        "DOWNED · CRAWL TOWARD LIGHT",
+        Strings.get("hud.downed_crawl_toward_light"),
         UDim2.new(1, -168, 0, 30),
         UDim2.fromOffset(146, 18),
         15,
@@ -91773,7 +91961,7 @@ function HUDController.new(
     local downedAlly = textLabel(
         downedFrame,
         "NearestAlly",
-        "HELP SIGNAL ACTIVE · NO ALLY NEARBY",
+        Strings.get("hud.help_signal_active_no_ally_nearby"),
         UDim2.new(1, -168, 0, 28),
         UDim2.fromOffset(146, 48),
         13,
@@ -91785,27 +91973,39 @@ function HUDController.new(
     local primary = actionButton(
         canvas,
         "PrimaryAction",
-        "FIND",
+        Strings.get("hud.find"),
         116,
         UDim2.new(1, -28, 1, -30),
         Vector2.new(1, 1)
     )
-    local tool =
-        actionButton(canvas, "UseTool", "STRIKE", 84, UDim2.new(1, -158, 1, -40), Vector2.new(1, 1))
+    local tool = actionButton(
+        canvas,
+        "UseTool",
+        Strings.get("hud.strike"),
+        84,
+        UDim2.new(1, -158, 1, -40),
+        Vector2.new(1, 1)
+    )
     tool.Visible = false
     stroke(tool, COLORS.danger, 0.2)
     local sprint =
         actionButton(canvas, "Sprint", "RUN", 80, UDim2.new(0, 166, 1, -34), Vector2.new(0, 1))
     sprint.Visible = UserInputService.TouchEnabled
     stroke(sprint, COLORS.blue, 0.2)
-    local dodge =
-        actionButton(canvas, "Dodge", "DODGE", 84, UDim2.new(1, -252, 1, -40), Vector2.new(1, 1))
+    local dodge = actionButton(
+        canvas,
+        "Dodge",
+        Strings.get("hud.dodge"),
+        84,
+        UDim2.new(1, -252, 1, -40),
+        Vector2.new(1, 1)
+    )
     dodge.Visible = false
     stroke(dodge, COLORS.amber, 0.12)
     local ability = actionButton(
         canvas,
         "ProfessionAbility",
-        "ABILITY",
+        Strings.get("hud.ability"),
         84,
         UDim2.new(1, -346, 1, -40),
         Vector2.new(1, 1)
@@ -91822,7 +92022,7 @@ function HUDController.new(
     local companion = actionButton(
         canvas,
         "CompanionCommand",
-        "HOUND",
+        Strings.get("hud.hound"),
         84,
         UDim2.new(1, -440, 1, -40),
         Vector2.new(1, 1)
@@ -91838,8 +92038,14 @@ function HUDController.new(
         mid-night, and I AM DOWN is the one phrase whose whole value is being
         one press away.
     ]]
-    local call =
-        actionButton(canvas, "QuickChat", "CALL", 84, UDim2.new(1, -534, 1, -40), Vector2.new(1, 1))
+    local call = actionButton(
+        canvas,
+        "QuickChat",
+        Strings.get("hud.call"),
+        84,
+        UDim2.new(1, -534, 1, -40),
+        Vector2.new(1, 1)
+    )
     call.Visible = false
     stroke(call, COLORS.blue, 0.12)
 
@@ -91877,7 +92083,7 @@ function HUDController.new(
     callClose.Size = UDim2.fromOffset(64, 30)
     callClose.BackgroundColor3 = COLORS.panelSoft
     callClose.Font = Enum.Font.GothamBold
-    callClose.Text = "CLOSE"
+    callClose.Text = Strings.get("hud.close")
     callClose.TextColor3 = COLORS.cream
     callClose.TextSize = 11
     callClose.Selectable = true
@@ -91980,7 +92186,7 @@ function HUDController.new(
     compact.BackgroundColor3 = COLORS.panel
     compact.BackgroundTransparency = 0.1
     compact.Font = Enum.Font.GothamBold
-    compact.Text = "COMPACT"
+    compact.Text = Strings.get("hud.compact")
     compact.TextColor3 = COLORS.muted
     compact.TextSize = 12
     compact.Parent = canvas
@@ -91995,7 +92201,7 @@ function HUDController.new(
     professionButton.BackgroundColor3 = COLORS.panel
     professionButton.BackgroundTransparency = 0.08
     professionButton.Font = Enum.Font.GothamBold
-    professionButton.Text = "PROFESSION"
+    professionButton.Text = Strings.get("hud.profession")
     professionButton.TextColor3 = COLORS.amber
     professionButton.TextSize = 12
     professionButton.Visible = false
@@ -92012,7 +92218,7 @@ function HUDController.new(
     progressButton.BackgroundColor3 = COLORS.panel
     progressButton.BackgroundTransparency = 0.08
     progressButton.Font = Enum.Font.GothamBold
-    progressButton.Text = "FIELD BOOK"
+    progressButton.Text = Strings.get("hud.field_book")
     progressButton.TextColor3 = COLORS.cream
     progressButton.TextSize = 12
     progressButton.Visible = false
@@ -92076,7 +92282,7 @@ function HUDController.new(
     local professionTitle = textLabel(
         professionPanel,
         "Title",
-        "CHOOSE YOUR PROFESSION",
+        Strings.get("hud.choose_your_profession"),
         UDim2.new(1, -100, 0, 34),
         UDim2.fromOffset(24, 18),
         22,
@@ -92087,7 +92293,7 @@ function HUDController.new(
     local professionDetail = textLabel(
         professionPanel,
         "Detail",
-        "Switch freely in Emberhollow. Every traveler keeps core combat, building, and rescue.",
+        Strings.get("hud.switch_freely_in_emberhollow_every_traveler"),
         UDim2.new(1, -48, 0, 42),
         UDim2.fromOffset(24, 52),
         13,
@@ -92103,7 +92309,7 @@ function HUDController.new(
     professionClose.Size = UDim2.fromOffset(72, 64)
     professionClose.BackgroundColor3 = COLORS.panelSoft
     professionClose.Font = Enum.Font.GothamBold
-    professionClose.Text = "CLOSE"
+    professionClose.Text = Strings.get("hud.close")
     professionClose.TextColor3 = COLORS.cream
     professionClose.TextSize = 11
     professionClose.ZIndex = 43
@@ -92137,7 +92343,7 @@ function HUDController.new(
     local progressTitle = textLabel(
         progressPanel,
         "Title",
-        "FIELD BOOK · RECIPES · QUESTS · MASTERY",
+        Strings.get("hud.field_book_recipes_quests_mastery"),
         UDim2.new(1, -120, 0, 34),
         UDim2.fromOffset(20, 18),
         16,
@@ -92176,7 +92382,7 @@ function HUDController.new(
     local progressText = textLabel(
         progressScroll,
         "Details",
-        "Loading field notes…",
+        Strings.get("hud.loading_field_notes"),
         UDim2.new(1, -10, 0, 0),
         UDim2.fromOffset(0, 0),
         13,
@@ -92257,7 +92463,7 @@ function HUDController.new(
     whetButton.Size = UDim2.fromOffset(220, 30)
     whetButton.BackgroundColor3 = COLORS.panelSoft
     whetButton.Font = Enum.Font.GothamBold
-    whetButton.Text = "WHET"
+    whetButton.Text = Strings.get("hud.whet")
     whetButton.TextColor3 = COLORS.amber
     whetButton.TextSize = 11
     whetButton.Visible = false
@@ -92273,7 +92479,7 @@ function HUDController.new(
     progressClose.Size = UDim2.fromOffset(72, 42)
     progressClose.BackgroundColor3 = COLORS.panelSoft
     progressClose.Font = Enum.Font.GothamBold
-    progressClose.Text = "CLOSE"
+    progressClose.Text = Strings.get("hud.close")
     progressClose.TextColor3 = COLORS.cream
     progressClose.TextSize = 11
     progressClose.ZIndex = 52
@@ -92323,7 +92529,7 @@ function HUDController.new(
     local storeTitle = textLabel(
         storePanel,
         "Title",
-        "THE OUTFITTER",
+        Strings.get("hud.the_outfitter"),
         UDim2.new(1, -40, 0, 26),
         UDim2.fromOffset(20, 16),
         18,
@@ -92344,7 +92550,7 @@ function HUDController.new(
     local storeAssurance = textLabel(
         storePanel,
         "Assurance",
-        "COSMETIC ONLY — ABILITIES ARE EARNED IN PLAY",
+        Strings.get("hud.cosmetic_only_abilities_are_earned_in"),
         UDim2.new(1, -40, 0, 16),
         UDim2.fromOffset(20, 44),
         11,
@@ -92374,7 +92580,7 @@ function HUDController.new(
     storeClose.Size = UDim2.fromOffset(220, 38)
     storeClose.BackgroundColor3 = COLORS.panelSoft
     storeClose.Font = Enum.Font.GothamBold
-    storeClose.Text = "CLOSE"
+    storeClose.Text = Strings.get("hud.close")
     storeClose.TextColor3 = COLORS.cream
     storeClose.TextSize = 11
     storeClose.Selectable = true
@@ -92417,7 +92623,7 @@ function HUDController.new(
     local storeEmpty = textLabel(
         storeScroll,
         "Empty",
-        "NOTHING IS ON THE RAIL YET.",
+        Strings.get("hud.nothing_is_on_the_rail_yet"),
         UDim2.new(1, -8, 0, 44),
         UDim2.fromOffset(0, 0),
         13,
@@ -92580,7 +92786,7 @@ function HUDController.new(
     local storeWardrobeTitle = textLabel(
         storeScroll,
         "WardrobeTitle",
-        "YOUR WARDROBE",
+        Strings.get("hud.your_wardrobe"),
         UDim2.new(1, -8, 0, 22),
         UDim2.fromOffset(0, 0),
         13,
@@ -92637,7 +92843,7 @@ function HUDController.new(
         rowAction.BackgroundColor3 = COLORS.panel
         rowAction.AutoButtonColor = true
         rowAction.Font = Enum.Font.GothamBold
-        rowAction.Text = "WEAR"
+        rowAction.Text = Strings.get("hud.wear")
         rowAction.TextColor3 = COLORS.cream
         rowAction.TextSize = 12
         rowAction.Selectable = true
@@ -92745,7 +92951,7 @@ function HUDController.new(
     lobbyTitle.Position = UDim2.fromOffset(14, 8)
     lobbyTitle.Size = UDim2.new(1, -28, 0, 18)
     lobbyTitle.Font = Enum.Font.GothamBold
-    lobbyTitle.Text = "DEPARTURE"
+    lobbyTitle.Text = Strings.get("hud.departure")
     lobbyTitle.TextColor3 = Color3.fromRGB(255, 181, 76)
     lobbyTitle.TextSize = 20
     lobbyTitle.TextXAlignment = Enum.TextXAlignment.Left
@@ -92758,7 +92964,7 @@ function HUDController.new(
     lobbyDetail.Position = UDim2.fromOffset(14, 34)
     lobbyDetail.Size = UDim2.new(1, -28, 0, 18)
     lobbyDetail.Font = Enum.Font.Gotham
-    lobbyDetail.Text = "STAND ON THE PLATFORM TO DEPART"
+    lobbyDetail.Text = Strings.get("hud.stand_on_the_platform_to_depart")
     lobbyDetail.TextColor3 = Color3.fromRGB(178, 194, 183)
     lobbyDetail.TextSize = 16
     lobbyDetail.TextXAlignment = Enum.TextXAlignment.Left
@@ -92854,7 +93060,7 @@ function HUDController.new(
     partyLine.Position = UDim2.fromOffset(14, 180)
     partyLine.Size = UDim2.new(1, -28, 0, 16)
     partyLine.Font = Enum.Font.Gotham
-    partyLine.Text = "TRAVELLING ALONE"
+    partyLine.Text = Strings.get("hud.travelling_alone")
     partyLine.TextColor3 = Color3.fromRGB(178, 194, 183)
     partyLine.TextSize = 14
     partyLine.TextXAlignment = Enum.TextXAlignment.Left
@@ -92877,11 +93083,11 @@ function HUDController.new(
     local partyButtons: { [string]: TextButton } = {}
     for order, entry in
         {
-            { key = "rejoin", label = "REJOIN" },
-            { key = "accept", label = "JOIN" },
-            { key = "decline", label = "DECLINE" },
-            { key = "invite", label = "INVITE" },
-            { key = "leave", label = "LEAVE" },
+            { key = "rejoin", label = Strings.get("hud.rejoin") },
+            { key = "accept", label = Strings.get("hud.join") },
+            { key = "decline", label = Strings.get("hud.decline") },
+            { key = "invite", label = Strings.get("hud.invite") },
+            { key = "leave", label = Strings.get("hud.leave") },
         }
     do
         local partyButton = Instance.new("TextButton")
@@ -93603,8 +93809,8 @@ function HUDController._updateStore(self: HUDController, state: any)
     self._storeEmpty.Visible = shown == 0 and worn == 0
     local unpriced = tonumber(store.unpricedProducts) or 0
     self._storeEmpty.Text = if unpriced > 0
-        then string.format("NOTHING IS PRICED YET — %d WAITING ON THE TILL.", unpriced)
-        else "NOTHING IS ON THE RAIL YET."
+        then string.format(Strings.get("hud.nothing_is_priced_yet_n_waiting"), unpriced)
+        else Strings.get("hud.nothing_is_on_the_rail_yet")
 end
 
 --[[
@@ -93803,21 +94009,21 @@ function HUDController._updateParty(self: HUDController, state: any)
 
     self._partyLine.Visible = true
     self._partyLine.Text = if hasRejoin
-        then string.format("YOUR PARTY OF %d IS STILL OUT THERE", rejoinSize)
+        then string.format(Strings.get("hud.your_party_of_n_is_still"), rejoinSize)
         elseif invitedBy ~= nil then string.format(
             "%s ASKS YOU TO TRAVEL WITH THEM",
             invitedBy
         )
         elseif party.inParty == true and party.leader == true then string.format(
-            "PARTY OF %d · YOU LEAD",
+            Strings.get("hud.party_of_n_you_lead"),
             size
         )
         elseif party.inParty == true then string.format(
-            "PARTY OF %d · LED BY %s",
+            Strings.get("hud.party_of_n_led_by_n"),
             size,
-            tostring(party.leaderName or "SOMEONE")
+            tostring(party.leaderName or Strings.get("hud.someone"))
         )
-        else "TRAVELLING ALONE"
+        else Strings.get("hud.travelling_alone")
 
     buttons.rejoin.Visible = hasRejoin
     buttons.accept.Visible = invitedBy ~= nil
@@ -93923,15 +94129,16 @@ function HUDController._updateLobby(self: HUDController, state: any)
     self._lobbyFrame.Visible = true
     self:_updateParty(state)
     if lobby.counting then
-        self._lobbyTitle.Text = string.format("DEPARTING IN %d", lobby.secondsRemaining)
+        self._lobbyTitle.Text =
+            string.format(Strings.get("hud.departing_in_n"), lobby.secondsRemaining)
         self._lobbyDetail.Text =
             string.format("%d ON THE PLATFORM * PARTY OF %d", lobby.readyCount, lobby.partySize)
         self._lobbySizes.Visible = false
     else
-        self._lobbyTitle.Text = "DEPARTURE"
+        self._lobbyTitle.Text = Strings.get("hud.departure")
         local chosen = self._selectedPartySize
         self._lobbyDetail.Text = if chosen ~= nil and lobby.readyCount <= 0
-            then string.format("PARTY OF %d * STAND ON THE PLATFORM", chosen)
+            then string.format(Strings.get("hud.party_of_n_stand_on_the"), chosen)
             elseif chosen ~= nil then string.format(
                 "%d ON THE PLATFORM * PARTY OF %d",
                 lobby.readyCount,
@@ -93941,7 +94148,7 @@ function HUDController._updateLobby(self: HUDController, state: any)
                 "%d ON THE PLATFORM * CHOOSE PARTY SIZE",
                 lobby.readyCount
             )
-            else "STAND ON THE PLATFORM TO DEPART"
+            else Strings.get("hud.stand_on_the_platform_to_depart")
         self._lobbySizes.Visible = true
         local maximum = if type(lobby.maxPartySize) == "number" then lobby.maxPartySize else 8
         for size, button in self._lobbySizeButtons do
@@ -94010,7 +94217,7 @@ function HUDController.setInputMode(self: HUDController, mode: string)
     self._tool.Text = if mode == "keyboard"
         then "CLICK\nSTRIKE"
         elseif mode == "gamepad" then "RT\nSTRIKE"
-        else "STRIKE"
+        else Strings.get("hud.strike")
     self:_updateCombatClock()
     self:_updateProfessionClock()
     self:_refreshActionCluster()
@@ -94056,13 +94263,16 @@ function HUDController._updateCombatClock(self: HUDController)
         elseif stamina < maxStamina * 0.55 then COLORS.amber
         else COLORS.blue
     self._staminaText.Text = if rooted
-        then string.format("ROOTED %.1fs · STAMINA %d", rootedRemaining, stamina)
+        then string.format(Strings.get("hud.rooted_ns_stamina_n"), rootedRemaining, stamina)
         elseif drowsy then string.format(
-            "DROWSY %.1fs · STAMINA %d",
+            Strings.get("hud.drowsy_ns_stamina_n"),
             drowsyRemaining,
             stamina
         )
-        elseif stamina < dodgeCost then string.format("LOW STAMINA · %d", stamina)
+        elseif stamina < dodgeCost then string.format(
+            Strings.get("hud.low_stamina_n"),
+            stamina
+        )
         else string.format("STAMINA · %d", stamina)
     self._staminaText.TextColor3 = if rooted
             or drowsy
@@ -94094,7 +94304,7 @@ function HUDController._updateCombatClock(self: HUDController)
         elseif not combatEnabled then "DODGE\nOFF"
         elseif cooldownRemaining > 0 then string.format("DODGE\n%.1fs", cooldownRemaining)
         elseif stamina < dodgeCost then "DODGE\nLOW"
-        else prefix .. "DODGE"
+        else prefix .. Strings.get("hud.dodge")
 end
 
 function HUDController._updateProfessionClock(self: HUDController)
@@ -94113,7 +94323,9 @@ function HUDController._updateProfessionClock(self: HUDController)
     if hasCompanion then
         self._companionMode = if companion.mode == "stay" then "stay" else "follow"
         -- the button names the order it will give, not the state it is in
-        self._companion.Text = if self._companionMode == "follow" then "STAY" else "FOLLOW"
+        self._companion.Text = if self._companionMode == "follow"
+            then Strings.get("hud.stay")
+            else Strings.get("hud.follow")
     end
 
     --[[
@@ -94157,8 +94369,8 @@ function HUDController._updateProfessionClock(self: HUDController)
     -- character kits (docs/CHARACTER_KITS_SPEC.md), and selling one word
     -- while the HUD uses it for a free system would be a bait.
     self._professionButton.Text = if displayName == nil
-        then "PROFESSION"
-        else "ROLE · " .. displayName
+        then Strings.get("hud.profession")
+        else Strings.get("hud.role") .. displayName
 
     for professionId, card in self._professionCards do
         local selected = professionId == selectedId
@@ -94188,7 +94400,7 @@ function HUDController._updateProfessionClock(self: HUDController)
     local remaining = math.max(0, readyAt - now)
     local active = now < activeUntil
     local ready = profession.enabled ~= false and not self._playerDowned and remaining <= 0
-    local abilityName = string.upper(tostring(profession.abilityName or "ABILITY"))
+    local abilityName = string.upper(tostring(profession.abilityName or Strings.get("hud.ability")))
     local compactAbilityName = string.gsub(abilityName, " ", "\n", 1)
     local prefix = if self._inputMode == "keyboard"
         then "Q\n"
@@ -94281,9 +94493,9 @@ function HUDController._updateProgress(self: HUDController)
     local function muted(text: string): string
         return string.format('<font color="#B8A88F">%s</font>', escape(text))
     end
-    local lines = { header("RECIPES") }
+    local lines = { header(Strings.get("hud.recipes")) }
     if #(state.recipes or {}) == 0 then
-        table.insert(lines, muted("Nothing learned yet — find a workbench."))
+        table.insert(lines, muted(Strings.get("hud.nothing_learned_yet_find_a_workbench")))
     end
     for _, recipe in state.recipes or {} do
         local materials = {}
@@ -94303,13 +94515,13 @@ function HUDController._updateProgress(self: HUDController)
         )
     end
     table.insert(lines, "")
-    table.insert(lines, header("QUESTS"))
+    table.insert(lines, header(Strings.get("hud.quests")))
     if #(state.quests or {}) == 0 then
-        table.insert(lines, muted("No open quests."))
+        table.insert(lines, muted(Strings.get("hud.no_open_quests")))
     end
     for _, quest in state.quests or {} do
         local status = if quest.claimed
-            then "CLAIMED"
+            then Strings.get("hud.claimed")
             else string.format("%d/%d", quest.progress, quest.threshold)
         table.insert(lines, string.format("• %s  ·  %s", escape(quest.displayName), status))
     end
@@ -94329,7 +94541,7 @@ function HUDController._updateProgress(self: HUDController)
             lines,
             header(
                 string.format(
-                    "MEMORY ARCHIVE · %d / %d RECOVERED",
+                    Strings.get("hud.memory_archive_n_n_recovered"),
                     tonumber(archive.found) or 0,
                     tonumber(archive.total) or 0
                 )
@@ -94350,14 +94562,14 @@ function HUDController._updateProgress(self: HUDController)
     local residentLife = state.residentLife
     if type(residentLife) == "table" and type(residentLife.residents) == "table" then
         table.insert(lines, "")
-        table.insert(lines, header("RESIDENTS"))
+        table.insert(lines, header(Strings.get("hud.residents")))
         local townHost = state.townHost
         if type(townHost) == "table" and townHost.role == "visitor" then
             table.insert(
                 lines,
                 muted(
                     string.format(
-                        "You are a guest in %s's Emberhollow — your help carries, your damage doesn't.",
+                        Strings.get("hud.you_are_a_guest_in_n"),
                         tostring(townHost.hostName or "a founder")
                     )
                 )
@@ -94378,7 +94590,9 @@ function HUDController._updateProgress(self: HUDController)
                 local name = string.upper(
                     (string.gsub(string.gsub(tostring(resident.residentId), "npc_", ""), "_", " "))
                 )
-                local status = if resident.injured then "RESTING — check on them" else "working"
+                local status = if resident.injured
+                    then Strings.get("hud.resting_check_on_them")
+                    else "working"
                 table.insert(
                     lines,
                     string.format(
@@ -94400,7 +94614,7 @@ function HUDController._updateProgress(self: HUDController)
             lines,
             muted(
                 string.format(
-                    "Decorations placed · %d / %d — marked spots around town take materials.",
+                    Strings.get("hud.decorations_placed_n_n_marked_spots"),
                     tonumber(decorations.count) or 0,
                     tonumber(decorations.cap) or 0
                 )
@@ -94408,7 +94622,7 @@ function HUDController._updateProgress(self: HUDController)
         )
     end
     table.insert(lines, "")
-    table.insert(lines, header("PROFESSION MASTERY"))
+    table.insert(lines, header(Strings.get("hud.profession_mastery")))
     for professionId, mastery in state.mastery or {} do
         table.insert(
             lines,
@@ -94422,9 +94636,9 @@ function HUDController._updateProgress(self: HUDController)
     end
     local equipped = state.equipped or {}
     table.insert(lines, "")
-    table.insert(lines, header("LOADOUT"))
+    table.insert(lines, header(Strings.get("hud.loadout")))
     if equipped.head == nil and equipped.feet == nil then
-        table.insert(lines, muted("Nothing equipped yet — craft gear at the workbenches."))
+        table.insert(lines, muted(Strings.get("hud.nothing_equipped_yet_craft_gear_at")))
     else
         table.insert(
             lines,
@@ -94446,8 +94660,11 @@ function HUDController._updateProgress(self: HUDController)
         local button = self._equipmentButtons[itemId]
         local count = tonumber(gear[itemId]) or 0
         button.Visible = self._progressOverlay.Visible and count > 0
-        local label =
-            string.format("%s ×%d", tostring(button:GetAttribute("BaseLabel") or "EQUIP"), count)
+        local label = string.format(
+            "%s ×%d",
+            tostring(button:GetAttribute("BaseLabel") or Strings.get("hud.equip")),
+            count
+        )
         local note = care[itemId]
         if type(note) == "table" then
             if type(note.trait) == "string" then
@@ -94464,7 +94681,7 @@ function HUDController._updateProgress(self: HUDController)
     local whetTarget = state.whetTarget
     if type(whetTarget) == "table" and type(whetTarget.itemId) == "string" then
         self._whetItemId = whetTarget.itemId
-        self._whetButton.Text = tostring(whetTarget.label or "WHET")
+        self._whetButton.Text = tostring(whetTarget.label or Strings.get("hud.whet"))
         self._whetButton.Visible = self._progressOverlay.Visible
     else
         self._whetItemId = nil
@@ -94569,7 +94786,7 @@ function HUDController.setInteraction(self: HUDController, label: string?, avail
         self._primary.AutoButtonColor = false
         self._primary.BackgroundColor3 = Color3.fromRGB(42, 48, 45)
         self._primary.TextColor3 = COLORS.muted
-        self._primary.Text = "DOWNED"
+        self._primary.Text = Strings.get("hud.downed")
         return
     end
     self._primary.Active = available
@@ -94580,7 +94797,9 @@ function HUDController.setInteraction(self: HUDController, label: string?, avail
         then "E · "
         elseif self._inputMode == "gamepad" then "X · "
         else ""
-    self._primary.Text = if available and label ~= nil then prefix .. label else "FIND"
+    self._primary.Text = if available and label ~= nil
+        then prefix .. label
+        else Strings.get("hud.find")
 end
 
 function HUDController.canInteractAction(self: HUDController, actionId: string): boolean
@@ -94777,7 +94996,9 @@ function HUDController._layout(self: HUDController)
             else UDim2.fromOffset(326, 132)
         self._resource.Position = UDim2.fromOffset(18, 164)
         self._compact.Size = UDim2.fromOffset(118, 38)
-        self._compact.Text = if self._compactEnabled then "EXPAND" else "COMPACT"
+        self._compact.Text = if self._compactEnabled
+            then Strings.get("hud.expand")
+            else Strings.get("hud.compact")
         self._lanternFrame.Position = UDim2.new(0.5, 0, 0, 66)
         self._blackoutFrame.Position = UDim2.new(0.5, 0, 0, 66)
         self._blackoutFrame.Size = UDim2.fromOffset(420, 64)
@@ -94837,10 +95058,10 @@ function HUDController._layout(self: HUDController)
 end
 
 function HUDController._presentPhase(self: HUDController, phase: string)
-    local accent = if phase == "DUSK"
+    local accent = if phase == Strings.get("hud.dusk")
         then Color3.fromRGB(255, 164, 91)
-        elseif phase == "NIGHT" then Color3.fromRGB(174, 211, 255)
-        elseif phase == "REVEAL" then Color3.fromRGB(172, 255, 205)
+        elseif phase == Strings.get("hud.night") then Color3.fromRGB(174, 211, 255)
+        elseif phase == Strings.get("hud.reveal") then Color3.fromRGB(172, 255, 205)
         else COLORS.amber
 
     self._phase.TextColor3 = accent
@@ -94893,10 +95114,14 @@ function HUDController._updateClock(self: HUDController)
         local targetEndsAt = tonumber(blackout.targetEndsAt) or 0
         local remaining = math.max(0, math.ceil(targetEndsAt - workspace:GetServerTimeNow()))
         clockText = if remaining > 0
-            then string.format("BLACKOUT · %02d:%02d", math.floor(remaining / 60), remaining % 60)
-            else "BLACKOUT · OVERTIME"
+            then string.format(
+                Strings.get("hud.blackout_n_n"),
+                math.floor(remaining / 60),
+                remaining % 60
+            )
+            else Strings.get("hud.blackout_overtime")
     elseif blackoutVisible then
-        clockText = "DAWN · CHAPTER I"
+        clockText = Strings.get("hud.dawn_chapter_i")
     elseif phaseEndsAt > 0 then
         --[[
             A held clock reads its seconds off the server rather than deriving
@@ -94914,17 +95139,19 @@ function HUDController._updateClock(self: HUDController)
         local remaining = if held
             then math.max(0, math.ceil(tonumber(state.phaseRemaining) or 0))
             else math.max(0, math.ceil(phaseEndsAt - workspace:GetServerTimeNow()))
-        -- "LEFT" because "DAY · 02:58" reads as three in the morning, not as
+        -- Strings.get("hud.left") because "DAY · 02:58" reads as three in the morning, not as
         -- a countdown. Two glyphs of clarity beat two glyphs of mystery.
         clockText = string.format(
             "%s · %02d:%02d %s",
             phase,
             math.floor(remaining / 60),
             remaining % 60,
-            if held then "HELD" else "LEFT"
+            if held then Strings.get("hud.held") else Strings.get("hud.left")
         )
     else
-        clockText = if phase == "REVEAL" then "DAWN · FIRST LIGHT" else phase .. " · MORNING"
+        clockText = if phase == Strings.get("hud.reveal")
+            then Strings.get("hud.dawn_first_light")
+            else phase .. " · MORNING"
     end
     --[[
         A practice server says so on the clock, and it says so to everybody.
@@ -94942,7 +95169,7 @@ function HUDController._updateClock(self: HUDController)
     ]]
     local practice = state.practice == true
     if practice then
-        clockText = "PRACTICE · " .. clockText
+        clockText = Strings.get("hud.practice") .. clockText
     end
     local pillWidth = if practice then 300 else 206
     if self._phaseFrame.Size.X.Offset ~= pillWidth then
@@ -94968,8 +95195,8 @@ function HUDController._updateClock(self: HUDController)
             elseif blackout.overtime then COLORS.danger
             else COLORS.blue
         self._blackoutTitle.Text = string.format(
-            "BRAMBLEWAKE BLACKOUT · %s · %d/%d",
-            tostring(blackout.stageLabel or "STAGE"),
+            Strings.get("hud.bramblewake_blackout_n_n_n"),
+            tostring(blackout.stageLabel or Strings.get("hud.stage")),
             tonumber(blackout.stage) or 0,
             tonumber(blackout.stageCount) or 4
         )
@@ -94980,28 +95207,28 @@ function HUDController._updateClock(self: HUDController)
                     (tonumber(blackout.fireExpiresAt) or 0) - workspace:GetServerTimeNow()
                 )
                 self._blackoutDetail.Text = string.format(
-                    "CARRY ROOTFIRE %.1fs → %s · %d/%d",
+                    Strings.get("hud.carry_rootfire_ns_n_n_n"),
                     fireRemaining,
-                    tostring(blackout.nextNodeLabel or "NEXT ROOT"),
+                    tostring(blackout.nextNodeLabel or Strings.get("hud.next_root")),
                     tonumber(blackout.deliveredNodes) or 0,
                     tonumber(blackout.relayRequired) or 3
                 )
             else
                 self._blackoutDetail.Text = string.format(
-                    "TAKE ROOTFIRE → %s · %d/%d",
-                    tostring(blackout.nextNodeLabel or "NEXT ROOT"),
+                    Strings.get("hud.take_rootfire_n_n_n"),
+                    tostring(blackout.nextNodeLabel or Strings.get("hud.next_root")),
                     tonumber(blackout.deliveredNodes) or 0,
                     tonumber(blackout.relayRequired) or 3
                 )
             end
         elseif blackout.status == "old_growth" then
-            self._blackoutDetail.Text = "ROOTED WALLS · CLEANSE OLD GROWTH"
+            self._blackoutDetail.Text = Strings.get("hud.rooted_walls_cleanse_old_growth")
         elseif blackout.status == "warden" then
-            self._blackoutDetail.Text = "WARDEN'S SEAL · CLEANSE OR BREAK ANTLERS"
+            self._blackoutDetail.Text = Strings.get("hud.warden_s_seal_cleanse_or_break")
         elseif blackout.status == "resolution" then
             self._blackoutDetail.Text = if blackout.vote == nil
-                then "VOTE: FARMLAND · WILD · SHARED AGROFOREST"
-                else "VOTE RECORDED · WAITING FOR ACTIVE TRAVELERS"
+                then Strings.get("hud.vote_farmland_wild_shared_agroforest")
+                else Strings.get("hud.vote_recorded_waiting_for_active_travelers")
         else
             local decision = string.upper(
                 (string.gsub(tostring(blackout.decision or "chapter resolved"), "_", " "))
@@ -95029,7 +95256,7 @@ function HUDController._updateClock(self: HUDController)
         local apexPhase = math.clamp(tonumber(apex.phase) or 1, 1, 3)
         self._eliteTitle.Text = string.format(
             "%s · PHASE %d/3 · %d/%d",
-            if bossView then "WARDEN STAG" else "OLD GROWTH",
+            if bossView then Strings.get("hud.warden_stag") else Strings.get("common.old_growth"),
             apexPhase,
             health,
             maxHealth
@@ -95047,14 +95274,14 @@ function HUDController._updateClock(self: HUDController)
                     elseif apex.outcome == "harmed" then "DEFEATED · FOREST HARMED · +5 AMBER SAP"
                     else "DEFEATED · FOREST SCARRED · +5 AMBER SAP"
                 elseif apex.rewardEligible then "CLEANSED · +3 AMBER SAP UNBANKED"
-                else "CLEANSED · CONTINUE TO WAYHOME"
+                else Strings.get("hud.cleansed_continue_to_wayhome")
             self._eliteDetail.TextColor3 = COLORS.green
         elseif bossView and apex.exposed then
-            self._eliteDetail.Text = "HEART EXPOSED · STRIKE THE MEMORY SEAL"
+            self._eliteDetail.Text = Strings.get("hud.heart_exposed_strike_the_memory_seal")
             self._eliteDetail.TextColor3 = COLORS.amber
         elseif bossView then
             self._eliteDetail.Text = string.format(
-                "ROOTS %d/%d · PRESERVE: CLEANSE · ANTLERS %d/2",
+                Strings.get("hud.roots_n_n_preserve_cleanse_antlers"),
                 tonumber(apex.cleansedNodes) or 0,
                 tonumber(apex.rootNodesRequired) or 0,
                 tonumber(apex.antlersBroken) or 0
@@ -95066,13 +95293,13 @@ function HUDController._updateClock(self: HUDController)
             local fireRemaining =
                 math.max(0, (tonumber(apex.fireExpiresAt) or 0) - workspace:GetServerTimeNow())
             self._eliteDetail.Text =
-                string.format("FIRE %.1fs · REACH THE ROOT HEART", fireRemaining)
+                string.format(Strings.get("hud.fire_ns_reach_the_root_heart"), fireRemaining)
             self._eliteDetail.TextColor3 = COLORS.amber
         elseif apex.shielded then
-            self._eliteDetail.Text = "SHIELDED · TAKE LANTERN FIRE"
+            self._eliteDetail.Text = Strings.get("hud.shielded_take_lantern_fire")
             self._eliteDetail.TextColor3 = COLORS.danger
         else
-            self._eliteDetail.Text = "EXPOSED · STRIKE THE AMBER HEART"
+            self._eliteDetail.Text = Strings.get("hud.exposed_strike_the_amber_heart")
             self._eliteDetail.TextColor3 = COLORS.amber
         end
         self._eliteFrame.Visible = apex.active == true or apex.complete == true
@@ -95087,17 +95314,19 @@ function HUDController._updateClock(self: HUDController)
     if type(threat) == "table" and not self._playerDowned then
         local remaining =
             math.max(0, (tonumber(threat.resolvesAt) or 0) - workspace:GetServerTimeNow())
-        local enemyName = tostring(threat.enemyName or "THREAT")
-        local attackName = tostring(threat.displayName or "ATTACK")
+        local enemyName = tostring(threat.enemyName or Strings.get("hud.threat"))
+        local attackName = tostring(threat.displayName or Strings.get("hud.attack"))
         local title = if string.find(attackName, enemyName, 1, true) ~= nil
             then attackName
             else enemyName .. " · " .. attackName
-        local shape = if threat.shape == "lane" then "LANE" else "RING"
+        local shape = if threat.shape == "lane"
+            then Strings.get("hud.lane")
+            else Strings.get("hud.ring")
         self._threatTitle.Text = "!! " .. title
         self._threatDetail.Text = string.format(
             "%s · %s · %.1fs",
             shape,
-            tostring(threat.instruction or "MOVE"),
+            tostring(threat.instruction or Strings.get("hud.move")),
             remaining
         )
         self._threatFrame.Visible = remaining > 0
@@ -95120,22 +95349,22 @@ function HUDController._updateClock(self: HUDController)
         local nearest = selfState.nearestAlly
         self._downedAlly.Text = if type(nearest) == "table"
             then string.format(
-                "HELP ACTIVE · %s %dm · %s",
-                tostring(nearest.direction or "UNKNOWN"),
+                Strings.get("hud.help_active_n_nm_n"),
+                tostring(nearest.direction or Strings.get("hud.unknown")),
                 tonumber(nearest.distance) or 0,
-                string.upper(tostring(nearest.displayName or "ALLY"))
+                string.upper(tostring(nearest.displayName or Strings.get("hud.ally")))
             )
-            else "HELP SIGNAL ACTIVE · NO ALLY NEARBY"
+            else Strings.get("hud.help_signal_active_no_ally_nearby")
     end
     local ally = survival.ally
     if type(ally) == "table" and not self._playerDowned then
         local bleedoutAt = tonumber(ally.bleedoutAt) or 0
         local remaining = math.max(0, math.ceil(bleedoutAt - workspace:GetServerTimeNow()))
         self._allyTitle.Text = "✚ ALLY DOWN · "
-            .. string.upper(tostring(ally.displayName or "ALLY"))
+            .. string.upper(tostring(ally.displayName or Strings.get("hud.ally")))
         self._allyDetail.Text = string.format(
             "%s · %dm · %02ds%s",
-            tostring(ally.direction or "UNKNOWN"),
+            tostring(ally.direction or Strings.get("hud.unknown")),
             tonumber(ally.distance) or 0,
             remaining,
             if ally.reviveEndsAt ~= nil then " · REVIVING" else ""
@@ -95160,7 +95389,7 @@ function HUDController.update(self: HUDController, state: any)
     -- Sprint is a toggle, not a hold, so the button has to show which it is.
     local combat = state.combat
     local running = type(combat) == "table" and combat.sprinting == true
-    self._sprint.Text = if running then "RUNNING" else "RUN"
+    self._sprint.Text = if running then Strings.get("hud.running") else "RUN"
     self._sprint.BackgroundColor3 = if running then COLORS.blue else COLORS.panel
     local survival = state.survival
     local selfSurvival = if type(survival) == "table" then survival.self else nil
@@ -95183,7 +95412,7 @@ function HUDController.update(self: HUDController, state: any)
         then UDim2.new(0.5, 0, 1, -264)
         else UDim2.new(0.5, 0, 1, -222)
     -- In the lobby the story has not started: the objective card was
-    -- already reading "FREE MARA" over the departure panel, pointing at a
+    -- already reading Strings.get("hud.free_mara") over the departure panel, pointing at a
     -- woman in a town the player had not left for. The card and the guide
     -- line belong to the world past the platform.
     local departedWorld = state.departed == true
@@ -95193,7 +95422,7 @@ function HUDController.update(self: HUDController, state: any)
     self._detail.Text = tostring(state.detail or "")
     self._progress.Text = string.format(
         "%s · %d / %d",
-        tostring(state.trailName or "FIRST LIGHT"),
+        tostring(state.trailName or Strings.get("hud.first_light")),
         tonumber(state.progress) or 0,
         tonumber(state.progressTotal) or 8
     )
@@ -95226,7 +95455,7 @@ function HUDController.update(self: HUDController, state: any)
     local equipped = state.equipped
     local heldWeapon = if type(equipped) == "table" and equipped.weapon ~= nil then "BOW" else nil
     self._resource.Text = string.format(
-        "HEARTWOOD · %d%s",
+        Strings.get("hud.heartwood_nn"),
         tonumber(state.resources) or 0,
         if heldWeapon ~= nil
             then "  ·  🏹 " .. heldWeapon
@@ -95242,7 +95471,7 @@ function HUDController.update(self: HUDController, state: any)
     local maxHealth = if type(selfSurvival) == "table"
         then tonumber(selfSurvival.maxHealth) or 100
         else 100
-    self._health.Text = string.format("HEALTH · %d / %d", health, maxHealth)
+    self._health.Text = string.format(Strings.get("hud.health_n_n"), health, maxHealth)
     self._health.TextColor3 = if health <= 35 then COLORS.danger else COLORS.cream
     self._health.Visible = not self._playerDowned and (nightActive or health < maxHealth)
     self._resource.Visible = not nightActive
@@ -95310,7 +95539,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="179">
+          <Item class="ModuleScript" referent="180">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -95678,7 +95907,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="180">
+          <Item class="ModuleScript" referent="181">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -95786,7 +96015,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="181">
+          <Item class="ModuleScript" referent="182">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -95905,7 +96134,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="182">
+          <Item class="ModuleScript" referent="183">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -95932,7 +96161,10 @@ return MusicController
 ]]
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+
+local Strings = require(ReplicatedStorage:WaitForChild("LastLight").Strings)
 
 local ObjectiveMarkerController = {}
 ObjectiveMarkerController.__index = ObjectiveMarkerController
@@ -96098,7 +96330,7 @@ function ObjectiveMarkerController.setTargets(self: ObjectiveMarkerController, t
         text.Font = Enum.Font.GothamBold
         text.TextSize = 15
         text.TextColor3 = AMBER
-        text.Text = "▼ " .. tostring(target.label or "OBJECTIVE")
+        text.Text = "▼ " .. tostring(target.label or Strings.get("objective.objective"))
         text.Parent = card
 
         self._anchors[target.interactionId] = anchor
@@ -96131,7 +96363,7 @@ function ObjectiveMarkerController._step(self: ObjectiveMarkerController)
             if label ~= nil and label:IsA("TextLabel") then
                 label.Text = string.format(
                     "▼ %s · %dm",
-                    tostring(target.label or "OBJECTIVE"),
+                    tostring(target.label or Strings.get("objective.objective")),
                     math.floor(distance + 0.5)
                 )
             end
@@ -96179,7 +96411,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="183">
+          <Item class="ModuleScript" referent="184">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -96334,7 +96566,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="184">
+          <Item class="ModuleScript" referent="185">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -96446,7 +96678,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="185">
+          <Item class="ModuleScript" referent="186">
             <Properties>
               <string name="Name">SocialPingController</string>
               <string name="Source"><![CDATA[--!strict
@@ -96828,7 +97060,7 @@ return table.freeze(SocialPingController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="186">
+          <Item class="ModuleScript" referent="187">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -97030,7 +97262,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="187">
+          <Item class="ModuleScript" referent="188">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -97239,7 +97471,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="188">
+          <Item class="ModuleScript" referent="189">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -97384,7 +97616,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="189">
+          <Item class="ModuleScript" referent="190">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -97684,13 +97916,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="190">
+  <Item class="TextChatService" referent="191">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="191">
+  <Item class="Workspace" referent="192">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

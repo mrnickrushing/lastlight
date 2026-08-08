@@ -7,6 +7,7 @@ local root = ReplicatedStorage:WaitForChild("LastLight", 8)
 assert(root ~= nil, "Last Light shared root did not replicate before client bootstrap timeout")
 
 local Config = require(root.Config)
+local Strings = require(root.Strings)
 local AmbientMotion = require(root.AmbientMotion)
 local ExpeditionContracts = require(root.ExpeditionContracts)
 local MusicCatalog = require(root.MusicCatalog)
@@ -216,12 +217,12 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
     end
     if nightActive and not lastNightActive and snapshot.expeditionActive ~= true then
         local nightNumber = tonumber(snapshot.nightNumber) or 0
-        local title = "THE FIRST NIGHT"
-        local subtitle = "KEEP THE LIGHT ALIVE"
+        local title = Strings.get("client.the_first_night")
+        local subtitle = Strings.get("client.keep_the_light_alive")
         if nightNumber >= 1 then
             local theme = TownNightSchedule.theme(nightNumber)
             local profile = TownNightSchedule.profile(nightNumber)
-            title = string.format("NIGHT %d · %s", nightNumber, theme)
+            title = string.format(Strings.get("client.night_n_n"), nightNumber, theme)
             subtitle = tostring(profile.instruction)
         end
         local focus = focusPart("FirstLantern")
@@ -242,8 +243,8 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
         local focus = focusPart("BlackoutLanternFire")
         if focus ~= nil then
             vignette:play({
-                title = "THE BLACKOUT",
-                subtitle = "CARRY THE ROOTFIRE",
+                title = Strings.get("client.the_blackout"),
+                subtitle = Strings.get("client.carry_the_rootfire"),
                 focus = focus,
                 duration = 5.5,
             })
@@ -257,8 +258,8 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
         local focus = focusPart("OldGrowthElite")
         if focus ~= nil then
             vignette:play({
-                title = "OLD GROWTH",
-                subtitle = "STRIKE THE AMBER HEART",
+                title = Strings.get("common.old_growth"),
+                subtitle = Strings.get("client.strike_the_amber_heart"),
                 focus = focus,
                 duration = 4.5,
             })
@@ -272,8 +273,8 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
         local focus = focusPart("WardenStagBoss")
         if focus ~= nil then
             vignette:play({
-                title = "THE WARDEN STAG",
-                subtitle = "CLEANSE THE LIVING ROOTS",
+                title = Strings.get("client.the_warden_stag"),
+                subtitle = Strings.get("client.cleanse_the_living_roots"),
                 focus = focus,
                 duration = 4.5,
             })

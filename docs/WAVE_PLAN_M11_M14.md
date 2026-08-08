@@ -213,16 +213,31 @@ the switches and the measurements that population needs to be worth having.
 | A ✅ | **Cohort-scoped feature flags** (shipped #346). `RolloutCohorts` (pure) owns the four rungs and three rules: **the ladder only widens** (`admits` walks bottom-up and returns at the first rung that lets a player in, so advancing cannot subtract), **a cohort-scoped flag read without a player throws** rather than picking one of two silently wrong defaults, and **a bucket is stable per player and independent per flag** — that last one measured rather than reasoned about, because the affine first version made two ten-percent cohorts perfectly disjoint. The switch and the rung are one fact through `globalDefault`, so the bit-identical pin is a consequence. [BETA_ROLLOUT.md](BETA_ROLLOUT.md) is the matrix and the spec reads its rows out of the document | Flag spec: a cohort-scoped flag is off for a player outside the cohort, on inside it, and the global default is unchanged for every existing flag (bit-identical, pinned) |
 | B ✅ | **First-session and first-night telemetry** (shipped #347). Five decisions, five events, and the reason a tuning event is not a gate event: a gate is a rate over instants and every gate emitter reports one instant, while a tuning decision is about a stretch of play. `AnalyticsService` already saw almost every number go past — what it did not do was **accumulate**. Two rules the events follow, both ways a tuning number lies: **a cliff is a comparison, so every checkpoint emits** rather than only the ones somebody suspects, and **an outcome without an attempt number is a survivorship number**. [BETA_TUNING.md](BETA_TUNING.md) is the table and `TuningMetrics.spec` is `GateMetrics.spec`'s three layers pointed at it | Spec: each tuning decision named in the roadmap has an event carrying the number it would be decided on |
 | C ✅ | **Tuning knobs as config** (shipped #348). Wave B gave every decision a number; a number you cannot act on is an observation, so this is the other half. Ten values came out of four services into `Config`, and the rule that makes them knobs is that each has exactly **one home** — a service reading `Config.EliteStrikeRange` while keeping its own `STRIKE_RANGE` is a knob somebody turns and watches do nothing, which is a tuning pass producing a *wrong* answer rather than no answer. The pairing is the load-bearing check: **every decision has at least one knob**, so a sixth tuning decision cannot arrive with an event and no way to respond to it | Spec: the named tuning values live in `Config` and every reader reads them from there |
-| D | *(not yet built; taken out of order — see the note under this table)* **Localization source coverage.** Every player-visible string through one table, so "finalize supported languages from localization QA capacity" is a capacity decision rather than an archaeology project | String spec: no player-visible literal outside the table. The same text check that catches an unwired action catches an unwired string |
+| D 🟡 | **Localization source coverage** (guard and first batch shipped #355). Every player-visible string through one table, so "finalize supported languages from localization QA capacity" is a capacity decision rather than an archaeology project. **The guard landed first, with an explicit list of the files it does not yet cover**, which is the shape `validate_monetization.py`'s allowlist and `Config.SaveSchemaFreeze` already have: the rule is live from the first commit, every exception is named with a reason, and `ALLOWLIST_SIZE` is pinned so the list can only shrink. `src/shared/Strings.luau` is the table, `get` throws on a key nobody defined, and the client surface is migrated. **The wave is finished when the allowlist is empty**; it stands at 91 files holding 2,854 strings | String spec: no player-visible literal outside the table. The same text check that catches an unwired action catches an unwired string — and both directions, since a key nothing reads is a string a translator is paid for and nobody sees |
 | E ✅ | **Kill switches and the rollback drill's code half** (shipped #349). [ROLLBACK.md](ROLLBACK.md) lists every flag, what turning it off leaves, and its **scope** — the column that makes the list load-bearing, because *a switch you have to restart every server to use is not a switch*. `TownNightService` cached the town cycle's flag at construction, so its off switch needed a restart; it is read at the door a cycle comes through now. Writing the list also found **four flags nothing reads at all**, declared `none` with the reason rather than wired into a fiction, and that count is pinned harder than the restart count | Spec: every major system has a flag, and turning it off leaves a playable game rather than an error |
 
-**Wave D is the one M13 wave still to build**, and it was taken out of order
-deliberately rather than started and abandoned: routing every player-visible
-string through one table touches nearly every file that speaks to a player, and
-a half-migrated string table is worse than none — the check that gives it its
-value ("no player-visible literal outside the table") cannot be turned on until
-the migration is complete, so a partial wave leaves a large diff with no guard
-on it. It wants a session with room for the whole thing.
+**Wave D is in flight and guarded.** The reason it sat unbuilt through two
+sessions was real: routing every player-visible string through one table touches
+nearly every file that speaks to a player, and the check that gives the wave its
+value cannot be switched on until the migration is complete — so the obvious
+version is a very large diff with no guard on it, and a half-migrated table
+looks finished from every direction except the one that matters.
+
+The way past that is not to do it all at once, it is to **land the guard first
+with the unmigrated files named**. `scripts/validate_localization.py` runs in
+`npm run check` from the day it landed; a file is either covered, in which case
+it may hold no player-visible literal at all, or on the allowlist with a written
+reason and a promise. `ALLOWLIST_SIZE` is pinned and only ever lowered, so a new
+file that speaks to a player routes its text through the table on the day it is
+written, and every batch in between ships guarded.
+
+**The remaining batches, in the order they are worth doing:** the server
+announcements and toasts (30 services), the world signage and prop labels, and
+the content catalogs, which are the bulk — 130 recipes, 46 quests, 27 residents
+and six expedition definitions. `src/first/LoadingController.client.luau` is the
+one file with an argument for staying: it runs before the shared root
+replicates, which is the whole point of it, and reaching for the table would
+make the loading screen wait for the thing it exists to cover.
 
 **Owner-gated for M13:** every cohort, guardian consent, the measurement
 window, moderation and scale health, the removal decisions, the language

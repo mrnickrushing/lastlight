@@ -7,7 +7,7 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = PR #354, build `0.53.0`,
+Last updated: 2026-08-08, at `main` = PR #355, build `0.53.0`,
 save schema 25, 27 services. Published to Roblox as place version 156,
 matching this revision exactly. (This line used to say ``at `main` = `HEAD` ``,
 and #354 is the wave that noticed `HEAD` is not a revision. The revision a
@@ -25,14 +25,15 @@ that makes that possible is
 available and driven from the terminal (launch recipe in the M7 runbook);
 Studio-facing checks not performed are recorded open rather than assumed.
 
-**Milestone 13's buildable half is four of five waves done** — A (cohort-scoped
-flags), B (tuning telemetry), C (tuning knobs) and E (kill switches and the
-rollback list) all shipped this session. **D, localization source coverage, is
-the one buildable wave left in M13**, and it is left whole rather than half
-done: routing every player-visible string through one table touches nearly every
-file that speaks to a player, and the check that gives the wave its value — *no
-player-visible literal outside the table* — cannot be switched on until the
-migration is complete. A partial pass is a large diff with no guard on it.
+**Milestone 13's buildable half is four waves done and one in flight and
+guarded.** A (cohort-scoped flags), B (tuning telemetry), C (tuning knobs) and E
+(kill switches and the rollback list) are complete. **D, localization source
+coverage, has its table, its guard and its first batch**, and the reason it sat
+unbuilt through two sessions was addressed rather than ignored: the guard landed
+*first*, with the 91 unmigrated files named individually and the count pinned so
+it can only shrink. The wave is finished when that list is empty; 2,854 strings
+are still on it, all of them in server announcements, world signage and content
+catalogs.
 **Milestone 14's buildable half is complete — waves A through E all shipped.**
 
 **Milestones 0 through 11 are complete, and so is Milestone 12's buildable
@@ -82,6 +83,55 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#355** (v157) **M13 wave D: the guard goes in before the migration, or the
+  migration has no guard.** Routing every player-visible string through one table
+  touches nearly every file that speaks to a player, and the check that gives the
+  wave its value — *no player-visible literal outside the table* — cannot be switched
+  on until the migration is complete. That is why this wave sat unbuilt through two
+  sessions, and the reasoning was right: **a half-migrated string table looks finished
+  from every direction except the one that matters.**
+
+  The way past it is not to do the whole thing at once. It is to land the rule with
+  the exceptions named. `scripts/validate_localization.py` runs in `npm run check`
+  from this commit; a file is either covered, in which case it may hold no
+  player-visible literal at all, or it is on an allowlist with a written reason.
+  `ALLOWLIST_SIZE` is pinned at 91 and **only ever lowered**, which is
+  `validate_monetization.py`'s shape and `Config.SaveSchemaFreeze`'s: a new file that
+  speaks to a player routes its text through the table on the day it is written, and
+  every batch between here and empty ships guarded.
+
+  **`src/shared/Strings.luau` is the table, and `get` throws.** That is the whole of
+  its error handling and it is deliberate, because both alternatives ship. Returning
+  the key paints `hud.close` on a button, which at least looks like a bug somebody
+  will file. Returning an empty string paints nothing, which looks like a design. This
+  project has paid four times for a silent fallback hiding a gap — 120 recipes with no
+  bench, 24 residents with no body, ninety craftable items with no equip button — and
+  every one of them was a lookup that answered instead of refusing.
+
+  **The check runs in both directions, which is what makes it a wiring check rather
+  than a lint.** A key nobody defined is a label wired to nothing. A key nobody reads
+  is a string a translator is paid for and no player ever sees — and it is exactly
+  what a migration leaves behind when it moves a line and forgets to delete the old
+  one.
+
+  **The first batch is the client surface**: 121 strings out of `HUDController`,
+  `init.client` and `ObjectiveMarkerController`. Writing the spec found the first
+  duplicate immediately — the Old Growth's name written once in the HUD and once in
+  the client bootstrap. Two keys holding one sentence is the smaller half a translator
+  pays twice for and the larger half where somebody edits one and the game starts
+  saying two things in one voice. Merged under `common`, and no two keys may hold the
+  same text.
+
+  **What is deliberately not translated is anything handed to `warn`, `error`,
+  `print` or `assert`.** A stack trace is read by whoever is holding the console, and
+  paying to translate one only makes it harder to search.
+
+  **Still to migrate, in the order they are worth doing:** server announcements and
+  toasts (30 services), world signage and prop labels, and the content catalogs, which
+  are the bulk. `src/first/LoadingController.client.luau` is the one file with a real
+  argument for staying — it runs before the shared root replicates, which is the whole
+  point of it, and reaching for the table would make the loading screen wait for the
+  thing it exists to cover.
 - **#354** (v156, unchanged — this wave adds a script, a validator and documents)
   **M14 wave E: `HEAD` is not a revision.** ROLLBACK.md's second step says "republish
   the last known-good place revision", and it pointed at this file's own header for
