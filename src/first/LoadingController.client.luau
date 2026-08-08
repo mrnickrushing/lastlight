@@ -105,6 +105,14 @@ end
 
 local backdrop = newFrame(gui, "Backdrop", 1)
 backdrop.Size = UDim2.fromScale(1, 1)
+--[[
+    The title screen swallows input until it is dismissed. Without this a
+    tap anywhere on it fell through to the world behind it -- a full
+    tutorial was once played to the survive stage entirely through this
+    screen without anybody pressing PLAY, every objective triggered by
+    taps the player believed were landing on a menu.
+]]
+backdrop.Active = true
 local skyGradient = Instance.new("UIGradient")
 skyGradient.Rotation = 90
 skyGradient.Color = ColorSequence.new({

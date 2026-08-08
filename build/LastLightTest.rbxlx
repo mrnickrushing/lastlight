@@ -54616,8 +54616,41 @@ local function hideProceduralPlaceholder(placeholder: Instance)
         if removeSemanticGui and (instance:IsA("SurfaceGui") or instance:IsA("BillboardGui")) then
             instance:Destroy()
         elseif instance:IsA("BasePart") then
+            --[[
+                An interaction's tap target is not scenery, whatever it is
+                parented to. The barricade's click volume lives inside the
+                construction plot placeholder, so the blanket below turned
+                it off along with the plot -- and the tutorial's build
+                step stopped answering taps entirely. A part that exists
+                to be clicked keeps its queries.
+            ]]
+            if
+                string.find(instance.Name, "_ClickVolume", 1, true) ~= nil
+                or instance:FindFirstChildOfClass("ClickDetector") ~= nil
+                or instance:FindFirstChildOfClass("ProximityPrompt") ~= nil
+            then
+                continue
+            end
             instance.Transparency = 1
             instance.CastShadow = false
+            --[[
+                A hidden placeholder keeps its collision and loses its
+                claim on taps.
+
+                Collision has to stay: 408 of the 424 authored meshes in
+                this world do not collide at all, so the primitive
+                underneath is the only floor a player stands on and the
+                only wall they cannot walk through. Turning it off drops
+                everybody through the workshop.
+
+                Queries are the opposite. An invisible part that answers a
+                raycast is a tap nobody can aim past, and this world puts
+                one under every replaced mesh -- which is how a player
+                ends up unable to tap the log they can plainly see, with
+                nothing on screen to explain why. The mesh above it, or
+                the interaction's own click volume, should take that tap.
+            ]]
+            instance.CanQuery = false
         elseif
             instance:IsA("Light")
             or instance:IsA("ParticleEmitter")
@@ -56124,6 +56157,17 @@ function WorldService._buildMara(self: WorldService, world: Model)
 
     self._mara = model
     self._maraStandY = model:GetPivot().Position.Y
+    --[[
+        The whole deadfall takes the tap, not a box on Mara's torso.
+
+        The first live playthrough on a phone could not free her: the log
+        is what a player aims at -- it is the thing pinning her, and the
+        objective says to clear it -- but the target was seven studs
+        around her chest, half of it under the log, and the construction
+        plot six studs away answered most of the misses with a line about
+        heartwood. The volume now spans the fallen roots themselves, so
+        tapping anywhere on what looks tappable frees her.
+    ]]
     self:_registerInteraction(
         torso,
         self._runtimeIds.InteractionIds.Mara,
@@ -56132,7 +56176,7 @@ function WorldService._buildMara(self: WorldService, world: Model)
         "Mara",
         nil,
         nil,
-        Vector3.new(7, 8, 7)
+        Vector3.new(16, 9, 12)
     )
 end
 
@@ -56929,10 +56973,18 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         "Barricade",
         nil,
         nil,
-        -- The plot is an 18 x 0.5 slab: almost impossible to hit, and the one
-        -- interaction players reported as simply not working. The volume
-        -- covers the whole worksite, posts and braces included.
-        Vector3.new(20, 12, 12)
+        --[[
+            The plot is an 18 x 0.5 slab: almost impossible to hit bare,
+            and the one interaction players reported as simply not
+            working, so the volume covers the whole worksite footprint.
+            What it must not do is stand up: the player approaches from
+            the south with the deadfall beyond it, so at twelve studs
+            tall this box was a wall across every tap aimed at the log,
+            and at twelve deep it reached the log besides. Wide and low:
+            generous for a tap aimed at the ground, invisible to a tap
+            aimed past it.
+        ]]
+        Vector3.new(20, 5, 9)
     )
 
     local firstLanternFallback = Instance.new("Model")
@@ -82822,6 +82874,55 @@ task.spawn(function()
 end)
 
 print(string.format("[Last Light] Client boot %s", Config.BuildVersion))
+
+--[[
+    Pull the world's mesh assets down before a player reaches them.
+
+    The server hides a mesh's primitive placeholder the moment the mesh
+    is swapped in, but that swap is a fact about the server: a phone that
+    has not yet downloaded the mesh renders nothing where the placeholder
+    was, and the placeholder is still the collision. The first minute of
+    a mobile session was full of solid air because of exactly this --
+    walls that had visibly "not loaded yet" would at least be honest;
+    these were invisible.
+
+    So the client asks for every mesh in the world up front,
+    nearest-to-spawn first, in small batches so the request queue never
+    starves the assets the engine wants for what is actually on screen.
+    Fire-and-forget: nothing waits on it, it just shrinks the window in
+    which a mesh can be touched before it can be seen.
+]]
+task.spawn(function()
+    local ContentProvider = game:GetService("ContentProvider")
+    local spawnPosition = Vector3.new(0, 0, 74)
+    local meshes: { { part: MeshPart, distance: number } } = {}
+    for _, descendant in workspace:GetDescendants() do
+        if descendant:IsA("MeshPart") then
+            table.insert(meshes, {
+                part = descendant,
+                distance = (descendant.Position - spawnPosition).Magnitude,
+            })
+        end
+    end
+    table.sort(meshes, function(a, b)
+        return a.distance < b.distance
+    end)
+    local batch: { Instance } = {}
+    for _, entry in meshes do
+        table.insert(batch, entry.part)
+        if #batch >= 12 then
+            pcall(function()
+                ContentProvider:PreloadAsync(batch)
+            end)
+            batch = {}
+        end
+    end
+    if #batch > 0 then
+        pcall(function()
+            ContentProvider:PreloadAsync(batch)
+        end)
+    end
+end)
 ]]></string>
         </Properties>
         <Item class="Folder" referent="165">
