@@ -119,11 +119,15 @@ Newest first since the last header:
   allowlisted player is one whose guardian consented.
 
   **Verified live in a running server**, because the boot path of every service in
-  the game now runs through a six-argument constructor: the server came up clean,
-  `feature_flags_initialized count=26 scoped=0` logged, and `RolloutCohorts` was
-  driven inside Roblox's own VM — the ladder, the refusal, and 2000 buckets giving
-  the same 20 percent overlap Lune reports. Roblox's `bit32` and Lune's agree,
-  which is not something a spec run outside the engine can say.
+  the game now runs through a six-argument constructor: `feature_flags_initialized
+  count=26 overridesAllowed=true scoped=0` and `server_boot_complete services=27`.
+  Then `RolloutCohorts` was driven inside Roblox's own VM and its answers held
+  against Lune's, **digit for digit**: the ladder reads
+  `off>team>allowlist>cohort>everyone`, a roster member is admitted at `team` and a
+  non-member refused with `outside_cohort` until `allowlist` takes them, and 2000
+  players across two 20 percent flags give `cohortA=404 cohortB=421 both=82` against
+  85 expected in both runtimes, with the same three sample buckets. Roblox's `bit32`
+  and Lune's agree, which is not something a spec run outside the engine can say.
 - **#344** (v151) **M12 wave E: the soak, and three ways the obvious version of it
   passes on a leaking build.** M12 asks that N cycles leave the same counts they
   started with. Read a counter at the start and again at the end and subtract,
