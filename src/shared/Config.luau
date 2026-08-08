@@ -203,6 +203,77 @@ return table.freeze({
         ]]
         cosmetic_store_enabled = false,
     }),
+    --[[
+        Which rung of Milestone 13's rollout each flag has reached.
+
+        The roadmap's four rungs are team and trusted testers, the consented
+        allowlist, the larger controlled cohort, and everyone. `off` is the
+        rung below all of them.
+
+        This table is not a second copy of the switches above -- it is the
+        same fact said in the vocabulary a staged rollout needs, and
+        `RolloutCohorts.globalDefault` is what holds the two together: a flag
+        at `everyone` is on for a player nobody has said anything about, and
+        a flag at any other rung is not. `FeatureFlagService.spec` walks both
+        tables and refuses any disagreement, so a flag added to one and not
+        the other fails on the day it is added rather than on the day a
+        cohort is supposed to see it.
+
+        Nothing sits mid-ladder today, and that is the honest state rather
+        than an oversight: the rungs are populations, and there is no
+        population yet. `RolloutRoster` below is empty for the same reason
+        `CommerceProductIds` is. Why each flag is where it is, is written in
+        the matrix in BETA_ROLLOUT.md, which this table is checked against.
+
+        `percent` is carried at every stage rather than only at `cohort`, so
+        a flag advancing to the cohort rung cannot arrive without one and
+        have somebody pick a number in the same commit that opens the gate.
+    ]]
+    FeatureFlagRollouts = table.freeze({
+        bounded_join = table.freeze({ stage = "everyone", percent = 100 }),
+        first_ten_minutes = table.freeze({ stage = "everyone", percent = 100 }),
+        input_action_system = table.freeze({ stage = "everyone", percent = 100 }),
+        combat_mobility_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        profession_kits_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        player_survival_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        tutorial_persistence = table.freeze({ stage = "off", percent = 0 }),
+        content_registry = table.freeze({ stage = "everyone", percent = 100 }),
+        bramblewake_events_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        old_growth_elite_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        warden_stag_boss_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        bramblewake_blackout_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        town_night_cycle_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        lobby_departure_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        reserved_run_servers_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        admin_commands_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        region_encounters_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        region_bramblewake_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        region_ironroot_enabled = table.freeze({ stage = "off", percent = 0 }),
+        region_mireglass_enabled = table.freeze({ stage = "off", percent = 0 }),
+        region_tempest_enabled = table.freeze({ stage = "off", percent = 0 }),
+        region_frostmere_enabled = table.freeze({ stage = "off", percent = 0 }),
+        region_cinderfall_enabled = table.freeze({ stage = "off", percent = 0 }),
+        region_hollow_enabled = table.freeze({ stage = "off", percent = 0 }),
+        quick_chat_enabled = table.freeze({ stage = "everyone", percent = 100 }),
+        cosmetic_store_enabled = table.freeze({ stage = "off", percent = 0 }),
+    }),
+    --[[
+        The two rosters the first two rungs are read from, by Roblox user ID.
+
+        Empty, and correctly so: a trusted tester is a person the owner has
+        asked, and an allowlisted player is one whose guardian has consented.
+        Neither is something this repository can invent. A flag standing at
+        `team` with an empty roster is on for nobody, which is the safe way
+        for this to be wrong.
+
+        By user ID rather than by name, for `AdminRoster`'s reason: a display
+        name can be changed by the person using it, and the number they join
+        with cannot.
+    ]]
+    RolloutRoster = table.freeze({
+        team = table.freeze({}),
+        allowlist = table.freeze({}),
+    }),
     Environments = table.freeze({
         ["local"] = table.freeze({
             LogLevel = "debug",

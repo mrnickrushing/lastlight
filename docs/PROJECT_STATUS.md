@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #344), build `0.53.0`,
-save schema 25, 27 services. Published to Roblox as place version 151,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #346), build `0.53.0`,
+save schema 25, 27 services. Published to Roblox as place version 152,
 matching this revision exactly. (#341 and #343 both left the built place
 byte-identical, because they add only specs and documentation and the built
 place carries no tests, so publishing either returned the version #340 had
@@ -67,6 +67,63 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#346** (v152) **M13 wave A: a flag can reach some players and not others, and the
+  hard part is what happens when it reaches more.** Milestone 13's rollout is four
+  rungs — team and trusted testers, a consented allowlist, a larger controlled
+  cohort, then everyone — and `FeatureFlagService` has answered one question
+  globally since Milestone 1. `RolloutCohorts` (pure) adds the second question and
+  three rules, each of which is a way a staged rollout goes wrong in somebody's
+  live beta rather than a preference.
+
+  **The ladder only ever widens.** A flag moved from `team` to `allowlist` must not
+  take the feature off the testers it was turned on for — those are the people
+  whose reports the next rung is decided on. That is structural rather than
+  remembered: `admits` walks the rungs from the bottom up to the flag's stage and
+  returns at the first one that lets the player in, so there is no branch that can
+  subtract. Driven as a property over a mixed population rather than asserted at
+  one step: for every player, the set of stages that admit them is upward closed.
+
+  **A cohort-scoped flag read without a player throws.** Every call site in the
+  game asks globally today, and one of them left asking globally about a flag that
+  has since acquired a cohort has to answer something. Both answers are silently
+  wrong in opposite directions — `true` ships an unreleased feature to the whole
+  population, which is the exact thing staging exists to prevent, and `false` hides
+  it from the only people it was turned on for. So there is no answer, the same way
+  an unknown flag already has none.
+
+  **A bucket is stable per player and independent per flag — and the second half
+  had to be measured rather than reasoned about.** The first version hashed
+  `flag .. userId` and ran it through the Lehmer step `ExpeditionGenerator` uses,
+  and every operation in that chain is affine, so changing the flag name shifted
+  every player's bucket by one constant. Two flags at ten percent came out
+  **perfectly disjoint** — 0 players in both against 201 expected — which reads as
+  a lovely property until you notice it means no player in the beta ever sees two
+  new features, and two flags at fifty percent would have cut the population into
+  exact complements. Folding the two hashes with an exclusive or breaks the
+  affinity; the same measurement returns 200 against 201. The spec keeps that
+  measurement rather than a single-player case, because nothing about it is visible
+  from one player and one flag.
+
+  **The switch and the rung are one fact, not two that can drift.** A flag is
+  `true` if and only if it stands at `everyone`, checked through
+  `RolloutCohorts.globalDefault`, so the pin the wave asks for — every existing
+  flag's global answer bit-identical — is a consequence rather than a snapshot.
+  [BETA_ROLLOUT.md](BETA_ROLLOUT.md) is the matrix, with why each flag is where it
+  is, and the spec reads its rows out of the document: **none of the three lists
+  may move alone.**
+
+  Nothing stands mid-ladder today and the spec asserts that too, which is the
+  honest state rather than an oversight — the middle rungs are populations and
+  there is no population. `Config.RolloutRoster` is empty for the reason
+  `CommerceProductIds` is: a trusted tester is somebody the owner asked, and an
+  allowlisted player is one whose guardian consented.
+
+  **Verified live in a running server**, because the boot path of every service in
+  the game now runs through a six-argument constructor: the server came up clean,
+  `feature_flags_initialized count=26 scoped=0` logged, and `RolloutCohorts` was
+  driven inside Roblox's own VM — the ladder, the refusal, and 2000 buckets giving
+  the same 20 percent overlap Lune reports. Roblox's `bit32` and Lune's agree,
+  which is not something a spec run outside the engine can say.
 - **#344** (v151) **M12 wave E: the soak, and three ways the obvious version of it
   passes on a leaking build.** M12 asks that N cycles leave the same counts they
   started with. Read a counter at the start and again at the end and subtract,

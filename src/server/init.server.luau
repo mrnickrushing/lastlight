@@ -64,6 +64,7 @@ local ProfilePersistence = require(root.ProfilePersistence)
 local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
 local TownVisitPolicy = require(root.TownVisitPolicy)
+local RolloutCohorts = require(root.RolloutCohorts)
 local RunHandoff = require(root.RunHandoff)
 local PartySession = require(root.PartySession)
 local PrivateServerControls = require(root.PrivateServerControls)
@@ -124,8 +125,14 @@ assert(environment ~= nil, environmentError)
 
 local environmentConfig = Config.Environments[environment]
 local logger = Logger.new(environment, environmentConfig.LogLevel)
-local featureFlags =
-    FeatureFlagService.new(Config.FeatureFlags, environmentConfig.AllowFlagOverrides, logger)
+local featureFlags = FeatureFlagService.new(
+    Config.FeatureFlags,
+    environmentConfig.AllowFlagOverrides,
+    logger,
+    RolloutCohorts,
+    Config.FeatureFlagRollouts,
+    Config.RolloutRoster
+)
 local content = Registry.new(Regions)
 local networkService = NetworkService.new(logger)
 -- Analytics before the profile service, because a profile transaction is one
