@@ -64,6 +64,7 @@ export type TutorialService = typeof(setmetatable(
         _gearWear: any,
         _gearTraits: any,
         _consumables: any,
+        _townVisitPolicy: any,
         _companionService: any,
         _partyService: any,
         _socialService: any,
@@ -106,7 +107,8 @@ function TutorialService.new(
     toolCatalog: any,
     gearWear: any,
     gearTraits: any,
-    consumables: any
+    consumables: any,
+    townVisitPolicy: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -140,6 +142,7 @@ function TutorialService.new(
         _gearWear = gearWear,
         _gearTraits = gearTraits,
         _consumables = consumables,
+        _townVisitPolicy = townVisitPolicy,
         _companionService = nil,
         _partyService = nil,
         _socialService = nil,
@@ -1244,6 +1247,31 @@ function TutorialService._interact(
         self:_publish(player)
         return
     end
+    if actionId == self._runtimeIds.Actions.SetVisitPolicy then
+        --[[
+            The gate takes the next policy in the list rather than choosing
+            one, so the press carries nothing and there is nothing in it to
+            forge. Only the founder may set it: a visitor standing at the gate
+            of somebody else's town is exactly the person a policy exists to
+            answer, and letting them work the latch would be the whole feature
+            backwards.
+        ]]
+        local hostInfo = self._townNightService:hostInfo(player.UserId)
+        if hostInfo == nil or hostInfo.role ~= "host" then
+            self:_setToast(player, "ONLY THIS TOWN'S FOUNDER SETS ITS GATE")
+            self:_publish(player)
+            return
+        end
+        local nextPolicy = self._townVisitPolicy.next(self._profileService:visitPolicy(player))
+        self._profileService:setVisitPolicy(player, nextPolicy)
+        self._townNightService:setHostPolicy(player.UserId, nextPolicy)
+        self:_setToast(player, "THE GATE IS " .. self._townVisitPolicy.label(nextPolicy))
+        -- Everyone, not just the presser: closing a gate changes what the
+        -- people already standing in the town may read, and a snapshot they
+        -- do not receive is a showcase they keep looking at.
+        self:_publishAll()
+        return
+    end
     if actionId == self._runtimeIds.Actions.OpenFieldBook then
         self:_setToast(player, "FIELD BOOK UPDATED — CHECK RECIPES, QUESTS, AND MASTERY")
         self:_publish(player)
@@ -2243,9 +2271,31 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
                 return nil
             end
             local hostPlayer = Players:GetPlayerByUserId(info.hostUserId)
+            --[[
+                The showcase: the host's own town record, and the reason a
+                policy is worth having. It is attached only for a host or an
+                admitted visitor -- an outsider gets the role and nothing else,
+                and so does a player whose relation the platform has not
+                answered on yet. A record that renders before the gate has
+                spoken is the gate not existing.
+            ]]
+            local showcase = nil
+            if (info.role == "host" or info.role == "visitor") and hostPlayer ~= nil then
+                local consequence = self._profileService:townConsequence(hostPlayer)
+                showcase = {
+                    tier = if type(consequence) == "table" then consequence.tier else nil,
+                    nightNumber = self._townNightService:nightNumber(),
+                    condition = self._townNightService:conditionSnapshot(),
+                }
+            end
             return {
                 role = info.role,
+                policy = if info.role == "host" then info.policy else nil,
+                policyLabel = if info.role == "host"
+                    then self._townVisitPolicy.label(info.policy)
+                    else nil,
                 hostName = if hostPlayer ~= nil then hostPlayer.DisplayName else nil,
+                showcase = showcase,
             }
         end)(),
         guideSpeaker = guideSpeaker,

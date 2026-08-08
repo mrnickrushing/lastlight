@@ -6625,6 +6625,79 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         nil
     )
 
+    --[[
+        The town gate, at the south end of the lantern road.
+
+        A setting about who may come into your Emberhollow belongs at the way
+        into it, not in a menu. The HUD has had buttons taken back off it twice
+        for portrait screens, and the pattern this game keeps landing on is
+        that a thing you do to the world is done at the thing in the world --
+        the same reasoning that moved FIND and STRIKE onto the objects they act
+        on. So the policy is a plank you walk up to and read.
+
+        Two posts and a lintel across the road rather than a sign on a stick,
+        because VISUAL_QUALITY_STANDARD asks for a shape recognizable before
+        its label is read, and a gate is only a gate if the road goes through
+        it. The board hangs at eye height under the beam where the prompt is.
+    ]]
+    local gateFolder = Instance.new("Folder")
+    gateFolder.Name = "TownGate"
+    gateFolder.Parent = interactables
+    local gateX, gateZ = 0, -198
+    for side = -1, 1, 2 do
+        part(
+            gateFolder,
+            "GatePost",
+            Vector3.new(1.7, 12.4, 1.7),
+            CFrame.new(gateX + side * 8.4, 6.2, gateZ),
+            BARK,
+            Enum.Material.Wood
+        )
+        part(
+            gateFolder,
+            "GateBrace",
+            Vector3.new(0.85, 0.85, 5),
+            CFrame.new(gateX + side * 7.1, 10.4, gateZ) * CFrame.Angles(0, 0, math.rad(side * 38)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+    end
+    part(
+        gateFolder,
+        "GateLintel",
+        Vector3.new(19.4, 1.5, 2.3),
+        CFrame.new(gateX, 12.6, gateZ),
+        WET_BARK,
+        Enum.Material.WoodPlanks
+    )
+    --[[
+        Turned to face up the road, which is the direction the town is in.
+
+        A board's Front face is its -Z, and an unrotated board at the south end
+        of the lantern road therefore reads out into the trees -- the live look
+        caught it immediately: the sign was blank from every angle a player
+        approaches from. Everything that reads this gate walks down to it from
+        the square, so the writing faces the square.
+    ]]
+    local gateBoard = part(
+        gateFolder,
+        "GateBoard",
+        Vector3.new(8.2, 3.4, 0.55),
+        CFrame.new(gateX, 9.2, gateZ + 1.1) * CFrame.Angles(0, math.rad(180), 0),
+        Color3.fromRGB(91, 65, 44),
+        Enum.Material.WoodPlanks
+    )
+    WorldSignBuilder.dressBoard(gateBoard, "TOWN GATE", CREAM)
+    self:_registerInteraction(
+        gateBoard,
+        self._runtimeIds.InteractionIds.TownGate,
+        self._runtimeIds.Actions.SetVisitPolicy,
+        "SET",
+        "Town Gate",
+        nil
+    )
+
     local masteryGrove = Instance.new("Folder")
     masteryGrove.Name = "GreenwardMasteryGrove"
     masteryGrove.Parent = interactables

@@ -264,7 +264,7 @@ return {
             -- to be refused the same way a forged chapter is.
             name = "a finale record persists, and a forged one does not",
             run = function()
-                TestRunner.equal(Config.SaveSchemaVersion, 22)
+                TestRunner.equal(Config.SaveSchemaVersion, 23)
                 local profile = resolvedThroughSix(SaveSchema.default(1000))
                 profile = (
                     SaveSchema.withFinaleResolution(profile, "finale:round:trip", {

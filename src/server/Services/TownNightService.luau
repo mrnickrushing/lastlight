@@ -22,7 +22,25 @@ export type TownNightService = typeof(setmetatable(
         _townNightIncident: any,
         _townCondition: any,
         _townPermissions: any,
+        _townVisitPolicy: any,
         _hostUserId: number?,
+        --[[
+            The host's policy, read once when the host is established and kept
+            for the life of the server. Deliberately not re-read from the
+            host's profile on demand: a host who disconnects mid-session leaves
+            their town standing, and a town that opened the moment its founder
+            dropped would be a policy that stops meaning anything exactly when
+            nobody is there to notice.
+        ]]
+        _hostPolicy: string,
+        --[[
+            What each arriving player is to the host -- friend, invited,
+            stranger -- resolved once and kept. The role is derived from this
+            plus the policy rather than stored, so a host cycling the gate
+            re-decides everyone in the server on the same press.
+        ]]
+        _relations: { [number]: string },
+        _pendingContributions: { [number]: any },
         _townGuardLastStand: any,
         _analyticsService: any,
         _condition: any,
@@ -38,6 +56,8 @@ export type TownNightService = typeof(setmetatable(
         _phase: string,
         _phaseEndsAt: number,
         _onChanged: ((string?) -> ())?,
+        _visitPolicyProvider: ((number) -> string)?,
+        _relationResolver: ((number, number, (string) -> ()) -> ())?,
         _onNightCompleted: ((number, number, any) -> ())?,
         _incident: any,
     },
@@ -53,6 +73,7 @@ function TownNightService.new(
     townNightIncident: any,
     townCondition: any,
     townPermissions: any,
+    townVisitPolicy: any,
     townGuardLastStand: any,
     analyticsService: any,
     featureFlags: any
@@ -68,7 +89,11 @@ function TownNightService.new(
         _townNightIncident = townNightIncident,
         _townCondition = townCondition,
         _townPermissions = townPermissions,
+        _townVisitPolicy = townVisitPolicy,
         _hostUserId = nil,
+        _hostPolicy = townVisitPolicy.Default,
+        _relations = {},
+        _pendingContributions = {},
         _townGuardLastStand = townGuardLastStand,
         _analyticsService = analyticsService,
         _condition = townCondition.default(),
@@ -84,6 +109,8 @@ function TownNightService.new(
         _phase = "dormant",
         _phaseEndsAt = 0,
         _onChanged = nil,
+        _visitPolicyProvider = nil,
+        _relationResolver = nil,
         _onNightCompleted = nil,
         _incident = nil,
     }, TownNightService)
@@ -273,18 +300,18 @@ function TownNightService.ensureStarted(
     -- number before it looks at integrity.
     if self._hostUserId == nil and actorUserId ~= nil then
         self._hostUserId = actorUserId
+        local provider = self._visitPolicyProvider
+        if provider ~= nil then
+            self._hostPolicy = self._townVisitPolicy.normalize(provider(actorUserId))
+        end
+        self._logger:info("town_host_established", {
+            host = actorUserId,
+            policy = self._hostPolicy,
+        })
     end
 
-    if condition ~= nil then
-        local role = self._townPermissions.roleFor(actorUserId, self._hostUserId)
-        self._condition = self._townPermissions.resolveCondition(
-            self._condition,
-            condition,
-            role,
-            self._townCondition.merge,
-            self._townCondition.averageIntegrity
-        )
-        self._worldService:setTownCondition(self:conditionSnapshot())
+    if condition ~= nil and actorUserId ~= nil then
+        self:_considerContribution(actorUserId, condition)
     end
     if not self._enabled or self._started then
         return
@@ -293,6 +320,148 @@ function TownNightService.ensureStarted(
     task.spawn(function()
         self:_runCycle()
     end)
+end
+
+--[[
+    Take an arriving player's town record, or do not.
+
+    The host's own record is applied immediately -- it is their town, and their
+    nights are what damaged it. Everyone else has to be decided, and deciding
+    needs an answer the platform gives asynchronously (friendship), so the
+    record is held until the answer lands rather than applied on a guess.
+
+    Holding rather than guessing is the whole point. A guess in the admitting
+    direction is a closed town adopting one stranger's record before the gate
+    can speak, which is exactly the bypass this wave exists to make impossible;
+    a guess in the refusing direction would drop a legitimate visitor's
+    contribution for good. A record that is never decided is simply never
+    applied, and an unapplied upward-only contribution costs a town nothing.
+]]
+function TownNightService._considerContribution(
+    self: TownNightService,
+    actorUserId: number,
+    condition: any
+)
+    if actorUserId == self._hostUserId then
+        self:_applyContribution(actorUserId, condition)
+        return
+    end
+    if self._relations[actorUserId] ~= nil then
+        self:_applyContribution(actorUserId, condition)
+        return
+    end
+    self._pendingContributions[actorUserId] = condition
+    local resolver = self._relationResolver
+    if resolver == nil then
+        -- No resolver wired: every arrival is the plain visitor the town has
+        -- always had, which is upward-only and cannot hurt anything. The
+        -- policy is a narrowing of that, never a widening of it.
+        self._relations[actorUserId] = "stranger"
+        self._hostPolicy = "open"
+        self:_applyContribution(actorUserId, condition)
+        return
+    end
+    resolver(actorUserId, self._hostUserId or actorUserId, function(relation: string)
+        self._relations[actorUserId] = relation
+        local held = self._pendingContributions[actorUserId]
+        if held ~= nil then
+            self:_applyContribution(actorUserId, held)
+        end
+    end)
+end
+
+function TownNightService._applyContribution(
+    self: TownNightService,
+    actorUserId: number,
+    condition: any
+)
+    self._pendingContributions[actorUserId] = nil
+    local role = self:roleFor(actorUserId)
+    if role == "outsider" then
+        self._logger:info("town_visit_refused", {
+            actor = actorUserId,
+            host = self._hostUserId,
+            policy = self._hostPolicy,
+            relation = self._relations[actorUserId],
+        })
+        return
+    end
+    self._condition = self._townPermissions.resolveCondition(
+        self._condition,
+        condition,
+        -- An outsider never reaches here, so TownPermissions still sees the
+        -- two roles it was written for and its invariant is unchanged.
+        if role == "host" then "host" else "visitor",
+        self._townCondition.merge,
+        self._townCondition.averageIntegrity
+    )
+    self._worldService:setTownCondition(self:conditionSnapshot())
+end
+
+--[[
+    What a player is in this town: host, visitor, outsider, or pending.
+
+    Pending is a real answer rather than a placeholder. Until the platform has
+    said whether these two people are friends, the honest thing to report is
+    that it does not know yet -- and because the showcase is attached to the
+    role, pending shows nothing, so an unresolved arrival cannot read a closed
+    town's record in the window before the gate speaks.
+]]
+function TownNightService.roleFor(self: TownNightService, actorUserId: number?): string
+    local hostUserId = self._hostUserId
+    if hostUserId == nil or actorUserId == nil then
+        return "pending"
+    end
+    if actorUserId == hostUserId then
+        return "host"
+    end
+    local relation = self._relations[actorUserId]
+    if relation == nil then
+        return "pending"
+    end
+    return self._townVisitPolicy.roleFor(self._hostPolicy, relation)
+end
+
+function TownNightService.setVisitPolicyProvider(
+    self: TownNightService,
+    provider: (number) -> string
+)
+    self._visitPolicyProvider = provider
+end
+
+function TownNightService.setRelationResolver(
+    self: TownNightService,
+    resolver: (number, number, (string) -> ()) -> ()
+)
+    self._relationResolver = resolver
+end
+
+--[[
+    The host changed their mind at the gate.
+
+    Every already-resolved relation is re-decided by the next `roleFor`, so a
+    town that closes stops showing its record to the people standing in it
+    immediately rather than at their next join. Contributions already adopted
+    stay adopted: closing a gate is not a way to take back what somebody
+    already helped build.
+]]
+function TownNightService.setHostPolicy(self: TownNightService, actorUserId: number, policy: string)
+    if self._hostUserId == nil or actorUserId ~= self._hostUserId then
+        return false
+    end
+    self._hostPolicy = self._townVisitPolicy.normalize(policy)
+    return true
+end
+
+function TownNightService.hostPolicy(self: TownNightService): string
+    return self._hostPolicy
+end
+
+-- Which night this town is on, for the showcase. The active night when one is
+-- running, so a visitor reading the record mid-night sees the night they are
+-- standing in rather than the one after it.
+function TownNightService.nightNumber(self: TownNightService): number
+    return if self._activeNightNumber > 0 then self._activeNightNumber else self._nightNumber
 end
 
 function TownNightService._runCycle(self: TownNightService)
@@ -472,7 +641,8 @@ function TownNightService.hostInfo(self: TownNightService, actorUserId: number?)
     end
     return {
         hostUserId = hostUserId,
-        role = self._townPermissions.roleFor(actorUserId, hostUserId),
+        role = self:roleFor(actorUserId),
+        policy = self._hostPolicy,
     }
 end
 

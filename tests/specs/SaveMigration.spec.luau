@@ -258,6 +258,46 @@ local ERA_PROFILES: { [number]: any } = {
     -- carries a resolved finale that must survive, and must arrive in 22 with
     -- no ticket -- there were no parties to be a member of, so there is
     -- nothing to be sent back to.
+    -- Schema 22 shipped the rejoin ticket; 23 adds the town visit policy. A
+    -- 22-era save carries a ticket that must survive, and must arrive in 23
+    -- OPEN -- every town before this schema was open to whoever the matchmaker
+    -- sent, and migrating them shut would be a change of behaviour wearing a
+    -- safe default's clothes.
+    [22] = {
+        schemaVersion = 22,
+        createdAt = 44,
+        updatedAt = 130,
+        revision = 210,
+        tutorial = { stage = "complete", complete = true, selectedTool = "hammer" },
+        profession = { selectedId = "profession_warden" },
+        gear = { gear_warden_cudgel = 1 },
+        equipped = { weapon = "gear_warden_cudgel" },
+        story = {
+            chapterOne = {
+                completedAt = 44,
+                decision = "wild_regrowth",
+                status = "complete",
+                transactionId = "chapter_1:era22:hash:9",
+                wardenOutcome = "scarred",
+            },
+            finale = {
+                completedAt = 118,
+                ending = "ending_ended",
+                light = 20,
+                status = "complete",
+                transactionId = "finale:era22:hash:9",
+            },
+        },
+        social = {
+            rejoin = {
+                partyId = "party_era22",
+                accessCode = "era22-access-code",
+                partySize = 3,
+                issuedAt = 130,
+                expiresAt = 4102444800,
+            },
+        },
+    },
     [21] = {
         schemaVersion = 21,
         createdAt = 40,
@@ -616,7 +656,16 @@ return {
             ]]
             name = "no save written before parties arrives holding a rejoin ticket",
             run = function()
-                for version = 1, Config.SaveSchemaVersion - 1 do
+                --[[
+                    Bounded at the schema parties shipped in rather than at the
+                    current one. An era-22 save may legitimately carry a ticket
+                    -- 22 is where tickets began -- and the second half of this
+                    case is that its ticket survives the migration intact,
+                    which is the claim that actually matters to a player who
+                    dropped out of a run and updated between.
+                ]]
+                local PARTIES_SCHEMA = 22
+                for version = 1, PARTIES_SCHEMA - 1 do
                     local profile = SaveSchema.normalize(ERA_PROFILES[version], NOW)
                     TestRunner.equal(
                         SaveSchema.rejoinTicket(profile),
@@ -624,6 +673,10 @@ return {
                         string.format("schema %d arrived holding a ticket", version)
                     )
                 end
+                local carried = SaveSchema.rejoinTicket(SaveSchema.normalize(ERA_PROFILES[22], NOW))
+                TestRunner.truthy(carried ~= nil, "an era-22 ticket was dropped by migration")
+                TestRunner.equal(carried.partyId, "party_era22")
+                TestRunner.equal(carried.accessCode, "era22-access-code")
 
                 local forged = table.clone(ERA_PROFILES[21])
                 forged.social = {

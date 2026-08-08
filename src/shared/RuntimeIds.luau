@@ -120,6 +120,14 @@ local RuntimeIds = {
             name somebody else's place.
         ]]
         QuickChat = "quick_chat",
+        --[[
+            Who may visit this town. Interaction-routed like every other thing
+            in the world you walk up to: the gate carries it, the client sends
+            a plain Interact naming the gate, and the server reads the ActionId
+            off the prompt. No payload, because the press does not choose a
+            value -- it takes the next one, and the gate says which that is.
+        ]]
+        SetVisitPolicy = "set_visit_policy",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -162,6 +170,15 @@ local RuntimeIds = {
         CraftAmberEdge = "craft_amber_edge_bench",
         CraftWardenCudgel = "craft_warden_cudgel_bench",
         QuestBoard = "quest_board",
+        --[[
+            The town gate, which is where you decide who comes through it.
+            An interaction rather than a HUD control on purpose: the owner's
+            screen is a portrait phone, this HUD has already had to take
+            buttons back off it twice, and a setting about the town belongs in
+            the town. The same reasoning moved FIND and STRIKE onto the world
+            objects they act on.
+        ]]
+        TownGate = "town_gate_policy",
     }),
     ResidentInteractionIds = table.freeze({
         npc_tomas_reed = "resident_tomas_reed",

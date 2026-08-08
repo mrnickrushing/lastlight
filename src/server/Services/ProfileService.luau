@@ -27,6 +27,7 @@ export type ProfileService = typeof(setmetatable(
         _loadedEvent: BindableEvent,
         _equipmentChangedEvent: BindableEvent,
         _saveSchema: any,
+        _townVisitPolicy: any,
         _profilePersistence: any,
         _profileBackup: any,
         _adminInspectionReport: any,
@@ -63,6 +64,7 @@ function ProfileService.new(logger: Logger, persistent: boolean): ProfileService
         _loadedEvent = Instance.new("BindableEvent"),
         _equipmentChangedEvent = Instance.new("BindableEvent"),
         _saveSchema = nil,
+        _townVisitPolicy = nil,
         _profilePersistence = nil,
         _profileBackup = nil,
         _adminInspectionReport = nil,
@@ -76,6 +78,7 @@ end
 
 function ProfileService.Init(self: ProfileService, context: any)
     self._saveSchema = context.saveSchema
+    self._townVisitPolicy = assert(context.townVisitPolicy, "town visit policy unavailable")
     self._profilePersistence =
         assert(context.profilePersistence, "profile persistence rules unavailable")
     self._profileBackup = assert(context.profileBackup, "profile backup rules unavailable")
@@ -978,6 +981,38 @@ function ProfileService.rejoinTicket(self: ProfileService, player: Player): any
         return nil
     end
     return self._saveSchema.rejoinTicket(profile)
+end
+
+--[[
+    Who may visit this player's Emberhollow.
+
+    Read by TownNightService when it decides what an arriving player is, and
+    written by the town gate. `setVisitPolicy` takes the value rather than
+    cycling here, because the cycle is a fact about the gate's one prompt and
+    this is storage.
+]]
+function ProfileService.visitPolicy(self: ProfileService, player: Player): string
+    local profile = self._profiles[player]
+    if profile == nil then
+        return self._townVisitPolicy.Default
+    end
+    return self._saveSchema.visitPolicy(profile)
+end
+
+function ProfileService.setVisitPolicy(self: ProfileService, player: Player, policy: any): boolean
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return false
+    end
+    local nextProfile = self._saveSchema.withVisitPolicy(profile, policy, os.time())
+    if nextProfile == profile then
+        return false
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    return true
 end
 
 function ProfileService.decorationsSnapshot(self: ProfileService, player: Player): any

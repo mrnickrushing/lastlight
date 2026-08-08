@@ -4835,7 +4835,7 @@ return table.freeze({
     NormalNightSeconds = 6 * 60,
     BlackoutNightSeconds = 9 * 60,
     BlackoutInterval = 7,
-    SaveSchemaVersion = 22,
+    SaveSchemaVersion = 23,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
@@ -29030,6 +29030,14 @@ local RuntimeIds = {
             name somebody else's place.
         ]]
         QuickChat = "quick_chat",
+        --[[
+            Who may visit this town. Interaction-routed like every other thing
+            in the world you walk up to: the gate carries it, the client sends
+            a plain Interact naming the gate, and the server reads the ActionId
+            off the prompt. No payload, because the press does not choose a
+            value -- it takes the next one, and the gate says which that is.
+        ]]
+        SetVisitPolicy = "set_visit_policy",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -29072,6 +29080,15 @@ local RuntimeIds = {
         CraftAmberEdge = "craft_amber_edge_bench",
         CraftWardenCudgel = "craft_warden_cudgel_bench",
         QuestBoard = "quest_board",
+        --[[
+            The town gate, which is where you decide who comes through it.
+            An interaction rather than a HUD control on purpose: the owner's
+            screen is a portrait phone, this HUD has already had to take
+            buttons back off it twice, and a setting about the town belongs in
+            the town. The same reasoning moved FIND and STRIKE onto the world
+            objects they act on.
+        ]]
+        TownGate = "town_gate_policy",
     }),
     ResidentInteractionIds = table.freeze({
         npc_tomas_reed = "resident_tomas_reed",
@@ -29105,6 +29122,7 @@ local HollowFinale = require("./Content/Definitions/HollowFinale")
 local NamelessNight = require("./NamelessNightEncounter")
 local MemoryFragments = require("./MemoryFragments")
 local PartySession = require("./PartySession")
+local TownVisitPolicy = require("./TownVisitPolicy")
 local Quests = require("./Quests")
 local ProfessionMastery = require("./ProfessionMastery")
 local Equipment = require("./Equipment")
@@ -29202,6 +29220,14 @@ export type Profile = {
     ]]
     social: {
         rejoin: PartySession.Ticket?,
+        --[[
+            Who may visit this player's Emberhollow. Lives beside the rejoin
+            ticket because both answer the same question from opposite ends --
+            the ticket is how you get back to people, the policy is who gets to
+            you -- and because a `social` table with one field in it was always
+            going to gain a second.
+        ]]
+        visitPolicy: TownVisitPolicy.Policy,
     },
 }
 
@@ -29220,7 +29246,7 @@ local WARDEN_OUTCOMES = table.freeze({
 
 function SaveSchema.default(now: number): Profile
     return {
-        schemaVersion = 22,
+        schemaVersion = 23,
         createdAt = now,
         updatedAt = now,
         revision = 0,
@@ -29274,6 +29300,7 @@ function SaveSchema.default(now: number): Profile
         },
         social = {
             rejoin = nil,
+            visitPolicy = TownVisitPolicy.Default,
         },
     }
 end
@@ -29560,8 +29587,15 @@ function SaveSchema.normalize(value: any, now: number): Profile
     profile.social.rejoin = PartySession.normalizeTicket(
         if type(value.social) == "table" then value.social.rejoin else nil
     )
+    -- An era-22 save has no policy, and the value it arrives with is the one
+    -- it was already being played under: every town before this schema was
+    -- open to whoever the matchmaker sent. Migrating them to `closed` would be
+    -- a silent change of behaviour dressed as a safe default.
+    profile.social.visitPolicy = TownVisitPolicy.normalize(
+        if type(value.social) == "table" then value.social.visitPolicy else nil
+    )
 
-    profile.schemaVersion = 22
+    profile.schemaVersion = 23
     return profile
 end
 
@@ -30048,6 +30082,28 @@ end
 
 function SaveSchema.rejoinTicket(profile: Profile): any
     return profile.social.rejoin
+end
+
+--[[
+    Set who may visit. A value the catalog does not know is refused outright
+    rather than normalized to the default: the caller is the gate, the gate
+    only ever offers the next value in the list, and quietly writing something
+    else would mean a press that says one thing and stores another.
+]]
+function SaveSchema.withVisitPolicy(profile: Profile, policy: any, now: number): Profile
+    if not TownVisitPolicy.isValid(policy) or policy == profile.social.visitPolicy then
+        return profile
+    end
+    local nextProfile = table.clone(profile)
+    nextProfile.social = table.clone(profile.social)
+    nextProfile.social.visitPolicy = policy
+    nextProfile.updatedAt = now
+    nextProfile.revision += 1
+    return nextProfile
+end
+
+function SaveSchema.visitPolicy(profile: Profile): TownVisitPolicy.Policy
+    return TownVisitPolicy.normalize(profile.social.visitPolicy)
 end
 
 -- Whether two condition states describe the same town. Compared building by
@@ -33875,6 +33931,179 @@ return table.freeze(TownProgression)
       </Item>
       <Item class="ModuleScript" referent="109">
         <Properties>
+          <string name="Name">TownVisitPolicy</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    Who may stand in your Emberhollow, and what standing there gets them.
+
+    A town in this game has always had a host and visitors -- `TownPermissions`
+    settled that in Milestone 4, and its invariant has held since: a visit may
+    improve a town or leave it alone, never break it. What was missing is the
+    other half of the sentence. A player had no say in *who* visited, and no
+    way to be told that they were the one being let in.
+
+    This module is that say, as four values and one question.
+
+    **What a policy actually governs, and what it cannot.** It does not govern
+    presence. Roblox decides which server a player lands in, and a game that
+    tried to eject somebody on arrival would be a game that bricks a public
+    join -- the player did nothing wrong by being matched. So the policy
+    governs what this game does control: whether the arriving player's town
+    record is **adopted into** the host's town, and whether they may **read**
+    the host's showcase. Refused, they are an outsider: they walk the same
+    world, they play their own nights and their own expeditions and their own
+    profile, and the host's Emberhollow is scenery they may not touch or
+    inspect. That is a real boundary rather than a decorative one, because
+    adoption is the only channel by which one player's save has ever reached
+    another player's town.
+
+    **A refusal cannot silently become a downgrade.** An outsider contributes
+    nothing, which is strictly less than the visitor's upward-only
+    contribution, so the Milestone 4 invariant is not merely preserved by this
+    change -- it is preserved twice over, and the spec re-asserts it against
+    this path rather than trusting that.
+
+    The four values are ordered from most open to least, and that order is
+    load-bearing: cycling the gate walks it, and a spec pins it so a value
+    added in the middle cannot quietly change what a press does.
+]]
+
+export type Policy = "open" | "friends" | "invited" | "closed"
+
+--[[
+    What the arriving player is to the host, decided by the server before this
+    module is asked anything. Deliberately not "friend or not": a party member
+    is admitted by a town set to `invited` whether or not they are on the
+    host's friends list, because being asked along is the invitation.
+]]
+export type Relation = "host" | "friend" | "invited" | "stranger"
+
+export type Decision = {
+    allowed: boolean,
+    reason: string,
+}
+
+local TownVisitPolicy = {
+    Default = "open" :: Policy,
+}
+
+local ORDER: { Policy } = { "open", "friends", "invited", "closed" }
+
+local LABELS: { [string]: string } = {
+    open = "OPEN TO ALL TRAVELLERS",
+    friends = "OPEN TO FRIENDS",
+    invited = "OPEN TO THOSE YOU ASKED ALONG",
+    closed = "CLOSED — THIS TOWN IS YOURS ALONE",
+}
+
+--[[
+    Which relations each policy admits.
+
+    Written out rather than derived from the order, because "friends admits an
+    invited stranger" is a decision and not an accident of sorting: somebody
+    you asked onto the departure platform is somebody you chose, and a town
+    that admits your friends but not the party you just built is a town that
+    refuses the people you are actually playing with.
+]]
+local ADMITS: { [string]: { [string]: boolean } } = {
+    open = { host = true, friend = true, invited = true, stranger = true },
+    friends = { host = true, friend = true, invited = true, stranger = false },
+    invited = { host = true, friend = false, invited = true, stranger = false },
+    closed = { host = true, friend = false, invited = false, stranger = false },
+}
+
+local POLICY_SET: { [string]: boolean } = {}
+for _, policy in ORDER do
+    POLICY_SET[policy] = true
+    assert(ADMITS[policy] ~= nil, "policy with no admission row: " .. policy)
+    assert(LABELS[policy] ~= nil, "policy with no label: " .. policy)
+end
+assert(POLICY_SET[TownVisitPolicy.Default], "default policy is not a policy")
+
+function TownVisitPolicy.isValid(policy: any): boolean
+    return type(policy) == "string" and POLICY_SET[policy] == true
+end
+
+--[[
+    Bound whatever came out of storage. An unreadable policy resolves to the
+    default rather than to `closed`: a corrupt byte must not lock a player out
+    of their own town's social life, and the default is the state every save
+    before this schema was in anyway.
+]]
+function TownVisitPolicy.normalize(policy: any): Policy
+    if TownVisitPolicy.isValid(policy) then
+        return policy :: Policy
+    end
+    return TownVisitPolicy.Default
+end
+
+function TownVisitPolicy.list(): { Policy }
+    return ORDER
+end
+
+function TownVisitPolicy.label(policy: any): string
+    return LABELS[TownVisitPolicy.normalize(policy)]
+end
+
+-- The gate is one prompt, so a press walks the list and wraps. The order is
+-- pinned by spec for exactly this reason.
+function TownVisitPolicy.next(policy: any): Policy
+    local current = TownVisitPolicy.normalize(policy)
+    for index, value in ORDER do
+        if value == current then
+            return ORDER[(index % #ORDER) + 1]
+        end
+    end
+    return TownVisitPolicy.Default
+end
+
+--[[
+    The one question. A host is always admitted to their own town, and that is
+    checked first rather than left to the table, because a policy value nobody
+    thought about must never be able to lock a founder out of the place they
+    built.
+]]
+function TownVisitPolicy.admits(policy: any, relation: any): Decision
+    if relation == "host" then
+        return { allowed = true, reason = "host" }
+    end
+    if relation ~= "friend" and relation ~= "invited" and relation ~= "stranger" then
+        -- An unknown relation is treated as the least of them. Guessing
+        -- upward here would mean a new relation kind ships admitted by every
+        -- town in the game before anybody decides it should be.
+        relation = "stranger"
+    end
+    local row = ADMITS[TownVisitPolicy.normalize(policy)]
+    if row[relation] == true then
+        return { allowed = true, reason = tostring(relation) }
+    end
+    return { allowed = false, reason = "refused_" .. tostring(relation) }
+end
+
+--[[
+    The role a player holds once the policy has spoken.
+
+    Three roles rather than TownPermissions' two, and the third is a narrowing
+    of the second: `visitor` is what `TownPermissions` has always meant, and
+    `outsider` is a visitor whose contribution and whose reading are both
+    refused. Everything downstream that already asks TownPermissions about a
+    host or a visitor keeps working unchanged, because an outsider never
+    reaches it.
+]]
+function TownVisitPolicy.roleFor(policy: any, relation: any): string
+    if relation == "host" then
+        return "host"
+    end
+    return if TownVisitPolicy.admits(policy, relation).allowed then "visitor" else "outsider"
+end
+
+return table.freeze(TownVisitPolicy)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="110">
+        <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -34035,7 +34264,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="110">
+      <Item class="ModuleScript" referent="111">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -34071,7 +34300,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="111">
+      <Item class="ModuleScript" referent="112">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -34453,7 +34682,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="112">
+      <Item class="ModuleScript" referent="113">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -34523,7 +34752,7 @@ return table.freeze(WeatherProfile)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="113">
+      <Item class="ModuleScript" referent="114">
         <Properties>
           <string name="Name">WhiteHowlerEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -34987,16 +35216,17 @@ return table.freeze(WhiteHowlerEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="114">
+  <Item class="ServerScriptService" referent="115">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="115">
+    <Item class="Script" referent="116">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
         <string name="Source"><![CDATA[--!strict
 
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -35057,6 +35287,7 @@ local PerformanceBudget = require(root.PerformanceBudget)
 local ProfilePersistence = require(root.ProfilePersistence)
 local ProfileBackup = require(root.ProfileBackup)
 local TownPermissions = require(root.TownPermissions)
+local TownVisitPolicy = require(root.TownVisitPolicy)
 local RunHandoff = require(root.RunHandoff)
 local PartySession = require(root.PartySession)
 local QuickChat = require(root.QuickChat)
@@ -35341,11 +35572,63 @@ local townNightService = TownNightService.new(
     TownNightIncident,
     TownCondition,
     TownPermissions,
+    TownVisitPolicy,
     TownGuardLastStand,
     analyticsService,
     featureFlags
 )
 townNightService:setDefense(defenseService, DefenseLanes)
+--[[
+    Who may visit this town, in the two pieces the service cannot supply
+    itself.
+
+    The policy is read once, from the founder's own profile, at the moment the
+    server adopts them as host -- so a founder who disconnects leaves their
+    gate exactly as they set it. The relation is the asynchronous half:
+    friendship is a platform round trip, and a party membership is something
+    PartyService already knows, so both are answered here and handed back
+    through the callback rather than blocking a profile load on a web call.
+
+    Order matters in the check. Being asked along beats being on a friends
+    list, because the party is the group actually playing together; a stranger
+    the founder invited onto the departure platform is somebody the founder
+    chose, and a town set to "invited" should let them in.
+]]
+townNightService:setVisitPolicyProvider(function(hostUserId: number): string
+    local hostPlayer = Players:GetPlayerByUserId(hostUserId)
+    if hostPlayer == nil then
+        return TownVisitPolicy.Default
+    end
+    return profileService:visitPolicy(hostPlayer)
+end)
+townNightService:setRelationResolver(
+    function(actorUserId: number, hostUserId: number, resolve: (string) -> ())
+        task.spawn(function()
+            if partyService:sharesPartyWith(hostUserId, actorUserId) then
+                resolve("invited")
+                return
+            end
+            local hostPlayer = Players:GetPlayerByUserId(hostUserId)
+            if hostPlayer ~= nil then
+                local ok, friends = pcall(function(): boolean
+                    return hostPlayer:IsFriendsWith(actorUserId)
+                end)
+                if ok and friends == true then
+                    resolve("friend")
+                    return
+                end
+                if not ok then
+                    -- The platform did not answer. A stranger is the honest
+                    -- reading and the safe one: it can only ever refuse, and a
+                    -- refusal costs an upward contribution the town was fine
+                    -- without, while a wrong "friend" opens a closed town.
+                    logger:warn("town_friendship_unavailable", { host = hostUserId })
+                end
+            end
+            resolve("stranger")
+        end)
+    end
+)
 survivalService:setPartyRecoveryProvider(
     function(eligiblePlayers: number, downedPlayers: number): any
         return townNightService:attemptLastStand(eligiblePlayers, downedPlayers)
@@ -35393,7 +35676,8 @@ local tutorialService = TutorialService.new(
     ToolCatalog,
     GearWear,
     GearTraits,
-    Consumables
+    Consumables,
+    TownVisitPolicy
 )
 
 local services = ServiceRegistry.new({
@@ -35406,6 +35690,7 @@ local services = ServiceRegistry.new({
     actionPayloadContract = ActionPayloadContract,
     adminInspectionReport = AdminInspectionReport,
     profilePersistence = ProfilePersistence,
+    townVisitPolicy = TownVisitPolicy,
     profileBackup = ProfileBackup,
     config = Config,
 })
@@ -35527,7 +35812,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="116">
+      <Item class="ModuleScript" referent="117">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -35625,11 +35910,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="117">
+      <Item class="Folder" referent="118">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="118">
+        <Item class="ModuleScript" referent="119">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -36244,7 +36529,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="119">
+        <Item class="ModuleScript" referent="120">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -37144,7 +37429,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="120">
+        <Item class="ModuleScript" referent="121">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -37645,7 +37930,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="121">
+        <Item class="ModuleScript" referent="122">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -37916,7 +38201,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="122">
+        <Item class="ModuleScript" referent="123">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -38336,7 +38621,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="123">
+        <Item class="ModuleScript" referent="124">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -40020,7 +40305,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="124">
+        <Item class="ModuleScript" referent="125">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -40734,7 +41019,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="125">
+        <Item class="ModuleScript" referent="126">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -40838,7 +41123,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="126">
+        <Item class="ModuleScript" referent="127">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41147,7 +41432,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="127">
+        <Item class="ModuleScript" referent="128">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41603,7 +41888,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="128">
+        <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -41697,7 +41982,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="129">
+        <Item class="ModuleScript" referent="130">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -41915,7 +42200,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="130">
+        <Item class="ModuleScript" referent="131">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42785,7 +43070,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">PartyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42920,6 +43205,39 @@ function PartyService._partyOf(self: PartyService, player: Player): (string?, an
         return nil, nil
     end
     return partyId, state
+end
+
+--[[
+    Whether these two people are travelling together, by user ID.
+
+    Read by the town gate rather than by anything in the party flow: a town set
+    to "invited" has to know who the founder asked along, and the party roster
+    is the record of exactly that. An outstanding invitation counts, because
+    being asked is the invitation -- a player who has been offered a seat and
+    has not yet pressed JOIN was still chosen.
+
+    By ID rather than by Player because the founder may have left the server
+    and their user ID is what the town still remembers them by.
+]]
+function PartyService.sharesPartyWith(
+    self: PartyService,
+    firstUserId: number,
+    secondUserId: number
+): boolean
+    if firstUserId == secondUserId then
+        return true
+    end
+    local held = self._partyByUser[firstUserId]
+    if held ~= nil then
+        if self._partyByUser[secondUserId] == held then
+            return true
+        end
+        if self._inviteByUser[secondUserId] == held then
+            return true
+        end
+    end
+    local theirs = self._partyByUser[secondUserId]
+    return theirs ~= nil and self._inviteByUser[firstUserId] == theirs
 end
 
 function PartyService._store(self: PartyService, partyId: string, state: any)
@@ -43400,7 +43718,7 @@ return PartyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43655,7 +43973,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43834,7 +44152,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="134">
+        <Item class="ModuleScript" referent="135">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -44450,7 +44768,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="135">
+        <Item class="ModuleScript" referent="136">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45563,7 +45881,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="136">
+        <Item class="ModuleScript" referent="137">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46188,7 +46506,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="137">
+        <Item class="ModuleScript" referent="138">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46220,6 +46538,7 @@ export type ProfileService = typeof(setmetatable(
         _loadedEvent: BindableEvent,
         _equipmentChangedEvent: BindableEvent,
         _saveSchema: any,
+        _townVisitPolicy: any,
         _profilePersistence: any,
         _profileBackup: any,
         _adminInspectionReport: any,
@@ -46256,6 +46575,7 @@ function ProfileService.new(logger: Logger, persistent: boolean): ProfileService
         _loadedEvent = Instance.new("BindableEvent"),
         _equipmentChangedEvent = Instance.new("BindableEvent"),
         _saveSchema = nil,
+        _townVisitPolicy = nil,
         _profilePersistence = nil,
         _profileBackup = nil,
         _adminInspectionReport = nil,
@@ -46269,6 +46589,7 @@ end
 
 function ProfileService.Init(self: ProfileService, context: any)
     self._saveSchema = context.saveSchema
+    self._townVisitPolicy = assert(context.townVisitPolicy, "town visit policy unavailable")
     self._profilePersistence =
         assert(context.profilePersistence, "profile persistence rules unavailable")
     self._profileBackup = assert(context.profileBackup, "profile backup rules unavailable")
@@ -47173,6 +47494,38 @@ function ProfileService.rejoinTicket(self: ProfileService, player: Player): any
     return self._saveSchema.rejoinTicket(profile)
 end
 
+--[[
+    Who may visit this player's Emberhollow.
+
+    Read by TownNightService when it decides what an arriving player is, and
+    written by the town gate. `setVisitPolicy` takes the value rather than
+    cycling here, because the cycle is a fact about the gate's one prompt and
+    this is storage.
+]]
+function ProfileService.visitPolicy(self: ProfileService, player: Player): string
+    local profile = self._profiles[player]
+    if profile == nil then
+        return self._townVisitPolicy.Default
+    end
+    return self._saveSchema.visitPolicy(profile)
+end
+
+function ProfileService.setVisitPolicy(self: ProfileService, player: Player, policy: any): boolean
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return false
+    end
+    local nextProfile = self._saveSchema.withVisitPolicy(profile, policy, os.time())
+    if nextProfile == profile then
+        return false
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent then
+        self._dirty[player] = true
+    end
+    return true
+end
+
 function ProfileService.decorationsSnapshot(self: ProfileService, player: Player): any
     local profile = self._profiles[player]
     if profile == nil then
@@ -48040,7 +48393,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="138">
+        <Item class="ModuleScript" referent="139">
           <Properties>
             <string name="Name">RegionEncounterService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48338,7 +48691,7 @@ return table.freeze(RegionEncounterService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="139">
+        <Item class="ModuleScript" referent="140">
           <Properties>
             <string name="Name">SocialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48617,7 +48970,7 @@ return table.freeze(SocialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="140">
+        <Item class="ModuleScript" referent="141">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48644,7 +48997,25 @@ export type TownNightService = typeof(setmetatable(
         _townNightIncident: any,
         _townCondition: any,
         _townPermissions: any,
+        _townVisitPolicy: any,
         _hostUserId: number?,
+        --[[
+            The host's policy, read once when the host is established and kept
+            for the life of the server. Deliberately not re-read from the
+            host's profile on demand: a host who disconnects mid-session leaves
+            their town standing, and a town that opened the moment its founder
+            dropped would be a policy that stops meaning anything exactly when
+            nobody is there to notice.
+        ]]
+        _hostPolicy: string,
+        --[[
+            What each arriving player is to the host -- friend, invited,
+            stranger -- resolved once and kept. The role is derived from this
+            plus the policy rather than stored, so a host cycling the gate
+            re-decides everyone in the server on the same press.
+        ]]
+        _relations: { [number]: string },
+        _pendingContributions: { [number]: any },
         _townGuardLastStand: any,
         _analyticsService: any,
         _condition: any,
@@ -48660,6 +49031,8 @@ export type TownNightService = typeof(setmetatable(
         _phase: string,
         _phaseEndsAt: number,
         _onChanged: ((string?) -> ())?,
+        _visitPolicyProvider: ((number) -> string)?,
+        _relationResolver: ((number, number, (string) -> ()) -> ())?,
         _onNightCompleted: ((number, number, any) -> ())?,
         _incident: any,
     },
@@ -48675,6 +49048,7 @@ function TownNightService.new(
     townNightIncident: any,
     townCondition: any,
     townPermissions: any,
+    townVisitPolicy: any,
     townGuardLastStand: any,
     analyticsService: any,
     featureFlags: any
@@ -48690,7 +49064,11 @@ function TownNightService.new(
         _townNightIncident = townNightIncident,
         _townCondition = townCondition,
         _townPermissions = townPermissions,
+        _townVisitPolicy = townVisitPolicy,
         _hostUserId = nil,
+        _hostPolicy = townVisitPolicy.Default,
+        _relations = {},
+        _pendingContributions = {},
         _townGuardLastStand = townGuardLastStand,
         _analyticsService = analyticsService,
         _condition = townCondition.default(),
@@ -48706,6 +49084,8 @@ function TownNightService.new(
         _phase = "dormant",
         _phaseEndsAt = 0,
         _onChanged = nil,
+        _visitPolicyProvider = nil,
+        _relationResolver = nil,
         _onNightCompleted = nil,
         _incident = nil,
     }, TownNightService)
@@ -48895,18 +49275,18 @@ function TownNightService.ensureStarted(
     -- number before it looks at integrity.
     if self._hostUserId == nil and actorUserId ~= nil then
         self._hostUserId = actorUserId
+        local provider = self._visitPolicyProvider
+        if provider ~= nil then
+            self._hostPolicy = self._townVisitPolicy.normalize(provider(actorUserId))
+        end
+        self._logger:info("town_host_established", {
+            host = actorUserId,
+            policy = self._hostPolicy,
+        })
     end
 
-    if condition ~= nil then
-        local role = self._townPermissions.roleFor(actorUserId, self._hostUserId)
-        self._condition = self._townPermissions.resolveCondition(
-            self._condition,
-            condition,
-            role,
-            self._townCondition.merge,
-            self._townCondition.averageIntegrity
-        )
-        self._worldService:setTownCondition(self:conditionSnapshot())
+    if condition ~= nil and actorUserId ~= nil then
+        self:_considerContribution(actorUserId, condition)
     end
     if not self._enabled or self._started then
         return
@@ -48915,6 +49295,148 @@ function TownNightService.ensureStarted(
     task.spawn(function()
         self:_runCycle()
     end)
+end
+
+--[[
+    Take an arriving player's town record, or do not.
+
+    The host's own record is applied immediately -- it is their town, and their
+    nights are what damaged it. Everyone else has to be decided, and deciding
+    needs an answer the platform gives asynchronously (friendship), so the
+    record is held until the answer lands rather than applied on a guess.
+
+    Holding rather than guessing is the whole point. A guess in the admitting
+    direction is a closed town adopting one stranger's record before the gate
+    can speak, which is exactly the bypass this wave exists to make impossible;
+    a guess in the refusing direction would drop a legitimate visitor's
+    contribution for good. A record that is never decided is simply never
+    applied, and an unapplied upward-only contribution costs a town nothing.
+]]
+function TownNightService._considerContribution(
+    self: TownNightService,
+    actorUserId: number,
+    condition: any
+)
+    if actorUserId == self._hostUserId then
+        self:_applyContribution(actorUserId, condition)
+        return
+    end
+    if self._relations[actorUserId] ~= nil then
+        self:_applyContribution(actorUserId, condition)
+        return
+    end
+    self._pendingContributions[actorUserId] = condition
+    local resolver = self._relationResolver
+    if resolver == nil then
+        -- No resolver wired: every arrival is the plain visitor the town has
+        -- always had, which is upward-only and cannot hurt anything. The
+        -- policy is a narrowing of that, never a widening of it.
+        self._relations[actorUserId] = "stranger"
+        self._hostPolicy = "open"
+        self:_applyContribution(actorUserId, condition)
+        return
+    end
+    resolver(actorUserId, self._hostUserId or actorUserId, function(relation: string)
+        self._relations[actorUserId] = relation
+        local held = self._pendingContributions[actorUserId]
+        if held ~= nil then
+            self:_applyContribution(actorUserId, held)
+        end
+    end)
+end
+
+function TownNightService._applyContribution(
+    self: TownNightService,
+    actorUserId: number,
+    condition: any
+)
+    self._pendingContributions[actorUserId] = nil
+    local role = self:roleFor(actorUserId)
+    if role == "outsider" then
+        self._logger:info("town_visit_refused", {
+            actor = actorUserId,
+            host = self._hostUserId,
+            policy = self._hostPolicy,
+            relation = self._relations[actorUserId],
+        })
+        return
+    end
+    self._condition = self._townPermissions.resolveCondition(
+        self._condition,
+        condition,
+        -- An outsider never reaches here, so TownPermissions still sees the
+        -- two roles it was written for and its invariant is unchanged.
+        if role == "host" then "host" else "visitor",
+        self._townCondition.merge,
+        self._townCondition.averageIntegrity
+    )
+    self._worldService:setTownCondition(self:conditionSnapshot())
+end
+
+--[[
+    What a player is in this town: host, visitor, outsider, or pending.
+
+    Pending is a real answer rather than a placeholder. Until the platform has
+    said whether these two people are friends, the honest thing to report is
+    that it does not know yet -- and because the showcase is attached to the
+    role, pending shows nothing, so an unresolved arrival cannot read a closed
+    town's record in the window before the gate speaks.
+]]
+function TownNightService.roleFor(self: TownNightService, actorUserId: number?): string
+    local hostUserId = self._hostUserId
+    if hostUserId == nil or actorUserId == nil then
+        return "pending"
+    end
+    if actorUserId == hostUserId then
+        return "host"
+    end
+    local relation = self._relations[actorUserId]
+    if relation == nil then
+        return "pending"
+    end
+    return self._townVisitPolicy.roleFor(self._hostPolicy, relation)
+end
+
+function TownNightService.setVisitPolicyProvider(
+    self: TownNightService,
+    provider: (number) -> string
+)
+    self._visitPolicyProvider = provider
+end
+
+function TownNightService.setRelationResolver(
+    self: TownNightService,
+    resolver: (number, number, (string) -> ()) -> ()
+)
+    self._relationResolver = resolver
+end
+
+--[[
+    The host changed their mind at the gate.
+
+    Every already-resolved relation is re-decided by the next `roleFor`, so a
+    town that closes stops showing its record to the people standing in it
+    immediately rather than at their next join. Contributions already adopted
+    stay adopted: closing a gate is not a way to take back what somebody
+    already helped build.
+]]
+function TownNightService.setHostPolicy(self: TownNightService, actorUserId: number, policy: string)
+    if self._hostUserId == nil or actorUserId ~= self._hostUserId then
+        return false
+    end
+    self._hostPolicy = self._townVisitPolicy.normalize(policy)
+    return true
+end
+
+function TownNightService.hostPolicy(self: TownNightService): string
+    return self._hostPolicy
+end
+
+-- Which night this town is on, for the showcase. The active night when one is
+-- running, so a visitor reading the record mid-night sees the night they are
+-- standing in rather than the one after it.
+function TownNightService.nightNumber(self: TownNightService): number
+    return if self._activeNightNumber > 0 then self._activeNightNumber else self._nightNumber
 end
 
 function TownNightService._runCycle(self: TownNightService)
@@ -49094,7 +49616,8 @@ function TownNightService.hostInfo(self: TownNightService, actorUserId: number?)
     end
     return {
         hostUserId = hostUserId,
-        role = self._townPermissions.roleFor(actorUserId, hostUserId),
+        role = self:roleFor(actorUserId),
+        policy = self._hostPolicy,
     }
 end
 
@@ -49254,7 +49777,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="141">
+        <Item class="ModuleScript" referent="142">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49323,6 +49846,7 @@ export type TutorialService = typeof(setmetatable(
         _gearWear: any,
         _gearTraits: any,
         _consumables: any,
+        _townVisitPolicy: any,
         _companionService: any,
         _partyService: any,
         _socialService: any,
@@ -49365,7 +49889,8 @@ function TutorialService.new(
     toolCatalog: any,
     gearWear: any,
     gearTraits: any,
-    consumables: any
+    consumables: any,
+    townVisitPolicy: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -49399,6 +49924,7 @@ function TutorialService.new(
         _gearWear = gearWear,
         _gearTraits = gearTraits,
         _consumables = consumables,
+        _townVisitPolicy = townVisitPolicy,
         _companionService = nil,
         _partyService = nil,
         _socialService = nil,
@@ -50503,6 +51029,31 @@ function TutorialService._interact(
         self:_publish(player)
         return
     end
+    if actionId == self._runtimeIds.Actions.SetVisitPolicy then
+        --[[
+            The gate takes the next policy in the list rather than choosing
+            one, so the press carries nothing and there is nothing in it to
+            forge. Only the founder may set it: a visitor standing at the gate
+            of somebody else's town is exactly the person a policy exists to
+            answer, and letting them work the latch would be the whole feature
+            backwards.
+        ]]
+        local hostInfo = self._townNightService:hostInfo(player.UserId)
+        if hostInfo == nil or hostInfo.role ~= "host" then
+            self:_setToast(player, "ONLY THIS TOWN'S FOUNDER SETS ITS GATE")
+            self:_publish(player)
+            return
+        end
+        local nextPolicy = self._townVisitPolicy.next(self._profileService:visitPolicy(player))
+        self._profileService:setVisitPolicy(player, nextPolicy)
+        self._townNightService:setHostPolicy(player.UserId, nextPolicy)
+        self:_setToast(player, "THE GATE IS " .. self._townVisitPolicy.label(nextPolicy))
+        -- Everyone, not just the presser: closing a gate changes what the
+        -- people already standing in the town may read, and a snapshot they
+        -- do not receive is a showcase they keep looking at.
+        self:_publishAll()
+        return
+    end
     if actionId == self._runtimeIds.Actions.OpenFieldBook then
         self:_setToast(player, "FIELD BOOK UPDATED — CHECK RECIPES, QUESTS, AND MASTERY")
         self:_publish(player)
@@ -51502,9 +52053,31 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
                 return nil
             end
             local hostPlayer = Players:GetPlayerByUserId(info.hostUserId)
+            --[[
+                The showcase: the host's own town record, and the reason a
+                policy is worth having. It is attached only for a host or an
+                admitted visitor -- an outsider gets the role and nothing else,
+                and so does a player whose relation the platform has not
+                answered on yet. A record that renders before the gate has
+                spoken is the gate not existing.
+            ]]
+            local showcase = nil
+            if (info.role == "host" or info.role == "visitor") and hostPlayer ~= nil then
+                local consequence = self._profileService:townConsequence(hostPlayer)
+                showcase = {
+                    tier = if type(consequence) == "table" then consequence.tier else nil,
+                    nightNumber = self._townNightService:nightNumber(),
+                    condition = self._townNightService:conditionSnapshot(),
+                }
+            end
             return {
                 role = info.role,
+                policy = if info.role == "host" then info.policy else nil,
+                policyLabel = if info.role == "host"
+                    then self._townVisitPolicy.label(info.policy)
+                    else nil,
                 hostName = if hostPlayer ~= nil then hostPlayer.DisplayName else nil,
+                showcase = showcase,
             }
         end)(),
         guideSpeaker = guideSpeaker,
@@ -51534,7 +52107,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="142">
+        <Item class="ModuleScript" referent="143">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -52403,7 +52976,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="143">
+        <Item class="ModuleScript" referent="144">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -59030,6 +59603,79 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         self._runtimeIds.Actions.OpenFieldBook,
         "OPEN",
         "Field Book",
+        nil
+    )
+
+    --[[
+        The town gate, at the south end of the lantern road.
+
+        A setting about who may come into your Emberhollow belongs at the way
+        into it, not in a menu. The HUD has had buttons taken back off it twice
+        for portrait screens, and the pattern this game keeps landing on is
+        that a thing you do to the world is done at the thing in the world --
+        the same reasoning that moved FIND and STRIKE onto the objects they act
+        on. So the policy is a plank you walk up to and read.
+
+        Two posts and a lintel across the road rather than a sign on a stick,
+        because VISUAL_QUALITY_STANDARD asks for a shape recognizable before
+        its label is read, and a gate is only a gate if the road goes through
+        it. The board hangs at eye height under the beam where the prompt is.
+    ]]
+    local gateFolder = Instance.new("Folder")
+    gateFolder.Name = "TownGate"
+    gateFolder.Parent = interactables
+    local gateX, gateZ = 0, -198
+    for side = -1, 1, 2 do
+        part(
+            gateFolder,
+            "GatePost",
+            Vector3.new(1.7, 12.4, 1.7),
+            CFrame.new(gateX + side * 8.4, 6.2, gateZ),
+            BARK,
+            Enum.Material.Wood
+        )
+        part(
+            gateFolder,
+            "GateBrace",
+            Vector3.new(0.85, 0.85, 5),
+            CFrame.new(gateX + side * 7.1, 10.4, gateZ) * CFrame.Angles(0, 0, math.rad(side * 38)),
+            WET_BARK,
+            Enum.Material.Wood,
+            false
+        )
+    end
+    part(
+        gateFolder,
+        "GateLintel",
+        Vector3.new(19.4, 1.5, 2.3),
+        CFrame.new(gateX, 12.6, gateZ),
+        WET_BARK,
+        Enum.Material.WoodPlanks
+    )
+    --[[
+        Turned to face up the road, which is the direction the town is in.
+
+        A board's Front face is its -Z, and an unrotated board at the south end
+        of the lantern road therefore reads out into the trees -- the live look
+        caught it immediately: the sign was blank from every angle a player
+        approaches from. Everything that reads this gate walks down to it from
+        the square, so the writing faces the square.
+    ]]
+    local gateBoard = part(
+        gateFolder,
+        "GateBoard",
+        Vector3.new(8.2, 3.4, 0.55),
+        CFrame.new(gateX, 9.2, gateZ + 1.1) * CFrame.Angles(0, math.rad(180), 0),
+        Color3.fromRGB(91, 65, 44),
+        Enum.Material.WoodPlanks
+    )
+    WorldSignBuilder.dressBoard(gateBoard, "TOWN GATE", CREAM)
+    self:_registerInteraction(
+        gateBoard,
+        self._runtimeIds.InteractionIds.TownGate,
+        self._runtimeIds.Actions.SetVisitPolicy,
+        "SET",
+        "Town Gate",
         nil
     )
 
@@ -67512,11 +68158,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="144">
+      <Item class="Folder" referent="145">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="145">
+        <Item class="ModuleScript" referent="146">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -71830,7 +72476,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="146">
+        <Item class="ModuleScript" referent="147">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -72929,7 +73575,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="147">
+        <Item class="ModuleScript" referent="148">
           <Properties>
             <string name="Name">CinderfallBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -73796,7 +74442,7 @@ return table.freeze(CinderfallBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="148">
+        <Item class="ModuleScript" referent="149">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -74491,7 +75137,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="149">
+        <Item class="ModuleScript" referent="150">
           <Properties>
             <string name="Name">FrostmereBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -75540,7 +76186,7 @@ return table.freeze(FrostmereBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="150">
+        <Item class="ModuleScript" referent="151">
           <Properties>
             <string name="Name">IronrootBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -76555,7 +77201,7 @@ return table.freeze(IronrootBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="151">
+        <Item class="ModuleScript" referent="152">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -77414,7 +78060,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="152">
+        <Item class="ModuleScript" referent="153">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -77500,7 +78146,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="153">
+        <Item class="ModuleScript" referent="154">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -77874,7 +78520,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="154">
+        <Item class="ModuleScript" referent="155">
           <Properties>
             <string name="Name">MireglassBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -78630,7 +79276,7 @@ return table.freeze(MireglassBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="155">
+        <Item class="ModuleScript" referent="156">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -78810,7 +79456,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="156">
+        <Item class="ModuleScript" referent="157">
           <Properties>
             <string name="Name">RegionBuilders</string>
             <string name="Source"><![CDATA[--!strict
@@ -79576,7 +80222,7 @@ return table.freeze(RegionBuilders)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="157">
+        <Item class="ModuleScript" referent="158">
           <Properties>
             <string name="Name">TempestBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -80397,7 +81043,7 @@ return table.freeze(TempestBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="158">
+        <Item class="ModuleScript" referent="159">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -80993,7 +81639,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="159">
+        <Item class="ModuleScript" referent="160">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -81230,7 +81876,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="160">
+        <Item class="ModuleScript" referent="161">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -81319,7 +81965,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="161">
+        <Item class="ModuleScript" referent="162">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -81656,15 +82302,15 @@ return table.freeze(WorldSignBuilder)
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="162">
+  <Item class="StarterPlayer" referent="163">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="163">
+    <Item class="StarterPlayerScripts" referent="164">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="164">
+      <Item class="LocalScript" referent="165">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -82034,11 +82680,11 @@ task.spawn(function()
 end)
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="165">
+        <Item class="Folder" referent="166">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="166">
+          <Item class="ModuleScript" referent="167">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -82169,7 +82815,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="167">
+          <Item class="ModuleScript" referent="168">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -85907,7 +86553,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="168">
+          <Item class="ModuleScript" referent="169">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -86275,7 +86921,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="169">
+          <Item class="ModuleScript" referent="170">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -86383,7 +87029,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="170">
+          <Item class="ModuleScript" referent="171">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -86502,7 +87148,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="171">
+          <Item class="ModuleScript" referent="172">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -86776,7 +87422,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="172">
+          <Item class="ModuleScript" referent="173">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -86876,7 +87522,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="173">
+          <Item class="ModuleScript" referent="174">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -86988,7 +87634,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="174">
+          <Item class="ModuleScript" referent="175">
             <Properties>
               <string name="Name">SocialPingController</string>
               <string name="Source"><![CDATA[--!strict
@@ -87370,7 +88016,7 @@ return table.freeze(SocialPingController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="175">
+          <Item class="ModuleScript" referent="176">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -87572,7 +88218,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="176">
+          <Item class="ModuleScript" referent="177">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -87781,7 +88427,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="177">
+          <Item class="ModuleScript" referent="178">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -87926,7 +88572,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="178">
+          <Item class="ModuleScript" referent="179">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -88226,13 +88872,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="179">
+  <Item class="TextChatService" referent="180">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="180">
+  <Item class="Workspace" referent="181">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>
