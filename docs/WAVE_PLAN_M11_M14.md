@@ -262,6 +262,9 @@ that keep a launch candidate from drifting after it is declared one.
 | D ✅ | **Release notes, known issues and dashboards, generated** (shipped #353). All three are normally written at the end of a project from memory, which is the one moment nobody has any. `npm run notes` builds them and `npm run check` fails when they are stale: [RELEASE_NOTES.md](RELEASE_NOTES.md) from the merge stream, [KNOWN_ISSUES.md](KNOWN_ISSUES.md) from the open threads the handoff already keeps inside the entry for the wave that found each one, [DASHBOARDS.md](DASHBOARDS.md) from the marked emitters in `src`. **The two guards matter more than the documents**: every pull request the handoff records has to exist in git, and every wave has to have a handoff entry. The second found three waves with no entry at all | The three documents build from the repository rather than being written from memory, and `npm run check` fails when any of them stops matching it |
 | E ✅ | **The rollback build and flag matrix** (shipped #354). ROLLBACK.md's step two said "republish the last known-good place revision" and pointed at the PROJECT_STATUS header for the revision and the flag state that go together. **That header records `at `main` = `HEAD``, and `HEAD` is not a revision** — it is whatever the reader is standing on, which during an incident is the build that is on fire. It is a table now: a full commit id, the place version, the save schema, the build, and all 26 flags read out of that revision. The rule with teeth is the schema one — rolling back past a bump strands every profile the newer build wrote, so **a schema bump moves the target forward**, which is `Config.SaveSchemaFreeze` from the other side. `npm run verify:rollback` builds the named revision in a worktree and verifies its DataModel | The named revision builds and boots — verified by building it byte-for-byte and by playing the place it produces |
 
+**Every buildable M14 wave has shipped** — A through E. What is left is the
+deliverable list no code produces.
+
 **Owner-gated for M14:** icon, thumbnails, trailer, description, age and
 content disclosures, Creator Dashboard configuration, permissions, private
 servers, product IDs, production places and universe links, final
@@ -305,10 +308,18 @@ seven launch journeys, and the Roblox publishing/review configuration.
 
 ## What only the owner can do — the consolidated list
 
-Written at the end of the session that finished M13 waves A, B, C and E, so
-the next person does not have to reassemble it from four sections. Nothing
-below is blocked on code, and none of it blocks the two waves that remain
-(M13 D, M14 B–E).
+Written at the end of the session that finished M14 waves B through E and put
+M13 wave D's guard in, so the next person does not have to reassemble it from
+five sections. **Nothing below is blocked on code.** The only code work left in
+the buildable roadmap is M13 wave D's remaining migration batches, and those are
+mechanical, guarded, and independent of everything here.
+
+**The launch checklist is the artifact this list now points at.**
+[QA_RELEASE_PLAN.md](QA_RELEASE_PLAN.md)'s release checklist holds 40 rows, 39 of
+them blocking. Seven are decided by this repository; **32 are open and owner-gated**,
+and `scripts/validate_launch_checklist.py` will refuse a declared launch candidate
+until every one of them is answered. That is the shortest complete statement of
+what is left, and it is executable. What follows is the same list read out loud.
 
 **People and populations (M12–M13).** Every cohort in the rollout: trusted
 testers, the age-range allowlist and the guardian consent that makes it legal,
@@ -330,9 +341,11 @@ and D left open.
 **Decisions.** Which of the six regions' `enabled` flags to flip, once a live
 session has walked each end to end — that flag is the whole remaining distance
 between the traversal spec and a real playthrough. What to remove for
-recurring confusion. Which languages ship. The final catalog and prices. Every
-tuning decision BETA_TUNING.md now has numbers and knobs for; the numbers do
-not choose themselves.
+recurring confusion. **Which languages ship**, which is now a capacity decision
+with a number attached rather than an archaeology project: `Strings.luau` holds
+the migrated source and `validate_localization.py` reports what is left. The
+final catalog and prices. Every tuning decision BETA_TUNING.md has numbers and
+knobs for; the numbers do not choose themselves.
 
 **Commerce, all of it.** Creator Dashboard products and their IDs (until they
 exist `Config.CommerceProductIds` is empty and `promptPurchase` correctly
@@ -346,10 +359,25 @@ four cosmetic outfits that read as a detailed torso block at card size, and
 M14's launch assets: icon, thumbnails, trailer, description, age and content
 disclosures.
 
+**Reviews that read an artifact this repository now produces.** The privacy and
+abuse review reads [SOCIAL_SAFETY_REVIEW.md](SOCIAL_SAFETY_REVIEW.md). The
+original-IP audit reads [ASSET_PROVENANCE.md](ASSET_PROVENANCE.md) — 51 licensed
+assets whose terms a human has to confirm, because no script can read a licence.
+The dashboards are built from [DASHBOARDS.md](DASHBOARDS.md)'s 23 panels. Known
+issues are generated into [KNOWN_ISSUES.md](KNOWN_ISSUES.md); patch notes in a
+player's language are not, deliberately.
+
 **Operations.** All five drills — moderation, support, incident, rollback,
-communication. ROLLBACK.md holds the code half of the fourth. Production
-places and universe links, permissions, private servers, canary and scale
-tests, and the seven launch journeys.
+communication. [ROLLBACK.md](ROLLBACK.md) holds the code half of the fourth,
+including the exact revision and flag state to restore and a `npm run
+verify:rollback` that builds it. Production places and universe links,
+permissions, private servers, canary and scale tests, and the seven launch
+journeys, which are ten rows of the checklist rather than one.
+
+**Two declarations that are one act.** Setting `Config.LaunchCandidate` requires
+`Config.SaveSchemaFreeze`, and a schema bump moves the rollback target forward.
+Those three values are the moment this project stops being in development, and
+nothing sets them but a person.
 
 **One piece of infrastructure rather than a decision:** production refuses
 flag overrides, so the first step of a rollback is a config change and a
