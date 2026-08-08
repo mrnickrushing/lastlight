@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #332), build `0.53.0`,
-save schema 24, 26 services. Published to Roblox as place version 144,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #333), build `0.53.0`,
+save schema 24, 26 services. Published to Roblox as place version 145,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,6 +59,37 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#333** (v145) **M12 wave B: the exploit suite can now say something it
+  could not before — *every* action kind has a refusal, not only a handler.**
+  `ExploitGate` covered the remote surface as it was in Milestone 3. It now
+  covers all forty-three action kinds by name, each filed under where its
+  refusal actually lives (the payload contract, a server re-check, or a world
+  prompt the player has to be standing at), and a new action with no entry
+  fails on the day it is added. That is deliberate: the two defects this spec
+  family exists for were both an action being half-wired, and half-wired is
+  exactly the state a new action is in between two commits. The shared refusal
+  is then *exercised* rather than asserted — a smuggled field is dropped for
+  every kind in the game, which is #219's shape run forty-three times.
+
+  Four new attacker's-side cases over what M11 added. **Quick chat**: there is
+  no position in the payload to forge and no target to name, an invented phrase
+  id resolves to nothing rather than to a default, and the wheel's budget is
+  its own bucket so flooding it cannot starve the action budget. **A block
+  cannot be walked around** by distance, by expiry or by direction — including
+  standing on top of the marker, which is the one a radius filter alone would
+  have let through. **The town gate** carries no payload at all, so the attack
+  that would matter (writing a policy onto somebody else's profile) has nothing
+  to ride in on. **Commerce**, the one surface where a successful attack costs
+  money: wearing what you did not buy, a save that claims you already are, and
+  a receipt for a product that does not exist all settle nothing.
+
+  And **one case per admin command** rather than one for the roster, because
+  the roster check and the parser are different gates. A stranger is refused
+  for every command, the feature flag is a complete off switch for every
+  command, and no command lets an absurd argument reach a handler as a value —
+  so a compromised roster account is still a bounded one. An unknown command is
+  refused with a *different reason* before authorization is considered, so the
+  roster cannot be probed by comparing refusals.
 - **#332** (v144) **M11 wave F: `CommerceService`, and the allowlist goes from
   zero entries to one.** The monetization guard has held since Milestone 4 by
   *absence* — there was no purchase API anywhere to branch on — and its own
