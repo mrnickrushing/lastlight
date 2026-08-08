@@ -100,6 +100,7 @@ TestRunner.run({
     require("./specs/CosmeticNeutrality.spec"),
     require("./specs/CosmeticReachability.spec"),
     require("./specs/CommerceAnalytics.spec"),
+    require("./specs/SaveRehearsal.spec"),
     require("./specs/PrivateServerControls.spec"),
     require("./specs/StoreAvailability.spec"),
     require("./specs/StoreCard.spec"),
