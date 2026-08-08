@@ -1688,6 +1688,15 @@ function TutorialService._advanceSurvivorToReveal(
     -- The night itself resolves once for the whole server, and a gate that
     -- reads "first-night completion after onboarding" is counting people.
     self._analyticsService:firstNightCompleted(player)
+    -- TUNING-METRIC: first_night_outcome
+    -- The gate above says they got through it. This says what it cost, which
+    -- is the only version of the question a tuning pass can act on.
+    self._analyticsService:firstNightOutcome(player)
+    -- TUNING-METRIC: difficulty_checkpoint
+    -- The first checkpoint on the path, and the one every later cliff is
+    -- measured against. Always cleared here, because reaching this line is
+    -- what clearing it means.
+    self._analyticsService:difficultyCheckpoint(player, "first_night", true)
     return true
 end
 

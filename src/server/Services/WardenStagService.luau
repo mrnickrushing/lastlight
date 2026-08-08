@@ -737,6 +737,8 @@ function WardenStagService.damageNearest(self: WardenStagService, player: Player
             self._state.antlersBroken,
             self:_participantCount()
         )
+        -- TUNING-METRIC: difficulty_checkpoint
+        self._analyticsService:difficultyCheckpoint(player, self._encounter.Id, true)
         local message = if self._state.outcome == "preserved"
             then "WARDEN STAG CALMED — FOREST ALLY PRESERVED · +5 AMBER SAP"
             elseif

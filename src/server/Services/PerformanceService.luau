@@ -289,6 +289,19 @@ function PerformanceService._closeSession(self: PerformanceService, player: Play
         self._analyticsService:joinFailed(player, "left_before_interactive", duration, platform)
     end
 
+    --[[
+        Where a first session ended, emitted before the session-end event
+        rather than after it.
+
+        Order matters here for a reason worth writing down: `sessionEnded` is
+        the last thing anybody looks at in a leave path, and a tuning event
+        added below it is one refactor away from landing after the clear that
+        drops the counters it reads. It goes first, where the numbers are still
+        there.
+    ]]
+    -- TUNING-METRIC: first_session_end
+    self._analyticsService:firstSessionEnded(player, duration, platform, reason)
+
     -- GATE-METRIC: session_ended
     self._analyticsService:sessionEnded(
         player.UserId,
