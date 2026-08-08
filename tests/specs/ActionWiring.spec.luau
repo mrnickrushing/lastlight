@@ -93,6 +93,11 @@ local INTERACTION_ROUTED: { [string]: boolean } = {
     warden_stag_choice = true,
     recover_memory_fragment = true,
     set_visit_policy = true,
+    -- The outfitter's stand in the departure lodge is the store's only door.
+    -- There is no HUD button that opens it, deliberately: a storefront that
+    -- can be opened from anywhere can be opened in the four moments
+    -- Milestone 11's exit gate says it must not.
+    open_store = true,
 }
 
 -- Actions the server raises on its own behalf, never in answer to a

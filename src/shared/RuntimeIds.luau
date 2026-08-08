@@ -128,6 +128,28 @@ local RuntimeIds = {
             value -- it takes the next one, and the gate says which that is.
         ]]
         SetVisitPolicy = "set_visit_policy",
+        --[[
+            The store, in four kinds because they are four different questions
+            and the taxonomy already counts them apart: a view, a card looked
+            at, a prompt raised, a thing worn.
+
+            OpenStore is interaction-routed and carries nothing -- the
+            outfitter's stand is the only door, so there is no payload in which
+            to name a store that is somewhere else. The other three each carry
+            exactly one id.
+
+            EquipCosmetic names a cosmetic and never a slot. The slot is the
+            catalog's answer about that cosmetic, which is the only version of
+            it a server should trust: #331's review found `equip` letting any
+            owned cosmetic go in any slot, so an outfit could be worn as a
+            lantern shell. A payload that cannot name a slot cannot name the
+            wrong one. Pressing an id you are already wearing takes it off,
+            which is what keeps taking-off from needing a second field.
+        ]]
+        OpenStore = "open_store",
+        StoreDetail = "store_detail",
+        StorePurchase = "store_purchase",
+        EquipCosmetic = "equip_cosmetic",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -179,6 +201,18 @@ local RuntimeIds = {
             objects they act on.
         ]]
         TownGate = "town_gate_policy",
+        --[[
+            The outfitter's stand in the departure lodge, which is the only
+            way into the store.
+
+            A storefront that opens from a HUD button is a storefront that can
+            open at any moment, and the moments this one may not open in are
+            the whole of the milestone's exit gate. Making it a thing you walk
+            up to in a room you are not being attacked in means the refusal is
+            the rule's second line of defence rather than its only one -- the
+            same reasoning that put the visit policy on the town gate.
+        ]]
+        Outfitter = "outfitter_stand",
     }),
     ResidentInteractionIds = table.freeze({
         npc_tomas_reed = "resident_tomas_reed",

@@ -1080,6 +1080,17 @@ function ActionPayloadContract.extraField(runtimeIds: any, kind: string): string
         -- payload because the server reads the sender's own, which is what
         -- makes a ping unforgeable rather than merely validated.
         return "phraseId"
+    elseif kind == actions.StoreDetail or kind == actions.StorePurchase then
+        -- Which product is being looked at, or bought. The Roblox product id
+        -- is never in a payload: the server maps this game's id to the
+        -- dashboard number, so a forged payload cannot prompt a purchase for
+        -- something this catalog does not sell.
+        return "productId"
+    elseif kind == actions.EquipCosmetic then
+        -- The cosmetic, and never its slot. The slot is the catalog's answer
+        -- about that id, and a payload with no slot in it cannot name the
+        -- wrong one.
+        return "cosmeticId"
     end
     return nil
 end
@@ -30043,6 +30054,28 @@ local RuntimeIds = {
             value -- it takes the next one, and the gate says which that is.
         ]]
         SetVisitPolicy = "set_visit_policy",
+        --[[
+            The store, in four kinds because they are four different questions
+            and the taxonomy already counts them apart: a view, a card looked
+            at, a prompt raised, a thing worn.
+
+            OpenStore is interaction-routed and carries nothing -- the
+            outfitter's stand is the only door, so there is no payload in which
+            to name a store that is somewhere else. The other three each carry
+            exactly one id.
+
+            EquipCosmetic names a cosmetic and never a slot. The slot is the
+            catalog's answer about that cosmetic, which is the only version of
+            it a server should trust: #331's review found `equip` letting any
+            owned cosmetic go in any slot, so an outfit could be worn as a
+            lantern shell. A payload that cannot name a slot cannot name the
+            wrong one. Pressing an id you are already wearing takes it off,
+            which is what keeps taking-off from needing a second field.
+        ]]
+        OpenStore = "open_store",
+        StoreDetail = "store_detail",
+        StorePurchase = "store_purchase",
+        EquipCosmetic = "equip_cosmetic",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -30094,6 +30127,18 @@ local RuntimeIds = {
             objects they act on.
         ]]
         TownGate = "town_gate_policy",
+        --[[
+            The outfitter's stand in the departure lodge, which is the only
+            way into the store.
+
+            A storefront that opens from a HUD button is a storefront that can
+            open at any moment, and the moments this one may not open in are
+            the whole of the milestone's exit gate. Making it a thing you walk
+            up to in a room you are not being attacked in means the refusal is
+            the rule's second line of defence rather than its only one -- the
+            same reasoning that put the visit policy on the town gate.
+        ]]
+        Outfitter = "outfitter_stand",
     }),
     ResidentInteractionIds = table.freeze({
         npc_tomas_reed = "resident_tomas_reed",
@@ -32274,6 +32319,377 @@ return table.freeze(StatusEffectState)
       </Item>
       <Item class="ModuleScript" referent="98">
         <Properties>
+          <string name="Name">StoreAvailability</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    When the store may open, and -- more to the point -- when it may not.
+
+    Milestone 11's exit gate is one sentence: *the store never interrupts
+    onboarding, active defense, downed state, or defeat.* The monetization
+    document says the same thing from the other side, listing "popups during
+    downed, defeat, urgent defense, or first-session teaching" among the
+    explicitly prohibited. Both are rules about a moment rather than about a
+    product, which is why they belong in a predicate rather than in a comment
+    beside a button.
+
+    **It is pure, and both sides call it.** The server decides -- a client that
+    decided would be a client that could decide otherwise -- but the HUD asks
+    the same function with the same snapshot fields, so a panel that is open
+    when a night starts closes itself on the frame the state changes rather
+    than waiting for somebody to press something. One rule, two readers, no
+    second copy to drift.
+
+    **The order the refusals are checked in is the message a player gets.** A
+    player who is downed during a lost night is being refused for the worst
+    reason that applies, not the first one the code happened to look at.
+]]
+
+local StoreAvailability = {}
+
+export type Context = {
+    -- The kill switch. `cosmetic_store_enabled` is false until there are
+    -- products to sell, and a flag that only hides the button is not a kill
+    -- switch.
+    storeEnabled: boolean?,
+    tutorialComplete: boolean?,
+    nightActive: boolean?,
+    -- Creatures standing in the world right now. Night is not the only defense
+    -- this game runs: a blackout relay, a town incident and both boss fights
+    -- all put a player in one during daylight, and every one of them is a
+    -- moment a store is not welcome in.
+    enemyCount: number?,
+    downed: boolean?,
+    -- Everybody who could act is down. This game has no permanent loss, so
+    -- defeat is the party wipe -- the moment the guard's last stand exists to
+    -- answer, and the single worst moment in the game to be sold something.
+    partyDown: boolean?,
+}
+
+export type Verdict = {
+    open: boolean,
+    reason: string,
+    label: string,
+}
+
+--[[
+    Every refusal, in the order they are asked, with the line a player reads.
+
+    The labels are the same voice as every other refusal in the HUD, and none
+    of them apologises for the store: a player told "not now" during a night
+    should read it as the game protecting the night.
+]]
+local REFUSALS: { { reason: string, label: string } } = table.freeze({
+    table.freeze({ reason = "store_disabled", label = "THE OUTFITTER IS NOT OPEN YET" }),
+    table.freeze({
+        reason = "defeat",
+        label = "THE PARTY IS DOWN — THAT IS ALL THAT MATTERS NOW",
+    }),
+    table.freeze({ reason = "downed", label = "GET BACK ON YOUR FEET FIRST" }),
+    table.freeze({ reason = "active_defense", label = "NOT WHILE SOMETHING IS OUT THERE" }),
+    table.freeze({ reason = "onboarding", label = "FINISH THE FIRST NIGHT FIRST" }),
+})
+
+local OPEN: Verdict = table.freeze({ open = true, reason = "open", label = "OUTFITTER" })
+
+local function refusal(reason: string): Verdict
+    for _, entry in REFUSALS do
+        if entry.reason == reason then
+            return table.freeze({ open = false, reason = entry.reason, label = entry.label })
+        end
+    end
+    -- Unreachable through `evaluate`; kept as a total function so a caller
+    -- asking about a reason nobody wrote gets a closed store rather than nil.
+    return table.freeze({ open = false, reason = reason, label = "THE OUTFITTER IS CLOSED" })
+end
+
+function StoreAvailability.reasons(): { { reason: string, label: string } }
+    return REFUSALS
+end
+
+function StoreAvailability.evaluate(context: any): Verdict
+    if type(context) ~= "table" then
+        return refusal("store_disabled")
+    end
+    if context.storeEnabled ~= true then
+        return refusal("store_disabled")
+    end
+    --[[
+        Defeat before downed, and downed before the defense that caused it.
+
+        A wiped party is one refusal, not one per member, and the player being
+        told about it is being told the most important true thing. Checking in
+        the other order would answer a lost night with "not while something is
+        out there", which is technically correct and reads as the game not
+        having noticed.
+    ]]
+    if context.partyDown == true then
+        return refusal("defeat")
+    end
+    if context.downed == true then
+        return refusal("downed")
+    end
+    local enemyCount = tonumber(context.enemyCount) or 0
+    if context.nightActive == true or enemyCount > 0 then
+        return refusal("active_defense")
+    end
+    --[[
+        Onboarding last, and it is the only one that is not about danger.
+
+        First-session teaching is a prohibited moment for its own reason: a
+        player who has not finished the first night has not yet been shown what
+        any of this is for, and a storefront is the loudest possible answer to
+        a question they have not asked.
+    ]]
+    if context.tutorialComplete ~= true then
+        return refusal("onboarding")
+    end
+    return OPEN
+end
+
+return table.freeze(StoreAvailability)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="99">
+        <Properties>
+          <string name="Name">StoreCard</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    What a store card is allowed to say, and what it may not be drawn without.
+
+    The monetization document is specific about this and the roadmap's exit
+    gate repeats it: every product shows a real preview, the exact Robux price,
+    permanence, and owned state, and no product may confuse price or
+    permanence. A card is therefore not a layout -- it is a claim about a
+    purchase, and a claim missing one of its four facts is worse than no claim
+    at all.
+
+    So the refusal is structural. `build` returns **nil** when it cannot make an
+    honest card, and the reason why, rather than returning a card with a blank
+    where the price goes. A player who sees a BUY button over an empty price is
+    a player who does not know what they are agreeing to, and a store that
+    shows nothing is merely a store that is not open yet.
+
+    **The price never comes from here.** It is passed in, because it has to be
+    read from platform product information at the moment it is asked for --
+    a number written into the source is a number that is wrong the first time
+    the owner edits it in the Creator Dashboard, and a card showing the wrong
+    price is the worst failure in this file.
+
+    **Nothing here names a cosmetic.** A card is built from whatever product and
+    plan it is handed. That is what lets `CosmeticNeutrality.spec` say no module
+    outside the catalog can name a cosmetic id: the store renders the catalog
+    rather than knowing it.
+]]
+
+local StoreCard = {}
+
+export type Context = {
+    -- Nil is a real answer and means "the platform has not told us". The
+    -- dashboard product may not exist yet, or the web call may have failed.
+    priceInRobux: number?,
+    owned: boolean?,
+    equipped: boolean?,
+    -- The geometry the card draws. A preview is one of the four required
+    -- facts, so a product whose grants resolve to nothing drawable has no
+    -- honest card either. Only its *presence* travels: see `previewParts`.
+    preview: { any }?,
+}
+
+export type Card = {
+    productId: string,
+    displayName: string,
+    detail: string,
+    priceLabel: string,
+    priceInRobux: number,
+    permanenceLabel: string,
+    ownedLabel: string,
+    owned: boolean,
+    equipped: boolean,
+    --[[
+        What the one button on the card does: `buy`, or nothing at all.
+
+        An owned product loses the buy button entirely rather than greying it
+        out, which is what the owned state is for -- a product with a price on
+        it that the player already has is the "sells a player the same thing
+        twice" case. And the button never becomes WEAR: a product may grant
+        more than one cosmetic, and a single button cannot honestly say which
+        of them it would put on. Wearing lives on the wardrobe row, which is
+        one row per cosmetic and therefore never ambiguous.
+    ]]
+    action: string,
+    actionLabel: string,
+    assurance: string,
+    --[[
+        How many parts the preview turned out to have, rather than the parts.
+
+        The card is built on a server and read by a client that already holds
+        the catalog, so shipping the geometry would put the same plan on the
+        wire on every snapshot push to say something the client can look up.
+        What has to travel is that the check passed: a card exists only if
+        there was real geometry behind it, and this is the number that says so.
+    ]]
+    previewParts: number,
+}
+
+export type WardrobeRow = {
+    cosmeticId: string,
+    displayName: string,
+    slot: string,
+    equipped: boolean,
+    actionLabel: string,
+    previewParts: number,
+}
+
+--[[
+    On every card, always, and built in rather than authored per product.
+
+    MONETIZATION_LIVEOPS_ANALYTICS forbids paid power, and
+    CHARACTER_KITS_SPEC's storefront review asks for the sentence in as many
+    words. A line a copywriter has to remember to add is a line that will be
+    missing from the twelfth product; a line the builder adds cannot be.
+]]
+local ASSURANCE = "COSMETIC ONLY — ABILITIES ARE EARNED IN PLAY"
+
+local PERMANENCE_LABELS: { [string]: string } = table.freeze({
+    permanent = "PERMANENT — YOURS FOR GOOD",
+})
+
+function StoreCard.assurance(): string
+    return ASSURANCE
+end
+
+--[[
+    The Robux figure as a player reads it.
+
+    Whole numbers only: the platform prices in whole Robux, and a decimal point
+    here would be this file inventing a currency.
+]]
+function StoreCard.priceLabel(priceInRobux: any): string?
+    if type(priceInRobux) ~= "number" then
+        return nil
+    end
+    if priceInRobux ~= priceInRobux or priceInRobux < 0 or priceInRobux == math.huge then
+        return nil
+    end
+    if priceInRobux ~= math.floor(priceInRobux) then
+        return nil
+    end
+    return string.format("%d ROBUX", priceInRobux)
+end
+
+function StoreCard.permanenceLabel(permanence: any): string?
+    if type(permanence) ~= "string" then
+        return nil
+    end
+    return PERMANENCE_LABELS[permanence]
+end
+
+--[[
+    One card, or nothing and the reason.
+
+    The four refusals below are the four facts the exit gate names, and the
+    order is deliberate: a missing permanence or a missing preview is a
+    catalog bug that should fail a spec, while a missing price is the ordinary
+    state of a product whose dashboard half does not exist yet. Naming them
+    apart is what lets the store say "not priced yet" without saying it about
+    a genuinely broken entry.
+]]
+function StoreCard.build(product: any, context: any): (Card?, string)
+    if type(product) ~= "table" or type(product.id) ~= "string" or #product.id == 0 then
+        return nil, "no_product"
+    end
+    if type(product.displayName) ~= "string" or #product.displayName == 0 then
+        return nil, "no_name"
+    end
+    local permanenceLabel = StoreCard.permanenceLabel(product.permanence)
+    if permanenceLabel == nil then
+        return nil, "no_permanence"
+    end
+    if type(context) ~= "table" then
+        return nil, "no_owned_state"
+    end
+    -- Owned has to be a boolean, not merely truthy. Nil here means nobody
+    -- asked, and a card that renders NOT OWNED because nobody asked is a card
+    -- that will sell a player something they already have.
+    if type(context.owned) ~= "boolean" then
+        return nil, "no_owned_state"
+    end
+    local preview = context.preview
+    if type(preview) ~= "table" or #preview == 0 then
+        return nil, "no_preview"
+    end
+    local priceLabel = StoreCard.priceLabel(context.priceInRobux)
+    if priceLabel == nil then
+        return nil, "no_price"
+    end
+
+    local owned = context.owned
+    local equipped = context.equipped == true
+    return {
+        productId = product.id,
+        displayName = product.displayName,
+        detail = if type(product.detail) == "string" then product.detail else "",
+        priceLabel = priceLabel,
+        priceInRobux = context.priceInRobux,
+        permanenceLabel = permanenceLabel,
+        ownedLabel = if owned then "OWNED" else "NOT OWNED",
+        owned = owned,
+        equipped = equipped,
+        action = if owned then "owned" else "buy",
+        actionLabel = if owned then "OWNED" else "BUY · " .. priceLabel,
+        assurance = ASSURANCE,
+        previewParts = #preview,
+    },
+        "ok"
+end
+
+--[[
+    A row for something already owned, which needs no price at all.
+
+    The wardrobe is a separate list from the shelf on purpose. A product can
+    stop resolving -- delisted in the dashboard, or its web call failing -- and
+    a store that showed owned cosmetics only through their sale cards would
+    make a paid-for coat unwearable the moment the thing that sold it went
+    away. That is the shape this project has now paid for four times: an
+    entitlement that exists and a cosmetic that can be worn are different
+    facts.
+]]
+function StoreCard.wardrobeRow(cosmetic: any, equipped: any): (WardrobeRow?, string)
+    if type(cosmetic) ~= "table" or type(cosmetic.id) ~= "string" or #cosmetic.id == 0 then
+        return nil, "no_cosmetic"
+    end
+    if type(cosmetic.displayName) ~= "string" or #cosmetic.displayName == 0 then
+        return nil, "no_name"
+    end
+    if type(cosmetic.slot) ~= "string" or #cosmetic.slot == 0 then
+        return nil, "no_slot"
+    end
+    if type(cosmetic.parts) ~= "table" or #cosmetic.parts == 0 then
+        return nil, "no_preview"
+    end
+    if type(equipped) ~= "boolean" then
+        return nil, "no_worn_state"
+    end
+    return {
+        cosmeticId = cosmetic.id,
+        displayName = cosmetic.displayName,
+        slot = cosmetic.slot,
+        equipped = equipped,
+        actionLabel = if equipped then "TAKE OFF" else "WEAR",
+        previewParts = #cosmetic.parts,
+    },
+        "ok"
+end
+
+return table.freeze(StoreCard)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="100">
+        <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -32529,7 +32945,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="99">
+      <Item class="ModuleScript" referent="101">
         <Properties>
           <string name="Name">TempestEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -32807,7 +33223,7 @@ return table.freeze(TempestEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="100">
+      <Item class="ModuleScript" referent="102">
         <Properties>
           <string name="Name">TideboundTitanEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -33238,7 +33654,7 @@ return table.freeze(TideboundTitanEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="101">
+      <Item class="ModuleScript" referent="103">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -33382,7 +33798,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="102">
+      <Item class="ModuleScript" referent="104">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -33792,7 +34208,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="103">
+      <Item class="ModuleScript" referent="105">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -33973,7 +34389,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="104">
+      <Item class="ModuleScript" referent="106">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -34037,7 +34453,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="105">
+      <Item class="ModuleScript" referent="107">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -34211,7 +34627,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="106">
+      <Item class="ModuleScript" referent="108">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -34303,7 +34719,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="107">
+      <Item class="ModuleScript" referent="109">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -34515,7 +34931,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="108">
+      <Item class="ModuleScript" referent="110">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -34693,7 +35109,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="109">
+      <Item class="ModuleScript" referent="111">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -34846,7 +35262,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="110">
+      <Item class="ModuleScript" referent="112">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -35179,7 +35595,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="111">
+      <Item class="ModuleScript" referent="113">
         <Properties>
           <string name="Name">TownVisitPolicy</string>
           <string name="Source"><![CDATA[--!strict
@@ -35352,7 +35768,7 @@ return table.freeze(TownVisitPolicy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="112">
+      <Item class="ModuleScript" referent="114">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -35514,7 +35930,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="113">
+      <Item class="ModuleScript" referent="115">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -35550,7 +35966,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="114">
+      <Item class="ModuleScript" referent="116">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -35932,7 +36348,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="115">
+      <Item class="ModuleScript" referent="117">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -36002,7 +36418,7 @@ return table.freeze(WeatherProfile)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="116">
+      <Item class="ModuleScript" referent="118">
         <Properties>
           <string name="Name">WhiteHowlerEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -36466,11 +36882,11 @@ return table.freeze(WhiteHowlerEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="117">
+  <Item class="ServerScriptService" referent="119">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="118">
+    <Item class="Script" referent="120">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -36544,6 +36960,8 @@ local PartySession = require(root.PartySession)
 local QuickChat = require(root.QuickChat)
 local CosmeticCatalog = require(root.CosmeticCatalog)
 local Entitlements = require(root.Entitlements)
+local StoreAvailability = require(root.StoreAvailability)
+local StoreCard = require(root.StoreCard)
 local AdminRoster = require(root.AdminRoster)
 local TownDecorations = require(root.TownDecorations)
 local TownProgression = require(root.TownProgression)
@@ -36831,6 +37249,7 @@ local commerceService = CommerceService.new(
     Config,
     CosmeticCatalog,
     Entitlements,
+    StoreCard,
     profileService,
     featureFlags,
     analyticsService
@@ -36964,7 +37383,8 @@ local tutorialService = TutorialService.new(
     GearWear,
     GearTraits,
     Consumables,
-    TownVisitPolicy
+    TownVisitPolicy,
+    StoreAvailability
 )
 
 local services = ServiceRegistry.new({
@@ -37017,6 +37437,30 @@ end)
 tutorialService:setCompanionService(companionService)
 tutorialService:setPartyService(partyService)
 tutorialService:setSocialService(socialService)
+tutorialService:setCommerceService(commerceService)
+--[[
+    A grant has to arrive somewhere the buyer can see.
+
+    `applyReceipt` and the mailbox drain both settle correctly on their own,
+    and both were silent: the live pass granted a product, watched the ledger
+    and the profile take it, and the card in front of the buyer went on saying
+    NOT OWNED until an unrelated push happened along. A purchase that lands
+    without a word is the one moment in this game where the player has already
+    paid.
+]]
+commerceService:setGrantHandler(function(player: Player, granted: { string })
+    -- A grant that handed over nothing is a bug somewhere behind this, not a
+    -- sentence to read out: "0 THINGS ARE YOURS" is worse than silence.
+    if #granted == 0 then
+        return
+    end
+    tutorialService:announceTo(
+        player,
+        if #granted == 1
+            then "IT IS YOURS — WEAR IT AT THE OUTFITTER"
+            else string.format("%d THINGS ARE YOURS — WEAR THEM AT THE OUTFITTER", #granted)
+    )
+end)
 partyService:setToastHandler(function(player: Player?, message: string)
     if player ~= nil then
         tutorialService:toastPlayer(player, message)
@@ -37100,7 +37544,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="119">
+      <Item class="ModuleScript" referent="121">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -37198,11 +37642,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="120">
+      <Item class="Folder" referent="122">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="121">
+        <Item class="ModuleScript" referent="123">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -37839,7 +38283,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="122">
+        <Item class="ModuleScript" referent="124">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -39118,7 +39562,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="123">
+        <Item class="ModuleScript" referent="125">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -39619,7 +40063,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="124">
+        <Item class="ModuleScript" referent="126">
           <Properties>
             <string name="Name">CommerceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -39659,6 +40103,7 @@ return table.freeze(BramblewakeBlackoutService)
 
 local MarketplaceService = game:GetService("MarketplaceService")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local CommerceService = {}
 CommerceService.__index = CommerceService
@@ -39676,6 +40121,7 @@ export type CommerceService = typeof(setmetatable(
         _config: any,
         _catalog: any,
         _entitlements: any,
+        _storeCard: any,
         _profileService: any,
         _featureFlags: any,
         _analyticsService: any,
@@ -39689,6 +40135,14 @@ export type CommerceService = typeof(setmetatable(
         ]]
         _localMailboxes: { [number]: { any } },
         _productInfo: { [string]: any },
+        --[[
+            When a product info lookup last failed, so a delisted or erroring
+            product is not re-asked on every snapshot build. `storeSnapshot`
+            runs on every push for every player and `GetProductInfo` is a
+            throttled web call: retrying it there turns one broken product into
+            a rate limit for all of them.
+        ]]
+        _productInfoFailedAt: { [string]: number },
         --[[
             Purchases already counted as lost, so one stuck receipt is one
             event rather than one per redelivery. The platform retries an
@@ -39705,12 +40159,14 @@ export type CommerceService = typeof(setmetatable(
 ))
 
 local MAILBOX_STORE = "LastLightCommerceMailbox_v1"
+local PRODUCT_INFO_RETRY_SECONDS = 60
 
 function CommerceService.new(
     logger: Logger,
     config: any,
     cosmeticCatalog: any,
     entitlements: any,
+    storeCard: any,
     profileService: any,
     featureFlags: any,
     analyticsService: any
@@ -39721,6 +40177,7 @@ function CommerceService.new(
         _config = config,
         _catalog = cosmeticCatalog,
         _entitlements = entitlements,
+        _storeCard = storeCard,
         _profileService = profileService,
         _featureFlags = featureFlags,
         _analyticsService = analyticsService,
@@ -39728,6 +40185,7 @@ function CommerceService.new(
         _mailboxStore = nil,
         _localMailboxes = {},
         _productInfo = {},
+        _productInfoFailedAt = {},
         _reportedLoss = {},
         _onGranted = nil,
     }, CommerceService)
@@ -40021,6 +40479,140 @@ function CommerceService.equip(
 end
 
 --[[
+    Wear one, named only by the cosmetic.
+
+    The slot comes from the catalog rather than from the caller, which is the
+    only version of it worth trusting: a client that could name a slot could
+    name the wrong one, and #331's review found exactly that hole on the layer
+    below. Pressing something already worn takes it off, so removal needs no
+    second field and no second action -- the toggle is what keeps the payload
+    at one id.
+]]
+function CommerceService.equipById(self: CommerceService, player: Player, cosmeticId: any): any
+    if not self._profileService:isLoaded(player) then
+        return { applied = false, reason = "profile_loading" }
+    end
+    local cosmetic = self._catalog.get(cosmeticId)
+    if cosmetic == nil then
+        return { applied = false, reason = "unknown_cosmetic" }
+    end
+    local state = self._profileService:commerce(player)
+    if self._entitlements.equippedIn(state, cosmetic.slot) == cosmetic.id then
+        return self:equip(player, cosmetic.slot, nil)
+    end
+    return self:equip(player, cosmetic.slot, cosmetic.id)
+end
+
+--[[
+    One card looked at. Nothing is decided here and nothing is returned,
+    because a detail view changes nothing -- it is a fact the monetization
+    taxonomy asks for by name, and an event with no emitter is a dashboard
+    reading nothing.
+]]
+function CommerceService.viewDetail(self: CommerceService, player: Player, productId: any): boolean
+    local product = self._catalog.product(productId)
+    if product == nil then
+        return false
+    end
+    self._analyticsService:productDetailView(player, product.id)
+    return true
+end
+
+--[[
+    The shelf and the wardrobe, built for one player.
+
+    Two lists rather than one, and the reason is the failure this project has
+    now paid for four times. A sale card needs a price and a product; a thing
+    already owned needs neither. If owned cosmetics were shown only through
+    their sale cards, a product delisted in the dashboard -- or a
+    `GetProductInfo` call that simply failed -- would make a paid-for coat
+    unwearable, which is an entitlement that exists and a cosmetic that cannot
+    be worn.
+
+    Every card is built by the shared builder, which refuses to make one
+    without a price, a permanence, an owned state and real geometry. A product
+    with no dashboard id yields no card at all rather than a card with a blank
+    where the price goes.
+]]
+function CommerceService.storeSnapshot(self: CommerceService, player: Player): any
+    if not self._profileService:isLoaded(player) then
+        return nil
+    end
+    local state = self._profileService:commerce(player)
+    local cards = {}
+    local unpriced = 0
+    for _, product in self._catalog.products() do
+        local granted = product.grants
+        local preview = {}
+        local owned = #granted > 0
+        local equipped = #granted > 0
+        for _, cosmeticId in granted do
+            local cosmetic = self._catalog.get(cosmeticId)
+            if cosmetic == nil then
+                owned = false
+                equipped = false
+            else
+                for _, plan in cosmetic.parts do
+                    table.insert(preview, plan)
+                end
+                if not self._entitlements.owns(state, cosmetic.id) then
+                    owned = false
+                end
+                if self._entitlements.equippedIn(state, cosmetic.slot) ~= cosmetic.id then
+                    equipped = false
+                end
+            end
+        end
+        local info = self:productInfo(product.id)
+        local card, reason = self._storeCard.build(product, {
+            priceInRobux = if info == nil then nil else info.priceInRobux,
+            owned = owned,
+            equipped = equipped,
+            preview = preview,
+        })
+        if card ~= nil then
+            table.insert(cards, card)
+        elseif reason == "no_price" then
+            unpriced += 1
+        else
+            -- Anything but a missing price is a catalog fault rather than a
+            -- dashboard one, and it is worth a line: the card is gone and no
+            -- spec would notice a product quietly disappearing from a shelf.
+            self._logger:warn("commerce_card_refused", { product = product.id, reason = reason })
+        end
+    end
+
+    local wardrobe = {}
+    for _, cosmetic in self._catalog.list() do
+        if self._entitlements.owns(state, cosmetic.id) then
+            local row = self._storeCard.wardrobeRow(
+                cosmetic,
+                self._entitlements.equippedIn(state, cosmetic.slot) == cosmetic.id
+            )
+            if row ~= nil then
+                table.insert(wardrobe, row)
+            end
+        end
+    end
+
+    return {
+        enabled = self._featureFlags:isEnabled("cosmetic_store_enabled"),
+        cards = cards,
+        wardrobe = wardrobe,
+        unpricedProducts = unpriced,
+        assurance = self._storeCard.assurance(),
+    }
+end
+
+--[[
+    Somebody opened the store. Counted where it happened rather than where it
+    was drawn: a client-side count of store views is a count a client decides.
+]]
+function CommerceService.recordStoreView(self: CommerceService, player: Player, cardCount: number)
+    self._analyticsService:storeView(player, cardCount)
+end
+
+--[[
     What a client may be told: what is worn, and what is owned.
 
     Owned reaches the client because the store card has to show it -- a card
@@ -40067,13 +40659,22 @@ function CommerceService.productInfo(self: CommerceService, productId: any): any
     if type(robloxId) ~= "number" then
         return nil
     end
+    -- A failure is remembered for a minute. Long enough that a bad product
+    -- costs one call rather than one per push; short enough that a dashboard
+    -- fix takes effect without a server restart.
+    local failedAt = self._productInfoFailedAt[productId]
+    if failedAt ~= nil and os.time() - failedAt < PRODUCT_INFO_RETRY_SECONDS then
+        return nil
+    end
     local ok, info = pcall(function()
         return MarketplaceService:GetProductInfo(robloxId, Enum.InfoType.Product)
     end)
     if not ok or type(info) ~= "table" then
+        self._productInfoFailedAt[productId] = os.time()
         self._logger:warn("commerce_product_info_failed", { product = productId })
         return nil
     end
+    self._productInfoFailedAt[productId] = nil
     local resolved = {
         priceInRobux = tonumber(info.PriceInRobux) or 0,
         name = tostring(info.Name or ""),
@@ -40155,11 +40756,97 @@ function CommerceService.Start(self: CommerceService)
         end)
     end)
 
+    self:_watchStudioStore()
+
     self._logger:info("commerce_started", {
         configured = self:_configuredCount(),
         products = #self._catalog.products(),
         storeEnabled = self._featureFlags:isEnabled("cosmetic_store_enabled"),
     })
+end
+
+--[[
+    The Studio half of a surface whose real half needs a Creator Dashboard.
+
+    Everything about the store that a camera can judge -- the panel on a
+    portrait canvas, a card's price line, the owned state, the wardrobe, the
+    preview of a cosmetic's own geometry -- is invisible until a product has a
+    price, and a product has no price until somebody creates it in the
+    dashboard and pastes the number into `Config.CommerceProductIds`. That is
+    the owner's, and it is not going to happen before this ships.
+
+    The failure that leaves behind is written down elsewhere in this codebase
+    in as many words: a live pass went to look at two rewritten HUD surfaces,
+    found both correctly empty, and ended knowing nothing. `LastLightSkipTutorial`
+    and `LastLightStockProfile` exist because of that pass. These two are the
+    same tool pointed at the store.
+
+    **Neither one grants anything the real path would not.** A price is a
+    number to draw, not a product id -- `promptPurchase` still refuses with
+    `product_not_configured`, because a dashboard product genuinely does not
+    exist. And a grant goes through `applyReceipt`, the single grant authority,
+    with a synthetic receipt: the platform's own `ProcessReceipt` cannot be
+    driven in Studio, and feeding the real handler a receipt is the closest
+    honest thing to it. Studio only, on both, and logged loudly every time.
+]]
+function CommerceService._watchStudioStore(self: CommerceService)
+    if not RunService:IsStudio() then
+        return
+    end
+
+    local function applyPrice()
+        local price = tonumber(game:GetAttribute("LastLightStudioStore"))
+        if price == nil or price <= 0 then
+            return
+        end
+        self._featureFlags:setOverride("cosmetic_store_enabled", true)
+        for _, product in self._catalog.products() do
+            self._productInfo[product.id] =
+                { priceInRobux = math.floor(price), name = product.displayName }
+        end
+        self._logger:warn("studio_store_priced", {
+            price = math.floor(price),
+            products = #self._catalog.products(),
+        })
+    end
+
+    local function applyGrant()
+        local productId = game:GetAttribute("LastLightStudioGrant")
+        if type(productId) ~= "string" or #productId == 0 then
+            return
+        end
+        for _, player in Players:GetPlayers() do
+            self:applyReceipt({
+                purchaseId = string.format("studio_%s_%d", productId, player.UserId),
+                productId = productId,
+                userId = player.UserId,
+                at = os.time(),
+            })
+        end
+        self._logger:warn("studio_store_granted", { product = productId })
+    end
+
+    --[[
+        Isolated, because these run inside Start. A Studio helper that throws
+        would take the rest of commerce startup with it, and the whole point of
+        these two is that they are scaffolding: they may not be able to break
+        the thing they exist to look at.
+    ]]
+    for name, apply in { LastLightStudioStore = applyPrice, LastLightStudioGrant = applyGrant } do
+        local ok, err = pcall(apply)
+        if not ok then
+            self._logger:warn("studio_store_hook_failed", { hook = name, reason = tostring(err) })
+        end
+        game:GetAttributeChangedSignal(name):Connect(function()
+            local applied, failure = pcall(apply)
+            if not applied then
+                self._logger:warn(
+                    "studio_store_hook_failed",
+                    { hook = name, reason = tostring(failure) }
+                )
+            end
+        end)
+    end
 end
 
 -- The dashboard number back to this game's own product id. A receipt names
@@ -40185,7 +40872,7 @@ return table.freeze(CommerceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="125">
+        <Item class="ModuleScript" referent="127">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -40456,7 +41143,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="126">
+        <Item class="ModuleScript" referent="128">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -40876,7 +41563,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="127">
+        <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -42560,7 +43247,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="128">
+        <Item class="ModuleScript" referent="130">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43289,7 +43976,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="129">
+        <Item class="ModuleScript" referent="131">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43393,7 +44080,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="130">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43702,7 +44389,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -44158,7 +44845,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -44252,7 +44939,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="135">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -44470,7 +45157,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="134">
+        <Item class="ModuleScript" referent="136">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45340,7 +46027,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="135">
+        <Item class="ModuleScript" referent="137">
           <Properties>
             <string name="Name">PartyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46024,7 +46711,7 @@ return PartyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="136">
+        <Item class="ModuleScript" referent="138">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46433,7 +47120,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="137">
+        <Item class="ModuleScript" referent="139">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46616,7 +47303,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="138">
+        <Item class="ModuleScript" referent="140">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47232,7 +47919,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="139">
+        <Item class="ModuleScript" referent="141">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47766,20 +48453,7 @@ function PlayerSurvivalService._attemptPartyRecovery(self: PlayerSurvivalService
         return
     end
 
-    local eligible: { Player } = {}
-    local downed = 0
-    for player, state in self._states do
-        if
-            player.Parent ~= nil
-            and player:GetAttribute("LastLightTutorialSurvivalReady") == true
-            and player:GetAttribute("LastLightInExpedition") ~= true
-        then
-            table.insert(eligible, player)
-            if state.status == "downed" then
-                downed += 1
-            end
-        end
-    end
+    local eligible, downed = self:_eligibleParty()
     if #eligible < 1 or downed ~= #eligible then
         return
     end
@@ -48337,15 +49011,57 @@ function PlayerSurvivalService.snapshot(self: PlayerSurvivalService, viewer: Pla
         ally = ally,
         downedCount = downedCount,
         enabled = self._featureFlags:isEnabled("player_survival_enabled"),
+        partyDown = self:_partyDown(),
         self = selfSnapshot,
     }
+end
+
+--[[
+    Everybody who could act is down.
+
+    This game has no permanent loss, so defeat is the party wipe -- the exact
+    condition the guard's last stand answers, computed with the same
+    eligibility rule so the two can never disagree about what a wipe is.
+    Reported in the snapshot because it is the single worst moment in the game
+    to open a storefront, and the rule that says so has to be able to see it.
+]]
+function PlayerSurvivalService._partyDown(self: PlayerSurvivalService): boolean
+    local eligible, downed = self:_eligibleParty()
+    return #eligible > 0 and downed == #eligible
+end
+
+--[[
+    Who counts as the party right now, and how many of them are down.
+
+    One reader, because the comment above claims the wipe the store refuses on
+    and the wipe the last stand answers cannot disagree, and a claim like that
+    made of two copies of a predicate is a claim with a half-life. A player
+    still in the tutorial or away in an expedition is neither: the first has
+    not joined the defense and the second is not standing in it.
+]]
+function PlayerSurvivalService._eligibleParty(self: PlayerSurvivalService): ({ Player }, number)
+    local eligible: { Player } = {}
+    local downed = 0
+    for player, state in self._states do
+        if
+            player.Parent ~= nil
+            and player:GetAttribute("LastLightTutorialSurvivalReady") == true
+            and player:GetAttribute("LastLightInExpedition") ~= true
+        then
+            table.insert(eligible, player)
+            if state.status == "downed" then
+                downed += 1
+            end
+        end
+    end
+    return eligible, downed
 end
 
 return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="140">
+        <Item class="ModuleScript" referent="142">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48970,7 +49686,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="141">
+        <Item class="ModuleScript" referent="143">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -50954,7 +51670,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="142">
+        <Item class="ModuleScript" referent="144">
           <Properties>
             <string name="Name">RegionEncounterService</string>
             <string name="Source"><![CDATA[--!strict
@@ -51252,7 +51968,7 @@ return table.freeze(RegionEncounterService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="143">
+        <Item class="ModuleScript" referent="145">
           <Properties>
             <string name="Name">SocialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -51541,7 +52257,7 @@ return table.freeze(SocialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="144">
+        <Item class="ModuleScript" referent="146">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -52351,7 +53067,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="145">
+        <Item class="ModuleScript" referent="147">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -52421,9 +53137,19 @@ export type TutorialService = typeof(setmetatable(
         _gearTraits: any,
         _consumables: any,
         _townVisitPolicy: any,
+        _storeAvailability: any,
         _companionService: any,
         _partyService: any,
         _socialService: any,
+        _commerceService: any,
+        --[[
+            Which store view each player is on, so the panel can be told to
+            open by the world rather than by a HUD button. It is a revision
+            rather than a boolean for the same reason the toast is: closing is
+            the client's own business, and a boolean the client cannot clear
+            would reopen the panel on every push.
+        ]]
+        _storeRevision: { [Player]: number },
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -52464,7 +53190,8 @@ function TutorialService.new(
     gearWear: any,
     gearTraits: any,
     consumables: any,
-    townVisitPolicy: any
+    townVisitPolicy: any,
+    storeAvailability: any
 ): TutorialService
     return setmetatable({
         Name = TutorialService.Name,
@@ -52499,9 +53226,12 @@ function TutorialService.new(
         _gearTraits = gearTraits,
         _consumables = consumables,
         _townVisitPolicy = townVisitPolicy,
+        _storeAvailability = storeAvailability,
         _companionService = nil,
         _partyService = nil,
         _socialService = nil,
+        _commerceService = nil,
+        _storeRevision = {},
         _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -52783,6 +53513,7 @@ function TutorialService.Start(self: TutorialService)
         self._expeditionModuleIndex[player] = nil
         self._expeditionEventRevision[player] = nil
         self._expeditionEventSecond[player] = nil
+        self._storeRevision[player] = nil
         self._limiter:clear(tostring(player.UserId))
         self._analyticsService:clear(player)
     end)
@@ -53001,6 +53732,20 @@ end
 
 function TutorialService.toastPlayer(self: TutorialService, player: Player, message: string)
     self:_setToast(player, message)
+end
+
+--[[
+    Something changed for one player and they are looking at it right now.
+
+    A toast that waits for the next unrelated push is a purchase that lands in
+    silence, which is how a granted receipt read in the live pass: the ledger
+    was right, the profile was right, and the card in front of the buyer still
+    said NOT OWNED. Same shape as the town that never re-rendered in the
+    session that changed it (#325).
+]]
+function TutorialService.announceTo(self: TutorialService, player: Player, message: string)
+    self:_setToast(player, message)
+    self:_publish(player)
 end
 
 function TutorialService._toastAll(self: TutorialService, message: string)
@@ -53302,6 +54047,50 @@ end
 
 function TutorialService.setSocialService(self: TutorialService, socialService: any)
     self._socialService = socialService
+end
+
+function TutorialService.setCommerceService(self: TutorialService, commerceService: any)
+    self._commerceService = commerceService
+end
+
+--[[
+    Whether the store may open for this player, right now.
+
+    The facts are read here because this is where they all already are, and the
+    decision is made in the shared predicate because the HUD makes the same one
+    from the same fields -- a panel open when a night starts has to shut itself
+    on the frame the state changes, not when somebody presses something. The
+    server's answer is the one that counts: it gates the door, and the client's
+    copy only decides what is drawn.
+]]
+function TutorialService._storeVerdict(
+    self: TutorialService,
+    player: Player,
+    knownPhase: any,
+    knownSurvival: any
+): any
+    local session = self._sessions[player]
+    local phase = knownPhase
+    if phase == nil then
+        local pastFirstLight = session ~= nil
+            and (
+                session.stage == "reveal"
+                or session.stage == "complete"
+                or self._phaseService:hasCompletedFirstNight()
+            )
+        phase = if pastFirstLight and self._townNightService:isRunning()
+            then self._townNightService:snapshot()
+            else self._phaseService:snapshot()
+    end
+    local survival = knownSurvival or self._survivalService:snapshot(player)
+    return self._storeAvailability.evaluate({
+        storeEnabled = self._featureFlags:isEnabled("cosmetic_store_enabled"),
+        tutorialComplete = session ~= nil and session.stage == "complete",
+        nightActive = phase.nightActive,
+        enemyCount = phase.enemyCount,
+        downed = survival.self ~= nil and survival.self.downed == true,
+        partyDown = survival.partyDown == true,
+    })
 end
 
 function TutorialService.strike(self: TutorialService, player: Player)
@@ -53626,6 +54415,36 @@ function TutorialService._interact(
         -- people already standing in the town may read, and a snapshot they
         -- do not receive is a showcase they keep looking at.
         self:_publishAll()
+        return
+    end
+    if actionId == self._runtimeIds.Actions.OpenStore then
+        --[[
+            The outfitter's stand, and the door the exit gate is about.
+
+            The refusal is here rather than on the button because the button is
+            a thing a client draws: a client that decided when the store may
+            open is a client that could decide it may always open. A player
+            refused is told which moment refused them, because "nothing
+            happened" is how a working gate reads as a broken prompt.
+        ]]
+        local verdict = self:_storeVerdict(player)
+        if not verdict.open then
+            self:_setToast(player, verdict.label)
+            self:_publish(player)
+            return
+        end
+        --[[
+            A revision rather than a flag. Closing the panel is the client's
+            own business -- it has a CLOSE button and a world behind it -- and a
+            server-held boolean the client cannot clear would reopen the store
+            on the next push, which is a modal overlay reappearing over a night.
+        ]]
+        self._storeRevision[player] = (self._storeRevision[player] or 0) + 1
+        if self._commerceService ~= nil then
+            local store = self._commerceService:storeSnapshot(player)
+            self._commerceService:recordStoreView(player, if store == nil then 0 else #store.cards)
+        end
+        self:_publish(player)
         return
     end
     if actionId == self._runtimeIds.Actions.OpenFieldBook then
@@ -54221,6 +55040,83 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
                 self:_publish(player)
             end
         end
+    elseif kind == self._runtimeIds.Actions.StoreDetail then
+        --[[
+            A card looked at. It settles nothing and answers nothing, which is
+            the point: the taxonomy counts detail views, and a count with no
+            emitter is a dashboard reading nothing. The store gate is asked
+            again anyway, because a card tapped through a stale panel during a
+            night is still a store open during a night.
+        ]]
+        local productId = payload.productId
+        if
+            self._commerceService ~= nil
+            and type(productId) == "string"
+            and #productId <= 48
+            and self:_storeVerdict(player).open
+        then
+            self._commerceService:viewDetail(player, productId)
+        end
+    elseif kind == self._runtimeIds.Actions.StorePurchase then
+        local productId = payload.productId
+        -- Bounded before it reaches anything, the same way every other id-carrying
+        -- action here is. The catalog would refuse a non-string on its own; what
+        -- the length adds is that a 128-character id never becomes a log line or
+        -- an analytics field.
+        if self._commerceService == nil or type(productId) ~= "string" or #productId > 48 then
+            return
+        end
+        local verdict = self:_storeVerdict(player)
+        if not verdict.open then
+            self:_setToast(player, verdict.label)
+            self:_publish(player)
+            return
+        end
+        local result = self._commerceService:promptPurchase(player, productId)
+        if not result.accepted then
+            --[[
+                Every refusal says something different, because the three mean
+                genuinely different things to the person pressing. A product
+                with no dashboard id is the owner's half of this milestone
+                being outstanding, and saying so is better than a prompt that
+                opens onto nothing -- which on a client looks exactly like the
+                button being broken.
+            ]]
+            self:_setToast(
+                player,
+                if result.reason == "product_not_configured"
+                    then "THAT ONE IS NOT FOR SALE YET"
+                    elseif result.reason == "unknown_product" then "NO SUCH THING IN THE CASE"
+                    elseif result.reason == "store_closed" then "THE OUTFITTER IS NOT OPEN YET"
+                    else "THE TILL DID NOT ANSWER — TRY AGAIN"
+            )
+            self:_publish(player)
+        end
+    elseif kind == self._runtimeIds.Actions.EquipCosmetic then
+        --[[
+            Wearing is not buying, so it is not gated on the store being open.
+
+            A player who is downed at the bottom of a night should not be sold
+            anything, and this sells nothing: it changes a look they already
+            paid for. Refusing it would mean a cosmetic that could only be
+            taken off in daylight, which is a rule nobody asked for and one
+            more thing a player would report as broken.
+        ]]
+        local cosmeticId = payload.cosmeticId
+        if self._commerceService ~= nil and type(cosmeticId) == "string" and #cosmeticId <= 48 then
+            local result = self._commerceService:equipById(player, cosmeticId)
+            self:_setToast(
+                player,
+                if result.applied and result.reason == "removed"
+                    then "TAKEN OFF"
+                    elseif result.applied then "WORN"
+                    elseif result.reason == "not_owned" then "YOU DO NOT OWN THAT"
+                    elseif result.reason == "unknown_cosmetic" then "NOTHING BY THAT NAME"
+                    elseif result.reason == "profile_loading" then "STILL UNPACKING YOUR THINGS"
+                    else "THAT CANNOT BE WORN"
+            )
+            self:_publish(player)
+        end
     elseif kind == self._runtimeIds.Actions.CompanionCommand then
         local mode = payload.mode
         if self._companionService ~= nil and type(mode) == "string" and #mode <= 12 then
@@ -54632,6 +55528,24 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             else nil,
         party = if self._partyService ~= nil then self._partyService:snapshot(player) else nil,
         social = if self._socialService ~= nil then self._socialService:snapshot(player) else nil,
+        store = (function(): any
+            if self._commerceService == nil then
+                return nil
+            end
+            local store = self._commerceService:storeSnapshot(player)
+            if store == nil then
+                return nil
+            end
+            local verdict = self:_storeVerdict(player, phase, survival)
+            store.available = verdict.open
+            store.reason = verdict.reason
+            store.closedLabel = if verdict.open then nil else verdict.label
+            -- The open instruction, and the only one the client acts on. It
+            -- rises when the stand is used and never falls, so a client that
+            -- missed a push opens late rather than never.
+            store.revision = self._storeRevision[player] or 0
+            return store
+        end)(),
         gearCare = gearCare,
         whetTarget = whetTarget,
         equipped = self._profileService:equippedSnapshot(player),
@@ -54708,7 +55622,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="146">
+        <Item class="ModuleScript" referent="148">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -55577,7 +56491,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="147">
+        <Item class="ModuleScript" referent="149">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -59736,9 +60650,19 @@ function WorldService._buildLobby(self: WorldService, world: Model)
             yaw = -90,
             scale = 1,
         },
+        --[[
+            The table moved to the fireside when the outfitter's stand arrived.
+
+            Measured rather than eyeballed: the east wall's only unbroken run
+            between the notice board and the first bed is the stretch this
+            table was sitting across, and the first placement of the stand put
+            a stone plinth through the table's own bench. A table belongs by a
+            hearth anyway; standing it in the middle of a wall was the least
+            considered thing in the room.
+        ]]
         {
             asset = "mesh_creator_picnic_table_a",
-            at = Vector3.new(23, 0, -6),
+            at = Vector3.new(14, 0, 17),
             yaw = 0,
             scale = 1.1,
         },
@@ -59766,6 +60690,315 @@ function WorldService._buildLobby(self: WorldService, world: Model)
             fallbackInstance = nil,
         })
     end
+    --[[
+        The outfitter's stand, on the east wall between the notice board and
+        the first bed -- which is where it fits, measured rather than chosen.
+
+        This is the only door into the store, and that is the design rather
+        than a placement. A storefront reachable from a HUD button is a
+        storefront that can open in any moment, and the moments it may not open
+        in are the whole of Milestone 11's exit gate -- onboarding, active
+        defense, downed, defeat. Making it a thing you walk up to, in the one
+        room in the game where none of those four can be happening, means the
+        refusal is the second line of defence rather than the only one. The
+        town gate settled the same argument for the visit policy.
+
+        A tailor's dummy rather than a sign on a stick: the silhouette says
+        clothing before a word of the label is read, which is what
+        VISUAL_QUALITY_STANDARD asks for, and a rail with a coat hanging off it
+        says the rest. Nothing here is a cosmetic -- the stand is furniture, and
+        what is for sale lives in the catalog.
+
+        Everything is arranged along Z and faces west into the room, because
+        the stand is against the east wall and every player walking from the
+        spawn to the departure platform passes it looking that way.
+    ]]
+    local outfitter = Instance.new("Folder")
+    outfitter.Name = "OutfitterStand"
+    outfitter.Parent = lobby
+    local outfitterAt = LOBBY_CENTER + Vector3.new(26, 0, -4)
+    local outfitterPlinth = part(
+        outfitter,
+        "OutfitterPlinth",
+        Vector3.new(5.5, 1.1, 7.5),
+        CFrame.new(outfitterAt + Vector3.new(0, 1.55, 0)),
+        Color3.fromRGB(66, 70, 66),
+        Enum.Material.Slate
+    )
+    --[[
+        The dummy: a splayed tripod foot, a post, and a torso that narrows at
+        the waist and squares at the shoulder. A single capsule would be a
+        bollard; the taper is the whole reason it reads as a person's shape.
+    ]]
+    local dummyAt = outfitterAt + Vector3.new(-1.1, 0, 0)
+    for footIndex = 0, 2 do
+        local footAngle = (footIndex / 3) * math.pi * 2
+        part(
+            outfitter,
+            "OutfitterDummyFoot",
+            Vector3.new(0.26, 0.26, 2.1),
+            CFrame.new(
+                dummyAt + Vector3.new(math.cos(footAngle) * 0.75, 2.35, math.sin(footAngle) * 0.75)
+            ) * CFrame.Angles(math.rad(22), -footAngle, 0),
+            Color3.fromRGB(74, 56, 38),
+            Enum.Material.Wood,
+            false
+        )
+    end
+    part(
+        outfitter,
+        "OutfitterDummyPost",
+        Vector3.new(0.34, 3.4, 0.34),
+        CFrame.new(dummyAt + Vector3.new(0, 3.8, 0)),
+        Color3.fromRGB(74, 56, 38),
+        Enum.Material.Wood,
+        false
+    )
+    part(
+        outfitter,
+        "OutfitterDummyWaist",
+        Vector3.new(1.05, 1.5, 1.25),
+        CFrame.new(dummyAt + Vector3.new(0, 5.9, 0)),
+        Color3.fromRGB(214, 198, 166),
+        Enum.Material.Fabric,
+        false
+    )
+    part(
+        outfitter,
+        "OutfitterDummyChest",
+        Vector3.new(1.5, 2.1, 2.35),
+        CFrame.new(dummyAt + Vector3.new(0, 7.4, 0)),
+        Color3.fromRGB(214, 198, 166),
+        Enum.Material.Fabric,
+        false
+    )
+    --[[
+        The dummy is wearing something, which is the whole point of a dummy.
+
+        The first pass was one fabric colour from waist to shoulder and it
+        photographed as a stack of two boxes -- VISUAL_QUALITY_STANDARD's
+        recoloured cube, in an interior dark enough that the taper did no work.
+        The second pass covered the whole front in one dark panel and
+        photographed as a black slab, which is worse. Two lapels with a gap
+        between them read as a coat worn open over a pale shirt, and the three
+        values are what make the shape survive a room lit by two lamps.
+    ]]
+    for lapelSide = -1, 1, 2 do
+        part(
+            outfitter,
+            "OutfitterDummyLapel",
+            Vector3.new(0.3, 2.5, 0.95),
+            CFrame.new(dummyAt + Vector3.new(-0.72, 7.1, lapelSide * 0.7)),
+            Color3.fromRGB(58, 46, 38),
+            Enum.Material.Fabric,
+            false
+        )
+    end
+    part(
+        outfitter,
+        "OutfitterDummyCoatTrim",
+        Vector3.new(0.34, 0.22, 2.55),
+        CFrame.new(dummyAt + Vector3.new(-0.72, 8.28, 0)),
+        Color3.fromRGB(226, 168, 88),
+        Enum.Material.Fabric,
+        false
+    )
+    local dummyShoulder = part(
+        outfitter,
+        "OutfitterDummyShoulder",
+        Vector3.new(0.7, 2.6, 1.6),
+        CFrame.new(dummyAt + Vector3.new(0, 8.55, 0)) * CFrame.Angles(math.rad(90), 0, 0),
+        Color3.fromRGB(186, 168, 134),
+        Enum.Material.Fabric,
+        false
+    )
+    dummyShoulder.Shape = Enum.PartType.Cylinder
+    part(
+        outfitter,
+        "OutfitterDummyNeck",
+        Vector3.new(0.5, 0.9, 0.5),
+        CFrame.new(dummyAt + Vector3.new(0, 9.25, 0)),
+        Color3.fromRGB(74, 56, 38),
+        Enum.Material.Wood,
+        false
+    )
+
+    --[[
+        The rail behind it, with one coat hung on it. A hanging garment needs
+        something to hang from, or it is a rectangle floating against a wall.
+    ]]
+    local railAt = outfitterAt + Vector3.new(1.6, 0, 0)
+    for railSide = -1, 1, 2 do
+        part(
+            outfitter,
+            "OutfitterRailPost",
+            Vector3.new(0.28, 6.4, 0.28),
+            CFrame.new(railAt + Vector3.new(0, 5.3, railSide * 3.1)),
+            Color3.fromRGB(88, 66, 44),
+            Enum.Material.Wood,
+            false
+        )
+    end
+    local outfitterRail = part(
+        outfitter,
+        "OutfitterRail",
+        Vector3.new(0.22, 6.5, 0.22),
+        CFrame.new(railAt + Vector3.new(0, 8.4, 0)) * CFrame.Angles(math.rad(90), 0, 0),
+        Color3.fromRGB(102, 78, 52),
+        Enum.Material.Wood,
+        false
+    )
+    outfitterRail.Shape = Enum.PartType.Cylinder
+    --[[
+        The spare garment hangs at the far end of the rail rather than behind
+        the dummy. At the middle it was invisible from every angle a player
+        approaches from -- the dummy stands two and a half studs in front of the
+        rail and covered it completely, which is geometry paid for and never
+        seen.
+    ]]
+    part(
+        outfitter,
+        "OutfitterHangerHook",
+        Vector3.new(0.12, 0.9, 0.12),
+        CFrame.new(railAt + Vector3.new(0, 8.05, -2.6)),
+        Color3.fromRGB(128, 126, 118),
+        Enum.Material.Metal,
+        false
+    )
+    part(
+        outfitter,
+        "OutfitterHungCoat",
+        Vector3.new(0.24, 3.5, 2.3),
+        CFrame.new(railAt + Vector3.new(0, 5.9, -2.6)) * CFrame.Angles(math.rad(3), 0, 0),
+        Color3.fromRGB(74, 96, 88),
+        Enum.Material.Fabric,
+        false
+    )
+    part(
+        outfitter,
+        "OutfitterHungCoatTrim",
+        Vector3.new(0.28, 0.2, 2.35),
+        CFrame.new(railAt + Vector3.new(0, 7.5, -2.6)),
+        Color3.fromRGB(226, 168, 88),
+        Enum.Material.Fabric,
+        false
+    )
+
+    --[[
+        Three lanterns, and the count is the fix rather than the decoration.
+
+        The stand went in at the darkest point on that wall -- the lodge's two
+        east lamps are at z = 46 and z = 78 and this sits between them -- and
+        the first pass gave it one lantern at the strength of a bedside lamp.
+        Photographed, the whole object was a silhouette: the sign unreadable,
+        the dummy a black mass, the coat gone. A shop stand is lit *from the
+        front*, which the rail lantern cannot do because it hangs behind the
+        dummy, so the two that matter are the pair flanking the sign on its own
+        posts. Shadows are off on all three: a light casting shadows through a
+        dummy is the dummy lighting nothing but the wall behind it.
+    ]]
+    local outfitterLamp = part(
+        outfitter,
+        "OutfitterLamp",
+        Vector3.new(0.9, 1.1, 0.9),
+        CFrame.new(railAt + Vector3.new(0, 7.7, 2.6)),
+        AMBER,
+        Enum.Material.Neon,
+        false
+    )
+    outfitterLamp.CastShadow = false
+    local outfitterLampLight = Instance.new("PointLight")
+    outfitterLampLight.Color = AMBER
+    outfitterLampLight.Brightness = 3.2
+    outfitterLampLight.Range = 34
+    outfitterLampLight.Shadows = false
+    outfitterLampLight.Parent = outfitterLamp
+    CollectionService:AddTag(outfitterLamp, self._runtimeIds.AmbientLightTag)
+
+    --[[
+        The board faces west, into the room.
+
+        A board's Front face is its -Z and a yaw of +90 degrees turns that to
+        -X, which is the way a player walking from the spawn to the platform is
+        looking. #329's gate sign shipped facing into the trees and was blank
+        from every angle anybody approaches from; the fix there was the same
+        arithmetic, checked by dot product and by eye.
+    ]]
+    for boardSide = -1, 1, 2 do
+        part(
+            outfitter,
+            "OutfitterBoardPost",
+            Vector3.new(0.3, 9.6, 0.3),
+            CFrame.new(dummyAt + Vector3.new(0, 6.9, boardSide * 3)),
+            Color3.fromRGB(88, 66, 44),
+            Enum.Material.Wood,
+            false
+        )
+        --[[
+            The bracket reaches two studs out, and the reason is measured.
+
+            Hung close to the post the lamps sat level with the dummy's own
+            front face and lit it edge-on: the sign above them read perfectly
+            and the thing being sold stayed a silhouette. A shop is lit from
+            where the customer is standing.
+        ]]
+        part(
+            outfitter,
+            "OutfitterPostBracket",
+            Vector3.new(2.4, 0.14, 0.14),
+            CFrame.new(dummyAt + Vector3.new(-1, 8.72, boardSide * 3)),
+            Color3.fromRGB(128, 126, 118),
+            Enum.Material.Metal,
+            false
+        )
+        local postLamp = part(
+            outfitter,
+            "OutfitterPostLamp",
+            Vector3.new(0.66, 0.8, 0.66),
+            CFrame.new(dummyAt + Vector3.new(-2, 8.2, boardSide * 3)),
+            AMBER,
+            Enum.Material.Neon,
+            false
+        )
+        postLamp.CastShadow = false
+        local postLight = Instance.new("PointLight")
+        postLight.Color = Color3.fromRGB(255, 214, 160)
+        postLight.Brightness = 3
+        postLight.Range = 24
+        postLight.Shadows = false
+        postLight.Parent = postLamp
+        CollectionService:AddTag(postLamp, self._runtimeIds.AmbientLightTag)
+    end
+    local outfitterBoard = part(
+        outfitter,
+        "OutfitterBoard",
+        Vector3.new(6.2, 2.4, 0.5),
+        CFrame.new(dummyAt + Vector3.new(0, 10.4, 0)) * CFrame.Angles(0, math.rad(90), 0),
+        Color3.fromRGB(91, 65, 44),
+        Enum.Material.WoodPlanks
+    )
+    WorldSignBuilder.dressBoard(outfitterBoard, "THE OUTFITTER", CREAM)
+    --[[
+        Registered on the plinth, not on the board.
+
+        The click volume grows *upward* from whatever it is anchored to, which
+        is right for a pedestal and wrong for a sign hanging ten studs up: on
+        the board it would have covered the ceiling and nothing a player is
+        pointing at. Anchored to the floor of the stand it covers the dummy,
+        the rail and the board -- the whole object, which is what a player is
+        aiming at when they aim at any of it. #325 was three defects of this
+        exact shape.
+    ]]
+    self:_registerInteraction(
+        outfitterPlinth,
+        self._runtimeIds.InteractionIds.Outfitter,
+        self._runtimeIds.Actions.OpenStore,
+        "BROWSE",
+        "The Outfitter",
+        nil,
+        nil,
+        Vector3.new(7.5, 12, 9.5)
+    )
 
     labelSign(
         lobby,
@@ -70759,11 +71992,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="148">
+      <Item class="Folder" referent="150">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="149">
+        <Item class="ModuleScript" referent="151">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -75077,7 +76310,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="150">
+        <Item class="ModuleScript" referent="152">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -76176,7 +77409,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="151">
+        <Item class="ModuleScript" referent="153">
           <Properties>
             <string name="Name">CinderfallBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -77043,7 +78276,7 @@ return table.freeze(CinderfallBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="152">
+        <Item class="ModuleScript" referent="154">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -77738,7 +78971,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="153">
+        <Item class="ModuleScript" referent="155">
           <Properties>
             <string name="Name">FrostmereBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -78787,7 +80020,7 @@ return table.freeze(FrostmereBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="154">
+        <Item class="ModuleScript" referent="156">
           <Properties>
             <string name="Name">IronrootBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -79802,7 +81035,7 @@ return table.freeze(IronrootBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="155">
+        <Item class="ModuleScript" referent="157">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -80661,7 +81894,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="156">
+        <Item class="ModuleScript" referent="158">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -80747,7 +81980,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="157">
+        <Item class="ModuleScript" referent="159">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -81121,7 +82354,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="158">
+        <Item class="ModuleScript" referent="160">
           <Properties>
             <string name="Name">MireglassBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -81877,7 +83110,7 @@ return table.freeze(MireglassBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="159">
+        <Item class="ModuleScript" referent="161">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -82057,7 +83290,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="160">
+        <Item class="ModuleScript" referent="162">
           <Properties>
             <string name="Name">RegionBuilders</string>
             <string name="Source"><![CDATA[--!strict
@@ -82823,7 +84056,7 @@ return table.freeze(RegionBuilders)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="161">
+        <Item class="ModuleScript" referent="163">
           <Properties>
             <string name="Name">TempestBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -83644,7 +84877,7 @@ return table.freeze(TempestBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="162">
+        <Item class="ModuleScript" referent="164">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -84240,7 +85473,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="163">
+        <Item class="ModuleScript" referent="165">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -84477,7 +85710,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="164">
+        <Item class="ModuleScript" referent="166">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -84566,7 +85799,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="165">
+        <Item class="ModuleScript" referent="167">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -84902,11 +86135,11 @@ return table.freeze(WorldSignBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="166">
+    <Item class="Folder" referent="168">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="167">
+      <Item class="Script" referent="169">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -86743,7 +87976,7 @@ print("[Last Light] PASS FoundationIntegration")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Script" referent="168">
+      <Item class="Script" referent="170">
         <Properties>
           <string name="Name">ModuleGallery</string>
           <token name="RunContext">0</token>
@@ -86834,15 +88067,15 @@ end
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="169">
+  <Item class="StarterPlayer" referent="171">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="170">
+    <Item class="StarterPlayerScripts" referent="172">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="171">
+      <Item class="LocalScript" referent="173">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -86981,6 +88214,23 @@ end)
 
 hud:setQuickChatHandler(function(phraseId: string)
     send(RuntimeIds.Actions.QuickChat, { phraseId = phraseId })
+end)
+
+--[[
+    The store, in three sends and no fourth.
+
+    Opening it is the outfitter's stand in the lodge, which is an ordinary
+    Interact -- there is no "open the store" button anywhere on the HUD,
+    because a storefront that can be opened from anywhere can be opened during
+    the four moments the exit gate says it must not. Closing it is the client's
+    own business and reaches nobody.
+]]
+hud:setStoreHandlers(function(productId: string)
+    send(RuntimeIds.Actions.StoreDetail, { productId = productId })
+end, function(productId: string)
+    send(RuntimeIds.Actions.StorePurchase, { productId = productId })
+end, function(cosmeticId: string)
+    send(RuntimeIds.Actions.EquipCosmetic, { cosmeticId = cosmeticId })
 end)
 
 hud:setLoadoutHandlers(function(slot: number)
@@ -87212,11 +88462,11 @@ task.spawn(function()
 end)
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="172">
+        <Item class="Folder" referent="174">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="173">
+          <Item class="ModuleScript" referent="175">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -87347,7 +88597,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="174">
+          <Item class="ModuleScript" referent="176">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -87360,8 +88610,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local sharedRoot = ReplicatedStorage:WaitForChild("LastLight")
 local Consumables = require(sharedRoot.Consumables)
+local CosmeticCatalog = require(sharedRoot.CosmeticCatalog)
 local Equipment = require(sharedRoot.Equipment)
 local QuickChat = require(sharedRoot.QuickChat)
+local StoreAvailability = require(sharedRoot.StoreAvailability)
 
 -- How many consumables the column shows at once. There are more than a
 -- phone screen has room for, so the HUD shows what a player is actually
@@ -87568,6 +88820,110 @@ local function createItemIcon(parent: Instance, itemId: string, size: number): V
     return viewport
 end
 
+--[[
+    A cosmetic's own geometry, drawn in a frame.
+
+    There is no per-cosmetic case here and that is the whole point: a plan is a
+    list of parts with a shape, a size, an offset, a rotation, a colour and a
+    material, so the twelfth cosmetic draws itself the day it is added to the
+    catalog. The equip panel shipped as a hardcoded list of eight items and
+    left ninety craftable items unwearable with every spec green (#299); a
+    storefront with a hand-written preview per product has that shape and a
+    price attached to it.
+
+    The camera is fitted to whatever the plan turns out to be rather than
+    parked at a constant distance -- a banner is four studs tall and a weapon
+    finish is half a stud wide, and one distance cannot frame both.
+]]
+local function createCosmeticPreview(parent: Instance, parts: { any }, size: number): ViewportFrame
+    local viewport = Instance.new("ViewportFrame")
+    viewport.Name = "Preview"
+    viewport.Size = UDim2.fromOffset(size, size)
+    viewport.BackgroundColor3 = Color3.fromRGB(31, 44, 42)
+    viewport.BorderSizePixel = 0
+    --[[
+        Nearly flat ambient, on purpose.
+
+        A viewport lit the way the world is lit renders a dark leather grip on
+        a dark panel as a black smear -- photographed at a 392 x 608 viewport,
+        the tool skin and the banner were both unreadable at 76 points. A
+        product preview is a catalogue photograph, not a scene: it is lit so
+        the shape can be read, and the key light only gives it a top.
+    ]]
+    viewport.Ambient = Color3.fromRGB(205, 206, 202)
+    viewport.LightColor = Color3.fromRGB(255, 246, 230)
+    viewport.LightDirection = Vector3.new(-0.55, -1, -0.8)
+    viewport.ZIndex = if parent:IsA("GuiObject") then parent.ZIndex + 1 else 1
+    viewport.Parent = parent
+
+    local world = Instance.new("WorldModel")
+    world.Parent = viewport
+
+    local minimum = Vector3.new(math.huge, math.huge, math.huge)
+    local maximum = Vector3.new(-math.huge, -math.huge, -math.huge)
+    for index, plan in parts do
+        local dimensions = Vector3.new(plan.size[1], plan.size[2], plan.size[3])
+        local offset = Vector3.new(plan.offset[1], plan.offset[2], plan.offset[3])
+        local piece = Instance.new("Part")
+        piece.Name = if type(plan.name) == "string" then plan.name else "Part" .. index
+        piece.Anchored = true
+        piece.CanCollide = false
+        piece.CanQuery = false
+        piece.Size = dimensions
+        piece.CFrame = CFrame.new(offset)
+            * CFrame.Angles(
+                math.rad(plan.rotation[1]),
+                math.rad(plan.rotation[2]),
+                math.rad(plan.rotation[3])
+            )
+        piece.Color = Color3.fromRGB(plan.color[1], plan.color[2], plan.color[3])
+        --[[
+            A material named by a string the catalog wrote, resolved rather
+            than branched on. An unknown name falls back to a plastic finish
+            instead of throwing: a preview that fails to draw is worse than one
+            drawn in the wrong material, because the second still shows a
+            player what they are buying.
+        ]]
+        local resolved = (Enum.Material :: any)[plan.material]
+        piece.Material = if typeof(resolved) == "EnumItem"
+            then resolved
+            else Enum.Material.SmoothPlastic
+        if plan.shape == "Ball" then
+            piece.Shape = Enum.PartType.Ball
+        elseif plan.shape == "Cylinder" then
+            piece.Shape = Enum.PartType.Cylinder
+        elseif plan.shape == "Wedge" then
+            piece.Shape = Enum.PartType.Wedge
+        end
+        piece.Parent = world
+        local half = dimensions / 2
+        minimum = minimum:Min(offset - half)
+        maximum = maximum:Max(offset + half)
+    end
+
+    --[[
+        A plan with nothing in it draws nothing rather than NaN.
+
+        With no parts the bounds stay at their infinities and the centre comes
+        out (inf + -inf) / 2, which is NaN on every axis and throws out of
+        `CFrame.new` -- inside `HUDController.new`, so one product whose grants
+        do not resolve would take the whole HUD down rather than one picture.
+        An empty frame is the honest failure and the card that would have used
+        it is refused by the builder anyway.
+    ]]
+    local center = if #parts == 0 then Vector3.zero else (minimum + maximum) / 2
+    local extent = if #parts == 0 then Vector3.zero else maximum - minimum
+    local reach = math.max(extent.X, extent.Y, extent.Z, 0.6)
+    local camera = Instance.new("Camera")
+    camera.FieldOfView = 30
+    -- Three quarters round and a little above, which is the angle every one of
+    -- this project's prop photographs was judged from.
+    camera.CFrame = CFrame.new(center + Vector3.new(reach * 1.5, reach * 0.75, reach * 2.1), center)
+    camera.Parent = viewport
+    viewport.CurrentCamera = camera
+    return viewport
+end
+
 local COLORS = {
     ink = Color3.fromRGB(14, 22, 21),
     panel = Color3.fromRGB(20, 31, 29),
@@ -87668,117 +89024,147 @@ end
 -- a gap, so a wrapped row can never be drawn through the row below it.
 local ACTION_ROW_PITCH = 128
 
-export type HUDController = typeof(setmetatable(
-    {} :: {
-        _gui: ScreenGui,
-        _actionFrame: Frame,
-        _actionLabel: TextLabel,
-        _actionFill: Frame,
-        _canvas: Frame,
-        _scale: UIScale,
-        _phaseFrame: Frame,
-        _phase: TextLabel,
-        _objectiveFrame: Frame,
-        _objective: TextLabel,
-        _detail: TextLabel,
-        _progress: TextLabel,
-        _mara: TextLabel,
-        _resource: TextLabel,
-        _health: TextLabel,
-        _staminaFrame: Frame,
-        _staminaFill: Frame,
-        _staminaText: TextLabel,
-        _toast: TextLabel,
-        _lanternFrame: Frame,
-        _lanternFill: Frame,
-        _lanternText: TextLabel,
-        _blackoutFrame: Frame,
-        _blackoutFill: Frame,
-        _blackoutTitle: TextLabel,
-        _blackoutDetail: TextLabel,
-        _eliteFrame: Frame,
-        _eliteFill: Frame,
-        _eliteTitle: TextLabel,
-        _eliteDetail: TextLabel,
-        _allyFrame: Frame,
-        _allyTitle: TextLabel,
-        _allyDetail: TextLabel,
-        _threatFrame: Frame,
-        _threatTitle: TextLabel,
-        _threatDetail: TextLabel,
-        _downedFrame: Frame,
-        _downedFill: Frame,
-        _downedTimer: TextLabel,
-        _downedDetail: TextLabel,
-        _downedAlly: TextLabel,
-        _primary: TextButton,
-        _tool: TextButton,
-        _sprint: TextButton,
-        _dodge: TextButton,
-        _ability: TextButton,
-        _companion: TextButton,
-        _call: TextButton,
-        _callOverlay: Frame,
-        _callPanel: Frame,
-        _callTabRow: Frame,
-        _callGrid: Frame,
-        _callTabs: { [string]: TextButton },
-        _callPhraseButtons: { { button: TextButton, phraseId: string, category: string } },
-        _callCategory: string,
-        _actionClusterRows: number,
-        _onQuickChat: ((string) -> ())?,
-        _companionMode: string,
-        _onCompanionCommand: ((string) -> ())?,
-        _compact: TextButton,
-        _professionButton: TextButton,
-        _lobbyFrame: Frame,
-        _lobbyTitle: TextLabel,
-        _lobbyDetail: TextLabel,
-        _lobbySizes: Frame,
-        _lobbySizeButtons: { TextButton },
-        _contractButtons: { [string]: TextButton },
-        _selectedContractId: string,
-        _onLobbyDepart: ((number) -> ())?,
-        _selectedPartySize: number?,
-        _partyLine: TextLabel,
-        _partyButtons: { [string]: TextButton },
-        _progressButton: TextButton,
-        _useButtons: { TextButton },
-        _professionOverlay: Frame,
-        _professionPanel: Frame,
-        _professionCards: { [string]: TextButton },
-        _professionOrder: { string },
-        _professionClose: TextButton,
-        _progressOverlay: Frame,
-        _progressPanel: Frame,
-        _progressScroll: ScrollingFrame,
-        _progressClose: TextButton,
-        _progressText: TextLabel,
-        _equipmentButtons: { [string]: TextButton },
-        _loadoutButtons: { [string]: TextButton },
-        _whetButton: TextButton,
-        _whetItemId: string?,
-        _onWhet: ((string) -> ())?,
-        _currentState: any,
-        _interactionLabel: string?,
-        _interactionAvailable: boolean,
-        _inputMode: string,
-        _maraText: string,
-        _maraShownAt: number,
-        _compactEnabled: boolean,
-        _playerDowned: boolean,
-        _combatContext: boolean,
-        _professionMenuOpen: boolean,
-        _professionSwitchable: boolean,
-        _lastToastRevision: number,
-        _lastPhase: string?,
-        _actionClusterSignature: string?,
-        _onCompact: ((boolean) -> ())?,
-        _onProfessionSelected: ((string) -> ())?,
-        _onEquip: ((string) -> ())?,
-    },
-    HUDController
-))
+export type HUDController =
+    typeof(setmetatable(
+        {} :: {
+            _gui: ScreenGui,
+            _actionFrame: Frame,
+            _actionLabel: TextLabel,
+            _actionFill: Frame,
+            _canvas: Frame,
+            _scale: UIScale,
+            _phaseFrame: Frame,
+            _phase: TextLabel,
+            _objectiveFrame: Frame,
+            _objective: TextLabel,
+            _detail: TextLabel,
+            _progress: TextLabel,
+            _mara: TextLabel,
+            _resource: TextLabel,
+            _health: TextLabel,
+            _staminaFrame: Frame,
+            _staminaFill: Frame,
+            _staminaText: TextLabel,
+            _toast: TextLabel,
+            _lanternFrame: Frame,
+            _lanternFill: Frame,
+            _lanternText: TextLabel,
+            _blackoutFrame: Frame,
+            _blackoutFill: Frame,
+            _blackoutTitle: TextLabel,
+            _blackoutDetail: TextLabel,
+            _eliteFrame: Frame,
+            _eliteFill: Frame,
+            _eliteTitle: TextLabel,
+            _eliteDetail: TextLabel,
+            _allyFrame: Frame,
+            _allyTitle: TextLabel,
+            _allyDetail: TextLabel,
+            _threatFrame: Frame,
+            _threatTitle: TextLabel,
+            _threatDetail: TextLabel,
+            _downedFrame: Frame,
+            _downedFill: Frame,
+            _downedTimer: TextLabel,
+            _downedDetail: TextLabel,
+            _downedAlly: TextLabel,
+            _primary: TextButton,
+            _tool: TextButton,
+            _sprint: TextButton,
+            _dodge: TextButton,
+            _ability: TextButton,
+            _companion: TextButton,
+            _call: TextButton,
+            _callOverlay: Frame,
+            _callPanel: Frame,
+            _callTabRow: Frame,
+            _callGrid: Frame,
+            _callTabs: { [string]: TextButton },
+            _callPhraseButtons: { { button: TextButton, phraseId: string, category: string } },
+            _callCategory: string,
+            _actionClusterRows: number,
+            _onQuickChat: ((string) -> ())?,
+            _companionMode: string,
+            _onCompanionCommand: ((string) -> ())?,
+            _compact: TextButton,
+            _professionButton: TextButton,
+            _lobbyFrame: Frame,
+            _lobbyTitle: TextLabel,
+            _lobbyDetail: TextLabel,
+            _lobbySizes: Frame,
+            _lobbySizeButtons: { TextButton },
+            _contractButtons: { [string]: TextButton },
+            _selectedContractId: string,
+            _onLobbyDepart: ((number) -> ())?,
+            _selectedPartySize: number?,
+            _partyLine: TextLabel,
+            _partyButtons: { [string]: TextButton },
+            _progressButton: TextButton,
+            _useButtons: { TextButton },
+            _professionOverlay: Frame,
+            _professionPanel: Frame,
+            _professionCards: { [string]: TextButton },
+            _professionOrder: { string },
+            _professionClose: TextButton,
+            _progressOverlay: Frame,
+            _progressPanel: Frame,
+            _progressScroll: ScrollingFrame,
+            _progressClose: TextButton,
+            _progressText: TextLabel,
+            _storeOverlay: Frame,
+            _storePanel: Frame,
+            _storeScroll: ScrollingFrame,
+            _storeClose: TextButton,
+            _storeEmpty: TextLabel,
+            _storeCards: {
+                [string]: {
+                    -- A button, not a frame: the card body is pressable on
+                    -- purpose, because tapping the card is the detail view and
+                    -- tapping its button is the decision.
+                    frame: TextButton,
+                    name: TextLabel,
+                    price: TextLabel,
+                    terms: TextLabel,
+                    action: TextButton,
+                    productId: string,
+                },
+            },
+            _storeWardrobeTitle: TextLabel,
+            _storeWardrobeRows: {
+                [string]: { frame: Frame, name: TextLabel, action: TextButton, cosmeticId: string },
+            },
+            -- The last open instruction this client acted on. The server counts
+            -- store presses; a client that reopened on every push would put a
+            -- modal over a night the moment one arrived.
+            _storeRevision: number,
+            _onStoreDetail: ((string) -> ())?,
+            _onStorePurchase: ((string) -> ())?,
+            _onCosmeticEquip: ((string) -> ())?,
+            _equipmentButtons: { [string]: TextButton },
+            _loadoutButtons: { [string]: TextButton },
+            _whetButton: TextButton,
+            _whetItemId: string?,
+            _onWhet: ((string) -> ())?,
+            _currentState: any,
+            _interactionLabel: string?,
+            _interactionAvailable: boolean,
+            _inputMode: string,
+            _maraText: string,
+            _maraShownAt: number,
+            _compactEnabled: boolean,
+            _playerDowned: boolean,
+            _combatContext: boolean,
+            _professionMenuOpen: boolean,
+            _professionSwitchable: boolean,
+            _lastToastRevision: number,
+            _lastPhase: string?,
+            _actionClusterSignature: string?,
+            _onCompact: ((boolean) -> ())?,
+            _onProfessionSelected: ((string) -> ())?,
+            _onEquip: ((string) -> ())?,
+        },
+        HUDController
+    ))
 
 function HUDController.new(
     playerGui: PlayerGui,
@@ -87993,7 +89379,18 @@ function HUDController.new(
     toast.BackgroundColor3 = COLORS.ink
     toast.BackgroundTransparency = 0.08
     toast.Visible = false
-    toast.ZIndex = 12
+    --[[
+        Above every overlay in the HUD, which it was not.
+
+        At 12 the toast drew behind the field book, the profession panel, the
+        call wheel and the store -- so a refusal raised while any of them was
+        open was invisible. Found by pressing BUY on a product with no Creator
+        Dashboard id: the server refused correctly, said so, and the sentence
+        was painted underneath the panel the player was looking at, which is
+        indistinguishable from the button doing nothing. #327 was about a modal
+        eating input; this is the same modal eating output.
+    ]]
+    toast.ZIndex = 60
     corner(toast, 14)
     stroke(toast, COLORS.amber, 0.4)
 
@@ -88783,6 +90180,330 @@ function HUDController.new(
     corner(progressClose, 12)
     stroke(progressClose, COLORS.cream, 0.58)
 
+    --[[
+        The outfitter's panel.
+
+        Built to the portrait canvas from the start rather than fitted to one
+        afterwards, because that lesson has a bug number: #327 found the field
+        book 46 points wider than the screen on each side with its CLOSE button
+        57% off it, and a modal overlay nobody can shut eats every world click
+        behind it -- which reads in play as the game having stopped responding.
+        Every figure below that could have been a literal is derived from the
+        canvas in _layoutStore.
+
+        One card per product and one row per owned cosmetic, both walked out of
+        the catalog rather than written here. A hand-written card list is the
+        equip panel's eight hardcoded items with a price attached.
+    ]]
+    local storeOverlay = Instance.new("Frame")
+    storeOverlay.Name = "StoreOverlay"
+    storeOverlay.Size = UDim2.fromScale(1, 1)
+    storeOverlay.BackgroundColor3 = COLORS.ink
+    storeOverlay.BackgroundTransparency = 0.18
+    storeOverlay.Active = true
+    storeOverlay.Visible = false
+    storeOverlay.ZIndex = 54
+    storeOverlay.Parent = canvas
+
+    local storePanel = Instance.new("Frame")
+    storePanel.Name = "StorePanel"
+    -- Top-anchored, and _layoutStore decides how far down. A centred panel on
+    -- a portrait canvas put its own CLOSE button underneath Roblox's topbar.
+    storePanel.AnchorPoint = Vector2.new(0.5, 0)
+    storePanel.Position = UDim2.new(0.5, 0, 0, 80)
+    storePanel.Size = UDim2.fromOffset(540, 560)
+    storePanel.BackgroundColor3 = COLORS.panel
+    storePanel.BackgroundTransparency = 0.02
+    storePanel.ZIndex = 55
+    storePanel.Parent = storeOverlay
+    corner(storePanel, 20)
+    stroke(storePanel, COLORS.amber, 0.2)
+
+    local storeTitle = textLabel(
+        storePanel,
+        "Title",
+        "THE OUTFITTER",
+        UDim2.new(1, -40, 0, 26),
+        UDim2.fromOffset(20, 16),
+        18,
+        COLORS.amber
+    )
+    storeTitle.Font = Enum.Font.GothamBold
+    storeTitle.ZIndex = 56
+
+    --[[
+        The line that has to be on every card, drawn once above all of them.
+
+        MONETIZATION_LIVEOPS_ANALYTICS forbids paid power and
+        CHARACTER_KITS_SPEC asks for the sentence in as many words. It is the
+        header rather than a repeat inside each card because on a 502-point
+        canvas the same sentence five times is five wasted rows of a screen a
+        player is trying to read prices on.
+    ]]
+    local storeAssurance = textLabel(
+        storePanel,
+        "Assurance",
+        "COSMETIC ONLY — ABILITIES ARE EARNED IN PLAY",
+        UDim2.new(1, -40, 0, 16),
+        UDim2.fromOffset(20, 44),
+        11,
+        COLORS.muted
+    )
+    storeAssurance.ZIndex = 56
+
+    --[[
+        CLOSE goes along the bottom of the panel, not into its top-right
+        corner, and that corner is the reason.
+
+        Measured live at 392 x 608: Roblox's own player list occupies
+        x 308..387 from y 4 down to y 308, directly over where this button
+        started. Synthetic input refused to click it -- "hits CoreGUI" -- which
+        is the platform saying the corner is already spoken for by the topbar,
+        the chat toggle and the roster. A modal whose only exit is under
+        somebody else's furniture is #327's field book again, and that one read
+        in play as the game having stopped responding.
+
+        Along the bottom it is also where a thumb already is on a portrait
+        phone, which is the same argument that put the quick chat wheel there.
+    ]]
+    local storeClose = Instance.new("TextButton")
+    storeClose.Name = "Close"
+    storeClose.AnchorPoint = Vector2.new(0.5, 1)
+    storeClose.Position = UDim2.new(0.5, 0, 1, -12)
+    storeClose.Size = UDim2.fromOffset(220, 38)
+    storeClose.BackgroundColor3 = COLORS.panelSoft
+    storeClose.Font = Enum.Font.GothamBold
+    storeClose.Text = "CLOSE"
+    storeClose.TextColor3 = COLORS.cream
+    storeClose.TextSize = 11
+    storeClose.Selectable = true
+    storeClose.ZIndex = 57
+    storeClose.Parent = storePanel
+    corner(storeClose, 10)
+    stroke(storeClose, COLORS.cream, 0.58)
+
+    local storeScroll = Instance.new("ScrollingFrame")
+    storeScroll.Name = "StoreScroll"
+    storeScroll.Position = UDim2.fromOffset(16, 70)
+    -- 132 = the header above it plus the close bar below it, so the list never
+    -- runs under either.
+    storeScroll.Size = UDim2.new(1, -32, 1, -132)
+    storeScroll.BackgroundTransparency = 1
+    storeScroll.BorderSizePixel = 0
+    storeScroll.ScrollBarThickness = 6
+    storeScroll.ScrollBarImageColor3 = COLORS.amber
+    storeScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    storeScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    storeScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+    storeScroll.Selectable = true
+    storeScroll.ZIndex = 56
+    storeScroll.Parent = storePanel
+    local storeLayout = Instance.new("UIListLayout")
+    storeLayout.FillDirection = Enum.FillDirection.Vertical
+    storeLayout.Padding = UDim.new(0, 10)
+    storeLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    storeLayout.Parent = storeScroll
+
+    --[[
+        The empty state, which is the state this store ships in.
+
+        `Config.CommerceProductIds` is empty until somebody creates the
+        products in the Creator Dashboard, and a card with no price does not
+        render at all -- that refusal is in the shared builder and it is
+        deliberate. What must not happen is a panel that opens onto nothing and
+        says nothing, because that is indistinguishable from a broken button.
+    ]]
+    local storeEmpty = textLabel(
+        storeScroll,
+        "Empty",
+        "NOTHING IS ON THE RAIL YET.",
+        UDim2.new(1, -8, 0, 44),
+        UDim2.fromOffset(0, 0),
+        13,
+        COLORS.muted
+    )
+    storeEmpty.LayoutOrder = 1
+    storeEmpty.TextYAlignment = Enum.TextYAlignment.Top
+    storeEmpty.ZIndex = 57
+
+    local storeCards: {
+        [string]: {
+            frame: TextButton,
+            name: TextLabel,
+            price: TextLabel,
+            terms: TextLabel,
+            action: TextButton,
+            productId: string,
+        },
+    } =
+        {}
+    for order, product in CosmeticCatalog.products() do
+        local card = Instance.new("TextButton")
+        card.Name = "Card_" .. product.id
+        card.LayoutOrder = 10 + order
+        card.Size = UDim2.new(1, -8, 0, 96)
+        card.BackgroundColor3 = COLORS.panelSoft
+        card.AutoButtonColor = false
+        card.Text = ""
+        card.Selectable = true
+        card.Visible = false
+        card.ZIndex = 57
+        card.Parent = storeScroll
+        corner(card, 12)
+        stroke(card, COLORS.amber, 0.62)
+
+        local previewParts = {}
+        for _, cosmeticId in product.grants do
+            local cosmetic = CosmeticCatalog.get(cosmeticId)
+            if cosmetic ~= nil then
+                for _, plan in cosmetic.parts do
+                    table.insert(previewParts, plan)
+                end
+            end
+        end
+        local preview = createCosmeticPreview(card, previewParts, 76)
+        preview.Position = UDim2.fromOffset(10, 10)
+        corner(preview, 10)
+
+        local cardName = textLabel(
+            card,
+            "Name",
+            product.displayName,
+            UDim2.new(1, -210, 0, 20),
+            UDim2.fromOffset(96, 12),
+            14,
+            COLORS.cream
+        )
+        cardName.Font = Enum.Font.GothamBold
+        cardName.ZIndex = 58
+        local cardPrice = textLabel(
+            card,
+            "Price",
+            "",
+            UDim2.new(1, -210, 0, 18),
+            UDim2.fromOffset(96, 34),
+            13,
+            COLORS.amber
+        )
+        cardPrice.Font = Enum.Font.GothamBold
+        cardPrice.ZIndex = 58
+        local cardTerms = textLabel(
+            card,
+            "Terms",
+            "",
+            UDim2.new(1, -110, 0, 30),
+            UDim2.fromOffset(96, 54),
+            11,
+            COLORS.muted
+        )
+        cardTerms.TextYAlignment = Enum.TextYAlignment.Top
+        cardTerms.ZIndex = 58
+
+        local cardAction = Instance.new("TextButton")
+        cardAction.Name = "Action"
+        cardAction.AnchorPoint = Vector2.new(1, 0)
+        cardAction.Position = UDim2.new(1, -10, 0, 12)
+        cardAction.Size = UDim2.fromOffset(104, 34)
+        cardAction.BackgroundColor3 = COLORS.panel
+        cardAction.AutoButtonColor = true
+        cardAction.Font = Enum.Font.GothamBold
+        cardAction.Text = "BUY"
+        cardAction.TextColor3 = COLORS.cream
+        cardAction.TextSize = 12
+        cardAction.TextWrapped = true
+        cardAction.Selectable = true
+        cardAction.ZIndex = 59
+        cardAction.Parent = card
+        corner(cardAction, 10)
+        stroke(cardAction, COLORS.amber, 0.3)
+
+        storeCards[product.id] = {
+            frame = card,
+            name = cardName,
+            price = cardPrice,
+            terms = cardTerms,
+            action = cardAction,
+            productId = product.id,
+        }
+    end
+
+    local storeWardrobeTitle = textLabel(
+        storeScroll,
+        "WardrobeTitle",
+        "YOUR WARDROBE",
+        UDim2.new(1, -8, 0, 22),
+        UDim2.fromOffset(0, 0),
+        13,
+        COLORS.amber
+    )
+    storeWardrobeTitle.Font = Enum.Font.GothamBold
+    storeWardrobeTitle.LayoutOrder = 100
+    storeWardrobeTitle.Visible = false
+    storeWardrobeTitle.ZIndex = 57
+
+    --[[
+        The wardrobe is a second list, and the reason is the one this project
+        keeps paying for. A product can stop resolving -- delisted, or a product
+        info call that simply fails -- and a store that showed owned cosmetics
+        only through their sale cards would make a paid-for coat unwearable the
+        moment the thing that sold it went away.
+    ]]
+    local storeWardrobeRows: {
+        [string]: { frame: Frame, name: TextLabel, action: TextButton, cosmeticId: string },
+    } =
+        {}
+    for order, cosmetic in CosmeticCatalog.list() do
+        local row = Instance.new("Frame")
+        row.Name = "Worn_" .. cosmetic.id
+        row.LayoutOrder = 100 + order
+        row.Size = UDim2.new(1, -8, 0, 56)
+        row.BackgroundColor3 = COLORS.panelSoft
+        row.BackgroundTransparency = 0.25
+        row.Visible = false
+        row.ZIndex = 57
+        row.Parent = storeScroll
+        corner(row, 10)
+
+        local rowPreview = createCosmeticPreview(row, cosmetic.parts, 40)
+        rowPreview.Position = UDim2.fromOffset(8, 8)
+        corner(rowPreview, 8)
+
+        local rowName = textLabel(
+            row,
+            "Name",
+            cosmetic.displayName,
+            UDim2.new(1, -170, 0, 40),
+            UDim2.fromOffset(56, 8),
+            12,
+            COLORS.cream
+        )
+        rowName.ZIndex = 58
+
+        local rowAction = Instance.new("TextButton")
+        rowAction.Name = "Action"
+        rowAction.AnchorPoint = Vector2.new(1, 0.5)
+        rowAction.Position = UDim2.new(1, -10, 0.5, 0)
+        rowAction.Size = UDim2.fromOffset(96, 32)
+        rowAction.BackgroundColor3 = COLORS.panel
+        rowAction.AutoButtonColor = true
+        rowAction.Font = Enum.Font.GothamBold
+        rowAction.Text = "WEAR"
+        rowAction.TextColor3 = COLORS.cream
+        rowAction.TextSize = 12
+        rowAction.Selectable = true
+        rowAction.ZIndex = 59
+        rowAction.Parent = row
+        corner(rowAction, 9)
+        stroke(rowAction, COLORS.cream, 0.5)
+
+        storeWardrobeRows[cosmetic.id] = {
+            frame = row,
+            name = rowName,
+            action = rowAction,
+            cosmeticId = cosmetic.id,
+        }
+    end
+
     local professionGrid = Instance.new("Frame")
     professionGrid.Name = "ProfessionGrid"
     professionGrid.BackgroundTransparency = 1
@@ -89172,6 +90893,18 @@ function HUDController.new(
         _progressScroll = progressScroll,
         _progressClose = progressClose,
         _progressText = progressText,
+        _storeOverlay = storeOverlay,
+        _storePanel = storePanel,
+        _storeScroll = storeScroll,
+        _storeClose = storeClose,
+        _storeEmpty = storeEmpty,
+        _storeCards = storeCards,
+        _storeWardrobeTitle = storeWardrobeTitle,
+        _storeWardrobeRows = storeWardrobeRows,
+        _storeRevision = 0,
+        _onStoreDetail = nil,
+        _onStorePurchase = nil,
+        _onCosmeticEquip = nil,
         _equipmentButtons = equipmentButtons,
         _whetButton = whetButton,
         _whetItemId = nil,
@@ -89253,6 +90986,44 @@ function HUDController.new(
             callback(itemId)
         end
     end)
+    storeClose.Activated:Connect(function()
+        self:setStoreOpen(false)
+    end)
+    for productId, card in storeCards do
+        --[[
+            The card body is a detail view; the button on it is the decision.
+            Two targets rather than one because they are two different events
+            in the monetization taxonomy, and because a card whose only
+            pressable region buys something is a card a thumb buys by
+            accident.
+        ]]
+        card.frame.Activated:Connect(function()
+            local callback = self._onStoreDetail
+            if callback ~= nil then
+                callback(productId)
+            end
+        end)
+        card.action.Activated:Connect(function()
+            -- Only ever a purchase. An owned card's button is not clickable,
+            -- because the only other thing it could mean is "wear", and a
+            -- product that grants two cosmetics cannot say which.
+            if card.action:GetAttribute("StoreAction") ~= "buy" then
+                return
+            end
+            local callback = self._onStorePurchase
+            if callback ~= nil then
+                callback(productId)
+            end
+        end)
+    end
+    for cosmeticId, row in storeWardrobeRows do
+        row.action.Activated:Connect(function()
+            local callback = self._onCosmeticEquip
+            if callback ~= nil then
+                callback(cosmeticId)
+            end
+        end)
+    end
     local function bindProfessionCard(professionId: string, card: TextButton)
         card.Activated:Connect(function()
             if not self._professionSwitchable then
@@ -89487,6 +91258,248 @@ function HUDController._focusProgressBook(self: HUDController, open: boolean)
         end
         warn("[Last Light] field book scroll never measured; controller focus skipped")
     end)
+end
+
+function HUDController.setStoreHandlers(
+    self: HUDController,
+    onDetail: (string) -> (),
+    onPurchase: (string) -> (),
+    onEquip: (string) -> ()
+)
+    self._onStoreDetail = onDetail
+    self._onStorePurchase = onPurchase
+    self._onCosmeticEquip = onEquip
+end
+
+function HUDController.storePanel(self: HUDController): Frame
+    return self._storePanel
+end
+
+function HUDController.storeClose(self: HUDController): TextButton
+    return self._storeClose
+end
+
+function HUDController.isStoreOpen(self: HUDController): boolean
+    return self._storeOverlay.Visible
+end
+
+function HUDController.setStoreOpen(self: HUDController, open: boolean)
+    self._storeOverlay.Visible = open
+    if open then
+        self:_layoutStore()
+        if self._currentState ~= nil then
+            self:_updateStore(self._currentState)
+        end
+        --[[
+            A pad needs a target inside the panel, and CLOSE is the one target
+            that is always there: the shelf can be empty and the wardrobe can
+            be empty, and the way out cannot. Without this the selection stays
+            on whatever HUD button was focused behind a modal that blocks the
+            world, which is the field book's #327 problem for a controller.
+        ]]
+        self._storeClose.NextSelectionUp = self._storeScroll
+        self._storeScroll.NextSelectionDown = self._storeClose
+        local assigned = pcall(function()
+            GuiService.SelectedObject = self._storeClose
+        end)
+        if not assigned then
+            warn("[Last Light] store focus refused")
+        end
+    else
+        local selected = GuiService.SelectedObject
+        if selected ~= nil and selected:IsDescendantOf(self._storeOverlay) then
+            GuiService.SelectedObject = nil
+        end
+    end
+end
+
+--[[
+    What the panel shows, and when it has to shut itself.
+
+    The refusal is the server's -- it gates the door and the actions -- but the
+    client evaluates the same shared predicate over the same snapshot fields,
+    because a store open when a night starts has to close on the frame the
+    state changes rather than when somebody happens to press something. Two
+    readers, one rule, no second copy to drift.
+]]
+function HUDController._updateStore(self: HUDController, state: any)
+    local store = if type(state) == "table" then state.store else nil
+    if type(store) ~= "table" then
+        self:setStoreOpen(false)
+        return
+    end
+
+    --[[
+        The open instruction, which rises and never falls. The server counts
+        presses on the outfitter's stand; anything else -- a push arriving, a
+        card being tapped -- must not reopen a panel the player has shut.
+    ]]
+    local revision = tonumber(store.revision) or 0
+    if revision > self._storeRevision then
+        self._storeRevision = revision
+        if not self._storeOverlay.Visible then
+            self:setStoreOpen(true)
+            return
+        end
+    end
+    if not self._storeOverlay.Visible then
+        return
+    end
+
+    local verdict = StoreAvailability.evaluate({
+        storeEnabled = store.enabled == true,
+        tutorialComplete = state.tutorialComplete == true,
+        nightActive = state.nightActive == true,
+        enemyCount = state.enemyCount,
+        downed = self._playerDowned,
+        partyDown = type(state.survival) == "table" and state.survival.partyDown == true,
+    })
+    if store.available == false or not verdict.open then
+        self:setStoreOpen(false)
+        return
+    end
+
+    local shown = 0
+    local cards = if type(store.cards) == "table" then store.cards else {}
+    local byProduct: { [string]: any } = {}
+    for _, card in cards do
+        if type(card) == "table" and type(card.productId) == "string" then
+            byProduct[card.productId] = card
+        end
+    end
+    for productId, entry in self._storeCards do
+        local card = byProduct[productId]
+        entry.frame.Visible = card ~= nil
+        if card ~= nil then
+            shown += 1
+            entry.name.Text = tostring(card.displayName)
+            entry.price.Text = tostring(card.priceLabel)
+            --[[
+                Permanence and owned state on the same line, because both are
+                required on every card and a portrait canvas has no row to
+                spare for either on its own. "WORN" is added rather than
+                substituted: a player looking at the shelf still needs to know
+                the thing is permanent.
+            ]]
+            --[[
+                Every field here arrives over the wire, so every one of them is
+                read as text rather than trusted to be text. This runs inside
+                `update`, so one malformed card would stop every step after it
+                on that push and on every push after -- which is a store entry
+                taking the HUD down.
+            ]]
+            local terms = tostring(card.permanenceLabel) .. " · " .. tostring(card.ownedLabel)
+            entry.terms.Text = if card.equipped == true then terms .. " · WORN" else terms
+            entry.action.Text = tostring(card.actionLabel)
+            entry.action:SetAttribute("StoreAction", tostring(card.action))
+            local purchasable = card.action == "buy"
+            entry.action.Active = purchasable
+            entry.action.AutoButtonColor = purchasable
+            entry.action.Selectable = purchasable
+            entry.action.TextColor3 = if purchasable then COLORS.cream else COLORS.green
+            entry.action.BackgroundColor3 = if purchasable then COLORS.panel else COLORS.panelSoft
+        end
+    end
+
+    local worn = 0
+    local wardrobe: { [string]: any } = {}
+    for _, row in (if type(store.wardrobe) == "table" then store.wardrobe else {}) do
+        if type(row) == "table" and type(row.cosmeticId) == "string" then
+            wardrobe[row.cosmeticId] = row
+        end
+    end
+    for cosmeticId, entry in self._storeWardrobeRows do
+        local row = wardrobe[cosmeticId]
+        entry.frame.Visible = row ~= nil
+        if row ~= nil then
+            worn += 1
+            entry.name.Text = string.format(
+                "%s · %s",
+                tostring(row.displayName),
+                string.upper(tostring(row.slot))
+            )
+            entry.action.Text = tostring(row.actionLabel)
+            entry.action.TextColor3 = if row.equipped == true then COLORS.amber else COLORS.cream
+        end
+    end
+    self._storeWardrobeTitle.Visible = worn > 0
+
+    --[[
+        The empty state says which kind of empty it is.
+
+        A store with no priced products and a store with nothing in the catalog
+        look identical to a player, and only one of them is somebody's job to
+        fix. `Config.CommerceProductIds` is empty until the products exist in
+        the Creator Dashboard, so this is the line the store ships showing.
+    ]]
+    self._storeEmpty.Visible = shown == 0 and worn == 0
+    local unpriced = tonumber(store.unpricedProducts) or 0
+    self._storeEmpty.Text = if unpriced > 0
+        then string.format("NOTHING IS PRICED YET — %d WAITING ON THE TILL.", unpriced)
+        else "NOTHING IS ON THE RAIL YET."
+end
+
+--[[
+    The panel, measured against the canvas rather than against a desktop.
+
+    Everything here was a literal in the first draft and every one of them was
+    a bet on a screen: #327 found the field book 46 points wider than the
+    portrait canvas on each side with CLOSE 57% off it, which made the panel
+    unclosable and therefore made every world click behind it disappear.
+]]
+function HUDController._layoutStore(self: HUDController)
+    local _viewport, scale, canvasWidth, canvasHeight = canvasMetrics()
+    local margin = 16
+    local panelWidth = math.min(560, math.max(260, canvasWidth - margin * 2))
+    --[[
+        Below Roblox's own topbar, measured rather than guessed.
+
+        This ScreenGui sets `IgnoreGuiInset`, so the canvas starts at the true
+        top of the screen and the platform's menu and chat buttons sit over the
+        first 58 pixels of it. Centred, this panel put its CLOSE button at
+        x 309..367, y 24..51 -- entirely inside `TopbarInset`, which on a phone
+        means a player tapping CLOSE opens the Roblox menu instead. That is
+        #327's defect exactly: a modal overlay nobody can shut swallows every
+        world click behind it, and reads in play as the game freezing.
+
+        The inset is in screen pixels and everything here is in canvas points,
+        so it is divided by the scale before it means anything.
+    ]]
+    local topbar = math.max(GuiService.TopbarInset.Height, 0) / math.max(scale, 0.01)
+    local top = topbar + 10
+    local panelHeight = math.min(600, math.max(240, canvasHeight - top - 24))
+    self._storePanel.AnchorPoint = Vector2.new(0.5, 0)
+    self._storePanel.Position = UDim2.new(0.5, 0, 0, top)
+    self._storePanel.Size = UDim2.fromOffset(panelWidth, panelHeight)
+    self._storeClose.Size = UDim2.fromOffset(math.min(240, panelWidth - margin * 2), 38)
+
+    --[[
+        A card is a preview, three lines of text and one button, and on a
+        narrow canvas the button cannot sit beside the text without one of
+        them being unreadable. Below 400 points it drops under the text and
+        the card grows a row instead, which is the same answer the field
+        book's equip grid reached: add a row, never a clipped control.
+    ]]
+    local narrow = panelWidth < 400
+    local cardHeight = if narrow then 130 else 96
+    local actionWidth = math.min(140, math.max(96, math.floor(panelWidth * 0.28)))
+    for _, entry in self._storeCards do
+        entry.frame.Size = UDim2.new(1, -8, 0, cardHeight)
+        entry.action.Size = UDim2.fromOffset(actionWidth, 34)
+        entry.action.AnchorPoint = if narrow then Vector2.new(0, 0) else Vector2.new(1, 0)
+        entry.action.Position = if narrow
+            then UDim2.fromOffset(96, cardHeight - 46)
+            else UDim2.new(1, -10, 0, 12)
+        local textRight = if narrow then 106 else actionWidth + 26
+        entry.name.Size = UDim2.new(1, -96 - textRight, 0, 20)
+        entry.price.Size = UDim2.new(1, -96 - textRight, 0, 18)
+        entry.terms.Size = UDim2.new(1, -106, 0, if narrow then 34 else 30)
+    end
+    for _, entry in self._storeWardrobeRows do
+        local rowActionWidth = math.min(110, math.max(76, math.floor(panelWidth * 0.24)))
+        entry.action.Size = UDim2.fromOffset(rowActionWidth, 32)
+        entry.name.Size = UDim2.new(1, -66 - rowActionWidth - 20, 0, 40)
+    end
 end
 
 function HUDController.setEquipHandler(self: HUDController, callback: (string) -> ())
@@ -90652,6 +92665,7 @@ function HUDController._layout(self: HUDController)
     self._callPanel.Position =
         UDim2.new(0.5, 0, 1, -(34 + self._actionClusterRows * ACTION_ROW_PITCH + 84 + 14))
     self:_layoutLoadout()
+    self:_layoutStore()
 end
 
 function HUDController._presentPhase(self: HUDController, phase: string)
@@ -91038,6 +93052,7 @@ function HUDController.update(self: HUDController, state: any)
     self:_refreshActionCluster()
     self:_updateGear()
     self:_updateProgress()
+    self:_updateStore(state)
     local eliteVisible = (type(boss) == "table" and (boss.active == true or boss.complete == true))
         or (type(elite) == "table" and (elite.active == true or elite.complete == true))
     eliteVisible = eliteVisible and not self._playerDowned
@@ -91085,7 +93100,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="175">
+          <Item class="ModuleScript" referent="177">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -91453,7 +93468,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="176">
+          <Item class="ModuleScript" referent="178">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -91561,7 +93576,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="177">
+          <Item class="ModuleScript" referent="179">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -91680,7 +93695,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="178">
+          <Item class="ModuleScript" referent="180">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -91954,7 +93969,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="179">
+          <Item class="ModuleScript" referent="181">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -92109,7 +94124,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="180">
+          <Item class="ModuleScript" referent="182">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -92221,7 +94236,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="181">
+          <Item class="ModuleScript" referent="183">
             <Properties>
               <string name="Name">SocialPingController</string>
               <string name="Source"><![CDATA[--!strict
@@ -92603,7 +94618,7 @@ return table.freeze(SocialPingController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="182">
+          <Item class="ModuleScript" referent="184">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -92805,7 +94820,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="183">
+          <Item class="ModuleScript" referent="185">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -93014,7 +95029,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="184">
+          <Item class="ModuleScript" referent="186">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -93159,7 +95174,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="185">
+          <Item class="ModuleScript" referent="187">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -93459,13 +95474,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="186">
+  <Item class="TextChatService" referent="188">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="187">
+  <Item class="Workspace" referent="189">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

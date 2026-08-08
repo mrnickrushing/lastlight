@@ -136,6 +136,23 @@ hud:setQuickChatHandler(function(phraseId: string)
     send(RuntimeIds.Actions.QuickChat, { phraseId = phraseId })
 end)
 
+--[[
+    The store, in three sends and no fourth.
+
+    Opening it is the outfitter's stand in the lodge, which is an ordinary
+    Interact -- there is no "open the store" button anywhere on the HUD,
+    because a storefront that can be opened from anywhere can be opened during
+    the four moments the exit gate says it must not. Closing it is the client's
+    own business and reaches nobody.
+]]
+hud:setStoreHandlers(function(productId: string)
+    send(RuntimeIds.Actions.StoreDetail, { productId = productId })
+end, function(productId: string)
+    send(RuntimeIds.Actions.StorePurchase, { productId = productId })
+end, function(cosmeticId: string)
+    send(RuntimeIds.Actions.EquipCosmetic, { cosmeticId = cosmeticId })
+end)
+
 hud:setLoadoutHandlers(function(slot: number)
     send(RuntimeIds.Actions.SaveLoadout, { slot = slot })
 end, function(slot: number)
