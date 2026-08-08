@@ -557,6 +557,11 @@ tutorialService:setCommerceService(commerceService)
     paid.
 ]]
 commerceService:setGrantHandler(function(player: Player, granted: { string })
+    -- A grant that handed over nothing is a bug somewhere behind this, not a
+    -- sentence to read out: "0 THINGS ARE YOURS" is worse than silence.
+    if #granted == 0 then
+        return
+    end
     tutorialService:announceTo(
         player,
         if #granted == 1

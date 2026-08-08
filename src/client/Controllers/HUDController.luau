@@ -299,8 +299,18 @@ local function createCosmeticPreview(parent: Instance, parts: { any }, size: num
         maximum = maximum:Max(offset + half)
     end
 
-    local center = (minimum + maximum) / 2
-    local extent = maximum - minimum
+    --[[
+        A plan with nothing in it draws nothing rather than NaN.
+
+        With no parts the bounds stay at their infinities and the centre comes
+        out (inf + -inf) / 2, which is NaN on every axis and throws out of
+        `CFrame.new` -- inside `HUDController.new`, so one product whose grants
+        do not resolve would take the whole HUD down rather than one picture.
+        An empty frame is the honest failure and the card that would have used
+        it is refused by the builder anyway.
+    ]]
+    local center = if #parts == 0 then Vector3.zero else (minimum + maximum) / 2
+    local extent = if #parts == 0 then Vector3.zero else maximum - minimum
     local reach = math.max(extent.X, extent.Y, extent.Z, 0.6)
     local camera = Instance.new("Camera")
     camera.FieldOfView = 30
@@ -506,7 +516,10 @@ export type HUDController =
             _storeEmpty: TextLabel,
             _storeCards: {
                 [string]: {
-                    frame: Frame,
+                    -- A button, not a frame: the card body is pressable on
+                    -- purpose, because tapping the card is the detail view and
+                    -- tapping its button is the decision.
+                    frame: TextButton,
                     name: TextLabel,
                     price: TextLabel,
                     terms: TextLabel,
@@ -2675,6 +2688,21 @@ function HUDController.setStoreOpen(self: HUDController, open: boolean)
         if self._currentState ~= nil then
             self:_updateStore(self._currentState)
         end
+        --[[
+            A pad needs a target inside the panel, and CLOSE is the one target
+            that is always there: the shelf can be empty and the wardrobe can
+            be empty, and the way out cannot. Without this the selection stays
+            on whatever HUD button was focused behind a modal that blocks the
+            world, which is the field book's #327 problem for a controller.
+        ]]
+        self._storeClose.NextSelectionUp = self._storeScroll
+        self._storeScroll.NextSelectionDown = self._storeClose
+        local assigned = pcall(function()
+            GuiService.SelectedObject = self._storeClose
+        end)
+        if not assigned then
+            warn("[Last Light] store focus refused")
+        end
     else
         local selected = GuiService.SelectedObject
         if selected ~= nil and selected:IsDescendantOf(self._storeOverlay) then
@@ -2742,8 +2770,8 @@ function HUDController._updateStore(self: HUDController, state: any)
         entry.frame.Visible = card ~= nil
         if card ~= nil then
             shown += 1
-            entry.name.Text = card.displayName
-            entry.price.Text = card.priceLabel
+            entry.name.Text = tostring(card.displayName)
+            entry.price.Text = tostring(card.priceLabel)
             --[[
                 Permanence and owned state on the same line, because both are
                 required on every card and a portrait canvas has no row to
@@ -2751,11 +2779,17 @@ function HUDController._updateStore(self: HUDController, state: any)
                 substituted: a player looking at the shelf still needs to know
                 the thing is permanent.
             ]]
-            entry.terms.Text = if card.equipped
-                then card.permanenceLabel .. " · " .. card.ownedLabel .. " · WORN"
-                else card.permanenceLabel .. " · " .. card.ownedLabel
-            entry.action.Text = card.actionLabel
-            entry.action:SetAttribute("StoreAction", card.action)
+            --[[
+                Every field here arrives over the wire, so every one of them is
+                read as text rather than trusted to be text. This runs inside
+                `update`, so one malformed card would stop every step after it
+                on that push and on every push after -- which is a store entry
+                taking the HUD down.
+            ]]
+            local terms = tostring(card.permanenceLabel) .. " · " .. tostring(card.ownedLabel)
+            entry.terms.Text = if card.equipped == true then terms .. " · WORN" else terms
+            entry.action.Text = tostring(card.actionLabel)
+            entry.action:SetAttribute("StoreAction", tostring(card.action))
             local purchasable = card.action == "buy"
             entry.action.Active = purchasable
             entry.action.AutoButtonColor = purchasable
@@ -2777,9 +2811,13 @@ function HUDController._updateStore(self: HUDController, state: any)
         entry.frame.Visible = row ~= nil
         if row ~= nil then
             worn += 1
-            entry.name.Text = string.format("%s · %s", row.displayName, string.upper(row.slot))
-            entry.action.Text = row.actionLabel
-            entry.action.TextColor3 = if row.equipped then COLORS.amber else COLORS.cream
+            entry.name.Text = string.format(
+                "%s · %s",
+                tostring(row.displayName),
+                string.upper(tostring(row.slot))
+            )
+            entry.action.Text = tostring(row.actionLabel)
+            entry.action.TextColor3 = if row.equipped == true then COLORS.amber else COLORS.cream
         end
     end
     self._storeWardrobeTitle.Visible = worn > 0

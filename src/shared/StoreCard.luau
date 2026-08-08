@@ -38,7 +38,7 @@ export type Context = {
     equipped: boolean?,
     -- The geometry the card draws. A preview is one of the four required
     -- facts, so a product whose grants resolve to nothing drawable has no
-    -- honest card either.
+    -- honest card either. Only its *presence* travels: see `previewParts`.
     preview: { any }?,
 }
 
@@ -66,7 +66,16 @@ export type Card = {
     action: string,
     actionLabel: string,
     assurance: string,
-    preview: { any },
+    --[[
+        How many parts the preview turned out to have, rather than the parts.
+
+        The card is built on a server and read by a client that already holds
+        the catalog, so shipping the geometry would put the same plan on the
+        wire on every snapshot push to say something the client can look up.
+        What has to travel is that the check passed: a card exists only if
+        there was real geometry behind it, and this is the number that says so.
+    ]]
+    previewParts: number,
 }
 
 export type WardrobeRow = {
@@ -75,7 +84,7 @@ export type WardrobeRow = {
     slot: string,
     equipped: boolean,
     actionLabel: string,
-    preview: { any },
+    previewParts: number,
 }
 
 --[[
@@ -176,7 +185,7 @@ function StoreCard.build(product: any, context: any): (Card?, string)
         action = if owned then "owned" else "buy",
         actionLabel = if owned then "OWNED" else "BUY · " .. priceLabel,
         assurance = ASSURANCE,
-        preview = preview,
+        previewParts = #preview,
     },
         "ok"
 end
@@ -214,7 +223,7 @@ function StoreCard.wardrobeRow(cosmetic: any, equipped: any): (WardrobeRow?, str
         slot = cosmetic.slot,
         equipped = equipped,
         actionLabel = if equipped then "TAKE OFF" else "WEAR",
-        preview = cosmetic.parts,
+        previewParts = #cosmetic.parts,
     },
         "ok"
 end

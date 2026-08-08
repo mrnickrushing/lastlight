@@ -529,20 +529,7 @@ function PlayerSurvivalService._attemptPartyRecovery(self: PlayerSurvivalService
         return
     end
 
-    local eligible: { Player } = {}
-    local downed = 0
-    for player, state in self._states do
-        if
-            player.Parent ~= nil
-            and player:GetAttribute("LastLightTutorialSurvivalReady") == true
-            and player:GetAttribute("LastLightInExpedition") ~= true
-        then
-            table.insert(eligible, player)
-            if state.status == "downed" then
-                downed += 1
-            end
-        end
-    end
+    local eligible, downed = self:_eligibleParty()
     if #eligible < 1 or downed ~= #eligible then
         return
     end
@@ -1115,7 +1102,21 @@ end
     to open a storefront, and the rule that says so has to be able to see it.
 ]]
 function PlayerSurvivalService._partyDown(self: PlayerSurvivalService): boolean
-    local eligible = 0
+    local eligible, downed = self:_eligibleParty()
+    return #eligible > 0 and downed == #eligible
+end
+
+--[[
+    Who counts as the party right now, and how many of them are down.
+
+    One reader, because the comment above claims the wipe the store refuses on
+    and the wipe the last stand answers cannot disagree, and a claim like that
+    made of two copies of a predicate is a claim with a half-life. A player
+    still in the tutorial or away in an expedition is neither: the first has
+    not joined the defense and the second is not standing in it.
+]]
+function PlayerSurvivalService._eligibleParty(self: PlayerSurvivalService): ({ Player }, number)
+    local eligible: { Player } = {}
     local downed = 0
     for player, state in self._states do
         if
@@ -1123,13 +1124,13 @@ function PlayerSurvivalService._partyDown(self: PlayerSurvivalService): boolean
             and player:GetAttribute("LastLightTutorialSurvivalReady") == true
             and player:GetAttribute("LastLightInExpedition") ~= true
         then
-            eligible += 1
+            table.insert(eligible, player)
             if state.status == "downed" then
                 downed += 1
             end
         end
     end
-    return eligible > 0 and downed == eligible
+    return eligible, downed
 end
 
 return table.freeze(PlayerSurvivalService)

@@ -32500,7 +32500,7 @@ export type Context = {
     equipped: boolean?,
     -- The geometry the card draws. A preview is one of the four required
     -- facts, so a product whose grants resolve to nothing drawable has no
-    -- honest card either.
+    -- honest card either. Only its *presence* travels: see `previewParts`.
     preview: { any }?,
 }
 
@@ -32528,7 +32528,16 @@ export type Card = {
     action: string,
     actionLabel: string,
     assurance: string,
-    preview: { any },
+    --[[
+        How many parts the preview turned out to have, rather than the parts.
+
+        The card is built on a server and read by a client that already holds
+        the catalog, so shipping the geometry would put the same plan on the
+        wire on every snapshot push to say something the client can look up.
+        What has to travel is that the check passed: a card exists only if
+        there was real geometry behind it, and this is the number that says so.
+    ]]
+    previewParts: number,
 }
 
 export type WardrobeRow = {
@@ -32537,7 +32546,7 @@ export type WardrobeRow = {
     slot: string,
     equipped: boolean,
     actionLabel: string,
-    preview: { any },
+    previewParts: number,
 }
 
 --[[
@@ -32638,7 +32647,7 @@ function StoreCard.build(product: any, context: any): (Card?, string)
         action = if owned then "owned" else "buy",
         actionLabel = if owned then "OWNED" else "BUY · " .. priceLabel,
         assurance = ASSURANCE,
-        preview = preview,
+        previewParts = #preview,
     },
         "ok"
 end
@@ -32676,7 +32685,7 @@ function StoreCard.wardrobeRow(cosmetic: any, equipped: any): (WardrobeRow?, str
         slot = cosmetic.slot,
         equipped = equipped,
         actionLabel = if equipped then "TAKE OFF" else "WEAR",
-        preview = cosmetic.parts,
+        previewParts = #cosmetic.parts,
     },
         "ok"
 end
@@ -37446,6 +37455,11 @@ tutorialService:setCommerceService(commerceService)
     paid.
 ]]
 commerceService:setGrantHandler(function(player: Player, granted: { string })
+    -- A grant that handed over nothing is a bug somewhere behind this, not a
+    -- sentence to read out: "0 THINGS ARE YOURS" is worse than silence.
+    if #granted == 0 then
+        return
+    end
     tutorialService:announceTo(
         player,
         if #granted == 1
@@ -40128,6 +40142,14 @@ export type CommerceService = typeof(setmetatable(
         _localMailboxes: { [number]: { any } },
         _productInfo: { [string]: any },
         --[[
+            When a product info lookup last failed, so a delisted or erroring
+            product is not re-asked on every snapshot build. `storeSnapshot`
+            runs on every push for every player and `GetProductInfo` is a
+            throttled web call: retrying it there turns one broken product into
+            a rate limit for all of them.
+        ]]
+        _productInfoFailedAt: { [string]: number },
+        --[[
             Purchases already counted as lost, so one stuck receipt is one
             event rather than one per redelivery. The platform retries an
             unconsumed receipt for the life of the purchase, and a
@@ -40143,6 +40165,7 @@ export type CommerceService = typeof(setmetatable(
 ))
 
 local MAILBOX_STORE = "LastLightCommerceMailbox_v1"
+local PRODUCT_INFO_RETRY_SECONDS = 60
 
 function CommerceService.new(
     logger: Logger,
@@ -40168,6 +40191,7 @@ function CommerceService.new(
         _mailboxStore = nil,
         _localMailboxes = {},
         _productInfo = {},
+        _productInfoFailedAt = {},
         _reportedLoss = {},
         _onGranted = nil,
     }, CommerceService)
@@ -40641,13 +40665,22 @@ function CommerceService.productInfo(self: CommerceService, productId: any): any
     if type(robloxId) ~= "number" then
         return nil
     end
+    -- A failure is remembered for a minute. Long enough that a bad product
+    -- costs one call rather than one per push; short enough that a dashboard
+    -- fix takes effect without a server restart.
+    local failedAt = self._productInfoFailedAt[productId]
+    if failedAt ~= nil and os.time() - failedAt < PRODUCT_INFO_RETRY_SECONDS then
+        return nil
+    end
     local ok, info = pcall(function()
         return MarketplaceService:GetProductInfo(robloxId, Enum.InfoType.Product)
     end)
     if not ok or type(info) ~= "table" then
+        self._productInfoFailedAt[productId] = os.time()
         self._logger:warn("commerce_product_info_failed", { product = productId })
         return nil
     end
+    self._productInfoFailedAt[productId] = nil
     local resolved = {
         priceInRobux = tonumber(info.PriceInRobux) or 0,
         name = tostring(info.Name or ""),
@@ -40799,10 +40832,27 @@ function CommerceService._watchStudioStore(self: CommerceService)
         self._logger:warn("studio_store_granted", { product = productId })
     end
 
-    applyPrice()
-    applyGrant()
-    game:GetAttributeChangedSignal("LastLightStudioStore"):Connect(applyPrice)
-    game:GetAttributeChangedSignal("LastLightStudioGrant"):Connect(applyGrant)
+    --[[
+        Isolated, because these run inside Start. A Studio helper that throws
+        would take the rest of commerce startup with it, and the whole point of
+        these two is that they are scaffolding: they may not be able to break
+        the thing they exist to look at.
+    ]]
+    for name, apply in { LastLightStudioStore = applyPrice, LastLightStudioGrant = applyGrant } do
+        local ok, err = pcall(apply)
+        if not ok then
+            self._logger:warn("studio_store_hook_failed", { hook = name, reason = tostring(err) })
+        end
+        game:GetAttributeChangedSignal(name):Connect(function()
+            local applied, failure = pcall(apply)
+            if not applied then
+                self._logger:warn(
+                    "studio_store_hook_failed",
+                    { hook = name, reason = tostring(failure) }
+                )
+            end
+        end)
+    end
 end
 
 -- The dashboard number back to this game's own product id. A receipt names
@@ -48409,20 +48459,7 @@ function PlayerSurvivalService._attemptPartyRecovery(self: PlayerSurvivalService
         return
     end
 
-    local eligible: { Player } = {}
-    local downed = 0
-    for player, state in self._states do
-        if
-            player.Parent ~= nil
-            and player:GetAttribute("LastLightTutorialSurvivalReady") == true
-            and player:GetAttribute("LastLightInExpedition") ~= true
-        then
-            table.insert(eligible, player)
-            if state.status == "downed" then
-                downed += 1
-            end
-        end
-    end
+    local eligible, downed = self:_eligibleParty()
     if #eligible < 1 or downed ~= #eligible then
         return
     end
@@ -48995,7 +49032,21 @@ end
     to open a storefront, and the rule that says so has to be able to see it.
 ]]
 function PlayerSurvivalService._partyDown(self: PlayerSurvivalService): boolean
-    local eligible = 0
+    local eligible, downed = self:_eligibleParty()
+    return #eligible > 0 and downed == #eligible
+end
+
+--[[
+    Who counts as the party right now, and how many of them are down.
+
+    One reader, because the comment above claims the wipe the store refuses on
+    and the wipe the last stand answers cannot disagree, and a claim like that
+    made of two copies of a predicate is a claim with a half-life. A player
+    still in the tutorial or away in an expedition is neither: the first has
+    not joined the defense and the second is not standing in it.
+]]
+function PlayerSurvivalService._eligibleParty(self: PlayerSurvivalService): ({ Player }, number)
+    local eligible: { Player } = {}
     local downed = 0
     for player, state in self._states do
         if
@@ -49003,13 +49054,13 @@ function PlayerSurvivalService._partyDown(self: PlayerSurvivalService): boolean
             and player:GetAttribute("LastLightTutorialSurvivalReady") == true
             and player:GetAttribute("LastLightInExpedition") ~= true
         then
-            eligible += 1
+            table.insert(eligible, player)
             if state.status == "downed" then
                 downed += 1
             end
         end
     end
-    return eligible > 0 and downed == eligible
+    return eligible, downed
 end
 
 return table.freeze(PlayerSurvivalService)
@@ -55003,11 +55054,22 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             again anyway, because a card tapped through a stale panel during a
             night is still a store open during a night.
         ]]
-        if self._commerceService ~= nil and self:_storeVerdict(player).open then
-            self._commerceService:viewDetail(player, payload.productId)
+        local productId = payload.productId
+        if
+            self._commerceService ~= nil
+            and type(productId) == "string"
+            and #productId <= 48
+            and self:_storeVerdict(player).open
+        then
+            self._commerceService:viewDetail(player, productId)
         end
     elseif kind == self._runtimeIds.Actions.StorePurchase then
-        if self._commerceService == nil then
+        local productId = payload.productId
+        -- Bounded before it reaches anything, the same way every other id-carrying
+        -- action here is. The catalog would refuse a non-string on its own; what
+        -- the length adds is that a 128-character id never becomes a log line or
+        -- an analytics field.
+        if self._commerceService == nil or type(productId) ~= "string" or #productId > 48 then
             return
         end
         local verdict = self:_storeVerdict(player)
@@ -55016,7 +55078,7 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             self:_publish(player)
             return
         end
-        local result = self._commerceService:promptPurchase(player, payload.productId)
+        local result = self._commerceService:promptPurchase(player, productId)
         if not result.accepted then
             --[[
                 Every refusal says something different, because the three mean
@@ -55046,8 +55108,9 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             taken off in daylight, which is a rule nobody asked for and one
             more thing a player would report as broken.
         ]]
-        if self._commerceService ~= nil then
-            local result = self._commerceService:equipById(player, payload.cosmeticId)
+        local cosmeticId = payload.cosmeticId
+        if self._commerceService ~= nil and type(cosmeticId) == "string" and #cosmeticId <= 48 then
+            local result = self._commerceService:equipById(player, cosmeticId)
             self:_setToast(
                 player,
                 if result.applied and result.reason == "removed"
@@ -86913,8 +86976,18 @@ local function createCosmeticPreview(parent: Instance, parts: { any }, size: num
         maximum = maximum:Max(offset + half)
     end
 
-    local center = (minimum + maximum) / 2
-    local extent = maximum - minimum
+    --[[
+        A plan with nothing in it draws nothing rather than NaN.
+
+        With no parts the bounds stay at their infinities and the centre comes
+        out (inf + -inf) / 2, which is NaN on every axis and throws out of
+        `CFrame.new` -- inside `HUDController.new`, so one product whose grants
+        do not resolve would take the whole HUD down rather than one picture.
+        An empty frame is the honest failure and the card that would have used
+        it is refused by the builder anyway.
+    ]]
+    local center = if #parts == 0 then Vector3.zero else (minimum + maximum) / 2
+    local extent = if #parts == 0 then Vector3.zero else maximum - minimum
     local reach = math.max(extent.X, extent.Y, extent.Z, 0.6)
     local camera = Instance.new("Camera")
     camera.FieldOfView = 30
@@ -87120,7 +87193,10 @@ export type HUDController =
             _storeEmpty: TextLabel,
             _storeCards: {
                 [string]: {
-                    frame: Frame,
+                    -- A button, not a frame: the card body is pressable on
+                    -- purpose, because tapping the card is the detail view and
+                    -- tapping its button is the decision.
+                    frame: TextButton,
                     name: TextLabel,
                     price: TextLabel,
                     terms: TextLabel,
@@ -89289,6 +89365,21 @@ function HUDController.setStoreOpen(self: HUDController, open: boolean)
         if self._currentState ~= nil then
             self:_updateStore(self._currentState)
         end
+        --[[
+            A pad needs a target inside the panel, and CLOSE is the one target
+            that is always there: the shelf can be empty and the wardrobe can
+            be empty, and the way out cannot. Without this the selection stays
+            on whatever HUD button was focused behind a modal that blocks the
+            world, which is the field book's #327 problem for a controller.
+        ]]
+        self._storeClose.NextSelectionUp = self._storeScroll
+        self._storeScroll.NextSelectionDown = self._storeClose
+        local assigned = pcall(function()
+            GuiService.SelectedObject = self._storeClose
+        end)
+        if not assigned then
+            warn("[Last Light] store focus refused")
+        end
     else
         local selected = GuiService.SelectedObject
         if selected ~= nil and selected:IsDescendantOf(self._storeOverlay) then
@@ -89356,8 +89447,8 @@ function HUDController._updateStore(self: HUDController, state: any)
         entry.frame.Visible = card ~= nil
         if card ~= nil then
             shown += 1
-            entry.name.Text = card.displayName
-            entry.price.Text = card.priceLabel
+            entry.name.Text = tostring(card.displayName)
+            entry.price.Text = tostring(card.priceLabel)
             --[[
                 Permanence and owned state on the same line, because both are
                 required on every card and a portrait canvas has no row to
@@ -89365,11 +89456,17 @@ function HUDController._updateStore(self: HUDController, state: any)
                 substituted: a player looking at the shelf still needs to know
                 the thing is permanent.
             ]]
-            entry.terms.Text = if card.equipped
-                then card.permanenceLabel .. " · " .. card.ownedLabel .. " · WORN"
-                else card.permanenceLabel .. " · " .. card.ownedLabel
-            entry.action.Text = card.actionLabel
-            entry.action:SetAttribute("StoreAction", card.action)
+            --[[
+                Every field here arrives over the wire, so every one of them is
+                read as text rather than trusted to be text. This runs inside
+                `update`, so one malformed card would stop every step after it
+                on that push and on every push after -- which is a store entry
+                taking the HUD down.
+            ]]
+            local terms = tostring(card.permanenceLabel) .. " · " .. tostring(card.ownedLabel)
+            entry.terms.Text = if card.equipped == true then terms .. " · WORN" else terms
+            entry.action.Text = tostring(card.actionLabel)
+            entry.action:SetAttribute("StoreAction", tostring(card.action))
             local purchasable = card.action == "buy"
             entry.action.Active = purchasable
             entry.action.AutoButtonColor = purchasable
@@ -89391,9 +89488,13 @@ function HUDController._updateStore(self: HUDController, state: any)
         entry.frame.Visible = row ~= nil
         if row ~= nil then
             worn += 1
-            entry.name.Text = string.format("%s · %s", row.displayName, string.upper(row.slot))
-            entry.action.Text = row.actionLabel
-            entry.action.TextColor3 = if row.equipped then COLORS.amber else COLORS.cream
+            entry.name.Text = string.format(
+                "%s · %s",
+                tostring(row.displayName),
+                string.upper(tostring(row.slot))
+            )
+            entry.action.Text = tostring(row.actionLabel)
+            entry.action.TextColor3 = if row.equipped == true then COLORS.amber else COLORS.cream
         end
     end
     self._storeWardrobeTitle.Visible = worn > 0

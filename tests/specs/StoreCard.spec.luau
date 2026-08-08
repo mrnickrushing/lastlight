@@ -73,7 +73,15 @@ return {
                 TestRunner.equal(built.action, "buy")
                 TestRunner.equal(built.actionLabel, "BUY · 399 ROBUX")
                 TestRunner.truthy(#built.permanenceLabel > 0, "permanence is not stated")
-                TestRunner.truthy(#built.preview > 0, "a card with no preview was built")
+                --[[
+                    The count travels, not the geometry: the client already
+                    holds the catalog, so shipping the plan on every snapshot
+                    push would put the same parts on the wire to say something
+                    the client can look up. What has to be true is that there
+                    was geometry behind the card.
+                ]]
+                TestRunner.equal(built.previewParts, 1)
+                TestRunner.equal((built :: any).preview, nil, "a card carried its geometry")
                 TestRunner.equal(built.assurance, StoreCard.assurance())
             end,
         },
@@ -225,7 +233,7 @@ return {
                     TestRunner.equal(off.cosmeticId, cosmetic.id)
                     TestRunner.equal(off.equipped, false)
                     TestRunner.equal(off.actionLabel, "WEAR")
-                    TestRunner.truthy(#off.preview > 0, cosmetic.id .. " draws nothing")
+                    TestRunner.truthy(off.previewParts > 0, cosmetic.id .. " draws nothing")
                     local on = StoreCard.wardrobeRow(cosmetic, true) :: any
                     TestRunner.equal(on.actionLabel, "TAKE OFF")
                 end

@@ -1976,11 +1976,22 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             again anyway, because a card tapped through a stale panel during a
             night is still a store open during a night.
         ]]
-        if self._commerceService ~= nil and self:_storeVerdict(player).open then
-            self._commerceService:viewDetail(player, payload.productId)
+        local productId = payload.productId
+        if
+            self._commerceService ~= nil
+            and type(productId) == "string"
+            and #productId <= 48
+            and self:_storeVerdict(player).open
+        then
+            self._commerceService:viewDetail(player, productId)
         end
     elseif kind == self._runtimeIds.Actions.StorePurchase then
-        if self._commerceService == nil then
+        local productId = payload.productId
+        -- Bounded before it reaches anything, the same way every other id-carrying
+        -- action here is. The catalog would refuse a non-string on its own; what
+        -- the length adds is that a 128-character id never becomes a log line or
+        -- an analytics field.
+        if self._commerceService == nil or type(productId) ~= "string" or #productId > 48 then
             return
         end
         local verdict = self:_storeVerdict(player)
@@ -1989,7 +2000,7 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             self:_publish(player)
             return
         end
-        local result = self._commerceService:promptPurchase(player, payload.productId)
+        local result = self._commerceService:promptPurchase(player, productId)
         if not result.accepted then
             --[[
                 Every refusal says something different, because the three mean
@@ -2019,8 +2030,9 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             taken off in daylight, which is a rule nobody asked for and one
             more thing a player would report as broken.
         ]]
-        if self._commerceService ~= nil then
-            local result = self._commerceService:equipById(player, payload.cosmeticId)
+        local cosmeticId = payload.cosmeticId
+        if self._commerceService ~= nil and type(cosmeticId) == "string" and #cosmeticId <= 48 then
+            local result = self._commerceService:equipById(player, cosmeticId)
             self:_setToast(
                 player,
                 if result.applied and result.reason == "removed"

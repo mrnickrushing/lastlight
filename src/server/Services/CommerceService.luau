@@ -68,6 +68,14 @@ export type CommerceService = typeof(setmetatable(
         _localMailboxes: { [number]: { any } },
         _productInfo: { [string]: any },
         --[[
+            When a product info lookup last failed, so a delisted or erroring
+            product is not re-asked on every snapshot build. `storeSnapshot`
+            runs on every push for every player and `GetProductInfo` is a
+            throttled web call: retrying it there turns one broken product into
+            a rate limit for all of them.
+        ]]
+        _productInfoFailedAt: { [string]: number },
+        --[[
             Purchases already counted as lost, so one stuck receipt is one
             event rather than one per redelivery. The platform retries an
             unconsumed receipt for the life of the purchase, and a
@@ -83,6 +91,7 @@ export type CommerceService = typeof(setmetatable(
 ))
 
 local MAILBOX_STORE = "LastLightCommerceMailbox_v1"
+local PRODUCT_INFO_RETRY_SECONDS = 60
 
 function CommerceService.new(
     logger: Logger,
@@ -108,6 +117,7 @@ function CommerceService.new(
         _mailboxStore = nil,
         _localMailboxes = {},
         _productInfo = {},
+        _productInfoFailedAt = {},
         _reportedLoss = {},
         _onGranted = nil,
     }, CommerceService)
@@ -581,13 +591,22 @@ function CommerceService.productInfo(self: CommerceService, productId: any): any
     if type(robloxId) ~= "number" then
         return nil
     end
+    -- A failure is remembered for a minute. Long enough that a bad product
+    -- costs one call rather than one per push; short enough that a dashboard
+    -- fix takes effect without a server restart.
+    local failedAt = self._productInfoFailedAt[productId]
+    if failedAt ~= nil and os.time() - failedAt < PRODUCT_INFO_RETRY_SECONDS then
+        return nil
+    end
     local ok, info = pcall(function()
         return MarketplaceService:GetProductInfo(robloxId, Enum.InfoType.Product)
     end)
     if not ok or type(info) ~= "table" then
+        self._productInfoFailedAt[productId] = os.time()
         self._logger:warn("commerce_product_info_failed", { product = productId })
         return nil
     end
+    self._productInfoFailedAt[productId] = nil
     local resolved = {
         priceInRobux = tonumber(info.PriceInRobux) or 0,
         name = tostring(info.Name or ""),
@@ -739,10 +758,27 @@ function CommerceService._watchStudioStore(self: CommerceService)
         self._logger:warn("studio_store_granted", { product = productId })
     end
 
-    applyPrice()
-    applyGrant()
-    game:GetAttributeChangedSignal("LastLightStudioStore"):Connect(applyPrice)
-    game:GetAttributeChangedSignal("LastLightStudioGrant"):Connect(applyGrant)
+    --[[
+        Isolated, because these run inside Start. A Studio helper that throws
+        would take the rest of commerce startup with it, and the whole point of
+        these two is that they are scaffolding: they may not be able to break
+        the thing they exist to look at.
+    ]]
+    for name, apply in { LastLightStudioStore = applyPrice, LastLightStudioGrant = applyGrant } do
+        local ok, err = pcall(apply)
+        if not ok then
+            self._logger:warn("studio_store_hook_failed", { hook = name, reason = tostring(err) })
+        end
+        game:GetAttributeChangedSignal(name):Connect(function()
+            local applied, failure = pcall(apply)
+            if not applied then
+                self._logger:warn(
+                    "studio_store_hook_failed",
+                    { hook = name, reason = tostring(failure) }
+                )
+            end
+        end)
+    end
 end
 
 -- The dashboard number back to this game's own product id. A receipt names
