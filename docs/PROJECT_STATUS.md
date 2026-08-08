@@ -8,7 +8,7 @@ hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
 Last updated: 2026-08-08, at `main` = `HEAD` (PR #334), build `0.53.0`,
-save schema 24, 26 services. Published to Roblox as place version 144,
+save schema 24, 26 services. Published to Roblox as place version 145,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,8 +59,7 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
-- **#334** (v144, unchanged — a validator and a config field, no place
-  content) **M14 wave A: the save schema freeze is a value now, not an
+- **#334** (v145) **M14 wave A: the save schema freeze is a value now, not an
   intention.** M14's deliverable list says "frozen save schema except blocker
   fixes", and the cost of forgetting that is not a broken build — it is a
   player's save. A launch candidate is declared, a bump lands two weeks later
