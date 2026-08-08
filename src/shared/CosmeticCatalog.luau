@@ -29,7 +29,7 @@
     purpose. A product in this catalog with no dashboard ID is a product that
     cannot be bought, which is the correct state for all of them right now.
 
-    Six entries, one per slot, is the spine rather than the shop. The initial
+    Five entries, one per slot, is the spine rather than the shop. The initial
     direct catalog is its own wave; what this file has to prove today is that
     the shape works end to end -- entry, plan, product, grant -- and that every
     part of that chain is reachable from the next.
@@ -79,9 +79,20 @@ local SLOTS = table.freeze({
     "weapon_skin",
     "tool_skin",
     "lantern_shell",
-    "emote",
     "banner",
 })
+
+--[[
+    Emotes are not here, and the omission is the honest one.
+
+    The wave plan lists emote packs among the first products, and an emote is a
+    motion rather than a shape -- there is no geometry to describe, and the
+    only thing this file could offer for one is a glow, which
+    VISUAL_QUALITY_STANDARD names directly as not being construction. An emote
+    slot arrives with the animation pipeline that makes an emote possible, not
+    before it. Shipping a lit sphere and calling it a salute would be the
+    catalog claiming something it does not have.
+]]
 
 local function part(
     name: string,
@@ -106,7 +117,7 @@ local function part(
 end
 
 --[[
-    The spine's six. Each is a labelled floor in the #292 sense: real geometry
+    The spine's five. Each is a labelled floor in the #292 sense: real geometry
     a player can actually see, marked `derived` so nothing here claims to be an
     art pass. Replacing a derived plan with an authored one is an art pass and
     it is the owner's.
@@ -188,14 +199,57 @@ local COSMETICS: { Cosmetic } = {
         derived = true,
         parts = {
             part(
-                "GripWrap",
+                "GripCore",
                 "RightHand",
                 "Cylinder",
-                { 0.9, 0.28, 0.28 },
-                { 0, 0.35, 0 },
+                { 1.05, 0.26, 0.26 },
+                { 0, 0.34, 0 },
+                { 0, 0, 90 },
+                { 62, 48, 34 },
+                "Wood"
+            ),
+            -- The binding, as turns rather than a sleeve. A single tube is a
+            -- recoloured cylinder; what makes cord read as cord is that you
+            -- can count the wraps.
+            part(
+                "GripTurnLower",
+                "RightHand",
+                "Cylinder",
+                { 0.16, 0.32, 0.32 },
+                { 0, 0.02, 0 },
                 { 0, 0, 90 },
                 { 86, 104, 58 },
                 "Fabric"
+            ),
+            part(
+                "GripTurnMiddle",
+                "RightHand",
+                "Cylinder",
+                { 0.16, 0.32, 0.32 },
+                { 0, 0.34, 0 },
+                { 0, 0, 90 },
+                { 76, 94, 52 },
+                "Fabric"
+            ),
+            part(
+                "GripTurnUpper",
+                "RightHand",
+                "Cylinder",
+                { 0.16, 0.32, 0.32 },
+                { 0, 0.66, 0 },
+                { 0, 0, 90 },
+                { 86, 104, 58 },
+                "Fabric"
+            ),
+            part(
+                "GripPommel",
+                "RightHand",
+                "Ball",
+                { 0.34, 0.34, 0.34 },
+                { 0, -0.24, 0 },
+                { 0, 0, 0 },
+                { 108, 84, 52 },
+                "Wood"
             ),
         },
     },
@@ -229,25 +283,6 @@ local COSMETICS: { Cosmetic } = {
         },
     },
     {
-        id = "cosmetic_wayfarer_salute",
-        slot = "emote",
-        displayName = "WAYFARER'S SALUTE",
-        detail = "Two fingers off the brim. What the road crews gave each other.",
-        derived = true,
-        parts = {
-            part(
-                "SaluteSpark",
-                "RightHand",
-                "Ball",
-                { 0.34, 0.34, 0.34 },
-                { 0, 0.5, 0 },
-                { 0, 0, 0 },
-                { 255, 206, 128 },
-                "Neon"
-            ),
-        },
-    },
-    {
         id = "cosmetic_greenward_banner",
         slot = "banner",
         displayName = "GREENWARD BANNER",
@@ -273,6 +308,29 @@ local COSMETICS: { Cosmetic } = {
                 { 0, 0, 90 },
                 { 96, 74, 48 },
                 "Wood"
+            ),
+            -- A banner hangs from something. The crossbar is what turns a
+            -- rectangle of cloth into a standard, and the finial is what stops
+            -- the pole reading as a cut-off stick.
+            part(
+                "BannerCrossbar",
+                "Banner",
+                "Cylinder",
+                { 2.8, 0.12, 0.12 },
+                { 0, 1.66, 0 },
+                { 0, 90, 90 },
+                { 82, 64, 42 },
+                "Wood"
+            ),
+            part(
+                "BannerFinial",
+                "Banner",
+                "Ball",
+                { 0.3, 0.3, 0.3 },
+                { -1.3, 1.78, 0 },
+                { 0, 0, 0 },
+                { 214, 172, 96 },
+                "Metal"
             ),
         },
     },
@@ -316,13 +374,6 @@ local PRODUCTS: { Product } = {
         grants = { "cosmetic_foxfire_shell" },
     },
     {
-        id = "product_wayfarer_salute",
-        displayName = "WAYFARER'S SALUTE",
-        detail = "An emote. Something to say without saying it.",
-        permanence = "permanent",
-        grants = { "cosmetic_wayfarer_salute" },
-    },
-    {
         id = "product_greenward_banner",
         displayName = "GREENWARD BANNER",
         detail = "A banner for a plot you have already built on.",
@@ -341,6 +392,9 @@ for _, cosmetic in COSMETICS do
     assert(cosmeticById[cosmetic.id] == nil, "duplicate cosmetic: " .. cosmetic.id)
     assert(slotSet[cosmetic.slot], cosmetic.id .. " names no slot: " .. cosmetic.slot)
     assert(#cosmetic.parts > 0, cosmetic.id .. " has no geometry")
+    -- table.freeze is shallow, so the parts array has to be frozen too or the
+    -- catalog is a frozen table pointing at a mutable list.
+    table.freeze(cosmetic.parts)
     cosmeticById[cosmetic.id] = table.freeze(cosmetic)
 end
 
@@ -354,6 +408,7 @@ for _, product in PRODUCTS do
             product.id .. " grants a cosmetic that does not exist: " .. cosmeticId
         )
     end
+    table.freeze(product.grants)
     productById[product.id] = table.freeze(product)
 end
 

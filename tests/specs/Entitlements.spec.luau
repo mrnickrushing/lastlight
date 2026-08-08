@@ -219,6 +219,34 @@ return {
                     nil,
                     "a slot kept pointing at a cosmetic the catalog dropped"
                 )
+
+                --[[
+                    Worn implies owned on the way back in as well. A save field
+                    saying you are wearing something you never bought is a free
+                    cosmetic for anyone who can write one, and it is also the
+                    state a refund leaves behind -- both are dropped here.
+                ]]
+                local unpaid = Entitlements.normalize({
+                    equipped = { outfit = COAT },
+                }, function(cosmeticId: string): boolean
+                    return CosmeticCatalog.get(cosmeticId) ~= nil
+                end)
+                TestRunner.equal(Entitlements.equippedIn(unpaid, "outfit"), nil)
+
+                -- and an entitlement for something the catalog no longer sells
+                -- does not survive either: a product that was removed is
+                -- removed, and keeping the id would be a slot pointing at
+                -- nothing the moment somebody equipped it.
+                local retired = Entitlements.normalize({
+                    entitlements = { cosmetic_from_a_removed_product = true, [COAT] = true },
+                }, function(cosmeticId: string): boolean
+                    return CosmeticCatalog.get(cosmeticId) ~= nil
+                end)
+                TestRunner.equal(
+                    Entitlements.owns(retired, "cosmetic_from_a_removed_product"),
+                    false
+                )
+                TestRunner.equal(Entitlements.owns(retired, COAT), true)
             end,
         },
     },

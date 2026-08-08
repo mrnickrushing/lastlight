@@ -106,7 +106,11 @@ function Entitlements.normalize(value: any, isKnownCosmetic: ((string) -> boolea
 
     if type(value.entitlements) == "table" then
         for cosmeticId, owned in value.entitlements do
-            if validId(cosmeticId) and owned == true then
+            if
+                validId(cosmeticId)
+                and owned == true
+                and (isKnownCosmetic == nil or isKnownCosmetic(cosmeticId))
+            then
                 state.entitlements[cosmeticId] = true
             end
         end
@@ -120,9 +124,17 @@ function Entitlements.normalize(value: any, isKnownCosmetic: ((string) -> boolea
     end
     if type(value.equipped) == "table" then
         for slot, cosmeticId in value.equipped do
+            --[[
+                Worn implies owned, on the way back in as well as on the way
+                through `equip`. A slot pointing at something this profile does
+                not own is a free cosmetic for anyone who can write a save
+                field, and it is also the state a refund leaves behind -- both
+                arrive here, and both are dropped rather than drawn.
+            ]]
             if
                 validId(slot)
                 and validId(cosmeticId)
+                and state.entitlements[cosmeticId] == true
                 and (isKnownCosmetic == nil or isKnownCosmetic(cosmeticId))
             then
                 state.equipped[slot] = cosmeticId
@@ -240,7 +252,12 @@ end
     Unequipping is `nil`, and it is always allowed: a player who has stopped
     owning something (a refund, a removed product) must be able to take it off.
 ]]
-function Entitlements.equip(state: any, slot: any, cosmeticId: any): (State, Result)
+function Entitlements.equip(
+    state: any,
+    slot: any,
+    cosmeticId: any,
+    slotOf: ((string) -> string?)?
+): (State, Result)
     local current = Entitlements.normalize(state)
     if not validId(slot) then
         return current,
@@ -261,6 +278,18 @@ function Entitlements.equip(state: any, slot: any, cosmeticId: any): (State, Res
     end
     if not Entitlements.owns(current, cosmeticId) then
         return current, { applied = false, acknowledge = false, reason = "not_owned", granted = {} }
+    end
+    --[[
+        A cosmetic goes in its own slot and no other. Without this an outfit
+        could be worn as a lantern shell -- owned, so the ownership check
+        passes -- and the appearance code would be asked to hang a coat on a
+        lamp. The catalog answers where each one belongs; passing the resolver
+        rather than requiring the catalog keeps this module ignorant of what is
+        for sale, which is what lets the spec drive it with a stub.
+    ]]
+    if slotOf ~= nil and slotOf(cosmeticId) ~= slot then
+        return current,
+            { applied = false, acknowledge = false, reason = "wrong_slot", granted = {} }
     end
     if current.equipped[slot] == cosmeticId then
         return current,

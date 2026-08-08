@@ -96,6 +96,11 @@ local COSMETIC_ID_ALLOWED: { [string]: boolean } = {
     ["src/shared/CosmeticCatalog.luau"] = true,
 }
 
+local function slotOf(cosmeticId: string): string?
+    local cosmetic = CosmeticCatalog.get(cosmeticId)
+    return if cosmetic == nil then nil else cosmetic.slot
+end
+
 return {
     name = "CosmeticNeutrality",
     cases = {
@@ -235,7 +240,7 @@ return {
                     entitlements = { cosmetic_lantern_keeper_coat = true },
                 })
                 local worn, result =
-                    Entitlements.equip(owned, "outfit", "cosmetic_lantern_keeper_coat")
+                    Entitlements.equip(owned, "outfit", "cosmetic_lantern_keeper_coat", slotOf)
                 TestRunner.equal(result.applied, true)
                 TestRunner.equal(
                     Entitlements.equippedIn(worn, "outfit"),
@@ -245,13 +250,29 @@ return {
                 -- longer owned: a refund must not leave a player stuck wearing
                 -- a thing they cannot remove
                 local stripped = Entitlements.normalize({
+                    entitlements = { cosmetic_lantern_keeper_coat = true },
                     equipped = { outfit = "cosmetic_lantern_keeper_coat" },
                 }, function(): boolean
                     return true
                 end)
-                local bare, removal = Entitlements.equip(stripped, "outfit", nil)
+                local bare, removal = Entitlements.equip(stripped, "outfit", nil, slotOf)
                 TestRunner.equal(removal.applied, true)
                 TestRunner.equal(Entitlements.equippedIn(bare, "outfit"), nil)
+
+                --[[
+                    And a cosmetic goes only in its own slot. Owned is not
+                    enough: without this an outfit could be worn as a lantern
+                    shell and the appearance code would be asked to hang a coat
+                    on a lamp.
+                ]]
+                local _, misplaced = Entitlements.equip(
+                    owned,
+                    "lantern_shell",
+                    "cosmetic_lantern_keeper_coat",
+                    slotOf
+                )
+                TestRunner.equal(misplaced.applied, false)
+                TestRunner.equal(misplaced.reason, "wrong_slot")
             end,
         },
     },

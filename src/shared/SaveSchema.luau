@@ -1024,7 +1024,18 @@ end
     directly would be handing them a way to grant one.
 ]]
 function SaveSchema.commerce(profile: Profile): Entitlements.State
-    return profile.commerce
+    --[[
+        A copy, not the profile's own table. Every other accessor here hands
+        back a scalar or a frozen value; commerce is three mutable maps, and a
+        caller that edited one in place would grant an entitlement without
+        going through `withCommerce` -- no normalization, no revision bump, no
+        dirty flag, and a save that never records it.
+    ]]
+    return {
+        entitlements = table.clone(profile.commerce.entitlements),
+        processed = table.clone(profile.commerce.processed),
+        equipped = table.clone(profile.commerce.equipped),
+    }
 end
 
 function SaveSchema.withCommerce(profile: Profile, commerce: any, now: number): Profile

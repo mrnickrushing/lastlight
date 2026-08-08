@@ -61,7 +61,7 @@ and `requires` is a new stage and nothing else has to change.
 Newest first since the last header:
 - **#331** (v143) **M11 wave E: the cosmetic spine, built before the platform
   call so the platform call has nowhere to put a decision.** `CosmeticCatalog`
-  (presentation only), `Entitlements` (pure: what a grant is, idempotency by
+  (presentation only, five slots), `Entitlements` (pure: what a grant is, idempotency by
   purchase id, the mailbox), `profile.commerce`, and the two specs the wave
   plan settled the architecture around. **No `MarketplaceService` in this
   wave** — the whole spine is testable without the platform, and that is the
@@ -99,6 +99,23 @@ Newest first since the last header:
   arrives while the profile is locked goes in a mailbox** that lives outside
   the profile by construction, because its entire reason for existing is the
   moments when the profile does not.
+
+  **Review found four real holes and one standards call.** `table.freeze` is
+  shallow, so a frozen catalog entry pointed at a mutable parts array;
+  `normalize` kept entitlements for cosmetics the catalog no longer sells and
+  kept a slot worn by somebody who did not own it (a free cosmetic for anyone
+  who can write a save field, and also exactly the state a refund leaves);
+  `equip` let any owned cosmetic go in any slot, so an outfit could be worn as
+  a lantern shell; and `SaveSchema.commerce` handed back the profile's own
+  table, which a caller could edit in place — granting an entitlement with no
+  normalization, no revision bump and no save. All four fixed. **And the emote
+  slot came back out**: an emote is a motion rather than a shape, the only
+  geometry this file could offer for one is a glow, and
+  VISUAL_QUALITY_STANDARD names a glow directly as not being construction. It
+  arrives with the animation pipeline that makes an emote possible, not as a
+  lit sphere called a salute. The tool grip and the banner were thickened for
+  the same reason — a wrap reads as cord when you can count the turns, and a
+  banner reads as a standard when it hangs from a crossbar.
 
   Save schema 23 → 24 with an era-23 fixture. `Config.CommerceProductIds` is
   empty and `cosmetic_store_enabled` is false, both correctly: a developer
