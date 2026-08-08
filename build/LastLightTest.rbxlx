@@ -4867,6 +4867,21 @@ return table.freeze({
     -- to be typed out, so a blocker fix is a deliberate act rather than a
     -- number quietly incrementing past a guard.
     SaveSchemaFreezeOverride = nil :: number?,
+    --[[
+        The declared launch candidate.
+
+        QA_RELEASE_PLAN.md's release checklist is nearly all owner rows, so a
+        checklist enforced from the day it lands fails every build forever and
+        gets switched off within a week. This is the switch that turns it into
+        a gate: while it is `nil` the checklist is only checked for shape, and
+        setting it to the candidate's build makes every blocking row have to be
+        answered before `npm run check` passes.
+
+        Setting it also requires SaveSchemaFreeze to be set, because a launch
+        candidate whose save schema is still moving is the failure the freeze
+        exists to prevent. The two declarations are one act.
+    ]]
+    LaunchCandidate = nil :: string?,
     BootstrapTimeoutSeconds = 8,
     FirstNightDuskSeconds = 15,
     FirstNightSeconds = 120,
