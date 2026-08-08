@@ -7,7 +7,7 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #352), build `0.53.0`,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #353), build `0.53.0`,
 save schema 25, 27 services. Published to Roblox as place version 156,
 matching this revision exactly. (#352 leaves the built place
 byte-identical, because it changes only manifests, validators and
@@ -30,7 +30,7 @@ done: routing every player-visible string through one table touches nearly every
 file that speaks to a player, and the check that gives the wave its value — *no
 player-visible literal outside the table* — cannot be switched on until the
 migration is complete. A partial pass is a large diff with no guard on it.
-**Milestone 14 has waves A, B and C shipped and D and E still to build.**
+**Milestone 14 has waves A through D shipped and E still to build.**
 
 **Milestones 0 through 11 are complete, and so is Milestone 12's buildable
 half** — M11 waves A through J and M12 waves A through E all shipped. What M12
@@ -79,6 +79,59 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#353** (v156, unchanged — this wave adds scripts and documents, and neither is
+  in the built place) **M14 wave D: release notes, known issues and dashboards are
+  normally written at the end of a project from memory, which is the one moment nobody
+  has any.** This repository has already paid for that once: the whole reason
+  PROJECT_STATUS.md exists is that a feature was built twice because nothing recorded
+  it was in flight. So none of the three is written. `npm run notes` builds them and
+  `npm run check` fails when they are stale, because **a generated document that can
+  go stale is a document written from memory again, with an extra step.**
+
+  [RELEASE_NOTES.md](RELEASE_NOTES.md) is the merge stream with the place version each
+  wave produced. [KNOWN_ISSUES.md](KNOWN_ISSUES.md) is the nine open threads this
+  handoff already keeps — written inside the entry for the wave that found each one,
+  which is the right place to write it and the wrong place to read it from, because at
+  2,600 lines "what is still open" is an archaeology question.
+  [DASHBOARDS.md](DASHBOARDS.md) is 23 panels off the marked emitters in `src`, beside
+  the gate or the tuning decision each one feeds.
+
+  **The two guards matter more than the three documents.** *Every pull request the
+  handoff records has to exist in git* — a handoff citing a number that never landed
+  is a note about something that did not happen, and nothing else in the project would
+  ever notice. And *every wave has to have a handoff entry*, which is the direction
+  that cannot be demanded of every pull request (plenty are one-line fixes summarised
+  in a batch) but can be demanded of a wave, because a wave is the unit this project
+  ships in and the wave plan records the number each one shipped as.
+
+  **That second guard found three waves with no entry at all**: #301, #302 and **#347,
+  M13 wave B**, which shipped this session and was described only in the wave plan and
+  in the entry for the wave after it. #301 and #302 turned out to be recorded under a
+  span — the reader was taking the first number of `#301–#302` and calling the second
+  one missing, which is a check crying wolf and therefore a check somebody deletes, so
+  it reads spans now. #347's entry is genuinely new, reconstructed from the merge
+  stream and the wave plan rather than from memory, and says so in its own text.
+
+  **Two smaller finds, both of the same kind.** Twelve pull requests in this history
+  were squash-merged rather than merge-committed, so their number is in a trailing
+  `(#N)` and a reader that knew one shape would have silently lost twelve — including
+  four the handoff writes about by number, which would then have been reported as
+  phantoms. And the first gate-table reader assumed four columns, so it found none of
+  the **zero-tolerance** gates, which are two: a dashboard document with the
+  zero-tolerance panels quietly missing is the precise failure it is generated to
+  prevent.
+
+  **The known-issues count is pinned at a minimum**, for #336's reason from a new
+  angle: an empty known-issues list and a broken parser produce the same document, and
+  it reads like good news.
+
+  **Open, by design rather than by omission:** the notes are allowed to lag the tip by
+  the merge commit that lands them, because a strict compare would leave `main` failing
+  its own check the moment any wave merges. What is refused is a hole or a phantom —
+  the rows have to be exactly the tail of the merge stream ending at the newest row
+  recorded. Patch notes in a player's language stay the owner's, and the checklist row
+  `patch_notes` says so beside the `known_issues_published` row this wave turned into a
+  check.
 - **#352** (v156, unchanged — this wave changes only manifests, validators and
   documentation, and none of the three is in the built place) **M14 wave C: a claim
   made once over a whole registry stops being true one asset at a time.** The three
@@ -257,6 +310,19 @@ Newest first since the last header:
   `furthestStep=3 furthestStage=first_night` from a funnel step recorded eight
   calls earlier. The residue counter read **8** for a departed player and **0**
   after `clear`, which is the leak the soak metric now watches.
+- **#347** (v153) **M13 wave B: the tuning decisions have numbers, and a tuning
+  number is not a gate number.** *(Reconstructed from the merge stream and the wave
+  plan rather than written at the time — #352's generator found this wave had shipped
+  with no handoff entry at all, which is the failure the handoff exists to prevent
+  happening to the handoff.)* Five decisions, five events, and the distinction that
+  makes them a separate family from #336's: a gate is a rate over instants and every
+  gate emitter reports one instant, while a tuning decision is about a stretch of
+  play, so `AnalyticsService` had to **accumulate** rather than forward. Two rules the
+  events follow, both ways a tuning number lies: **a cliff is a comparison, so every
+  checkpoint emits** rather than only the ones somebody suspects, and **an outcome
+  with no attempt number is a survivorship number**.
+  [BETA_TUNING.md](BETA_TUNING.md) is the table and `TuningMetrics.spec` is
+  `GateMetrics.spec`'s three layers pointed at it.
 - **#346** (v152) **M13 wave A: a flag can reach some players and not others, and the
   hard part is what happens when it reaches more.** Milestone 13's rollout is four
   rungs — team and trusted testers, a consented allowlist, a larger controlled

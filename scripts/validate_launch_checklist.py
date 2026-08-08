@@ -46,9 +46,9 @@ PACKAGE = ROOT / "package.json"
 # The counts this checklist is pinned at. They are here rather than in the
 # document because a pin that lives beside the thing it pins is a pin that gets
 # edited in the same keystroke as the thing it pins.
-EXPECTED_ITEMS = 39
-EXPECTED_BLOCKING = 38
-EXPECTED_CHECK_ROWS = 6
+EXPECTED_ITEMS = 40
+EXPECTED_BLOCKING = 39
+EXPECTED_CHECK_ROWS = 7
 
 STATUSES = ("check", "done", "open", "n/a")
 
