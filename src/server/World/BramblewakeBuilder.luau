@@ -582,12 +582,19 @@ local function rootArch(parent: Instance, center: Vector3, scale: number, facing
             Enum.Material.Wood
         )
     end
+    --[[
+        Not DARK_BARK. The crown is a twenty-nine stud beam seen against
+        the sky, and at RGB(32, 25, 23) the sky won: it rendered as a
+        featureless black slab floating over the canopy. Ground-level
+        accents can afford near-black; anything silhouetted overhead needs
+        enough color for the wood grain to survive being backlit.
+    ]]
     part(
         parent,
         "RootCrown",
         Vector3.new(29 * scale, 2.8 * scale, 3 * scale),
         CFrame.new(center + Vector3.new(0, 17 * scale, 0)) * CFrame.Angles(0, math.rad(45), 0),
-        DARK_BARK,
+        Color3.fromRGB(97, 72, 52),
         Enum.Material.Wood
     )
 end
@@ -3226,13 +3233,22 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
         seed: number
     )
         local lean = math.rad(((seed % 7) - 3) * 1.6)
+        --[[
+            Shade compresses instead of multiplying straight through. The
+            raw multiplier took the far ranks to roughly half of an
+            already dark base, and from under the canopy those trees were
+            pure black shapes -- unlit cutouts, not forest. The remap
+            keeps distance darkening the ranks while flooring the far end
+            where green still reads as green.
+        ]]
+        local lift = 0.55 + shade * 0.45
         local trunk = part(
             folder,
             "BackdropTrunk",
             Vector3.new(width, height, width),
             CFrame.new(at + Vector3.new(0, height / 2, 0))
                 * CFrame.Angles(lean, (seed % 360) * 0.0175, lean * 0.6),
-            Color3.fromRGB(math.floor(34 * shade), math.floor(30 * shade), math.floor(26 * shade)),
+            Color3.fromRGB(math.floor(52 * lift), math.floor(44 * lift), math.floor(38 * lift)),
             Enum.Material.Wood,
             false
         )
@@ -3246,7 +3262,7 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
             Vector3.new(width * 3.4, height * 0.6, width * 3.4),
             CFrame.new(at + Vector3.new(0, height * 0.95, 0))
                 * CFrame.Angles(lean, (seed % 211) * 0.021, 0),
-            Color3.fromRGB(math.floor(38 * shade), math.floor(58 * shade), math.floor(41 * shade)),
+            Color3.fromRGB(math.floor(64 * lift), math.floor(96 * lift), math.floor(66 * lift)),
             Enum.Material.Grass,
             false
         )
@@ -3690,26 +3706,36 @@ local function buildBlackoutLayer(
     local decisions = {}
     for _, definition in
         {
+            --[[
+                A ring further out than it used to be. At sixteen and
+                twenty studs these shrines sat inside the Warden's own
+                interaction ring -- the wild-regrowth marker's click volume
+                completely capped the south root node's, and both antlers
+                shared air with the outer two, so during the fight a tap
+                on a root or an antler landed on a dormant vote marker and
+                died. At thirty-four the vote ring sits on the town-side
+                approach, clear of all four roots and both antlers.
+            ]]
             {
                 color = MEADOW,
                 decisionId = "restore_farmland",
                 interactionId = runtimeIds.InteractionIds.BlackoutDecisionFarmland,
                 label = "RESTORE FARMLAND",
-                offset = Vector3.new(-16, 2.5, 16),
+                offset = Vector3.new(-18, 2.5, 34),
             },
             {
                 color = Color3.fromRGB(71, 139, 84),
                 decisionId = "wild_regrowth",
                 interactionId = runtimeIds.InteractionIds.BlackoutDecisionWild,
                 label = "ALLOW WILD REGROWTH",
-                offset = Vector3.new(0, 2.5, 20),
+                offset = Vector3.new(0, 2.5, 38),
             },
             {
                 color = FOXFIRE,
                 decisionId = "shared_agroforest",
                 interactionId = runtimeIds.InteractionIds.BlackoutDecisionShared,
                 label = "CREATE SHARED AGROFOREST",
-                offset = Vector3.new(16, 2.5, 16),
+                offset = Vector3.new(18, 2.5, 34),
             },
         }
     do
@@ -3760,7 +3786,8 @@ local function buildResourceNodes(
     moduleIndex: number,
     runtimeIds: any,
     nodes: { any },
-    meshPlacements: { any }
+    meshPlacements: { any },
+    hostsEliteArena: boolean?
 )
     if moduleIndex < 2 then
         return
@@ -3768,7 +3795,18 @@ local function buildResourceNodes(
     for slot = 1, 2 do
         local isSap = (moduleIndex + slot) % 2 == 0
         local side = if slot == 1 then -1 else 1
-        local at = center + Vector3.new(side * (15 + (moduleIndex % 3) * 2), 0, (slot - 1.5) * 18)
+        --[[
+            In the arena module the node lane flips to the opposite
+            corners. The default lane put each node five studs from an
+            elite anchor -- the fire at (-20, -12) and the heart at
+            (+20, +12) -- and both carry ten-stud invisible click volumes,
+            so a tap aimed at the heart during the fifteen-second fire
+            carry landed on a harvest node instead. Same offsets, other
+            diagonal: twenty studs of clearance and the volumes stop
+            overlapping.
+        ]]
+        local lane = if hostsEliteArena then -(slot - 1.5) else (slot - 1.5)
+        local at = center + Vector3.new(side * (15 + (moduleIndex % 3) * 2), 0, lane * 18)
         local nodeId = string.format("node_bw_%d_%d", moduleIndex, slot)
 
         local anchor = part(
@@ -3930,7 +3968,8 @@ function BramblewakeBuilder.build(
             placement.index,
             runtimeIds,
             resourceNodes,
-            meshPlacements
+            meshPlacements,
+            definition.eliteId ~= nil
         )
         local moduleDressingExtra = {}
         -- The yaw of the road as it reaches this module, taken from the

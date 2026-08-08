@@ -66,6 +66,7 @@ export type WorldService = typeof(setmetatable(
         _blackoutArena: any,
         _characterRoots: { [Player]: BasePart? },
         _townConsequence: any,
+        _townConsequenceSignature: string?,
         _townConstruction: any,
         _townConstructionRules: any,
         _townCondition: any,
@@ -301,10 +302,18 @@ local function queueRoadAssetPlacements(
     for index = 1, count do
         local alpha = (index - 0.5) / count
         local position = startPosition:Lerp(finishPosition, alpha)
+        --[[
+            The caller's height is the road's height. This used to clamp
+            every strip to Y 0.42, which happens to seat stones correctly
+            on the arrival road and the cabin paths -- and left them
+            hanging a third of a stud in the air over the district roads,
+            whose surfaces top out around 0.11. One call site even passed
+            a deliberate -0.62 offset that this clamp silently discarded.
+        ]]
         table.insert(placements, {
             assetId = "mesh_creator_road_stones_a",
             fallbackKind = "asset_dressing",
-            position = Vector3.new(position.X, 0.42, position.Z),
+            position = position,
             scale = 1,
             yaw = yaw,
             seed = seedBase + index,
@@ -1255,11 +1264,14 @@ local function buildEmberhollowSanctuary(
         rut.CanQuery = false
     end
     clearRoadCorridor(Vector3.new(0, 0, 1), Vector3.new(0, 0, -205), 18)
+    -- 0.42 seats the strip into the main street's cobble skin; the 0.92
+    -- this used to pass was only ever corrected by the clamp that
+    -- queueRoadAssetPlacements no longer applies.
     queueRoadAssetPlacements(
         meshPlacements,
         parent,
-        Vector3.new(0, 0.92, 0),
-        Vector3.new(0, 0.92, -204),
+        Vector3.new(0, 0.42, 0),
+        Vector3.new(0, 0.42, -204),
         9600
     )
     local function townSideRoad(start: Vector3, finish: Vector3)
@@ -1296,11 +1308,14 @@ local function buildEmberhollowSanctuary(
             false
         )
         wear.CanQuery = false
+        -- The district road surface tops out at 0.11, so -0.43 off the
+        -- 0.45 route height sets stone bottoms at 0.02: inset into the
+        -- cobble, proud of the wear strip, and no longer airborne.
         queueRoadAssetPlacements(
             meshPlacements,
             parent,
-            start + Vector3.new(0, -0.62, 0),
-            finish + Vector3.new(0, -0.62, 0),
+            start + Vector3.new(0, -0.43, 0),
+            finish + Vector3.new(0, -0.43, 0),
             9700 + #meshPlacements
         )
     end
@@ -1969,6 +1984,7 @@ function WorldService.new(
         _blackoutArena = nil,
         _characterRoots = {},
         _townConsequence = nil,
+        _townConsequenceSignature = nil,
         _townConstruction = townConstruction.default(),
         _townConstructionRules = townConstruction,
         _townCondition = { integrity = 100, damageLevel = 0, repairsRemaining = 0 },
@@ -3165,8 +3181,17 @@ local function hideProceduralPlaceholder(placeholder: Instance)
             or instance:IsA("Sparkles")
             or instance:IsA("Trail")
             or instance:IsA("Beam")
-            or instance:IsA("LayerCollector")
+            or (instance:IsA("LayerCollector") and not instance:IsA("BillboardGui"))
         then
+            --[[
+                Billboards are semantics, not scenery, so they are excused
+                from this blanket. An authored mesh replaces geometry; the
+                name floating over it still has a job -- every POI label,
+                the Old Growth's LANTERN FIRE and ROOT HEART, and the whole
+                Blackout relay's guidance went dark here for as long as the
+                art pass succeeded. A mesh that carries its own signage opts
+                its labels out with HideSemanticGuiOnReplacement above.
+            ]]
             instance.Enabled = false
         end
     end
@@ -3180,7 +3205,8 @@ local function keepReplacedAnchorHidden(target: BasePart)
     target.Transparency = 1
     target.CastShadow = false
     for _, child in target:GetChildren() do
-        if child:IsA("LayerCollector") then
+        -- Billboards survive replacement; see hideProceduralPlaceholder.
+        if child:IsA("LayerCollector") and not child:IsA("BillboardGui") then
             child.Enabled = false
         end
     end
@@ -7368,6 +7394,22 @@ function WorldService.markResourceNodeHarvested(self: WorldService, interactionI
     local prompt = self._interactions[interactionId]
     if prompt ~= nil then
         prompt.Enabled = false
+        --[[
+            A spent node also gives up its claim on clicks. The generous
+            invisible volumes overlap freely -- Module 9's nodes sit five
+            studs from the Old Growth's fire and heart anchors -- and a
+            dead volume that still answers raycasts eats every tap aimed
+            at the live interaction behind it, with MOVE CLOSER TO THE
+            MARKED OBJECT as the only reply.
+        ]]
+        local anchor = prompt.Parent
+        if anchor ~= nil and anchor:IsA("BasePart") then
+            anchor.CanQuery = false
+            local volume = anchor:FindFirstChild(interactionId .. "_ClickVolume")
+            if volume ~= nil and volume:IsA("BasePart") then
+                volume.CanQuery = false
+            end
+        end
     end
     local module = node.target.Parent
     if module ~= nil then
@@ -12696,6 +12738,25 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
         return
     end
     self._townConsequence = self._townProgression.merge(self._townConsequence, consequence)
+    --[[
+        Rebuild only when the merged consequence actually says something
+        new. This call used to run only at profile load, so every call was
+        a change by definition; now dawn and chapter resolution re-push it
+        every time (see TutorialService), and tearing the whole town down
+        each dawn to rebuild it identically would be pure flicker.
+    ]]
+    local merged = self._townConsequence
+    local signature = string.format(
+        "%s|%s|%s|%s",
+        tostring(merged.tier),
+        tostring(merged.decision),
+        tostring(merged.wardenOutcome),
+        table.concat(merged.residentIds or {}, ",")
+    )
+    if signature == self._townConsequenceSignature then
+        return
+    end
+    self._townConsequenceSignature = signature
     self:_rebuildTownProgression()
 end
 
@@ -13299,8 +13360,20 @@ function WorldService.buildBramblewake(
                 already do; fall back to the anchor only if nothing is under
                 it at all.
             ]]
-            local shardX = anchorPart.Position.X + 2.6
-            local shardZ = anchorPart.Position.Z + 2.6
+            --[[
+                Off the anchor's shoulder, except at the Wayhome gate.
+
+                The default nudge keeps a shard beside its anchor, but both
+                interactions carry a generous invisible click volume, and
+                +2.6 studs left the bell fragment's volume sitting square
+                across the extraction gate's own -- most angles that aimed
+                at WAYHOME hit REMEMBER instead, and a re-readable fragment
+                never stops answering. The gate's shard steps well aside so
+                the two volumes stop sharing air.
+            ]]
+            local isWayhomeAnchor = fragment.anchorKey == "site:wayhome"
+            local shardX = anchorPart.Position.X + (if isWayhomeAnchor then -9 else 2.6)
+            local shardZ = anchorPart.Position.Z + (if isWayhomeAnchor then 6 else 2.6)
             local groundParams = RaycastParams.new()
             groundParams.FilterType = Enum.RaycastFilterType.Exclude
             local ignored: { Instance } = { shard }

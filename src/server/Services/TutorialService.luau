@@ -267,6 +267,18 @@ function TutorialService.Init(self: TutorialService, context: any)
                 condition.integrity,
                 condition.damageLevel
             )
+            --[[
+                Dawn is when the tier can move, and the tier is what decides
+                which buildings stand and who lives here. The consequence
+                used to render only at profile load, so three survived
+                nights raised a town nobody saw until they rejoined.
+                setTownConsequence skips the rebuild when nothing changed,
+                so most dawns this costs a comparison.
+            ]]
+            for player in self._sessions do
+                self._worldService:setTownConsequence(self._profileService:townConsequence(player))
+                break
+            end
             self:_publishAll()
         end
     )
@@ -379,6 +391,23 @@ function TutorialService._watchStudioSkip(self: TutorialService)
                 session.toast = "STUDIO: TUTORIAL SKIPPED"
                 session.toastRevision += 1
                 player:SetAttribute("LastLightTutorialSurvivalReady", true)
+                --[[
+                    The same world setup a loaded complete profile gets.
+                    Without it a skipped session has no way into Bramblewake
+                    at all: the beacon that carries the only entry
+                    interaction stays dark and disabled, which is how a
+                    whole live session went looking for the expedition and
+                    found a prompt that refused every click.
+                ]]
+                self._worldService:setBeaconVisible(true)
+                local profile = self._profileService:get(player)
+                if profile ~= nil then
+                    self._townNightService:ensureStarted(
+                        profile.town.nightNumber,
+                        self._profileService:townCondition(player),
+                        player.UserId
+                    )
+                end
                 self._logger:warn("studio_tutorial_skipped", { player = player.UserId })
                 self:_publish(player)
             end
@@ -1115,6 +1144,18 @@ function TutorialService._interact(
     end
     if actionId == self._runtimeIds.Actions.BramblewakeBlackout then
         local result = self._blackoutService:interact(player, prompt)
+        --[[
+            Coming home from a chapter has to show something changed, and
+            it never did in the session it happened: the town consequence
+            was only pushed at profile load, so the residents a resolved
+            chapter sends and the greenward the vote plants waited for a
+            rejoin. The single-place topology this ships on today has no
+            rejoin between run and town, so push it the moment the profile
+            has the chapter.
+        ]]
+        if result.reason == "resolved" then
+            self._worldService:setTownConsequence(self._profileService:townConsequence(player))
+        end
         self:_setToast(player, result.message)
         self:_publishAll()
         return
@@ -1316,7 +1357,19 @@ function TutorialService._interact(
     if actionId == self._runtimeIds.Actions.Reveal and session.stage == "complete" then
         if self._expeditionService:enter(player) then
             local blackoutResult = self._blackoutService:participantEntered(player)
-            self:_setToast(player, blackoutResult.message or "ENTERING BRAMBLEWAKE")
+            -- Entering gets said first; the blackout's announcement follows
+            -- rather than replacing it. Same reasoning as the completion
+            -- toast in the tutorial's own Reveal handler below.
+            self:_setToast(player, "ENTERING BRAMBLEWAKE")
+            if blackoutResult.message ~= nil then
+                local announcement = blackoutResult.message
+                task.delay(3.4, function()
+                    if player.Parent ~= nil and self._sessions[player] ~= nil then
+                        self:_setToast(player, announcement)
+                        self:_publish(player)
+                    end
+                end)
+            end
             self._analyticsService:expeditionStarted(
                 player,
                 self._expeditionService:snapshot(player)
@@ -1412,7 +1465,24 @@ function TutorialService._interact(
     elseif actionId == self._runtimeIds.Actions.Reveal then
         if self._expeditionService:enter(player) then
             local blackoutResult = self._blackoutService:participantEntered(player)
-            self:_setToast(player, blackoutResult.message or "BRAMBLEWAKE REMEMBERS YOU")
+            --[[
+                Finishing First Light gets its own line. The blackout's
+                join announcement used to replace it entirely, so the
+                moment the tutorial paid off, the only thing on screen
+                was JOINED THE ACTIVE BRAMBLEWAKE BLACKOUT -- an event
+                notice standing where the completion belonged. The event
+                line follows a breath later instead of first.
+            ]]
+            self:_setToast(player, "FIRST LIGHT COMPLETE — BRAMBLEWAKE REMEMBERS YOU")
+            if blackoutResult.message ~= nil then
+                local announcement = blackoutResult.message
+                task.delay(3.4, function()
+                    if player.Parent ~= nil and self._sessions[player] ~= nil then
+                        self:_setToast(player, announcement)
+                        self:_publish(player)
+                    end
+                end)
+            end
             self._analyticsService:expeditionStarted(
                 player,
                 self._expeditionService:snapshot(player)

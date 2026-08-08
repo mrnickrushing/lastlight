@@ -48734,6 +48734,18 @@ function TutorialService.Init(self: TutorialService, context: any)
                 condition.integrity,
                 condition.damageLevel
             )
+            --[[
+                Dawn is when the tier can move, and the tier is what decides
+                which buildings stand and who lives here. The consequence
+                used to render only at profile load, so three survived
+                nights raised a town nobody saw until they rejoined.
+                setTownConsequence skips the rebuild when nothing changed,
+                so most dawns this costs a comparison.
+            ]]
+            for player in self._sessions do
+                self._worldService:setTownConsequence(self._profileService:townConsequence(player))
+                break
+            end
             self:_publishAll()
         end
     )
@@ -48846,6 +48858,23 @@ function TutorialService._watchStudioSkip(self: TutorialService)
                 session.toast = "STUDIO: TUTORIAL SKIPPED"
                 session.toastRevision += 1
                 player:SetAttribute("LastLightTutorialSurvivalReady", true)
+                --[[
+                    The same world setup a loaded complete profile gets.
+                    Without it a skipped session has no way into Bramblewake
+                    at all: the beacon that carries the only entry
+                    interaction stays dark and disabled, which is how a
+                    whole live session went looking for the expedition and
+                    found a prompt that refused every click.
+                ]]
+                self._worldService:setBeaconVisible(true)
+                local profile = self._profileService:get(player)
+                if profile ~= nil then
+                    self._townNightService:ensureStarted(
+                        profile.town.nightNumber,
+                        self._profileService:townCondition(player),
+                        player.UserId
+                    )
+                end
                 self._logger:warn("studio_tutorial_skipped", { player = player.UserId })
                 self:_publish(player)
             end
@@ -49582,6 +49611,18 @@ function TutorialService._interact(
     end
     if actionId == self._runtimeIds.Actions.BramblewakeBlackout then
         local result = self._blackoutService:interact(player, prompt)
+        --[[
+            Coming home from a chapter has to show something changed, and
+            it never did in the session it happened: the town consequence
+            was only pushed at profile load, so the residents a resolved
+            chapter sends and the greenward the vote plants waited for a
+            rejoin. The single-place topology this ships on today has no
+            rejoin between run and town, so push it the moment the profile
+            has the chapter.
+        ]]
+        if result.reason == "resolved" then
+            self._worldService:setTownConsequence(self._profileService:townConsequence(player))
+        end
         self:_setToast(player, result.message)
         self:_publishAll()
         return
@@ -49783,7 +49824,19 @@ function TutorialService._interact(
     if actionId == self._runtimeIds.Actions.Reveal and session.stage == "complete" then
         if self._expeditionService:enter(player) then
             local blackoutResult = self._blackoutService:participantEntered(player)
-            self:_setToast(player, blackoutResult.message or "ENTERING BRAMBLEWAKE")
+            -- Entering gets said first; the blackout's announcement follows
+            -- rather than replacing it. Same reasoning as the completion
+            -- toast in the tutorial's own Reveal handler below.
+            self:_setToast(player, "ENTERING BRAMBLEWAKE")
+            if blackoutResult.message ~= nil then
+                local announcement = blackoutResult.message
+                task.delay(3.4, function()
+                    if player.Parent ~= nil and self._sessions[player] ~= nil then
+                        self:_setToast(player, announcement)
+                        self:_publish(player)
+                    end
+                end)
+            end
             self._analyticsService:expeditionStarted(
                 player,
                 self._expeditionService:snapshot(player)
@@ -49879,7 +49932,24 @@ function TutorialService._interact(
     elseif actionId == self._runtimeIds.Actions.Reveal then
         if self._expeditionService:enter(player) then
             local blackoutResult = self._blackoutService:participantEntered(player)
-            self:_setToast(player, blackoutResult.message or "BRAMBLEWAKE REMEMBERS YOU")
+            --[[
+                Finishing First Light gets its own line. The blackout's
+                join announcement used to replace it entirely, so the
+                moment the tutorial paid off, the only thing on screen
+                was JOINED THE ACTIVE BRAMBLEWAKE BLACKOUT -- an event
+                notice standing where the completion belonged. The event
+                line follows a breath later instead of first.
+            ]]
+            self:_setToast(player, "FIRST LIGHT COMPLETE — BRAMBLEWAKE REMEMBERS YOU")
+            if blackoutResult.message ~= nil then
+                local announcement = blackoutResult.message
+                task.delay(3.4, function()
+                    if player.Parent ~= nil and self._sessions[player] ~= nil then
+                        self:_setToast(player, announcement)
+                        self:_publish(player)
+                    end
+                end)
+            end
             self._analyticsService:expeditionStarted(
                 player,
                 self._expeditionService:snapshot(player)
@@ -51568,6 +51638,7 @@ export type WorldService = typeof(setmetatable(
         _blackoutArena: any,
         _characterRoots: { [Player]: BasePart? },
         _townConsequence: any,
+        _townConsequenceSignature: string?,
         _townConstruction: any,
         _townConstructionRules: any,
         _townCondition: any,
@@ -51803,10 +51874,18 @@ local function queueRoadAssetPlacements(
     for index = 1, count do
         local alpha = (index - 0.5) / count
         local position = startPosition:Lerp(finishPosition, alpha)
+        --[[
+            The caller's height is the road's height. This used to clamp
+            every strip to Y 0.42, which happens to seat stones correctly
+            on the arrival road and the cabin paths -- and left them
+            hanging a third of a stud in the air over the district roads,
+            whose surfaces top out around 0.11. One call site even passed
+            a deliberate -0.62 offset that this clamp silently discarded.
+        ]]
         table.insert(placements, {
             assetId = "mesh_creator_road_stones_a",
             fallbackKind = "asset_dressing",
-            position = Vector3.new(position.X, 0.42, position.Z),
+            position = position,
             scale = 1,
             yaw = yaw,
             seed = seedBase + index,
@@ -52757,11 +52836,14 @@ local function buildEmberhollowSanctuary(
         rut.CanQuery = false
     end
     clearRoadCorridor(Vector3.new(0, 0, 1), Vector3.new(0, 0, -205), 18)
+    -- 0.42 seats the strip into the main street's cobble skin; the 0.92
+    -- this used to pass was only ever corrected by the clamp that
+    -- queueRoadAssetPlacements no longer applies.
     queueRoadAssetPlacements(
         meshPlacements,
         parent,
-        Vector3.new(0, 0.92, 0),
-        Vector3.new(0, 0.92, -204),
+        Vector3.new(0, 0.42, 0),
+        Vector3.new(0, 0.42, -204),
         9600
     )
     local function townSideRoad(start: Vector3, finish: Vector3)
@@ -52798,11 +52880,14 @@ local function buildEmberhollowSanctuary(
             false
         )
         wear.CanQuery = false
+        -- The district road surface tops out at 0.11, so -0.43 off the
+        -- 0.45 route height sets stone bottoms at 0.02: inset into the
+        -- cobble, proud of the wear strip, and no longer airborne.
         queueRoadAssetPlacements(
             meshPlacements,
             parent,
-            start + Vector3.new(0, -0.62, 0),
-            finish + Vector3.new(0, -0.62, 0),
+            start + Vector3.new(0, -0.43, 0),
+            finish + Vector3.new(0, -0.43, 0),
             9700 + #meshPlacements
         )
     end
@@ -53471,6 +53556,7 @@ function WorldService.new(
         _blackoutArena = nil,
         _characterRoots = {},
         _townConsequence = nil,
+        _townConsequenceSignature = nil,
         _townConstruction = townConstruction.default(),
         _townConstructionRules = townConstruction,
         _townCondition = { integrity = 100, damageLevel = 0, repairsRemaining = 0 },
@@ -54667,8 +54753,17 @@ local function hideProceduralPlaceholder(placeholder: Instance)
             or instance:IsA("Sparkles")
             or instance:IsA("Trail")
             or instance:IsA("Beam")
-            or instance:IsA("LayerCollector")
+            or (instance:IsA("LayerCollector") and not instance:IsA("BillboardGui"))
         then
+            --[[
+                Billboards are semantics, not scenery, so they are excused
+                from this blanket. An authored mesh replaces geometry; the
+                name floating over it still has a job -- every POI label,
+                the Old Growth's LANTERN FIRE and ROOT HEART, and the whole
+                Blackout relay's guidance went dark here for as long as the
+                art pass succeeded. A mesh that carries its own signage opts
+                its labels out with HideSemanticGuiOnReplacement above.
+            ]]
             instance.Enabled = false
         end
     end
@@ -54682,7 +54777,8 @@ local function keepReplacedAnchorHidden(target: BasePart)
     target.Transparency = 1
     target.CastShadow = false
     for _, child in target:GetChildren() do
-        if child:IsA("LayerCollector") then
+        -- Billboards survive replacement; see hideProceduralPlaceholder.
+        if child:IsA("LayerCollector") and not child:IsA("BillboardGui") then
             child.Enabled = false
         end
     end
@@ -58870,6 +58966,22 @@ function WorldService.markResourceNodeHarvested(self: WorldService, interactionI
     local prompt = self._interactions[interactionId]
     if prompt ~= nil then
         prompt.Enabled = false
+        --[[
+            A spent node also gives up its claim on clicks. The generous
+            invisible volumes overlap freely -- Module 9's nodes sit five
+            studs from the Old Growth's fire and heart anchors -- and a
+            dead volume that still answers raycasts eats every tap aimed
+            at the live interaction behind it, with MOVE CLOSER TO THE
+            MARKED OBJECT as the only reply.
+        ]]
+        local anchor = prompt.Parent
+        if anchor ~= nil and anchor:IsA("BasePart") then
+            anchor.CanQuery = false
+            local volume = anchor:FindFirstChild(interactionId .. "_ClickVolume")
+            if volume ~= nil and volume:IsA("BasePart") then
+                volume.CanQuery = false
+            end
+        end
     end
     local module = node.target.Parent
     if module ~= nil then
@@ -64198,6 +64310,25 @@ function WorldService.setTownConsequence(self: WorldService, consequence: any)
         return
     end
     self._townConsequence = self._townProgression.merge(self._townConsequence, consequence)
+    --[[
+        Rebuild only when the merged consequence actually says something
+        new. This call used to run only at profile load, so every call was
+        a change by definition; now dawn and chapter resolution re-push it
+        every time (see TutorialService), and tearing the whole town down
+        each dawn to rebuild it identically would be pure flicker.
+    ]]
+    local merged = self._townConsequence
+    local signature = string.format(
+        "%s|%s|%s|%s",
+        tostring(merged.tier),
+        tostring(merged.decision),
+        tostring(merged.wardenOutcome),
+        table.concat(merged.residentIds or {}, ",")
+    )
+    if signature == self._townConsequenceSignature then
+        return
+    end
+    self._townConsequenceSignature = signature
     self:_rebuildTownProgression()
 end
 
@@ -64801,8 +64932,20 @@ function WorldService.buildBramblewake(
                 already do; fall back to the anchor only if nothing is under
                 it at all.
             ]]
-            local shardX = anchorPart.Position.X + 2.6
-            local shardZ = anchorPart.Position.Z + 2.6
+            --[[
+                Off the anchor's shoulder, except at the Wayhome gate.
+
+                The default nudge keeps a shard beside its anchor, but both
+                interactions carry a generous invisible click volume, and
+                +2.6 studs left the bell fragment's volume sitting square
+                across the extraction gate's own -- most angles that aimed
+                at WAYHOME hit REMEMBER instead, and a re-readable fragment
+                never stops answering. The gate's shard steps well aside so
+                the two volumes stop sharing air.
+            ]]
+            local isWayhomeAnchor = fragment.anchorKey == "site:wayhome"
+            local shardX = anchorPart.Position.X + (if isWayhomeAnchor then -9 else 2.6)
+            local shardZ = anchorPart.Position.Z + (if isWayhomeAnchor then 6 else 2.6)
             local groundParams = RaycastParams.new()
             groundParams.FilterType = Enum.RaycastFilterType.Exclude
             local ignored: { Instance } = { shard }
@@ -67124,12 +67267,19 @@ local function rootArch(parent: Instance, center: Vector3, scale: number, facing
             Enum.Material.Wood
         )
     end
+    --[[
+        Not DARK_BARK. The crown is a twenty-nine stud beam seen against
+        the sky, and at RGB(32, 25, 23) the sky won: it rendered as a
+        featureless black slab floating over the canopy. Ground-level
+        accents can afford near-black; anything silhouetted overhead needs
+        enough color for the wood grain to survive being backlit.
+    ]]
     part(
         parent,
         "RootCrown",
         Vector3.new(29 * scale, 2.8 * scale, 3 * scale),
         CFrame.new(center + Vector3.new(0, 17 * scale, 0)) * CFrame.Angles(0, math.rad(45), 0),
-        DARK_BARK,
+        Color3.fromRGB(97, 72, 52),
         Enum.Material.Wood
     )
 end
@@ -69768,13 +69918,22 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
         seed: number
     )
         local lean = math.rad(((seed % 7) - 3) * 1.6)
+        --[[
+            Shade compresses instead of multiplying straight through. The
+            raw multiplier took the far ranks to roughly half of an
+            already dark base, and from under the canopy those trees were
+            pure black shapes -- unlit cutouts, not forest. The remap
+            keeps distance darkening the ranks while flooring the far end
+            where green still reads as green.
+        ]]
+        local lift = 0.55 + shade * 0.45
         local trunk = part(
             folder,
             "BackdropTrunk",
             Vector3.new(width, height, width),
             CFrame.new(at + Vector3.new(0, height / 2, 0))
                 * CFrame.Angles(lean, (seed % 360) * 0.0175, lean * 0.6),
-            Color3.fromRGB(math.floor(34 * shade), math.floor(30 * shade), math.floor(26 * shade)),
+            Color3.fromRGB(math.floor(52 * lift), math.floor(44 * lift), math.floor(38 * lift)),
             Enum.Material.Wood,
             false
         )
@@ -69788,7 +69947,7 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
             Vector3.new(width * 3.4, height * 0.6, width * 3.4),
             CFrame.new(at + Vector3.new(0, height * 0.95, 0))
                 * CFrame.Angles(lean, (seed % 211) * 0.021, 0),
-            Color3.fromRGB(math.floor(38 * shade), math.floor(58 * shade), math.floor(41 * shade)),
+            Color3.fromRGB(math.floor(64 * lift), math.floor(96 * lift), math.floor(66 * lift)),
             Enum.Material.Grass,
             false
         )
@@ -70232,26 +70391,36 @@ local function buildBlackoutLayer(
     local decisions = {}
     for _, definition in
         {
+            --[[
+                A ring further out than it used to be. At sixteen and
+                twenty studs these shrines sat inside the Warden's own
+                interaction ring -- the wild-regrowth marker's click volume
+                completely capped the south root node's, and both antlers
+                shared air with the outer two, so during the fight a tap
+                on a root or an antler landed on a dormant vote marker and
+                died. At thirty-four the vote ring sits on the town-side
+                approach, clear of all four roots and both antlers.
+            ]]
             {
                 color = MEADOW,
                 decisionId = "restore_farmland",
                 interactionId = runtimeIds.InteractionIds.BlackoutDecisionFarmland,
                 label = "RESTORE FARMLAND",
-                offset = Vector3.new(-16, 2.5, 16),
+                offset = Vector3.new(-18, 2.5, 34),
             },
             {
                 color = Color3.fromRGB(71, 139, 84),
                 decisionId = "wild_regrowth",
                 interactionId = runtimeIds.InteractionIds.BlackoutDecisionWild,
                 label = "ALLOW WILD REGROWTH",
-                offset = Vector3.new(0, 2.5, 20),
+                offset = Vector3.new(0, 2.5, 38),
             },
             {
                 color = FOXFIRE,
                 decisionId = "shared_agroforest",
                 interactionId = runtimeIds.InteractionIds.BlackoutDecisionShared,
                 label = "CREATE SHARED AGROFOREST",
-                offset = Vector3.new(16, 2.5, 16),
+                offset = Vector3.new(18, 2.5, 34),
             },
         }
     do
@@ -70302,7 +70471,8 @@ local function buildResourceNodes(
     moduleIndex: number,
     runtimeIds: any,
     nodes: { any },
-    meshPlacements: { any }
+    meshPlacements: { any },
+    hostsEliteArena: boolean?
 )
     if moduleIndex < 2 then
         return
@@ -70310,7 +70480,18 @@ local function buildResourceNodes(
     for slot = 1, 2 do
         local isSap = (moduleIndex + slot) % 2 == 0
         local side = if slot == 1 then -1 else 1
-        local at = center + Vector3.new(side * (15 + (moduleIndex % 3) * 2), 0, (slot - 1.5) * 18)
+        --[[
+            In the arena module the node lane flips to the opposite
+            corners. The default lane put each node five studs from an
+            elite anchor -- the fire at (-20, -12) and the heart at
+            (+20, +12) -- and both carry ten-stud invisible click volumes,
+            so a tap aimed at the heart during the fifteen-second fire
+            carry landed on a harvest node instead. Same offsets, other
+            diagonal: twenty studs of clearance and the volumes stop
+            overlapping.
+        ]]
+        local lane = if hostsEliteArena then -(slot - 1.5) else (slot - 1.5)
+        local at = center + Vector3.new(side * (15 + (moduleIndex % 3) * 2), 0, lane * 18)
         local nodeId = string.format("node_bw_%d_%d", moduleIndex, slot)
 
         local anchor = part(
@@ -70472,7 +70653,8 @@ function BramblewakeBuilder.build(
             placement.index,
             runtimeIds,
             resourceNodes,
-            meshPlacements
+            meshPlacements,
+            definition.eliteId ~= nil
         )
         local moduleDressingExtra = {}
         -- The yaw of the road as it reaches this module, taken from the
@@ -84187,15 +84369,37 @@ function HUDController.new(
     )
     progressTitle.Font = Enum.Font.GothamBold
     progressTitle.ZIndex = 52
+    --[[
+        The notes live in a scrolling window now. One label holding 130
+        recipes plus quests, archive, residents and mastery ran to several
+        screens of text: it painted straight through the loadout buttons,
+        past the panel's bottom edge and off the monitor, and nothing
+        could reach the sections underneath. The label keeps growing to
+        whatever the book holds; the window is what stays put.
+    ]]
+    local progressScroll = Instance.new("ScrollingFrame")
+    progressScroll.Name = "DetailsScroll"
+    progressScroll.Position = UDim2.fromOffset(20, 132)
+    progressScroll.Size = UDim2.new(1, -40, 1, -152)
+    progressScroll.BackgroundTransparency = 1
+    progressScroll.BorderSizePixel = 0
+    progressScroll.ScrollBarThickness = 6
+    progressScroll.ScrollBarImageColor3 = COLORS.amber
+    progressScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    progressScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    progressScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+    progressScroll.ZIndex = 52
+    progressScroll.Parent = progressPanel
     local progressText = textLabel(
-        progressPanel,
+        progressScroll,
         "Details",
         "Loading field notes…",
-        UDim2.new(1, -40, 1, -78),
-        UDim2.fromOffset(20, 66),
+        UDim2.new(1, -10, 0, 0),
+        UDim2.fromOffset(0, 0),
         13,
         COLORS.cream
     )
+    progressText.AutomaticSize = Enum.AutomaticSize.Y
     progressText.TextWrapped = true
     progressText.RichText = true
     progressText.TextYAlignment = Enum.TextYAlignment.Top
@@ -84240,8 +84444,10 @@ function HUDController.new(
         for _, kind in { "save", "apply" } do
             local button = Instance.new("TextButton")
             button.Name = string.format("Loadout_%s_%d", kind, slot)
+            -- Above the scrolling notes, not over them: the rows sit
+            -- between the title and the DetailsScroll window.
             button.Position =
-                UDim2.fromOffset(20 + (slot - 1) * 190 + (if kind == "apply" then 92 else 0), 104)
+                UDim2.fromOffset(20 + (slot - 1) * 190 + (if kind == "apply" then 92 else 0), 58)
             button.Size = UDim2.fromOffset(if kind == "apply" then 84 else 88, 30)
             button.BackgroundColor3 = COLORS.panelSoft
             button.Font = Enum.Font.GothamBold
@@ -84262,7 +84468,7 @@ function HUDController.new(
     -- most needs it. Hidden while everything is sound.
     local whetButton = Instance.new("TextButton")
     whetButton.Name = "Whet"
-    whetButton.Position = UDim2.fromOffset(20, 140)
+    whetButton.Position = UDim2.fromOffset(20, 94)
     whetButton.Size = UDim2.fromOffset(220, 30)
     whetButton.BackgroundColor3 = COLORS.panelSoft
     whetButton.Font = Enum.Font.GothamBold
@@ -86331,8 +86537,16 @@ function InputController.new(
             { name = "Keyboard", key = Enum.KeyCode.E },
             { name = "Gamepad", key = Enum.KeyCode.ButtonX },
         }, hud:primaryButton())
+        --[[
+            No mouse binding here on purpose. TapController owns what a
+            mouse click means: a click that lands on a creature or an
+            interactable is delivered once by the engine's ClickDetector,
+            and a click on nothing resolves to a swing there. Binding
+            MouseLeftButton here as well made every click on an object
+            also swing the tool, so each success toast was immediately
+            stomped by "The tool is calm in daylight."
+        ]]
         local tool = createBoolAction(context, "UseTool", {
-            { name = "Mouse", key = Enum.KeyCode.MouseLeftButton },
             { name = "Gamepad", key = Enum.KeyCode.ButtonR2 },
         }, hud:toolButton())
         local sprint = createBoolAction(context, "Sprint", {
@@ -86539,10 +86753,9 @@ function InputController._installFallback(
                 input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.ButtonB
             then
                 onDodge()
-            elseif
-                input.UserInputType == Enum.UserInputType.MouseButton1
-                or input.KeyCode == Enum.KeyCode.ButtonR2
-            then
+            elseif input.KeyCode == Enum.KeyCode.ButtonR2 then
+                -- Mouse clicks are resolved by TapController; see the
+                -- action binding above for why M1 must not live here too.
                 onUseTool()
             elseif input.KeyCode == Enum.KeyCode.Q or input.KeyCode == Enum.KeyCode.ButtonL1 then
                 onProfessionAbility()
@@ -87413,13 +87626,44 @@ function TapController.new(onStrike: () -> (), onInteract: (string) -> ()): TapC
             if (ended - origin).Magnitude > TAP_SLOP_PIXELS then
                 return
             end
-            self:_resolve(ended)
+            self:_resolve(ended, input.UserInputType == Enum.UserInputType.MouseButton1)
         end)
     )
     return self
 end
 
-function TapController._resolve(self: TapController, position: Vector2)
+--[[
+    Will the engine's own ClickDetector answer this mouse click?
+
+    On a mouse, every click volume and every creature already carries a
+    detector wired to the same server handler this controller would call,
+    and the engine fires it for any click inside its activation distance.
+    Sending our own request on top of that is how one physical click became
+    two interactions: the first consumed the step and the second bounced
+    off the freshly disabled prompt, overwriting every success toast with
+    MOVE CLOSER TO THE MARKED OBJECT. So a mouse tap defers to a detector
+    that is going to fire, and only speaks up when the engine will stay
+    silent -- a target beyond detector range, where the server's own
+    rejection is the feedback a player should get.
+]]
+local function engineWillHandle(hit: RaycastResult, character: Model): boolean
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if root == nil or not root:IsA("BasePart") then
+        return false
+    end
+    local node: Instance? = hit.Instance
+    while node ~= nil and node ~= workspace do
+        for _, child in node:GetChildren() do
+            if child:IsA("ClickDetector") then
+                return (root.Position - hit.Position).Magnitude <= child.MaxActivationDistance + 2
+            end
+        end
+        node = node.Parent
+    end
+    return false
+end
+
+function TapController._resolve(self: TapController, position: Vector2, isMouse: boolean)
     local camera = workspace.CurrentCamera
     local player = Players.LocalPlayer
     local character = player.Character
@@ -87432,13 +87676,24 @@ function TapController._resolve(self: TapController, position: Vector2)
     params.FilterDescendantsInstances = { character }
     local hit = workspace:Raycast(ray.Origin, ray.Direction * MAX_TAP_DISTANCE, params)
     if hit == nil then
+        -- A mouse tap at open sky still means "swing": the blind M1 swing
+        -- used to live in InputController, and combat expects a click near
+        -- a creature to try, with the server deciding what is in reach.
+        if isMouse then
+            self._onStrike()
+        end
         return
     end
     local kind, interactionId = resolveTarget(hit.Instance)
-    if kind == "strike" then
-        self._onStrike()
-    elseif kind == "interact" and interactionId ~= nil then
+    if isMouse and engineWillHandle(hit, character) then
+        return
+    end
+    if kind == "interact" and interactionId ~= nil then
         self._onInteract(interactionId)
+    elseif kind == "strike" or isMouse then
+        -- A mouse tap on plain scenery still swings; only touch demands a
+        -- real target, since a stray thumb is not a combat intent.
+        self._onStrike()
     end
 end
 
