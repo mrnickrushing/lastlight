@@ -1114,15 +1114,37 @@ function HUDController.new(
     )
     progressTitle.Font = Enum.Font.GothamBold
     progressTitle.ZIndex = 52
+    --[[
+        The notes live in a scrolling window now. One label holding 130
+        recipes plus quests, archive, residents and mastery ran to several
+        screens of text: it painted straight through the loadout buttons,
+        past the panel's bottom edge and off the monitor, and nothing
+        could reach the sections underneath. The label keeps growing to
+        whatever the book holds; the window is what stays put.
+    ]]
+    local progressScroll = Instance.new("ScrollingFrame")
+    progressScroll.Name = "DetailsScroll"
+    progressScroll.Position = UDim2.fromOffset(20, 132)
+    progressScroll.Size = UDim2.new(1, -40, 1, -152)
+    progressScroll.BackgroundTransparency = 1
+    progressScroll.BorderSizePixel = 0
+    progressScroll.ScrollBarThickness = 6
+    progressScroll.ScrollBarImageColor3 = COLORS.amber
+    progressScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    progressScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    progressScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+    progressScroll.ZIndex = 52
+    progressScroll.Parent = progressPanel
     local progressText = textLabel(
-        progressPanel,
+        progressScroll,
         "Details",
         "Loading field notes…",
-        UDim2.new(1, -40, 1, -78),
-        UDim2.fromOffset(20, 66),
+        UDim2.new(1, -10, 0, 0),
+        UDim2.fromOffset(0, 0),
         13,
         COLORS.cream
     )
+    progressText.AutomaticSize = Enum.AutomaticSize.Y
     progressText.TextWrapped = true
     progressText.RichText = true
     progressText.TextYAlignment = Enum.TextYAlignment.Top
@@ -1167,8 +1189,10 @@ function HUDController.new(
         for _, kind in { "save", "apply" } do
             local button = Instance.new("TextButton")
             button.Name = string.format("Loadout_%s_%d", kind, slot)
+            -- Above the scrolling notes, not over them: the rows sit
+            -- between the title and the DetailsScroll window.
             button.Position =
-                UDim2.fromOffset(20 + (slot - 1) * 190 + (if kind == "apply" then 92 else 0), 104)
+                UDim2.fromOffset(20 + (slot - 1) * 190 + (if kind == "apply" then 92 else 0), 58)
             button.Size = UDim2.fromOffset(if kind == "apply" then 84 else 88, 30)
             button.BackgroundColor3 = COLORS.panelSoft
             button.Font = Enum.Font.GothamBold
@@ -1189,7 +1213,7 @@ function HUDController.new(
     -- most needs it. Hidden while everything is sound.
     local whetButton = Instance.new("TextButton")
     whetButton.Name = "Whet"
-    whetButton.Position = UDim2.fromOffset(20, 140)
+    whetButton.Position = UDim2.fromOffset(20, 94)
     whetButton.Size = UDim2.fromOffset(220, 30)
     whetButton.BackgroundColor3 = COLORS.panelSoft
     whetButton.Font = Enum.Font.GothamBold

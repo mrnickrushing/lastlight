@@ -78,8 +78,16 @@ function InputController.new(
             { name = "Keyboard", key = Enum.KeyCode.E },
             { name = "Gamepad", key = Enum.KeyCode.ButtonX },
         }, hud:primaryButton())
+        --[[
+            No mouse binding here on purpose. TapController owns what a
+            mouse click means: a click that lands on a creature or an
+            interactable is delivered once by the engine's ClickDetector,
+            and a click on nothing resolves to a swing there. Binding
+            MouseLeftButton here as well made every click on an object
+            also swing the tool, so each success toast was immediately
+            stomped by "The tool is calm in daylight."
+        ]]
         local tool = createBoolAction(context, "UseTool", {
-            { name = "Mouse", key = Enum.KeyCode.MouseLeftButton },
             { name = "Gamepad", key = Enum.KeyCode.ButtonR2 },
         }, hud:toolButton())
         local sprint = createBoolAction(context, "Sprint", {
@@ -286,10 +294,9 @@ function InputController._installFallback(
                 input.KeyCode == Enum.KeyCode.LeftAlt or input.KeyCode == Enum.KeyCode.ButtonB
             then
                 onDodge()
-            elseif
-                input.UserInputType == Enum.UserInputType.MouseButton1
-                or input.KeyCode == Enum.KeyCode.ButtonR2
-            then
+            elseif input.KeyCode == Enum.KeyCode.ButtonR2 then
+                -- Mouse clicks are resolved by TapController; see the
+                -- action binding above for why M1 must not live here too.
                 onUseTool()
             elseif input.KeyCode == Enum.KeyCode.Q or input.KeyCode == Enum.KeyCode.ButtonL1 then
                 onProfessionAbility()

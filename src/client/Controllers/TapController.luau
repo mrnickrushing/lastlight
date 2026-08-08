@@ -114,13 +114,44 @@ function TapController.new(onStrike: () -> (), onInteract: (string) -> ()): TapC
             if (ended - origin).Magnitude > TAP_SLOP_PIXELS then
                 return
             end
-            self:_resolve(ended)
+            self:_resolve(ended, input.UserInputType == Enum.UserInputType.MouseButton1)
         end)
     )
     return self
 end
 
-function TapController._resolve(self: TapController, position: Vector2)
+--[[
+    Will the engine's own ClickDetector answer this mouse click?
+
+    On a mouse, every click volume and every creature already carries a
+    detector wired to the same server handler this controller would call,
+    and the engine fires it for any click inside its activation distance.
+    Sending our own request on top of that is how one physical click became
+    two interactions: the first consumed the step and the second bounced
+    off the freshly disabled prompt, overwriting every success toast with
+    MOVE CLOSER TO THE MARKED OBJECT. So a mouse tap defers to a detector
+    that is going to fire, and only speaks up when the engine will stay
+    silent -- a target beyond detector range, where the server's own
+    rejection is the feedback a player should get.
+]]
+local function engineWillHandle(hit: RaycastResult, character: Model): boolean
+    local root = character:FindFirstChild("HumanoidRootPart")
+    if root == nil or not root:IsA("BasePart") then
+        return false
+    end
+    local node: Instance? = hit.Instance
+    while node ~= nil and node ~= workspace do
+        for _, child in node:GetChildren() do
+            if child:IsA("ClickDetector") then
+                return (root.Position - hit.Position).Magnitude <= child.MaxActivationDistance + 2
+            end
+        end
+        node = node.Parent
+    end
+    return false
+end
+
+function TapController._resolve(self: TapController, position: Vector2, isMouse: boolean)
     local camera = workspace.CurrentCamera
     local player = Players.LocalPlayer
     local character = player.Character
@@ -133,13 +164,24 @@ function TapController._resolve(self: TapController, position: Vector2)
     params.FilterDescendantsInstances = { character }
     local hit = workspace:Raycast(ray.Origin, ray.Direction * MAX_TAP_DISTANCE, params)
     if hit == nil then
+        -- A mouse tap at open sky still means "swing": the blind M1 swing
+        -- used to live in InputController, and combat expects a click near
+        -- a creature to try, with the server deciding what is in reach.
+        if isMouse then
+            self._onStrike()
+        end
         return
     end
     local kind, interactionId = resolveTarget(hit.Instance)
-    if kind == "strike" then
-        self._onStrike()
-    elseif kind == "interact" and interactionId ~= nil then
+    if isMouse and engineWillHandle(hit, character) then
+        return
+    end
+    if kind == "interact" and interactionId ~= nil then
         self._onInteract(interactionId)
+    elseif kind == "strike" or isMouse then
+        -- A mouse tap on plain scenery still swings; only touch demands a
+        -- real target, since a stray thumb is not a combat intent.
+        self._onStrike()
     end
 end
 
