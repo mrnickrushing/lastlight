@@ -7,8 +7,8 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = `HEAD` (PR #336), build `0.53.0`,
-save schema 24, 26 services. Published to Roblox as place version 146,
+Last updated: 2026-08-08, at `main` = `HEAD` (PR #338), build `0.53.0`,
+save schema 24, 26 services. Published to Roblox as place version 148,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,7 +59,44 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
-- **#337** **M11 wave G: there is a shop, and the interesting half of it is
+- **#338** (v148) **M11 wave H: the direct catalog is four lines, not five loose
+  things.** The spine shipped one cosmetic per slot to prove the chain -- entry,
+  plan, product, grant -- and five loose objects is not a catalog. What a player
+  wants is a look, and a look is not a lantern shell: it is the thing the
+  lantern shell finishes. So the unit is a **line**, one look across all five
+  slots, named in the data rather than implied by display names.
+
+  **Naming it is what makes the claim checkable.** A set product that grants
+  four of five slots is a set with a hole in it, and the hole is invisible until
+  somebody buys it and finds their lantern still bare — this project's most
+  expensive shape, an entitlement that exists beside a cosmetic that cannot be
+  worn. `CosmeticReachability.spec` now demands every line carry exactly one
+  cosmetic per slot, every line have exactly one set, and each set grant exactly
+  its own five with no two things for one slot. The counts are pinned and
+  pinned again in CONTENT_CATALOG.md, with a case holding the two together.
+
+  **Three new lines, named for places the story has been** rather than for
+  invented brands: the Ironroot is pit leather and riveted iron with a caged
+  lamp built to be dropped, the Mireglass is bog oak and split-reed binding and
+  glass the colour of standing water, the Cinderfall is scorched plate with
+  bronze at the joins and one ember inset that is the only lit thing on it.
+  Every silhouette differs from the Greenward's rather than only its palette,
+  because a line whose sole difference is its colours is VISUAL_QUALITY_STANDARD's
+  recoloured cube wearing a second name.
+
+  **20 cosmetics, 24 products**, and the four sets are the first thing to
+  exercise a path wave E built and had nothing to run through it: one purchase
+  id handing over five cosmetics at once, idempotently.
+
+  **Verified live at 392 x 608**: all 24 cards and all four line headings render
+  in the outfitter's panel, a heading appears only when its line has a card
+  under it, and a set shows its outfit and says · 5 PIECES rather than stacking
+  five plans at one origin — merged, they photograph as a pile. Weapons, tools,
+  lanterns and banners each read as their own object at 76 points. **Open, and
+  honest:** the four outfits read as a detailed torso block at that size, which
+  is what a derived plan of a torso is; the art pass that replaces them is the
+  owner's and every plan is still `derived = true`.
+- **#337** (v147) **M11 wave G: there is a shop, and the interesting half of it is
   everywhere it refuses to open.** Milestone 11's exit gate is one sentence —
   *the store never interrupts onboarding, active defense, downed state, or
   defeat* — and the monetization document forbids the same four from the other
