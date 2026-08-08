@@ -18,6 +18,13 @@ export type AnalyticsService = typeof(setmetatable(
         _logger: Logger,
         _startedAt: { [Player]: number },
         _expeditionStarted: { [Player]: boolean },
+        _furthestStep: { [Player]: number },
+        _furthestStage: { [Player]: string },
+        _newPlayer: { [Player]: boolean },
+        _downs: { [Player]: number },
+        _revives: { [Player]: number },
+        _attempts: { [Player]: { [string]: number } },
+        _activityRuns: { [Player]: { [string]: number } },
     },
     AnalyticsService
 ))
@@ -28,7 +35,25 @@ function AnalyticsService.new(logger: Logger): AnalyticsService
         _logger = logger,
         _startedAt = {},
         _expeditionStarted = {},
+        _furthestStep = {},
+        _furthestStage = {},
+        _newPlayer = {},
+        _downs = {},
+        _revives = {},
+        _attempts = {},
+        _activityRuns = {},
     }, AnalyticsService)
+end
+
+local function bump(store: { [Player]: { [string]: number } }, player: Player, key: string): number
+    local counts = store[player]
+    if counts == nil then
+        counts = {}
+        store[player] = counts
+    end
+    local next = (counts[key] or 0) + 1
+    counts[key] = next
+    return next
 end
 
 function AnalyticsService.Init(_self: AnalyticsService, _context: any) end
@@ -38,6 +63,14 @@ function AnalyticsService.Start(_self: AnalyticsService) end
 function AnalyticsService.stage(self: AnalyticsService, player: Player, step: number, stage: string)
     if self._startedAt[player] == nil then
         self._startedAt[player] = os.clock()
+    end
+
+    -- How far they got, kept rather than only reported. A funnel step says
+    -- somebody passed a point; the tuning question is where they stopped, and
+    -- that is only knowable once they have stopped.
+    if step > (self._furthestStep[player] or 0) then
+        self._furthestStep[player] = step
+        self._furthestStage[player] = stage
     end
 
     self._logger:info("tutorial_funnel_step", {
@@ -171,6 +204,7 @@ function AnalyticsService.sessionStarted(
         platform = platform,
         player = player.UserId,
     })
+    self._newPlayer[player] = daysSinceFirstSession <= 0
     if not RunService:IsStudio() then
         pcall(function()
             RobloxAnalytics:LogCustomEvent(player, "InteractiveSession", 1, {
@@ -460,6 +494,7 @@ function AnalyticsService.expeditionExtractionFailed(
 end
 
 function AnalyticsService.playerDowned(self: AnalyticsService, player: Player, source: string)
+    self._downs[player] = (self._downs[player] or 0) + 1
     self._logger:info("player_downed", {
         player = player.UserId,
         source = source,
@@ -479,6 +514,7 @@ function AnalyticsService.playerRevived(
     reviver: Player,
     duration: number
 )
+    self._revives[player] = (self._revives[player] or 0) + 1
     self._logger:info("player_revived", {
         duration = duration,
         player = player.UserId,
@@ -1265,9 +1301,210 @@ function AnalyticsService.chapterCompleted(
     end
 end
 
+--[[
+    The numbers Milestone 13's tuning decisions are made on.
+
+    The roadmap names five things a closed beta tunes -- first session, first
+    night, difficulty cliffs, group scaling, and repetition -- and none of them
+    had a number. The gap is not that this service cannot see them. It sees
+    almost all of them go past: every funnel step, every down, every revive,
+    every extraction. What it did not do is **accumulate**.
+
+    That is the whole shape of this block, and it is the reason a tuning event
+    is a different object from a gate event. A gate is a rate over instants and
+    every emitter above reports one instant. A tuning decision is about a
+    *stretch of play* -- how far somebody got before they stopped, how many
+    tries the third night took, whether the fifth run into the same wood was
+    finished -- and an instant cannot answer any of those. So the counters
+    below ride along with the events already being emitted, and five emitters
+    report them at the moment the unit of play the decision is about ends.
+
+    Two rules the shape follows, and both are ways a tuning number lies.
+
+    **A cliff is a comparison, so every checkpoint emits.** A difficulty cliff
+    is not a hard checkpoint, it is a checkpoint that is much harder than the
+    one before it, which cannot be seen from a single reading. Emitting only at
+    the places somebody already suspects produces a set of numbers that agree
+    with the suspicion and say nothing about the rest of the game.
+
+    **An outcome without an attempt number is a survivorship number.** A boss
+    whose clear rate is 90% looks tuned until you learn it is the ninth attempt
+    that clears. Every checkpoint carries which try this was, counted per
+    player, so a cliff shows up as attempts rather than as failures.
+
+    `TUNING-METRIC: <id>` marks each call site, and `TuningMetrics.spec` holds
+    them against BETA_TUNING.md in both directions -- the same three layers
+    `GateMetrics.spec` uses, for the same reason: an emitter nobody calls is a
+    dashboard reading zero, and it looks exactly like a decision that has been
+    measured.
+]]
+
+--[[
+    Where a first session ended.
+
+    The decision this feeds is whether the opening is too long, too slow, or
+    too confusing, and the number that answers it is **where they stopped**,
+    not how long they played -- a player who quits at step three and a player
+    who finishes and stays for twenty minutes both produce a session length.
+    Only a first-day session emits, because a returning player walking back
+    through the lodge is not evidence about onboarding.
+]]
+function AnalyticsService.firstSessionEnded(
+    self: AnalyticsService,
+    player: Player,
+    durationSeconds: number,
+    platform: string,
+    reason: string
+)
+    if self._newPlayer[player] ~= true then
+        return
+    end
+
+    self._logger:info("first_session_end", {
+        durationSeconds = math.floor(durationSeconds + 0.5),
+        furthestStage = string.sub(self._furthestStage[player] or "none", 1, 32),
+        furthestStep = self._furthestStep[player] or 0,
+        platform = platform,
+        reason = string.sub(reason, 1, 24),
+        user = player.UserId,
+    })
+end
+
+--[[
+    How the first night actually went, as opposed to whether it was survived.
+
+    `first_night_completed` is a release gate and answers a yes-or-no question.
+    The tuning question is a different one and a rate cannot hold it: a night
+    everybody survives on their third down is not the same night as one
+    everybody survives untouched, and both read 100%.
+]]
+function AnalyticsService.firstNightOutcome(self: AnalyticsService, player: Player)
+    local startedAt = self._startedAt[player]
+    self._logger:info("first_night_outcome", {
+        downs = self._downs[player] or 0,
+        revives = self._revives[player] or 0,
+        secondsToReach = if startedAt == nil then 0 else math.floor(os.clock() - startedAt),
+        user = player.UserId,
+    })
+end
+
+--[[
+    One named place on the path, with which try this was.
+
+    The unit of the difficulty-cliff decision. `cleared` is the outcome and
+    `attempt` is the number that makes it readable, for the reason written
+    above: an outcome on its own is a survivorship number.
+]]
+function AnalyticsService.difficultyCheckpoint(
+    self: AnalyticsService,
+    player: Player,
+    checkpointId: string,
+    cleared: boolean
+)
+    local id = string.sub(checkpointId, 1, 48)
+    self._logger:info("difficulty_checkpoint", {
+        attempt = bump(self._attempts, player, id),
+        checkpoint = id,
+        cleared = cleared,
+        user = player.UserId,
+    })
+end
+
+--[[
+    The same outcome with the size of the group beside it.
+
+    Group scaling is not answerable from a win rate, because a win rate has no
+    denominator that says how many people were carrying it. This is emitted per
+    player rather than once per group, so a party of four produces four rows
+    and a run one person carried is visible as three rows with nothing banked.
+]]
+function AnalyticsService.groupOutcome(
+    self: AnalyticsService,
+    player: Player,
+    activityId: string,
+    partySize: number,
+    cleared: boolean,
+    banked: number
+)
+    self._logger:info("group_outcome", {
+        activity = string.sub(activityId, 1, 48),
+        banked = banked,
+        cleared = cleared,
+        partySize = partySize,
+        user = player.UserId,
+    })
+end
+
+--[[
+    The nth time this player has done the same thing, and whether they finished
+    it that time.
+
+    Repetition is a decision about the nth attempt and nothing else -- the
+    question is at which n the same activity stops being worth doing, and a
+    count of runs cannot answer it because it has no n on any individual row.
+]]
+function AnalyticsService.repeatActivity(
+    self: AnalyticsService,
+    player: Player,
+    activityId: string,
+    completed: boolean
+)
+    local id = string.sub(activityId, 1, 48)
+    self._logger:info("repeat_activity", {
+        activity = id,
+        completed = completed,
+        run = bump(self._activityRuns, player, id),
+        user = player.UserId,
+    })
+end
+
+--[[
+    Per-player tables this service is still holding for players who have gone.
+
+    The soak's `player_residue` metric watches exactly this, and until this
+    wave it walked only `ProfileService`'s tables -- which was the whole of the
+    per-player state worth watching when it was written and stopped being so
+    the moment a second service started counting things per player. A counter
+    that reads a subset while being described as reading all of it is the shape
+    of gap this project keeps paying for, so a service that keeps player-keyed
+    state answers for its own.
+]]
+function AnalyticsService.playerResidue(
+    self: AnalyticsService,
+    present: { [Player]: boolean }
+): number
+    local residue = 0
+    local tables: { { [Player]: any } } = {
+        self._startedAt,
+        self._expeditionStarted,
+        self._furthestStep,
+        self._furthestStage,
+        self._newPlayer,
+        self._downs,
+        self._revives,
+        self._attempts,
+        self._activityRuns,
+    }
+    for _, held in tables do
+        for player in held do
+            if not present[player] then
+                residue += 1
+            end
+        end
+    end
+    return residue
+end
+
 function AnalyticsService.clear(self: AnalyticsService, player: Player)
     self._startedAt[player] = nil
     self._expeditionStarted[player] = nil
+    self._furthestStep[player] = nil
+    self._furthestStage[player] = nil
+    self._newPlayer[player] = nil
+    self._downs[player] = nil
+    self._revives[player] = nil
+    self._attempts[player] = nil
+    self._activityRuns[player] = nil
 end
 
 return table.freeze(AnalyticsService)

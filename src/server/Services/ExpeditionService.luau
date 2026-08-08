@@ -268,6 +268,24 @@ function ExpeditionService.occupied(_self: ExpeditionService): boolean
     return false
 end
 
+--[[
+    How many people are in the wood right now.
+
+    The group-scaling decision's denominator. Counted off the same attribute
+    `occupied` reads rather than off a party roster, because a party is who was
+    invited and this asks who is actually standing there -- a party of four
+    where two never departed scales like a pair.
+]]
+function ExpeditionService.partySize(_self: ExpeditionService): number
+    local count = 0
+    for _, player in Players:GetPlayers() do
+        if player:GetAttribute("LastLightInExpedition") == true then
+            count += 1
+        end
+    end
+    return count
+end
+
 function ExpeditionService.enter(self: ExpeditionService, player: Player): boolean
     if self._rebuilding then
         -- The wood is being torn down and stood up again. Admitting somebody
@@ -691,6 +709,14 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
         }
     end
 
+    --[[
+        Read here rather than beside the event that carries it. Extraction
+        clears this player's own expedition attribute on the way out, so a
+        count taken afterwards is the party they left behind: it reads one
+        short, and a solo run would report a party of zero.
+    ]]
+    local partySize = self:partySize()
+
     local manifest = assert(self._manifest, "expedition manifest was not initialized")
     local sessionPending = self._rewardLedger.pending(self._rewardLedgerState, player.UserId)
     local combinedPending = self:_combinedPending(player)
@@ -724,6 +750,10 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
     )
     if not settlement.accepted then
         self._analyticsService:expeditionExtractionFailed(player, manifest.hash, settlement.reason)
+        -- TUNING-METRIC: repeat_activity
+        self._analyticsService:repeatActivity(player, "expedition_bramblewake", false)
+        -- TUNING-METRIC: group_outcome
+        self._analyticsService:groupOutcome(player, "expedition_bramblewake", partySize, false, 0)
         return {
             accepted = false,
             message = if settlement.reason == "profile_read_only"
@@ -767,6 +797,18 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
         player,
         manifest.hash,
         settlement.settlementId,
+        bankedAmount
+    )
+    -- TUNING-METRIC: repeat_activity
+    -- Counted at the end of the attempt rather than the start, because the
+    -- repetition question is about runs that were seen through.
+    self._analyticsService:repeatActivity(player, "expedition_bramblewake", true)
+    -- TUNING-METRIC: group_outcome
+    self._analyticsService:groupOutcome(
+        player,
+        "expedition_bramblewake",
+        partySize,
+        true,
         bankedAmount
     )
     return {

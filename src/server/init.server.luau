@@ -438,8 +438,21 @@ performanceService:setSoakCounters({
     tracked_enemies = function(): number
         return enemyService:trackedCount()
     end,
+    --[[
+        Every per-player table this server is still holding for somebody who
+        has gone, and it has to be every service that keeps one. It read only
+        ProfileService's tables until AnalyticsService started counting things
+        per player for the tuning metrics, at which point a counter described
+        as watching the game's player residue would have been watching a
+        subset -- which is worse than watching nothing, because it reports a
+        clean zero while a leak grows beside it.
+    ]]
     player_residue = function(): number
-        return profileService:playerResidue()
+        local present: { [Player]: boolean } = {}
+        for _, player in Players:GetPlayers() do
+            present[player] = true
+        end
+        return profileService:playerResidue() + analyticsService:playerResidue(present)
     end,
     profile_bytes = function(): number
         return profileService:largestProfileBytes()

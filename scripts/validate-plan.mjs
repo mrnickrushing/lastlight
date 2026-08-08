@@ -23,6 +23,7 @@ const requiredFiles = [
   "docs/QA_RELEASE_PLAN.md",
   "docs/SOCIAL_SAFETY_REVIEW.md",
   "docs/BETA_ROLLOUT.md",
+  "docs/BETA_TUNING.md",
   "src/shared/RolloutCohorts.luau",
   "docs/RELEASE_GATES.md",
   "docs/DEVELOPMENT.md",

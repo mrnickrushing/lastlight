@@ -466,6 +466,8 @@ function BramblewakeBlackoutService.interact(
             self._state.startedAt,
             now
         )
+        -- TUNING-METRIC: difficulty_checkpoint
+        self._analyticsService:difficultyCheckpoint(player, self._flow.Id, true)
     else
         result.message = "BLACKOUT UPDATED"
     end

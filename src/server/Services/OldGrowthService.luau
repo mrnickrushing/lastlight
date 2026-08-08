@@ -735,6 +735,8 @@ function OldGrowthService.damageNearest(self: OldGrowthService, player: Player):
             self._state.shieldIndex,
             self:_participantCount()
         )
+        -- TUNING-METRIC: difficulty_checkpoint
+        self._analyticsService:difficultyCheckpoint(player, self._encounter.Id, true)
         self:_notify("OLD GROWTH CLEANSED — +3 AMBER SAP UNBANKED")
         return true, "Old Growth cleansed. Amber Sap added to the expedition pouch."
     end
