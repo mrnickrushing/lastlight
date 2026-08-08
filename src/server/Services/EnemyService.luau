@@ -79,6 +79,8 @@ export type EnemyService = typeof(setmetatable(
         _engineerBraceState: any,
         _onChanged: ((string?) -> ())?,
         _heartbeat: RBXScriptConnection?,
+        _still: boolean,
+        _stillSince: number,
     },
     EnemyService
 ))
@@ -141,6 +143,8 @@ function EnemyService.new(
         _engineerBraceState = engineerBrace.default(),
         _onChanged = nil,
         _heartbeat = nil,
+        _still = false,
+        _stillSince = 0,
     }, EnemyService)
 end
 
@@ -153,10 +157,76 @@ function EnemyService.Start(self: EnemyService)
         if accumulator < 0.05 then
             return
         end
+        --[[
+            Stillness is the whole simulation stopping, not the walk cycle.
+
+            A creature that stopped moving and went on winding up an attack
+            would be a cinematic tool that kills you for using it, and one that
+            stopped attacking while the spawn timers ran would fill the town
+            with statues that all wake at once. `_step` is the only thing that
+            advances any of it, so not calling it is the honest version.
+        ]]
+        if self._still then
+            accumulator = 0
+            return
+        end
         local elapsed = accumulator
         accumulator = 0
         self:_step(elapsed)
     end)
+end
+
+--[[
+    Only a practice server reaches this: PrivateServerService is the sole caller
+    and it has already latched profile writes off before it gets here.
+
+    Releasing has to move every deadline forward by the held duration, and the
+    review caught that not doing so makes the comment above `_step` a lie. Not
+    calling `_step` freezes the poses and the walking; it does not freeze the
+    wall clock those deadlines are measured against. Held for thirty seconds,
+    an attack cooldown and the spawn timer are both long satisfied by the time
+    the world moves again, so the creature swings on the first frame and the
+    queue drains at once -- the statues all waking together. Worse, a telegraph
+    that was in flight has an `endsAt` in the past and resolves with no windup
+    left, which is a cinematic tool that hits you for using it.
+]]
+function EnemyService.setStillness(self: EnemyService, still: boolean)
+    local next_ = still == true
+    if next_ == self._still then
+        return
+    end
+    self._still = next_
+    local now = workspace:GetServerTimeNow()
+    if next_ then
+        self._stillSince = now
+        return
+    end
+
+    local heldFor = math.max(0, now - self._stillSince)
+    self._stillSince = 0
+    self._nextSpawnAt += heldFor
+    local enemy = self._active
+    if enemy ~= nil then
+        -- `spawnedAt` rides along too: it is the pose clock's origin, so
+        -- leaving it behind would snap the animation forward by the whole hold
+        -- on the frame the world resumes.
+        enemy.spawnedAt += heldFor
+        enemy.lastAttackAt += heldFor
+        enemy.luredUntil += heldFor
+        enemy.markedUntil += heldFor
+        enemy.snaredUntil += heldFor
+        enemy.stilledUntil += heldFor
+        local attack = enemy.attack
+        if attack ~= nil and type(attack.flow) == "table" then
+            attack.flow.startedAt += heldFor
+            attack.flow.endsAt += heldFor
+        end
+    end
+    self._lureUntil += heldFor
+end
+
+function EnemyService.isStill(self: EnemyService): boolean
+    return self._still
 end
 
 function EnemyService.setChangedHandler(self: EnemyService, callback: (string?) -> ())

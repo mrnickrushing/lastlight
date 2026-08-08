@@ -165,6 +165,7 @@ logged loudly when it fires:
 | `LastLightStockProfile` | a number | Fills the purse so crafting and equipping can be driven without playing an hour. |
 | `LastLightStudioStore` | Robux price | Turns the `cosmetic_store_enabled` flag on and gives every product that price, so the outfitter's cards render. It is a **price**, not a product id — `promptPurchase` still refuses with `product_not_configured`, because a Creator Dashboard product genuinely does not exist. |
 | `LastLightStudioGrant` | a product id | Pushes a synthetic receipt through `applyReceipt`, the real and only grant authority, for every player in the server. The platform's own `ProcessReceipt` cannot be driven in Studio; this is the closest honest thing to it. |
+| `LastLightStudioPrivateServer` | a user ID | Makes the private-server control rail answer to that user. A Studio session is neither a private server nor a reserved one, so this is the only way to reach the rail from a playtest at all. It fakes exactly one thing — the owner — and every refusal, the practice latch and all four consequences are the real path. |
 
 The reason the last two exist is written into the wave that added them: a live
 pass on a store with no priced products sees an empty panel, and an empty panel

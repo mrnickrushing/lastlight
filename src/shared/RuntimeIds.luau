@@ -1,6 +1,7 @@
 --!strict
 
 local ExpeditionEventFlow = require("./ExpeditionEventFlow")
+local PrivateServerControls = require("./PrivateServerControls")
 local ProfessionMastery = require("./ProfessionMastery")
 local TownProgression = require("./TownProgression")
 
@@ -29,6 +30,16 @@ local townRepairInteractionIds = {}
 for _, buildingId in TownProgression.buildingIds() do
     constructionInteractionIds[buildingId] = "construction_" .. buildingId
     townRepairInteractionIds[buildingId] = "town_repair_" .. buildingId
+end
+
+-- One board per private-server control, generated from the control list rather
+-- than written out, for the reason the construction prompts are generated: a
+-- control added to the catalog gets a board it can be pressed on instead of
+-- needing somebody to remember to add one. The rail is the only place these
+-- exist, so a control with no board is a control nobody can reach.
+local privateControlInteractionIds: { [string]: string } = {}
+for _, control in PrivateServerControls.controls() do
+    privateControlInteractionIds[control.id] = "private_control_" .. control.id
 end
 
 local RuntimeIds = {
@@ -150,6 +161,19 @@ local RuntimeIds = {
         StoreDetail = "store_detail",
         StorePurchase = "store_purchase",
         EquipCosmetic = "equip_cosmetic",
+        --[[
+            A board on the private server's control rail, and it carries no
+            payload at all -- not even which board.
+
+            Which control was pressed is an attribute on the prompt the player
+            is standing at, read server-side, the same way a profession
+            specialization's is. That is deliberate rather than tidy: these
+            controls end a server's rewards permanently, and a payload naming
+            one would let a client end them from anywhere, at any moment, with
+            no rail in front of it. There is nothing to forge because there is
+            nothing in the payload.
+        ]]
+        PrivateControl = "private_control",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -219,6 +243,7 @@ local RuntimeIds = {
         npc_pip_wren = "resident_pip_wren",
         npc_ena_moss = "resident_ena_moss",
     }),
+    PrivateControlInteractionIds = table.freeze(privateControlInteractionIds),
     ConstructionInteractionIds = table.freeze(constructionInteractionIds),
     TownRepairInteractionIdByBuilding = table.freeze(townRepairInteractionIds),
     ProfessionSpecializationInteractionIds = table.freeze(professionSpecializationInteractionIds),

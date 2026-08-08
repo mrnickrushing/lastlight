@@ -65,6 +65,7 @@ local TownPermissions = require(root.TownPermissions)
 local TownVisitPolicy = require(root.TownVisitPolicy)
 local RunHandoff = require(root.RunHandoff)
 local PartySession = require(root.PartySession)
+local PrivateServerControls = require(root.PrivateServerControls)
 local QuickChat = require(root.QuickChat)
 local CosmeticCatalog = require(root.CosmeticCatalog)
 local Entitlements = require(root.Entitlements)
@@ -97,6 +98,7 @@ local LobbyService = require(script.Services.LobbyService)
 local PartyService = require(script.Services.PartyService)
 local SocialService = require(script.Services.SocialService)
 local CommerceService = require(script.Services.CommerceService)
+local PrivateServerService = require(script.Services.PrivateServerService)
 local AdminService = require(script.Services.AdminService)
 local CompanionService = require(script.Services.CompanionService)
 local DefenseService = require(script.Services.DefenseService)
@@ -393,6 +395,25 @@ local townNightService = TownNightService.new(
 )
 townNightService:setDefense(defenseService, DefenseLanes)
 --[[
+    The private server's control rail.
+
+    Constructed after the three things it can hold still, and it is the only
+    caller of any of them: the profile write latch, the town clock's hold, the
+    creature simulation's stillness and the expedition's rebuild all exist for
+    this service. Keeping the callers to one is what makes "no private-server
+    setting changes a reward" a claim about a single file rather than about
+    however many places learned to stop the clock.
+]]
+local privateServerService = PrivateServerService.new(
+    logger,
+    PrivateServerControls,
+    profileService,
+    townNightService,
+    enemyService,
+    analyticsService
+)
+privateServerService:setExpeditionService(expeditionService)
+--[[
     Who may visit this town, in the two pieces the service cannot supply
     itself.
 
@@ -506,6 +527,7 @@ local services = ServiceRegistry.new({
     adminInspectionReport = AdminInspectionReport,
     profilePersistence = ProfilePersistence,
     townVisitPolicy = TownVisitPolicy,
+    privateServerControls = PrivateServerControls,
     profileBackup = ProfileBackup,
     config = Config,
 })
@@ -533,6 +555,7 @@ services:register(regionEncounterService)
 services:register(partyService)
 services:register(socialService)
 services:register(commerceService)
+services:register(privateServerService)
 -- Without this the departure countdown never reached a client: LobbyService
 -- published every whole second into a handler nobody had set, so the panel
 -- froze at "DEPARTING IN 10" while the server counted down and launched.
@@ -546,6 +569,7 @@ tutorialService:setCompanionService(companionService)
 tutorialService:setPartyService(partyService)
 tutorialService:setSocialService(socialService)
 tutorialService:setCommerceService(commerceService)
+tutorialService:setPrivateServerService(privateServerService)
 --[[
     A grant has to arrive somewhere the buyer can see.
 

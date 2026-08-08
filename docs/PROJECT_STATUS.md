@@ -8,7 +8,7 @@ hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
 Last updated: 2026-08-08, at `main` = `HEAD` (PR #338), build `0.53.0`,
-save schema 24, 26 services. Published to Roblox as place version 148,
+save schema 25, 27 services. Published to Roblox as place version 148,
 matching this revision exactly. **The owner's standing directive: complete
 Milestones 11 through 14 continuously, wave by wave, each implemented,
 tested, merged and published, with no check-in between waves.** The queue
@@ -59,6 +59,91 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#339** **M11 wave I: a private server can hold its own clock, and the price is
+  that it stops paying.** MONETIZATION_LIVEOPS_ANALYTICS describes private-server
+  controls as phase pause in non-reward practice, seed selection among already
+  discovered seeds and cinematic tools, with one sentence attached that decides
+  the whole design: **reward-bearing modifiers remain server-defined.**
+
+  The usual way to keep that is to sort the controls into the ones that touch
+  rewards and the ones that do not, and trust the sorting — a judgement made
+  once, by whoever adds the fifth control, about a system they are not thinking
+  about. So this module does not sort. **Every control forces practice, and
+  practice is a one-way latch on the whole server.** The argument fits in a
+  line: a control that changes nothing about the world does not need a private
+  server to house it, and a control that changes the world changes the run.
+  Hiding your own HUD is a HUD feature. What is left, once that is taken out, is
+  a list where every entry is reward-bearing.
+
+  That makes the gate line true structurally rather than by inspection — there
+  is no reward left for a setting to change. `apply` sets `practice` on every
+  accepted change with **no per-control branch**, so a fifth control is latched
+  by the same line as the four here, and the spec drives the whole catalog
+  through it rather than holding a case per entry. **The latch never lifts**,
+  because a practice server that could go back to paying would let somebody hold
+  the clock, arrange a night, release it and bank — the modifier the promise is
+  about, reached in two presses. Verified live: releasing the hold left PRACTICE
+  on the pill.
+
+  **Practice is two lines, not an audit of forty reward paths.** Every mutation
+  in the game funnels through `ProfileService.isWritable` and every durable write
+  through `save`, so the whole of "a practice phase grants nothing" lives at two
+  seams that can be checked. The second one is the non-obvious half: `save` does
+  not consult the dirty flag — the leave path and the lock heartbeat both call it
+  outright — so gating mutations alone would have left a practice server writing
+  the entire in-memory profile on the way out. And **the locks go back**: a
+  server that has renounced writing forever and still holds a session lock is
+  holding somebody's save hostage, so the latch flushes once, then releases every
+  lock it holds, and a profile arriving afterwards never claims one.
+
+  **Nothing here is a purchase.** Authority is `PrivateServerOwnerId`, a property
+  of the server rather than an entitlement of the player, which is what keeps it
+  outside the monetization guard: no gameplay branch reads what anybody owns. A
+  **reserved** server is refused by name, and that refusal is the one worth
+  having — every expedition this game launches runs in one, and Roblox reports it
+  with a non-empty `PrivateServerId` and an owner of zero, so the obvious test
+  would put a clock-holding rail inside the reward-bearing half of the game.
+
+  Save schema 24 → 25 with an era-24 fixture: a capped, deduplicated history of
+  the seeds a player has actually **walked** (recorded on entering the wood, not
+  on requesting a departure — a run nobody reached is a layout they have never
+  seen). Capped because M12's soak gate asks in as many words that profile size
+  not grow without bound. An era-24 save arrives remembering no seeds, which is
+  what that player has rather than something migration lost.
+
+  **Verified live at 392 x 608, and two things only looking could find.** (1)
+  **The pill counted down through a stopped clock.** The server sat at 543.8
+  seconds left for six seconds while the HUD went 08:38 to 08:32 — the label
+  refreshes ten times a second off its own copy of `phaseEndsAt`, and a hold
+  moves that deadline on the server and pushes nothing. Every spec passed. The
+  seconds are measured where the clock is now, the flag rides with them, and the
+  word changes to HELD, because a number that has simply stopped is what a frozen
+  game looks like. (2) The seed readout said THE WOOD IS **REGION_BRAMBLEWAKE** ·
+  32693 — a database key shouted at somebody standing in front of a plank.
+
+  Walked on the fixed build: the rail stands inside the town gate with all four
+  boards legible in portrait; a real mouse click on HOLD THE CLOCK gave PRACTICE ·
+  DAY · 10:25 HELD and froze the pill for eight seconds; a second click read THE
+  CLOCK RUNS AGAIN and the clock resumed with PRACTICE still on it; CALL THE NEXT
+  PHASE walked day → dusk → night with the world's own announcements; STILL THE
+  DARK left a spawned Rootling at 0.0000 studs over eight seconds against 18.5
+  studs in five for a free Briarback, and releasing it resumed the night; CHOOSE
+  A SEED refused with YOU HAVE NOT WALKED A SEED WORTH KEEPING YET on a fresh
+  profile and rebuilt the wood once a seed had been walked. **And the central
+  claim was checked against a control in the same session**: SaveLoadout answered
+  KIT 1 SAVED and KIT 2 SAVED before the latch and KIT COULD NOT BE SAVED two
+  minutes later, with nothing else changed.
+
+  `LastLightStudioPrivateServer` is the fifth Studio-only attribute and fakes
+  exactly one thing — the owner — because a Studio session is neither a private
+  server nor a reserved one and the rail is otherwise unreachable from a
+  playtest. Documented in [STUDIO_MCP_SETUP.md](STUDIO_MCP_SETUP.md).
+
+  **Open, and needs a second person:** the seed board's SOMEBODY IS STILL IN THE
+  WOOD refusal. It reads the whole player list, so the only honest way to raise
+  it is another player standing in the expedition; a solo session cannot press a
+  board in the town while it is in the wood. It joins M11 wave C's two-player
+  half in the cohort work M12–M13 already list.
 - **#338** (v148) **M11 wave H: the direct catalog is four lines, not five loose
   things.** The spine shipped one cosmetic per slot to prove the chain -- entry,
   plan, product, grant -- and five loose objects is not a catalog. What a player

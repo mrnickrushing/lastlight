@@ -26,6 +26,8 @@ export type ExpeditionService = typeof(setmetatable(
         _profileService: any,
         _analyticsService: any,
         _seed: number,
+        _regionId: string,
+        _rebuilding: boolean,
         _manifest: any,
         _partCount: number,
         _eventStates: { [string]: any },
@@ -69,6 +71,8 @@ function ExpeditionService.new(
         _profileService = profileService,
         _analyticsService = analyticsService,
         _seed = seed,
+        _regionId = "region_bramblewake",
+        _rebuilding = false,
         _manifest = nil,
         _partCount = 0,
         _eventStates = {},
@@ -111,6 +115,22 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
         "region " .. tostring(regionId) .. " is enabled but has no builder wired"
     )
     self._catalog = catalog
+    self._regionId = regionId
+    self:_buildRegion(seed)
+end
+
+--[[
+    Roll a seed into a walkable wood and stand it up.
+
+    Split out of Init because a private server's owner can ask for a different
+    one at runtime, and the alternative -- a second copy of this sequence in the
+    rebuild path -- is how a manifest gets built without its event states, or
+    dressed without its fallback metric. `BramblewakeBuilder.build` already
+    destroys whatever it finds before it builds, which is what makes calling
+    this twice safe rather than merely possible.
+]]
+function ExpeditionService._buildRegion(self: ExpeditionService, seed: number)
+    local regionId = self._regionId
     local manifest = self._generator.generate(seed, false, nil, regionId)
     local valid, issues = self._generator.validate(manifest)
     assert(valid, "expedition manifest is invalid: " .. table.concat(issues, "; "))
@@ -135,6 +155,7 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
     self._partCount = result.partCount
     self._eventsEnabled = self._featureFlags:isEnabled("bramblewake_events_enabled")
     self._worldService:setExpeditionEventsEnabled(self._eventsEnabled)
+    self._eventStates = {}
     for _, placement in manifest.modules do
         if placement.eventId ~= nil then
             local definition = self._generator.eventDefinition(placement.eventId)
@@ -144,6 +165,56 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
             self._worldService:setExpeditionEventState(placement.eventId, state)
         end
     end
+end
+
+--[[
+    Walk a different seed, in a server that has already given up on rewards.
+
+    Refused while anybody is inside, and that refusal is the whole safety
+    argument: rebuilding the wood destroys the model the people in it are
+    standing on. Refused too when the seed is one this build cannot resolve, so
+    a history entry from an older catalog fails here rather than half-way
+    through a rebuild.
+]]
+function ExpeditionService.rebuildWithSeed(self: ExpeditionService, seed: any): (boolean, string)
+    local numericSeed = tonumber(seed)
+    if numericSeed == nil then
+        return false, "invalid_seed"
+    end
+    if self:occupied() then
+        return false, "expedition_occupied"
+    end
+    --[[
+        The flag, and it is the whole safety argument rather than bookkeeping.
+
+        `_buildRegion` yields -- the generator and the world builder both run
+        across frames -- so the check above and the finished wood are not the
+        same moment. Without this, `enter` can admit somebody in between and
+        put them on a model that is about to be destroyed under them, which is
+        precisely the failure the refusal exists to prevent, arrived at through
+        the door the refusal is guarding.
+    ]]
+    self._rebuilding = true
+    local ok, err = pcall(function()
+        self:_buildRegion(numericSeed)
+    end)
+    self._rebuilding = false
+    if not ok then
+        self._logger:warn("expedition_rebuild_failed", { reason = tostring(err) })
+        return false, "invalid_seed"
+    end
+    local manifest = assert(self._manifest, "expedition manifest was not initialized")
+    self._logger:warn("expedition_rebuilt", {
+        hash = manifest.hash,
+        seed = manifest.seed,
+        source = manifest.source,
+    })
+    return true, "rebuilt"
+end
+
+function ExpeditionService.currentSeed(self: ExpeditionService): (string, number)
+    local manifest = assert(self._manifest, "expedition manifest was not initialized")
+    return self._regionId, manifest.seed
 end
 
 function ExpeditionService.Start(self: ExpeditionService)
@@ -185,9 +256,40 @@ function ExpeditionService.Start(self: ExpeditionService)
     end)
 end
 
+-- Whether anybody is standing in the wood. Read by the rebuild and by the
+-- control that asks for one, so the refusal a player is shown and the refusal
+-- the service enforces are the same question rather than two copies of it.
+function ExpeditionService.occupied(_self: ExpeditionService): boolean
+    for _, player in Players:GetPlayers() do
+        if player:GetAttribute("LastLightInExpedition") == true then
+            return true
+        end
+    end
+    return false
+end
+
 function ExpeditionService.enter(self: ExpeditionService, player: Player): boolean
+    if self._rebuilding then
+        -- The wood is being torn down and stood up again. Admitting somebody
+        -- now would drop them onto a model that is about to be destroyed.
+        return false
+    end
     local entered = self._worldService:enterBramblewake(player)
     if entered then
+        --[[
+            A seed is discovered by being walked, not by being rolled.
+
+            Recorded here rather than at departure because a run somebody never
+            reached is a layout they have never seen, and "among already
+            discovered seeds" is the only bound private-server seed selection
+            has. A practice server records nothing, which is correct twice
+            over: the profile is read-only there anyway, and a seed handed to
+            you by a control is not one you found.
+        ]]
+        local manifest = self._manifest
+        if manifest ~= nil then
+            self._profileService:recordDiscoveredSeed(player, self._regionId, manifest.seed)
+        end
         local cache = self._profileService:recoveryCache(player)
         if cache ~= nil then
             self._worldService:showRecoveryCache(player, cache)

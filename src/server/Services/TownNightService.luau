@@ -60,6 +60,9 @@ export type TownNightService = typeof(setmetatable(
         _relationResolver: ((number, number, (string) -> ()) -> ())?,
         _onNightCompleted: ((number, number, any) -> ())?,
         _incident: any,
+        _hold: boolean,
+        _skip: boolean,
+        _heldSeconds: number,
     },
     TownNightService
 ))
@@ -113,6 +116,9 @@ function TownNightService.new(
         _relationResolver = nil,
         _onNightCompleted = nil,
         _incident = nil,
+        _hold = false,
+        _skip = false,
+        _heldSeconds = 0,
     }, TownNightService)
 end
 
@@ -267,10 +273,77 @@ function TownNightService.resolveIncident(
     }
 end
 
-local function waitUntilTime(target: number)
-    while workspace:GetServerTimeNow() < target do
+--[[
+    A held clock stops rather than stretches.
+
+    Every wait in the cycle pushes its own deadline forward by exactly the time
+    that passed while the hold was on, so releasing it leaves the phase with
+    the seconds it had left rather than with a number somebody guessed. The
+    same push lands on the night's beat offsets through `_heldSeconds`, because
+    a night whose clock stopped and whose waves did not would spend its hold
+    quietly emptying the schedule.
+
+    Both of these only exist in a practice server -- `PrivateServerService` is
+    the only caller and it has already latched the profile writes off by the
+    time it calls either.
+]]
+local function pushHold(self: TownNightService, since: number)
+    local delta = workspace:GetServerTimeNow() - since
+    self._phaseEndsAt += delta
+    self._heldSeconds += delta
+end
+
+function TownNightService._waitForPhaseEnd(self: TownNightService)
+    while true do
+        if self._skip then
+            self._skip = false
+            return
+        end
+        local now = workspace:GetServerTimeNow()
+        if not self._hold and now >= self._phaseEndsAt then
+            return
+        end
         task.wait(0.15)
+        if self._hold then
+            pushHold(self, now)
+        end
     end
+end
+
+-- Returns whether the phase was called on rather than the beat arriving. The
+-- flag is peeked rather than consumed, because the loop that breaks on it is
+-- not the wait that ends the phase.
+function TownNightService._waitForBeat(self: TownNightService, target: number): boolean
+    while not self._skip do
+        local now = workspace:GetServerTimeNow()
+        if not self._hold and now >= target + self._heldSeconds then
+            return false
+        end
+        task.wait(0.15)
+        if self._hold then
+            pushHold(self, now)
+        end
+    end
+    return true
+end
+
+function TownNightService.setHold(self: TownNightService, held: boolean)
+    self._hold = held == true
+end
+
+function TownNightService.isHeld(self: TownNightService): boolean
+    return self._hold
+end
+
+-- End the phase now. Refused while the cycle is dormant, because there is no
+-- phase to end and a skip banked against a clock that has not started would
+-- fire at whatever the first wait turned out to be.
+function TownNightService.stepPhase(self: TownNightService): boolean
+    if self._phase == "dormant" then
+        return false
+    end
+    self._skip = true
+    return true
 end
 
 -- Called once for every player in this server session known to be past
@@ -472,14 +545,16 @@ function TownNightService._runCycle(self: TownNightService)
         self._phase = "day"
         self._activeNightNumber = 0
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._daySeconds
+        self._heldSeconds = 0
         self._worldService:setDusk(false)
         self._worldService:setTownRepairEnabled(true)
         self:_notify(nil)
         self._logger:info("town_day_started", { night = self._nightNumber })
-        waitUntilTime(self._phaseEndsAt)
+        self:_waitForPhaseEnd()
 
         self._phase = "dusk"
         self._phaseEndsAt = workspace:GetServerTimeNow() + self._duskSeconds
+        self._heldSeconds = 0
         self._worldService:setDusk(true)
         self._worldService:setTownRepairEnabled(false)
         self:_notify(
@@ -489,12 +564,13 @@ function TownNightService._runCycle(self: TownNightService)
                 self._nightNumber
             )
         )
-        waitUntilTime(self._phaseEndsAt)
+        self:_waitForPhaseEnd()
 
         self._phase = "night"
         self._incident = nil
         local nightStartedAt = workspace:GetServerTimeNow()
         self._phaseEndsAt = nightStartedAt + self._nightSeconds
+        self._heldSeconds = 0
         -- Frozen for the rest of this night: a higher number from a veteran
         -- who joins mid-night (ensureStarted always raises self._nightNumber
         -- to the max seen) must not retroactively change the wave schedule,
@@ -550,7 +626,14 @@ function TownNightService._runCycle(self: TownNightService)
         end
 
         for _, beat in self._townNightSchedule.beats(self._nightSeconds, activeNight, partySize) do
-            waitUntilTime(nightStartedAt + beat.at)
+            if self:_waitForBeat(nightStartedAt + beat.at) then
+                -- The phase was called on early. The beats left in this night
+                -- are dropped rather than run at once: a skip that fired six
+                -- queued waves the instant it was pressed would be a control
+                -- that made the night harder, and every control here is
+                -- supposed to make it optional.
+                break
+            end
             if beat.kind == "spawn" then
                 self._worldService:signalNightWave(beat.enemyId, beat.wave, theme)
                 local laneId = if self._defenseLanes ~= nil
@@ -572,7 +655,7 @@ function TownNightService._runCycle(self: TownNightService)
             end
         end
 
-        waitUntilTime(self._phaseEndsAt)
+        self:_waitForPhaseEnd()
         local endingIncident = self._incident
         if endingIncident ~= nil and endingIncident.status == "active" then
             self:_expireIncident(activeNight, endingIncident.definition.id)
@@ -797,6 +880,20 @@ function TownNightService.snapshot(self: TownNightService): any
         theme = self._townNightSchedule.theme(self._nightNumber),
         phase = self._phase,
         phaseEndsAt = self._phaseEndsAt,
+        --[[
+            A held clock needs both of these, and the live pass is why.
+
+            The HUD counts down locally between pushes -- ten times a second,
+            off its own copy of `phaseEndsAt` -- so a hold that only moves the
+            deadline on the server leaves the pill running on through a clock
+            that has stopped. Pressed once and watched: the server sat at
+            543.8 seconds left for six seconds while the pill went 08:38 to
+            08:32. Every spec passed. The seconds are therefore measured here,
+            where the clock actually is, and the flag tells the client to show
+            that number rather than derive one.
+        ]]
+        phaseHeld = self._hold,
+        phaseRemaining = math.max(0, self._phaseEndsAt - workspace:GetServerTimeNow()),
         incident = self._townNightIncident.snapshot(self._incident),
     }
 end

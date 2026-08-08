@@ -98,6 +98,11 @@ local INTERACTION_ROUTED: { [string]: boolean } = {
     -- can be opened from anywhere can be opened in the four moments
     -- Milestone 11's exit gate says it must not.
     open_store = true,
+    -- The four boards on the private server's rail. Which board is a prompt
+    -- attribute the server reads, never a field the client sends: working one
+    -- ends the server's rewards for good, and a payload that could name a
+    -- control would end them from anywhere.
+    private_control = true,
 }
 
 -- Actions the server raises on its own behalf, never in answer to a

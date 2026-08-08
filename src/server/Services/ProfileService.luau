@@ -37,6 +37,7 @@ export type ProfileService = typeof(setmetatable(
         _store: GlobalDataStore?,
         _backupStore: GlobalDataStore?,
         _lastBackupAt: { [number]: number },
+        _practice: boolean,
     },
     ProfileService
 ))
@@ -79,6 +80,7 @@ function ProfileService.new(
         _store = nil,
         _backupStore = nil,
         _lastBackupAt = {},
+        _practice = false,
     }, ProfileService)
 end
 
@@ -255,6 +257,15 @@ function ProfileService._load(self: ProfileService, player: Player)
             })
         else
             self._logger:warn("profile_load_timed_out", { player = player.UserId })
+        end
+
+        -- A profile arriving into a practice server is read-only from its
+        -- first frame, and never claims a lock. Claiming one would make this
+        -- server the sole writer of a save it has already promised never to
+        -- write, which is the hostage the release above is about.
+        if self._practice then
+            writable = false
+            source = "practice_read_only"
         end
 
         -- A profile another live server still holds is played read-only rather
@@ -505,7 +516,146 @@ end
 
 function ProfileService.isWritable(self: ProfileService, player: Player): boolean
     return self._profiles[player] ~= nil
+        and not self._practice
         and (not self._persistent or self._writable[player] == true)
+end
+
+--[[
+    Turn this server into a practice server, for good.
+
+    Every mutation in the game funnels through `isWritable` and every durable
+    write through `save`, which is why practice is two lines rather than an
+    audit of forty reward paths. That matters more than the line count: "a
+    practice phase grants nothing" is the exit-gate claim, and a claim held at
+    one seam can be checked, while a claim held at forty is a claim somebody
+    will add a forty-first path beside.
+
+    Three things happen in an order that is not arbitrary.
+
+    **One last honest save.** Progress earned before the latch was earned under
+    ordinary rules and belongs to the player. Dropping it would make engaging a
+    control a punishment for everything that came before it, which is not what
+    practice means.
+
+    **Then the latch**, before any lock is released, so nothing can be written
+    between the flush and the renunciation.
+
+    **Then the locks go back.** A session lock is this server's claim to be the
+    only writer of a profile. A server that has renounced writing forever and
+    still holds the claim is holding somebody's save hostage: they would leave,
+    join a real server, and play their own game read-only until a lock that will
+    never beat again goes stale. So practice gives the locks back, and a profile
+    that arrives after the latch never claims one at all.
+]]
+function ProfileService.beginPractice(self: ProfileService, reason: string): boolean
+    if self._practice then
+        return false
+    end
+
+    for player in self._profiles do
+        if self._persistent and self._writable[player] == true then
+            self:save(player)
+        end
+    end
+
+    self._practice = true
+    self._logger:warn("profile_practice_engaged", { reason = reason })
+
+    for player in self._profiles do
+        if self._persistent and self._writable[player] == true then
+            self:_releaseLock(player)
+        end
+    end
+
+    --[[
+        And the bookkeeping goes with the claim, because leaving it behind
+        makes this latch write to a zero-tolerance gate.
+
+        `_writable` still true and `_dirty` still set is a server that says it
+        may write and never does. The leave path reads exactly those two -- a
+        failed save plus unsaved work plus a writable profile -- and files
+        `save_loss`, so every departure from a practice server would report lost
+        progress against the one metric RELEASE_GATES.md allows no failures on.
+        Nothing was lost: the flush above is the whole of it. The heartbeat has
+        the smaller version of the same bug, respawning a save task for every
+        still-dirty player forever, because `save` now returns before anything
+        can clear the flag.
+    ]]
+    for player in self._profiles do
+        self._writable[player] = false
+        self._dirty[player] = nil
+    end
+    return true
+end
+
+function ProfileService.isPractice(self: ProfileService): boolean
+    return self._practice
+end
+
+function ProfileService.recordDiscoveredSeed(
+    self: ProfileService,
+    player: Player,
+    regionId: any,
+    seed: any
+): boolean
+    local profile = self._profiles[player]
+    if profile == nil or not self:isWritable(player) then
+        return false
+    end
+    local nextProfile = self._saveSchema.withDiscoveredSeed(profile, regionId, seed, os.time())
+    if nextProfile == profile then
+        return false
+    end
+    self._profiles[player] = nextProfile
+    if self._persistent and self._writable[player] == true then
+        self._dirty[player] = true
+    end
+    return true
+end
+
+function ProfileService.discoveredSeeds(self: ProfileService, player: Player): { any }
+    local profile = self._profiles[player]
+    if profile == nil then
+        return {}
+    end
+    return self._saveSchema.discoveredSeeds(profile)
+end
+
+--[[
+    Hand a profile's session lock back without touching the profile.
+
+    Deliberately not a save: the stored copy is whatever the flush above left,
+    and writing the in-memory profile again here would be the practice server
+    persisting one more time on its way out of the business of persisting.
+]]
+function ProfileService._releaseLock(self: ProfileService, player: Player)
+    local store = self._store
+    if store == nil then
+        return
+    end
+    local jobId = self._jobId
+    local ok, message = pcall(function()
+        store:UpdateAsync(string.format("player_%d", player.UserId), function(current: any)
+            if type(current) ~= "table" then
+                return current
+            end
+            local held = current.sessionLock
+            -- Only ours. A lock some other server claimed while this one was
+            -- flushing is not this one's to give away.
+            if type(held) ~= "table" or held.jobId ~= jobId then
+                return current
+            end
+            local written = table.clone(current)
+            written.sessionLock = nil
+            return written
+        end)
+    end)
+    if not ok then
+        self._logger:warn("profile_lock_release_failed", {
+            player = player.UserId,
+            reason = tostring(message),
+        })
+    end
 end
 
 function ProfileService.setTutorial(
@@ -1609,6 +1759,18 @@ function ProfileService.save(self: ProfileService, player: Player): boolean
     end
     if not self._persistent then
         return true
+    end
+    --[[
+        The second of practice's two seams, and the one that is not obvious.
+
+        `save` does not consult the dirty flag -- the leave path and the lock
+        heartbeat both call it outright -- so gating mutations alone would leave
+        a practice server writing the whole in-memory profile on the way out.
+        That is the loss this latch exists to prevent, arriving through the one
+        door that never asked whether anything had changed.
+    ]]
+    if self._practice then
+        return false
     end
     if self._store == nil or self._writable[player] ~= true then
         self._logger:warn("profile_save_skipped_read_only", {
