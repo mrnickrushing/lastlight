@@ -7,9 +7,9 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = PR #356, build `0.53.0`,
+Last updated: 2026-08-08, at `main` = PR #357, build `0.53.0`,
 save schema 25, 27 services. Published to Roblox as place version 158,
-matching this revision exactly. (This line used to say ``at `main` = `HEAD` ``,
+matching PR #356 exactly; #357 adds only documentation. (This line used to say ``at `main` = `HEAD` ``,
 and #354 is the wave that noticed `HEAD` is not a revision. The revision a
 rollback restores is recorded properly in
 [ROLLBACK.md](ROLLBACK.md#the-rollback-target).) (#352 leaves the built place
@@ -82,6 +82,24 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#357** (v158, unchanged — documentation only) **Where the buildable roadmap
+  actually stands, and the owner-gated list gathered against an executable one.**
+  Milestones 0 through 12 are complete on their buildable halves, **M14's buildable
+  half is now complete (A through E)**, and **M13 has four waves complete and one, D,
+  in flight and guarded**.
+
+  The consolidated owner list at the end of the wave plan is rewritten to point at the
+  thing that now enforces it. QA_RELEASE_PLAN.md's checklist holds 40 rows, 39
+  blocking, of which **32 are open and owner-gated**, and
+  `validate_launch_checklist.py` refuses a declared launch candidate until each is
+  answered. That is the shortest complete statement of what is left and it is
+  executable, so the prose list is a reading of it rather than a second copy that can
+  drift.
+
+  **What is left in code is one thing**: M13 wave D's remaining migration batches — 88
+  files, 2,623 strings, all in server announcements and content catalogs. Every one of
+  them is guarded by a check that is already live, `ALLOWLIST_SIZE` only moves down,
+  and none of it blocks anything on the owner's list.
 - **#356** (v158) **M13 wave D, batch two: the world surface, chosen because it is the
   batch you can read back out of a running server.** 227 strings out of
   `WorldService`, `BramblewakeBuilder` and `RegionBuilders` — every proximity prompt,
