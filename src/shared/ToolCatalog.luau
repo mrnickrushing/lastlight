@@ -21,6 +21,8 @@
     work in the Milestone 6 runbook rather than pretended at here.
 ]]
 
+local Strings = require("./Strings")
+
 local ToolCatalog = {}
 
 export type Definition = {
@@ -53,30 +55,30 @@ local DEFINITIONS: { [string]: Definition } = {
     axe = table.freeze({
         id = "axe",
         family = "axe",
-        displayName = "HAND AXE",
-        description = "Strikes land a quarter harder.",
+        displayName = Strings.get("world.tool_axe"),
+        description = Strings.get("item.strikes_land_a_quarter_harder"),
         strikeDamageMultiplier = 1.25,
     }),
     hammer = table.freeze({
         id = "hammer",
         family = "hammer",
-        displayName = "BUILDER'S HAMMER",
-        description = "Gather and build work runs a quarter faster.",
+        displayName = Strings.get("world.tool_hammer"),
+        description = Strings.get("item.gather_and_build_work_runs_a"),
         actionDurationMultiplier = 0.75,
     }),
     torch = table.freeze({
         id = "torch",
         family = "lantern",
-        displayName = "HAND TORCH",
-        description = "Swung fire reaches four studs further at a small cost.",
+        displayName = Strings.get("world.tool_torch"),
+        description = Strings.get("item.swung_fire_reaches_four_studs_further"),
         strikeDamageMultiplier = 0.9,
         strikeRangeBonus = 4,
     }),
     pick = table.freeze({
         id = "pick",
         family = "pick",
-        displayName = "IRONROOT PICK",
-        description = "Sap and clay come loose a quarter faster; a heavy point.",
+        displayName = Strings.get("world.tool_pick"),
+        description = Strings.get("item.sap_and_clay_come_loose_a"),
         strikeDamageMultiplier = 1.05,
         gatherDurationMultiplier = 0.75,
         gatherMaterials = table.freeze({
@@ -87,8 +89,8 @@ local DEFINITIONS: { [string]: Definition } = {
     sickle = table.freeze({
         id = "sickle",
         family = "sickle",
-        displayName = "MEADOW SICKLE",
-        description = "Fiber and brightcap fall a quarter faster; a sweeping arc.",
+        displayName = Strings.get("world.tool_sickle"),
+        description = Strings.get("item.fiber_and_brightcap_fall_a_quarter"),
         strikeRangeBonus = 2,
         gatherDurationMultiplier = 0.75,
         gatherMaterials = table.freeze({
@@ -99,22 +101,22 @@ local DEFINITIONS: { [string]: Definition } = {
     fishing_kit = table.freeze({
         id = "fishing_kit",
         family = "fishing_kit",
-        displayName = "FISHING KIT",
-        description = "An angler's patience: stamina returns 10% faster.",
+        displayName = Strings.get("world.tool_fishing_kit"),
+        description = Strings.get("item.an_angler_s_patience_stamina_returns"),
         staminaRegenMultiplier = 1.1,
     }),
     climbing_kit = table.freeze({
         id = "climbing_kit",
         family = "climbing_kit",
-        displayName = "CLIMBING KIT",
-        description = "Sure-footed: running carries you 8% faster.",
+        displayName = Strings.get("world.tool_climbing_kit"),
+        description = Strings.get("item.sure_footed_running_carries_you_8naster"),
         sprintSpeedMultiplier = 1.08,
     }),
     survey_kit = table.freeze({
         id = "survey_kit",
         family = "survey_kit",
-        displayName = "SURVEY GLASS",
-        description = "Marks the nearest unharvested node on your trail.",
+        displayName = Strings.get("world.tool_survey_kit"),
+        description = Strings.get("item.marks_the_nearest_unharvested_node_on"),
         surveyRevealsNodes = true,
     }),
 }

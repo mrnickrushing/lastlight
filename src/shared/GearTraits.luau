@@ -16,6 +16,7 @@
 
 local CraftingCatalog = require("./CraftingCatalog")
 local Equipment = require("./Equipment")
+local Strings = require("./Strings")
 
 local GearTraits = {}
 
@@ -37,20 +38,20 @@ end
 local WEAPON_TRAITS: { Trait } = table.freeze({
     trait({
         id = "trait_keen",
-        displayName = "KEEN",
-        description = "Strikes land 5% harder.",
+        displayName = Strings.get("item.keen"),
+        description = Strings.get("item.strikes_land_5narder"),
         strikeDamageBonus = 0.05,
     }),
     trait({
         id = "trait_balanced",
-        displayName = "BALANCED",
-        description = "Reaches 2 studs further.",
+        displayName = Strings.get("item.balanced"),
+        description = Strings.get("item.reaches_2_studs_further"),
         reachBonus = 2,
     }),
     trait({
         id = "trait_tempered",
-        displayName = "TEMPERED",
-        description = "Dulls at half the pace.",
+        displayName = Strings.get("item.tempered"),
+        description = Strings.get("item.dulls_at_half_the_pace"),
         wearPointsOverride = 1,
     }),
 })
@@ -58,14 +59,14 @@ local WEAPON_TRAITS: { Trait } = table.freeze({
 local PASSIVE_TRAITS: { Trait } = table.freeze({
     trait({
         id = "trait_sturdy",
-        displayName = "STURDY",
-        description = "Softens incoming damage 2% more.",
+        displayName = Strings.get("item.sturdy"),
+        description = Strings.get("item.softens_incoming_damage_2nore"),
         damageReductionBonus = 0.02,
     }),
     trait({
         id = "trait_light",
-        displayName = "LIGHT",
-        description = "Stamina returns 5% faster.",
+        displayName = Strings.get("world.light"),
+        description = Strings.get("item.stamina_returns_5naster"),
         staminaRegenBonus = 0.05,
     }),
 })

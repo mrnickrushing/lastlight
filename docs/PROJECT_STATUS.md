@@ -25,17 +25,24 @@ that makes that possible is
 available and driven from the terminal (launch recipe in the M7 runbook);
 Studio-facing checks not performed are recorded open rather than assumed.
 
-**Milestone 13's buildable half is four waves done and one in flight and
-guarded.** A (cohort-scoped flags), B (tuning telemetry), C (tuning knobs) and E
-(kill switches and the rollback list) are complete. **D, localization source
-coverage, has its table, its guard and four batches**, and the reason it sat
-unbuilt through two sessions was addressed rather than ignored: the guard landed
-*first*, with the 91 unmigrated files named individually and the count pinned so
-it can only shrink. The wave is finished when that list is empty; after batch four it holds 17 files
-and 1,360 strings — the item catalogs, the residents, the six expedition
-definitions, three files that are not player-facing at all, and the loading
-screen.
+**Milestone 13's buildable half is complete — waves A through E all shipped**, and
+with it **the whole buildable roadmap**. A (cohort-scoped flags), B (tuning
+telemetry), C (tuning knobs) and E (kill switches and the rollback list) were
+already done. **D, localization source coverage, closed in five batches**, and the
+reason it sat unbuilt through two sessions was addressed rather than ignored: the
+guard landed *first*, with the 91 unmigrated files named individually and the count
+pinned so it could only shrink. It stands at **one file** now, and one is the floor
+— the loading screen runs before the shared root replicates and cannot reach the
+table without blocking on the thing it exists to cover. Three further files are
+declared *not player-facing* on a separate list with their readers named.
+`Strings.luau` holds **2,621 source strings**, which is the number the language
+decision is made on.
 **Milestone 14's buildable half is complete — waves A through E all shipped.**
+
+**There is no code work left in the buildable roadmap.** What remains is the
+owner-gated list at the end of [WAVE_PLAN_M11_M14.md](WAVE_PLAN_M11_M14.md), read
+out of QA_RELEASE_PLAN.md's 40-row checklist, of which 32 are open and every one
+needs a person.
 
 **Milestones 0 through 11 are complete, and so is Milestone 12's buildable
 half** — M11 waves A through J and M12 waves A through E all shipped. What M12
@@ -84,7 +91,62 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
-- **#359** **M13 wave D, batch four: the content the world is made of — and a
+- **#360** **M13 wave D, batch five: the last catalogs, and the allowlist reaches its
+  floor. Milestone 13's buildable half is complete, and so is the buildable
+  roadmap.** 1,435 strings out of the thirteen files a player actually browses — 130
+  recipes, 90 craftable items, the consumables, the tools and their traits, 27
+  residents and everything they say, and all six expedition definitions with their
+  landmarks, events and the sentence each one tells you before it kills you.
+  **`Strings.luau` is 2,621 entries**, and that number is the answer to the question
+  M13's deliverable list actually asks: *what does a language cost.*
+
+  **The allowlist holds one file, and one is the floor rather than a shortfall.**
+  `src/first/LoadingController.client.luau` runs from ReplicatedFirst to cover the
+  wait for the shared root, and it only ever asks for the runtime with a
+  non-blocking `FindFirstChild`. Requiring the table would mean
+  `WaitForChild("LastLight")` — the loading screen blocking on the very replication
+  it exists to hide, against its own first rule that *a player must never be trapped
+  behind this screen*. Twelve strings, written where they are read, with the reason
+  in the guard.
+
+  **Three more files came off by a different argument, onto a different list.** The
+  allowlist means *not yet*; `NOT_TRANSLATED` means *never*, and keeping them apart is
+  the point — a reader who cannot tell them apart cannot tell whether this wave is
+  done. `MusicCatalog`'s track titles and publishers are read by nothing (the
+  controller takes `assetId`, `volume` and `intensity`), and the publisher is the
+  field `validate_audio_assets.py` and ASSET_PROVENANCE.md hold the licence claim
+  against, so translating it would **break an audit rather than serve a player**.
+  `PerformanceBudget` and `SoakProbe` are metric labels in an admin readout and a soak
+  report. It is the same judgement the guard already makes for anything handed to
+  `warn`, arriving one seam later, because a label stored in a table and concatenated
+  into a report is invisible from the call site. **Every entry names its reader**, and
+  the count is pinned harder than the allowlist's, because "operator text" is exactly
+  the sentence somebody reaches for when they want a string out of the way.
+
+  **Four refusals exercised against the real files** before it shipped: a file on both
+  lists, the not-translated count moved without the list, a file declared
+  not-player-facing that holds no such text, and the allowlist emptied without
+  lowering the pin.
+
+  **Verified live**: all 116 shared modules load inside Roblox's own VM and all 2,621
+  keys resolve non-empty there; the world settles at 13,931 descendants, subtree for
+  subtree identical to the pre-wave baseline; 132 prompts and 209 labels with none
+  empty and none showing a key; the joined prose reads as one sentence
+  (`A family lived here until the roots came through the floor. The door is still
+  barred from the inside.`) rather than as the two halves it was written in.
+
+  **Open, and found by finishing:** the content registry has declared localization
+  keys since Milestone 1 — `displayNameKey` on all seven regions,
+  `localizationKey` on all 48 expedition events, **55 in total** — and **nothing
+  resolves any of them**. `Registry.luau` and `ExpeditionEventFlow` assert only that
+  the field is a non-empty string; no table defines the keys and nothing reads them
+  for a word. It is the guard's own second rule one level up: a key nobody defined is
+  a label wired to nothing, and here it is a whole naming convention wired to
+  nothing, invisible to `validate_localization.py` because that check only follows
+  `Strings.get`. Now that the table is complete, the choice is to point them at real
+  keys or delete them, and both are a wave rather than a footnote — `Registry.luau`'s
+  required-field list and its spec pin the shape.
+- **#359** (v160) **M13 wave D, batch four: the content the world is made of — and a
   migration that had turned identifiers into translations.** 871 strings out of 51
   shared modules: every encounter, every enemy's attack and tell, the town's own
   systems, the store, the professions, the quests and the story. The allowlist goes

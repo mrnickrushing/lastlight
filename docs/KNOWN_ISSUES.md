@@ -13,10 +13,11 @@ issue is closed that the handoff still describes as open.
 is pinned at a minimum of 9 threads and fails rather than
 producing a short one.
 
-12 open threads.
+13 open threads.
 
 | Found in | Kind | What is open |
 |---|---|---|
+| #360 | Open, and found by finishing | the content registry has declared localization keys since Milestone 1 — `displayNameKey` on all seven regions, `localizationKey` on all 48 expedition events, **55 in total** — and **nothing resolves any of them**. `Registry.luau` and `ExpeditionEventFlow` assert only that the field is a non-empty string; no table defines the keys and nothing reads them for a word. It is the guard's own second rule one level up: a key nobody defined is a label wired to nothing, and here it is a whole naming convention wired to nothing, invisible to `validate_localization.py` because that check only follows `Strings.get`. Now that the table is complete, the choice is to point them at real keys or delete them, and both are a wave rather than a footnote — `Registry.luau`'s required-field list and its spec pin the shape. |
 | #359 | Open | a canvas narrower than 446 points still cannot fit that row, and no clamp can make it — the row has to wrap, which is a layout decision rather than a bound. |
 | #358 | Open | the transient itself is not reproducible on demand, so this is a fix for a mechanism that was observed rather than a case that is covered. |
 | #353 | Open, by design rather than by omission | the notes are allowed to lag the tip by the merge commit that lands them, because a strict compare would leave `main` failing its own check the moment any wave merges. What is refused is a hole or a phantom — the rows have to be exactly the tail of the merge stream ending at the newest row recorded. Patch notes in a player's language stay the owner's, and the checklist row `patch_notes` says so beside the `known_issues_published` row this wave turned into a check. |

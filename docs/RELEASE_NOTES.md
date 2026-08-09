@@ -10,12 +10,13 @@ it cannot be written in a player's language either. Patch notes in a
 player's language are still the owner's, and QA_RELEASE_PLAN.md's
 checklist says so.
 
-357 merged pull requests. The version column is blank where the
+358 merged pull requests. The version column is blank where the
 handoff did not record one, which is most of the history before it began
 publishing a place per wave.
 
 | PR | Merged | Place | Title |
 |---|---|---|---|
+| #359 | 2026-08-08 | v160 | M13 wave D batch four: the content the world is made of |
 | #358 | 2026-08-08 | v159 | M13 wave D batch three: the server surface |
 | #357 | 2026-08-08 | v158 | Record where the buildable roadmap stands, and point the owner list at the checklist that enforces it |
 | #356 | 2026-08-08 | v158 | M13 wave D batch two: the world surface, and a guard catching the migration blinding another guard |
