@@ -106,18 +106,21 @@ return {
             -- The region must not open until it is whole. This pins the
             -- other half of that promise: the builder answering for every
             -- key is what earns the enabled flag, not the reverse.
-            name = "the new regions stay closed until their runtimes land",
+            name = "a region opens only after its live walk, and the rest stay closed",
             run = function()
                 local Regions = require("../../src/shared/Content/Definitions/Regions")
                 local byId: { [string]: any } = {}
                 for _, region in Regions do
                     byId[region.id] = region
                 end
-                -- Geometry is necessary, not sufficient: these stay shut
-                -- until their services and arenas exist too. When one flips
-                -- to true, the coverage case above is what says it was
-                -- allowed to.
-                TestRunner.equal(byId.region_ironroot.enabled, false)
+                --[[
+                    Ironroot opened with the assembly seam: departure
+                    board, arrival, nodes, POI, event, fragment, both
+                    elites, the Maw, extraction, all walked live in the
+                    session that flipped it. The others stay shut until
+                    each earns the same walk.
+                ]]
+                TestRunner.equal(byId.region_ironroot.enabled, true)
                 TestRunner.equal(byId.region_mireglass.enabled, false)
                 TestRunner.equal(byId.region_tempest.enabled, false)
                 TestRunner.equal(byId.region_frostmere.enabled, false)

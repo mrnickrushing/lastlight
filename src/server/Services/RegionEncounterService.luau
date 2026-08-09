@@ -27,6 +27,7 @@
     called by the server in answer to an interaction the world raised.
 ]]
 
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
@@ -54,12 +55,26 @@ export type Definition = {
     interactions: { [string]: (state: any, player: Player, now: number) -> (any, any) },
     -- Called on the service's tick; returns a new state or nil for "no change".
     tick: ((state: any, now: number) -> any?)?,
+    -- Elites that must be complete before this encounter unlocks.
+    lockedUntil: { string }?,
+    -- For a boss: how its finished state resolves its chapter.
+    chapterResolution: ((
+        state: any
+    ) -> {
+        chapterId: string,
+        decision: string,
+        outcome: string,
+    })?,
 }
 
 type Live = {
     definition: Definition,
     state: any,
     anchors: { [string]: BasePart },
+    -- Where the fight stands in the world, so a strike can be routed to
+    -- the encounter the striker is actually inside.
+    center: Vector3?,
+    radius: number?,
 }
 
 export type RegionEncounterService = typeof(setmetatable(
@@ -129,7 +144,8 @@ function RegionEncounterService.beginRun(
     runId: string,
     manifestHash: string,
     definitions: { Definition },
-    anchorsById: { [string]: { [string]: BasePart } }
+    anchorsById: { [string]: { [string]: BasePart } },
+    arenasById: { [string]: { center: Vector3, radius: number } }?
 )
     assert(runId ~= "", "encounter run id is required")
     assert(manifestHash ~= "", "encounter manifest hash is required")
@@ -138,16 +154,49 @@ function RegionEncounterService.beginRun(
     self._live = {}
     for _, definition in definitions do
         local enabled = self._featureFlags:isEnabled("region_encounters_enabled")
+        local arena = if arenasById ~= nil then arenasById[definition.id] else nil
         self._live[definition.id] = {
             definition = definition,
             state = definition.module.create(runId, manifestHash, enabled),
             anchors = anchorsById[definition.id] or {},
+            center = if arena ~= nil then arena.center else nil,
+            radius = if arena ~= nil then arena.radius else nil,
         }
         self._logger:info("region_encounter_ready", {
             encounter = definition.id,
             enabled = enabled,
             region = definition.regionId,
         })
+    end
+end
+
+--[[
+    A boss stays locked until its region's elites are complete. Checked
+    after anything completes rather than where the elite settles, so the
+    rule reads in one place and a second elite added later changes the
+    list, not the mechanism.
+]]
+function RegionEncounterService._unlockWaiting(self: RegionEncounterService)
+    for _, live in self._live do
+        local waitingOn = live.definition.lockedUntil
+        if waitingOn ~= nil and live.state.status == "locked" then
+            local cleared = true
+            for _, eliteId in waitingOn do
+                local elite = self._live[eliteId]
+                if elite == nil or elite.state.status ~= "complete" then
+                    cleared = false
+                    break
+                end
+            end
+            if cleared then
+                local nextState = live.definition.module.unlock(live.state)
+                live.state = nextState
+                self._logger:info("region_encounter_unlocked", {
+                    encounter = live.definition.id,
+                })
+                self:_toast(nil, Strings.get("encounter.something_below_has_stopped_waiting"))
+            end
+        end
     end
 end
 
@@ -186,6 +235,7 @@ function RegionEncounterService.interact(
         self:_toast(player, result.message)
         if result.completed == true then
             self:_settle(player, live)
+            self:_unlockWaiting()
         end
     end
     return true
@@ -210,18 +260,81 @@ function RegionEncounterService.damageNearest(
     if not self._survivalService:canAct(player) then
         return false, Strings.get("toast.you_cannot_strike_while_downed")
     end
+    local now = workspace:GetServerTimeNow()
     local strike = live.definition.module.strike
-    local nextState, result =
-        strike(live.state, player.UserId, amount, workspace:GetServerTimeNow())
+    local nextState, result = strike(live.state, player.UserId, amount, now)
     live.state = nextState
     if type(result) ~= "table" or result.accepted ~= true then
-        local snapshot = live.definition.module.snapshot(live.state, player.UserId, 0)
+        local snapshot = live.definition.module.snapshot(live.state, player.UserId, now)
         return false, tostring(snapshot.instruction)
     end
     if result.completed == true then
         self:_settle(player, live)
+        self:_unlockWaiting()
+        local snapshot = live.definition.module.snapshot(live.state, player.UserId, now)
+        return true, tostring(snapshot.instruction)
     end
-    return true, tostring(result.reason)
+    --[[
+        The blow landed, so say what it did in numbers a player can act
+        on. `reason` is a state-machine token ("damaged", "board_seized")
+        and belongs in a log, never on a screen.
+    ]]
+    return true,
+        string.format(
+            Strings.get("encounter.struck_n_holds_at_n"),
+            string.upper(
+                tostring(
+                    live.definition.module.snapshot(live.state, player.UserId, now).displayName
+                )
+            ),
+            math.max(0, math.floor(tonumber(result.health) or 0))
+        )
+end
+
+--[[
+    Route a strike to whichever encounter the striker is standing in.
+    Returns nil when they are standing in none, so the caller can hand
+    the strike to the enemy roster instead -- this is how UseTool serves
+    both a night wave and an arena without the client naming either.
+]]
+function RegionEncounterService.strikeNearest(
+    self: RegionEncounterService,
+    player: Player,
+    -- The strike context rides through unused today: encounter damage is
+    -- the fight's own tuning, not the weapon's, the same judgement the
+    -- Old Growth made. It stays in the signature so the day a weapon
+    -- matters here is a change to this file alone.
+    _context: any
+): (boolean?, string?)
+    local character = player.Character
+    local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+    if root == nil or not root:IsA("BasePart") then
+        return nil, nil
+    end
+    for encounterId, live in self._live do
+        local center = live.center
+        local radius = live.radius
+        if center ~= nil and radius ~= nil then
+            local offset = root.Position - center
+            local flat = Vector3.new(offset.X, 0, offset.Z)
+            if flat.Magnitude <= radius + 6 then
+                local snapshot = live.definition.module.snapshot(
+                    live.state,
+                    player.UserId,
+                    workspace:GetServerTimeNow()
+                )
+                if snapshot.enabled == true and snapshot.complete ~= true then
+                    local tuning = live.definition.module.Tuning
+                    local amount = if snapshot.marked == true
+                            and type(tuning.markedStrikeDamage) == "number"
+                        then tuning.markedStrikeDamage
+                        else tuning.strikeDamage
+                    return self:damageNearest(player, encounterId, amount)
+                end
+            end
+        end
+    end
+    return nil, nil
 end
 
 --[[
@@ -230,23 +343,73 @@ end
     the ledger has seen that id before and refuses the second grant
     without anyone here having to remember.
 ]]
-function RegionEncounterService._settle(self: RegionEncounterService, player: Player, live: Live)
+function RegionEncounterService._settle(self: RegionEncounterService, _player: Player, live: Live)
+    --[[
+        Everyone who took part is paid, not only whoever landed the last
+        press. Participants are what the encounter itself recorded, the
+        transaction id is per participant, and the ledger's idempotency is
+        what makes a rejoin or a duplicate completion safe -- the same
+        contract the expedition events settle on.
+    ]]
     local reward = live.definition.module.Reward
-    if type(reward) ~= "table" then
-        return
+    if type(reward) == "table" then
+        for participantKey in live.state.participants do
+            local userId = tonumber(participantKey)
+            local participant = if userId ~= nil then Players:GetPlayerByUserId(userId) else nil
+            if participant ~= nil then
+                local transactionId = live.definition.module.rewardTransactionId(live.state, userId)
+                local result = self._profileService:grantUnbankedExpeditionReward(
+                    participant,
+                    transactionId,
+                    self._manifestHash,
+                    { materialId = reward.materialId, amount = reward.amount }
+                )
+                self._logger:info("region_encounter_settled", {
+                    applied = if type(result) == "table" then result.applied else nil,
+                    encounter = live.definition.id,
+                    player = userId,
+                })
+            end
+        end
     end
-    local transactionId = live.definition.module.rewardTransactionId(live.state, player.UserId)
-    local result = self._profileService:grantUnbankedExpeditionReward(
-        player,
-        transactionId,
-        self._manifestHash,
-        { materialId = reward.materialId, amount = reward.amount }
-    )
-    self._logger:info("region_encounter_settled", {
-        applied = if type(result) == "table" then result.applied else nil,
-        encounter = live.definition.id,
-        player = player.UserId,
-    })
+
+    --[[
+        A boss's completion is the chapter's resolution, and the decision
+        was made inside the fight rather than at a menu -- which vent, what
+        was spared. Resolved for every participant present, through the
+        profile's own chapter mutator, so the story record and the reward
+        settle at the same moment for the same people.
+    ]]
+    local resolve = live.definition.chapterResolution
+    if resolve ~= nil then
+        local resolution = resolve(live.state)
+        for participantKey in live.state.participants do
+            local userId = tonumber(participantKey)
+            local participant = if userId ~= nil then Players:GetPlayerByUserId(userId) else nil
+            if participant ~= nil then
+                local transactionId = string.format(
+                    "chapter:%s",
+                    live.definition.module.rewardTransactionId(live.state, userId)
+                )
+                local result = self._profileService:resolveChapter(
+                    participant,
+                    resolution.chapterId,
+                    transactionId,
+                    resolution.decision,
+                    resolution.outcome
+                )
+                self._logger:info("region_chapter_resolved", {
+                    accepted = if type(result) == "table" then result.accepted else nil,
+                    chapter = resolution.chapterId,
+                    decision = resolution.decision,
+                    encounter = live.definition.id,
+                    outcome = resolution.outcome,
+                    player = userId,
+                    reason = if type(result) == "table" then result.reason else nil,
+                })
+            end
+        end
+    end
 end
 
 function RegionEncounterService.snapshot(

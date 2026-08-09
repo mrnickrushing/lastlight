@@ -103,6 +103,14 @@ local INTERACTION_ROUTED: { [string]: boolean } = {
     -- ends the server's rewards for good, and a payload that could name a
     -- control would end them from anywhere.
     private_control = true,
+    --[[
+        The destination board and the region arenas. A plank carries its
+        region id the way a bench carries its recipe; an arena anchor
+        carries its encounter and anchor id as prompt attributes. Neither
+        is a payload a client composes.
+    ]]
+    select_destination = true,
+    region_encounter = true,
 }
 
 -- Actions the server raises on its own behalf, never in answer to a

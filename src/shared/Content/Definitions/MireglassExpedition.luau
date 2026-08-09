@@ -900,6 +900,16 @@ return table.freeze({
     RequiredModuleIds = table.freeze({
         "module_mg_witch_approach",
     }),
+    --[[
+        The two fragment-anchored POIs place in every run, Bramblewake's
+        rule applied here the day the region opened: a memory fragment
+        whose anchor only turns up some runs is a story beat demoted to
+        a lottery ticket.
+    ]]
+    FixedPointOfInterestIds = table.freeze({
+        "poi_mg_ferry_ledger",
+        "poi_mg_still_pool",
+    }),
     -- The known-good fallback walk: touches every required tag, keeps the
     -- puzzle and the landmark, and stays well inside every budget.
     FixedMiddleIds = table.freeze({

@@ -5129,7 +5129,7 @@ return table.freeze({
         ]]
         region_encounters_enabled = true,
         region_bramblewake_enabled = true,
-        region_ironroot_enabled = false,
+        region_ironroot_enabled = true,
         region_mireglass_enabled = false,
         region_tempest_enabled = false,
         region_frostmere_enabled = false,
@@ -5199,7 +5199,7 @@ return table.freeze({
         admin_commands_enabled = table.freeze({ stage = "everyone", percent = 100 }),
         region_encounters_enabled = table.freeze({ stage = "everyone", percent = 100 }),
         region_bramblewake_enabled = table.freeze({ stage = "everyone", percent = 100 }),
-        region_ironroot_enabled = table.freeze({ stage = "off", percent = 0 }),
+        region_ironroot_enabled = table.freeze({ stage = "everyone", percent = 100 }),
         region_mireglass_enabled = table.freeze({ stage = "off", percent = 0 }),
         region_tempest_enabled = table.freeze({ stage = "off", percent = 0 }),
         region_frostmere_enabled = table.freeze({ stage = "off", percent = 0 }),
@@ -9813,6 +9813,16 @@ return table.freeze({
         "module_ir_bellows_approach",
     }),
     --[[
+        The two fragment-anchored POIs place in every run, Bramblewake's
+        rule applied here the day the region opened: a memory fragment
+        whose anchor only turns up some runs is a story beat demoted to
+        a lottery ticket.
+    ]]
+    FixedPointOfInterestIds = table.freeze({
+        "poi_ir_tally_wall",
+        "poi_ir_crushed_cage",
+    }),
+    --[[
         The known-good fallback's middle, in authored order: a walk that
         touches every required tag, keeps the puzzle and landmark stops,
         and stays well inside every budget. Until a live session proves
@@ -10742,6 +10752,16 @@ return table.freeze({
     RequiredModuleIds = table.freeze({
         "module_mg_witch_approach",
     }),
+    --[[
+        The two fragment-anchored POIs place in every run, Bramblewake's
+        rule applied here the day the region opened: a memory fragment
+        whose anchor only turns up some runs is a story beat demoted to
+        a lottery ticket.
+    ]]
+    FixedPointOfInterestIds = table.freeze({
+        "poi_mg_ferry_ledger",
+        "poi_mg_still_pool",
+    }),
     -- The known-good fallback walk: touches every required tag, keeps the
     -- puzzle and the landmark, and stays well inside every budget.
     FixedMiddleIds = table.freeze({
@@ -10785,7 +10805,7 @@ local regions = {
         id = "region_ironroot",
         kind = "region",
         version = 1,
-        enabled = false,
+        enabled = true,
         displayNameKey = "content.region.ironroot.name",
         analyticsKey = "region_ironroot",
         assetBundle = "region_ironroot_v1",
@@ -30247,6 +30267,479 @@ return table.freeze(RegionAccess)
       </Item>
       <Item class="ModuleScript" referent="89">
         <Properties>
+          <string name="Name">RegionEncounterWiring</string>
+          <string name="Source"><![CDATA[--!strict
+
+--[[
+    How the six region encounters plug into a world.
+
+    RegionEncounterService drives any encounter that describes itself as
+    an interaction table, and the encounter modules are pure state
+    machines that never name a part or a prompt. This module is the seam
+    between them: for each encounter it lists the anchors its arena needs
+    with the words each prompt says, and wires each anchor to the verb the
+    encounter answers it with. It lives in shared code so the Lune suite
+    can hold the wiring against the encounter modules' own id lists --
+    a lever with no handler, or a handler for a lever no arena builds, is
+    a fight that cannot be finished, and nothing else would notice.
+
+    Handlers return the encounter's own next instruction as the message,
+    because the instruction lines already carry the progress a player
+    needs ("THROW THE SIGNAL LEVERS -- 2 OF 3") and a second copy of that
+    text would drift from the first.
+]]
+
+local BellowsMawEncounter = require("./BellowsMawEncounter")
+local DrownedCallerEncounter = require("./DrownedCallerEncounter")
+local ForemanEchoEncounter = require("./ForemanEchoEncounter")
+local IronWidowEncounter = require("./IronWidowEncounter")
+local LanternWitchEncounter = require("./LanternWitchEncounter")
+local ManyFaceEncounter = require("./ManyFaceEncounter")
+local Strings = require("./Strings")
+
+local RegionEncounterWiring = {}
+
+export type Anchor = {
+    id: string,
+    action: string,
+    object: string,
+}
+
+export type Definition = {
+    id: string,
+    regionId: string,
+    module: any,
+    anchors: { Anchor },
+    interactions: { [string]: (state: any, player: any, now: number) -> (any, any) },
+    tick: ((state: any, now: number) -> any?)?,
+    -- Elite ids that must be complete before this encounter's challenge
+    -- anchor will wake it. The Maw and the Witch wait on their region's
+    -- elites, the way the Warden's Seal waits on the Old Growth.
+    lockedUntil: { string }?,
+    -- For a boss: how a finished state resolves its chapter.
+    chapterResolution: ((
+        state: any
+    ) -> {
+        chapterId: string,
+        decision: string,
+        outcome: string,
+    })?,
+}
+
+-- Every arena gets one challenge anchor: the thing you touch to start
+-- the fight. Its id is shared so the service can special-case nothing.
+RegionEncounterWiring.ChallengeAnchorId = "challenge"
+
+local function instructionOf(module: any, state: any, userId: number, now: number): string
+    return tostring(module.snapshot(state, userId, now).instruction)
+end
+
+--[[
+    Wrap an encounter verb so the toast a player reads is always the
+    encounter's next instruction. `completed` rides through untouched;
+    it is what tells the service to settle rewards.
+]]
+local function verb(
+    module: any,
+    call: (state: any, userId: number, now: number) -> (any, any)
+): (state: any, player: any, now: number) -> (any, any)
+    return function(state: any, player: any, now: number): (any, any)
+        local nextState, result = call(state, player.UserId, now)
+        local message = instructionOf(module, nextState, player.UserId, now)
+        return nextState,
+            {
+                accepted = if type(result) == "table" then result.accepted else false,
+                completed = if type(result) == "table" then result.completed == true else false,
+                message = message,
+            }
+    end
+end
+
+local function challenge(module: any): (state: any, player: any, now: number) -> (any, any)
+    return verb(module, function(state: any, userId: number, _now: number): (any, any)
+        return module.activate(state, userId)
+    end)
+end
+
+local function anchor(id: string, action: string, object: string): Anchor
+    return { id = id, action = action, object = object }
+end
+
+function RegionEncounterWiring.definitionsFor(regionId: string): { Definition }
+    if regionId == "region_ironroot" then
+        local echoInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(ForemanEchoEncounter),
+        }
+        local echoAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.foreman_echo")
+            ),
+            anchor(
+                "lever_north",
+                Strings.get("encounter.throw"),
+                Strings.get("encounter.north_signal_lever")
+            ),
+            anchor(
+                "lever_shaft",
+                Strings.get("encounter.throw"),
+                Strings.get("encounter.shaft_signal_lever")
+            ),
+            anchor(
+                "lever_south",
+                Strings.get("encounter.throw"),
+                Strings.get("encounter.south_signal_lever")
+            ),
+        }
+        for _, leverId in ForemanEchoEncounter.LeverIds do
+            echoInteractions[leverId] = verb(
+                ForemanEchoEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return ForemanEchoEncounter.throwLever(state, userId, leverId)
+                end
+            )
+        end
+
+        local widowInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(IronWidowEncounter),
+        }
+        local widowAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.iron_widow")
+            ),
+        }
+        local widowAnchorObjects: { [string]: string } = {
+            anchor_head = Strings.get("encounter.head_web_anchor"),
+            anchor_spur = Strings.get("encounter.spur_web_anchor"),
+            anchor_tail = Strings.get("encounter.tail_web_anchor"),
+            anchor_crown = Strings.get("encounter.crown_web_anchor"),
+        }
+        for _, anchorId in IronWidowEncounter.AnchorIds do
+            table.insert(
+                widowAnchors,
+                anchor(anchorId, Strings.get("encounter.cut"), widowAnchorObjects[anchorId])
+            )
+            widowInteractions[anchorId] = verb(
+                IronWidowEncounter,
+                function(state: any, userId: number, now: number): (any, any)
+                    return IronWidowEncounter.cutAnchor(state, userId, anchorId, now)
+                end
+            )
+        end
+
+        local mawInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(BellowsMawEncounter),
+        }
+        local mawAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.bellows_maw")
+            ),
+        }
+        local mawObjects: { [string]: string } = {
+            line_head = Strings.get("encounter.head_feed_line"),
+            line_spur = Strings.get("encounter.spur_feed_line"),
+            line_deep = Strings.get("encounter.deep_feed_line"),
+            line_return = Strings.get("encounter.return_feed_line"),
+            vent_drift = Strings.get("encounter.drift_vent_wheel"),
+            vent_stope = Strings.get("encounter.stope_vent_wheel"),
+        }
+        for lineId in BellowsMawEncounter.LineIds :: { [string]: boolean } do
+            table.insert(
+                mawAnchors,
+                anchor(lineId, Strings.get("encounter.reroute"), mawObjects[lineId])
+            )
+            mawInteractions[lineId] = verb(
+                BellowsMawEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return BellowsMawEncounter.rerouteLine(state, userId, lineId)
+                end
+            )
+        end
+        for ventId in BellowsMawEncounter.VentIds :: { [string]: boolean } do
+            table.insert(
+                mawAnchors,
+                anchor(ventId, Strings.get("expedition.vent"), mawObjects[ventId])
+            )
+            mawInteractions[ventId] = verb(
+                BellowsMawEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return BellowsMawEncounter.ventPressure(state, userId, ventId)
+                end
+            )
+        end
+        table.sort(mawAnchors, function(left: Anchor, right: Anchor): boolean
+            return left.id < right.id
+        end)
+
+        return {
+            {
+                id = ForemanEchoEncounter.Id,
+                regionId = regionId,
+                module = ForemanEchoEncounter,
+                anchors = echoAnchors,
+                interactions = echoInteractions,
+                tick = ForemanEchoEncounter.expire,
+            },
+            {
+                id = IronWidowEncounter.Id,
+                regionId = regionId,
+                module = IronWidowEncounter,
+                anchors = widowAnchors,
+                interactions = widowInteractions,
+                tick = IronWidowEncounter.expire,
+            },
+            {
+                id = BellowsMawEncounter.Id,
+                regionId = regionId,
+                module = BellowsMawEncounter,
+                anchors = mawAnchors,
+                interactions = mawInteractions,
+                lockedUntil = { ForemanEchoEncounter.Id, IronWidowEncounter.Id },
+                chapterResolution = function(state: any)
+                    local drift = state.ventedInto.vent_drift == true
+                    local stope = state.ventedInto.vent_stope == true
+                    local decision = if drift and stope
+                        then "vent_both"
+                        elseif drift then "vent_drifts"
+                        else "vent_stope"
+                    return {
+                        chapterId = "chapter_two",
+                        decision = decision,
+                        outcome = tostring(state.outcome),
+                    }
+                end,
+            },
+        }
+    elseif regionId == "region_mireglass" then
+        local faceInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(ManyFaceEncounter),
+        }
+        local faceAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.the_many_face")
+            ),
+        }
+        local mirrorObjects: { [string]: string } = {
+            mirror_left = Strings.get("encounter.left_court_mirror"),
+            mirror_center = Strings.get("encounter.center_court_mirror"),
+            mirror_right = Strings.get("encounter.right_court_mirror"),
+        }
+        for mirrorId in ManyFaceEncounter.MirrorIds :: { [string]: boolean } do
+            table.insert(
+                faceAnchors,
+                anchor(mirrorId, Strings.get("expedition.turn"), mirrorObjects[mirrorId])
+            )
+            faceInteractions[mirrorId] = verb(
+                ManyFaceEncounter,
+                function(state: any, userId: number, now: number): (any, any)
+                    return ManyFaceEncounter.turnMirror(state, userId, mirrorId, now)
+                end
+            )
+        end
+        table.sort(faceAnchors, function(left: Anchor, right: Anchor): boolean
+            return left.id < right.id
+        end)
+        --[[
+            The Many-Face changes face on its own clock as well as closing
+            its counter window, so its tick carries a second timestamp the
+            state does not: when the next face is due. A closure holds it
+            because the cadence belongs to this run of the fight, and
+            beginRun builds fresh definitions for every run.
+        ]]
+        local nextFaceAt = 0
+        local function manyFaceTick(state: any, now: number): any?
+            local expired = ManyFaceEncounter.expire(state, now)
+            if expired.status ~= "wearing" and expired.status ~= "countered" then
+                nextFaceAt = 0
+                return if expired == state then nil else expired
+            end
+            if nextFaceAt == 0 then
+                nextFaceAt = now + ManyFaceEncounter.Tuning.faceSeconds
+            end
+            if now >= nextFaceAt then
+                nextFaceAt = now + ManyFaceEncounter.Tuning.faceSeconds
+                local cycled = ManyFaceEncounter.cycleFace(expired)
+                return cycled
+            end
+            return if expired == state then nil else expired
+        end
+
+        local callerInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(DrownedCallerEncounter),
+        }
+        local callerAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.drowned_caller")
+            ),
+        }
+        local poolObjects: { [string]: string } = {
+            pool_north = Strings.get("encounter.north_reflected_pool"),
+            pool_east = Strings.get("encounter.east_reflected_pool"),
+            pool_south = Strings.get("encounter.south_reflected_pool"),
+            pool_west = Strings.get("encounter.west_reflected_pool"),
+        }
+        for _, poolId in DrownedCallerEncounter.PoolIds do
+            table.insert(
+                callerAnchors,
+                anchor(poolId, Strings.get("encounter.silt"), poolObjects[poolId])
+            )
+            callerInteractions[poolId] = verb(
+                DrownedCallerEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return DrownedCallerEncounter.siltPool(state, userId, poolId)
+                end
+            )
+        end
+
+        local witchInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(LanternWitchEncounter),
+        }
+        local witchAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.lantern_witch")
+            ),
+        }
+        local copyObjects: { [string]: string } = {
+            copy_first = Strings.get("encounter.first_lantern_copy"),
+            copy_second = Strings.get("encounter.second_lantern_copy"),
+            copy_third = Strings.get("encounter.third_lantern_copy"),
+            copy_fourth = Strings.get("encounter.fourth_lantern_copy"),
+        }
+        for _, copyId in LanternWitchEncounter.CopyIds do
+            table.insert(
+                witchAnchors,
+                anchor(copyId, Strings.get("encounter.name"), copyObjects[copyId])
+            )
+            --[[
+                One anchor, two verbs, chosen by the state rather than the
+                payload: while she hides, touching a copy names it; once
+                she is found, touching the found copy spends it against
+                her. Sparing and the final answer live on their own
+                anchors, because a mercy that shares a button with an
+                attack is a misclick with a consequence.
+            ]]
+            witchInteractions[copyId] = function(state: any, player: any, now: number): (any, any)
+                local nextState, result
+                if state.status == "found" then
+                    nextState, result = LanternWitchEncounter.useCopy(state, player.UserId, true)
+                else
+                    nextState, result = LanternWitchEncounter.nameCopy(state, player.UserId, copyId)
+                end
+                return nextState,
+                    {
+                        accepted = if type(result) == "table" then result.accepted else false,
+                        completed = if type(result) == "table"
+                            then result.completed == true
+                            else false,
+                        message = instructionOf(
+                            LanternWitchEncounter,
+                            nextState,
+                            player.UserId,
+                            now
+                        ),
+                    }
+            end
+        end
+        table.insert(
+            witchAnchors,
+            anchor(
+                "witch_spare",
+                Strings.get("encounter.spare"),
+                Strings.get("encounter.the_found_copy")
+            )
+        )
+        witchInteractions.witch_spare = verb(
+            LanternWitchEncounter,
+            function(state: any, userId: number, _now: number): (any, any)
+                if state.status == "asking" then
+                    return LanternWitchEncounter.answer(state, userId, true)
+                end
+                return LanternWitchEncounter.useCopy(state, userId, false)
+            end
+        )
+        table.insert(
+            witchAnchors,
+            anchor(
+                "witch_take",
+                Strings.get("encounter.refuse"),
+                Strings.get("encounter.her_question")
+            )
+        )
+        witchInteractions.witch_take = verb(
+            LanternWitchEncounter,
+            function(state: any, userId: number, _now: number): (any, any)
+                return LanternWitchEncounter.answer(state, userId, false)
+            end
+        )
+
+        return {
+            {
+                id = ManyFaceEncounter.Id,
+                regionId = regionId,
+                module = ManyFaceEncounter,
+                anchors = faceAnchors,
+                interactions = faceInteractions,
+                tick = manyFaceTick,
+            },
+            {
+                id = DrownedCallerEncounter.Id,
+                regionId = regionId,
+                module = DrownedCallerEncounter,
+                anchors = callerAnchors,
+                interactions = callerInteractions,
+            },
+            {
+                id = LanternWitchEncounter.Id,
+                regionId = regionId,
+                module = LanternWitchEncounter,
+                anchors = witchAnchors,
+                interactions = witchInteractions,
+                lockedUntil = { ManyFaceEncounter.Id, DrownedCallerEncounter.Id },
+                chapterResolution = function(state: any)
+                    local decision = if state.outcome == "broken"
+                        then "refused_her"
+                        elseif state.outcome == "sealed" then "spared_copies"
+                        else "spent_copies"
+                    return {
+                        chapterId = "chapter_three",
+                        decision = decision,
+                        outcome = tostring(state.outcome),
+                    }
+                end,
+            },
+        }
+    end
+    return {}
+end
+
+-- The anchor id list an arena is built from, in the order the wiring
+-- declares them. RegionBuilders.buildArena spaces them evenly, so order
+-- is placement.
+function RegionEncounterWiring.anchorIds(definition: Definition): { string }
+    local ids: { string } = {}
+    for _, entry in definition.anchors do
+        table.insert(ids, entry.id)
+    end
+    return ids
+end
+
+return table.freeze(RegionEncounterWiring)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="90">
+        <Properties>
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -30513,7 +31006,7 @@ return table.freeze(ResidentDialogue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="90">
+      <Item class="ModuleScript" referent="91">
         <Properties>
           <string name="Name">ResidentLife</string>
           <string name="Source"><![CDATA[--!strict
@@ -30837,7 +31330,7 @@ return table.freeze(ResidentLife)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="91">
+      <Item class="ModuleScript" referent="92">
         <Properties>
           <string name="Name">ResidentRoster</string>
           <string name="Source"><![CDATA[--!strict
@@ -31473,7 +31966,7 @@ return table.freeze(ResidentRoster)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="92">
+      <Item class="ModuleScript" referent="93">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -31588,7 +32081,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="93">
+      <Item class="ModuleScript" referent="94">
         <Properties>
           <string name="Name">RolloutCohorts</string>
           <string name="Source"><![CDATA[--!strict
@@ -31812,7 +32305,7 @@ return table.freeze(RolloutCohorts)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="94">
+      <Item class="ModuleScript" referent="95">
         <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -31981,7 +32474,7 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="95">
+      <Item class="ModuleScript" referent="96">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -32160,6 +32653,17 @@ local RuntimeIds = {
             nothing in the payload.
         ]]
         PrivateControl = "private_control",
+        --[[
+            The destination board and the region arenas, both
+            interaction-routed. A destination plank carries its region id
+            as the prompt's payload the way a crafting bench carries its
+            recipe; an arena anchor carries its encounter and its own
+            anchor id as prompt attributes, so the client can name
+            neither a region it is not standing at nor a lever it cannot
+            reach.
+        ]]
+        SelectDestination = "select_destination",
+        RegionEncounter = "region_encounter",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",
@@ -32242,7 +32746,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="96">
+      <Item class="ModuleScript" referent="97">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -34013,7 +34517,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="97">
+      <Item class="ModuleScript" referent="98">
         <Properties>
           <string name="Name">SessionSegment</string>
           <string name="Source"><![CDATA[--!strict
@@ -34203,7 +34707,7 @@ return table.freeze(SessionSegment)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="98">
+      <Item class="ModuleScript" referent="99">
         <Properties>
           <string name="Name">SfxCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -34370,7 +34874,7 @@ return table.freeze(SfxCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="99">
+      <Item class="ModuleScript" referent="100">
         <Properties>
           <string name="Name">SoakProbe</string>
           <string name="Source"><![CDATA[--!strict
@@ -34761,7 +35265,7 @@ return table.freeze(SoakProbe)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="100">
+      <Item class="ModuleScript" referent="101">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -34905,7 +35409,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="101">
+      <Item class="ModuleScript" referent="102">
         <Properties>
           <string name="Name">StoreAvailability</string>
           <string name="Source"><![CDATA[--!strict
@@ -35055,7 +35559,7 @@ return table.freeze(StoreAvailability)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="102">
+      <Item class="ModuleScript" referent="103">
         <Properties>
           <string name="Name">StoreCard</string>
           <string name="Source"><![CDATA[--!strict
@@ -35296,7 +35800,7 @@ return table.freeze(StoreCard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="103">
+      <Item class="ModuleScript" referent="104">
         <Properties>
           <string name="Name">Strings</string>
           <string name="Source"><![CDATA[--!strict
@@ -35632,6 +36136,7 @@ local SOURCE: { [string]: string } = {
     ["world.repair"] = "REPAIR",
     ["world.stores_full_n_surplus_turned_away"] = "STORES FULL · %d SURPLUS TURNED AWAY",
     ["world.harvest"] = "HARVEST",
+    ["world.set_course"] = "SET COURSE",
     ["world.take_fire"] = "TAKE FIRE",
     ["world.burn_shield"] = "BURN SHIELD",
     ["world.lost_satchel"] = "LOST SATCHEL · ",
@@ -35673,6 +36178,12 @@ local SOURCE: { [string]: string } = {
     ["bramblewake.bramblewake_woods"] = "BRAMBLEWAKE WOODS",
     ["region.frostmere_ice"] = "Frostmere Ice",
     ["region.frostmere_wool"] = "Frostmere Wool",
+    ["region.ironroot_delve"] = "IRONROOT DELVE",
+    ["region.mireglass_fen"] = "MIREGLASS FEN",
+    ["region.tempest_reach"] = "TEMPEST REACH",
+    ["region.frostmere_vale"] = "FROSTMERE VALE",
+    ["region.cinderfall_crown"] = "CINDERFALL CROWN",
+    ["region.the_hollow"] = "THE HOLLOW",
     ["region.witchlight_pollen"] = "Witchlight Pollen",
     ["world.tool_axe"] = "HAND AXE",
     ["world.tool_hammer"] = "BUILDER'S HAMMER",
@@ -35689,7 +36200,14 @@ local SOURCE: { [string]: string } = {
     ["toast.healed"] = "HEALED",
     ["toast.phase_unavailable_right_now"] = "PHASE UNAVAILABLE RIGHT NOW",
     ["toast.already_in_bramblewake"] = "ALREADY IN BRAMBLEWAKE",
-    ["toast.entering_bramblewake"] = "ENTERING BRAMBLEWAKE",
+    ["toast.entering_n"] = "ENTERING %s",
+    ["toast.that_destination_is_unknown"] = "THAT DESTINATION IS UNKNOWN",
+    ["toast.that_region_is_not_open"] = "THAT REGION IS NOT OPEN YET",
+    ["toast.the_story_has_not_reached_that"] = "THE STORY HAS NOT REACHED THAT REGION",
+    ["toast.the_road_already_leads_to_n"] = "THE ROAD ALREADY LEADS TO %s",
+    ["toast.the_wood_is_occupied_extract_first"] = "THE WOOD IS OCCUPIED - EXTRACT FIRST",
+    ["toast.the_road_would_not_turn"] = "THE ROAD WOULD NOT TURN - TRY AGAIN",
+    ["toast.the_road_now_leads_to_n"] = "THE ROAD NOW LEADS TO %s",
     ["toast.entry_unavailable"] = "ENTRY UNAVAILABLE",
     ["toast.already_in_town"] = "ALREADY IN TOWN",
     ["toast.returning_to_emberhollow"] = "RETURNING TO EMBERHOLLOW",
@@ -35774,19 +36292,19 @@ local SOURCE: { [string]: string } = {
     ["toast.safe_retreat_half_the_pouch_waits"] = "SAFE RETREAT — HALF THE POUCH WAITS IN A LOST SATCHEL",
     ["toast.safe_retreat_small_pouch_retained"] = "SAFE RETREAT — SMALL POUCH RETAINED",
     ["toast.safe_retreat_pouch_retained_while_profile"] = "SAFE RETREAT — POUCH RETAINED WHILE PROFILE RECOVERS",
-    ["toast.enter_bramblewake_to_recover_the_satchel"] = "ENTER BRAMBLEWAKE TO RECOVER THE SATCHEL",
+    ["toast.enter_n_to_recover_the_satchel"] = "ENTER %s TO RECOVER THE SATCHEL",
     ["toast.that_lost_satchel_belongs_to_another"] = "THAT LOST SATCHEL BELONGS TO ANOTHER TRAVELER",
     ["toast.that_recovery_mark_is_invalid"] = "THAT RECOVERY MARK IS INVALID",
     ["toast.satchel_recovery_will_retry_when_your"] = "SATCHEL RECOVERY WILL RETRY WHEN YOUR PROFILE IS READY",
     ["toast.that_satchel_has_already_been_recovered"] = "THAT SATCHEL HAS ALREADY BEEN RECOVERED",
     ["toast.lost_satchel_recovered_n_materials_back"] = "LOST SATCHEL RECOVERED — %d MATERIALS BACK IN POUCH",
-    ["toast.enter_bramblewake_to_answer_this_event"] = "ENTER BRAMBLEWAKE TO ANSWER THIS EVENT",
+    ["toast.enter_n_to_answer_this_event"] = "ENTER %s TO ANSWER THIS EVENT",
     ["toast.that_event_mark_is_invalid"] = "THAT EVENT MARK IS INVALID",
     ["toast.that_event_is_no_longer_available"] = "THAT EVENT IS NO LONGER AVAILABLE",
     ["toast.that_event_mark_is_already_set"] = "THAT EVENT MARK IS ALREADY SET",
     ["toast.this_event_is_temporarily_dormant"] = "THIS EVENT IS TEMPORARILY DORMANT",
     ["toast.that_event_action_was_rejected"] = "THAT EVENT ACTION WAS REJECTED",
-    ["toast.you_are_not_inside_bramblewake"] = "YOU ARE NOT INSIDE BRAMBLEWAKE",
+    ["toast.you_are_not_inside_n"] = "YOU ARE NOT INSIDE %s",
     ["toast.rewards_banked_wayhome_transition_will_retry"] = "REWARDS BANKED — WAYHOME TRANSITION WILL RETRY",
     ["toast.wayhome_transition_will_retry"] = "WAYHOME TRANSITION WILL RETRY",
     ["toast.returning_to_emberhollow_banked_delivery_rea"] = "RETURNING TO EMBERHOLLOW — BANKED DELIVERY READY",
@@ -35996,7 +36514,7 @@ local SOURCE: { [string]: string } = {
     ["tutorial.the_resident_is_busy_with_the"] = "THE RESIDENT IS BUSY WITH THE NIGHT WATCH",
     ["tutorial.return_through_wayhome_before_repairing_town"] = "RETURN THROUGH WAYHOME BEFORE REPAIRING TOWN",
     ["tutorial.you_need_3_heartwood"] = "YOU NEED 3 HEARTWOOD",
-    ["tutorial.bramblewake_is_still_forming"] = "BRAMBLEWAKE IS STILL FORMING",
+    ["tutorial.the_wood_is_still_forming"] = "THE WOOD IS STILL FORMING",
     ["tutorial.current_objective_n"] = "CURRENT OBJECTIVE: %s",
     ["tutorial.mara_is_safe"] = "MARA IS SAFE",
     ["tutorial.barricade_complete"] = "BARRICADE COMPLETE",
@@ -36207,6 +36725,42 @@ local SOURCE: { [string]: string } = {
     ["encounter.the_shift_is_over"] = "THE SHIFT IS OVER",
     ["encounter.enter_the_signal_gallery"] = "ENTER THE SIGNAL GALLERY",
     ["encounter.foreman_echo"] = "FOREMAN ECHO",
+    ["encounter.face"] = "CHALLENGE",
+    ["encounter.throw"] = "THROW",
+    ["encounter.cut"] = "CUT",
+    ["encounter.reroute"] = "REROUTE",
+    ["encounter.silt"] = "SILT",
+    ["encounter.name"] = "NAME",
+    ["encounter.spare"] = "SPARE",
+    ["encounter.refuse"] = "REFUSE",
+    ["encounter.north_signal_lever"] = "NORTH SIGNAL LEVER",
+    ["encounter.shaft_signal_lever"] = "SHAFT SIGNAL LEVER",
+    ["encounter.south_signal_lever"] = "SOUTH SIGNAL LEVER",
+    ["encounter.head_web_anchor"] = "HEAD WEB ANCHOR",
+    ["encounter.spur_web_anchor"] = "SPUR WEB ANCHOR",
+    ["encounter.tail_web_anchor"] = "TAIL WEB ANCHOR",
+    ["encounter.crown_web_anchor"] = "CROWN WEB ANCHOR",
+    ["encounter.head_feed_line"] = "HEAD FEED LINE",
+    ["encounter.spur_feed_line"] = "SPUR FEED LINE",
+    ["encounter.deep_feed_line"] = "DEEP FEED LINE",
+    ["encounter.return_feed_line"] = "RETURN FEED LINE",
+    ["encounter.drift_vent_wheel"] = "DRIFT VENT WHEEL",
+    ["encounter.stope_vent_wheel"] = "STOPE VENT WHEEL",
+    ["encounter.left_court_mirror"] = "LEFT COURT MIRROR",
+    ["encounter.center_court_mirror"] = "CENTER COURT MIRROR",
+    ["encounter.right_court_mirror"] = "RIGHT COURT MIRROR",
+    ["encounter.north_reflected_pool"] = "NORTH REFLECTED POOL",
+    ["encounter.east_reflected_pool"] = "EAST REFLECTED POOL",
+    ["encounter.south_reflected_pool"] = "SOUTH REFLECTED POOL",
+    ["encounter.west_reflected_pool"] = "WEST REFLECTED POOL",
+    ["encounter.first_lantern_copy"] = "FIRST LANTERN COPY",
+    ["encounter.second_lantern_copy"] = "SECOND LANTERN COPY",
+    ["encounter.third_lantern_copy"] = "THIRD LANTERN COPY",
+    ["encounter.fourth_lantern_copy"] = "FOURTH LANTERN COPY",
+    ["encounter.the_found_copy"] = "THE FOUND COPY",
+    ["encounter.her_question"] = "HER QUESTION",
+    ["encounter.struck_n_holds_at_n"] = "%s HOLDS AT %d",
+    ["encounter.something_below_has_stopped_waiting"] = "SOMETHING BELOW HAS STOPPED WAITING",
     ["encounter.summons"] = "SUMMONS",
     ["encounter.get_behind_something_still_standing"] = "GET BEHIND SOMETHING STILL STANDING",
     ["encounter.sentence"] = "SENTENCE",
@@ -37990,7 +38544,7 @@ return Strings
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="104">
+      <Item class="ModuleScript" referent="105">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -38247,7 +38801,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="105">
+      <Item class="ModuleScript" referent="106">
         <Properties>
           <string name="Name">TempestEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -38527,7 +39081,7 @@ return table.freeze(TempestEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="106">
+      <Item class="ModuleScript" referent="107">
         <Properties>
           <string name="Name">TideboundTitanEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -38970,7 +39524,7 @@ return table.freeze(TideboundTitanEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="107">
+      <Item class="ModuleScript" referent="108">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -39116,7 +39670,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="108">
+      <Item class="ModuleScript" referent="109">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -39526,7 +40080,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="109">
+      <Item class="ModuleScript" referent="110">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -39707,7 +40261,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="110">
+      <Item class="ModuleScript" referent="111">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -39771,7 +40325,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="111">
+      <Item class="ModuleScript" referent="112">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -39947,7 +40501,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="112">
+      <Item class="ModuleScript" referent="113">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -40039,7 +40593,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="113">
+      <Item class="ModuleScript" referent="114">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -40253,7 +40807,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="114">
+      <Item class="ModuleScript" referent="115">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -40459,7 +41013,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="115">
+      <Item class="ModuleScript" referent="116">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -40612,7 +41166,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="116">
+      <Item class="ModuleScript" referent="117">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -40946,7 +41500,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="117">
+      <Item class="ModuleScript" referent="118">
         <Properties>
           <string name="Name">TownVisitPolicy</string>
           <string name="Source"><![CDATA[--!strict
@@ -41121,7 +41675,7 @@ return table.freeze(TownVisitPolicy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="118">
+      <Item class="ModuleScript" referent="119">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -41285,7 +41839,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="119">
+      <Item class="ModuleScript" referent="120">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -41321,7 +41875,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="120">
+      <Item class="ModuleScript" referent="121">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -41713,7 +42267,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="121">
+      <Item class="ModuleScript" referent="122">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -41783,7 +42337,7 @@ return table.freeze(WeatherProfile)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="122">
+      <Item class="ModuleScript" referent="123">
         <Properties>
           <string name="Name">WhiteHowlerEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -42255,11 +42809,11 @@ return table.freeze(WhiteHowlerEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="123">
+  <Item class="ServerScriptService" referent="124">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="124">
+    <Item class="Script" referent="125">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -42297,6 +42851,7 @@ local ExtractionPayoff = require(root.ExtractionPayoff)
 local NightSchedule = require(root.NightSchedule)
 local OldGrowthEncounter = require(root.OldGrowthEncounter)
 local WardenStagEncounter = require(root.WardenStagEncounter)
+local RegionEncounterWiring = require(root.RegionEncounterWiring)
 local BramblewakeBlackout = require(root.BramblewakeBlackout)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local ProfessionAbilityVisuals = require(root.ProfessionAbilityVisuals)
@@ -42918,6 +43473,29 @@ tutorialService:setPartyService(partyService)
 tutorialService:setSocialService(socialService)
 tutorialService:setCommerceService(commerceService)
 tutorialService:setPrivateServerService(privateServerService)
+tutorialService:setRegionEncounterService(regionEncounterService)
+--[[
+    Bind the region encounters to every wood the expedition raises. For
+    Bramblewake the definitions list is empty and the bind clears the
+    previous region's fights, which is exactly what changing destination
+    should do to them.
+]]
+expeditionService:setRegionBuiltHandler(
+    function(regionId: string, runId: string, manifestHash: string, encounters: any)
+        local definitions = RegionEncounterWiring.definitionsFor(regionId)
+        if #definitions == 0 then
+            regionEncounterService:endRun()
+            return
+        end
+        local anchorsById: { [string]: { [string]: BasePart } } = {}
+        local arenasById: { [string]: { center: Vector3, radius: number } } = {}
+        for _, site in encounters do
+            anchorsById[site.id] = site.anchors
+            arenasById[site.id] = { center = site.center, radius = site.radius }
+        end
+        regionEncounterService:beginRun(runId, manifestHash, definitions, anchorsById, arenasById)
+    end
+)
 --[[
     A grant has to arrive somewhere the buyer can see.
 
@@ -43027,7 +43605,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="125">
+      <Item class="ModuleScript" referent="126">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -43125,11 +43703,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="126">
+      <Item class="Folder" referent="127">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="127">
+        <Item class="ModuleScript" referent="128">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -43159,6 +43737,7 @@ local Players = game:GetService("Players")
 local TextChatService = game:GetService("TextChatService")
 
 local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+local RegionExpeditionAssembly = require(script.Parent.Parent.World.RegionExpeditionAssembly)
 
 local AdminService = {}
 AdminService.__index = AdminService
@@ -43280,7 +43859,12 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
                 self:_reply(
                     player,
                     if entered
-                        then Strings.get("toast.entering_bramblewake")
+                        then string.format(
+                            Strings.get("toast.entering_n"),
+                            RegionExpeditionAssembly.displayName(
+                                (self._expeditionService:currentSeed())
+                            )
+                        )
                         else Strings.get("toast.entry_unavailable")
                 )
             end
@@ -43788,7 +44372,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="128">
+        <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45304,7 +45888,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="129">
+        <Item class="ModuleScript" referent="130">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -45819,7 +46403,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="130">
+        <Item class="ModuleScript" referent="131">
           <Properties>
             <string name="Name">CommerceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46644,7 +47228,7 @@ return table.freeze(CommerceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46919,7 +47503,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47356,7 +47940,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49131,7 +49715,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="134">
+        <Item class="ModuleScript" referent="135">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49139,6 +49723,7 @@ return table.freeze(EnemyService)
 local Players = game:GetService("Players")
 
 local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+local RegionExpeditionAssembly = require(script.Parent.Parent.World.RegionExpeditionAssembly)
 
 local ExpeditionService = {}
 ExpeditionService.__index = ExpeditionService
@@ -49173,6 +49758,9 @@ export type ExpeditionService = typeof(setmetatable(
         _eventsEnabled: boolean,
         _runId: string,
         _pendingExtractionPayoffs: { [Player]: any },
+        _bootSeed: number,
+        _regionBuiltHandler: ((string, string, string, any) -> ())?,
+        _lastEncounters: any,
     },
     ExpeditionService
 ))
@@ -49218,6 +49806,9 @@ function ExpeditionService.new(
         _eventsEnabled = false,
         _runId = "",
         _pendingExtractionPayoffs = {},
+        _bootSeed = seed,
+        _regionBuiltHandler = nil,
+        _lastEncounters = nil,
     }, ExpeditionService)
 end
 
@@ -49249,12 +49840,122 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
     local regionId = self._regionAccess.destinationFor(requestedRegion, nil)
     local catalog = self._generator.catalogFor(regionId)
     assert(
-        regionId == "region_bramblewake",
+        self._worldService:canBuildExpeditionRegion(regionId),
         "region " .. tostring(regionId) .. " is enabled but has no builder wired"
     )
     self._catalog = catalog
     self._regionId = regionId
+    self._bootSeed = seed
     self:_buildRegion(seed)
+end
+
+--[[
+    Called after every region build with the encounter sites the world
+    just raised, so whoever owns the encounters can bind them to this
+    run. Set from the bootstrap rather than constructed here, because
+    the encounter service is built after this one and the seam should be
+    one function wide.
+]]
+function ExpeditionService.setRegionBuiltHandler(
+    self: ExpeditionService,
+    handler: (
+        regionId: string,
+        runId: string,
+        manifestHash: string,
+        encounters: any
+    ) -> ()
+)
+    self._regionBuiltHandler = handler
+    local manifest = self._manifest
+    if manifest ~= nil then
+        handler(self._regionId, self._runId, manifest.hash, self._lastEncounters or {})
+    end
+end
+
+--[[
+    A player at the destination board asking the road to point somewhere.
+
+    Every gate is re-checked here with the asker's own story: the
+    registry flag, the region's feature flag, dependencies, the chapter,
+    and readiness, through the same RegionAccess evaluation every other
+    caller uses. A wood with anybody standing in it refuses -- rebuilding
+    the expedition destroys the model under their feet, which is the rule
+    rebuildWithSeed already enforces at the same door.
+]]
+function ExpeditionService.selectDestination(
+    self: ExpeditionService,
+    player: Player,
+    regionId: any
+): any
+    if type(regionId) ~= "string" or #regionId > 40 then
+        return { accepted = false, message = Strings.get("toast.that_destination_is_unknown") }
+    end
+    local flagName = regionId .. "_enabled"
+    if not self._featureFlags:isEnabled(flagName) then
+        return {
+            accepted = false,
+            message = Strings.get("toast.that_region_is_not_open"),
+            reason = "region_flag_off",
+        }
+    end
+    local story = self._profileService:storySnapshot(player)
+    local verdict = self._regionAccess.evaluate(regionId, story)
+    if not verdict.allowed then
+        local message = if verdict.reason == "chapter_not_reached"
+            then Strings.get("toast.the_story_has_not_reached_that")
+            else Strings.get("toast.that_region_is_not_open")
+        return { accepted = false, message = message, reason = verdict.reason }
+    end
+    if regionId == self._regionId then
+        return {
+            accepted = true,
+            message = string.format(
+                Strings.get("toast.the_road_already_leads_to_n"),
+                RegionExpeditionAssembly.displayName(regionId)
+            ),
+            reason = "already_set",
+        }
+    end
+    if self:occupied() then
+        return {
+            accepted = false,
+            message = Strings.get("toast.the_wood_is_occupied_extract_first"),
+            reason = "expedition_occupied",
+        }
+    end
+    self._regionId = regionId
+    self._catalog = self._generator.catalogFor(regionId)
+    self._rebuilding = true
+    local ok, err = pcall(function()
+        self:_buildRegion(self._bootSeed)
+    end)
+    self._rebuilding = false
+    if not ok then
+        self._logger:warn("expedition_destination_failed", {
+            reason = tostring(err),
+            region = regionId,
+        })
+        self._regionId = "region_bramblewake"
+        self._catalog = self._generator.catalogFor(self._regionId)
+        self:_buildRegion(self._bootSeed)
+        return {
+            accepted = false,
+            message = Strings.get("toast.the_road_would_not_turn"),
+            reason = "build_failed",
+        }
+    end
+    self._logger:info("expedition_destination_set", {
+        player = player.UserId,
+        region = regionId,
+    })
+    return {
+        accepted = true,
+        message = string.format(
+            Strings.get("toast.the_road_now_leads_to_n"),
+            RegionExpeditionAssembly.displayName(regionId)
+        ),
+        reason = "destination_set",
+    }
 end
 
 --[[
@@ -49288,9 +49989,18 @@ function ExpeditionService._buildRegion(self: ExpeditionService, seed: number)
         self._analyticsService:generatorFallback(regionId, manifest.seed, manifest.source)
     end
 
-    local result = self._worldService:buildBramblewake(manifest, self._generator, self._catalog)
+    local result = if regionId == "region_bramblewake"
+        then self._worldService:buildBramblewake(manifest, self._generator, self._catalog)
+        else self._worldService:buildRegionExpedition(manifest, self._generator, self._catalog)
     self._manifest = manifest
     self._partCount = result.partCount
+    -- Encounter sites are the region path's; Bramblewake's elites live in
+    -- their own services and hand back none.
+    self._lastEncounters = result.encounters or {}
+    local builtHandler = self._regionBuiltHandler
+    if builtHandler ~= nil then
+        builtHandler(regionId, self._runId, manifest.hash, self._lastEncounters)
+    end
     --[[
         Read at every build rather than once at boot.
 
@@ -49508,7 +50218,10 @@ function ExpeditionService.recoverCache(
     if player:GetAttribute("LastLightInExpedition") ~= true then
         return {
             accepted = false,
-            message = Strings.get("toast.enter_bramblewake_to_recover_the_satchel"),
+            message = string.format(
+                Strings.get("toast.enter_n_to_recover_the_satchel"),
+                RegionExpeditionAssembly.displayName(self._regionId)
+            ),
         }
     end
     if prompt:GetAttribute("OwnerUserId") ~= player.UserId then
@@ -49702,7 +50415,10 @@ function ExpeditionService.interact(
     if player:GetAttribute("LastLightInExpedition") ~= true then
         return {
             accepted = false,
-            message = Strings.get("toast.enter_bramblewake_to_answer_this_event"),
+            message = string.format(
+                Strings.get("toast.enter_n_to_answer_this_event"),
+                RegionExpeditionAssembly.displayName(self._regionId)
+            ),
             reason = "player_not_in_expedition",
         }
     end
@@ -49862,7 +50578,10 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
     if player:GetAttribute("LastLightInExpedition") ~= true then
         return {
             accepted = false,
-            message = Strings.get("toast.you_are_not_inside_bramblewake"),
+            message = string.format(
+                Strings.get("toast.you_are_not_inside_n"),
+                RegionExpeditionAssembly.displayName(self._regionId)
+            ),
             reason = "player_not_in_expedition",
         }
     end
@@ -49909,9 +50628,19 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
     if not settlement.accepted then
         self._analyticsService:expeditionExtractionFailed(player, manifest.hash, settlement.reason)
         -- TUNING-METRIC: repeat_activity
-        self._analyticsService:repeatActivity(player, "expedition_bramblewake", false)
+        self._analyticsService:repeatActivity(
+            player,
+            (string.gsub(self._regionId, "^region_", "expedition_")),
+            false
+        )
         -- TUNING-METRIC: group_outcome
-        self._analyticsService:groupOutcome(player, "expedition_bramblewake", partySize, false, 0)
+        self._analyticsService:groupOutcome(
+            player,
+            (string.gsub(self._regionId, "^region_", "expedition_")),
+            partySize,
+            false,
+            0
+        )
         return {
             accepted = false,
             message = if settlement.reason == "profile_read_only"
@@ -49960,11 +50689,15 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
     -- TUNING-METRIC: repeat_activity
     -- Counted at the end of the attempt rather than the start, because the
     -- repetition question is about runs that were seen through.
-    self._analyticsService:repeatActivity(player, "expedition_bramblewake", true)
+    self._analyticsService:repeatActivity(
+        player,
+        (string.gsub(self._regionId, "^region_", "expedition_")),
+        true
+    )
     -- TUNING-METRIC: group_outcome
     self._analyticsService:groupOutcome(
         player,
-        "expedition_bramblewake",
+        (string.gsub(self._regionId, "^region_", "expedition_")),
         partySize,
         true,
         bankedAmount
@@ -50026,7 +50759,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="135">
+        <Item class="ModuleScript" referent="136">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -50250,7 +50983,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="136">
+        <Item class="ModuleScript" referent="137">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -50559,7 +51292,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="137">
+        <Item class="ModuleScript" referent="138">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -51017,7 +51750,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="138">
+        <Item class="ModuleScript" referent="139">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -51111,7 +51844,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="139">
+        <Item class="ModuleScript" referent="140">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -51329,7 +52062,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="140">
+        <Item class="ModuleScript" referent="141">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -52223,7 +52956,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="141">
+        <Item class="ModuleScript" referent="142">
           <Properties>
             <string name="Name">PartyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -52910,7 +53643,7 @@ return PartyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="142">
+        <Item class="ModuleScript" referent="143">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -53433,7 +54166,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="143">
+        <Item class="ModuleScript" referent="144">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -53618,7 +54351,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="144">
+        <Item class="ModuleScript" referent="145">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -54240,7 +54973,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="145">
+        <Item class="ModuleScript" referent="146">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -55392,7 +56125,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="146">
+        <Item class="ModuleScript" referent="147">
           <Properties>
             <string name="Name">PrivateServerService</string>
             <string name="Source"><![CDATA[--!strict
@@ -55673,7 +56406,7 @@ return PrivateServerService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="147">
+        <Item class="ModuleScript" referent="148">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -56316,7 +57049,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="148">
+        <Item class="ModuleScript" referent="149">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -56326,6 +57059,8 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+local ChapterCatalog =
+    require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").ChapterCatalog)
 
 local ProfileService = {}
 ProfileService.__index = ProfileService
@@ -56639,6 +57374,7 @@ function ProfileService._load(self: ProfileService, player: Player)
     end
 
     profile = self:_applyStudioStock(profile, now)
+    profile = self:_applyStudioChapters(profile, now)
     self._profiles[player] = profile
     self._writable[player] = writable
     self._loading[player] = nil
@@ -56716,6 +57452,92 @@ function ProfileService._watchStudioStock(self: ProfileService)
             end
         end
     end)
+    game:GetAttributeChangedSignal("LastLightStudioChapter"):Connect(function()
+        for player, profile in self._profiles do
+            local advanced = self:_applyStudioChapters(profile, os.time())
+            if advanced ~= profile then
+                self._profiles[player] = advanced
+                self._loadedEvent:Fire(player, advanced)
+            end
+        end
+    end)
+end
+
+--[[
+    Chapter progress for a live verification run, through the real
+    mutators and nothing else.
+
+    The stock hook's note says it cannot grant chapters because chapters
+    are what a verification run performs -- and that was the whole truth
+    while chapter one was the thing being verified. It is a shipped,
+    live-walked path now, and the thing a session needs to look at is the
+    region *behind* it, which sits behind a chapter gate by design. So:
+    set `LastLightStudioChapter` to a chapter number and a joining
+    profile arrives with the story resolved through that chapter --
+    resolved by SaveSchema's own mutators, with each chapter's first
+    listed decision and outcome, so the save is one the game itself can
+    produce rather than a hand-built fixture.
+
+    The same three guards as the stock hook: Studio only, non-persistent
+    only, logged loudly every time it fires.
+]]
+function ProfileService._applyStudioChapters(self: ProfileService, profile: any, now: number): any
+    if self._persistent or not RunService:IsStudio() then
+        return profile
+    end
+    local requested = tonumber(game:GetAttribute("LastLightStudioChapter"))
+    if requested == nil then
+        return profile
+    end
+    local through = math.clamp(math.floor(requested), 1, 7)
+    local nextProfile = profile
+    local applied = 0
+    if through >= 1 then
+        local chapterOne = self._saveSchema.chapterOne(nextProfile)
+        if chapterOne == nil or chapterOne.status ~= "complete" then
+            local resolved, result = self._saveSchema.withChapterOneResolution(
+                nextProfile,
+                "studio:chapter_one",
+                "shared_agroforest",
+                "preserved",
+                now
+            )
+            if result.applied then
+                nextProfile = resolved
+                applied += 1
+            end
+        end
+    end
+    local ordered = ChapterCatalog.list()
+    for index = 2, through do
+        local definition = ordered[index]
+        if definition == nil then
+            break
+        end
+        local chapterId = definition.id
+        local record = nextProfile.story.chapters[chapterId]
+        if type(record) ~= "table" or record.status ~= "complete" then
+            local resolved, result = self._saveSchema.withChapterResolution(
+                nextProfile,
+                chapterId,
+                "studio:" .. chapterId,
+                definition.decisions[1],
+                definition.outcomes[1],
+                now
+            )
+            if result.applied then
+                nextProfile = resolved
+                applied += 1
+            end
+        end
+    end
+    if applied > 0 then
+        self._logger:warn("studio_chapters_resolved", {
+            through = through,
+            applied = applied,
+        })
+    end
+    return nextProfile
 end
 
 function ProfileService.Start(self: ProfileService)
@@ -58129,6 +58951,88 @@ function ProfileService.chapterOneSnapshot(self: ProfileService, player: Player)
     return self._saveSchema.chapterOne(profile)
 end
 
+--[[
+    The story as the access gates read it: chapterOne beside the keyed
+    chapter records, which is the exact shape RegionAccess.evaluate takes.
+    A copy rather than the live table, for the same reason every other
+    snapshot here copies -- a caller must not be able to resolve a chapter
+    by writing into what it was handed.
+]]
+function ProfileService.storySnapshot(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    local chapters: { [string]: any } = {}
+    for chapterId, record in profile.story.chapters do
+        chapters[chapterId] = table.clone(record)
+    end
+    return {
+        chapterOne = table.clone(profile.story.chapterOne),
+        chapters = chapters,
+    }
+end
+
+--[[
+    Resolve a chapter past the first, through SaveSchema's own mutator.
+    The boss services are the only callers: a chapter's resolution is its
+    boss's completion, and the decision arrives from inside the fight.
+    Same durable contract as completeChapterOne -- accepted means the
+    record is in the profile, durable means it survived a save.
+]]
+function ProfileService.resolveChapter(
+    self: ProfileService,
+    player: Player,
+    chapterId: string,
+    transactionId: string,
+    decision: string,
+    outcome: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { accepted = false, durable = false, reason = "profile_loading" }
+    end
+    if not self:isWritable(player) then
+        return { accepted = false, durable = false, reason = "profile_read_only" }
+    end
+    local nextProfile, result = self._saveSchema.withChapterResolution(
+        profile,
+        chapterId,
+        transactionId,
+        decision,
+        outcome,
+        os.time()
+    )
+    if not result.applied and not result.duplicate then
+        return { accepted = false, durable = true, reason = result.reason }
+    end
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent then
+            self._dirty[player] = true
+        end
+    end
+    local durable = not self._persistent
+    if self._persistent and (result.applied or self._dirty[player] == true) then
+        local saved = self:save(player)
+        local activeProfile = self._profiles[player]
+        local record = if activeProfile == nil then nil else activeProfile.story.chapters[chapterId]
+        durable = saved
+            and type(record) == "table"
+            and record.status == "complete"
+            and record.transactionId == transactionId
+    elseif self._persistent then
+        durable = true
+    end
+    return {
+        accepted = true,
+        applied = result.applied == true,
+        durable = durable,
+        reason = if durable then result.reason else "save_pending",
+        record = result.record,
+    }
+end
+
 function ProfileService.save(self: ProfileService, player: Player): boolean
     local profile = self._profiles[player]
     if profile == nil then
@@ -58518,7 +59422,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="149">
+        <Item class="ModuleScript" referent="150">
           <Properties>
             <string name="Name">RegionEncounterService</string>
             <string name="Source"><![CDATA[--!strict
@@ -58550,6 +59454,7 @@ return table.freeze(ProfileService)
     called by the server in answer to an interaction the world raised.
 ]]
 
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
@@ -58577,12 +59482,26 @@ export type Definition = {
     interactions: { [string]: (state: any, player: Player, now: number) -> (any, any) },
     -- Called on the service's tick; returns a new state or nil for "no change".
     tick: ((state: any, now: number) -> any?)?,
+    -- Elites that must be complete before this encounter unlocks.
+    lockedUntil: { string }?,
+    -- For a boss: how its finished state resolves its chapter.
+    chapterResolution: ((
+        state: any
+    ) -> {
+        chapterId: string,
+        decision: string,
+        outcome: string,
+    })?,
 }
 
 type Live = {
     definition: Definition,
     state: any,
     anchors: { [string]: BasePart },
+    -- Where the fight stands in the world, so a strike can be routed to
+    -- the encounter the striker is actually inside.
+    center: Vector3?,
+    radius: number?,
 }
 
 export type RegionEncounterService = typeof(setmetatable(
@@ -58652,7 +59571,8 @@ function RegionEncounterService.beginRun(
     runId: string,
     manifestHash: string,
     definitions: { Definition },
-    anchorsById: { [string]: { [string]: BasePart } }
+    anchorsById: { [string]: { [string]: BasePart } },
+    arenasById: { [string]: { center: Vector3, radius: number } }?
 )
     assert(runId ~= "", "encounter run id is required")
     assert(manifestHash ~= "", "encounter manifest hash is required")
@@ -58661,16 +59581,49 @@ function RegionEncounterService.beginRun(
     self._live = {}
     for _, definition in definitions do
         local enabled = self._featureFlags:isEnabled("region_encounters_enabled")
+        local arena = if arenasById ~= nil then arenasById[definition.id] else nil
         self._live[definition.id] = {
             definition = definition,
             state = definition.module.create(runId, manifestHash, enabled),
             anchors = anchorsById[definition.id] or {},
+            center = if arena ~= nil then arena.center else nil,
+            radius = if arena ~= nil then arena.radius else nil,
         }
         self._logger:info("region_encounter_ready", {
             encounter = definition.id,
             enabled = enabled,
             region = definition.regionId,
         })
+    end
+end
+
+--[[
+    A boss stays locked until its region's elites are complete. Checked
+    after anything completes rather than where the elite settles, so the
+    rule reads in one place and a second elite added later changes the
+    list, not the mechanism.
+]]
+function RegionEncounterService._unlockWaiting(self: RegionEncounterService)
+    for _, live in self._live do
+        local waitingOn = live.definition.lockedUntil
+        if waitingOn ~= nil and live.state.status == "locked" then
+            local cleared = true
+            for _, eliteId in waitingOn do
+                local elite = self._live[eliteId]
+                if elite == nil or elite.state.status ~= "complete" then
+                    cleared = false
+                    break
+                end
+            end
+            if cleared then
+                local nextState = live.definition.module.unlock(live.state)
+                live.state = nextState
+                self._logger:info("region_encounter_unlocked", {
+                    encounter = live.definition.id,
+                })
+                self:_toast(nil, Strings.get("encounter.something_below_has_stopped_waiting"))
+            end
+        end
     end
 end
 
@@ -58709,6 +59662,7 @@ function RegionEncounterService.interact(
         self:_toast(player, result.message)
         if result.completed == true then
             self:_settle(player, live)
+            self:_unlockWaiting()
         end
     end
     return true
@@ -58733,18 +59687,81 @@ function RegionEncounterService.damageNearest(
     if not self._survivalService:canAct(player) then
         return false, Strings.get("toast.you_cannot_strike_while_downed")
     end
+    local now = workspace:GetServerTimeNow()
     local strike = live.definition.module.strike
-    local nextState, result =
-        strike(live.state, player.UserId, amount, workspace:GetServerTimeNow())
+    local nextState, result = strike(live.state, player.UserId, amount, now)
     live.state = nextState
     if type(result) ~= "table" or result.accepted ~= true then
-        local snapshot = live.definition.module.snapshot(live.state, player.UserId, 0)
+        local snapshot = live.definition.module.snapshot(live.state, player.UserId, now)
         return false, tostring(snapshot.instruction)
     end
     if result.completed == true then
         self:_settle(player, live)
+        self:_unlockWaiting()
+        local snapshot = live.definition.module.snapshot(live.state, player.UserId, now)
+        return true, tostring(snapshot.instruction)
     end
-    return true, tostring(result.reason)
+    --[[
+        The blow landed, so say what it did in numbers a player can act
+        on. `reason` is a state-machine token ("damaged", "board_seized")
+        and belongs in a log, never on a screen.
+    ]]
+    return true,
+        string.format(
+            Strings.get("encounter.struck_n_holds_at_n"),
+            string.upper(
+                tostring(
+                    live.definition.module.snapshot(live.state, player.UserId, now).displayName
+                )
+            ),
+            math.max(0, math.floor(tonumber(result.health) or 0))
+        )
+end
+
+--[[
+    Route a strike to whichever encounter the striker is standing in.
+    Returns nil when they are standing in none, so the caller can hand
+    the strike to the enemy roster instead -- this is how UseTool serves
+    both a night wave and an arena without the client naming either.
+]]
+function RegionEncounterService.strikeNearest(
+    self: RegionEncounterService,
+    player: Player,
+    -- The strike context rides through unused today: encounter damage is
+    -- the fight's own tuning, not the weapon's, the same judgement the
+    -- Old Growth made. It stays in the signature so the day a weapon
+    -- matters here is a change to this file alone.
+    _context: any
+): (boolean?, string?)
+    local character = player.Character
+    local root = if character ~= nil then character:FindFirstChild("HumanoidRootPart") else nil
+    if root == nil or not root:IsA("BasePart") then
+        return nil, nil
+    end
+    for encounterId, live in self._live do
+        local center = live.center
+        local radius = live.radius
+        if center ~= nil and radius ~= nil then
+            local offset = root.Position - center
+            local flat = Vector3.new(offset.X, 0, offset.Z)
+            if flat.Magnitude <= radius + 6 then
+                local snapshot = live.definition.module.snapshot(
+                    live.state,
+                    player.UserId,
+                    workspace:GetServerTimeNow()
+                )
+                if snapshot.enabled == true and snapshot.complete ~= true then
+                    local tuning = live.definition.module.Tuning
+                    local amount = if snapshot.marked == true
+                            and type(tuning.markedStrikeDamage) == "number"
+                        then tuning.markedStrikeDamage
+                        else tuning.strikeDamage
+                    return self:damageNearest(player, encounterId, amount)
+                end
+            end
+        end
+    end
+    return nil, nil
 end
 
 --[[
@@ -58753,23 +59770,73 @@ end
     the ledger has seen that id before and refuses the second grant
     without anyone here having to remember.
 ]]
-function RegionEncounterService._settle(self: RegionEncounterService, player: Player, live: Live)
+function RegionEncounterService._settle(self: RegionEncounterService, _player: Player, live: Live)
+    --[[
+        Everyone who took part is paid, not only whoever landed the last
+        press. Participants are what the encounter itself recorded, the
+        transaction id is per participant, and the ledger's idempotency is
+        what makes a rejoin or a duplicate completion safe -- the same
+        contract the expedition events settle on.
+    ]]
     local reward = live.definition.module.Reward
-    if type(reward) ~= "table" then
-        return
+    if type(reward) == "table" then
+        for participantKey in live.state.participants do
+            local userId = tonumber(participantKey)
+            local participant = if userId ~= nil then Players:GetPlayerByUserId(userId) else nil
+            if participant ~= nil then
+                local transactionId = live.definition.module.rewardTransactionId(live.state, userId)
+                local result = self._profileService:grantUnbankedExpeditionReward(
+                    participant,
+                    transactionId,
+                    self._manifestHash,
+                    { materialId = reward.materialId, amount = reward.amount }
+                )
+                self._logger:info("region_encounter_settled", {
+                    applied = if type(result) == "table" then result.applied else nil,
+                    encounter = live.definition.id,
+                    player = userId,
+                })
+            end
+        end
     end
-    local transactionId = live.definition.module.rewardTransactionId(live.state, player.UserId)
-    local result = self._profileService:grantUnbankedExpeditionReward(
-        player,
-        transactionId,
-        self._manifestHash,
-        { materialId = reward.materialId, amount = reward.amount }
-    )
-    self._logger:info("region_encounter_settled", {
-        applied = if type(result) == "table" then result.applied else nil,
-        encounter = live.definition.id,
-        player = player.UserId,
-    })
+
+    --[[
+        A boss's completion is the chapter's resolution, and the decision
+        was made inside the fight rather than at a menu -- which vent, what
+        was spared. Resolved for every participant present, through the
+        profile's own chapter mutator, so the story record and the reward
+        settle at the same moment for the same people.
+    ]]
+    local resolve = live.definition.chapterResolution
+    if resolve ~= nil then
+        local resolution = resolve(live.state)
+        for participantKey in live.state.participants do
+            local userId = tonumber(participantKey)
+            local participant = if userId ~= nil then Players:GetPlayerByUserId(userId) else nil
+            if participant ~= nil then
+                local transactionId = string.format(
+                    "chapter:%s",
+                    live.definition.module.rewardTransactionId(live.state, userId)
+                )
+                local result = self._profileService:resolveChapter(
+                    participant,
+                    resolution.chapterId,
+                    transactionId,
+                    resolution.decision,
+                    resolution.outcome
+                )
+                self._logger:info("region_chapter_resolved", {
+                    accepted = if type(result) == "table" then result.accepted else nil,
+                    chapter = resolution.chapterId,
+                    decision = resolution.decision,
+                    encounter = live.definition.id,
+                    outcome = resolution.outcome,
+                    player = userId,
+                    reason = if type(result) == "table" then result.reason else nil,
+                })
+            end
+        end
+    end
 end
 
 function RegionEncounterService.snapshot(
@@ -58818,7 +59885,7 @@ return table.freeze(RegionEncounterService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="150">
+        <Item class="ModuleScript" referent="151">
           <Properties>
             <string name="Name">SocialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -59107,7 +60174,7 @@ return table.freeze(SocialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="151">
+        <Item class="ModuleScript" referent="152">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -60083,7 +61150,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="152">
+        <Item class="ModuleScript" referent="153">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -60092,6 +61159,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+local RegionExpeditionAssembly = require(script.Parent.Parent.World.RegionExpeditionAssembly)
 
 local TutorialService = {}
 TutorialService.__index = TutorialService
@@ -60161,6 +61229,7 @@ export type TutorialService = typeof(setmetatable(
         _socialService: any,
         _commerceService: any,
         _privateServerService: any,
+        _regionEncounterService: any,
         --[[
             Which store view each player is on, so the panel can be told to
             open by the world rather than by a HUD button. It is a revision
@@ -60251,6 +61320,7 @@ function TutorialService.new(
         _socialService = nil,
         _commerceService = nil,
         _privateServerService = nil,
+        _regionEncounterService = nil,
         _storeRevision = {},
         _actions = {},
         _sessions = {},
@@ -61086,6 +62156,16 @@ function TutorialService.setPrivateServerService(self: TutorialService, privateS
     self._privateServerService = privateServerService
 end
 
+-- The toast channel is wired in the bootstrap beside every other
+-- encounter service's; this reference is for routing interactions and
+-- strikes into the arenas.
+function TutorialService.setRegionEncounterService(
+    self: TutorialService,
+    regionEncounterService: any
+)
+    self._regionEncounterService = regionEncounterService
+end
+
 --[[
     Whether the store may open for this player, right now.
 
@@ -61147,7 +62227,24 @@ function TutorialService.strike(self: TutorialService, player: Player)
         )
     then
         local context = self:_strikeContext(player)
-        local landed, message = self._enemyService:damageNearest(player, context)
+        --[[
+            An expedition strike asks the region arenas first: a player
+            standing inside one is fighting that encounter, and only a
+            player standing in none is offered to the roster. nil from
+            strikeNearest means "not my fight", which is what lets one
+            button serve a night wave and an arena without the client
+            naming either.
+        ]]
+        local landed, message
+        if
+            player:GetAttribute("LastLightInExpedition") == true
+            and self._regionEncounterService ~= nil
+        then
+            landed, message = self._regionEncounterService:strikeNearest(player, context)
+        end
+        if landed == nil then
+            landed, message = self._enemyService:damageNearest(player, context)
+        end
         if landed and context.weaponId ~= nil then
             local wearTrait =
                 self._gearTraits.get(self._profileService:gearTraitOf(player, context.weaponId))
@@ -61315,6 +62412,26 @@ function TutorialService._interact(
         local result = self._expeditionService:interact(player, prompt)
         self:_setToast(player, result.message)
         self:_publishAll()
+        return
+    end
+    if actionId == self._runtimeIds.Actions.RegionEncounter then
+        local encounterId = prompt:GetAttribute("EncounterId")
+        local anchorId = prompt:GetAttribute("Payload")
+        if
+            type(encounterId) == "string"
+            and type(anchorId) == "string"
+            and self._regionEncounterService ~= nil
+        then
+            self._regionEncounterService:interact(player, encounterId, anchorId)
+            self:_publishAll()
+        end
+        return
+    end
+    if actionId == self._runtimeIds.Actions.SelectDestination then
+        local regionId = prompt:GetAttribute("Payload")
+        local result = self._expeditionService:selectDestination(player, regionId)
+        self:_setToast(player, result.message)
+        self:_publish(player)
         return
     end
     if actionId == self._runtimeIds.Actions.OldGrowthFire then
@@ -61638,11 +62755,22 @@ function TutorialService._interact(
 
     if actionId == self._runtimeIds.Actions.Reveal and session.stage == "complete" then
         if self._expeditionService:enter(player) then
-            local blackoutResult = self._blackoutService:participantEntered(player)
+            local regionId = self._expeditionService:currentSeed()
+            -- The blackout is Bramblewake's own chapter event; a road
+            -- pointed anywhere else has no blackout to join.
+            local blackoutResult = if regionId == "region_bramblewake"
+                then self._blackoutService:participantEntered(player)
+                else { message = nil }
             -- Entering gets said first; the blackout's announcement follows
             -- rather than replacing it. Same reasoning as the completion
             -- toast in the tutorial's own Reveal handler below.
-            self:_setToast(player, Strings.get("toast.entering_bramblewake"))
+            self:_setToast(
+                player,
+                string.format(
+                    Strings.get("toast.entering_n"),
+                    RegionExpeditionAssembly.displayName(regionId)
+                )
+            )
             if blackoutResult.message ~= nil then
                 local announcement = blackoutResult.message
                 task.delay(3.4, function()
@@ -61657,7 +62785,7 @@ function TutorialService._interact(
                 self._expeditionService:snapshot(player)
             )
         else
-            self:_setToast(player, Strings.get("tutorial.bramblewake_is_still_forming"))
+            self:_setToast(player, Strings.get("tutorial.the_wood_is_still_forming"))
         end
         self:_publish(player)
         return
@@ -61746,7 +62874,10 @@ function TutorialService._interact(
         self._phaseService:startFirstNight()
     elseif actionId == self._runtimeIds.Actions.Reveal then
         if self._expeditionService:enter(player) then
-            local blackoutResult = self._blackoutService:participantEntered(player)
+            local firstRevealRegion = self._expeditionService:currentSeed()
+            local blackoutResult = if firstRevealRegion == "region_bramblewake"
+                then self._blackoutService:participantEntered(player)
+                else { message = nil }
             --[[
                 Finishing First Light gets its own line. The blackout's
                 join announcement used to replace it entirely, so the
@@ -62766,7 +63897,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="153">
+        <Item class="ModuleScript" referent="154">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -63659,7 +64790,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="154">
+        <Item class="ModuleScript" referent="155">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -63672,7 +64803,12 @@ local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+local Regions = require(
+    game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Content.Definitions.Regions
+)
 local BramblewakeBuilder = require(script.Parent.Parent.World.BramblewakeBuilder)
+local RegionBuilders = require(script.Parent.Parent.World.RegionBuilders)
+local RegionExpeditionAssembly = require(script.Parent.Parent.World.RegionExpeditionAssembly)
 local FoliageBuilder = require(script.Parent.Parent.World.FoliageBuilder)
 local MeshTemplateLoader = require(script.Parent.Parent.World.MeshTemplateLoader)
 local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
@@ -68199,6 +69335,56 @@ function WorldService._buildLobby(self: WorldService, world: Model)
             * CFrame.Angles(0, math.rad(180), 0),
         Strings.get("world.to_emberhollow")
     )
+
+    --[[
+        The destination board, on the west wall across from the outfitter:
+        one plank per region, walked up to and pressed like everything
+        else in this game. The plank names the region and the press asks
+        the server to point the road at it; every gate -- enabled flag,
+        feature flag, chapter, readiness, an occupied wood -- is checked
+        where the request lands, so a plank for a shut region is a
+        refusal with a reason rather than a secret.
+    ]]
+    local destinationBoard = Instance.new("Folder")
+    destinationBoard.Name = "DestinationBoard"
+    destinationBoard.Parent = lobby
+    local boardAt = LOBBY_CENTER + Vector3.new(-26, 0, -4)
+    part(
+        destinationBoard,
+        "DestinationBoardPlinth",
+        Vector3.new(1.4, 12.5, 10.5),
+        CFrame.new(boardAt + Vector3.new(0, 6.25, 0)),
+        Color3.fromRGB(56, 44, 34),
+        Enum.Material.WoodPlanks
+    )
+    for index, region in ipairs(Regions) do
+        --[[
+            Spaced so the seventh plank still hangs above the floor. The
+            first pass stepped 1.9 studs from 11.4 and put Cinderfall's
+            plank level with the boards and the Hollow's inside them.
+        ]]
+        local plank = part(
+            destinationBoard,
+            "DestinationPlank",
+            Vector3.new(0.6, 1.3, 8.6),
+            CFrame.new(boardAt + Vector3.new(0.9, 12.3 - index * 1.55, 0)),
+            if region.enabled == true
+                then Color3.fromRGB(122, 92, 56)
+                else Color3.fromRGB(64, 58, 52),
+            Enum.Material.Wood,
+            false
+        )
+        self:_registerInteraction(
+            plank,
+            "destination_" .. region.id,
+            self._runtimeIds.Actions.SelectDestination,
+            Strings.get("world.set_course"),
+            RegionExpeditionAssembly.displayName(region.id),
+            region.id,
+            nil,
+            Vector3.new(5, 3.4, 10)
+        )
+    end
 
     -- Spawn at the back of the room, facing the platform and the doorway
     -- beyond it, so the first thing a player sees is where to go.
@@ -77487,74 +78673,21 @@ function WorldService.showExtractionPayoff(
     end)
 end
 
-function WorldService.buildBramblewake(
+function WorldService._placeMemoryFragments(
     self: WorldService,
+    model: Instance,
     manifest: any,
-    generator: any,
-    catalog: any
-): any
-    local world = assert(self._world, "world service has not initialized")
-    for interactionId, prompt in self._interactions do
-        local actionId = prompt:GetAttribute("ActionId")
-        if
-            actionId == self._runtimeIds.Actions.ExpeditionEvent
-            or actionId == self._runtimeIds.Actions.Extract
-            or actionId == self._runtimeIds.Actions.OldGrowthFire
-            or actionId == self._runtimeIds.Actions.WardenStagChoice
-            or actionId == self._runtimeIds.Actions.BramblewakeBlackout
-            or actionId == self._runtimeIds.Actions.RecoverExpeditionCache
-        then
-            self._interactions[interactionId] = nil
-        end
-    end
-    self._eventSockets = {}
-    self._eventTargets = {}
-    self._oldGrowthArena = nil
-    self._wardenStagArena = nil
-    self._blackoutArena = nil
-
-    local result = BramblewakeBuilder.build(world, manifest, generator, catalog, self._runtimeIds)
-    self:_placeAuthoredMeshes(
-        result.meshPlacements,
-        result.model,
-        result.model,
-        "expedition_mesh_dressing_ready"
-    )
-    self._expeditionEntry = result.entryCFrame
-    self._expeditionManifest = manifest
-    self._expeditionModuleCenters = result.moduleCenters
-    self._eventSockets = result.eventSockets
-    self._oldGrowthArena = result.eliteArena
-    self._wardenStagArena = result.bossArena
-    self._blackoutArena = result.blackout
-    self:_registerInteraction(
-        result.extractionTarget,
-        self._runtimeIds.InteractionIds.Wayhome,
-        self._runtimeIds.Actions.Extract,
-        "BANK & RETURN",
-        "Wayhome Gate",
-        nil,
-        nil
-    )
-    -- Harvest nodes: the reason to walk the route. Registered with the same
-    -- generous click volume everything else uses, and remembered here so the
-    -- tutorial service can look up what a given node grants.
-    self._resourceNodes = {}
-    for _, node in result.resourceNodes or {} do
-        self:_registerInteraction(
-            node.target,
-            node.interactionId,
-            self._runtimeIds.Actions.GatherResource,
-            Strings.get("world.harvest"),
-            node.objectText,
-            nil,
-            nil,
-            Vector3.new(10, 12, 10)
-        )
-        self._resourceNodes[node.interactionId] = node
-        addBillboard(node.target, string.upper(node.objectText), AMBER, 90)
-    end
-
+    extractionTarget: BasePart?,
+    bossSeal: BasePart?,
+    --[[
+        Where the ground-measuring ray starts, above the anchor. It has
+        to clear whatever scenery holds the anchor, and it must not
+        clear the region's own ceiling: fourteen studs is right for
+        Bramblewake's open sky and put both Delve shards on top of the
+        shored roof, nine studs above anyone who could read them.
+    ]]
+    rayStartOffset: number?
+)
     --[[
         Memory fragments: chapter one's story, resting on scenery that was
         already standing there.
@@ -77577,7 +78710,7 @@ function WorldService.buildBramblewake(
             return nil
         end
         if kind == "story" then
-            for _, descendant in result.model:GetDescendants() do
+            for _, descendant in model:GetDescendants() do
                 if
                     descendant:IsA("BasePart")
                     and descendant:GetAttribute("StoryLandmark") == key
@@ -77587,9 +78720,9 @@ function WorldService.buildBramblewake(
             end
             return nil
         elseif kind == "poi" then
-            local model = result.model:FindFirstChild("PhysicalPOI_" .. key, true)
-            local anchorPart = if model ~= nil
-                then model:FindFirstChild("PointOfInterest", true)
+            local wrapper = model:FindFirstChild("PhysicalPOI_" .. key, true)
+            local anchorPart = if wrapper ~= nil
+                then wrapper:FindFirstChild("PointOfInterest", true)
                 else nil
             if anchorPart ~= nil and anchorPart:IsA("BasePart") then
                 return anchorPart
@@ -77603,7 +78736,7 @@ function WorldService.buildBramblewake(
                 rather than by the name of a wrapper only one builder
                 makes.
             ]]
-            for _, descendant in result.model:GetDescendants() do
+            for _, descendant in model:GetDescendants() do
                 if
                     descendant:IsA("BasePart")
                     and descendant.Name == "PointOfInterest"
@@ -77614,9 +78747,9 @@ function WorldService.buildBramblewake(
             end
             return nil
         elseif kind == "site" and key == "wayhome" then
-            return result.extractionTarget
+            return extractionTarget
         elseif kind == "site" and key == "warden_seal" then
-            local seal = result.bossArena ~= nil and result.bossArena.seal or nil
+            local seal = bossSeal
             return if seal ~= nil and seal:IsA("BasePart") then seal else nil
         end
         return nil
@@ -77642,7 +78775,7 @@ function WorldService.buildBramblewake(
             local shard = Instance.new("Model")
             shard.Name = "MemoryFragment_" .. fragment.id
             shard:SetAttribute("MemoryFragmentId", fragment.id)
-            shard.Parent = result.model
+            shard.Parent = model
             --[[
                 Seat the shard on the ground, not on its anchor's height.
 
@@ -77683,7 +78816,8 @@ function WorldService.buildBramblewake(
                 could stand on.
             ]]
             local groundY = anchorPart.Position.Y
-            local origin = Vector3.new(shardX, anchorPart.Position.Y + 14, shardZ)
+            local origin =
+                Vector3.new(shardX, anchorPart.Position.Y + (rayStartOffset or 14), shardZ)
             for _ = 1, 8 do
                 local groundHit = workspace:Raycast(origin, Vector3.new(0, -90, 0), groundParams)
                 if groundHit == nil then
@@ -77773,6 +78907,231 @@ function WorldService.buildBramblewake(
             }
         end
     end
+end
+
+--[[
+    Clear everything a previous expedition registered, whichever builder
+    made it. The prompts themselves die with the expedition model; these
+    are the table entries that would otherwise hold destroyed prompts and
+    answer for them.
+]]
+function WorldService._clearExpeditionRegistrations(self: WorldService)
+    for interactionId, prompt in self._interactions do
+        local actionId = prompt:GetAttribute("ActionId")
+        if
+            actionId == self._runtimeIds.Actions.ExpeditionEvent
+            or actionId == self._runtimeIds.Actions.Extract
+            or actionId == self._runtimeIds.Actions.OldGrowthFire
+            or actionId == self._runtimeIds.Actions.WardenStagChoice
+            or actionId == self._runtimeIds.Actions.BramblewakeBlackout
+            or actionId == self._runtimeIds.Actions.RecoverExpeditionCache
+            or actionId == self._runtimeIds.Actions.RegionEncounter
+        then
+            self._interactions[interactionId] = nil
+        end
+    end
+    --[[
+        Nodes and memory shards are registered under ids that differ per
+        region, so a region switch leaves the old ids stale rather than
+        overwritten. Both tables are rebuilt by whichever builder runs
+        next; the prompts they point at are already destroyed.
+    ]]
+    for interactionId in self._resourceNodes do
+        self._interactions[interactionId] = nil
+    end
+    for interactionId in self._memoryFragmentTargets do
+        self._interactions[interactionId] = nil
+    end
+    self._resourceNodes = {}
+    self._memoryFragmentTargets = {}
+    self._eventSockets = {}
+    self._eventTargets = {}
+    self._oldGrowthArena = nil
+    self._wardenStagArena = nil
+    self._blackoutArena = nil
+end
+
+-- Whether a region's world can be raised by this server: Bramblewake
+-- through its own builder, everything else through the assembly and its
+-- region's visual builder.
+function WorldService.canBuildExpeditionRegion(_self: WorldService, regionId: any): boolean
+    if regionId == "region_bramblewake" then
+        return true
+    end
+    return type(regionId) == "string" and RegionBuilders.get(regionId) ~= nil
+end
+
+--[[
+    Raise a non-Bramblewake region as this server's expedition, and wire
+    the pieces the assembly hands back: extraction, harvest nodes, event
+    steps, memory fragments, and each encounter arena's anchors. The
+    shape mirrors buildBramblewake's tail exactly where the two share a
+    contract, because ExpeditionService reads the same fields from both.
+]]
+function WorldService.buildRegionExpedition(
+    self: WorldService,
+    manifest: any,
+    generator: any,
+    catalog: any
+): any
+    local world = assert(self._world, "world service has not initialized")
+    self:_clearExpeditionRegistrations()
+
+    local result =
+        RegionExpeditionAssembly.build(world, manifest, generator, catalog, self._runtimeIds)
+    self._expeditionEntry = result.entryCFrame
+    self._expeditionManifest = manifest
+    self._expeditionModuleCenters = result.moduleCenters
+    self._eventSockets = result.eventSockets
+
+    self:_registerInteraction(
+        result.extractionTarget,
+        self._runtimeIds.InteractionIds.Wayhome,
+        self._runtimeIds.Actions.Extract,
+        "BANK & RETURN",
+        "Wayhome Gate",
+        nil,
+        nil
+    )
+
+    self._resourceNodes = {}
+    for _, node in result.resourceNodes or {} do
+        self:_registerInteraction(
+            node.target,
+            node.interactionId,
+            self._runtimeIds.Actions.GatherResource,
+            Strings.get("world.harvest"),
+            node.objectText,
+            nil,
+            nil,
+            Vector3.new(10, 12, 10)
+        )
+        self._resourceNodes[node.interactionId] = node
+        -- Half Bramblewake's label reach. The region cells are open
+        -- enough that ninety studs put every node name in one gold band.
+        addBillboard(node.target, string.upper(node.objectText), AMBER, 45)
+    end
+
+    self:_placeMemoryFragments(result.model, manifest, result.extractionTarget, nil, 2.5)
+
+    for _, descriptor in result.eventInteractions do
+        self:_registerInteraction(
+            descriptor.target,
+            descriptor.interactionId,
+            self._runtimeIds.Actions.ExpeditionEvent,
+            descriptor.actionText,
+            descriptor.objectText,
+            nil,
+            nil
+        )
+        local prompt = self._interactions[descriptor.interactionId]
+        prompt:SetAttribute("EventId", descriptor.eventId)
+        prompt:SetAttribute("EventStepId", descriptor.stepId)
+        local targets = self._eventTargets[descriptor.eventId]
+        if targets == nil then
+            targets = {}
+            self._eventTargets[descriptor.eventId] = targets
+        end
+        targets[descriptor.stepId] = descriptor.target
+    end
+
+    --[[
+        Every arena anchor is a plain interaction carrying its encounter
+        and its own id as attributes. The client sends the interaction id
+        it is standing at and nothing else, which is the same contract
+        the private-server rail settled on: a payload that could name a
+        lever could throw it from anywhere.
+    ]]
+    for _, encounter in result.encounters do
+        for _, meta in encounter.anchorMeta do
+            local anchorPart = encounter.anchors[meta.id]
+            if anchorPart ~= nil then
+                local interactionId = string.format("enc_%s_%s", encounter.id, meta.id)
+                self:_registerInteraction(
+                    anchorPart,
+                    interactionId,
+                    self._runtimeIds.Actions.RegionEncounter,
+                    meta.action,
+                    meta.object,
+                    meta.id,
+                    nil,
+                    Vector3.new(9, 11, 9)
+                )
+                local prompt = self._interactions[interactionId]
+                prompt:SetAttribute("EncounterId", encounter.id)
+            end
+        end
+    end
+
+    world:SetAttribute("ExpeditionReady", true)
+    world:SetAttribute("ExpeditionManifestHash", manifest.hash)
+    world:SetAttribute("ExpeditionEventInteractions", #result.eventInteractions)
+    return result
+end
+
+function WorldService.buildBramblewake(
+    self: WorldService,
+    manifest: any,
+    generator: any,
+    catalog: any
+): any
+    local world = assert(self._world, "world service has not initialized")
+    self:_clearExpeditionRegistrations()
+    -- A region wood may be standing where the forest is about to be:
+    -- Bramblewake's builder only knows to clear its own model.
+    local regionModel = world:FindFirstChild("RegionExpedition")
+    if regionModel ~= nil then
+        regionModel:Destroy()
+    end
+
+    local result = BramblewakeBuilder.build(world, manifest, generator, catalog, self._runtimeIds)
+    self:_placeAuthoredMeshes(
+        result.meshPlacements,
+        result.model,
+        result.model,
+        "expedition_mesh_dressing_ready"
+    )
+    self._expeditionEntry = result.entryCFrame
+    self._expeditionManifest = manifest
+    self._expeditionModuleCenters = result.moduleCenters
+    self._eventSockets = result.eventSockets
+    self._oldGrowthArena = result.eliteArena
+    self._wardenStagArena = result.bossArena
+    self._blackoutArena = result.blackout
+    self:_registerInteraction(
+        result.extractionTarget,
+        self._runtimeIds.InteractionIds.Wayhome,
+        self._runtimeIds.Actions.Extract,
+        "BANK & RETURN",
+        "Wayhome Gate",
+        nil,
+        nil
+    )
+    -- Harvest nodes: the reason to walk the route. Registered with the same
+    -- generous click volume everything else uses, and remembered here so the
+    -- tutorial service can look up what a given node grants.
+    self._resourceNodes = {}
+    for _, node in result.resourceNodes or {} do
+        self:_registerInteraction(
+            node.target,
+            node.interactionId,
+            self._runtimeIds.Actions.GatherResource,
+            Strings.get("world.harvest"),
+            node.objectText,
+            nil,
+            nil,
+            Vector3.new(10, 12, 10)
+        )
+        self._resourceNodes[node.interactionId] = node
+        addBillboard(node.target, string.upper(node.objectText), AMBER, 90)
+    end
+
+    self:_placeMemoryFragments(
+        result.model,
+        manifest,
+        result.extractionTarget,
+        if result.bossArena ~= nil then result.bossArena.seal else nil
+    )
 
     for _, descriptor in result.eventInteractions do
         self:_registerInteraction(
@@ -79407,11 +80766,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="155">
+      <Item class="Folder" referent="156">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="156">
+        <Item class="ModuleScript" referent="157">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -83730,7 +85089,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="157">
+        <Item class="ModuleScript" referent="158">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -84829,7 +86188,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="158">
+        <Item class="ModuleScript" referent="159">
           <Properties>
             <string name="Name">CinderfallBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -85696,7 +87055,7 @@ return table.freeze(CinderfallBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="159">
+        <Item class="ModuleScript" referent="160">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -86391,7 +87750,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="160">
+        <Item class="ModuleScript" referent="161">
           <Properties>
             <string name="Name">FrostmereBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -87440,7 +88799,7 @@ return table.freeze(FrostmereBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="161">
+        <Item class="ModuleScript" referent="162">
           <Properties>
             <string name="Name">IronrootBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -88455,7 +89814,7 @@ return table.freeze(IronrootBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="162">
+        <Item class="ModuleScript" referent="163">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -89314,7 +90673,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="163">
+        <Item class="ModuleScript" referent="164">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -89400,7 +90759,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="164">
+        <Item class="ModuleScript" referent="165">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -89774,7 +91133,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="165">
+        <Item class="ModuleScript" referent="166">
           <Properties>
             <string name="Name">MireglassBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -90530,7 +91889,7 @@ return table.freeze(MireglassBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="166">
+        <Item class="ModuleScript" referent="167">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -90710,7 +92069,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="167">
+        <Item class="ModuleScript" referent="168">
           <Properties>
             <string name="Name">RegionBuilders</string>
             <string name="Source"><![CDATA[--!strict
@@ -90757,9 +92116,14 @@ local ENTRIES: { [string]: any } = {
     },
     region_ironroot = {
         builder = IronrootBuilder,
-        walkable = false,
-        -- Mesh dressing is an art pass: authored assets, not wiring.
-        -- Everything a party needs to walk the region is built.
+        --[[
+            Walked end to end in a live session the day this flipped:
+            departure board, arrival, nodes, a point of interest, an
+            event, a memory fragment, both elites, the Maw, extraction.
+            The missing list is a note for the art pass, not a gate;
+            readiness only reads `walkable`.
+        ]]
+        walkable = true,
         missing = {
             "authored mesh dressing",
         },
@@ -91069,7 +92433,13 @@ local function labelled(parent: Instance, text: string, color: Color3)
     gui.Size = UDim2.fromOffset(220, 40)
     gui.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
     gui.AlwaysOnTop = false
-    gui.MaxDistance = 140
+    --[[
+        Close enough to read on approach, far enough to find. The first
+        Delve walk had every point of interest, event socket and node
+        label in a twelve-module wood stacked into one band of gold soup
+        at 140, because 140 studs is two whole cells.
+    ]]
+    gui.MaxDistance = 60
     gui.Parent = parent
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
@@ -91477,7 +92847,634 @@ return table.freeze(RegionBuilders)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="168">
+        <Item class="ModuleScript" referent="169">
+          <Properties>
+            <string name="Name">RegionExpeditionAssembly</string>
+            <string name="Source"><![CDATA[--!strict
+
+--[[
+    Stand a non-Bramblewake region up as a walkable expedition.
+
+    Bramblewake's builder does all of this and its own dressing in one
+    four-thousand-line pass. The newer regions were built the other way
+    around: each owns a module-visual vocabulary (IronrootBuilder,
+    MireglassBuilder, ...) and RegionBuilders holds the shared pieces --
+    nodes, points of interest, event sockets, arenas, wayfinding. What no
+    wave ever wrote was the assembly that composes those pieces into one
+    world a server can raise, which is why every region after the first
+    sat enabled = false with all of its content reachable by no one.
+
+    This is that assembly. It is deliberately plainer than Bramblewake's
+    -- the authored dressing is still an art pass -- but everything a run
+    needs is here: continuous ground, the region's own module visuals,
+    harvest nodes, labelled points of interest, event sockets with their
+    step anchors, the elite and boss arenas with a creature presence in
+    each, a wayfinding trail, an arrival sign and an extraction gate.
+]]
+
+local CollectionService = game:GetService("CollectionService")
+
+local RegionEncounterWiring =
+    require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").RegionEncounterWiring)
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+local RegionBuilders = require(script.Parent.RegionBuilders)
+
+local RegionExpeditionAssembly = {}
+
+-- The same anchor Bramblewake builds from, so the road out of town and
+-- the distant scenery frame whichever wood is standing.
+local ORIGIN = Vector3.new(1600, 0, -230)
+
+export type EncounterSite = {
+    id: string,
+    anchors: { [string]: BasePart },
+    anchorMeta: { RegionEncounterWiring.Anchor },
+    center: Vector3,
+    radius: number,
+}
+
+--[[
+    What each region's assembly looks like where the shared pieces need a
+    colour or a material: the ground its modules stand on, the arena
+    palette, and the presence at an arena's middle. Kept small on
+    purpose; a region's real identity lives in its module visuals.
+]]
+local LOOKS: { [string]: any } = {
+    region_ironroot = {
+        groundColor = Color3.fromRGB(48, 44, 42),
+        groundMaterial = Enum.Material.Rock,
+        arenaFloor = Color3.fromRGB(54, 50, 48),
+        arenaEdge = Color3.fromRGB(66, 58, 50),
+        arenaAnchor = Color3.fromRGB(255, 206, 128),
+        presenceBody = Color3.fromRGB(38, 34, 32),
+        presenceGlow = Color3.fromRGB(255, 168, 66),
+    },
+    region_mireglass = {
+        groundColor = Color3.fromRGB(52, 58, 50),
+        groundMaterial = Enum.Material.Mud,
+        arenaFloor = Color3.fromRGB(56, 64, 58),
+        arenaEdge = Color3.fromRGB(72, 78, 70),
+        arenaAnchor = Color3.fromRGB(146, 214, 226),
+        presenceBody = Color3.fromRGB(40, 46, 44),
+        presenceGlow = Color3.fromRGB(146, 214, 226),
+    },
+    region_tempest = {
+        groundColor = Color3.fromRGB(70, 72, 74),
+        groundMaterial = Enum.Material.Slate,
+        arenaFloor = Color3.fromRGB(76, 78, 82),
+        arenaEdge = Color3.fromRGB(88, 92, 96),
+        arenaAnchor = Color3.fromRGB(255, 216, 150),
+        presenceBody = Color3.fromRGB(48, 50, 54),
+        presenceGlow = Color3.fromRGB(255, 216, 150),
+    },
+    region_frostmere = {
+        groundColor = Color3.fromRGB(196, 204, 210),
+        groundMaterial = Enum.Material.Snow,
+        arenaFloor = Color3.fromRGB(180, 190, 198),
+        arenaEdge = Color3.fromRGB(126, 128, 130),
+        arenaAnchor = Color3.fromRGB(238, 128, 54),
+        presenceBody = Color3.fromRGB(210, 218, 224),
+        presenceGlow = Color3.fromRGB(126, 236, 198),
+    },
+    region_cinderfall = {
+        groundColor = Color3.fromRGB(72, 66, 62),
+        groundMaterial = Enum.Material.Basalt,
+        arenaFloor = Color3.fromRGB(80, 72, 66),
+        arenaEdge = Color3.fromRGB(148, 142, 134),
+        arenaAnchor = Color3.fromRGB(255, 148, 62),
+        presenceBody = Color3.fromRGB(52, 46, 44),
+        presenceGlow = Color3.fromRGB(255, 148, 62),
+    },
+}
+
+local function ground(parent: Instance, center: Vector3, size: number, look: any): BasePart
+    local slab = Instance.new("Part")
+    slab.Name = "RegionGround"
+    slab.Size = Vector3.new(size, 5, size)
+    slab.CFrame = CFrame.new(center + Vector3.new(0, -2.5, 0))
+    slab.Color = look.groundColor
+    slab.Material = look.groundMaterial
+    slab.Anchored = true
+    slab.Parent = parent
+    return slab
+end
+
+local function billboardLabel(target: BasePart, text: string, color: Color3, maxDistance: number?)
+    local gui = Instance.new("BillboardGui")
+    gui.Name = "Label"
+    gui.Size = UDim2.fromOffset(230, 42)
+    gui.StudsOffsetWorldSpace = Vector3.new(0, 5.5, 0)
+    gui.AlwaysOnTop = false
+    gui.MaxDistance = maxDistance or 80
+    gui.Parent = target
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Font = Enum.Font.GothamBold
+    label.Text = string.upper(text)
+    label.TextColor3 = color
+    label.TextScaled = true
+    label.TextStrokeTransparency = 0.4
+    label.Parent = gui
+end
+
+--[[
+    A creature presence at an arena's middle, so a fight is against
+    something a camera can find rather than against empty air. Not an
+    authored body -- that is the art pass -- but a deliberate mass: a
+    leaning dark bulk at head-and-a-half height with a lit core, the
+    same silhouette discipline the enemy roster follows (a threat may
+    glow; an objective may not impersonate one).
+]]
+local function presence(parent: Instance, center: Vector3, look: any, encounterId: string): BasePart
+    local model = Instance.new("Model")
+    model.Name = "EncounterPresence"
+    model:SetAttribute("EncounterId", encounterId)
+    model.Parent = parent
+    local base = Instance.new("Part")
+    base.Name = "PresenceBase"
+    base.Size = Vector3.new(6.5, 5.5, 5.5)
+    base.CFrame = CFrame.new(center + Vector3.new(0, 2.75, 0)) * CFrame.Angles(0, 0.6, 0.08)
+    base.Color = look.presenceBody
+    base.Material = Enum.Material.Rock
+    base.Anchored = true
+    base.Parent = model
+    local shoulder = Instance.new("Part")
+    shoulder.Name = "PresenceShoulder"
+    shoulder.Size = Vector3.new(4.6, 3.4, 4.2)
+    shoulder.CFrame = CFrame.new(center + Vector3.new(0.4, 6.6, -0.3))
+        * CFrame.Angles(0.14, 1.1, -0.1)
+    shoulder.Color = look.presenceBody
+    shoulder.Material = Enum.Material.Rock
+    shoulder.Anchored = true
+    shoulder.Parent = model
+    local core = Instance.new("Part")
+    core.Name = "PresenceCore"
+    core.Shape = Enum.PartType.Ball
+    core.Size = Vector3.new(1.6, 1.6, 1.6)
+    core.CFrame = CFrame.new(center + Vector3.new(0, 5.4, 1.9))
+    core.Color = look.presenceGlow
+    core.Material = Enum.Material.Neon
+    core.Anchored = true
+    core.CanCollide = false
+    core.CanQuery = false
+    core.CastShadow = false
+    core.Parent = model
+    local light = Instance.new("PointLight")
+    light.Color = look.presenceGlow
+    light.Brightness = 1.4
+    light.Range = 18
+    light.Shadows = false
+    light.Parent = core
+    return core
+end
+
+--[[
+    Cut the road through whatever a module visual stood across it.
+
+    The visuals were authored cell by cell, and several stand scenery on
+    their cell edges: the Delve's floor walls both X sides in cut rock,
+    which is right for a room and wrong for the two rooms the route
+    passes between -- the first live walk met a rock canyon with a
+    three-stud unlit slot where the trail said the road was. So after
+    every module is drawn, anything solid and tall standing near the
+    seam between two connected cells is removed. Floors and way markers
+    are low; nothing a player walks ON clears the height test.
+]]
+local function clearRouteCorridor(regionModel: Instance, from: Vector3, to: Vector3)
+    local midpoint = (from + to) / 2
+    for _, descendant in regionModel:GetDescendants() do
+        if
+            descendant:IsA("BasePart")
+            and descendant.CanCollide
+            and descendant.Size.Y > 2.5
+            and descendant.Name ~= "RegionGround"
+        then
+            local offset = descendant.Position - midpoint
+            if math.abs(offset.X) < 12 and math.abs(offset.Z) < 12 then
+                descendant:Destroy()
+            end
+        end
+    end
+end
+
+--[[
+    An unoccupied cell beside a host module, for an arena. The route is a
+    self-avoiding walk, so at least one of a module's four neighbours is
+    always free; claimed arena cells count as occupied so two fights are
+    never dealt onto the same ground.
+]]
+local function freeNeighbor(
+    hostCenter: Vector3,
+    cellSize: number,
+    occupied: { [string]: boolean }
+): Vector3
+    local steps = {
+        Vector3.new(cellSize, 0, 0),
+        Vector3.new(0, 0, cellSize),
+        Vector3.new(-cellSize, 0, 0),
+        Vector3.new(0, 0, -cellSize),
+    }
+    for _, step in steps do
+        local candidate = hostCenter + step
+        local key = string.format("%d:%d", candidate.X, candidate.Z)
+        if not occupied[key] then
+            occupied[key] = true
+            return candidate
+        end
+    end
+    -- Unreachable on any valid manifest; a diagonal cell is the honest
+    -- fallback rather than stacking two arenas.
+    local fallback = hostCenter + Vector3.new(cellSize, 0, cellSize)
+    occupied[string.format("%d:%d", fallback.X, fallback.Z)] = true
+    return fallback
+end
+
+function RegionExpeditionAssembly.build(
+    parent: Instance,
+    manifest: any,
+    generator: any,
+    catalog: any,
+    runtimeIds: any
+): any
+    local regionId = manifest.regionId
+    local look = assert(LOOKS[regionId], "no assembly look for region " .. tostring(regionId))
+    local builder = RegionBuilders.get(regionId)
+    assert(builder ~= nil, "no builder for region " .. tostring(regionId))
+
+    for _, name in { "BramblewakeExpedition", "RegionExpedition" } do
+        local existing = parent:FindFirstChild(name)
+        if existing ~= nil then
+            existing:Destroy()
+        end
+    end
+
+    local expedition = Instance.new("Model")
+    expedition.Name = "RegionExpedition"
+    expedition:SetAttribute("RegionId", regionId)
+    expedition:SetAttribute("ManifestHash", manifest.hash)
+    expedition:SetAttribute("Seed", manifest.seed)
+    expedition:SetAttribute("Source", manifest.source)
+    expedition:SetAttribute("Ready", false)
+    expedition.Parent = parent
+
+    local centers: { Vector3 } = {}
+    local occupied: { [string]: boolean } = {}
+    local cellCenters: { Vector3 } = {}
+    for _, placement in manifest.modules do
+        local center = ORIGIN
+            + Vector3.new(placement.cellX * catalog.CellSize, 0, placement.cellZ * catalog.CellSize)
+        centers[placement.index] = center
+        occupied[string.format("%d:%d", center.X, center.Z)] = true
+        table.insert(cellCenters, center)
+    end
+
+    --[[
+        Modules first: the region's own visuals, on continuous ground.
+        The module visuals float their floors inside the cell (the
+        Delve's is 56 studs on a 72-stud cell), so the full-cell slab
+        underneath is what keeps the seam between two modules from being
+        a 16-stud fall out of the world.
+    ]]
+    local moduleModels: { Instance } = {}
+    local drawn = 0
+    for _, placement in manifest.modules do
+        local definition = generator.moduleDefinition(placement.moduleId)
+        local center = centers[placement.index]
+        local module = Instance.new("Model")
+        module.Name = string.format("Module_%02d", placement.index)
+        module:SetAttribute("ContentId", placement.moduleId)
+        module:SetAttribute("DisplayName", definition.displayName)
+        module:SetAttribute("SequenceIndex", placement.index)
+        module:SetAttribute("CellX", placement.cellX)
+        module:SetAttribute("CellZ", placement.cellZ)
+        module.Parent = expedition
+        CollectionService:AddTag(module, runtimeIds.ExpeditionModuleTag)
+        ground(module, center, catalog.CellSize, look)
+        if builder.buildModuleVisual(module, definition.visual, center) then
+            drawn += 1
+        end
+        moduleModels[placement.index] = module
+    end
+    assert(drawn == #manifest.modules, regionId .. " placed a module its builder cannot draw")
+
+    -- The trail between modules, in the region's own light.
+    local trailLook = RegionBuilders.Wayfinding[regionId]
+    if trailLook ~= nil then
+        RegionBuilders.buildWayfinding(
+            expedition,
+            manifest,
+            catalog,
+            ORIGIN,
+            trailLook.marker,
+            trailLook.glow
+        )
+    end
+
+    -- Harvest nodes, from the region's own material list.
+    local materials = RegionBuilders.NodeMaterials[regionId]
+    assert(materials ~= nil, regionId .. " has no node material list")
+    local nodePrefix = string.gsub(regionId, "^region_", "")
+    local resourceNodes = RegionBuilders.buildResourceNodes(
+        moduleModels,
+        manifest,
+        catalog,
+        ORIGIN,
+        materials,
+        nodePrefix
+    )
+
+    RegionBuilders.buildPointsOfInterest(
+        moduleModels,
+        manifest,
+        generator,
+        catalog,
+        ORIGIN,
+        look.arenaAnchor
+    )
+
+    -- Event sockets and their step anchors, flattened into the same
+    -- descriptor shape Bramblewake's builder returns, so one registration
+    -- path serves both.
+    local sockets = RegionBuilders.buildEventSockets(
+        moduleModels,
+        manifest,
+        generator,
+        catalog,
+        ORIGIN,
+        runtimeIds,
+        look.presenceGlow
+    )
+    local eventSockets: { [string]: BasePart } = {}
+    local eventInteractions = {}
+    for _, socket in sockets do
+        eventSockets[socket.eventId] = socket.target
+        for _, step in socket.steps do
+            table.insert(eventInteractions, {
+                target = step.target,
+                interactionId = runtimeIds.eventInteractionId(socket.eventId, step.stepId),
+                eventId = socket.eventId,
+                stepId = step.stepId,
+                actionText = step.actionText,
+                objectText = step.objectText,
+            })
+        end
+    end
+
+    -- Arrival sign at the first module, so the first thing a party sees
+    -- names where they are standing.
+    local arrivalCenter = centers[1]
+    local arrivalPost = Instance.new("Part")
+    arrivalPost.Name = "RegionArrivalSign"
+    arrivalPost.Size = Vector3.new(0.8, 6.4, 0.8)
+    arrivalPost.CFrame = CFrame.new(arrivalCenter + Vector3.new(0, 3.2, -8))
+    arrivalPost.Color = Color3.fromRGB(74, 56, 38)
+    arrivalPost.Material = Enum.Material.Wood
+    arrivalPost.Anchored = true
+    arrivalPost.Parent = expedition
+    billboardLabel(arrivalPost, RegionExpeditionAssembly.displayName(regionId), look.arenaAnchor)
+
+    --[[
+        The extraction gate, at the module whose role is extraction: a
+        lit column a player can see across the wood, ringed so it reads
+        as a destination, with the interaction on the column itself.
+    ]]
+    local extractionTarget: BasePart? = nil
+    for _, placement in manifest.modules do
+        local definition = generator.moduleDefinition(placement.moduleId)
+        if definition.role == "extraction" then
+            local center = centers[placement.index]
+            local column = Instance.new("Part")
+            column.Name = "WayhomeLight"
+            column.Size = Vector3.new(3.2, 14, 3.2)
+            column.CFrame = CFrame.new(center + Vector3.new(0, 7, 10))
+            column.Color = Color3.fromRGB(255, 224, 168)
+            column.Material = Enum.Material.Neon
+            column.Transparency = 0.35
+            column.Anchored = true
+            column.CanCollide = false
+            column:SetAttribute("ContentId", placement.moduleId)
+            column:SetAttribute("ExtractionId", "extraction_" .. nodePrefix .. "_wayhome")
+            CollectionService:AddTag(column, runtimeIds.ExpeditionExtractionTag)
+            local glowLight = Instance.new("PointLight")
+            glowLight.Color = Color3.fromRGB(255, 224, 168)
+            glowLight.Brightness = 2
+            glowLight.Range = 26
+            glowLight.Parent = column
+            for postIndex = 0, 5 do
+                local angle = postIndex * (math.pi * 2 / 6)
+                local marker = Instance.new("Part")
+                marker.Name = "WayhomeMarker"
+                marker.Size = Vector3.new(1.4, 2.2, 1.4)
+                marker.CFrame = CFrame.new(
+                    center + Vector3.new(math.cos(angle) * 7, 1.1, 10 + math.sin(angle) * 7)
+                )
+                marker.Color = look.arenaEdge
+                marker.Material = Enum.Material.Slate
+                marker.Anchored = true
+                marker.Parent = moduleModels[placement.index]
+            end
+            column.Parent = moduleModels[placement.index]
+            extractionTarget = column
+        end
+    end
+
+    --[[
+        Arenas. The elites stand a third and two thirds of the way along
+        the walk, the boss beside its end, each in a free cell off the
+        route with its own ground -- an arena floating over the void is
+        the first thing a walk would have filed. Anchor lists come from
+        the encounter wiring, so a fight and its arena cannot disagree
+        about what stands in it.
+    ]]
+    local encounters: { EncounterSite } = {}
+    local wiringDefinitions = RegionEncounterWiring.definitionsFor(regionId)
+    local moduleCount = #manifest.modules
+    local hostIndexFor = {
+        math.max(2, math.floor(moduleCount / 3)),
+        math.max(3, math.floor(moduleCount * 2 / 3)),
+        moduleCount,
+    }
+    for index, definition in wiringDefinitions do
+        local arenaSpec = RegionBuilders.Arenas[definition.id]
+        assert(arenaSpec ~= nil, definition.id .. " has no arena spec")
+        local hostIndex = hostIndexFor[math.min(index, #hostIndexFor)]
+        local hostCenter = centers[hostIndex] or centers[moduleCount]
+        local arenaCenter = freeNeighbor(hostCenter, catalog.CellSize, occupied)
+        local arenaHolder = Instance.new("Model")
+        arenaHolder.Name = arenaSpec.name .. "Site"
+        arenaHolder.Parent = expedition
+        ground(arenaHolder, arenaCenter, catalog.CellSize, look)
+        local anchors = RegionBuilders.buildArena(arenaHolder, arenaCenter, {
+            name = arenaSpec.name,
+            radius = arenaSpec.radius,
+            floorColor = look.arenaFloor,
+            edgeColor = look.arenaEdge,
+            anchorIds = RegionEncounterWiring.anchorIds(definition),
+            anchorColor = look.arenaAnchor,
+        })
+        presence(arenaHolder, arenaCenter, look, definition.id)
+        -- A short lit spur from the host module, or the arena is a room
+        -- with no corridor: findable on the map and missable on foot.
+        local span = arenaCenter - hostCenter
+        for step = 1, 4 do
+            local at = hostCenter + span * (step / 5)
+            local spur = Instance.new("Part")
+            spur.Name = "ArenaSpur"
+            spur.Size = Vector3.new(1.6, 0.9, 1.6)
+            spur.CFrame = CFrame.new(at + Vector3.new(0, 0.45, 0))
+            spur.Color = look.arenaAnchor
+            spur.Material = Enum.Material.Neon
+            spur.Transparency = 0.5
+            spur.Anchored = true
+            spur.CanCollide = false
+            spur.CanQuery = false
+            spur.Parent = arenaHolder
+        end
+        --[[
+            Named at the anchor, not only at the prompt: the first walk
+            found four identical glowing pillars, distinguishable only by
+            standing at each one. The label reach is short so the arena
+            does not join the label soup two cells away.
+        ]]
+        for _, meta in definition.anchors do
+            local anchorPart = anchors[meta.id]
+            if anchorPart ~= nil then
+                billboardLabel(anchorPart, meta.object, look.arenaAnchor, 40)
+            end
+        end
+        clearRouteCorridor(expedition, hostCenter, arenaCenter)
+        table.insert(cellCenters, arenaCenter)
+        table.insert(encounters, {
+            id = definition.id,
+            anchors = anchors,
+            anchorMeta = definition.anchors,
+            center = arenaCenter,
+            radius = arenaSpec.radius,
+        })
+    end
+
+    for index = 1, #manifest.modules - 1 do
+        clearRouteCorridor(expedition, centers[index], centers[index + 1])
+    end
+
+    --[[
+        A rim around every outside edge, so a sightline ends on rock
+        rather than on sky. The first dusk in the Delve washed the whole
+        region to a pale blank -- the town's atmosphere had nothing to
+        read against, because unlike Bramblewake this world had no
+        backdrop -- and the same open edges let a player walk off the
+        ground slabs into the void. One wall per cell edge that faces no
+        other cell answers both.
+    ]]
+    local rim = Instance.new("Model")
+    rim.Name = "RegionRim"
+    rim.Parent = expedition
+    local edges = {
+        { dx = 1, dz = 0 },
+        { dx = -1, dz = 0 },
+        { dx = 0, dz = 1 },
+        { dx = 0, dz = -1 },
+    }
+    for _, cell in cellCenters do
+        for _, edge in edges do
+            local neighborKey = string.format(
+                "%d:%d",
+                cell.X + edge.dx * catalog.CellSize,
+                cell.Z + edge.dz * catalog.CellSize
+            )
+            if not occupied[neighborKey] then
+                local wall = Instance.new("Part")
+                wall.Name = "RimWall"
+                wall.Size = if edge.dx ~= 0
+                    then Vector3.new(3, 18, catalog.CellSize + 3)
+                    else Vector3.new(catalog.CellSize + 3, 18, 3)
+                wall.CFrame = CFrame.new(
+                    cell
+                        + Vector3.new(
+                            edge.dx * (catalog.CellSize / 2),
+                            6.5,
+                            edge.dz * (catalog.CellSize / 2)
+                        )
+                )
+                wall.Color = Color3.new(
+                    look.groundColor.R * 0.55,
+                    look.groundColor.G * 0.55,
+                    look.groundColor.B * 0.55
+                )
+                wall.Material = Enum.Material.Rock
+                wall.Anchored = true
+                wall.CastShadow = false
+                wall.Parent = rim
+            end
+        end
+    end
+
+    local generatedParts = 0
+    for _, descendant in expedition:GetDescendants() do
+        if descendant:IsA("BasePart") then
+            generatedParts += 1
+        end
+    end
+    expedition:SetAttribute("GeneratedPartCount", generatedParts)
+    expedition:SetAttribute("ModuleCount", #manifest.modules)
+    expedition:SetAttribute("EventInteractionCount", #eventInteractions)
+    expedition:SetAttribute("ExtractionReady", extractionTarget ~= nil)
+    expedition:SetAttribute("Ready", true)
+
+    local moduleCenters = {}
+    for index, center in centers do
+        table.insert(moduleCenters, {
+            index = index,
+            moduleId = manifest.modules[index].moduleId,
+            position = center,
+        })
+    end
+    return {
+        model = expedition,
+        entryCFrame = CFrame.new(centers[1] + Vector3.new(0, 5, 0)),
+        extractionTarget = assert(
+            extractionTarget,
+            regionId .. " walk placed no extraction module"
+        ),
+        eventInteractions = eventInteractions,
+        resourceNodes = resourceNodes,
+        eventSockets = eventSockets,
+        encounters = encounters,
+        moduleCenters = moduleCenters,
+        partCount = generatedParts,
+    }
+end
+
+--[[
+    What each region is called where a player reads it. Static calls
+    rather than the registry's declared displayNameKey, because those 55
+    declared keys resolve to nothing (#360 found the whole convention
+    wired to nothing) and a static call is one the localization check can
+    hold in both directions.
+]]
+function RegionExpeditionAssembly.displayName(regionId: string): string
+    if regionId == "region_ironroot" then
+        return Strings.get("region.ironroot_delve")
+    elseif regionId == "region_mireglass" then
+        return Strings.get("region.mireglass_fen")
+    elseif regionId == "region_tempest" then
+        return Strings.get("region.tempest_reach")
+    elseif regionId == "region_frostmere" then
+        return Strings.get("region.frostmere_vale")
+    elseif regionId == "region_cinderfall" then
+        return Strings.get("region.cinderfall_crown")
+    elseif regionId == "region_hollow" then
+        return Strings.get("region.the_hollow")
+    end
+    return Strings.get("bramblewake.bramblewake_woods")
+end
+
+return table.freeze(RegionExpeditionAssembly)
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="170">
           <Properties>
             <string name="Name">TempestBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -92298,7 +94295,7 @@ return table.freeze(TempestBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="169">
+        <Item class="ModuleScript" referent="171">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -92894,7 +94891,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="170">
+        <Item class="ModuleScript" referent="172">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -93131,7 +95128,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="171">
+        <Item class="ModuleScript" referent="173">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -93220,7 +95217,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="172">
+        <Item class="ModuleScript" referent="174">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -93556,11 +95553,11 @@ return table.freeze(WorldSignBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="173">
+    <Item class="Folder" referent="175">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="174">
+      <Item class="Script" referent="176">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -95397,7 +97394,7 @@ print("[Last Light] PASS FoundationIntegration")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Script" referent="175">
+      <Item class="Script" referent="177">
         <Properties>
           <string name="Name">ModuleGallery</string>
           <token name="RunContext">0</token>
@@ -95488,15 +97485,15 @@ end
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="176">
+  <Item class="StarterPlayer" referent="178">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="177">
+    <Item class="StarterPlayerScripts" referent="179">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="178">
+      <Item class="LocalScript" referent="180">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -95884,11 +97881,11 @@ task.spawn(function()
 end)
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="179">
+        <Item class="Folder" referent="181">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="180">
+          <Item class="ModuleScript" referent="182">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -96019,7 +98016,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="181">
+          <Item class="ModuleScript" referent="183">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -100725,7 +102722,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="182">
+          <Item class="ModuleScript" referent="184">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -101093,7 +103090,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="183">
+          <Item class="ModuleScript" referent="185">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -101201,7 +103198,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="184">
+          <Item class="ModuleScript" referent="186">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -101320,7 +103317,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="185">
+          <Item class="ModuleScript" referent="187">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -101597,7 +103594,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="186">
+          <Item class="ModuleScript" referent="188">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -101752,7 +103749,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="187">
+          <Item class="ModuleScript" referent="189">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -101864,7 +103861,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="188">
+          <Item class="ModuleScript" referent="190">
             <Properties>
               <string name="Name">SocialPingController</string>
               <string name="Source"><![CDATA[--!strict
@@ -102246,7 +104243,7 @@ return table.freeze(SocialPingController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="189">
+          <Item class="ModuleScript" referent="191">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -102448,7 +104445,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="190">
+          <Item class="ModuleScript" referent="192">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -102657,7 +104654,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="191">
+          <Item class="ModuleScript" referent="193">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -102802,7 +104799,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="192">
+          <Item class="ModuleScript" referent="194">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -103102,13 +105099,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="193">
+  <Item class="TextChatService" referent="195">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="194">
+  <Item class="Workspace" referent="196">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

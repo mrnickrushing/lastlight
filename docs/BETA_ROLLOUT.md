@@ -82,7 +82,7 @@ same commit.
 | `admin_commands_enabled` | `everyone` | 100 | a complete off switch for the roster, not a rollout |
 | `region_encounters_enabled` | `everyone` | 100 | on so it can be turned off in a hurry, not staged in |
 | `region_bramblewake_enabled` | `everyone` | 100 | the one region a live session has walked end to end |
-| `region_ironroot_enabled` | `off` | 0 | owner-gated: a region opens once a live session walks it |
+| `region_ironroot_enabled` | `everyone` | 100 | walked end to end in a live session before it opened |
 | `region_mireglass_enabled` | `off` | 0 | owner-gated: as above |
 | `region_tempest_enabled` | `off` | 0 | owner-gated: as above |
 | `region_frostmere_enabled` | `off` | 0 | owner-gated: as above |

@@ -5,6 +5,8 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+local ChapterCatalog =
+    require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").ChapterCatalog)
 
 local ProfileService = {}
 ProfileService.__index = ProfileService
@@ -318,6 +320,7 @@ function ProfileService._load(self: ProfileService, player: Player)
     end
 
     profile = self:_applyStudioStock(profile, now)
+    profile = self:_applyStudioChapters(profile, now)
     self._profiles[player] = profile
     self._writable[player] = writable
     self._loading[player] = nil
@@ -395,6 +398,92 @@ function ProfileService._watchStudioStock(self: ProfileService)
             end
         end
     end)
+    game:GetAttributeChangedSignal("LastLightStudioChapter"):Connect(function()
+        for player, profile in self._profiles do
+            local advanced = self:_applyStudioChapters(profile, os.time())
+            if advanced ~= profile then
+                self._profiles[player] = advanced
+                self._loadedEvent:Fire(player, advanced)
+            end
+        end
+    end)
+end
+
+--[[
+    Chapter progress for a live verification run, through the real
+    mutators and nothing else.
+
+    The stock hook's note says it cannot grant chapters because chapters
+    are what a verification run performs -- and that was the whole truth
+    while chapter one was the thing being verified. It is a shipped,
+    live-walked path now, and the thing a session needs to look at is the
+    region *behind* it, which sits behind a chapter gate by design. So:
+    set `LastLightStudioChapter` to a chapter number and a joining
+    profile arrives with the story resolved through that chapter --
+    resolved by SaveSchema's own mutators, with each chapter's first
+    listed decision and outcome, so the save is one the game itself can
+    produce rather than a hand-built fixture.
+
+    The same three guards as the stock hook: Studio only, non-persistent
+    only, logged loudly every time it fires.
+]]
+function ProfileService._applyStudioChapters(self: ProfileService, profile: any, now: number): any
+    if self._persistent or not RunService:IsStudio() then
+        return profile
+    end
+    local requested = tonumber(game:GetAttribute("LastLightStudioChapter"))
+    if requested == nil then
+        return profile
+    end
+    local through = math.clamp(math.floor(requested), 1, 7)
+    local nextProfile = profile
+    local applied = 0
+    if through >= 1 then
+        local chapterOne = self._saveSchema.chapterOne(nextProfile)
+        if chapterOne == nil or chapterOne.status ~= "complete" then
+            local resolved, result = self._saveSchema.withChapterOneResolution(
+                nextProfile,
+                "studio:chapter_one",
+                "shared_agroforest",
+                "preserved",
+                now
+            )
+            if result.applied then
+                nextProfile = resolved
+                applied += 1
+            end
+        end
+    end
+    local ordered = ChapterCatalog.list()
+    for index = 2, through do
+        local definition = ordered[index]
+        if definition == nil then
+            break
+        end
+        local chapterId = definition.id
+        local record = nextProfile.story.chapters[chapterId]
+        if type(record) ~= "table" or record.status ~= "complete" then
+            local resolved, result = self._saveSchema.withChapterResolution(
+                nextProfile,
+                chapterId,
+                "studio:" .. chapterId,
+                definition.decisions[1],
+                definition.outcomes[1],
+                now
+            )
+            if result.applied then
+                nextProfile = resolved
+                applied += 1
+            end
+        end
+    end
+    if applied > 0 then
+        self._logger:warn("studio_chapters_resolved", {
+            through = through,
+            applied = applied,
+        })
+    end
+    return nextProfile
 end
 
 function ProfileService.Start(self: ProfileService)
@@ -1806,6 +1895,88 @@ function ProfileService.chapterOneSnapshot(self: ProfileService, player: Player)
         return nil
     end
     return self._saveSchema.chapterOne(profile)
+end
+
+--[[
+    The story as the access gates read it: chapterOne beside the keyed
+    chapter records, which is the exact shape RegionAccess.evaluate takes.
+    A copy rather than the live table, for the same reason every other
+    snapshot here copies -- a caller must not be able to resolve a chapter
+    by writing into what it was handed.
+]]
+function ProfileService.storySnapshot(self: ProfileService, player: Player): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return nil
+    end
+    local chapters: { [string]: any } = {}
+    for chapterId, record in profile.story.chapters do
+        chapters[chapterId] = table.clone(record)
+    end
+    return {
+        chapterOne = table.clone(profile.story.chapterOne),
+        chapters = chapters,
+    }
+end
+
+--[[
+    Resolve a chapter past the first, through SaveSchema's own mutator.
+    The boss services are the only callers: a chapter's resolution is its
+    boss's completion, and the decision arrives from inside the fight.
+    Same durable contract as completeChapterOne -- accepted means the
+    record is in the profile, durable means it survived a save.
+]]
+function ProfileService.resolveChapter(
+    self: ProfileService,
+    player: Player,
+    chapterId: string,
+    transactionId: string,
+    decision: string,
+    outcome: string
+): any
+    local profile = self._profiles[player]
+    if profile == nil then
+        return { accepted = false, durable = false, reason = "profile_loading" }
+    end
+    if not self:isWritable(player) then
+        return { accepted = false, durable = false, reason = "profile_read_only" }
+    end
+    local nextProfile, result = self._saveSchema.withChapterResolution(
+        profile,
+        chapterId,
+        transactionId,
+        decision,
+        outcome,
+        os.time()
+    )
+    if not result.applied and not result.duplicate then
+        return { accepted = false, durable = true, reason = result.reason }
+    end
+    if result.applied then
+        self._profiles[player] = nextProfile
+        if self._persistent then
+            self._dirty[player] = true
+        end
+    end
+    local durable = not self._persistent
+    if self._persistent and (result.applied or self._dirty[player] == true) then
+        local saved = self:save(player)
+        local activeProfile = self._profiles[player]
+        local record = if activeProfile == nil then nil else activeProfile.story.chapters[chapterId]
+        durable = saved
+            and type(record) == "table"
+            and record.status == "complete"
+            and record.transactionId == transactionId
+    elseif self._persistent then
+        durable = true
+    end
+    return {
+        accepted = true,
+        applied = result.applied == true,
+        durable = durable,
+        reason = if durable then result.reason else "save_pending",
+        record = result.record,
+    }
 end
 
 function ProfileService.save(self: ProfileService, player: Player): boolean

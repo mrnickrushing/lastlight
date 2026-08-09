@@ -950,6 +950,16 @@ return table.freeze({
         "module_ir_bellows_approach",
     }),
     --[[
+        The two fragment-anchored POIs place in every run, Bramblewake's
+        rule applied here the day the region opened: a memory fragment
+        whose anchor only turns up some runs is a story beat demoted to
+        a lottery ticket.
+    ]]
+    FixedPointOfInterestIds = table.freeze({
+        "poi_ir_tally_wall",
+        "poi_ir_crushed_cage",
+    }),
+    --[[
         The known-good fallback's middle, in authored order: a walk that
         touches every required tag, keeps the puzzle and landmark stops,
         and stays well inside every budget. Until a live session proves
