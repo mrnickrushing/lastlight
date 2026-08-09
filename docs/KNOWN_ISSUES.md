@@ -13,10 +13,11 @@ issue is closed that the handoff still describes as open.
 is pinned at a minimum of 9 threads and fails rather than
 producing a short one.
 
-14 open threads.
+15 open threads.
 
 | Found in | Kind | What is open |
 |---|---|---|
+| #365 | Open, recorded as design questions rather than defects | the Witch's `sealed` outcome - the `spared_copies` decision - is unreachable by her own state machine, because sparing returns her to hiding without advancing the phase, so chapter III can end `bound` or `broken` but never `sealed`; whether mercy should advance a phase is the owner's call. The fen banks crossing route corridors stand 2.4 studs - under the corridor cutter's height floor, over a walking step, jumpable, and reading as fen rather than fence. And the extra swing after any encounter completes still falls through to the roster's "the tool is calm in daylight," which is true and reads odd standing over a sealed witch. |
 | #363 | Open | the Fen, the Reach, the Vale, the Crown and the Hollow stay shut behind the same gate; Mireglass is next, and its encounter wiring ships here already, disabled. |
 | #360 | Open, and found by finishing | the content registry has declared localization keys since Milestone 1 — `displayNameKey` on all seven regions, `localizationKey` on all 48 expedition events, **55 in total** — and **nothing resolves any of them**. `Registry.luau` and `ExpeditionEventFlow` assert only that the field is a non-empty string; no table defines the keys and nothing reads them for a word. It is the guard's own second rule one level up: a key nobody defined is a label wired to nothing, and here it is a whole naming convention wired to nothing, invisible to `validate_localization.py` because that check only follows `Strings.get`. Now that the table is complete, the choice is to point them at real keys or delete them, and both are a wave rather than a footnote — `Registry.luau`'s required-field list and its spec pin the shape. |
 | #359 | Open | a canvas narrower than 446 points still cannot fit that row, and no clamp can make it — the row has to wrap, which is a layout decision rather than a bound. |

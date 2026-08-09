@@ -387,5 +387,6 @@ end to end live, and opened it: departure board, arrival, a gather, an
 event by real clicks, a memory fragment, both elites, the Maw with the
 vent choice resolving chapter II, and a Wayhome extraction. Wayfinding is
 built by the seam; authored mesh dressing remains an art pass and is
-recorded as a non-blocking note in RegionBuilders. The Fen's flags stay
-off until its own walk.
+recorded as a non-blocking note in RegionBuilders. The Fen followed
+through the same seam in #365, walked the same way: mirrors, pools, the
+Witch's question, chapter III resolved in play, and a banked extraction.
