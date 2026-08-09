@@ -22,6 +22,8 @@
     turn.
 ]]
 
+local Strings = require("./Strings")
+
 local GlassBailiffEncounter = {}
 
 export type Status = "disabled" | "dormant" | "sitting" | "sentencing" | "complete"
@@ -49,9 +51,9 @@ local SITTING_FRACTION = 0.3
 
 local SUMMONS = table.freeze({
     attackId = "glass_bailiff_summons",
-    attackName = "SUMMONS",
+    attackName = Strings.get("encounter.summons"),
     damage = 22,
-    instruction = "GET BEHIND SOMETHING STILL STANDING",
+    instruction = Strings.get("encounter.get_behind_something_still_standing"),
     length = 32,
     shape = "lane",
     width = 7,
@@ -60,9 +62,9 @@ local SUMMONS = table.freeze({
 
 local SENTENCE = table.freeze({
     attackId = "glass_bailiff_sentence",
-    attackName = "SENTENCE",
+    attackName = Strings.get("encounter.sentence"),
     damage = 30,
-    instruction = "IT IS NOT LOOKING AT YOU — GO",
+    instruction = Strings.get("encounter.it_is_not_looking_at_you"),
     radius = 16,
     shape = "circle",
     windup = 1.9,
@@ -266,16 +268,24 @@ end
 function GlassBailiffEncounter.snapshot(state: State, userId: number): any
     local standing = GlassBailiffEncounter.standingCount(state)
     local instruction = if state.status == "sitting" and state.marked ~= nil
-        then "IT HAS MARKED SOMETHING — APPEAL IT OR LET IT FALL"
-        elseif state.status == "sitting" then "NOTHING IS MARKED — IT IS STILL IN SESSION"
-        elseif state.status == "sentencing" then "IT IS CARRYING OUT THE SENTENCE — STRIKE"
-        elseif state.status == "complete" then "THE BAILIFF IS DOWN · THE COURT IS ADJOURNED"
-        elseif state.status == "disabled" then "ELITE TEMPORARILY DORMANT"
-        else "ENTER THE COURT"
+        then Strings.get("encounter.it_has_marked_something_appeal_it")
+        elseif state.status == "sitting" then Strings.get(
+            "encounter.nothing_is_marked_it_is_still"
+        )
+        elseif state.status == "sentencing" then Strings.get(
+            "encounter.it_is_carrying_out_the_sentence"
+        )
+        elseif state.status == "complete" then Strings.get(
+            "encounter.the_bailiff_is_down_the_court"
+        )
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.elite_temporarily_dormant"
+        )
+        else Strings.get("encounter.enter_the_court")
     return {
         active = state.status == "sitting" or state.status == "sentencing",
         complete = state.status == "complete",
-        displayName = "GLASS BAILIFF",
+        displayName = Strings.get("encounter.glass_bailiff"),
         enabled = state.status ~= "disabled",
         health = state.health,
         instruction = instruction,

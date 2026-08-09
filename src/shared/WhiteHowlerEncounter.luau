@@ -29,6 +29,8 @@
     does not end.
 ]]
 
+local Strings = require("./Strings")
+
 local WhiteHowlerEncounter = {}
 
 export type Status =
@@ -81,9 +83,9 @@ local TRACKS_REQUIRED = 2
 
 local SNOW_BREATH = table.freeze({
     attackId = "white_howler_breath",
-    attackName = "SNOW BREATH",
+    attackName = Strings.get("encounter.snow_breath"),
     damage = 30,
-    instruction = "GET BEHIND SOMETHING SOLID",
+    instruction = Strings.get("encounter.get_behind_something_solid"),
     length = 34,
     shape = "lane",
     width = 9,
@@ -92,9 +94,9 @@ local SNOW_BREATH = table.freeze({
 
 local LISTENING_STILL = table.freeze({
     attackId = "white_howler_listen",
-    attackName = "IT IS LISTENING",
+    attackName = Strings.get("encounter.it_is_listening"),
     damage = 26,
-    instruction = "STOP MOVING",
+    instruction = Strings.get("encounter.stop_moving"),
     radius = 15,
     shape = "circle",
     windup = 1.9,
@@ -102,9 +104,9 @@ local LISTENING_STILL = table.freeze({
 
 local WHITEOUT = table.freeze({
     attackId = "white_howler_whiteout",
-    attackName = "WHITEOUT",
+    attackName = Strings.get("encounter.whiteout"),
     damage = 34,
-    instruction = "FOLLOW THE LIGHT, NOT THE SOUND",
+    instruction = Strings.get("encounter.follow_the_light_not_the_sound"),
     radius = 19,
     shape = "circle",
     windup = 1.7,
@@ -396,35 +398,41 @@ end
 function WhiteHowlerEncounter.snapshot(state: State, userId: number): any
     local instruction = if state.status == "listening"
         then string.format(
-            "QUIET THE BOWL — %d OF %d",
+            Strings.get("encounter.quiet_the_bowl_n_of_n"),
             countTrue(state.hushed),
             WhiteHowlerEncounter.hushRequired(state.phase)
         )
         elseif state.status == "warming" then string.format(
-            "SHARE WARMTH — %d OF %d GIVEN",
+            Strings.get("encounter.share_warmth_n_of_n_given"),
             countTrue(state.shared),
             WARMTH_REQUIRED
         )
         elseif state.status == "tracking" then string.format(
-            "READ THE AURORA IN ORDER — %d OF %d",
+            Strings.get("encounter.read_the_aurora_in_order_n"),
             countTrue(state.followed),
             WhiteHowlerEncounter.tracksRequired(state)
         )
-        elseif state.status == "exposed" then "IT HAS NOWHERE LEFT — STRIKE"
+        elseif state.status == "exposed" then Strings.get(
+            "encounter.it_has_nowhere_left_strike"
+        )
         elseif state.status == "complete" then if state.outcome == "sheltered"
-            then "THE HOWLER IS DOWN · ITS DEN STILL BURNS"
-            elseif state.outcome == "silenced" then "THE HOWLER IS DOWN · THE VALE IS SILENT"
-            else "THE HOWLER IS DOWN · THE LINE THINS"
-        elseif state.status == "locked" then "THE VALE IS NOT OPEN TO YOU YET"
-        elseif state.status == "disabled" then "THE HOWLER DOES NOT ANSWER"
-        else "SOMETHING IN THE BOWL IS LISTENING"
+            then Strings.get("encounter.the_howler_is_down_its_den")
+            elseif state.outcome == "silenced" then Strings.get(
+                "encounter.the_howler_is_down_the_vale"
+            )
+            else Strings.get("encounter.the_howler_is_down_the_line")
+        elseif state.status == "locked" then Strings.get("encounter.the_vale_is_not_open_to")
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.the_howler_does_not_answer"
+        )
+        else Strings.get("encounter.something_in_the_bowl_is_listening")
     return {
         active = state.status ~= "disabled"
             and state.status ~= "locked"
             and state.status ~= "dormant",
         complete = state.status == "complete",
         denPhases = table.clone(state.denPhases),
-        displayName = "WHITE HOWLER",
+        displayName = Strings.get("encounter.white_howler"),
         enabled = state.status ~= "disabled",
         health = state.health,
         hushRequired = WhiteHowlerEncounter.hushRequired(state.phase),

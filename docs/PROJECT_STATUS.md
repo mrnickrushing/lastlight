@@ -28,11 +28,13 @@ Studio-facing checks not performed are recorded open rather than assumed.
 **Milestone 13's buildable half is four waves done and one in flight and
 guarded.** A (cohort-scoped flags), B (tuning telemetry), C (tuning knobs) and E
 (kill switches and the rollback list) are complete. **D, localization source
-coverage, has its table, its guard and three batches**, and the reason it sat
+coverage, has its table, its guard and four batches**, and the reason it sat
 unbuilt through two sessions was addressed rather than ignored: the guard landed
 *first*, with the 91 unmigrated files named individually and the count pinned so
-it can only shrink. The wave is finished when that list is empty; after batch three it holds 68 files
-and 2,209 strings, all of them content catalogs.
+it can only shrink. The wave is finished when that list is empty; after batch four it holds 17 files
+and 1,360 strings — the item catalogs, the residents, the six expedition
+definitions, three files that are not player-facing at all, and the loading
+screen.
 **Milestone 14's buildable half is complete — waves A through E all shipped.**
 
 **Milestones 0 through 11 are complete, and so is Milestone 12's buildable
@@ -82,7 +84,48 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
-- **#358** **M13 wave D, batch three: the server surface, and the batch found the
+- **#359** **M13 wave D, batch four: the content the world is made of — and a
+  migration that had turned identifiers into translations.** 871 strings out of 51
+  shared modules: every encounter, every enemy's attack and tell, the town's own
+  systems, the store, the professions, the quests and the story. The allowlist goes
+  **68 files to 17**, and what is left is the item catalogs, the residents, the six
+  expedition definitions, three files that are not player-facing at all, and the
+  loading screen.
+
+  **The find is bigger than the batch.** Batches one and two moved four *identifiers*
+  into the string table, and every one of them was then compared to decide what the
+  game does — **24 sites**. `theme == Strings.get("world.miretide")` chose which night
+  dressing the town raises and what colour the lantern road glows.
+  `name == Strings.get("world.mara_s_shelter")` chose a cabin's wall colour, its prop
+  seed and whether it gets a cot. `altar.name == Strings.get("world.engineer")` chose
+  a mesh — and beside it, **`"profession_" .. string.lower(altar.name)` built the
+  profession's id out of its signboard**, so a translated sign produces an attribute
+  no lookup matches, and `seed = 9970 + #altar.name` moved a prop by the *length* of
+  a translated word. `phase == Strings.get("hud.dusk")` chose the clock's accent.
+
+  Every one of those is correct today and wrong the day somebody translates the
+  string, in the localized build only, with nothing failing anywhere — **which is the
+  precise failure this wave exists to prevent, created by this wave.** The whole point
+  of one table is that a translator may change every string in it; nothing may be true
+  only while a string stays in English.
+
+  **So identifiers are identifiers again.** A night's theme is `emberfall`, not
+  `EMBERFALL` — it was a table key in two modules, the value `WorldService` compares,
+  *and* the word printed in "EMBERFALL NIGHT 3", and there is no version of one string
+  doing both jobs that is right. `TownNightSchedule.displayName` is the word now. The
+  cabins take a flag, the altars carry `id = "profession_scout"`, the clock compares
+  the phase id.
+
+  **And `validate_localization.py` refuses a `Strings.get` inside a comparison from
+  this commit**, which is the durable half — the 24 sites were found by reading, and
+  reading does not scale.
+
+  **The portrait pass found the departure panel overflowing at its own floor**, which
+  is #358's fix seen from the other side: eight party-size buttons at 44 points need
+  422, and the floor was 260. It is the sum rather than a constant now. **Open:** a
+  canvas narrower than 446 points still cannot fit that row, and no clamp can make it
+   — the row has to wrap, which is a layout decision rather than a bound.
+- **#358** (v159) **M13 wave D, batch three: the server surface, and the batch found the
   check reporting good news about files it could not read.** 483 strings out of the
   twenty server files — every announcement, refusal and confirmation the server pushes
   at a player, and the tutorial's own voice. The allowlist goes 88 files to **68**, and

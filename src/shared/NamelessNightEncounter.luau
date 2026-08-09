@@ -25,6 +25,8 @@
     transaction id, and so does the ending.
 ]]
 
+local Strings = require("./Strings")
+
 local NamelessNightEncounter = {}
 
 export type Status = "disabled" | "locked" | "dormant" | "playing" | "complete"
@@ -66,9 +68,9 @@ local ENDING_IDS = table.freeze({ "ending_kept", "ending_ended", "ending_shared"
 
 local THE_STREET = table.freeze({
     attackId = "nameless_night_street",
-    attackName = "IT IS IN THE STREET",
+    attackName = Strings.get("encounter.it_is_in_the_street"),
     damage = 28,
-    instruction = "IT COMES THROUGH THE POST NOBODY IS AT",
+    instruction = Strings.get("encounter.it_comes_through_the_post_nobody"),
     radius = 16,
     shape = "circle",
     windup = 1.6,
@@ -76,9 +78,9 @@ local THE_STREET = table.freeze({
 
 local THE_WITHDRAWAL = table.freeze({
     attackId = "nameless_night_withdraw",
-    attackName = "IT WITHDRAWS",
+    attackName = Strings.get("encounter.it_withdraws"),
     damage = 22,
-    instruction = "IT IS NOT RUNNING — DO NOT RUN EITHER",
+    instruction = Strings.get("encounter.it_is_not_running_do_not"),
     length = 32,
     shape = "lane",
     width = 9,
@@ -87,9 +89,9 @@ local THE_WITHDRAWAL = table.freeze({
 
 local THE_ARITHMETIC = table.freeze({
     attackId = "nameless_night_arithmetic",
-    attackName = "THE ARITHMETIC",
+    attackName = Strings.get("encounter.the_arithmetic"),
     damage = 32,
-    instruction = "IT IS WAITING FOR YOU TO DECIDE",
+    instruction = Strings.get("encounter.it_is_waiting_for_you_to"),
     radius = 18,
     shape = "circle",
     windup = 2.2,
@@ -405,32 +407,34 @@ end
 
 function NamelessNightEncounter.snapshot(state: State, userId: number): any
     local instruction = if state.status == "complete"
-        then "IT IS DECIDED"
-        elseif state.status == "locked" then "THE HOLLOW IS NOT OPEN TO YOU YET"
-        elseif state.status == "disabled" then "THE HOLLOW DOES NOT ANSWER"
-        elseif state.status == "dormant" then "THE ROAD KEEPS GOING"
+        then Strings.get("encounter.it_is_decided")
+        elseif state.status == "locked" then Strings.get("encounter.the_hollow_is_not_open_to")
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.the_hollow_does_not_answer"
+        )
+        elseif state.status == "dormant" then Strings.get("encounter.the_road_keeps_going")
         elseif state.scene == 1 then string.format(
-            "HOLD TWO POSTS — %d OF %d",
+            Strings.get("encounter.hold_two_posts_n_of_n"),
             countTrue(state.held),
             POSTS_REQUIRED
         )
         elseif state.scene == 2 then string.format(
-            "FOLLOW IT DOWN — %d MARKS, %d LIGHT LEFT",
+            Strings.get("encounter.follow_it_down_n_marks_n"),
             countTrue(state.followed),
             state.light
         )
-        elseif state.scene == 3 then "THERE IS LIGHT FOR ONE OF THEM"
+        elseif state.scene == 3 then Strings.get("encounter.there_is_light_for_one_of")
         elseif state.scene == 4 then string.format(
-            "LOOK AT ALL OF IT — %d OF %d",
+            Strings.get("encounter.look_at_all_of_it_n"),
             countTrue(state.witnessed),
             #MOMENT_IDS
         )
-        else "DECIDE WHAT HAPPENS TO THE LIGHT"
+        else Strings.get("encounter.decide_what_happens_to_the_light")
     return {
         abandonedPost = state.abandonedPost,
         active = state.status == "playing",
         complete = state.status == "complete",
-        displayName = "THE NAMELESS NIGHT",
+        displayName = Strings.get("encounter.the_nameless_night"),
         enabled = state.status ~= "disabled",
         ending = state.chosenEnding,
         instruction = instruction,

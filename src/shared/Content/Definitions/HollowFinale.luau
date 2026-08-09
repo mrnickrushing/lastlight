@@ -36,26 +36,24 @@ end
     scene, and the last two are the same room seen twice -- once while it
     is still explaining itself and once when there is nothing left to say.
 ]]
+local Strings = require("../../Strings")
+
 local pointsOfInterest = {
     frozen({
         id = "poi_hb_the_last_street",
-        displayName = "The Last Street",
+        displayName = Strings.get("story.the_last_street"),
         visual = "last_street",
         scene = 1,
         tags = { "story", "arrival" },
-        detail = "Emberhollow, exactly, down to the crack in the board "
-            .. "outside the inn. Nobody has ever lived here and every "
-            .. "lamp is lit.",
+        detail = Strings.get("story.emberhollow_exactly_down_to_the_crack"),
     }),
     frozen({
         id = "poi_hb_three_posts",
-        displayName = "The Three Posts",
+        displayName = Strings.get("story.the_three_posts"),
         visual = "three_posts",
         scene = 1,
         tags = { "combat", "choice" },
-        detail = "Gate, road and hearth, and not enough of you to stand "
-            .. "at all three. Whichever one is empty is the one it comes "
-            .. "through.",
+        detail = Strings.get("story.gate_road_and_hearth_and_not"),
     }),
     frozen({
         id = "poi_hb_the_way_down",
@@ -63,36 +61,31 @@ local pointsOfInterest = {
         visual = "way_down",
         scene = 2,
         tags = { "traversal", "risk" },
-        detail = "Not a stair and not a shaft. The road simply keeps "
-            .. "going after the ground has stopped, and the lamps go with "
-            .. "it.",
+        detail = Strings.get("story.not_a_stair_and_not_a"),
     }),
     frozen({
         id = "poi_hb_the_held_light",
-        displayName = "The Held Light",
+        displayName = Strings.get("story.the_held_light"),
         visual = "held_light",
         scene = 3,
         tags = { "story", "rescue" },
-        detail = "Two people down here and light enough to bring out "
-            .. "one. Both of them have worked out the arithmetic already.",
+        detail = Strings.get("story.two_people_down_here_and_light"),
     }),
     frozen({
         id = "poi_hb_the_first_lantern",
-        displayName = "The First Lantern",
+        displayName = Strings.get("story.the_first_lantern"),
         visual = "first_lantern_true",
         scene = 4,
         tags = { "story", "mystery" },
-        detail = "The one every other lantern was lit from, still "
-            .. "burning, with nothing feeding it that anyone can see.",
+        detail = Strings.get("story.the_one_every_other_lantern_was"),
     }),
     frozen({
         id = "poi_hb_the_long_record",
-        displayName = "The Long Record",
+        displayName = Strings.get("story.the_long_record"),
         visual = "long_record",
         scene = 4,
         tags = { "story", "codex" },
-        detail = "Names, in one hand, going back further than the town "
-            .. "does. The last page is this year and it is not finished.",
+        detail = Strings.get("story.names_in_one_hand_going_back"),
     }),
     frozen({
         id = "poi_hb_the_seat",
@@ -100,9 +93,7 @@ local pointsOfInterest = {
         visual = "the_seat",
         scene = 5,
         tags = { "landmark", "boss", "story" },
-        detail = "A chair at the bottom of the light, facing up the way "
-            .. "you came. Whatever has been sitting in it stands when you "
-            .. "arrive.",
+        detail = Strings.get("story.a_chair_at_the_bottom_of"),
     }),
 }
 
@@ -115,45 +106,42 @@ local scenes = {
     frozen({
         id = "scene_defend",
         number = 1,
-        displayName = "THE LAST STREET",
+        displayName = Strings.get("story.the_last_street_2"),
         verb = "defend",
-        instruction = "HOLD TWO POSTS — THE THIRD IS GOING TO FALL",
-        detail = "It is walking into a copy of your town, and you cannot "
-            .. "stand everywhere at once.",
+        instruction = Strings.get("story.hold_two_posts_the_third_is"),
+        detail = Strings.get("story.it_is_walking_into_a_copy"),
     }),
     frozen({
         id = "scene_pursue",
         number = 2,
-        displayName = "THE WAY DOWN",
+        displayName = Strings.get("story.the_way_down"),
         verb = "pursue",
-        instruction = "FOLLOW IT DOWN — EVERY MARK COSTS LIGHT",
-        detail = "It does not run. It withdraws, at exactly the speed "
-            .. "you are willing to spend light following it.",
+        instruction = Strings.get("story.follow_it_down_every_mark_costs"),
+        detail = Strings.get("story.it_does_not_run_it_withdraws"),
     }),
     frozen({
         id = "scene_rescue",
         number = 3,
-        displayName = "THE HELD LIGHT",
+        displayName = Strings.get("story.the_held_light_2"),
         verb = "rescue",
-        instruction = "THERE IS LIGHT FOR ONE OF THEM",
-        detail = "Neither of them will ask you to pick them. That is the " .. "worst part of it.",
+        instruction = Strings.get("encounter.there_is_light_for_one_of"),
+        detail = Strings.get("story.neither_of_them_will_ask_you"),
     }),
     frozen({
         id = "scene_witness",
         number = 4,
-        displayName = "THE FIRST LANTERN",
+        displayName = Strings.get("world.the_first_lantern"),
         verb = "witness",
-        instruction = "LOOK AT ALL OF IT BEFORE YOU DECIDE ANYTHING",
-        detail = "Nothing here attacks. This is the game explaining "
-            .. "itself, and it takes as long as a player wants it to.",
+        instruction = Strings.get("story.look_at_all_of_it_before"),
+        detail = Strings.get("story.nothing_here_attacks_this_is_the"),
     }),
     frozen({
         id = "scene_choose",
         number = 5,
-        displayName = "THE SEAT",
+        displayName = Strings.get("story.the_seat"),
         verb = "choose",
-        instruction = "DECIDE WHAT HAPPENS TO THE LIGHT",
-        detail = "Three things can be done and none of them undoes what " .. "is already gone.",
+        instruction = Strings.get("encounter.decide_what_happens_to_the_light"),
+        detail = Strings.get("story.three_things_can_be_done_and"),
     }),
 }
 
@@ -165,24 +153,18 @@ local scenes = {
 local endings = {
     frozen({
         id = "ending_kept",
-        displayName = "THE LANTERN KEPT",
-        detail = "The light stays where it is and keeps being fed. "
-            .. "Emberhollow survives every night it has left, and "
-            .. "somebody is always down here.",
+        displayName = Strings.get("story.the_lantern_kept"),
+        detail = Strings.get("story.the_light_stays_where_it_is"),
     }),
     frozen({
         id = "ending_ended",
-        displayName = "THE LANTERN PUT OUT",
-        detail = "The light goes out and the nights stop being hunted. "
-            .. "So does every lantern above it, and the town has to learn "
-            .. "the dark.",
+        displayName = Strings.get("story.the_lantern_put_out"),
+        detail = Strings.get("story.the_light_goes_out_and_the"),
     }),
     frozen({
         id = "ending_shared",
-        displayName = "THE LANTERN SHARED",
-        detail = "The light is broken up and carried out a piece at a "
-            .. "time. No lantern town any more, and no single thing left "
-            .. "to sit at the bottom of it.",
+        displayName = Strings.get("story.the_lantern_shared"),
+        detail = Strings.get("story.the_light_is_broken_up_and"),
     }),
 }
 

@@ -21,6 +21,8 @@
     transaction id, disable-able, server-called throughout.
 ]]
 
+local Strings = require("./Strings")
+
 local IronWidowEncounter = {}
 
 export type Status = "disabled" | "dormant" | "webbed" | "grounded" | "complete"
@@ -49,9 +51,9 @@ local GROUNDED_SECONDS = 9
 
 local CART_AMBUSH = table.freeze({
     attackId = "iron_widow_cart",
-    attackName = "CART AMBUSH",
+    attackName = Strings.get("encounter.cart_ambush"),
     damage = 24,
-    instruction = "OFF THE LINE — A CART IS COMING",
+    instruction = Strings.get("encounter.off_the_line_a_cart_is"),
     length = 34,
     shape = "lane",
     width = 7,
@@ -60,9 +62,9 @@ local CART_AMBUSH = table.freeze({
 
 local CABLE_SWEEP = table.freeze({
     attackId = "iron_widow_sweep",
-    attackName = "CABLE SWEEP",
+    attackName = Strings.get("encounter.cable_sweep"),
     damage = 20,
-    instruction = "DUCK THE SWEEPING CABLE",
+    instruction = Strings.get("encounter.duck_the_sweeping_cable"),
     radius = 12,
     shape = "circle",
     windup = 1.3,
@@ -254,17 +256,21 @@ function IronWidowEncounter.snapshot(state: State, userId: number, now: number):
     local cut = anchorsCut(state)
     local grounded = state.status == "grounded" and now < state.groundedUntil
     local instruction = if state.status == "webbed"
-        then string.format("CUT THE WEB ANCHORS — %d OF %d", cut, #ANCHOR_IDS)
-        elseif state.status == "grounded" then "STRIKE HER WHILE SHE IS DOWN"
-        elseif state.status == "complete" then "THE RAILS ARE QUIET"
-        elseif state.status == "disabled" then "ELITE TEMPORARILY DORMANT"
-        else "ENTER THE FLOODED STOPE"
+        then string.format(Strings.get("encounter.cut_the_web_anchors_n_of"), cut, #ANCHOR_IDS)
+        elseif state.status == "grounded" then Strings.get(
+            "encounter.strike_her_while_she_is_down"
+        )
+        elseif state.status == "complete" then Strings.get("encounter.the_rails_are_quiet")
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.elite_temporarily_dormant"
+        )
+        else Strings.get("encounter.enter_the_flooded_stope")
     return {
         active = state.status == "webbed" or state.status == "grounded",
         anchorsCut = cut,
         anchorTotal = #ANCHOR_IDS,
         complete = state.status == "complete",
-        displayName = "IRON WIDOW",
+        displayName = Strings.get("encounter.iron_widow"),
         enabled = state.status ~= "disabled",
         grounded = grounded,
         groundedUntil = if grounded and state.groundedUntil ~= math.huge

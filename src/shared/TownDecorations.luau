@@ -12,6 +12,8 @@
     Decorations are identity, never power: no slot changes a stat anywhere.
 ]]
 
+local Strings = require("./Strings")
+
 local TownDecorations = {}
 
 export type Slot = {
@@ -26,49 +28,49 @@ export type State = { [string]: boolean }
 local SLOTS: { Slot } = table.freeze({
     table.freeze({
         id = "decor_plaza_banner_east",
-        displayName = "EAST PLAZA BANNER",
+        displayName = Strings.get("town.east_plaza_banner"),
         kind = "banner",
         cost = table.freeze({ material_meadow_fiber = 3, material_heartwood = 1 }) :: { [string]: number },
     }),
     table.freeze({
         id = "decor_plaza_banner_west",
-        displayName = "WEST PLAZA BANNER",
+        displayName = Strings.get("town.west_plaza_banner"),
         kind = "banner",
         cost = table.freeze({ material_meadow_fiber = 3, material_heartwood = 1 }) :: { [string]: number },
     }),
     table.freeze({
         id = "decor_road_garland_north",
-        displayName = "NORTH ROAD GARLAND",
+        displayName = Strings.get("town.north_road_garland"),
         kind = "garland",
         cost = table.freeze({ material_meadow_fiber = 2, material_brightcap = 1 }) :: { [string]: number },
     }),
     table.freeze({
         id = "decor_road_garland_south",
-        displayName = "SOUTH ROAD GARLAND",
+        displayName = Strings.get("town.south_road_garland"),
         kind = "garland",
         cost = table.freeze({ material_meadow_fiber = 2, material_brightcap = 1 }) :: { [string]: number },
     }),
     table.freeze({
         id = "decor_planter_gate",
-        displayName = "GATE PLANTER",
+        displayName = Strings.get("town.gate_planter"),
         kind = "planter",
         cost = table.freeze({ material_heartwood = 2, material_amber_sap = 1 }) :: { [string]: number },
     }),
     table.freeze({
         id = "decor_planter_archive",
-        displayName = "ARCHIVE PLANTER",
+        displayName = Strings.get("town.archive_planter"),
         kind = "planter",
         cost = table.freeze({ material_heartwood = 2, material_amber_sap = 1 }) :: { [string]: number },
     }),
     table.freeze({
         id = "decor_planter_inn",
-        displayName = "INN PLANTER",
+        displayName = Strings.get("town.inn_planter"),
         kind = "planter",
         cost = table.freeze({ material_heartwood = 2, material_amber_sap = 1 }) :: { [string]: number },
     }),
     table.freeze({
         id = "decor_planter_workshop",
-        displayName = "WORKSHOP PLANTER",
+        displayName = Strings.get("town.workshop_planter"),
         kind = "planter",
         cost = table.freeze({ material_heartwood = 2, material_amber_sap = 1 }) :: { [string]: number },
     }),

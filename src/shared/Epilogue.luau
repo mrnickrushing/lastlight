@@ -26,6 +26,7 @@
 local ChapterCatalog = require("./ChapterCatalog")
 local HollowFinale = require("./Content/Definitions/HollowFinale")
 local ResidentRoster = require("./ResidentRoster")
+local Strings = require("./Strings")
 
 local Epilogue = {}
 
@@ -47,46 +48,46 @@ export type Resolution = {
 ]]
 local OUTCOME_LINES: { [string]: { [string]: string } } = {
     chapter_one = {
-        preserved = "The forest kept its old paths, and people still walk them.",
-        scarred = "The forest grew back crooked, and the road through it is harder than it was.",
-        harmed = "Nothing has come out of the wood since. Nobody says that is a relief.",
+        preserved = Strings.get("story.the_forest_kept_its_old_paths"),
+        scarred = Strings.get("story.the_forest_grew_back_crooked_and"),
+        harmed = Strings.get("story.nothing_has_come_out_of_the"),
     },
     chapter_two = {
-        cleared = "The Delve's air runs clean, and there is iron coming up again.",
-        fouled = "The Delve is worked in short shifts now, and nobody goes deep.",
-        mixed = "Half the Delve breathes. The other half is bricked up and marked.",
+        cleared = Strings.get("story.the_delve_s_air_runs_clean"),
+        fouled = Strings.get("story.the_delve_is_worked_in_short"),
+        mixed = Strings.get("story.half_the_delve_breathes_the_other"),
     },
     chapter_three = {
-        sealed = "The Fen is quiet, and the light in it stays where it is put.",
-        bound = "The Fen is watched. What is under it is held rather than gone.",
-        broken = "The Fen went dark all at once, and the water has not settled since.",
+        sealed = Strings.get("story.the_fen_is_quiet_and_the"),
+        bound = Strings.get("story.the_fen_is_watched_what_is"),
+        broken = Strings.get("story.the_fen_went_dark_all_at"),
     },
     chapter_four = {
-        navigable = "The harbour takes boats again. Two came in this spring.",
-        scoured = "The channel silted where the tide dropped, and only small craft use it.",
-        broken = "There is no harbour mouth any more, only a bay with a bad memory.",
+        navigable = Strings.get("story.the_harbour_takes_boats_again_two"),
+        scoured = Strings.get("story.the_channel_silted_where_the_tide"),
+        broken = Strings.get("story.there_is_no_harbour_mouth_any"),
     },
     chapter_five = {
-        sheltered = "There is still something living in the Vale, and it keeps to itself.",
-        thinned = "The Vale is emptier every year, but it is not empty.",
-        silenced = "Nothing calls in the Vale now. The quiet up there is total.",
+        sheltered = Strings.get("story.there_is_still_something_living_in"),
+        thinned = Strings.get("story.the_vale_is_emptier_every_year"),
+        silenced = Strings.get("story.nothing_calls_in_the_vale_now"),
     },
     chapter_six = {
-        remembered = "Every true face in the Crown is still standing, and people go to read them.",
-        recast = "Some of the Crown's dead are still named. The rest are rubble nobody sorts.",
-        erased = "The Crown is clean stone. There is no record left of who was in it.",
+        remembered = Strings.get("story.every_true_face_in_the_crown"),
+        recast = Strings.get("story.some_of_the_crown_s_dead"),
+        erased = Strings.get("story.the_crown_is_clean_stone_there"),
     },
     chapter_seven = {
-        lantern_kept = "The lantern road still runs, and there is always somebody below it.",
-        lantern_out = "There is no lantern road. The nights are only nights now.",
-        lantern_shared = "Everyone carries a piece of it. No road, and nothing at the bottom.",
+        lantern_kept = Strings.get("story.the_lantern_road_still_runs_and"),
+        lantern_out = Strings.get("story.there_is_no_lantern_road_the"),
+        lantern_shared = Strings.get("story.everyone_carries_a_piece_of_it"),
     },
 }
 
 local ENDING_TITLES: { [string]: string } = {
-    ending_kept = "THE LANTERN KEPT",
-    ending_ended = "THE LANTERN PUT OUT",
-    ending_shared = "THE LANTERN SHARED",
+    ending_kept = Strings.get("story.the_lantern_kept"),
+    ending_ended = Strings.get("story.the_lantern_put_out"),
+    ending_shared = Strings.get("story.the_lantern_shared"),
 }
 
 local TOWN_STATES: { [string]: string } = {
@@ -96,9 +97,9 @@ local TOWN_STATES: { [string]: string } = {
 }
 
 local POST_LINES: { [string]: string } = {
-    post_gate = "The gate went first, and the copy of this town burned from the road in.",
-    post_road = "It came up the road, past the posts nobody could spare, into the middle.",
-    post_hearth = "It reached the hearth. In a town that was never lived in, that still mattered.",
+    post_gate = Strings.get("story.the_gate_went_first_and_the"),
+    post_road = Strings.get("story.it_came_up_the_road_past"),
+    post_hearth = Strings.get("story.it_reached_the_hearth_in_a"),
 }
 
 Epilogue.OutcomeLines = OUTCOME_LINES
@@ -155,7 +156,7 @@ function Epilogue.resolve(story: any): Resolution
                 table.insert(
                     lines,
                     string.format(
-                        "%s came back up. %s did not, and everybody knows which.",
+                        Strings.get("story.n_came_back_up_n_did"),
                         (rescued :: any).displayName,
                         (left :: any).displayName
                     )
@@ -163,22 +164,27 @@ function Epilogue.resolve(story: any): Resolution
             elseif rescued ~= nil then
                 table.insert(
                     lines,
-                    string.format("%s came back up with you.", (rescued :: any).displayName)
+                    string.format(
+                        Strings.get("story.n_came_back_up_with_you"),
+                        (rescued :: any).displayName
+                    )
                 )
             end
         else
-            table.insert(lines, "Nobody came back up with you. There was light for one.")
+            table.insert(lines, Strings.get("story.nobody_came_back_up_with_you"))
         end
     end
 
     if #lines == 0 then
-        table.insert(lines, "Emberhollow is still standing, and its story is not written yet.")
+        table.insert(lines, Strings.get("story.emberhollow_is_still_standing_and_its"))
     end
 
     return {
         ending = ending,
         lines = lines,
-        title = if ending ~= nil then ENDING_TITLES[ending] else "THE STORY SO FAR",
+        title = if ending ~= nil
+            then ENDING_TITLES[ending]
+            else Strings.get("story.the_story_so_far"),
         townState = if ending ~= nil then TOWN_STATES[ending] else "emberhollow_lit",
     }
 end

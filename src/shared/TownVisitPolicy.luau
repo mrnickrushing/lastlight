@@ -50,6 +50,8 @@ export type Decision = {
     reason: string,
 }
 
+local Strings = require("./Strings")
+
 local TownVisitPolicy = {
     Default = "open" :: Policy,
 }
@@ -57,10 +59,10 @@ local TownVisitPolicy = {
 local ORDER: { Policy } = { "open", "friends", "invited", "closed" }
 
 local LABELS: { [string]: string } = {
-    open = "OPEN TO ALL TRAVELLERS",
-    friends = "OPEN TO FRIENDS",
-    invited = "OPEN TO THOSE YOU ASKED ALONG",
-    closed = "CLOSED — THIS TOWN IS YOURS ALONE",
+    open = Strings.get("town.open_to_all_travellers"),
+    friends = Strings.get("town.open_to_friends"),
+    invited = Strings.get("town.open_to_those_you_asked_along"),
+    closed = Strings.get("town.closed_this_town_is_yours_alone"),
 }
 
 --[[

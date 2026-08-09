@@ -19,6 +19,8 @@
     one reward per participant per run, disable-able, server-called.
 ]]
 
+local Strings = require("./Strings")
+
 local AdmiralWreckEncounter = {}
 
 export type Status = "disabled" | "dormant" | "covered" | "exposed" | "complete"
@@ -45,9 +47,9 @@ local COVERED_FRACTION = 0.3
 
 local DEBRIS_SWEEP = table.freeze({
     attackId = "admiral_wreck_sweep",
-    attackName = "DEBRIS SWEEP",
+    attackName = Strings.get("encounter.debris_sweep"),
     damage = 26,
-    instruction = "THE RING IS COMING AROUND — MOVE INSIDE IT",
+    instruction = Strings.get("encounter.the_ring_is_coming_around_move"),
     radius = 14,
     shape = "circle",
     windup = 1.5,
@@ -55,9 +57,9 @@ local DEBRIS_SWEEP = table.freeze({
 
 local BROADSIDE = table.freeze({
     attackId = "admiral_wreck_broadside",
-    attackName = "BROADSIDE",
+    attackName = Strings.get("encounter.broadside"),
     damage = 32,
-    instruction = "CLEAR THE BROADSIDE LINE",
+    instruction = Strings.get("encounter.clear_the_broadside_line"),
     length = 34,
     shape = "lane",
     width = 9,
@@ -250,16 +252,20 @@ end
 function AdmiralWreckEncounter.snapshot(state: State, userId: number): any
     local cut = AdmiralWreckEncounter.cutCount(state)
     local instruction = if state.status == "covered"
-        then string.format("CUT THE TOW LINES — %d OF %d", cut, #LINE_IDS)
-        elseif state.status == "exposed" then "THE RING IS STOPPED — STRIKE HIM"
-        elseif state.status == "complete" then "THE WRECKS DRIFT APART"
-        elseif state.status == "disabled" then "ELITE TEMPORARILY DORMANT"
-        else "ENTER THE WRECK YARD"
+        then string.format(Strings.get("encounter.cut_the_tow_lines_n_of"), cut, #LINE_IDS)
+        elseif state.status == "exposed" then Strings.get(
+            "encounter.the_ring_is_stopped_strike_him"
+        )
+        elseif state.status == "complete" then Strings.get("encounter.the_wrecks_drift_apart")
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.elite_temporarily_dormant"
+        )
+        else Strings.get("encounter.enter_the_wreck_yard")
     return {
         active = state.status == "covered" or state.status == "exposed",
         complete = state.status == "complete",
         covered = state.status == "covered",
-        displayName = "ADMIRAL WRECK",
+        displayName = Strings.get("encounter.admiral_wreck"),
         enabled = state.status ~= "disabled",
         exposed = state.status == "exposed",
         health = state.health,

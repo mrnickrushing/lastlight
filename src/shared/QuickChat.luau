@@ -64,6 +64,8 @@ export type Call = {
     z: number?,
 }
 
+local Strings = require("./Strings")
+
 local QuickChat = {
     -- A phrase id is a catalog key, and the catalog is the only source of
     -- them. The bound is here so the transport can refuse a long string
@@ -77,7 +79,7 @@ local QuickChat = {
 local PING_KINDS: { PingKind } = {
     {
         id = "danger",
-        label = "DANGER",
+        label = Strings.get("chat.danger"),
         glyph = "▲",
         seconds = 8,
         marks = true,
@@ -96,7 +98,7 @@ local PING_KINDS: { PingKind } = {
     },
     {
         id = "move",
-        label = "MOVE",
+        label = Strings.get("hud.move"),
         glyph = "➤",
         seconds = 6,
         marks = true,
@@ -104,7 +106,7 @@ local PING_KINDS: { PingKind } = {
     },
     {
         id = "hold",
-        label = "HOLD",
+        label = Strings.get("chat.hold"),
         glyph = "■",
         seconds = 12,
         marks = true,
@@ -112,7 +114,7 @@ local PING_KINDS: { PingKind } = {
     },
     {
         id = "found",
-        label = "FOUND",
+        label = Strings.get("chat.found"),
         glyph = "◆",
         -- A node does not walk away, so the marker on it outlives every other
         -- kind. This is the one a party actually navigates by.
@@ -122,7 +124,7 @@ local PING_KINDS: { PingKind } = {
     },
     {
         id = "reply",
-        label = "REPLY",
+        label = Strings.get("chat.reply"),
         glyph = "·",
         -- Spoken, not placed. Zero seconds is not a marker that vanishes
         -- instantly; marks = false means one is never built at all.
@@ -133,10 +135,10 @@ local PING_KINDS: { PingKind } = {
 }
 
 local CATEGORIES = {
-    { id = "danger", label = "DANGER" },
-    { id = "direction", label = "DIRECTION" },
-    { id = "need", label = "NEED" },
-    { id = "courtesy", label = "COURTESY" },
+    { id = "danger", label = Strings.get("chat.danger") },
+    { id = "direction", label = Strings.get("chat.direction") },
+    { id = "need", label = Strings.get("chat.need") },
+    { id = "courtesy", label = Strings.get("chat.courtesy") },
 }
 
 --[[
@@ -147,43 +149,133 @@ local CATEGORIES = {
     somebody else found is the difference between banking a pouch and not.
 ]]
 local PHRASES: { Phrase } = {
-    { id = "qc_enemy_here", category = "danger", text = "ENEMY HERE", ping = "danger" },
-    { id = "qc_something_big", category = "danger", text = "SOMETHING BIG", ping = "danger" },
+    {
+        id = "qc_enemy_here",
+        category = "danger",
+        text = Strings.get("chat.enemy_here"),
+        ping = "danger",
+    },
+    {
+        id = "qc_something_big",
+        category = "danger",
+        text = Strings.get("chat.something_big"),
+        ping = "danger",
+    },
     {
         id = "qc_lantern_failing",
         category = "danger",
-        text = "THE LANTERN IS FAILING",
+        text = Strings.get("chat.the_lantern_is_failing"),
         ping = "danger",
     },
-    { id = "qc_i_am_down", category = "danger", text = "I AM DOWN", ping = "aid" },
-    { id = "qc_fall_back", category = "danger", text = "FALL BACK", ping = "danger" },
-    { id = "qc_watch_the_dark", category = "danger", text = "WATCH THE DARK", ping = "danger" },
+    {
+        id = "qc_i_am_down",
+        category = "danger",
+        text = Strings.get("chat.i_am_down"),
+        ping = "aid",
+    },
+    {
+        id = "qc_fall_back",
+        category = "danger",
+        text = Strings.get("chat.fall_back"),
+        ping = "danger",
+    },
+    {
+        id = "qc_watch_the_dark",
+        category = "danger",
+        text = Strings.get("chat.watch_the_dark"),
+        ping = "danger",
+    },
 
-    { id = "qc_going_here", category = "direction", text = "GOING HERE", ping = "move" },
-    { id = "qc_this_way", category = "direction", text = "THIS WAY", ping = "move" },
-    { id = "qc_holding_here", category = "direction", text = "HOLDING HERE", ping = "hold" },
-    { id = "qc_wait_for_me", category = "direction", text = "WAIT FOR ME", ping = "hold" },
+    {
+        id = "qc_going_here",
+        category = "direction",
+        text = Strings.get("chat.going_here"),
+        ping = "move",
+    },
+    {
+        id = "qc_this_way",
+        category = "direction",
+        text = Strings.get("chat.this_way"),
+        ping = "move",
+    },
+    {
+        id = "qc_holding_here",
+        category = "direction",
+        text = Strings.get("chat.holding_here"),
+        ping = "hold",
+    },
+    {
+        id = "qc_wait_for_me",
+        category = "direction",
+        text = Strings.get("chat.wait_for_me"),
+        ping = "hold",
+    },
     {
         id = "qc_for_the_gate",
         category = "direction",
-        text = "HEADING FOR THE GATE",
+        text = Strings.get("chat.heading_for_the_gate"),
         ping = "move",
     },
-    { id = "qc_splitting_off", category = "direction", text = "SPLITTING OFF", ping = "move" },
+    {
+        id = "qc_splitting_off",
+        category = "direction",
+        text = Strings.get("chat.splitting_off"),
+        ping = "move",
+    },
 
-    { id = "qc_need_help", category = "need", text = "NEED HELP", ping = "aid" },
-    { id = "qc_need_rootfire", category = "need", text = "NEED ROOTFIRE", ping = "aid" },
-    { id = "qc_short_materials", category = "need", text = "SHORT ON MATERIALS", ping = "aid" },
-    { id = "qc_harvest_here", category = "need", text = "HARVEST HERE", ping = "found" },
-    { id = "qc_memory_here", category = "need", text = "A MEMORY HERE", ping = "found" },
-    { id = "qc_event_here", category = "need", text = "SOMETHING HAPPENING HERE", ping = "found" },
+    { id = "qc_need_help", category = "need", text = Strings.get("chat.need_help"), ping = "aid" },
+    {
+        id = "qc_need_rootfire",
+        category = "need",
+        text = Strings.get("chat.need_rootfire"),
+        ping = "aid",
+    },
+    {
+        id = "qc_short_materials",
+        category = "need",
+        text = Strings.get("chat.short_on_materials"),
+        ping = "aid",
+    },
+    {
+        id = "qc_harvest_here",
+        category = "need",
+        text = Strings.get("chat.harvest_here"),
+        ping = "found",
+    },
+    {
+        id = "qc_memory_here",
+        category = "need",
+        text = Strings.get("chat.a_memory_here"),
+        ping = "found",
+    },
+    {
+        id = "qc_event_here",
+        category = "need",
+        text = Strings.get("chat.something_happening_here"),
+        ping = "found",
+    },
 
     { id = "qc_yes", category = "courtesy", text = "YES", ping = "reply" },
     { id = "qc_no", category = "courtesy", text = "NO", ping = "reply" },
-    { id = "qc_ready", category = "courtesy", text = "READY", ping = "reply" },
-    { id = "qc_thank_you", category = "courtesy", text = "THANK YOU", ping = "reply" },
-    { id = "qc_my_mistake", category = "courtesy", text = "MY MISTAKE", ping = "reply" },
-    { id = "qc_well_done", category = "courtesy", text = "WELL DONE", ping = "reply" },
+    { id = "qc_ready", category = "courtesy", text = Strings.get("chat.ready"), ping = "reply" },
+    {
+        id = "qc_thank_you",
+        category = "courtesy",
+        text = Strings.get("chat.thank_you"),
+        ping = "reply",
+    },
+    {
+        id = "qc_my_mistake",
+        category = "courtesy",
+        text = Strings.get("chat.my_mistake"),
+        ping = "reply",
+    },
+    {
+        id = "qc_well_done",
+        category = "courtesy",
+        text = Strings.get("chat.well_done"),
+        ping = "reply",
+    },
 }
 
 local pingById: { [string]: PingKind } = {}

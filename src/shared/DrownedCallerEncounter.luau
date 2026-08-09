@@ -22,6 +22,8 @@
     transaction id, disable-able, every mutation server-called.
 ]]
 
+local Strings = require("./Strings")
+
 local DrownedCallerEncounter = {}
 
 export type Status = "disabled" | "dormant" | "calling" | "exposed" | "complete"
@@ -57,9 +59,9 @@ local MIN_CALL_SECONDS = 3
 
 local DROWNING_HAND = table.freeze({
     attackId = "drowned_caller_hand",
-    attackName = "DROWNING HAND",
+    attackName = Strings.get("encounter.drowning_hand"),
     damage = 26,
-    instruction = "STEP OFF THE WET GROUND",
+    instruction = Strings.get("encounter.step_off_the_wet_ground"),
     radius = 10,
     shape = "circle",
     windup = 1.45,
@@ -67,9 +69,9 @@ local DROWNING_HAND = table.freeze({
 
 local UNDERTOW = table.freeze({
     attackId = "drowned_caller_undertow",
-    attackName = "UNDERTOW",
+    attackName = Strings.get("encounter.undertow"),
     damage = 30,
-    instruction = "GET CLEAR OF THE PULL",
+    instruction = Strings.get("encounter.get_clear_of_the_pull"),
     length = 28,
     shape = "lane",
     width = 9,
@@ -274,16 +276,24 @@ end
 function DrownedCallerEncounter.snapshot(state: State, userId: number): any
     local silted = poolsSilted(state)
     local instruction = if state.status == "calling"
-        then string.format("SILT THE REFLECTED POOLS — %d OF %d", silted, #POOL_IDS)
-        elseif state.status == "exposed" then "NOTHING LEFT TO REACH THROUGH — STRIKE IT"
-        elseif state.status == "complete" then "THE CALLING IS ENDED"
-        elseif state.status == "disabled" then "ELITE TEMPORARILY DORMANT"
-        else "ENTER THE BELL MARSH"
+        then string.format(
+            Strings.get("encounter.silt_the_reflected_pools_n_of"),
+            silted,
+            #POOL_IDS
+        )
+        elseif state.status == "exposed" then Strings.get(
+            "encounter.nothing_left_to_reach_through_strike"
+        )
+        elseif state.status == "complete" then Strings.get("encounter.the_calling_is_ended")
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.elite_temporarily_dormant"
+        )
+        else Strings.get("encounter.enter_the_bell_marsh")
     return {
         active = state.status == "calling" or state.status == "exposed",
         callCooldown = DrownedCallerEncounter.callCooldown(state),
         complete = state.status == "complete",
-        displayName = "DROWNED CALLER",
+        displayName = Strings.get("encounter.drowned_caller"),
         enabled = state.status ~= "disabled",
         exposed = state.status == "exposed",
         health = state.health,

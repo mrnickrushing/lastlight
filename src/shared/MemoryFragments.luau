@@ -31,6 +31,8 @@
     set on the profile; a client never decides what it has found.
 ]]
 
+local Strings = require("./Strings")
+
 local MemoryFragments = {}
 
 export type Fragment = {
@@ -75,136 +77,96 @@ local LIST: { Fragment } = table.freeze({
     fragment({
         id = "fragment_last_harvest",
         anchorKey = "story:last_harvest",
-        title = "THE LAST HARVEST",
-        foundAt = "Sunken Orchard",
+        title = Strings.get("story.the_last_harvest"),
+        foundAt = Strings.get("story.sunken_orchard"),
         act = 1,
         requiresChapterOne = false,
-        body = "They brought it in anyway. Every apple, every root, knowing the "
-            .. "carts left at dawn and the cellar stayed behind. Ena Moss's "
-            .. "grandmother wrote the count in the ledger, and underneath it "
-            .. "she wrote: we did not waste it, we only failed to carry it. "
-            .. "The orchard has been holding that harvest ever since.",
+        body = Strings.get("story.they_brought_it_in_anyway_every"),
     }),
     fragment({
         id = "fragment_road_they_left",
         anchorKey = "story:evacuation_cart",
-        title = "THE ROAD THEY LEFT",
+        title = Strings.get("story.the_road_they_left"),
         foundAt = "Hollow Farm",
         act = 1,
         requiresChapterOne = false,
-        body = "Someone counted children at this bend. Counted twice, because "
-            .. "the first count came up one short and the second came up "
-            .. "right, and nobody afterward could agree which had been the "
-            .. "mistake. The road remembers the counting. It does not "
-            .. "remember the name it could not find.",
+        body = Strings.get("story.someone_counted_children_at_this_bend"),
     }),
     fragment({
         id = "fragment_last_repair",
         anchorKey = "story:last_repair",
-        title = "THE LAST REPAIR",
-        foundAt = "Windmill Copse",
+        title = Strings.get("story.the_last_repair"),
+        foundAt = Strings.get("story.windmill_copse"),
         act = 1,
         requiresChapterOne = false,
-        body = "The mill was still turning when the last cart left. That was "
-            .. "deliberate. A man named Ol' Wren stayed behind to keep it "
-            .. "turning, so anyone still walking would have something to "
-            .. "steer by. He is not in the arrival rolls at Emberhollow. The "
-            .. "sails turned eleven more days. Pip has never been told.",
+        body = Strings.get("story.the_mill_was_still_turning_when"),
     }),
     fragment({
         id = "fragment_lost_crossing",
         anchorKey = "story:lost_crossing",
-        title = "THE LOST CROSSING",
-        foundAt = "Tangle Bridge",
+        title = Strings.get("story.the_lost_crossing"),
+        foundAt = Strings.get("story.tangle_bridge"),
         act = 1,
         requiresChapterOne = false,
-        body = "The bridge went down under the third cart, not the first. "
-            .. "Tomas Reed was quartermaster that night, and he had loaded "
-            .. "the heavy stores last so the families could cross first. He "
-            .. "has never once told that story as a thing he got right.",
+        body = Strings.get("story.the_bridge_went_down_under_the"),
     }),
 
     -- ACT II -- The keeper's trail
     fragment({
         id = "fragment_house_that_answered",
         anchorKey = "poi:poi_bw_reedstead_ruin",
-        title = "THE HOUSE THAT ANSWERED",
-        foundAt = "Reedstead Ruin",
+        title = Strings.get("story.the_house_that_answered"),
+        foundAt = Strings.get("story.reedstead_ruin"),
         act = 2,
         requiresChapterOne = false,
-        body = "This house kept answering its door for two winters after "
-            .. "nobody lived in it. Not haunted -- remembered. The Long Night "
-            .. "does not only take. Sometimes it holds a habit so tightly "
-            .. "that the habit goes on without the person.",
+        body = Strings.get("story.this_house_kept_answering_its_door"),
     }),
     fragment({
         id = "fragment_what_moths_carry",
         anchorKey = "poi:poi_bw_mothwell",
-        title = "WHAT THE MOTHS CARRY",
+        title = Strings.get("story.what_the_moths_carry"),
         foundAt = "Mothwell",
         act = 2,
         requiresChapterOne = false,
-        body = "Light-moths carry a little of whatever light they hatched "
-            .. "from. These hatched from evacuation lanterns. Follow enough "
-            .. "of them and you are walking the road as it was walked, at the "
-            .. "pace it was walked, behind people who are no longer there.",
+        body = Strings.get("story.light_moths_carry_a_little_of"),
     }),
     fragment({
         id = "fragment_keeper_came_through",
         anchorKey = "poi:poi_bw_sapglass_grove",
-        title = "THE KEEPER CAME THROUGH",
-        foundAt = "Sapglass Grove",
+        title = Strings.get("story.the_keeper_came_through"),
+        foundAt = Strings.get("story.sapglass_grove"),
         act = 2,
         requiresChapterOne = false,
-        body = "He tapped these trees and left the vials full, which is not "
-            .. "what a thief does. The sap in them has gone to glass, and "
-            .. "inside the glass is light that does not flicker. Orin Vale "
-            .. "was testing whether a memory could be held outside a lantern. "
-            .. "It can. That is the frightening part.",
+        body = Strings.get("story.he_tapped_these_trees_and_left"),
     }),
     fragment({
         id = "fragment_what_orin_said",
         anchorKey = "poi:poi_bw_root_chapel",
-        title = "WHAT ORIN SAID AT THE SEAL",
+        title = Strings.get("story.what_orin_said_at_the_seal"),
         foundAt = "Root Chapel",
         act = 2,
         requiresChapterOne = false,
-        body = "I am not stealing them, he said. I am letting them out. The "
-            .. "chapel heard it and kept it, the way roots keep everything. "
-            .. "The machine has been eating what people could not carry -- "
-            .. "seven towns' worth of grief, filed where nobody has to feel "
-            .. "it. I have felt it, he said. Somebody had to.",
+        body = Strings.get("story.i_am_not_stealing_them_he"),
     }),
 
     -- ACT III -- Your part in it
     fragment({
         id = "fragment_eighth_seal",
         anchorKey = "site:warden_seal",
-        title = "THE EIGHTH SEAL",
-        foundAt = "The Warden's Seal",
+        title = Strings.get("story.the_eighth_seal"),
+        foundAt = Strings.get("story.the_warden_s_seal"),
         act = 3,
         requiresChapterOne = true,
-        body = "He woke the Stag on purpose -- not to guard the seal against "
-            .. "you, but to guard it for you, until someone arrived who would "
-            .. "open it slowly. The eighth was never his to take. It answers "
-            .. "to whoever chooses to carry it. You picked it up on the first "
-            .. "morning without being asked, and it has been answering ever "
-            .. "since.",
+        body = Strings.get("story.he_woke_the_stag_on_purpose"),
     }),
     fragment({
         id = "fragment_bell_beneath_iron",
         anchorKey = "site:wayhome",
-        title = "A BELL, FAR UNDER",
+        title = Strings.get("story.a_bell_far_under"),
         foundAt = "Wayhome Gate",
         act = 3,
         requiresChapterOne = true,
-        body = "There is a bell ringing under Ironroot Delve. Nobody is "
-            .. "pulling it. The shift-bell rang three times a day for forty "
-            .. "years, and the crews who answered it were owed wages "
-            .. "Emberhollow never paid; now it rings on time in an empty "
-            .. "shaft. Orin went that way. He is walking one town's debt at a "
-            .. "time, and the next question waiting for you is what a town "
-            .. "owes the people whose labour built it. Bring an answer.",
+        body = Strings.get("story.there_is_a_bell_ringing_under"),
     }),
 
     --[[
@@ -222,121 +184,101 @@ local LIST: { Fragment } = table.freeze({
         id = "fragment_delve_shift_book",
         anchorKey = "poi:poi_ir_tally_wall",
         regionId = "region_ironroot",
-        title = "THE LAST SHIFT",
+        title = Strings.get("story.the_last_shift"),
         foundAt = "Tally Wall",
         act = 4,
         requiresChapterOne = true,
-        body = "The wall still shows a shift that went down and did not come "
-            .. "up, and somebody kept chalking it forward. The names are in a "
-            .. "steady hand for the first month and a shaking one after.",
+        body = Strings.get("story.the_wall_still_shows_a_shift"),
     }),
     fragment({
         id = "fragment_delve_air",
         anchorKey = "poi:poi_ir_crushed_cage",
         regionId = "region_ironroot",
-        title = "WHAT THE AIR TOOK",
+        title = Strings.get("story.what_the_air_took"),
         foundAt = "Crushed Cage",
         act = 4,
         requiresChapterOne = true,
-        body = "They kept birds because a bird stops singing before a person "
-            .. "stops standing. The cage came out crushed and empty, and "
-            .. "somebody carried it all the way up rather than leave it.",
+        body = Strings.get("story.they_kept_birds_because_a_bird"),
     }),
     fragment({
         id = "fragment_fen_ferry",
         anchorKey = "poi:poi_mg_ferry_ledger",
         regionId = "region_mireglass",
-        title = "THE LAST CROSSING",
+        title = Strings.get("story.the_last_crossing"),
         foundAt = "Ferry Ledger",
         act = 4,
         requiresChapterOne = true,
-        body = "The ferryman's tally runs to the day the water rose and then "
-            .. "stops mid-column. He did not stop counting because he left. "
-            .. "He stopped because there was nobody on the far bank to count.",
+        body = Strings.get("story.the_ferryman_s_tally_runs_to"),
     }),
     fragment({
         id = "fragment_fen_reflection",
         anchorKey = "poi:poi_mg_still_pool",
         regionId = "region_mireglass",
-        title = "WHAT LOOKED BACK",
-        foundAt = "The Still Pool",
+        title = Strings.get("story.what_looked_back"),
+        foundAt = Strings.get("story.the_still_pool"),
         act = 4,
         requiresChapterOne = true,
-        body = "Every account of this water agrees on one detail and disagrees "
-            .. "on everything else: whatever you see in it is doing what you "
-            .. "are doing, a half-second late.",
+        body = Strings.get("story.every_account_of_this_water_agrees"),
     }),
     fragment({
         id = "fragment_reach_signal",
         anchorKey = "poi:poi_tr_lighthouse_stump",
         regionId = "region_tempest",
-        title = "THE SIGNAL BOOK",
-        foundAt = "Lighthouse Stump",
+        title = Strings.get("story.the_signal_book"),
+        foundAt = Strings.get("story.lighthouse_stump"),
         act = 4,
         requiresChapterOne = true,
-        body = "The tower is a stump and the lamp is gone, but the log "
-            .. "survived: every light shown from this coast for sixty years. "
-            .. "The last was for a ship already down, shown all night anyway.",
+        body = Strings.get("story.the_tower_is_a_stump_and"),
     }),
     fragment({
         id = "fragment_reach_harbour",
         anchorKey = "poi:poi_tr_anchor_field",
         regionId = "region_tempest",
-        title = "WHERE THE BIG BOATS WENT",
+        title = Strings.get("story.where_the_big_boats_went"),
         foundAt = "Anchor Field",
         act = 4,
         requiresChapterOne = true,
-        body = "Anchors from boats too big for this water now, laid out in "
-            .. "rows. Somebody cut the year beside each one, and the years "
-            .. "stop within a season of each other.",
+        body = Strings.get("story.anchors_from_boats_too_big_for"),
     }),
     fragment({
         id = "fragment_vale_bell_rope",
         anchorKey = "poi:poi_fv_bell_without_rope",
         regionId = "region_frostmere",
-        title = "WHO CUT THE ROPE",
-        foundAt = "Bell Without a Rope",
+        title = Strings.get("story.who_cut_the_rope"),
+        foundAt = Strings.get("story.bell_without_a_rope"),
         act = 4,
         requiresChapterOne = true,
-        body = "The abbey rang for anyone still alive in the valley. Somebody "
-            .. "decided that calling the living was also calling the other "
-            .. "thing, and went round every bell with a knife.",
+        body = Strings.get("story.the_abbey_rang_for_anyone_still"),
     }),
     fragment({
         id = "fragment_vale_cold_hearth",
         anchorKey = "poi:poi_fv_cold_hearth",
         regionId = "region_frostmere",
-        title = "THE FIRE THEY KEPT",
-        foundAt = "The Cold Hearth",
+        title = Strings.get("story.the_fire_they_kept"),
+        foundAt = Strings.get("story.the_cold_hearth"),
         act = 4,
         requiresChapterOne = true,
-        body = "The great fire was tended in shifts for nine years without "
-            .. "going out. The wood beside it is still stacked and still dry, "
-            .. "which means it did not go out for want of anyone trying.",
+        body = Strings.get("story.the_great_fire_was_tended_in"),
     }),
     fragment({
         id = "fragment_crown_ovation",
         anchorKey = "poi:poi_cc_last_ovation",
         regionId = "region_cinderfall",
-        title = "THE LAST OVATION",
-        foundAt = "The Last Ovation",
+        title = Strings.get("story.the_last_ovation"),
+        foundAt = Strings.get("story.the_last_ovation_2"),
         act = 4,
         requiresChapterOne = true,
-        body = "They were watching something right up until the end, and every "
-            .. "one of them is turned the same way. Whatever it was, it was "
-            .. "worth not running from.",
+        body = Strings.get("story.they_were_watching_something_right_up"),
     }),
     fragment({
         id = "fragment_crown_name_wall",
         anchorKey = "poi:poi_cc_name_wall",
         regionId = "region_cinderfall",
-        title = "THE OTHER NAMES",
-        foundAt = "The Name Wall",
+        title = Strings.get("quest.the_other_names"),
+        foundAt = Strings.get("story.the_name_wall"),
         act = 4,
         requiresChapterOne = true,
-        body = "Official names cut deep and formal, and under each one, small "
-            .. "and scratched, the name the person actually went by. Somebody "
-            .. "came back with a nail and corrected the whole wall.",
+        body = Strings.get("story.official_names_cut_deep_and_formal"),
     }),
 })
 

@@ -1,5 +1,7 @@
 --!strict
 
+local Strings = require("./Strings")
+
 local OldGrowthEncounter = {}
 
 export type Status = "disabled" | "dormant" | "vulnerable" | "shielded" | "complete"
@@ -21,9 +23,9 @@ local SHIELD_THRESHOLDS = table.freeze({ 240, 120 })
 
 local ROOT_LANE = table.freeze({
     attackId = "old_growth_root_lane",
-    attackName = "CATHEDRAL ROOTS",
+    attackName = Strings.get("encounter.cathedral_roots"),
     damage = 20,
-    instruction = "CLEAR THE ROOT LANE",
+    instruction = Strings.get("encounter.clear_the_root_lane"),
     length = 32,
     rootedDuration = 1.6,
     rootedMultiplier = 0.35,
@@ -34,9 +36,9 @@ local ROOT_LANE = table.freeze({
 
 local CANOPY_FALL = table.freeze({
     attackId = "old_growth_canopy_fall",
-    attackName = "CANOPY FALL",
+    attackName = Strings.get("encounter.canopy_fall"),
     damage = 28,
-    instruction = "LEAVE THE FALL RING",
+    instruction = Strings.get("encounter.leave_the_fall_ring"),
     radius = 10,
     shape = "circle",
     windup = 1.55,
@@ -242,16 +244,20 @@ function OldGrowthEncounter.snapshot(state: State, userId: number, now: number):
     local expiresAt = state.carriers[tostring(userId)] or 0
     local carryingFire = now < expiresAt
     local instruction = if state.status == "shielded"
-        then if carryingFire then "CARRY FIRE TO THE ROOT HEART" else "TAKE LANTERN FIRE"
-        elseif state.status == "vulnerable" then "STRIKE THE AMBER HEART"
-        elseif state.status == "complete" then "OLD GROWTH CLEANSED"
-        elseif state.status == "disabled" then "ELITE TEMPORARILY DORMANT"
-        else "ENTER THE OLD GROWTH ARENA"
+        then if carryingFire
+            then Strings.get("encounter.carry_fire_to_the_root_heart")
+            else Strings.get("encounter.take_lantern_fire")
+        elseif state.status == "vulnerable" then Strings.get("client.strike_the_amber_heart")
+        elseif state.status == "complete" then Strings.get("encounter.old_growth_cleansed")
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.elite_temporarily_dormant"
+        )
+        else Strings.get("encounter.enter_the_old_growth_arena")
     return {
         active = state.status == "vulnerable" or state.status == "shielded",
         carryingFire = carryingFire,
         complete = state.status == "complete",
-        displayName = "OLD GROWTH",
+        displayName = Strings.get("common.old_growth"),
         enabled = state.status ~= "disabled",
         fireExpiresAt = if carryingFire then expiresAt else 0,
         health = state.health,

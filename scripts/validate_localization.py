@@ -58,36 +58,6 @@ ALLOWED: dict[str, str] = {
     "src/first/LoadingController.client.luau": (
         "loads before the shared root replicates, which is the whole point of it; reaching for the table would make the loading screen wait for the thing it exists to cover"
     ),
-    "src/shared/AbbeySilenceEncounter.luau": (
-        "content catalog; 10 authored strings, migrating with the content batch"
-    ),
-    "src/shared/ActionProgress.luau": (
-        "content catalog; 3 authored strings, migrating with the content batch"
-    ),
-    "src/shared/AdmiralWreckEncounter.luau": (
-        "content catalog; 10 authored strings, migrating with the content batch"
-    ),
-    "src/shared/AshRegentEncounter.luau": (
-        "content catalog; 15 authored strings, migrating with the content batch"
-    ),
-    "src/shared/AuroraHartEncounter.luau": (
-        "content catalog; 10 authored strings, migrating with the content batch"
-    ),
-    "src/shared/BellowsMawEncounter.luau": (
-        "content catalog; 16 authored strings, migrating with the content batch"
-    ),
-    "src/shared/BramblewakeBlackout.luau": (
-        "content catalog; 18 authored strings, migrating with the content batch"
-    ),
-    "src/shared/BramblewakeEnemies.luau": (
-        "content catalog; 13 authored strings, migrating with the content batch"
-    ),
-    "src/shared/ChapterCatalog.luau": (
-        "content catalog; 14 authored strings, migrating with the content batch"
-    ),
-    "src/shared/CinderfallEnemies.luau": (
-        "content catalog; 13 authored strings, migrating with the content batch"
-    ),
     "src/shared/Consumables.luau": (
         "content catalog; 82 authored strings, migrating with the content batch"
     ),
@@ -100,9 +70,6 @@ ALLOWED: dict[str, str] = {
     "src/shared/Content/Definitions/FrostmereExpedition.luau": (
         "content catalog; 93 authored strings, migrating with the content batch"
     ),
-    "src/shared/Content/Definitions/HollowFinale.luau": (
-        "content catalog; 35 authored strings, migrating with the content batch"
-    ),
     "src/shared/Content/Definitions/IronrootExpedition.luau": (
         "content catalog; 111 authored strings, migrating with the content batch"
     ),
@@ -112,161 +79,53 @@ ALLOWED: dict[str, str] = {
     "src/shared/Content/Definitions/TempestExpedition.luau": (
         "content catalog; 95 authored strings, migrating with the content batch"
     ),
-    "src/shared/CosmeticCatalog.luau": (
-        "content catalog; 75 authored strings, migrating with the content batch"
-    ),
     "src/shared/CraftingCatalog.luau": (
         "content catalog; 220 authored strings, migrating with the content batch"
-    ),
-    "src/shared/DefenseLanes.luau": (
-        "content catalog; 3 authored strings, migrating with the content batch"
-    ),
-    "src/shared/DrownedCallerEncounter.luau": (
-        "content catalog; 10 authored strings, migrating with the content batch"
-    ),
-    "src/shared/EnemyCombatRules.luau": (
-        "content catalog; 3 authored strings, migrating with the content batch"
-    ),
-    "src/shared/Epilogue.luau": (
-        "content catalog; 30 authored strings, migrating with the content batch"
     ),
     "src/shared/Equipment.luau": (
         "content catalog; 148 authored strings, migrating with the content batch"
     ),
-    "src/shared/ExpeditionContracts.luau": (
-        "content catalog; 8 authored strings, migrating with the content batch"
-    ),
-    "src/shared/ExtractionPayoff.luau": (
-        "content catalog; 30 authored strings, migrating with the content batch"
-    ),
-    "src/shared/ForemanEchoEncounter.luau": (
-        "content catalog; 10 authored strings, migrating with the content batch"
-    ),
-    "src/shared/FrostmereEnemies.luau": (
-        "content catalog; 12 authored strings, migrating with the content batch"
-    ),
     "src/shared/GearTraits.luau": (
         "content catalog; 10 authored strings, migrating with the content batch"
-    ),
-    "src/shared/GlassBailiffEncounter.luau": (
-        "content catalog; 11 authored strings, migrating with the content batch"
-    ),
-    "src/shared/IronWidowEncounter.luau": (
-        "content catalog; 10 authored strings, migrating with the content batch"
-    ),
-    "src/shared/IronrootEnemies.luau": (
-        "content catalog; 12 authored strings, migrating with the content batch"
-    ),
-    "src/shared/LanternWitchEncounter.luau": (
-        "content catalog; 16 authored strings, migrating with the content batch"
-    ),
-    "src/shared/LeadActorEncounter.luau": (
-        "content catalog; 10 authored strings, migrating with the content batch"
-    ),
-    "src/shared/LighthouseEaterEncounter.luau": (
-        "content catalog; 10 authored strings, migrating with the content batch"
-    ),
-    "src/shared/ManyFaceEncounter.luau": (
-        "content catalog; 10 authored strings, migrating with the content batch"
-    ),
-    "src/shared/MemoryFragments.luau": (
-        "content catalog; 57 authored strings, migrating with the content batch"
-    ),
-    "src/shared/MireglassEnemies.luau": (
-        "content catalog; 12 authored strings, migrating with the content batch"
     ),
     "src/shared/MusicCatalog.luau": (
         "content catalog; 30 authored strings, migrating with the content batch"
     ),
-    "src/shared/NamelessNightEncounter.luau": (
-        "content catalog; 16 authored strings, migrating with the content batch"
-    ),
-    "src/shared/OldGrowthEncounter.luau": (
-        "content catalog; 11 authored strings, migrating with the content batch"
-    ),
     "src/shared/PerformanceBudget.luau": (
         "content catalog; 9 authored strings, migrating with the content batch"
-    ),
-    "src/shared/PrivateServerControls.luau": (
-        "content catalog; 16 authored strings, migrating with the content batch"
-    ),
-    "src/shared/ProfessionCatalog.luau": (
-        "content catalog; 30 authored strings, migrating with the content batch"
-    ),
-    "src/shared/ProfessionMastery.luau": (
-        "content catalog; 48 authored strings, migrating with the content batch"
-    ),
-    "src/shared/ProfessionRescue.luau": (
-        "content catalog; 3 authored strings, migrating with the content batch"
-    ),
-    "src/shared/QuestCatalog.luau": (
-        "content catalog; 45 authored strings, migrating with the content batch"
-    ),
-    "src/shared/QuickChat.luau": (
-        "content catalog; 30 authored strings, migrating with the content batch"
     ),
     "src/shared/ResidentDialogue.luau": (
         "content catalog; 76 authored strings, migrating with the content batch"
     ),
-    "src/shared/ResidentLife.luau": (
-        "content catalog; 8 authored strings, migrating with the content batch"
-    ),
     "src/shared/ResidentRoster.luau": (
         "content catalog; 106 authored strings, migrating with the content batch"
-    ),
-    "src/shared/RunHandoff.luau": (
-        "content catalog; 1 authored strings, migrating with the content batch"
     ),
     "src/shared/SoakProbe.luau": (
         "content catalog; 10 authored strings, migrating with the content batch"
     ),
-    "src/shared/StoreAvailability.luau": (
-        "content catalog; 7 authored strings, migrating with the content batch"
-    ),
-    "src/shared/StoreCard.luau": (
-        "content catalog; 7 authored strings, migrating with the content batch"
-    ),
-    "src/shared/TempestEnemies.luau": (
-        "content catalog; 14 authored strings, migrating with the content batch"
-    ),
-    "src/shared/TideboundTitanEncounter.luau": (
-        "content catalog; 16 authored strings, migrating with the content batch"
-    ),
     "src/shared/ToolCatalog.luau": (
         "content catalog; 16 authored strings, migrating with the content batch"
-    ),
-    "src/shared/TownDecorations.luau": (
-        "content catalog; 8 authored strings, migrating with the content batch"
-    ),
-    "src/shared/TownNightIncident.luau": (
-        "content catalog; 25 authored strings, migrating with the content batch"
-    ),
-    "src/shared/TownNightSchedule.luau": (
-        "content catalog; 8 authored strings, migrating with the content batch"
-    ),
-    "src/shared/TownProgression.luau": (
-        "content catalog; 8 authored strings, migrating with the content batch"
-    ),
-    "src/shared/TownVisitPolicy.luau": (
-        "content catalog; 4 authored strings, migrating with the content batch"
-    ),
-    "src/shared/TutorialFlow.luau": (
-        "content catalog; 24 authored strings, migrating with the content batch"
-    ),
-    "src/shared/WardenStagEncounter.luau": (
-        "content catalog; 15 authored strings, migrating with the content batch"
-    ),
-    "src/shared/WhiteHowlerEncounter.luau": (
-        "content catalog; 17 authored strings, migrating with the content batch"
     ),
 }
 
 # Pinned. It shrinks; it does not grow.
-ALLOWLIST_SIZE = 68
+ALLOWLIST_SIZE = 17
 
 COMMENT = re.compile(r"--\[\[.*?\]\]|--[^\n]*", re.DOTALL)
 LITERAL = re.compile(r'"((?:[^"\\\n]|\\.)*)"')
 KEY_USE = re.compile(r'Strings\.get\(\s*"([a-z0-9_.]+)"')
+# A lookup standing on either side of an equality test. This is the check that
+# arrived latest and matters most: batch two moved four *identifiers* into the
+# table -- a night's theme, a cabin's name, a profession altar's, a phase --
+# and every one of them was then compared to decide what the world builds.
+# Translating any of them changes the game, in the localized build only, with
+# nothing failing anywhere. The whole point of one table is that a translator
+# can change every string in it, so nothing may be true only while a string
+# stays in English.
+COMPARED = re.compile(
+    r'(?:[=~]=\s*Strings\.get\(\s*"[a-z0-9_.]+"\s*\)'
+    r'|Strings\.get\(\s*"[a-z0-9_.]+"\s*\)\s*[=~]=)'
+)
 KEY_DEF = re.compile(r'^\s*\["([a-z0-9_.]+)"\]\s*=\s*"', re.M)
 
 # A player-visible string is a run of capitals, or a capitalized phrase with a
@@ -369,11 +228,15 @@ def main() -> int:
         )
 
     used: set[str] = set()
+    compared: list[str] = []
     uncovered: dict[str, list[str]] = {}
     for path in sorted(SRC.rglob("*.luau")):
         relative = str(path.relative_to(ROOT))
         source = COMMENT.sub("", path.read_text())
         used.update(KEY_USE.findall(source))
+        for match in COMPARED.finditer(source):
+            line = source.count("\n", 0, match.start()) + 1
+            compared.append(f"{relative}:{line} {match.group(0).strip()}")
         if path == TABLE:
             continue
         if relative in ALLOWED:
@@ -390,6 +253,15 @@ def main() -> int:
             f"table: {shown}{more}. Route them through Strings, or -- if this file is "
             f"a batch for later -- add it to ALLOWED with the reason and raise "
             f"ALLOWLIST_SIZE in the same commit"
+        )
+
+    if compared:
+        failures.append(
+            "a decision is made by comparing a translated string: "
+            + "; ".join(compared)
+            + ". Translating the string changes what the code does, which is a "
+            "defect that exists only in the localized build and fails nothing. "
+            "Compare an id and read the string for display"
         )
 
     missing = sorted(used - defined)

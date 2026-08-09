@@ -31,6 +31,8 @@
         does not prove membership of one, and nothing is granted on it.
 ]]
 
+local Strings = require("./Strings")
+
 local RunHandoff = {}
 
 export type Payload = {
@@ -154,7 +156,7 @@ function RunHandoff.failureRecovery(reason: any): any
         returnToLobby = true,
         cancelDeparture = true,
         reason = if type(reason) == "string" and #reason > 0 then reason else "unknown",
-        message = "THE ROAD DID NOT OPEN - EVERYONE IS STILL HERE",
+        message = Strings.get("toast.the_road_did_not_open_everyone"),
     }
 end
 

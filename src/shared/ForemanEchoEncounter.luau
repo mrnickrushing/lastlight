@@ -23,6 +23,8 @@
     right order while the ground itself is being turned against you.
 ]]
 
+local Strings = require("./Strings")
+
 local ForemanEchoEncounter = {}
 
 export type Status = "disabled" | "dormant" | "commanding" | "exposed" | "complete"
@@ -48,9 +50,9 @@ local MARK_SECONDS = 6
 
 local UNSAFE_MARK = table.freeze({
     attackId = "foreman_echo_mark",
-    attackName = "UNSAFE GROUND",
+    attackName = Strings.get("encounter.unsafe_ground"),
     damage = 22,
-    instruction = "LEAVE THE MARKED GROUND",
+    instruction = Strings.get("encounter.leave_the_marked_ground"),
     radius = 11,
     shape = "circle",
     windup = 1.4,
@@ -58,9 +60,9 @@ local UNSAFE_MARK = table.freeze({
 
 local CART_ORDER = table.freeze({
     attackId = "foreman_echo_cart_order",
-    attackName = "CART ORDER",
+    attackName = Strings.get("encounter.cart_order"),
     damage = 26,
-    instruction = "CLEAR THE RAIL LINE",
+    instruction = Strings.get("encounter.clear_the_rail_line"),
     length = 30,
     shape = "lane",
     width = 8,
@@ -265,15 +267,21 @@ end
 function ForemanEchoEncounter.snapshot(state: State, userId: number, now: number): any
     local thrown = leversThrown(state)
     local instruction = if state.status == "commanding"
-        then string.format("THROW THE SIGNAL LEVERS — %d OF %d", thrown, #LEVER_IDS)
-        elseif state.status == "exposed" then "STRIKE THE FOREMAN"
-        elseif state.status == "complete" then "THE SHIFT IS OVER"
-        elseif state.status == "disabled" then "ELITE TEMPORARILY DORMANT"
-        else "ENTER THE SIGNAL GALLERY"
+        then string.format(
+            Strings.get("encounter.throw_the_signal_levers_n_of"),
+            thrown,
+            #LEVER_IDS
+        )
+        elseif state.status == "exposed" then Strings.get("encounter.strike_the_foreman")
+        elseif state.status == "complete" then Strings.get("encounter.the_shift_is_over")
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.elite_temporarily_dormant"
+        )
+        else Strings.get("encounter.enter_the_signal_gallery")
     return {
         active = state.status == "commanding" or state.status == "exposed",
         complete = state.status == "complete",
-        displayName = "FOREMAN ECHO",
+        displayName = Strings.get("encounter.foreman_echo"),
         enabled = state.status ~= "disabled",
         exposed = state.status == "exposed",
         health = state.health,

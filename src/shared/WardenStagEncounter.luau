@@ -1,5 +1,7 @@
 --!strict
 
+local Strings = require("./Strings")
+
 local WardenStagEncounter = {}
 
 export type Status = "disabled" | "locked" | "dormant" | "cleansing" | "vulnerable" | "complete"
@@ -35,9 +37,9 @@ local ANTLER_IDS = table.freeze({
 
 local ROOTBOUND_CHARGE = table.freeze({
     attackId = "warden_stag_rootbound_charge",
-    attackName = "ROOTBOUND CHARGE",
+    attackName = Strings.get("encounter.rootbound_charge"),
     damage = 24,
-    instruction = "CLEAR THE CHARGE LANE",
+    instruction = Strings.get("encounter.clear_the_charge_lane"),
     length = 42,
     rootedDuration = 1.2,
     rootedMultiplier = 0.45,
@@ -48,9 +50,9 @@ local ROOTBOUND_CHARGE = table.freeze({
 
 local ANTLER_ARC = table.freeze({
     attackId = "warden_stag_antler_arc",
-    attackName = "ANTLER ARC",
+    attackName = Strings.get("encounter.antler_arc"),
     damage = 28,
-    instruction = "LEAVE THE ANTLER RING",
+    instruction = Strings.get("encounter.leave_the_antler_ring"),
     radius = 11,
     shape = "circle",
     windup = 1.7,
@@ -58,9 +60,9 @@ local ANTLER_ARC = table.freeze({
 
 local MEMORY_STAMPEDE = table.freeze({
     attackId = "warden_stag_memory_stampede",
-    attackName = "MEMORY STAMPEDE",
+    attackName = Strings.get("encounter.memory_stampede"),
     damage = 32,
-    instruction = "CROSS OUT OF THE MEMORY LANE",
+    instruction = Strings.get("encounter.cross_out_of_the_memory_lane"),
     length = 48,
     rootedDuration = 1.5,
     rootedMultiplier = 0.38,
@@ -329,26 +331,34 @@ function WardenStagEncounter.snapshot(state: State, userId: number): any
     local required = ROOTS_REQUIRED[state.phase] or ROOTS_REQUIRED[#ROOTS_REQUIRED]
     local instruction = if state.status == "cleansing"
         then string.format(
-            "CLEANSE LIVING ROOTS %d/%d · BREAKING ANTLERS CHANGES THE FOREST",
+            Strings.get("encounter.cleanse_living_roots_n_n_breaking"),
             cleansed,
             required
         )
-        elseif state.status == "vulnerable" then "HEART EXPOSED · STRIKE THE MEMORY SEAL"
+        elseif state.status == "vulnerable" then Strings.get(
+            "hud.heart_exposed_strike_the_memory_seal"
+        )
         elseif state.status == "complete" then if state.outcome == "preserved"
-            then "WARDEN STAG CALMED · FOREST ALLY PRESERVED"
-            elseif state.outcome == "harmed" then "WARDEN STAG DEFEATED · FOREST HARMED"
-            else "WARDEN STAG DEFEATED · FOREST SCARRED"
-        elseif state.status == "dormant" then "ENTER THE WARDEN'S SEAL"
-        elseif state.status == "locked" then "CLEANSE OLD GROWTH TO OPEN THE WARDEN'S SEAL"
-        elseif state.status == "disabled" then "WARDEN STAG TEMPORARILY DORMANT"
-        else "WARDEN STAG"
+            then Strings.get("encounter.warden_stag_calmed_forest_ally_preserved")
+            elseif state.outcome == "harmed" then Strings.get(
+                "encounter.warden_stag_defeated_forest_harmed"
+            )
+            else Strings.get("encounter.warden_stag_defeated_forest_scarred")
+        elseif state.status == "dormant" then Strings.get("encounter.enter_the_warden_s_seal")
+        elseif state.status == "locked" then Strings.get(
+            "encounter.cleanse_old_growth_to_open_the"
+        )
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.warden_stag_temporarily_dormant"
+        )
+        else Strings.get("hud.warden_stag")
     return {
         active = isActive(state.status),
         antlersBroken = state.antlersBroken,
         choiceAvailable = state.status == "cleansing" and state.antlersBroken < 2,
         cleansedNodes = cleansed,
         complete = state.status == "complete",
-        displayName = "WARDEN STAG",
+        displayName = Strings.get("hud.warden_stag"),
         enabled = state.status ~= "disabled",
         exposed = state.status == "vulnerable",
         health = state.health,

@@ -24,6 +24,8 @@
     wheels stay where they are put.
 ]]
 
+local Strings = require("./Strings")
+
 local BellowsMawEncounter = {}
 
 export type Status =
@@ -71,9 +73,9 @@ local VENT_OUTCOMES = table.freeze({
 
 local FEED_SURGE = table.freeze({
     attackId = "bellows_maw_feed_surge",
-    attackName = "FEED SURGE",
+    attackName = Strings.get("encounter.feed_surge"),
     damage = 26,
-    instruction = "CLEAR THE FEED LINE",
+    instruction = Strings.get("encounter.clear_the_feed_line"),
     length = 34,
     shape = "lane",
     width = 8,
@@ -82,9 +84,9 @@ local FEED_SURGE = table.freeze({
 
 local PRESSURE_BURST = table.freeze({
     attackId = "bellows_maw_pressure_burst",
-    attackName = "PRESSURE BURST",
+    attackName = Strings.get("encounter.pressure_burst"),
     damage = 30,
-    instruction = "GET BEHIND COVER — IT IS VENTING WILD",
+    instruction = Strings.get("encounter.get_behind_cover_it_is_venting"),
     radius = 14,
     shape = "circle",
     windup = 1.6,
@@ -92,9 +94,9 @@ local PRESSURE_BURST = table.freeze({
 
 local CINDER_FALL = table.freeze({
     attackId = "bellows_maw_cinder_fall",
-    attackName = "CINDER FALL",
+    attackName = Strings.get("encounter.cinder_fall"),
     damage = 22,
-    instruction = "LEAVE THE FALLING EMBERS",
+    instruction = Strings.get("encounter.leave_the_falling_embers"),
     radius = 10,
     shape = "circle",
     windup = 1.35,
@@ -341,24 +343,34 @@ function BellowsMawEncounter.snapshot(state: State, userId: number): any
     local rerouted = countKeys(state.reroutedLines)
     local required = linesRequired(state.phase)
     local instruction = if state.status == "feeding"
-        then string.format("REROUTE THE FEED LINES %d/%d", rerouted, required)
-        elseif
-            state.status == "pressured"
-        then "VENT THE PRESSURE · DRIFTS ARE QUICK, THE STOPE IS CLEAN"
-        elseif state.status == "exposed" then "THE CORE IS OPEN — STRIKE IT"
+        then string.format(Strings.get("encounter.reroute_the_feed_lines_n_n"), rerouted, required)
+        elseif state.status == "pressured" then Strings.get(
+            "encounter.vent_the_pressure_drifts_are_quick"
+        )
+        elseif state.status == "exposed" then Strings.get(
+            "encounter.the_core_is_open_strike_it"
+        )
         elseif state.status == "complete" then if state.outcome == "cleared"
-            then "THE MAW IS STILL · THE DELVE BREATHES CLEAN"
-            elseif state.outcome == "fouled" then "THE MAW IS STILL · THE DRIFTS ARE FOULED"
-            else "THE MAW IS STILL · THE DELVE IS CHANGED"
-        elseif state.status == "dormant" then "ENTER THE BELLOWS CHAMBER"
-        elseif state.status == "locked" then "CLEAR THE DELVE'S ELITES TO OPEN THE CHAMBER"
-        elseif state.status == "disabled" then "BELLOWS MAW TEMPORARILY DORMANT"
-        else "BELLOWS MAW"
+            then Strings.get("encounter.the_maw_is_still_the_delve")
+            elseif state.outcome == "fouled" then Strings.get(
+                "encounter.the_maw_is_still_the_drifts"
+            )
+            else Strings.get("encounter.the_maw_is_still_the_delve_2")
+        elseif state.status == "dormant" then Strings.get(
+            "encounter.enter_the_bellows_chamber"
+        )
+        elseif state.status == "locked" then Strings.get(
+            "encounter.clear_the_delve_s_elites_to"
+        )
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.bellows_maw_temporarily_dormant"
+        )
+        else Strings.get("encounter.bellows_maw")
     return {
         active = isActive(state.status),
         choiceAvailable = state.status == "pressured",
         complete = state.status == "complete",
-        displayName = "BELLOWS MAW",
+        displayName = Strings.get("encounter.bellows_maw"),
         enabled = state.status ~= "disabled",
         exposed = state.status == "exposed",
         health = state.health,

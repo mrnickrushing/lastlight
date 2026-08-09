@@ -1,5 +1,7 @@
 --!strict
 
+local Strings = require("./Strings")
+
 local TownNightSchedule = {}
 
 export type Beat = {
@@ -29,41 +31,67 @@ local MAX_WAVES = 8
 -- The director's ceiling for a full party. Solo nights keep MAX_WAVES; the
 -- extra headroom only opens as real defenders stand in the town.
 local MAX_WAVES_GROUP = 12
-local THEMES = table.freeze({ "EMBERFALL", "MIRETIDE", "ROOTMOON", "ASHEN VEIL" })
+--[[
+	A night's theme is an **id**, and it did not used to be.
+
+	It was the word EMBERFALL: a table key here, a table key in
+	TownNightIncident, the value WorldService compares to choose which dressing
+	to raise and what colour the lantern road glows -- and the same word printed
+	at the player in "EMBERFALL NIGHT 3". That works in exactly one language.
+	Translate it and the schedule keeps returning the English word (so the
+	dressing still builds) while the player reads English, or translate the
+	table too and every lookup misses and every night becomes amber. There is no
+	version of it that is right, because it is one string doing two jobs.
+
+	So the id is lowercase and never shown, `displayName` is the word, and
+	WorldService compares the id.
+]]
+local THEMES = table.freeze({ "emberfall", "miretide", "rootmoon", "ashen_veil" })
 local THEME_PROFILES = table.freeze({
-    EMBERFALL = table.freeze({
-        id = "EMBERFALL",
-        instruction = "KEEP ATTACKERS OFF THE FIRST LANTERN",
+    emberfall = table.freeze({
+        id = "emberfall",
+        name = Strings.get("world.emberfall"),
+        instruction = Strings.get("town.keep_attackers_off_the_first_lantern"),
         healthMultiplier = 1,
         speedMultiplier = 1,
         playerDamageMultiplier = 1,
         lanternDamageMultiplier = 1.25,
     }),
-    MIRETIDE = table.freeze({
-        id = "MIRETIDE",
-        instruction = "SLOW ADVANCE · HEAVIER BLOWS",
+    miretide = table.freeze({
+        id = "miretide",
+        name = Strings.get("world.miretide"),
+        instruction = Strings.get("town.slow_advance_heavier_blows"),
         healthMultiplier = 1,
         speedMultiplier = 0.82,
         playerDamageMultiplier = 1.2,
         lanternDamageMultiplier = 1,
     }),
-    ROOTMOON = table.freeze({
-        id = "ROOTMOON",
-        instruction = "ARMORED GROWTH · FOCUS EACH TARGET",
+    rootmoon = table.freeze({
+        id = "rootmoon",
+        name = Strings.get("world.rootmoon"),
+        instruction = Strings.get("town.armored_growth_focus_each_target"),
         healthMultiplier = 1.25,
         speedMultiplier = 0.94,
         playerDamageMultiplier = 1,
         lanternDamageMultiplier = 1,
     }),
-    ["ASHEN VEIL"] = table.freeze({
-        id = "ASHEN VEIL",
-        instruction = "FRAGILE HUNTERS · FAST APPROACH",
+    ashen_veil = table.freeze({
+        id = "ashen_veil",
+        name = Strings.get("world.ashen_veil"),
+        instruction = Strings.get("town.fragile_hunters_fast_approach"),
         healthMultiplier = 0.85,
         speedMultiplier = 1.25,
         playerDamageMultiplier = 1,
         lanternDamageMultiplier = 1,
     }),
 })
+
+-- The word for a theme, for the one job the id must not do.
+function TownNightSchedule.displayName(theme: string): string
+    local profile = THEME_PROFILES[theme]
+    assert(profile ~= nil, `TownNightSchedule.displayName: no theme "{theme}"`)
+    return profile.name
+end
 
 function TownNightSchedule.theme(nightNumber: number): string
     assert(nightNumber >= 1 and nightNumber == math.floor(nightNumber), "night number is invalid")

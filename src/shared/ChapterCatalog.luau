@@ -17,6 +17,8 @@
     from its original home; this catalog describes it, it does not move it.
 ]]
 
+local Strings = require("./Strings")
+
 local ChapterCatalog = {}
 
 export type Chapter = {
@@ -63,10 +65,10 @@ local DEFINITIONS: { [string]: Chapter } = {
     chapter_one = chapter({
         id = "chapter_one",
         number = 1,
-        displayName = "THE LANTERN ROAD",
+        displayName = Strings.get("story.the_lantern_road"),
         regionId = "region_bramblewake",
         bossId = "boss_warden_stag",
-        decisionPrompt = "WHAT GROWS BACK WHERE THE ROOTS WERE",
+        decisionPrompt = Strings.get("story.what_grows_back_where_the_roots"),
         decisions = { "restore_farmland", "wild_regrowth", "shared_agroforest" },
         outcomes = { "preserved", "scarred", "harmed" },
         requires = nil,
@@ -74,7 +76,7 @@ local DEFINITIONS: { [string]: Chapter } = {
     chapter_two = chapter({
         id = "chapter_two",
         number = 2,
-        displayName = "THE DELVE BELOW",
+        displayName = Strings.get("story.the_delve_below"),
         regionId = "region_ironroot",
         bossId = "boss_bellows_maw",
         --[[
@@ -83,7 +85,7 @@ local DEFINITIONS: { [string]: Chapter } = {
             pays for it, the flooded stope is slow and clean. What a crew
             reached for is what the chapter records.
         ]]
-        decisionPrompt = "WHERE THE PRESSURE WENT",
+        decisionPrompt = Strings.get("story.where_the_pressure_went"),
         decisions = { "vent_drifts", "vent_stope", "vent_both" },
         outcomes = { "cleared", "fouled", "mixed" },
         requires = "chapter_one",
@@ -91,7 +93,7 @@ local DEFINITIONS: { [string]: Chapter } = {
     chapter_three = chapter({
         id = "chapter_three",
         number = 3,
-        displayName = "THE DROWNED COUNTRY",
+        displayName = Strings.get("story.the_drowned_country"),
         regionId = "region_mireglass",
         bossId = "boss_lantern_witch",
         --[[
@@ -99,7 +101,7 @@ local DEFINITIONS: { [string]: Chapter } = {
             only holds if it is given. Spending her copies to get there is
             the cost the ending remembers.
         ]]
-        decisionPrompt = "WHAT WAS SPENT TO REACH HER",
+        decisionPrompt = Strings.get("story.what_was_spent_to_reach_her"),
         decisions = { "spared_copies", "spent_copies", "refused_her" },
         outcomes = { "sealed", "bound", "broken" },
         requires = "chapter_two",
@@ -107,7 +109,7 @@ local DEFINITIONS: { [string]: Chapter } = {
     chapter_four = chapter({
         id = "chapter_four",
         number = 4,
-        displayName = "THE HARBOUR MOUTH",
+        displayName = Strings.get("story.the_harbour_mouth"),
         regionId = "region_tempest",
         bossId = "boss_tidebound_titan",
         --[[
@@ -117,7 +119,7 @@ local DEFINITIONS: { [string]: Chapter } = {
             slammed, the tide drops at once and takes the mouth with it.
             A party in trouble tonight may not care, which is the point.
         ]]
-        decisionPrompt = "HOW THE TIDE WAS LOWERED",
+        decisionPrompt = Strings.get("story.how_the_tide_was_lowered"),
         decisions = { "eased_gates", "slammed_gates", "mixed_gates" },
         outcomes = { "navigable", "scoured", "broken" },
         requires = "chapter_three",
@@ -125,7 +127,7 @@ local DEFINITIONS: { [string]: Chapter } = {
     chapter_five = chapter({
         id = "chapter_five",
         number = 5,
-        displayName = "THE QUIET VALE",
+        displayName = Strings.get("story.the_quiet_vale"),
         regionId = "region_frostmere",
         bossId = "boss_white_howler",
         --[[
@@ -135,7 +137,7 @@ local DEFINITIONS: { [string]: Chapter } = {
             phase that paid for it -- so the decision is made in the one
             currency the whole region is about.
         ]]
-        decisionPrompt = "WHERE THE WARMTH WENT",
+        decisionPrompt = Strings.get("story.where_the_warmth_went"),
         decisions = { "warmed_den", "kept_warmth", "split_warmth" },
         outcomes = { "sheltered", "thinned", "silenced" },
         requires = "chapter_four",
@@ -143,7 +145,7 @@ local DEFINITIONS: { [string]: Chapter } = {
     chapter_six = chapter({
         id = "chapter_six",
         number = 6,
-        displayName = "THE CROWN STILL BURNING",
+        displayName = Strings.get("story.the_crown_still_burning"),
         regionId = "region_cinderfall",
         bossId = "boss_ash_regent",
         --[[
@@ -154,7 +156,7 @@ local DEFINITIONS: { [string]: Chapter } = {
             people who died in it, and the chapter records how much of
             that a party was willing to do.
         ]]
-        decisionPrompt = "WHAT WAS BROKEN TO REACH IT",
+        decisionPrompt = Strings.get("story.what_was_broken_to_reach_it"),
         decisions = { "spared_memories", "broke_some", "broke_them_all" },
         outcomes = { "remembered", "recast", "erased" },
         requires = "chapter_five",
@@ -162,7 +164,7 @@ local DEFINITIONS: { [string]: Chapter } = {
     chapter_seven = chapter({
         id = "chapter_seven",
         number = 7,
-        displayName = "THE HOLLOW BELOW",
+        displayName = Strings.get("story.the_hollow_below"),
         regionId = "region_hollow",
         bossId = "boss_nameless_night",
         --[[
@@ -171,7 +173,7 @@ local DEFINITIONS: { [string]: Chapter } = {
             something is happening; this is what is left when there is
             nothing happening any more.
         ]]
-        decisionPrompt = "WHAT HAPPENS TO THE LIGHT",
+        decisionPrompt = Strings.get("story.what_happens_to_the_light"),
         decisions = { "ending_kept", "ending_ended", "ending_shared" },
         outcomes = { "lantern_kept", "lantern_out", "lantern_shared" },
         requires = "chapter_six",

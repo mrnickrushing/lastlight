@@ -423,6 +423,23 @@ end
 -- a gap, so a wrapped row can never be drawn through the row below it.
 local ACTION_ROW_PITCH = 128
 
+--[[
+	The departure panel cannot be narrower than the row inside it.
+
+	Eight party-size buttons at 44 points with 6 between them, inside a frame
+	inset 14 either side, is 422 -- so any width under that renders button
+	eight past the panel's edge, which is what a floor of 260 was found doing
+	after a degenerate viewport wrote one. The number is written as the sum it
+	is rather than as a constant, because a ninth button would otherwise move
+	the row and not the floor.
+
+	**Open, and honest about what this does not fix:** a phone whose canvas is
+	narrower than 446 points still cannot fit the row, and no clamp can make it
+	-- the row has to wrap or the buttons have to shrink, which is a layout
+	decision rather than a bound.
+]]
+local LOBBY_MIN_WIDTH = 8 * 44 + 7 * 6 + 28
+
 export type HUDController =
     typeof(setmetatable(
         {} :: {
@@ -623,7 +640,7 @@ function HUDController.new(
     local phase = textLabel(
         phaseFrame,
         "Phase",
-        Strings.get("hud.day_morning"),
+        string.format(Strings.get("hud.phase_morning"), Strings.get("hud.day")),
         UDim2.fromScale(1, 1),
         UDim2.fromScale(0, 0),
         17,
@@ -3984,7 +4001,8 @@ function HUDController._layout(self: HUDController)
         (`math.max(120, ...)`); the three panels that were sized without one
         have it now.
     ]]
-    self._lobbyFrame.Size = UDim2.fromOffset(math.max(260, math.min(420, canvasWidth - 24)), 246)
+    self._lobbyFrame.Size =
+        UDim2.fromOffset(math.max(LOBBY_MIN_WIDTH, math.min(420, canvasWidth - 24)), 246)
 
     if narrow then
         -- 470 is a tablet's card, not a phone's: capped to the canvas so the
@@ -4180,11 +4198,31 @@ function HUDController._layout(self: HUDController)
     self:_layoutStore()
 end
 
-function HUDController._presentPhase(self: HUDController, phase: string)
-    local accent = if phase == Strings.get("hud.dusk")
+--[[
+	The accent is chosen by the phase's **id**, and that is not a style note.
+
+	It used to compare the phase against `Strings.get("hud.dusk")`, which is
+	the word DUSK, and it worked because the id upper-cased happens to equal
+	the English label. Translate the label and dusk silently stops being
+	orange -- in the localized build only, with nothing failing anywhere.
+	`validate_localization.py` refuses a `Strings.get` inside a comparison now,
+	because a decision made on a translated string is a decision that changes
+	when somebody translates it.
+]]
+local function phaseLabel(phaseId: string): string
+    return if phaseId == "dusk"
+        then Strings.get("hud.dusk")
+        elseif phaseId == "night" then Strings.get("hud.night")
+        elseif phaseId == "reveal" then Strings.get("hud.reveal")
+        elseif phaseId == "day" then Strings.get("hud.day")
+        else string.upper(phaseId)
+end
+
+function HUDController._presentPhase(self: HUDController, phaseId: string)
+    local accent = if phaseId == "dusk"
         then Color3.fromRGB(255, 164, 91)
-        elseif phase == Strings.get("hud.night") then Color3.fromRGB(174, 211, 255)
-        elseif phase == Strings.get("hud.reveal") then Color3.fromRGB(172, 255, 205)
+        elseif phaseId == "night" then Color3.fromRGB(174, 211, 255)
+        elseif phaseId == "reveal" then Color3.fromRGB(172, 255, 205)
         else COLORS.amber
 
     self._phase.TextColor3 = accent
@@ -4221,11 +4259,12 @@ function HUDController._updateClock(self: HUDController)
         return
     end
 
-    local phase = string.upper(tostring(state.phase or "day"))
-    if phase ~= self._lastPhase then
-        self._lastPhase = phase
-        self:_presentPhase(phase)
+    local phaseId = tostring(state.phase or "day")
+    if phaseId ~= self._lastPhase then
+        self._lastPhase = phaseId
+        self:_presentPhase(phaseId)
     end
+    local phase = phaseLabel(phaseId)
     local phaseEndsAt = tonumber(state.phaseEndsAt) or 0
     local blackout = state.blackout
     local blackoutVisible = type(blackout) == "table"
@@ -4265,16 +4304,16 @@ function HUDController._updateClock(self: HUDController)
         -- Strings.get("hud.left") because "DAY · 02:58" reads as three in the morning, not as
         -- a countdown. Two glyphs of clarity beat two glyphs of mystery.
         clockText = string.format(
-            "%s · %02d:%02d %s",
+            Strings.get("hud.phase_clock"),
             phase,
             math.floor(remaining / 60),
             remaining % 60,
             if held then Strings.get("hud.held") else Strings.get("hud.left")
         )
     else
-        clockText = if phase == Strings.get("hud.reveal")
+        clockText = if phaseId == "reveal"
             then Strings.get("hud.dawn_first_light")
-            else phase .. " · MORNING"
+            else string.format(Strings.get("hud.phase_morning"), phase)
     end
     --[[
         A practice server says so on the clock, and it says so to everybody.

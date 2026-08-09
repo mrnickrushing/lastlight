@@ -23,6 +23,8 @@
     reason that applies, not the first one the code happened to look at.
 ]]
 
+local Strings = require("./Strings")
+
 local StoreAvailability = {}
 
 export type Context = {
@@ -58,17 +60,27 @@ export type Verdict = {
     should read it as the game protecting the night.
 ]]
 local REFUSALS: { { reason: string, label: string } } = table.freeze({
-    table.freeze({ reason = "store_disabled", label = "THE OUTFITTER IS NOT OPEN YET" }),
+    table.freeze({
+        reason = "store_disabled",
+        label = Strings.get("tutorial.the_outfitter_is_not_open_yet"),
+    }),
     table.freeze({
         reason = "defeat",
-        label = "THE PARTY IS DOWN — THAT IS ALL THAT MATTERS NOW",
+        label = Strings.get("store.the_party_is_down_that_is"),
     }),
-    table.freeze({ reason = "downed", label = "GET BACK ON YOUR FEET FIRST" }),
-    table.freeze({ reason = "active_defense", label = "NOT WHILE SOMETHING IS OUT THERE" }),
-    table.freeze({ reason = "onboarding", label = "FINISH THE FIRST NIGHT FIRST" }),
+    table.freeze({ reason = "downed", label = Strings.get("store.get_back_on_your_feet_first") }),
+    table.freeze({
+        reason = "active_defense",
+        label = Strings.get("store.not_while_something_is_out_there"),
+    }),
+    table.freeze({
+        reason = "onboarding",
+        label = Strings.get("store.finish_the_first_night_first"),
+    }),
 })
 
-local OPEN: Verdict = table.freeze({ open = true, reason = "open", label = "OUTFITTER" })
+local OPEN: Verdict =
+    table.freeze({ open = true, reason = "open", label = Strings.get("world.outfitter") })
 
 local function refusal(reason: string): Verdict
     for _, entry in REFUSALS do
@@ -78,7 +90,11 @@ local function refusal(reason: string): Verdict
     end
     -- Unreachable through `evaluate`; kept as a total function so a caller
     -- asking about a reason nobody wrote gets a closed store rather than nil.
-    return table.freeze({ open = false, reason = reason, label = "THE OUTFITTER IS CLOSED" })
+    return table.freeze({
+        open = false,
+        reason = reason,
+        label = Strings.get("store.the_outfitter_is_closed"),
+    })
 end
 
 function StoreAvailability.reasons(): { { reason: string, label: string } }

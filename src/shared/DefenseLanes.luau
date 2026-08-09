@@ -16,6 +16,8 @@
     is knowable at nightfall and two runs of the same night match.
 ]]
 
+local Strings = require("./Strings")
+
 local DefenseLanes = {}
 
 export type Lane = {
@@ -25,9 +27,21 @@ export type Lane = {
 }
 
 local LANES: { Lane } = table.freeze({
-    table.freeze({ id = "lane_meadow_gate", displayName = "MEADOW GATE", yaw = 0 }),
-    table.freeze({ id = "lane_east_hollow", displayName = "EAST HOLLOW", yaw = math.rad(52) }),
-    table.freeze({ id = "lane_west_break", displayName = "WEST BREAK", yaw = math.rad(-52) }),
+    table.freeze({
+        id = "lane_meadow_gate",
+        displayName = Strings.get("town.meadow_gate"),
+        yaw = 0,
+    }),
+    table.freeze({
+        id = "lane_east_hollow",
+        displayName = Strings.get("town.east_hollow"),
+        yaw = math.rad(52),
+    }),
+    table.freeze({
+        id = "lane_west_break",
+        displayName = Strings.get("town.west_break"),
+        yaw = math.rad(-52),
+    }),
 }) :: { Lane }
 
 -- How far from the lantern a lane's snare plot sits: inside the enemy's

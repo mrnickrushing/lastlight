@@ -1,5 +1,7 @@
 --!strict
 
+local Strings = require("./Strings")
+
 local BramblewakeBlackout = {}
 
 export type Status =
@@ -38,9 +40,9 @@ local RELAY_NODE_ORDER = table.freeze({
     "blackout_root_cathedral",
 })
 local RELAY_NODE_LABELS = table.freeze({
-    blackout_root_farm = "FARM ROOT",
-    blackout_root_mill = "MILL ROOT",
-    blackout_root_cathedral = "CATHEDRAL ROOT",
+    blackout_root_farm = Strings.get("bramblewake.farm_root"),
+    blackout_root_mill = Strings.get("bramblewake.mill_root"),
+    blackout_root_cathedral = Strings.get("bramblewake.cathedral_root"),
 })
 local DECISION_IDS = table.freeze({
     restore_farmland = true,
@@ -60,11 +62,11 @@ local STAGE_INDEX = table.freeze({
     complete = 4,
 })
 local STAGE_LABEL = table.freeze({
-    relay = "ROOTFIRE RELAY",
-    old_growth = "OLD GROWTH",
-    warden = "WARDEN'S SEAL",
-    resolution = "GREENWARD CHOICE",
-    complete = "CHAPTER RESOLVED",
+    relay = Strings.get("encounter.rootfire_relay"),
+    old_growth = Strings.get("common.old_growth"),
+    warden = Strings.get("tutorial.warden_s_seal"),
+    resolution = Strings.get("encounter.greenward_choice"),
+    complete = Strings.get("encounter.chapter_resolved"),
 })
 
 BramblewakeBlackout.Id = "blackout_bramblewake"
@@ -424,14 +426,18 @@ function BramblewakeBlackout.snapshot(state: State, userId: number, now: number)
     local nextNodeId = nextRelayNodeId(state.deliveredNodes)
     local instruction = if state.status == "relay"
         then if carryingFire
-            then "DELIVER ROOTFIRE TO THE MARKED NEXT ROOT"
-            else "TAKE ROOTFIRE FROM THE BLACKOUT LANTERN"
-        elseif state.status == "old_growth" then "CLEANSE OLD GROWTH"
-        elseif state.status == "warden" then "ANSWER THE WARDEN'S SEAL"
-        elseif state.status == "resolution" then "CHOOSE THE GREENWARD'S FUTURE"
-        elseif state.status == "complete" then "CHAPTER I RESOLVED"
-        elseif state.status == "dormant" then "ENTER BRAMBLEWAKE TO BEGIN THE BLACKOUT"
-        else "BRAMBLEWAKE BLACKOUT DISABLED"
+            then Strings.get("encounter.deliver_rootfire_to_the_marked_next")
+            else Strings.get("encounter.take_rootfire_from_the_blackout_lantern")
+        elseif state.status == "old_growth" then Strings.get("tutorial.cleanse_old_growth")
+        elseif state.status == "warden" then Strings.get("encounter.answer_the_warden_s_seal")
+        elseif state.status == "resolution" then Strings.get(
+            "encounter.choose_the_greenward_s_future"
+        )
+        elseif state.status == "complete" then Strings.get("encounter.chapter_i_resolved")
+        elseif state.status == "dormant" then Strings.get(
+            "encounter.enter_bramblewake_to_begin_the_blackout"
+        )
+        else Strings.get("encounter.bramblewake_blackout_disabled")
     return {
         active = active(state.status),
         carryingFire = carryingFire,
@@ -457,7 +463,7 @@ function BramblewakeBlackout.snapshot(state: State, userId: number, now: number)
         revision = state.revision,
         stage = STAGE_INDEX[state.status] or 0,
         stageCount = BramblewakeBlackout.StageCount,
-        stageLabel = STAGE_LABEL[state.status] or "BLACKOUT",
+        stageLabel = STAGE_LABEL[state.status] or Strings.get("encounter.blackout"),
         status = state.status,
         targetEndsAt = targetEndsAt,
         vote = state.votes[key],

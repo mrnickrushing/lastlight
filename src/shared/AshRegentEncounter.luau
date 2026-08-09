@@ -25,6 +25,8 @@
     is a count of what a party smashed to get there.
 ]]
 
+local Strings = require("./Strings")
+
 local AshRegentEncounter = {}
 
 export type Status = "disabled" | "locked" | "dormant" | "anchored" | "exposed" | "complete"
@@ -59,9 +61,9 @@ local ANCHORS_REQUIRED = 3
 
 local ASH_FALL = table.freeze({
     attackId = "ash_regent_fall",
-    attackName = "ASH FALL",
+    attackName = Strings.get("encounter.ash_fall"),
     damage = 30,
-    instruction = "GET UNDER SOMETHING",
+    instruction = Strings.get("encounter.get_under_something"),
     radius = 17,
     shape = "circle",
     windup = 1.6,
@@ -69,9 +71,9 @@ local ASH_FALL = table.freeze({
 
 local RECITATION = table.freeze({
     attackId = "ash_regent_recital",
-    attackName = "RECITATION",
+    attackName = Strings.get("encounter.recitation"),
     damage = 26,
-    instruction = "IT IS SAYING A NAME — CLEAR THE LINE",
+    instruction = Strings.get("encounter.it_is_saying_a_name_clear"),
     length = 34,
     shape = "lane",
     width = 8,
@@ -80,9 +82,9 @@ local RECITATION = table.freeze({
 
 local CORONATION = table.freeze({
     attackId = "ash_regent_coronation",
-    attackName = "CORONATION",
+    attackName = Strings.get("encounter.coronation"),
     damage = 36,
-    instruction = "THE CEREMONY IS FINISHING — BREAK IT",
+    instruction = Strings.get("encounter.the_ceremony_is_finishing_break_it"),
     radius = 21,
     shape = "circle",
     windup = 1.9,
@@ -345,24 +347,30 @@ function AshRegentEncounter.snapshot(state: State, userId: number): any
     local outcome = AshRegentEncounter.outcome(state)
     local instruction = if state.status == "anchored"
         then string.format(
-            "TAKE ITS ANCHORS — %d OF %d",
+            Strings.get("encounter.take_its_anchors_n_of_n"),
             AshRegentEncounter.anchorsRemoved(state),
             ANCHORS_REQUIRED
         )
-        elseif state.status == "exposed" then "THE REGENT IS STANDING ALONE — STRIKE"
+        elseif state.status == "exposed" then Strings.get(
+            "encounter.the_regent_is_standing_alone_strike"
+        )
         elseif state.status == "complete" then if outcome == "remembered"
-            then "THE REGENT IS DOWN · EVERY TRUE FACE STILL STANDS"
-            elseif outcome == "erased" then "THE REGENT IS DOWN · NOBODY IS LEFT TO REMEMBER"
-            else "THE REGENT IS DOWN · SOME OF THEM ARE STILL HERE"
-        elseif state.status == "locked" then "THE CROWN IS NOT OPEN TO YOU YET"
-        elseif state.status == "disabled" then "THE REGENT DOES NOT ANSWER"
-        else "SOMETHING IN THE BOX IS SITTING VERY STILL"
+            then Strings.get("encounter.the_regent_is_down_every_true")
+            elseif outcome == "erased" then Strings.get(
+                "encounter.the_regent_is_down_nobody_is"
+            )
+            else Strings.get("encounter.the_regent_is_down_some_of")
+        elseif state.status == "locked" then Strings.get("encounter.the_crown_is_not_open_to")
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.the_regent_does_not_answer"
+        )
+        else Strings.get("encounter.something_in_the_box_is_sitting")
     return {
         active = state.status == "anchored" or state.status == "exposed",
         anchors = AshRegentEncounter.anchorsRemoved(state),
         anchorsRequired = ANCHORS_REQUIRED,
         complete = state.status == "complete",
-        displayName = "ASH REGENT",
+        displayName = Strings.get("encounter.ash_regent"),
         enabled = state.status ~= "disabled",
         erased = state.erased,
         health = state.health,

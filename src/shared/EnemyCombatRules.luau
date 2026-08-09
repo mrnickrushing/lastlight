@@ -1,5 +1,7 @@
 --!strict
 
+local Strings = require("./Strings")
+
 local EnemyCombatRules = {}
 
 function EnemyCombatRules.contains(
@@ -67,15 +69,15 @@ function EnemyCombatRules.strikeDamage(
     local label: string? = nil
     if stilled then
         multiplier *= 1.25
-        label = "BOUND OPEN — A CLEAN FLANK"
+        label = Strings.get("enemy.bound_open_a_clean_flank")
     elseif snared then
         multiplier *= 1.2
-        label = "EXPOSED — THE SNARE HELD IT"
+        label = Strings.get("enemy.exposed_the_snare_held_it")
     end
     if drowsy then
         multiplier *= 0.85
         if label == nil then
-            label = "DROWSY SWING"
+            label = Strings.get("enemy.drowsy_swing")
         end
     end
     damage = math.floor(damage * math.clamp(multiplier, 0.6, 1.6) + 0.5)

@@ -14,6 +14,8 @@
     an enemy into a one-shot or a reward into an economy leak.
 ]]
 
+local Strings = require("./Strings")
+
 local ExpeditionContracts = {}
 
 export type Contract = {
@@ -28,32 +30,32 @@ export type Contract = {
 local CONTRACTS: { Contract } = table.freeze({
     table.freeze({
         id = "contract_standard",
-        title = "STANDARD SWEEP",
-        detail = "The woods as they are. Even trade.",
+        title = Strings.get("expedition.standard_sweep"),
+        detail = Strings.get("expedition.the_woods_as_they_are_even"),
         rewardMultiplier = 1,
         enemyDamageMultiplier = 1,
         weather = "clear",
     }),
     table.freeze({
         id = "contract_quiet_roads",
-        title = "QUIET ROADS",
-        detail = "Mist keeps the worst asleep. Lighter pouch, lighter bruises.",
+        title = Strings.get("expedition.quiet_roads"),
+        detail = Strings.get("expedition.mist_keeps_the_worst_asleep_lighter"),
         rewardMultiplier = 0.75,
         enemyDamageMultiplier = 0.8,
         weather = "mist",
     }),
     table.freeze({
         id = "contract_storm_salvage",
-        title = "STORM SALVAGE",
-        detail = "Rain wakes the roots. What you carry out is worth more.",
+        title = Strings.get("expedition.storm_salvage"),
+        detail = Strings.get("expedition.rain_wakes_the_roots_what_you"),
         rewardMultiplier = 1.25,
         enemyDamageMultiplier = 1.2,
         weather = "storm",
     }),
     table.freeze({
         id = "contract_deep_growth",
-        title = "DEEP GROWTH",
-        detail = "The forest at full strength. The pouch pays for the scars.",
+        title = Strings.get("expedition.deep_growth"),
+        detail = Strings.get("expedition.the_forest_at_full_strength_the"),
         rewardMultiplier = 1.5,
         enemyDamageMultiplier = 1.35,
         weather = "spores",

@@ -613,7 +613,9 @@ function TownNightService._runCycle(self: TownNightService)
         self:_notify(
             string.format(
                 Strings.get("toast.dusk_falls_n_night_n_approaches"),
-                self._townNightSchedule.theme(self._nightNumber),
+                self._townNightSchedule.displayName(
+                    self._townNightSchedule.theme(self._nightNumber)
+                ),
                 self._nightNumber
             )
         )
@@ -633,7 +635,11 @@ function TownNightService._runCycle(self: TownNightService)
         local activeNight = self._nightNumber
         self._activeNightNumber = activeNight
         local blackoutDue = self:_isBlackoutDue(activeNight)
+        -- The id goes to the world, which builds this night's dressing from
+        -- it; the name goes into the sentence. They were one string until this
+        -- wave, and that string could only ever be right in one language.
         local theme = self._townNightSchedule.theme(activeNight)
+        local themeName = self._townNightSchedule.displayName(theme)
         local themeProfile = self._townNightSchedule.profile(activeNight)
         self._worldService:setNight(true, theme)
         self._enemyService:startNight(themeProfile)
@@ -641,12 +647,12 @@ function TownNightService._runCycle(self: TownNightService)
             if blackoutDue
                 then string.format(
                     Strings.get("toast.n_night_n_the_blackout_looms"),
-                    theme,
+                    themeName,
                     activeNight
                 )
                 else string.format(
                     Strings.get("toast.n_night_n_n"),
-                    theme,
+                    themeName,
                     activeNight,
                     themeProfile.instruction
                 )
@@ -873,8 +879,9 @@ function TownNightService.residentRepair(self: TownNightService): any?
     return { buildingId = worst.buildingId, restored = result.restored }
 end
 
+-- Its name, because every caller of this puts it in a sentence.
 function TownNightService.themeForNight(self: TownNightService, nightNumber: number): string
-    return tostring(self._townNightSchedule.theme(nightNumber))
+    return self._townNightSchedule.displayName(self._townNightSchedule.theme(nightNumber))
 end
 
 function TownNightService.repairTown(self: TownNightService, buildingId: any): any
@@ -937,7 +944,9 @@ function TownNightService.snapshot(self: TownNightService): any
         townCondition = self:conditionSnapshot(),
         nightActive = self:isNightActive(),
         nightNumber = self._nightNumber,
-        theme = self._townNightSchedule.theme(self._nightNumber),
+        theme = self._townNightSchedule.displayName(
+            self._townNightSchedule.theme(self._nightNumber)
+        ),
         phase = self._phase,
         phaseEndsAt = self._phaseEndsAt,
         --[[

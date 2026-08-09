@@ -1,16 +1,18 @@
 --!strict
 
+local Strings = require("./Strings")
+
 local TownNightIncident = {}
 
 local SITE_IDS = table.freeze({ "archive", "workshop", "inn" })
 
 local DEFINITIONS = table.freeze({
-    EMBERFALL = table.freeze({
+    emberfall = table.freeze({
         table.freeze({
             id = "incident_emberfall_cinders",
-            title = "ROOFTOP CINDERS",
-            instruction = "SMOTHER THREE CINDER NESTS BEFORE THEY CATCH",
-            actionText = "SMOTHER",
+            title = Strings.get("town.rooftop_cinders"),
+            instruction = Strings.get("town.smother_three_cinder_nests_before_they"),
+            actionText = Strings.get("town.smother"),
             objectText = "Cinder Nest",
             duration = 42,
             lanternPenalty = 12,
@@ -18,21 +20,21 @@ local DEFINITIONS = table.freeze({
         }),
         table.freeze({
             id = "incident_emberfall_flues",
-            title = "SPARKING FLUES",
-            instruction = "CAP THREE SPARKING FLUES BEFORE THE ROOFS IGNITE",
+            title = Strings.get("town.sparking_flues"),
+            instruction = Strings.get("town.cap_three_sparking_flues_before_the"),
             actionText = "CAP",
-            objectText = "Sparking Flue",
+            objectText = Strings.get("town.sparking_flue"),
             duration = 42,
             lanternPenalty = 12,
             sites = SITE_IDS,
         }),
     }),
-    MIRETIDE = table.freeze({
+    miretide = table.freeze({
         table.freeze({
             id = "incident_miretide_clogs",
-            title = "CHOKED DRAINS",
-            instruction = "PULL THREE ROOT CLOGS BEFORE THE SQUARE FLOODS",
-            actionText = "CLEAR",
+            title = Strings.get("town.choked_drains"),
+            instruction = Strings.get("town.pull_three_root_clogs_before_the"),
+            actionText = Strings.get("town.clear"),
             objectText = "Root Clog",
             duration = 42,
             lanternPenalty = 12,
@@ -40,21 +42,21 @@ local DEFINITIONS = table.freeze({
         }),
         table.freeze({
             id = "incident_miretide_seeps",
-            title = "MIRE SEEPS",
-            instruction = "SEAL THREE MIRE SEEPS BEFORE THE FOUNDATIONS SINK",
-            actionText = "SEAL",
+            title = Strings.get("town.mire_seeps"),
+            instruction = Strings.get("town.seal_three_mire_seeps_before_the"),
+            actionText = Strings.get("town.seal"),
             objectText = "Mire Seep",
             duration = 42,
             lanternPenalty = 12,
             sites = SITE_IDS,
         }),
     }),
-    ROOTMOON = table.freeze({
+    rootmoon = table.freeze({
         table.freeze({
             id = "incident_rootmoon_anchors",
-            title = "ROOT ANCHORS",
-            instruction = "SEVER THREE ANCHORS FEEDING THE NIGHT ASSAULT",
-            actionText = "SEVER",
+            title = Strings.get("town.root_anchors"),
+            instruction = Strings.get("town.sever_three_anchors_feeding_the_night"),
+            actionText = Strings.get("town.sever"),
             objectText = "Root Anchor",
             duration = 42,
             lanternPenalty = 12,
@@ -62,21 +64,21 @@ local DEFINITIONS = table.freeze({
         }),
         table.freeze({
             id = "incident_rootmoon_snares",
-            title = "SNARE PODS",
-            instruction = "BREAK THREE SNARE PODS BEFORE THEY BLOOM",
-            actionText = "BREAK",
+            title = Strings.get("town.snare_pods"),
+            instruction = Strings.get("town.break_three_snare_pods_before_they"),
+            actionText = Strings.get("town.break"),
             objectText = "Snare Pod",
             duration = 42,
             lanternPenalty = 12,
             sites = SITE_IDS,
         }),
     }),
-    ["ASHEN VEIL"] = table.freeze({
+    ashen_veil = table.freeze({
         table.freeze({
             id = "incident_ashen_watchfires",
-            title = "DARK WATCHFIRES",
-            instruction = "RELIGHT THREE WATCHFIRES BEFORE THE VEIL CLOSES",
-            actionText = "RELIGHT",
+            title = Strings.get("town.dark_watchfires"),
+            instruction = Strings.get("town.relight_three_watchfires_before_the_veil"),
+            actionText = Strings.get("town.relight"),
             objectText = "Watchfire",
             duration = 42,
             lanternPenalty = 12,
@@ -84,9 +86,9 @@ local DEFINITIONS = table.freeze({
         }),
         table.freeze({
             id = "incident_ashen_bells",
-            title = "SILENCED BELLS",
-            instruction = "RING THREE WARD BELLS BEFORE THE VEIL SETTLES",
-            actionText = "RING",
+            title = Strings.get("town.silenced_bells"),
+            instruction = Strings.get("town.ring_three_ward_bells_before_the"),
+            actionText = Strings.get("hud.ring"),
             objectText = "Ward Bell",
             duration = 42,
             lanternPenalty = 12,
