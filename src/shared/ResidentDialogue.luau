@@ -2,6 +2,7 @@
 
 local QuestCatalog = require("./QuestCatalog")
 local ResidentRoster = require("./ResidentRoster")
+local Strings = require("./Strings")
 
 local ResidentDialogue = {}
 
@@ -54,60 +55,60 @@ table.freeze(RESIDENT_NAMES)
     quest is broken by the quest itself.
 ]]
 local GUIDANCE = table.freeze({
-    npc_tomas_reed = "CRAFT ONE USEFUL ITEM AT THE WORKBENCH",
-    npc_pip_wren = "HELP THE LANTERN ROAD SURVIVE THREE NIGHTS",
-    npc_ena_moss = "BANK A POUCH FROM BRAMBLEWAKE THREE TIMES",
-    npc_hesper_vane = "BRING ME GEAR THAT HAS FOUND ITS OWN CHARACTER",
-    npc_odell_crane = "FILL THE STORES — SIXTY OF ANYTHING WILL DO",
-    npc_junie_falk = "KEEP THE LIGHT LIT FOR SEVEN NIGHTS",
-    npc_bartram_hoke = "RAISE FOUR BUILDINGS SO THERE IS SOMEWHERE TO COOK",
-    npc_saoirse_quill = "BANK EIGHT POUCHES FROM BRAMBLEWAKE AND I WILL RULE THE COLUMN",
-    npc_wren_dabbler = "PUT UP THREE DECORATIONS — THIS TOWN SHOULD LOOK LIVED IN",
-    npc_marek_still = "CRAFT SIX THINGS AND LOOK TWICE AT EACH",
-    npc_lissen_ford = "BE TRUSTED BY THREE RESIDENTS — CHECK ON THEM",
-    npc_isolde_maren = "KEEP THE LIGHT LIT FOURTEEN NIGHTS. I HAVE DONE LONGER FOR LESS",
-    npc_cass_pell = "MAKE TWENTY THINGS WITH YOUR HANDS AND I WILL TEACH YOU ROPE",
-    npc_alder_kine = "TWO HUNDRED IN THE STORES. I WANT TO SEE THE COLUMN IN BLACK ONCE",
-    npc_nell_barrow = "FOURTEEN LOADS BANKED FROM BRAMBLEWAKE — THE LOAD IS THE PART THAT COUNTS",
-    npc_anselm_rill = "FIND FOUR OF WHAT THIS PLACE REMEMBERS. SOMEBODY SHOULD KEEP IT",
-    npc_ivy_thorn = "BE TRUSTED BY EIGHT OF US. I COUNT BY NAME, NOT BY HEAD",
-    npc_halvard_sunn = "CLOSE EVERY CHAPTER. A STORE IS ONLY FULL WHEN NOTHING IS STILL OPEN",
-    npc_maud_ferrow = "RAISE TWELVE BUILDINGS. TWELVE DOORS IS A TOWN, NOT A CAMP",
-    npc_sabine_ash = "MAKE FORTY THINGS. NOT ONE OF THEM SHAPED LIKE A PERSON",
-    npc_theo_marl = "FIND EIGHT OF WHAT THIS WORLD REMEMBERS AND I WILL COPY THEM OUT",
-    npc_delia_kass = "BE TRUSTED BY FOURTEEN OF US. NAMES, NOT NUMBERS",
-    npc_bran_holt = "TWENTY BUILDINGS STANDING. I WILL CUT THE BEAMS FOR THE REST",
-    npc_orin_vale = "CLOSE ALL SEVEN. I HAVE BEEN WAITING ON THE LAST ONE A LONG TIME",
-    npc_signe_marr = "FOUR HUNDRED IN THE STORES. A TOWN SHOULD NEVER BE THIRSTY AGAIN",
-    npc_ruth_calder = "PUT UP EIGHT DECORATIONS. NOBODY MEETS IN A ROOM NOBODY LIKES",
-    npc_edda_pyne = "THIRTY NIGHTS. I WILL HAVE THE WARDS UP BY THE TENTH",
+    npc_tomas_reed = Strings.get("resident.craft_one_useful_item_at_the"),
+    npc_pip_wren = Strings.get("resident.help_the_lantern_road_survive_three"),
+    npc_ena_moss = Strings.get("resident.bank_a_pouch_from_bramblewake_three"),
+    npc_hesper_vane = Strings.get("resident.bring_me_gear_that_has_found"),
+    npc_odell_crane = Strings.get("resident.fill_the_stores_sixty_of_anything"),
+    npc_junie_falk = Strings.get("resident.keep_the_light_lit_for_seven"),
+    npc_bartram_hoke = Strings.get("resident.raise_four_buildings_so_there_is"),
+    npc_saoirse_quill = Strings.get("resident.bank_eight_pouches_from_bramblewake_and"),
+    npc_wren_dabbler = Strings.get("resident.put_up_three_decorations_this_town"),
+    npc_marek_still = Strings.get("resident.craft_six_things_and_look_twice"),
+    npc_lissen_ford = Strings.get("resident.be_trusted_by_three_residents_check"),
+    npc_isolde_maren = Strings.get("resident.keep_the_light_lit_fourteen_nights"),
+    npc_cass_pell = Strings.get("resident.make_twenty_things_with_your_hands"),
+    npc_alder_kine = Strings.get("resident.two_hundred_in_the_stores_i"),
+    npc_nell_barrow = Strings.get("resident.fourteen_loads_banked_from_bramblewake_the"),
+    npc_anselm_rill = Strings.get("resident.find_four_of_what_this_place"),
+    npc_ivy_thorn = Strings.get("resident.be_trusted_by_eight_of_us"),
+    npc_halvard_sunn = Strings.get("resident.close_every_chapter_a_store_is"),
+    npc_maud_ferrow = Strings.get("resident.raise_twelve_buildings_twelve_doors_is"),
+    npc_sabine_ash = Strings.get("resident.make_forty_things_not_one_of"),
+    npc_theo_marl = Strings.get("resident.find_eight_of_what_this_world"),
+    npc_delia_kass = Strings.get("resident.be_trusted_by_fourteen_of_us"),
+    npc_bran_holt = Strings.get("resident.twenty_buildings_standing_i_will_cut"),
+    npc_orin_vale = Strings.get("resident.close_all_seven_i_have_been"),
+    npc_signe_marr = Strings.get("resident.four_hundred_in_the_stores_a"),
+    npc_ruth_calder = Strings.get("resident.put_up_eight_decorations_nobody_meets"),
+    npc_edda_pyne = Strings.get("resident.thirty_nights_i_will_have_the"),
 })
 
 local ARRIVAL_LINES = table.freeze({
-    npc_hesper_vane = "A TOOL YOU KEPT SHARP IS A DAY YOU MEANT TO SURVIVE. BRING ME THE DULL ONES.",
-    npc_odell_crane = "FULL STORES AND A QUIET BELL. I COULD ALMOST SIT DOWN.",
-    npc_junie_falk = "SEVEN NIGHTS LIT IN A ROW. DOWN BELOW WE NEVER MANAGED THREE.",
-    npc_bartram_hoke = "A REAL KITCHEN. I HAVE BEEN COOKING OUT OF A HELMET SINCE I WAS TWENTY.",
-    npc_saoirse_quill = "NAMES OUT AND NAMES BACK, AND THE COLUMNS AGREE. I HAVE NOT WRITTEN THAT IN YEARS.",
-    npc_wren_dabbler = "I WOVE ONE FOR EVERY HOUSE THE WATER TOOK. NOW I WEAVE THEM FOR DOORS THAT STAND.",
-    npc_marek_still = "LOOK TWICE AT WHAT YOU CARRY. THE FEN TAUGHT ME THAT AND IT COST IT NOTHING.",
-    npc_lissen_ford = "EVERY HEAD COUNTED AT DUSK, AND EVERY ONE OF THEM KNOWS YOUR NAME. THAT IS THE WORK.",
-    npc_isolde_maren = "FOURTEEN NIGHTS AND THE LIGHT NEVER WENT OUT. NOBODY DROWNED LOOKING FOR IT.",
-    npc_cass_pell = "GOOD ROPE IS A PROMISE YOU CAN PULL ON. THIS TOWN HAS ENOUGH OF IT NOW.",
-    npc_alder_kine = "THE COLUMN IS IN BLACK. I HAVE NOT WRITTEN THAT SINCE THE HARBOUR WENT.",
-    npc_nell_barrow = "EVERY TRIP OUT CAME BACK. THAT IS THE ONLY LEDGER I HAVE EVER KEPT.",
-    npc_anselm_rill = "FOUR THINGS THIS PLACE REMEMBERS, AND SOMEONE ALIVE TO REMEMBER THEM.",
-    npc_ivy_thorn = "EIGHT NAMES, ALL OF THEM ANSWERING. THE ABBEY NEVER MANAGED THAT.",
-    npc_halvard_sunn = "NOTHING LEFT OPEN AND THE STORE STILL SHUT. THAT IS A WINTER SURVIVED.",
-    npc_maud_ferrow = "TWELVE DOORS, AND NOT ONE OF THEM MINE TO GIVE AWAY. GOOD.",
-    npc_sabine_ash = "FORTY THINGS AND NOT A FACE AMONG THEM. I CAN WORK IN A TOWN LIKE THIS.",
-    npc_theo_marl = "EIGHT OF THEM, COPIED OUT PROPERLY. THE SCRATCHED NAMES GO IN THE SAME BOOK NOW.",
-    npc_delia_kass = "FOURTEEN PEOPLE WHO KNOW YOUR NAME AND YOU KNOW THEIRS. THAT IS A MEMORIAL.",
-    npc_bran_holt = "TWENTY STANDING. LET SOMETHING TRY TO BURN THIS ONE.",
-    npc_orin_vale = "ALL SEVEN CLOSED, AND I AM STANDING IN DAYLIGHT. I HAD STOPPED EXPECTING IT.",
-    npc_signe_marr = "FOUR HUNDRED IN STORE AND THE WELL STILL COLD. NOBODY GOES SHORT THIS YEAR.",
-    npc_ruth_calder = "EIGHT THINGS SOMEBODY CHOSE TO PUT UP. NOW IT IS A ROOM AND NOT A SHELTER.",
-    npc_edda_pyne = "THIRTY NIGHTS AND THE WARDS TOOK THE FIRST BITE OF EVERY ONE.",
+    npc_hesper_vane = Strings.get("resident.a_tool_you_kept_sharp_is"),
+    npc_odell_crane = Strings.get("resident.full_stores_and_a_quiet_bell"),
+    npc_junie_falk = Strings.get("resident.seven_nights_lit_in_a_row"),
+    npc_bartram_hoke = Strings.get("resident.a_real_kitchen_i_have_been"),
+    npc_saoirse_quill = Strings.get("resident.names_out_and_names_back_and"),
+    npc_wren_dabbler = Strings.get("resident.i_wove_one_for_every_house"),
+    npc_marek_still = Strings.get("resident.look_twice_at_what_you_carry"),
+    npc_lissen_ford = Strings.get("resident.every_head_counted_at_dusk_and"),
+    npc_isolde_maren = Strings.get("resident.fourteen_nights_and_the_light_never"),
+    npc_cass_pell = Strings.get("resident.good_rope_is_a_promise_you"),
+    npc_alder_kine = Strings.get("resident.the_column_is_in_black_i"),
+    npc_nell_barrow = Strings.get("resident.every_trip_out_came_back_that"),
+    npc_anselm_rill = Strings.get("resident.four_things_this_place_remembers_and"),
+    npc_ivy_thorn = Strings.get("resident.eight_names_all_of_them_answering"),
+    npc_halvard_sunn = Strings.get("resident.nothing_left_open_and_the_store"),
+    npc_maud_ferrow = Strings.get("resident.twelve_doors_and_not_one_of"),
+    npc_sabine_ash = Strings.get("resident.forty_things_and_not_a_face"),
+    npc_theo_marl = Strings.get("resident.eight_of_them_copied_out_properly"),
+    npc_delia_kass = Strings.get("resident.fourteen_people_who_know_your_name"),
+    npc_bran_holt = Strings.get("resident.twenty_standing_let_something_try_to"),
+    npc_orin_vale = Strings.get("resident.all_seven_closed_and_i_am"),
+    npc_signe_marr = Strings.get("resident.four_hundred_in_store_and_the"),
+    npc_ruth_calder = Strings.get("resident.eight_things_somebody_chose_to_put"),
+    npc_edda_pyne = Strings.get("resident.thirty_nights_and_the_wards_took"),
 })
 
 --[[
@@ -117,21 +118,21 @@ local ARRIVAL_LINES = table.freeze({
     ARRIVAL_LINES above, which players have already heard.
 ]]
 local STAGE_GUIDANCE = table.freeze({
-    quest_tomas_second_bench = "TWELVE THINGS MADE. I WANT A BENCH THAT LOOKS WORKED AT",
-    quest_tomas_full_house = "TEN PEOPLE WHO TRUST YOU. THEN EVERY BED HERE IS FULL",
-    quest_pip_further_roads = "SIX LOADS BANKED FROM BRAMBLEWAKE. I WANT THE FAR ROADS ON THE BOARD",
-    quest_pip_every_night = "TWENTY-ONE NIGHTS POSTED BEFORE THEY ARRIVED. NOT ONE SURPRISE",
-    quest_ena_first_growth = "FIVE THINGS PLANTED OR HUNG. THIS PLACE SHOULD LOOK TENDED",
-    quest_ena_the_archive = "SIX OF WHAT THE FOREST KEPT. IT IS A STORY, NOT A COLLECTION",
+    quest_tomas_second_bench = Strings.get("resident.twelve_things_made_i_want_a"),
+    quest_tomas_full_house = Strings.get("resident.ten_people_who_trust_you_then"),
+    quest_pip_further_roads = Strings.get("resident.six_loads_banked_from_bramblewake_i"),
+    quest_pip_every_night = Strings.get("resident.twenty_one_nights_posted_before_they"),
+    quest_ena_first_growth = Strings.get("resident.five_things_planted_or_hung_this"),
+    quest_ena_the_archive = Strings.get("resident.six_of_what_the_forest_kept"),
 })
 
 local STAGE_STORIES = table.freeze({
-    quest_tomas_second_bench = "TWELVE THINGS OFF THAT BENCH AND THE GRAIN IS GOING SMOOTH. THAT IS WHAT A TOOL BENCH IS FOR.",
-    quest_tomas_full_house = "EVERY BED FULL AND I KNOW WHO IS IN EACH ONE. I DID NOT THINK I WOULD SEE THAT AGAIN.",
-    quest_pip_further_roads = "SIX RUNS OUT AND SIX BACK. THE FAR ROADS ARE ON THE BOARD NOW, IN INK.",
-    quest_pip_every_night = "TWENTY-ONE NIGHTS AND NOBODY WAS SURPRISED BY ANY OF THEM. THAT IS THE WHOLE JOB.",
-    quest_ena_first_growth = "FIVE THINGS PLANTED, AND THE TOWN LOOKS TENDED INSTEAD OF OCCUPIED.",
-    quest_ena_the_archive = "SIX OF THEM, IN ORDER. IT IS A STORY, AND SOMEBODY IS FINALLY READING IT.",
+    quest_tomas_second_bench = Strings.get("resident.twelve_things_off_that_bench_and"),
+    quest_tomas_full_house = Strings.get("resident.every_bed_full_and_i_know"),
+    quest_pip_further_roads = Strings.get("resident.six_runs_out_and_six_back"),
+    quest_pip_every_night = Strings.get("resident.twenty_one_nights_and_nobody_was"),
+    quest_ena_first_growth = Strings.get("resident.five_things_planted_and_the_town"),
+    quest_ena_the_archive = Strings.get("resident.six_of_them_in_order_it"),
 })
 
 local function questById(quests: any, questId: string): any
@@ -161,30 +162,30 @@ local function completedStory(residentId: string, consequence: any, questId: str
     local wardenOutcome = if type(consequence) == "table" then consequence.wardenOutcome else nil
     if residentId == "npc_tomas_reed" then
         if decision == "restore_farmland" then
-            return "THE RENEWED FIELDS NEED TOOLS AS MUCH AS SEED. KEEP THE BENCH BUSY."
+            return Strings.get("resident.the_renewed_fields_need_tools_as")
         elseif decision == "wild_regrowth" then
-            return "THE WILD GROVE GIVES LESS ON COMMAND, BUT MORE TO THOSE WHO LISTEN."
+            return Strings.get("resident.the_wild_grove_gives_less_on")
         elseif decision == "shared_agroforest" then
-            return "FOREST AND FIELD ARE SHARING ONE TABLE NOW. THAT IS WORTH BUILDING FOR."
+            return Strings.get("resident.forest_and_field_are_sharing_one")
         end
-        return "ONE GOOD TOOL CAN TURN A BAD NIGHT. KEEP MAKING WHAT THE TOWN NEEDS."
+        return Strings.get("resident.one_good_tool_can_turn_a")
     elseif residentId == "npc_pip_wren" then
         if wardenOutcome == "preserved" then
-            return "THE WARDEN LEFT OLD TRACKS OPEN. I HAVE MARKED THE SAFEST ONES."
+            return Strings.get("resident.the_warden_left_old_tracks_open")
         elseif wardenOutcome == "scarred" then
-            return "THE SCARRED TRAILS SHIFT AFTER RAIN. FOLLOW THE FRESH AMBER MARKS."
+            return Strings.get("resident.the_scarred_trails_shift_after_rain")
         elseif wardenOutcome == "harmed" then
-            return "THE FOREST IS WATCHING THE ROAD NOW. TRAVEL WITH LIGHT AND COMPANY."
+            return Strings.get("resident.the_forest_is_watching_the_road")
         end
-        return "THREE DAWNS PROVE A ROAD CAN HOLD. THE NEXT ONE STILL NEEDS A SCOUT."
+        return Strings.get("resident.three_dawns_prove_a_road_can")
     elseif decision == "restore_farmland" then
-        return "I SAVED BRAMBLEWAKE SEED FOR THESE FURROWS. THE FIRST SHOOTS ARE YOURS TOO."
+        return Strings.get("resident.i_saved_bramblewake_seed_for_these")
     elseif decision == "wild_regrowth" then
-        return "THE GROVE IS CHOOSING ITS OWN SHAPE. WATCH WHERE THE BRIGHTCAPS RETURN."
+        return Strings.get("resident.the_grove_is_choosing_its_own")
     elseif decision == "shared_agroforest" then
-        return "ROOT, CROP, AND LANTERN ARE GROWING TOGETHER. KEEP BRINGING PEOPLE HOME."
+        return Strings.get("resident.root_crop_and_lantern_are_growing")
     end
-    return "EVERY SAFE RETURN TEACHES THE GREENWARD HOW TO GROW AROUND US."
+    return Strings.get("resident.every_safe_return_teaches_the_greenward")
 end
 
 function ResidentDialogue.respond(residentId: any, quests: any, consequence: any): Response?
@@ -244,10 +245,10 @@ function ResidentDialogue.respond(residentId: any, quests: any, consequence: any
     -- for a quest that counts something else entirely.
     local guidance = STAGE_GUIDANCE[currentQuestId]
         or GUIDANCE[residentId]
-        or "THERE IS WORK HERE WHEN YOU ARE READY"
+        or Strings.get("resident.there_is_work_here_when_you")
     return {
         message = string.format(
-            "%s: %s — %d/%d. I WILL MARK IT WHEN IT IS DONE.",
+            Strings.get("resident.n_n_n_n_i_will"),
             residentName,
             guidance,
             math.min(current, threshold),

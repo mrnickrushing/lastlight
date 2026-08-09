@@ -23,7 +23,16 @@ pinned so the list can shrink and cannot quietly grow. A file leaves the list in
 the batch that migrates it, and the wave is finished when the list is empty.
 Every batch in between is guarded.
 
-Three checks, and the second and third are the ones that catch an unwired
+**Five batches later it is empty except for one file, and that is the finished
+state rather than an unfinished one.** `src/first/LoadingController.client.luau`
+runs from ReplicatedFirst to cover the wait for the shared root, so reaching for
+a module inside that root would make it block on the thing it exists to hide.
+Three further files are on a *different* list, `NOT_TRANSLATED`, because their
+text is not player-facing at all -- and keeping the two lists apart is the point:
+one says "not yet", the other says "never", and a reader who cannot tell them
+apart cannot tell whether this wave is done.
+
+Four checks, and the second and third are the ones that catch an unwired
 string the way `ActionWiring.spec` catches an unwired action:
 
   1. **No player-visible literal in a covered file.** What counts as
@@ -37,6 +46,14 @@ string the way `ActionWiring.spec` catches an unwired action:
      nothing reads is a string a translator is paid to translate and no player
      ever sees, and it is also what a migration leaves behind when it moves a
      line and forgets to delete the old one.
+  4. **No decision is made by comparing a translated string.** This one was
+     written last and is the one a migration creates rather than leaves behind.
+     Moving a string into the table makes it a translator's to change; if the
+     code then branches on its value, translating it changes what the game
+     does -- in the localized build only, with nothing failing anywhere. Batches
+     one and two did exactly that to four identifiers across twenty-four sites,
+     including which dressing a night raises and how a profession's id is
+     spelled.
 """
 
 from __future__ import annotations
@@ -54,62 +71,66 @@ TABLE = SRC / "shared" / "Strings.luau"
 # ALLOWLIST_SIZE below, which is pinned for the same reason
 # validate_monetization.py pins its own: a list nobody counts is a list that
 # grows.
+#
+# **This list is at its floor and the floor is one.** The migration is finished;
+# what is left is the one file that cannot reach the table, and the reason is
+# structural rather than a matter of effort. Anything added here from now on is
+# a new promise, and a promise is what the pin exists to make somebody argue
+# for.
 ALLOWED: dict[str, str] = {
     "src/first/LoadingController.client.luau": (
-        "loads before the shared root replicates, which is the whole point of it; reaching for the table would make the loading screen wait for the thing it exists to cover"
-    ),
-    "src/shared/Consumables.luau": (
-        "content catalog; 82 authored strings, migrating with the content batch"
-    ),
-    "src/shared/Content/Definitions/BramblewakeExpedition.luau": (
-        "content catalog; 121 authored strings, migrating with the content batch"
-    ),
-    "src/shared/Content/Definitions/CinderfallExpedition.luau": (
-        "content catalog; 108 authored strings, migrating with the content batch"
-    ),
-    "src/shared/Content/Definitions/FrostmereExpedition.luau": (
-        "content catalog; 93 authored strings, migrating with the content batch"
-    ),
-    "src/shared/Content/Definitions/IronrootExpedition.luau": (
-        "content catalog; 111 authored strings, migrating with the content batch"
-    ),
-    "src/shared/Content/Definitions/MireglassExpedition.luau": (
-        "content catalog; 111 authored strings, migrating with the content batch"
-    ),
-    "src/shared/Content/Definitions/TempestExpedition.luau": (
-        "content catalog; 95 authored strings, migrating with the content batch"
-    ),
-    "src/shared/CraftingCatalog.luau": (
-        "content catalog; 220 authored strings, migrating with the content batch"
-    ),
-    "src/shared/Equipment.luau": (
-        "content catalog; 148 authored strings, migrating with the content batch"
-    ),
-    "src/shared/GearTraits.luau": (
-        "content catalog; 10 authored strings, migrating with the content batch"
-    ),
-    "src/shared/MusicCatalog.luau": (
-        "content catalog; 30 authored strings, migrating with the content batch"
-    ),
-    "src/shared/PerformanceBudget.luau": (
-        "content catalog; 9 authored strings, migrating with the content batch"
-    ),
-    "src/shared/ResidentDialogue.luau": (
-        "content catalog; 76 authored strings, migrating with the content batch"
-    ),
-    "src/shared/ResidentRoster.luau": (
-        "content catalog; 106 authored strings, migrating with the content batch"
-    ),
-    "src/shared/SoakProbe.luau": (
-        "content catalog; 10 authored strings, migrating with the content batch"
-    ),
-    "src/shared/ToolCatalog.luau": (
-        "content catalog; 16 authored strings, migrating with the content batch"
+        "runs from ReplicatedFirst, before the shared root replicates. It is the "
+        "screen that covers that wait, and it only ever asks for the runtime with "
+        "a non-blocking FindFirstChild -- requiring Strings would mean "
+        "WaitForChild(\"LastLight\"), so the loading screen would block on the very "
+        "replication it exists to cover, against its own first rule that a player "
+        "must never be trapped behind it. Five stage captions and the title, "
+        "written where they are read."
     ),
 }
 
-# Pinned. It shrinks; it does not grow.
-ALLOWLIST_SIZE = 17
+# Pinned. It shrinks; it does not grow. It is at its floor.
+ALLOWLIST_SIZE = 1
+
+# A different thing from the allowlist, and worth keeping different.
+#
+# The allowlist is *not yet migrated*. This is *not player-facing at all*: text
+# read by whoever is holding the console or running the soak, which the guard's
+# generous heuristic cannot tell apart from copy because a metric's label and a
+# button's label are both a run of capitals. It is the same judgement the
+# DIAGNOSTIC set above already makes for anything handed to `warn` -- a stack
+# trace is not worth translating and translating it only makes it harder to
+# search -- arriving one seam later, because a label stored in a table and
+# concatenated into a report much later is invisible from the call site.
+#
+# Every entry has to say who reads it. That is the whole discipline: "operator
+# text" is exactly the sentence somebody reaches for when they want a string out
+# of the way, so the reason names the reader and the surface, and the count is
+# pinned harder than the allowlist's, because this list does not shrink on its
+# own the way that one does.
+NOT_TRANSLATED: dict[str, str] = {
+    "src/shared/MusicCatalog.luau": (
+        "track titles and their publishers, and nothing reads either one: "
+        "MusicController takes assetId, volume and intensity and never touches "
+        "name or creator. The publisher is also the field validate_audio_assets.py "
+        "and ASSET_PROVENANCE.md hold the licence claim against, so translating it "
+        "would break an audit rather than serve a player"
+    ),
+    "src/shared/PerformanceBudget.luau": (
+        "metric labels for the admin readout PerformanceBudget.format builds. Its "
+        "first line goes to a toast and is in the table; every other line goes to "
+        "the log, for whoever closes the exit gate"
+    ),
+    "src/shared/SoakProbe.luau": (
+        "metric labels and the sentence explaining what a breach in each one means, "
+        "read in a soak report by whoever is running the soak. No player ever sees a "
+        "soak"
+    ),
+}
+
+# Pinned, and harder than the allowlist's. A file arrives here by an argument
+# about who reads it, never by a migration being inconvenient.
+NOT_TRANSLATED_SIZE = 3
 
 COMMENT = re.compile(r"--\[\[.*?\]\]|--[^\n]*", re.DOTALL)
 LITERAL = re.compile(r'"((?:[^"\\\n]|\\.)*)"')
@@ -239,7 +260,7 @@ def main() -> int:
             compared.append(f"{relative}:{line} {match.group(0).strip()}")
         if path == TABLE:
             continue
-        if relative in ALLOWED:
+        if relative in ALLOWED or relative in NOT_TRANSLATED:
             continue
         literals = scan(path)
         if literals:
@@ -283,7 +304,18 @@ def main() -> int:
             "a line and forgets to delete the old one"
         )
 
-    stale = sorted(name for name in ALLOWED if not (ROOT / name).is_file())
+    both = sorted(set(ALLOWED) & set(NOT_TRANSLATED))
+    if both:
+        failures.append(
+            "on both lists: "
+            + ", ".join(both)
+            + ". A file is either waiting to be migrated or decided not to be, and "
+            "one of those two lists is telling the reader something untrue"
+        )
+
+    stale = sorted(
+        name for name in list(ALLOWED) + list(NOT_TRANSLATED) if not (ROOT / name).is_file()
+    )
     if stale:
         failures.append(
             "on the allowlist and not in the tree: "
@@ -299,6 +331,23 @@ def main() -> int:
             + ", ".join(empty)
             + ". These are migrated -- take them off the list and lower "
             "ALLOWLIST_SIZE, which is the only direction it moves"
+        )
+
+    silent = sorted(name for name in NOT_TRANSLATED if not scan(ROOT / name)) if not stale else []
+    if silent:
+        failures.append(
+            "declared not player-facing and holding no strings at all: "
+            + ", ".join(silent)
+            + ". The declaration is about text that exists; a file with none of it "
+            "is covered like any other and does not need an exemption"
+        )
+
+    if len(NOT_TRANSLATED) != NOT_TRANSLATED_SIZE:
+        failures.append(
+            f"the not-translated list holds {len(NOT_TRANSLATED)} files and is pinned "
+            f"at {NOT_TRANSLATED_SIZE}. A file arrives on it by an argument about who "
+            f"reads its text, never by a migration being inconvenient, so the count "
+            f"moves in the commit that makes the argument"
         )
 
     if len(ALLOWED) > ALLOWLIST_SIZE:
@@ -323,7 +372,8 @@ def main() -> int:
     remaining = sum(len(scan(ROOT / name)) for name in ALLOWED)
     print(
         f"Localization validation passed: {len(defined)} source strings in the table, "
-        f"{len(ALLOWED)} file(s) not yet migrated holding {remaining} string(s)."
+        f"{len(ALLOWED)} file(s) not yet migrated holding {remaining} string(s), "
+        f"{len(NOT_TRANSLATED)} file(s) declared not player-facing."
     )
     return 0
 

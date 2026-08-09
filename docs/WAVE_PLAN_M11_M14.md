@@ -213,11 +213,11 @@ the switches and the measurements that population needs to be worth having.
 | A ✅ | **Cohort-scoped feature flags** (shipped #346). `RolloutCohorts` (pure) owns the four rungs and three rules: **the ladder only widens** (`admits` walks bottom-up and returns at the first rung that lets a player in, so advancing cannot subtract), **a cohort-scoped flag read without a player throws** rather than picking one of two silently wrong defaults, and **a bucket is stable per player and independent per flag** — that last one measured rather than reasoned about, because the affine first version made two ten-percent cohorts perfectly disjoint. The switch and the rung are one fact through `globalDefault`, so the bit-identical pin is a consequence. [BETA_ROLLOUT.md](BETA_ROLLOUT.md) is the matrix and the spec reads its rows out of the document | Flag spec: a cohort-scoped flag is off for a player outside the cohort, on inside it, and the global default is unchanged for every existing flag (bit-identical, pinned) |
 | B ✅ | **First-session and first-night telemetry** (shipped #347). Five decisions, five events, and the reason a tuning event is not a gate event: a gate is a rate over instants and every gate emitter reports one instant, while a tuning decision is about a stretch of play. `AnalyticsService` already saw almost every number go past — what it did not do was **accumulate**. Two rules the events follow, both ways a tuning number lies: **a cliff is a comparison, so every checkpoint emits** rather than only the ones somebody suspects, and **an outcome without an attempt number is a survivorship number**. [BETA_TUNING.md](BETA_TUNING.md) is the table and `TuningMetrics.spec` is `GateMetrics.spec`'s three layers pointed at it | Spec: each tuning decision named in the roadmap has an event carrying the number it would be decided on |
 | C ✅ | **Tuning knobs as config** (shipped #348). Wave B gave every decision a number; a number you cannot act on is an observation, so this is the other half. Ten values came out of four services into `Config`, and the rule that makes them knobs is that each has exactly **one home** — a service reading `Config.EliteStrikeRange` while keeping its own `STRIKE_RANGE` is a knob somebody turns and watches do nothing, which is a tuning pass producing a *wrong* answer rather than no answer. The pairing is the load-bearing check: **every decision has at least one knob**, so a sixth tuning decision cannot arrive with an event and no way to respond to it | Spec: the named tuning values live in `Config` and every reader reads them from there |
-| D 🟡 | **Localization source coverage** (guard and first batch shipped #355). Every player-visible string through one table, so "finalize supported languages from localization QA capacity" is a capacity decision rather than an archaeology project. **The guard landed first, with an explicit list of the files it does not yet cover**, which is the shape `validate_monetization.py`'s allowlist and `Config.SaveSchemaFreeze` already have: the rule is live from the first commit, every exception is named with a reason, and `ALLOWLIST_SIZE` is pinned so the list can only shrink. `src/shared/Strings.luau` is the table, `get` throws on a key nobody defined, and the client, world, server and content surfaces are migrated. **The wave is finished when the allowlist is empty**; after batch four (#359) it stands at 17 files holding 1,360 strings | String spec: no player-visible literal outside the table. The same text check that catches an unwired action catches an unwired string — and both directions, since a key nothing reads is a string a translator is paid for and nobody sees |
+| D ✅ | **Localization source coverage** (shipped #355, #356, #358, #359, #360). Every player-visible string through one table, so "finalize supported languages from localization QA capacity" is a capacity decision rather than an archaeology project. **The guard landed first, with an explicit list of the files it does not yet cover**, which is the shape `validate_monetization.py`'s allowlist and `Config.SaveSchemaFreeze` already have: the rule is live from the first commit, every exception is named with a reason, and `ALLOWLIST_SIZE` is pinned so the list can only shrink. `src/shared/Strings.luau` is the table, `get` throws on a key nobody defined, and every surface is migrated across five batches. **The allowlist stands at one file and that is its floor** — the loading screen runs before the shared root replicates — with three more declared *not player-facing* on a separate list, readers named. 2,621 source strings, which is the number the language decision is made on | String spec: no player-visible literal outside the table. The same text check that catches an unwired action catches an unwired string — and both directions, since a key nothing reads is a string a translator is paid for and nobody sees |
 | E ✅ | **Kill switches and the rollback drill's code half** (shipped #349). [ROLLBACK.md](ROLLBACK.md) lists every flag, what turning it off leaves, and its **scope** — the column that makes the list load-bearing, because *a switch you have to restart every server to use is not a switch*. `TownNightService` cached the town cycle's flag at construction, so its off switch needed a restart; it is read at the door a cycle comes through now. Writing the list also found **four flags nothing reads at all**, declared `none` with the reason rather than wired into a fiction, and that count is pinned harder than the restart count | Spec: every major system has a flag, and turning it off leaves a playable game rather than an error |
 
-**Wave D is in flight and guarded.** The reason it sat unbuilt through two
-sessions was real: routing every player-visible string through one table touches
+**Wave D is complete, in five guarded batches.** The reason it sat unbuilt through
+two sessions was real: routing every player-visible string through one table touches
 nearly every file that speaks to a player, and the check that gives the wave its
 value cannot be switched on until the migration is complete — so the obvious
 version is a very large diff with no guard on it, and a half-migrated table
@@ -255,12 +255,15 @@ a profession's id was built by lower-casing its signboard. Every one is correct
 until somebody translates the string. `validate_localization.py` refuses a
 `Strings.get` inside a comparison now.
 
-**The remaining batch is the item catalogs, the residents and the six expedition
-definitions** — 130 recipes, 27 residents, six expeditions.
-`src/first/LoadingController.client.luau` is the one file with an argument for
-staying: it runs before the shared root replicates, which is the whole point of it,
-and reaching for the table would make the loading screen wait for the thing it
-exists to cover.
+**Batch five took the catalogs a player browses** — 1,435 strings across the item
+catalogs, the residents and the six expedition definitions — and brought the
+allowlist to its floor. `src/first/LoadingController.client.luau` is the one file
+that stays: it runs from ReplicatedFirst to cover the wait for the shared root, and
+requiring the table would mean `WaitForChild("LastLight")`, so the loading screen
+would block on the very replication it exists to hide. Three more files moved to a
+separate `NOT_TRANSLATED` list, because their text is read by whoever is holding the
+console rather than by a player, and *not yet* and *never* are different claims —
+a reader who cannot tell them apart cannot tell whether the wave is done.
 
 **Owner-gated for M13:** every cohort, guardian consent, the measurement
 window, moderation and scale health, the removal decisions, the language
@@ -327,9 +330,10 @@ seven launch journeys, and the Roblox publishing/review configuration.
 
 Written at the end of the session that finished M14 waves B through E and put
 M13 wave D's guard in, so the next person does not have to reassemble it from
-five sections. **Nothing below is blocked on code.** The only code work left in
-the buildable roadmap is M13 wave D's remaining migration batches, and those are
-mechanical, guarded, and independent of everything here.
+five sections, and **re-checked at the end of the session that finished wave D**.
+**Nothing below is blocked on code, and now there is no code work left to be
+blocked on**: with M13 wave D closed, every buildable wave in M11 through M14 has
+shipped. This list is the whole of what remains.
 
 **The launch checklist is the artifact this list now points at.**
 [QA_RELEASE_PLAN.md](QA_RELEASE_PLAN.md)'s release checklist holds 40 rows, 39 of
@@ -359,8 +363,9 @@ and D left open.
 session has walked each end to end — that flag is the whole remaining distance
 between the traversal spec and a real playthrough. What to remove for
 recurring confusion. **Which languages ship**, which is now a capacity decision
-with a number attached rather than an archaeology project: `Strings.luau` holds
-the migrated source and `validate_localization.py` reports what is left. The
+with a number on it rather than an archaeology project: `Strings.luau` holds
+**2,621 source strings** and that is what one language costs. Translating them is
+owner work; the source coverage that makes the question answerable is done. The
 final catalog and prices. Every tuning decision BETA_TUNING.md has numbers and
 knobs for; the numbers do not choose themselves.
 

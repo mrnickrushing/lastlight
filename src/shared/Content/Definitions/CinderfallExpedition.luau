@@ -79,6 +79,8 @@ end
     because deciding which memories to trust is the region and the lit
     modules are where the false ones are made.
 ]]
+local Strings = require("../../Strings")
+
 local modules = {
     frozenDefinition({
         id = "module_cc_crown_gate",
@@ -121,7 +123,7 @@ local modules = {
     -- about what is safe to be near.
     frozenDefinition({
         id = "module_cc_glass_orchard",
-        displayName = "Glass Orchard",
+        displayName = Strings.get("expedition.glass_orchard"),
         role = "resource",
         visual = "glass_orchard",
         tags = { "resource", "memory" },
@@ -133,7 +135,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_silk_looms",
-        displayName = "Ash Silk Looms",
+        displayName = Strings.get("expedition.ash_silk_looms"),
         role = "resource",
         visual = "silk_looms",
         tags = { "resource", "safe" },
@@ -145,7 +147,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_pearl_beds",
-        displayName = "Kiln Pearl Beds",
+        displayName = Strings.get("expedition.kiln_pearl_beds"),
         role = "resource",
         visual = "pearl_beds",
         tags = { "resource", "risk" },
@@ -157,7 +159,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_coal_terraces",
-        displayName = "Coal Terraces",
+        displayName = Strings.get("expedition.coal_terraces"),
         role = "resource",
         visual = "coal_terraces",
         tags = { "resource", "heat" },
@@ -181,7 +183,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_foundry_yards",
-        displayName = "Foundry Yards",
+        displayName = Strings.get("expedition.foundry_yards"),
         role = "resource",
         visual = "foundry_yards",
         tags = { "resource", "story" },
@@ -208,7 +210,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_cooling_channel",
-        displayName = "Cooling Channel",
+        displayName = Strings.get("expedition.cooling_channel"),
         role = "traversal",
         visual = "cooling_channel",
         tags = { "traversal", "heat" },
@@ -220,7 +222,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_collapsed_tiers",
-        displayName = "Collapsed Tiers",
+        displayName = Strings.get("expedition.collapsed_tiers"),
         role = "traversal",
         visual = "collapsed_tiers",
         tags = { "traversal", "risk" },
@@ -232,7 +234,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_ash_colonnade",
-        displayName = "Ash Colonnade",
+        displayName = Strings.get("expedition.ash_colonnade"),
         role = "traversal",
         visual = "ash_colonnade",
         tags = { "traversal", "safe" },
@@ -244,7 +246,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_stage_bridges",
-        displayName = "Stage Bridges",
+        displayName = Strings.get("expedition.stage_bridges"),
         role = "traversal",
         visual = "stage_bridges",
         tags = { "traversal", "risk" },
@@ -256,7 +258,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_procession_stair",
-        displayName = "Procession Stair",
+        displayName = Strings.get("expedition.procession_stair"),
         role = "traversal",
         visual = "procession_stair",
         tags = { "traversal", "story" },
@@ -268,7 +270,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_applause_court",
-        displayName = "Applause Court",
+        displayName = Strings.get("expedition.applause_court"),
         role = "combat",
         visual = "applause_court",
         tags = { "combat", "memory" },
@@ -280,7 +282,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_knight_gallery",
-        displayName = "Glass Knight Gallery",
+        displayName = Strings.get("expedition.glass_knight_gallery"),
         role = "combat",
         visual = "knight_gallery",
         tags = { "combat", "risk" },
@@ -304,7 +306,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_giant_plaza",
-        displayName = "Parade Giant Plaza",
+        displayName = Strings.get("expedition.parade_giant_plaza"),
         role = "combat",
         visual = "giant_plaza",
         tags = { "combat", "risk" },
@@ -316,7 +318,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_citizen_quarter",
-        displayName = "False Citizen Quarter",
+        displayName = Strings.get("expedition.false_citizen_quarter"),
         role = "combat",
         visual = "citizen_quarter",
         tags = { "combat", "story" },
@@ -379,7 +381,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_regents_box",
-        displayName = "The Regent's Box",
+        displayName = Strings.get("expedition.the_regent_s_box"),
         role = "story",
         visual = "regents_box",
         tags = { "story", "resident" },
@@ -391,7 +393,7 @@ local modules = {
     }),
     frozenDefinition({
         id = "module_cc_sculptors_hall",
-        displayName = "Sculptor's Hall",
+        displayName = Strings.get("expedition.sculptor_s_hall"),
         role = "story",
         visual = "sculptors_hall",
         tags = { "story", "memory" },
@@ -444,7 +446,7 @@ local modules = {
     -- with the false statues already standing in it.
     frozenDefinition({
         id = "module_cc_regent_approach",
-        displayName = "Regent's Approach",
+        displayName = Strings.get("expedition.regent_s_approach"),
         role = "landmark",
         visual = "regent_approach",
         tags = { "landmark", "boss", "story" },
@@ -459,111 +461,87 @@ local modules = {
 local pointsOfInterest = {
     frozenDefinition({
         id = "poi_cc_last_ovation",
-        displayName = "The Last Ovation",
+        displayName = Strings.get("story.the_last_ovation_2"),
         visual = "last_ovation",
         tags = { "story", "warning" },
-        detail = "The crowd in the upper stands, cast where they were "
-            .. "standing, every one of them turned to face the stage. "
-            .. "Whatever they were watching, they were watching it right "
-            .. "up until the end.",
+        detail = Strings.get("expedition.the_crowd_in_the_upper_stands"),
     }),
     frozenDefinition({
         id = "poi_cc_glass_family",
-        displayName = "The Glass Family",
+        displayName = Strings.get("expedition.the_glass_family"),
         visual = "glass_family",
         tags = { "mystery", "story" },
-        detail = "Four figures at a table, and the fourth chair pulled out "
-            .. "as though someone had just got up. Nothing here casts a "
-            .. "shadow the right way round.",
+        detail = Strings.get("expedition.four_figures_at_a_table_and"),
     }),
     frozenDefinition({
         id = "poi_cc_unfinished_statue",
-        displayName = "The Unfinished Statue",
+        displayName = Strings.get("expedition.the_unfinished_statue"),
         visual = "unfinished_statue",
         tags = { "mystery", "memory" },
-        detail = "Half-carved and abandoned, with the tools left where "
-            .. "they fell. It is the only figure in the district nobody "
-            .. "could have mistaken for a person.",
+        detail = Strings.get("expedition.half_carved_and_abandoned_with_the"),
     }),
     frozenDefinition({
         id = "poi_cc_regents_chair",
-        displayName = "The Regent's Chair",
+        displayName = Strings.get("expedition.the_regent_s_chair"),
         visual = "regents_chair",
         tags = { "story", "resident" },
-        detail = "Empty, and clean, in a box thick with ash. Something has "
-            .. "been sitting in it often enough to keep it that way.",
+        detail = Strings.get("expedition.empty_and_clean_in_a_box"),
     }),
     frozenDefinition({
         id = "poi_cc_ash_shadow",
-        displayName = "The Ash Shadow",
+        displayName = Strings.get("expedition.the_ash_shadow"),
         visual = "ash_shadow",
         tags = { "story", "warning" },
-        detail = "A shape burned into a wall where a body stopped the "
-            .. "heat. The posture is unmistakeably someone shielding "
-            .. "somebody smaller.",
+        detail = Strings.get("expedition.a_shape_burned_into_a_wall"),
     }),
     frozenDefinition({
         id = "poi_cc_kiln_still_lit",
-        displayName = "The Kiln Still Lit",
+        displayName = Strings.get("expedition.the_kiln_still_lit"),
         visual = "kiln_still_lit",
         tags = { "resource", "heat" },
-        detail = "Coal enough for another century, feeding a fire nobody "
-            .. "has fed since. Whatever is coming out of it is still "
-            .. "being made.",
+        detail = Strings.get("expedition.coal_enough_for_another_century_feeding"),
     }),
     frozenDefinition({
         id = "poi_cc_false_shopfront",
-        displayName = "The False Shopfront",
+        displayName = Strings.get("expedition.the_false_shopfront"),
         visual = "false_shopfront",
         tags = { "mystery", "warning" },
-        detail = "A shop with a full window and no door, no counter and no "
-            .. "room behind it. The Crown's clearest tell, once you have "
-            .. "seen it once.",
+        detail = Strings.get("expedition.a_shop_with_a_full_window"),
     }),
     frozenDefinition({
         id = "poi_cc_crown_mold",
-        displayName = "The Crown Mold",
+        displayName = Strings.get("expedition.the_crown_mold"),
         visual = "crown_mold",
         tags = { "resource", "story" },
-        detail = "The mold the ceremonial crown was cast in, cracked in "
-            .. "half. Both halves are here, which means the crown left "
-            .. "before the fire did.",
+        detail = Strings.get("expedition.the_mold_the_ceremonial_crown_was"),
     }),
     frozenDefinition({
         id = "poi_cc_name_wall",
-        displayName = "The Name Wall",
+        displayName = Strings.get("story.the_name_wall"),
         visual = "name_wall",
         tags = { "story", "resident" },
-        detail = "Official names cut deep and formal. Under each one, "
-            .. "scratched small, a second name in a different hand -- "
-            .. "the one the person actually went by.",
+        detail = Strings.get("expedition.official_names_cut_deep_and_formal"),
     }),
     frozenDefinition({
         id = "poi_cc_cooling_pool",
-        displayName = "The Cooling Pool",
+        displayName = Strings.get("expedition.the_cooling_pool"),
         visual = "cooling_pool",
         tags = { "resource", "safe" },
-        detail = "Channel water still running cold through a district that "
-            .. "is still hot. It is the only place in the Crown that is "
-            .. "not doing anything.",
+        detail = Strings.get("expedition.channel_water_still_running_cold_through"),
     }),
     frozenDefinition({
         id = "poi_cc_understudy",
-        displayName = "The Understudy",
+        displayName = Strings.get("expedition.the_understudy"),
         visual = "understudy",
         tags = { "mystery", "story" },
-        detail = "A cast of the Regent, in the Regent's costume, standing "
-            .. "in the wings. It is a head shorter and the hands are "
-            .. "wrong.",
+        detail = Strings.get("expedition.a_cast_of_the_regent_in"),
     }),
     frozenDefinition({
         id = "poi_cc_crown_marker",
-        displayName = "The Crown Marker",
+        displayName = Strings.get("expedition.the_crown_marker"),
         visual = "crown_marker",
         tags = { "landmark", "story" },
-        detail = "A processional marker pointing the way to the stage, and "
-            .. "the only sign in the district that has been repainted "
-            .. "recently.",
+        detail = Strings.get("expedition.a_processional_marker_pointing_the_way"),
     }),
 }
 
@@ -573,44 +551,41 @@ local events = {
         displayName = "Parade Loop",
         visual = "parade_loop",
         tags = { "memory", "urgent" },
-        objective = "BREAK THE PROCESSION BEFORE IT COMES ROUND AGAIN",
-        detail = "The parade has walked this route a thousand times. It is "
-            .. "wearing a groove into the street and everything in the "
-            .. "district keeps time to it.",
+        objective = Strings.get("expedition.break_the_procession_before_it_comes"),
+        detail = Strings.get("expedition.the_parade_has_walked_this_route"),
         completionMessage = "THE PROCESSION BREAKS — +3 MEMORY GLASS",
-        failureMessage = "IT COMES ROUND AGAIN",
+        failureMessage = Strings.get("expedition.it_comes_round_again"),
         durationSeconds = 100,
         defaultSolution = true,
         criticalPathBlocking = false,
         minimumRouteSpace = 20,
         startConditions = { "player_in_expedition", "interaction_in_range" },
         incompatibleEvents = {},
-        failureResolution = "The chance passes; the marked critical path stays open.",
+        failureResolution = Strings.get("expedition.the_chance_passes_the_marked_critical"),
         localizationKey = "events.cinderfall.parade_loop",
         analyticsId = "CinderfallParadeLoop",
         killSwitchFlag = "cinderfall_events_enabled",
         soloVariant = {
-            guidance = "Find the one that leads, not the one at the front. They "
-                .. "are different.",
+            guidance = Strings.get("expedition.find_the_one_that_leads_not"),
         },
-        groupVariant = { guidance = "One reads the line while the others take the leader." },
+        groupVariant = { guidance = Strings.get("expedition.one_reads_the_line_while_the") },
         reward = { materialId = "material_memory_glass", amount = 3 },
         steps = {
             {
                 id = "read_line",
-                actionText = "READ",
-                objectText = "Procession Line",
+                actionText = Strings.get("expedition.read"),
+                objectText = Strings.get("expedition.procession_line"),
                 offset = { x = -6, y = 1.5, z = -2 },
             },
             {
                 id = "mark_leader",
-                actionText = "MARK",
-                objectText = "The One Leading",
+                actionText = Strings.get("expedition.mark"),
+                objectText = Strings.get("expedition.the_one_leading"),
                 offset = { x = 4, y = 1.4, z = 3 },
             },
             {
                 id = "break_step",
-                actionText = "BREAK",
+                actionText = Strings.get("town.break"),
                 objectText = "Its Step",
                 offset = { x = 7, y = 1.2, z = -5 },
             },
@@ -621,38 +596,36 @@ local events = {
         displayName = "Glass Family",
         visual = "glass_family_event",
         tags = { "choice", "memory" },
-        objective = "DECIDE WHICH OF THEM WAS REAL",
-        detail = "Four figures, one of them a person the ash caught and "
-            .. "three of them casts made afterwards. Only one is worth "
-            .. "carrying out.",
+        objective = Strings.get("expedition.decide_which_of_them_was_real"),
+        detail = Strings.get("expedition.four_figures_one_of_them_a"),
         completionMessage = "THE REAL ONE IS CARRIED OUT — +3 ASH SILK",
-        failureMessage = "ALL FOUR ARE LEFT WHERE THEY STAND",
+        failureMessage = Strings.get("expedition.all_four_are_left_where_they"),
         durationSeconds = 110,
         defaultSolution = true,
         criticalPathBlocking = false,
         minimumRouteSpace = 18,
         startConditions = { "player_in_expedition", "interaction_in_range" },
         incompatibleEvents = {},
-        failureResolution = "The chance passes; the marked critical path stays open.",
+        failureResolution = Strings.get("expedition.the_chance_passes_the_marked_critical"),
         localizationKey = "events.cinderfall.glass_family",
         analyticsId = "CinderfallGlassFamily",
         killSwitchFlag = "cinderfall_events_enabled",
         soloVariant = {
-            guidance = "Look at the hands. Casts are made from molds and molds " .. "have seams.",
+            guidance = Strings.get("expedition.look_at_the_hands_casts_are"),
         },
-        groupVariant = { guidance = "Split the four; compare before anyone commits." },
+        groupVariant = { guidance = Strings.get("expedition.split_the_four_compare_before_anyone") },
         reward = { materialId = "material_ash_silk", amount = 3 },
         steps = {
             {
                 id = "read_seams",
-                actionText = "READ",
+                actionText = Strings.get("expedition.read"),
                 objectText = "Their Hands",
                 offset = { x = -5, y = 1.4, z = 1 },
             },
             {
                 id = "lift_true",
-                actionText = "LIFT",
-                objectText = "The One Without Seams",
+                actionText = Strings.get("expedition.lift"),
+                objectText = Strings.get("expedition.the_one_without_seams"),
                 offset = { x = 5, y = 1.3, z = -2 },
             },
         },
@@ -662,44 +635,41 @@ local events = {
         displayName = "Kiln Restart",
         visual = "kiln_restart",
         tags = { "heat", "risk" },
-        objective = "RESTART A KILN WITHOUT FIRING WHAT IS INSIDE IT",
-        detail = "The kiln holds a cast that was never finished. "
-            .. "Restarting it warms the district; finishing the cast "
-            .. "fills it with one more thing that repeats.",
+        objective = Strings.get("expedition.restart_a_kiln_without_firing_what"),
+        detail = Strings.get("expedition.the_kiln_holds_a_cast_that"),
         completionMessage = "THE KILN RUNS COLD — +3 CROWN COAL",
-        failureMessage = "THE FIRING COMPLETES",
+        failureMessage = Strings.get("expedition.the_firing_completes"),
         durationSeconds = 120,
         defaultSolution = true,
         criticalPathBlocking = false,
         minimumRouteSpace = 20,
         startConditions = { "player_in_expedition", "interaction_in_range" },
         incompatibleEvents = {},
-        failureResolution = "The chance passes; the marked critical path stays open.",
+        failureResolution = Strings.get("expedition.the_chance_passes_the_marked_critical"),
         localizationKey = "events.cinderfall.kiln_restart",
         analyticsId = "CinderfallKilnRestart",
         killSwitchFlag = "cinderfall_events_enabled",
         soloVariant = {
-            guidance = "Vent first, then feed. Feeding a sealed kiln is how the "
-                .. "cast finishes.",
+            guidance = Strings.get("expedition.vent_first_then_feed_feeding_a"),
         },
-        groupVariant = { guidance = "One vents while one feeds; do not swap halfway." },
+        groupVariant = { guidance = Strings.get("expedition.one_vents_while_one_feeds_do") },
         reward = { materialId = "material_crown_coal", amount = 3 },
         steps = {
             {
                 id = "open_vent",
-                actionText = "OPEN",
+                actionText = Strings.get("world.open"),
                 objectText = "Kiln Vent",
                 offset = { x = -7, y = 1.6, z = 0 },
             },
             {
                 id = "feed_coal",
-                actionText = "FEED",
+                actionText = Strings.get("expedition.feed"),
                 objectText = "Coal Chute",
                 offset = { x = 6, y = 1.4, z = -3 },
             },
             {
                 id = "bank_fire",
-                actionText = "BANK",
+                actionText = Strings.get("expedition.bank"),
                 objectText = "The Fire",
                 offset = { x = 2, y = 1.2, z = 6 },
             },
@@ -710,31 +680,29 @@ local events = {
         displayName = "Actor Rescue",
         visual = "actor_rescue",
         tags = { "urgent", "story" },
-        objective = "GET THE LIVING ONE OUT OF THE CAST",
-        detail = "One of the figures on the stage is breathing. The rest "
-            .. "of the company will keep performing around them either "
-            .. "way.",
+        objective = Strings.get("expedition.get_the_living_one_out_of"),
+        detail = Strings.get("expedition.one_of_the_figures_on_the"),
         completionMessage = "THEY WALK OUT WITH YOU — +3 CINDERSTEEL",
-        failureMessage = "THE PERFORMANCE CONTINUES",
+        failureMessage = Strings.get("expedition.the_performance_continues"),
         durationSeconds = 90,
         defaultSolution = true,
         criticalPathBlocking = false,
         minimumRouteSpace = 22,
         startConditions = { "player_in_expedition", "interaction_in_range" },
         incompatibleEvents = {},
-        failureResolution = "The chance passes; the marked critical path stays open.",
+        failureResolution = Strings.get("expedition.the_chance_passes_the_marked_critical"),
         localizationKey = "events.cinderfall.actor_rescue",
         analyticsId = "CinderfallActorRescue",
         killSwitchFlag = "cinderfall_events_enabled",
         soloVariant = {
-            guidance = "Cut the cast, not the person. The ash is thicker than it " .. "looks.",
+            guidance = Strings.get("expedition.cut_the_cast_not_the_person"),
         },
-        groupVariant = { guidance = "One holds the company's attention while one cuts." },
+        groupVariant = { guidance = Strings.get("expedition.one_holds_the_company_s_attention") },
         reward = { materialId = "material_cindersteel", amount = 3 },
         steps = {
             {
                 id = "find_breath",
-                actionText = "LISTEN",
+                actionText = Strings.get("expedition.listen"),
                 objectText = "The Company",
                 offset = { x = -6, y = 1.5, z = 2 },
             },
@@ -751,38 +719,38 @@ local events = {
         displayName = "Ash Storm",
         visual = "ash_storm",
         tags = { "urgent", "cold" },
-        objective = "GET UNDER COVER BEFORE THE FALL SETS",
-        detail = "Fresh ash falls hot and sets in minutes. Anything still "
-            .. "standing in it when it sets becomes another thing that "
-            .. "stands here.",
+        objective = Strings.get("expedition.get_under_cover_before_the_fall"),
+        detail = Strings.get("expedition.fresh_ash_falls_hot_and_sets"),
         completionMessage = "THE FALL PASSES OVER YOU — +3 KILN PEARL",
-        failureMessage = "THE FALL SETS AROUND YOU",
+        failureMessage = Strings.get("expedition.the_fall_sets_around_you"),
         durationSeconds = 80,
         defaultSolution = true,
         criticalPathBlocking = false,
         minimumRouteSpace = 24,
         startConditions = { "player_in_expedition", "interaction_in_range" },
         incompatibleEvents = {},
-        failureResolution = "The chance passes; the marked critical path stays open.",
+        failureResolution = Strings.get("expedition.the_chance_passes_the_marked_critical"),
         localizationKey = "events.cinderfall.ash_storm",
         analyticsId = "CinderfallAshStorm",
         killSwitchFlag = "cinderfall_events_enabled",
         soloVariant = {
-            guidance = "Shutter, then shelter. A shelter with the shutters open " .. "is a mold.",
+            guidance = Strings.get("expedition.shutter_then_shelter_a_shelter_with"),
         },
-        groupVariant = { guidance = "Shutters are faster shared; shelter together or not at all." },
+        groupVariant = {
+            guidance = Strings.get("expedition.shutters_are_faster_shared_shelter_together"),
+        },
         reward = { materialId = "material_kiln_pearl", amount = 3 },
         steps = {
             {
                 id = "close_shutters",
-                actionText = "CLOSE",
-                objectText = "Arcade Shutters",
+                actionText = Strings.get("hud.close"),
+                objectText = Strings.get("expedition.arcade_shutters"),
                 offset = { x = -8, y = 1.5, z = -1 },
             },
             {
                 id = "take_shelter",
-                actionText = "SHELTER",
-                objectText = "Under the Arcade",
+                actionText = Strings.get("expedition.shelter"),
+                objectText = Strings.get("expedition.under_the_arcade"),
                 offset = { x = 6, y = 1.2, z = 4 },
             },
         },
@@ -792,84 +760,80 @@ local events = {
         displayName = "False Shop",
         visual = "false_shop",
         tags = { "mystery", "choice" },
-        objective = "TELL THE STOCKED SHOP FROM THE REAL ONE",
-        detail = "Two shopfronts, both full. One of them has a back room "
-            .. "and a ledger; the other has a window and nothing behind "
-            .. "it.",
+        objective = Strings.get("expedition.tell_the_stocked_shop_from_the"),
+        detail = Strings.get("expedition.two_shopfronts_both_full_one_of"),
         completionMessage = "THE REAL STOCK COMES WITH YOU — +3 ASH SILK",
-        failureMessage = "YOU CARRY OUT A WINDOW",
+        failureMessage = Strings.get("expedition.you_carry_out_a_window"),
         durationSeconds = 95,
         defaultSolution = true,
         criticalPathBlocking = false,
         minimumRouteSpace = 18,
         startConditions = { "player_in_expedition", "interaction_in_range" },
         incompatibleEvents = {},
-        failureResolution = "The chance passes; the marked critical path stays open.",
+        failureResolution = Strings.get("expedition.the_chance_passes_the_marked_critical"),
         localizationKey = "events.cinderfall.false_shop",
         analyticsId = "CinderfallFalseShop",
         killSwitchFlag = "cinderfall_events_enabled",
         soloVariant = {
-            guidance = "Go round the back. Casts are only made from the side " .. "people saw.",
+            guidance = Strings.get("expedition.go_round_the_back_casts_are"),
         },
-        groupVariant = { guidance = "One takes each front; meet behind them." },
+        groupVariant = { guidance = Strings.get("expedition.one_takes_each_front_meet_behind") },
         reward = { materialId = "material_ash_silk", amount = 3 },
         steps = {
             {
                 id = "check_backs",
-                actionText = "CHECK",
-                objectText = "Behind Both Fronts",
+                actionText = Strings.get("expedition.check"),
+                objectText = Strings.get("expedition.behind_both_fronts"),
                 offset = { x = -6, y = 1.4, z = -3 },
             },
             {
                 id = "take_stock",
-                actionText = "TAKE",
-                objectText = "The Real Stock",
+                actionText = Strings.get("expedition.take"),
+                objectText = Strings.get("expedition.the_real_stock"),
                 offset = { x = 6, y = 1.3, z = 2 },
             },
         },
     }),
     frozenDefinition({
         id = "event_cc_cooling_channel",
-        displayName = "Cooling Channel",
+        displayName = Strings.get("expedition.cooling_channel"),
         visual = "cooling_channel_event",
         tags = { "heat", "puzzle" },
-        objective = "PUT THE CHANNEL BACK THROUGH THE DISTRICT",
-        detail = "The channel that kept this quarter workable is blocked "
-            .. "in three places. Clearing it cools the kilns and stops "
-            .. "them making anything else.",
+        objective = Strings.get("expedition.put_the_channel_back_through_the"),
+        detail = Strings.get("expedition.the_channel_that_kept_this_quarter"),
         completionMessage = "THE QUARTER COOLS — +3 CROWN COAL",
-        failureMessage = "THE KILNS KEEP THEIR HEAT",
+        failureMessage = Strings.get("expedition.the_kilns_keep_their_heat"),
         durationSeconds = 115,
         defaultSolution = true,
         criticalPathBlocking = false,
         minimumRouteSpace = 22,
         startConditions = { "player_in_expedition", "interaction_in_range" },
         incompatibleEvents = {},
-        failureResolution = "The chance passes; the marked critical path stays open.",
+        failureResolution = Strings.get("expedition.the_chance_passes_the_marked_critical"),
         localizationKey = "events.cinderfall.cooling_channel",
         analyticsId = "CinderfallCoolingChannel",
         killSwitchFlag = "cinderfall_events_enabled",
         soloVariant = {
-            guidance = "Upstream first. Clearing downstream only moves the block.",
+            guidance = Strings.get("expedition.upstream_first_clearing_downstream_only_move"),
         },
-        groupVariant = { guidance = "Take a block each, but clear them in order." },
+        groupVariant = { guidance = Strings.get("expedition.take_a_block_each_but_clear") },
         reward = { materialId = "material_crown_coal", amount = 3 },
         steps = {
             {
                 id = "clear_upper",
-                actionText = "CLEAR",
+                actionText = Strings.get("town.clear"),
                 objectText = "Upper Block",
                 offset = { x = -8, y = 1.4, z = -4 },
             },
             {
                 id = "clear_middle",
-                actionText = "CLEAR",
+                actionText = Strings.get("town.clear"),
                 objectText = "Middle Block",
                 offset = { x = 0, y = 1.4, z = 5 },
             },
             {
                 id = "clear_lower",
-                actionText = "CLEAR",
+                actionText = Strings.get("town.clear"),
                 objectText = "Lower Block",
                 offset = { x = 8, y = 1.4, z = -2 },
             },
@@ -877,40 +841,38 @@ local events = {
     }),
     frozenDefinition({
         id = "event_cc_empty_applause",
-        displayName = "Empty Applause",
+        displayName = Strings.get("expedition.empty_applause"),
         visual = "empty_applause",
         tags = { "memory", "quiet" },
-        objective = "STOP THE COURT APPLAUDING",
-        detail = "The applause starts when anyone walks in and does not "
-            .. "stop until they leave. Everything in the district that "
-            .. "hunts by sound is listening to it.",
+        objective = Strings.get("expedition.stop_the_court_applauding"),
+        detail = Strings.get("expedition.the_applause_starts_when_anyone_walks"),
         completionMessage = "THE COURT GOES QUIET — +3 MEMORY GLASS",
-        failureMessage = "THE APPLAUSE CARRIES",
+        failureMessage = Strings.get("expedition.the_applause_carries"),
         durationSeconds = 100,
         defaultSolution = true,
         criticalPathBlocking = false,
         minimumRouteSpace = 20,
         startConditions = { "player_in_expedition", "interaction_in_range" },
         incompatibleEvents = {},
-        failureResolution = "The chance passes; the marked critical path stays open.",
+        failureResolution = Strings.get("expedition.the_chance_passes_the_marked_critical"),
         localizationKey = "events.cinderfall.empty_applause",
         analyticsId = "CinderfallEmptyApplause",
         killSwitchFlag = "cinderfall_events_enabled",
         soloVariant = {
-            guidance = "Find the first pair of hands. The rest are only following it.",
+            guidance = Strings.get("expedition.find_the_first_pair_of_hands"),
         },
-        groupVariant = { guidance = "Spread out; whoever finds the first pair calls it." },
+        groupVariant = { guidance = Strings.get("expedition.spread_out_whoever_finds_the_first") },
         reward = { materialId = "material_memory_glass", amount = 3 },
         steps = {
             {
                 id = "find_first",
-                actionText = "FIND",
-                objectText = "The First Pair of Hands",
+                actionText = Strings.get("hud.find"),
+                objectText = Strings.get("expedition.the_first_pair_of_hands"),
                 offset = { x = -5, y = 1.5, z = 3 },
             },
             {
                 id = "still_them",
-                actionText = "STILL",
+                actionText = Strings.get("expedition.still"),
                 objectText = "Them",
                 offset = { x = 5, y = 1.3, z = -3 },
             },
