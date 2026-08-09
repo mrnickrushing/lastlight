@@ -344,7 +344,7 @@ function TutorialService.Init(self: TutorialService, context: any)
     self._blackoutService:setChangedHandler(function(toast: string?)
         if toast ~= nil then
             for player, session in self._sessions do
-                if self._blackoutService:snapshot(player) ~= nil then
+                if self:_blackoutSnapshot(player) ~= nil then
                     session.toast = toast
                     session.toastRevision += 1
                 end
@@ -1009,6 +1009,24 @@ function TutorialService.setRegionEncounterService(
     regionEncounterService: any
 )
     self._regionEncounterService = regionEncounterService
+end
+
+--[[
+    The Blackout is chapter I's event and Bramblewake's alone, but its
+    service only asks whether the player is out, so with the road turned
+    to any later region the HUD's trail card still read BRAMBLEWAKE
+    BLACKOUT and told the player to enter a wood that was not standing.
+    Found on the Reach's first live walk. The road's own region is the
+    gate: a Blackout snapshot exists only while the wood it happens in
+    does, which is the same test participantEntered already makes at the
+    expedition door.
+]]
+function TutorialService._blackoutSnapshot(self: TutorialService, player: Player): any
+    local regionId = self._expeditionService:currentSeed()
+    if regionId ~= "region_bramblewake" then
+        return nil
+    end
+    return self._blackoutService:snapshot(player)
 end
 
 --[[
@@ -2310,7 +2328,7 @@ function TutorialService._objectiveTargets(
                 })
             end
         end
-        local blackout = self._blackoutService:snapshot(player)
+        local blackout = self:_blackoutSnapshot(player)
         local arena = self._worldService:blackoutArena()
         if blackout ~= nil and arena ~= nil then
             if blackout.status == "relay" then
@@ -2465,7 +2483,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         then self._townNightService:snapshot()
         else self._phaseService:snapshot()
     local survival = self._survivalService:snapshot(player)
-    local blackout = self._blackoutService:snapshot(player)
+    local blackout = self:_blackoutSnapshot(player)
     if blackout ~= nil then
         trailName = Strings.get("tutorial.bramblewake_blackout")
         progress = blackout.stage

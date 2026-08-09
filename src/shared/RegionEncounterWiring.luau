@@ -19,13 +19,16 @@
     text would drift from the first.
 ]]
 
+local AdmiralWreckEncounter = require("./AdmiralWreckEncounter")
 local BellowsMawEncounter = require("./BellowsMawEncounter")
 local DrownedCallerEncounter = require("./DrownedCallerEncounter")
 local ForemanEchoEncounter = require("./ForemanEchoEncounter")
 local IronWidowEncounter = require("./IronWidowEncounter")
 local LanternWitchEncounter = require("./LanternWitchEncounter")
+local LighthouseEaterEncounter = require("./LighthouseEaterEncounter")
 local ManyFaceEncounter = require("./ManyFaceEncounter")
 local Strings = require("./Strings")
+local TideboundTitanEncounter = require("./TideboundTitanEncounter")
 
 local RegionEncounterWiring = {}
 
@@ -443,6 +446,250 @@ function RegionEncounterWiring.definitionsFor(regionId: string): { Definition }
                         else "spent_copies"
                     return {
                         chapterId = "chapter_three",
+                        decision = decision,
+                        outcome = tostring(state.outcome),
+                    }
+                end,
+            },
+        }
+    elseif regionId == "region_tempest" then
+        local eaterInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(LighthouseEaterEncounter),
+        }
+        local eaterAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.lighthouse_eater")
+            ),
+        }
+        local beaconObjects: { [string]: string } = {
+            beacon_point = Strings.get("encounter.point_beacon"),
+            beacon_jetty = Strings.get("encounter.jetty_beacon"),
+            beacon_shoal = Strings.get("encounter.shoal_beacon"),
+            beacon_wall = Strings.get("encounter.wall_beacon"),
+        }
+        for _, beaconId in LighthouseEaterEncounter.BeaconIds do
+            table.insert(
+                eaterAnchors,
+                anchor(beaconId, Strings.get("world.light"), beaconObjects[beaconId])
+            )
+            eaterInteractions[beaconId] = verb(
+                LighthouseEaterEncounter,
+                function(state: any, userId: number, now: number): (any, any)
+                    return LighthouseEaterEncounter.lightBeacon(state, userId, beaconId, now)
+                end
+            )
+        end
+
+        local wreckInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(AdmiralWreckEncounter),
+        }
+        local wreckAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.admiral_wreck")
+            ),
+        }
+        local lineObjects: { [string]: string } = {
+            tow_bow = Strings.get("encounter.bow_tow_line"),
+            tow_quarter = Strings.get("encounter.quarter_tow_line"),
+            tow_stern = Strings.get("encounter.stern_tow_line"),
+            tow_spring = Strings.get("encounter.spring_tow_line"),
+        }
+        for _, lineId in AdmiralWreckEncounter.LineIds do
+            table.insert(
+                wreckAnchors,
+                anchor(lineId, Strings.get("encounter.cut"), lineObjects[lineId])
+            )
+            wreckInteractions[lineId] = verb(
+                AdmiralWreckEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return AdmiralWreckEncounter.cutLine(state, userId, lineId)
+                end
+            )
+        end
+        --[[
+            His crew re-rigs each cut line after a fixed span. The state
+            keeps no timestamps -- a cut is a boolean -- so the cadence
+            lives here, the way the Many-Face's face clock does: remember
+            when each cut appeared, and give it back when its time is up.
+        ]]
+        local rerigAt: { [string]: number } = {}
+        local function wreckTick(state: any, now: number): any?
+            if state.status ~= "covered" and state.status ~= "exposed" then
+                if next(rerigAt) ~= nil then
+                    rerigAt = {}
+                end
+                return nil
+            end
+            local nextState = state
+            for _, lineId in AdmiralWreckEncounter.LineIds do
+                if nextState.lines[lineId] then
+                    if rerigAt[lineId] == nil then
+                        rerigAt[lineId] = now + AdmiralWreckEncounter.Tuning.lineRerigSeconds
+                    elseif now >= rerigAt[lineId] then
+                        rerigAt[lineId] = nil
+                        nextState = (AdmiralWreckEncounter.rerigLine(nextState, lineId))
+                    end
+                else
+                    rerigAt[lineId] = nil
+                end
+            end
+            return if nextState == state then nil else nextState
+        end
+
+        local titanInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(TideboundTitanEncounter),
+        }
+        local titanAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.tidebound_titan")
+            ),
+        }
+        local wreckObjects: { [string]: string } = {
+            wreck_collier = Strings.get("encounter.collier_wreck"),
+            wreck_packet = Strings.get("encounter.packet_wreck"),
+            wreck_trawler = Strings.get("encounter.trawler_wreck"),
+            wreck_cutter = Strings.get("encounter.cutter_wreck"),
+        }
+        for _, wreckId in TideboundTitanEncounter.WreckIds do
+            table.insert(
+                titanAnchors,
+                anchor(wreckId, Strings.get("encounter.climb"), wreckObjects[wreckId])
+            )
+            titanInteractions[wreckId] = verb(
+                TideboundTitanEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return TideboundTitanEncounter.climbWreck(state, userId, wreckId)
+                end
+            )
+        end
+        local rodObjects: { [string]: string } = {
+            rod_seaward = Strings.get("encounter.seaward_storm_rod"),
+            rod_landward = Strings.get("encounter.landward_storm_rod"),
+        }
+        for _, rodId in TideboundTitanEncounter.RodIds do
+            table.insert(
+                titanAnchors,
+                anchor(rodId, Strings.get("encounter.ground"), rodObjects[rodId])
+            )
+            titanInteractions[rodId] = verb(
+                TideboundTitanEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return TideboundTitanEncounter.groundRod(state, userId, rodId)
+                end
+            )
+        end
+        --[[
+            The chapter's decision, worked with two verbs per gate rather
+            than chosen at a menu -- and easing shares no anchor with
+            slamming, for the Witch's reason: a decision that shares a
+            button with its opposite is a misclick with a consequence.
+            The module counts slams and nothing else, so the once-a-phase
+            cadence its outcome comment assumes ("three phases offer two
+            gates each") is held here: a gate already worked this phase
+            answers with its own refusal instead of double-counting.
+        ]]
+        local gateWorkedInPhase: { [string]: number } = {}
+        local gateObjects: { [string]: string } = {
+            gate_north = Strings.get("encounter.north_tide_gate"),
+            gate_south = Strings.get("encounter.south_tide_gate"),
+        }
+        for gateId in TideboundTitanEncounter.GateIds :: { [string]: boolean } do
+            local function workGate(state: any, player: any, now: number, slam: boolean): (any, any)
+                if state.status == "exposed" and gateWorkedInPhase[gateId] == state.phase then
+                    return state,
+                        {
+                            accepted = false,
+                            completed = false,
+                            message = Strings.get("encounter.this_gate_is_worked_the_tide"),
+                        }
+                end
+                local nextState, result =
+                    TideboundTitanEncounter.lowerTide(state, player.UserId, gateId, slam)
+                if type(result) == "table" and result.accepted == true then
+                    gateWorkedInPhase[gateId] = nextState.phase
+                end
+                return nextState,
+                    {
+                        accepted = if type(result) == "table" then result.accepted else false,
+                        completed = false,
+                        message = instructionOf(
+                            TideboundTitanEncounter,
+                            nextState,
+                            player.UserId,
+                            now
+                        ),
+                    }
+            end
+            table.insert(
+                titanAnchors,
+                anchor(gateId, Strings.get("encounter.ease"), gateObjects[gateId])
+            )
+            titanInteractions[gateId] = function(state: any, player: any, now: number): (any, any)
+                return workGate(state, player, now, false)
+            end
+            local slamId = gateId .. "_slam"
+            table.insert(
+                titanAnchors,
+                anchor(slamId, Strings.get("encounter.slam"), gateObjects[gateId])
+            )
+            titanInteractions[slamId] = function(state: any, player: any, now: number): (any, any)
+                return workGate(state, player, now, true)
+            end
+        end
+        table.sort(titanAnchors, function(left: Anchor, right: Anchor): boolean
+            if left.id == RegionEncounterWiring.ChallengeAnchorId then
+                return true
+            elseif right.id == RegionEncounterWiring.ChallengeAnchorId then
+                return false
+            end
+            return left.id < right.id
+        end)
+
+        return {
+            {
+                id = LighthouseEaterEncounter.Id,
+                regionId = regionId,
+                module = LighthouseEaterEncounter,
+                anchors = eaterAnchors,
+                interactions = eaterInteractions,
+                tick = LighthouseEaterEncounter.expire,
+            },
+            {
+                id = AdmiralWreckEncounter.Id,
+                regionId = regionId,
+                module = AdmiralWreckEncounter,
+                anchors = wreckAnchors,
+                interactions = wreckInteractions,
+                tick = wreckTick,
+            },
+            {
+                id = TideboundTitanEncounter.Id,
+                regionId = regionId,
+                module = TideboundTitanEncounter,
+                anchors = titanAnchors,
+                interactions = titanInteractions,
+                lockedUntil = { LighthouseEaterEncounter.Id, AdmiralWreckEncounter.Id },
+                chapterResolution = function(state: any)
+                    --[[
+                        Slams are the only thing the fight counts, so the
+                        decision reads off the same thresholds the outcome
+                        does: never slammed is a party that took the long
+                        turn every time, four or more is a policy, and the
+                        stretch between is a night that went both ways.
+                    ]]
+                    local slams = tonumber(state.slammedGates) or 0
+                    local decision = if slams == 0
+                        then "eased_gates"
+                        elseif slams >= 4 then "slammed_gates"
+                        else "mixed_gates"
+                    return {
+                        chapterId = "chapter_four",
                         decision = decision,
                         outcome = tostring(state.outcome),
                     }

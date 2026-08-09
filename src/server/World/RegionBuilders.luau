@@ -56,7 +56,12 @@ local ENTRIES: { [string]: any } = {
     },
     region_tempest = {
         builder = TempestBuilder,
-        walkable = false,
+        --[[
+            Walked end to end in a live session the day this flipped,
+            through the same assembly seam as the Delve and the Fen. The
+            missing list is a note for the art pass, not a gate.
+        ]]
+        walkable = true,
         missing = {
             "authored mesh dressing",
         },

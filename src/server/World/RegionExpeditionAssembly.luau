@@ -483,12 +483,17 @@ function RegionExpeditionAssembly.build(
             Named at the anchor, not only at the prompt: the first walk
             found four identical glowing pillars, distinguishable only by
             standing at each one. The label reach is short so the arena
-            does not join the label soup two cells away.
+            does not join the label soup two cells away -- and shorter
+            again when the ring is crowded, because the Titan's eleven
+            anchors at the reach the Maw's seven walked fine with read as
+            one mashed band from the arena's edge. Past nine anchors,
+            only the names near you render.
         ]]
+        local anchorLabelReach = if #definition.anchors >= 10 then 26 else 40
         for _, meta in definition.anchors do
             local anchorPart = anchors[meta.id]
             if anchorPart ~= nil then
-                billboardLabel(anchorPart, meta.object, look.arenaAnchor, 40)
+                billboardLabel(anchorPart, meta.object, look.arenaAnchor, anchorLabelReach)
             end
         end
         clearRouteCorridor(expedition, hostCenter, arenaCenter)

@@ -606,7 +606,7 @@ local events = {
         tags = { "rescue", "urgent" },
         objective = Strings.get("expedition.cut_the_rigging_and_get_them"),
         detail = Strings.get("expedition.somebody_is_tangled_in_the_shrouds"),
-        completionMessage = "THEY ARE OFF THE WRECK — +3 SHIPS IRON",
+        completionMessage = "THEY ARE OFF THE WRECK — +3 SHIP'S IRON",
         failureMessage = Strings.get("expedition.the_hull_goes_over"),
         durationSeconds = 110,
         defaultSolution = true,
@@ -803,7 +803,7 @@ local events = {
         tags = { "hazard", "story" },
         objective = Strings.get("expedition.relight_the_beacon_before_the_next"),
         detail = Strings.get("expedition.the_beacon_is_dark_the_channel"),
-        completionMessage = "THE BEACON BURNS — +3 SHIPS IRON",
+        completionMessage = "THE BEACON BURNS — +3 SHIP'S IRON",
         failureMessage = Strings.get("expedition.the_channel_stays_dark"),
         durationSeconds = 105,
         defaultSolution = true,
@@ -872,6 +872,17 @@ return table.freeze({
     }),
     RequiredModuleIds = table.freeze({
         "module_tr_titan_approach",
+    }),
+    --[[
+        The two fragment-anchored POIs place in every run, Bramblewake's
+        rule applied the day the region opened: a memory fragment whose
+        anchor only turns up some runs is a story beat demoted to a
+        lottery ticket. The Reach's first live walk found exactly that,
+        with the Signal Book's stump missing from the seed it rolled.
+    ]]
+    FixedPointOfInterestIds = table.freeze({
+        "poi_tr_lighthouse_stump",
+        "poi_tr_anchor_field",
     }),
     FixedMiddleIds = table.freeze({
         "module_tr_jetty_span",
