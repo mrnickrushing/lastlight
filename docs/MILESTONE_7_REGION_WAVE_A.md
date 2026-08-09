@@ -381,6 +381,11 @@ Four waves took both new regions from "a catalog and some geometry" to
   so what differs between them arrives as an interaction table and their
   rules stay in their own modules.
 
-What both regions still owe is wayfinding and mesh dressing, which is an
-art pass. The flags stay off until that lands and a live session walks
-one end to end.
+What both regions still owed after those waves was the assembly itself —
+the composition nothing ever called — and #363 built it, walked the Delve
+end to end live, and opened it: departure board, arrival, a gather, an
+event by real clicks, a memory fragment, both elites, the Maw with the
+vent choice resolving chapter II, and a Wayhome extraction. Wayfinding is
+built by the seam; authored mesh dressing remains an art pass and is
+recorded as a non-blocking note in RegionBuilders. The Fen's flags stay
+off until its own walk.

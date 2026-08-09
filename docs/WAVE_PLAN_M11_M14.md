@@ -46,7 +46,9 @@ are.
 - **Device-hardware items** — baseline phone performance, touch reach, safe
   areas.
 - **Flipping a region's `enabled` flag** once a live session walks it end to
-  end.
+  end. **Ironroot Delve is open** (#363: the region assembly seam, the walk,
+  and the six defects it found, all in one pull request); the Fen, the Reach,
+  the Vale, the Crown and the Hollow still wait on their own walks.
 
 **New with M11 (commerce and social):**
 
@@ -359,9 +361,10 @@ being written, and the seed board's SOMEBODY IS STILL IN THE WOOD refusal
 needs a second person in the server, as does every two-player case M11 waves C
 and D left open.
 
-**Decisions.** Which of the six regions' `enabled` flags to flip, once a live
-session has walked each end to end — that flag is the whole remaining distance
-between the traversal spec and a real playthrough. What to remove for
+**Decisions.** Which of the still-shut regions' `enabled` flags to flip, once
+a live session has walked each end to end — Ironroot's flipped in #363 with its
+walk, and the region assembly seam that walk forced into existence is what the
+remaining five open through. What to remove for
 recurring confusion. **Which languages ship**, which is now a capacity decision
 with a number on it rather than an archaeology project: `Strings.luau` holds
 **2,621 source strings** and that is what one language costs. Translating them is

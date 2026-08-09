@@ -7,10 +7,10 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = PR #361, build `0.53.0`,
-save schema 25, 27 services. Published to Roblox as place version 161,
-matching PR #360 exactly; #361 adds only documentation and republishing it
-returned the version #360 had already produced. (#358 produced v159 and #359
+Last updated: 2026-08-08, at `main` = PR #363, build `0.53.0`,
+save schema 25, 27 services. Published to Roblox as place version 162.
+(#361 added only documentation over v161 and #362 only the header rule
+below.) (#358 produced v159 and #359
 v160; those three are Milestone 13 wave D's closing batches, and each was
 published before the next was started.) (This line used to say ``at `main` = `HEAD` ``,
 and #354 is the wave that noticed `HEAD` is not a revision. The revision a
@@ -20,9 +20,10 @@ byte-identical, because it changes only manifests, validators and
 documentation.) (#341 and #343 both left the built place
 byte-identical, because they add only specs and documentation and the built
 place carries no tests, so publishing either returned the version #340 had
-already produced.) **The owner's standing directive: complete
-Milestones 11 through 14 continuously, wave by wave, each implemented,
-tested, merged and published, with no check-in between waves.** The queue
+already produced.) **The owner's standing directive: continue until the
+game is completely done, then test — the buildable roadmap is finished, and
+what remains in code is opening the six shut regions, each in the pull
+request of its own live walk.** The queue
 that makes that possible is
 [WAVE_PLAN_M11_M14.md](WAVE_PLAN_M11_M14.md); read it second. Studio is
 available and driven from the terminal (launch recipe in the M7 runbook);
@@ -94,6 +95,68 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#363** (v162) **The region assembly seam, and the Ironroot Delve opens — the first
+  region since Bramblewake a player can actually walk.** Every region after the
+  forest had all of its content and none of it reachable, and the recorded gap
+  ("authored mesh dressing") stood in front of an unrecorded one: `ExpeditionService`
+  asserted Bramblewake by name at boot, `WorldService` built the forest
+  unconditionally, and nothing anywhere called `RegionBuilders.buildModules`,
+  `buildResourceNodes`, `buildPointsOfInterest`, `buildEventSockets`, `buildArena`,
+  `buildWayfinding` or `RegionEncounterService.beginRun` — the shared pieces four
+  waves built were functions with no caller. **The assembly that composes a region
+  into a world a server can raise did not exist**, and no spec could see it, because
+  every part of it a spec can read was correct.
+
+  `RegionExpeditionAssembly` is that seam: full-cell ground under module floors
+  that float inside their cells (the Delve's is 56 studs on a 72-stud cell, and the
+  16-stud remainder was a fall out of the world), the region's own visuals, nodes,
+  POIs, event sockets with their step anchors, wayfinding, an arrival sign, an
+  extraction gate, one arena per encounter with a presence at its middle, and a rim
+  wall on every outside cell edge. `RegionEncounterWiring` (shared, so Lune can hold
+  a fight against its arena) maps each encounter's own id lists to anchors and
+  verbs; every toast is the encounter's next instruction, the one string that cannot
+  drift from the state machine. The service gained the strike router, the
+  elite-to-boss unlock chain, per-participant settlement, and chapter resolution
+  through `ProfileService.resolveChapter` — **a boss's completion is its chapter's
+  resolution, and the decision is made inside the fight** (which vent, what was
+  spared). The destination board in the departure lodge closes the M7 runbook's
+  region-transition item: one plank per region, every gate re-checked where the
+  press lands, the wood rebuilt only while nobody stands in it.
+
+  **Walked live end to end before the flags flipped**, on the built place:
+  destination press ("THE ROAD NOW LEADS TO IRONROOT DELVE"), arrival, a coalglass
+  gather, the Gas Leak event by real clicks ("GAS LEAK — 1/3 … THE AIR CLEARS —
+  +2 MACHINE OIL"), THE LAST SHIFT memory fragment, the Foreman Echo through two
+  board seizes, the Iron Widow through four cuts and her grounded windows, the Maw
+  unlocking itself ("SOMETHING BELOW HAS STOPPED WAITING") and dying through all
+  three phases with `vent_stope` recorded — `region_chapter_resolved
+  chapter=chapter_two decision=vent_stope outcome=cleared` — and a Wayhome
+  extraction banking fourteen materials.
+
+  **The walk found six defects and the fixes shipped in the same pull request**,
+  every one of them the class no spec can see: the destination board's sixth plank
+  level with the floor and its seventh inside it; billboard labels legible two full
+  cells away stacking into one band of gold soup; **cut-rock canyons across the
+  route seams**, because the Delve floor walls both X edges of every cell and
+  nobody had ever walked between two cells; four identical unlabelled arena
+  pillars; **both memory fragments seated on top of the shored roof**, nine studs
+  above anyone who could read them, by a ground ray that starts fourteen studs up —
+  above the region's own ceiling; and **a dusk that washed the whole region to a
+  pale blank**, because unlike Bramblewake this world had no backdrop and the
+  atmosphere had nothing to end a sightline on. The rim walls fixed the wash and
+  the walk-off-the-world edge in one stroke. Everything changed was re-walked on a
+  fresh boot before the merge.
+
+  `LastLightStudioChapter` joins the Studio attributes (chapter progress through
+  the real SaveSchema mutators, same three guards as the stock hook), because the
+  region behind a chapter gate is now the thing a session verifies, and chapter I
+  is a shipped, live-walked path. The specs that pinned "exactly one region
+  enabled" pin the new truth by name: a region joins the open set only in the pull
+  request of its own live walk. Ironroot's fragment-anchor POIs are pinned the way
+  Bramblewake's are (and Mireglass's with them), so a story beat stops being a
+  lottery ticket. **Open:** the Fen, the Reach, the Vale, the Crown and the Hollow
+  stay shut behind the same gate; Mireglass is next, and its encounter wiring
+  ships here already, disabled.
 - **#360** **M13 wave D, batch five: the last catalogs, and the allowlist reaches its
   floor. Milestone 13's buildable half is complete, and so is the buildable
   roadmap.** 1,435 strings out of the thirteen files a player actually browses — 130
