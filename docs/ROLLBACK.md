@@ -59,7 +59,7 @@ switch is a flag nobody has decided about.
 | Region encounters | `region_encounters_enabled` | the six region encounters never start | live |
 | Bramblewake region | `region_bramblewake_enabled` | no region is walkable; the town remains | live |
 | Ironroot region | `region_ironroot_enabled` | the destination board refuses the Delve; a run already out finishes and extracts | live |
-| Mireglass region | `region_mireglass_enabled` | unreleased | live |
+| Mireglass region | `region_mireglass_enabled` | the destination board refuses the Fen; a run already out finishes and extracts | live |
 | Tempest region | `region_tempest_enabled` | unreleased | live |
 | Frostmere region | `region_frostmere_enabled` | unreleased | live |
 | Cinderfall region | `region_cinderfall_enabled` | unreleased | live |
