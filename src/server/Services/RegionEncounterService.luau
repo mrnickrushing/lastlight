@@ -262,6 +262,15 @@ function RegionEncounterService.damageNearest(
     end
     local now = workspace:GetServerTimeNow()
     local strike = live.definition.module.strike
+    --[[
+        Not every encounter answers a blow. The Lantern Witch's fight is
+        naming and mercy, and her module exports no strike at all -- a
+        swing inside her ring earns her instruction, never a nil call.
+    ]]
+    if type(strike) ~= "function" then
+        local snapshot = live.definition.module.snapshot(live.state, player.UserId, now)
+        return false, tostring(snapshot.instruction)
+    end
     local nextState, result = strike(live.state, player.UserId, amount, now)
     live.state = nextState
     if type(result) ~= "table" or result.accepted ~= true then

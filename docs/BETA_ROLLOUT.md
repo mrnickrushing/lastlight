@@ -83,7 +83,7 @@ same commit.
 | `region_encounters_enabled` | `everyone` | 100 | on so it can be turned off in a hurry, not staged in |
 | `region_bramblewake_enabled` | `everyone` | 100 | the one region a live session has walked end to end |
 | `region_ironroot_enabled` | `everyone` | 100 | walked end to end in a live session before it opened |
-| `region_mireglass_enabled` | `off` | 0 | owner-gated: as above |
+| `region_mireglass_enabled` | `everyone` | 100 | walked end to end in a live session before it opened |
 | `region_tempest_enabled` | `off` | 0 | owner-gated: as above |
 | `region_frostmere_enabled` | `off` | 0 | owner-gated: as above |
 | `region_cinderfall_enabled` | `off` | 0 | owner-gated: as above |

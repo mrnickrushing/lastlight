@@ -430,11 +430,13 @@ return {
                         string.format("%s is still chapter-locked after the walk", region.id)
                     )
                 end
-                -- Bramblewake and the Delve are open; each further region
-                -- joins this count in the pull request of its own live walk.
-                TestRunner.equal(enabled, 2)
+                -- Bramblewake, the Delve and the Fen are open; each further
+                -- region joins this count in the pull request of its own
+                -- live walk.
+                TestRunner.equal(enabled, 3)
                 TestRunner.equal(RegionAccess.available(finished.story)[1], "region_bramblewake")
                 TestRunner.equal(RegionAccess.available(finished.story)[2], "region_ironroot")
+                TestRunner.equal(RegionAccess.available(finished.story)[3], "region_mireglass")
             end,
         },
         {

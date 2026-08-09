@@ -121,7 +121,7 @@ return {
                     each earns the same walk.
                 ]]
                 TestRunner.equal(byId.region_ironroot.enabled, true)
-                TestRunner.equal(byId.region_mireglass.enabled, false)
+                TestRunner.equal(byId.region_mireglass.enabled, true)
                 TestRunner.equal(byId.region_tempest.enabled, false)
                 TestRunner.equal(byId.region_frostmere.enabled, false)
                 TestRunner.equal(byId.region_cinderfall.enabled, false)

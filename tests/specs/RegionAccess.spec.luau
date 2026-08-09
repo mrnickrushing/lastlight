@@ -24,7 +24,7 @@ return {
                 one region" until the Delve was walked end to end in a
                 live session; it pins the new truth now.
             ]]
-            name = "the Delve is open behind its chapter and the rest stay shut",
+            name = "the Delve and the Fen open behind their chapters and the rest stay shut",
             run = function()
                 TestRunner.equal(RegionAccess.evaluate("region_bramblewake", nil).allowed, true)
                 local delveEarly = RegionAccess.evaluate("region_ironroot", nil)
@@ -32,16 +32,28 @@ return {
                 TestRunner.equal(delveEarly.reason, "chapter_not_reached")
                 local delve = RegionAccess.evaluate("region_ironroot", RESOLVED_ONE)
                 TestRunner.equal(delve.allowed, true)
-                local fen = RegionAccess.evaluate("region_mireglass", RESOLVED_ONE)
-                TestRunner.equal(fen.allowed, false)
-                TestRunner.equal(fen.reason, "region_not_built")
+                local fenEarly = RegionAccess.evaluate("region_mireglass", RESOLVED_ONE)
+                TestRunner.equal(fenEarly.allowed, false)
+                TestRunner.equal(fenEarly.reason, "chapter_not_reached")
+                local throughTwo = {
+                    chapterOne = RESOLVED_ONE.chapterOne,
+                    chapters = {
+                        chapter_two = { status = "complete", outcome = "cleared" },
+                    },
+                }
+                local fen = RegionAccess.evaluate("region_mireglass", throughTwo)
+                TestRunner.equal(fen.allowed, true)
+                local reach = RegionAccess.evaluate("region_tempest", throughTwo)
+                TestRunner.equal(reach.allowed, false)
+                TestRunner.equal(reach.reason, "region_not_built")
                 local nowhere = RegionAccess.evaluate("region_nowhere", nil)
                 TestRunner.equal(nowhere.reason, "region_unknown")
 
-                local open = RegionAccess.available(RESOLVED_ONE)
-                TestRunner.equal(#open, 2)
+                local open = RegionAccess.available(throughTwo)
+                TestRunner.equal(#open, 3)
                 TestRunner.equal(open[1], "region_bramblewake")
                 TestRunner.equal(open[2], "region_ironroot")
+                TestRunner.equal(open[3], "region_mireglass")
 
                 TestRunner.equal(
                     RegionAccess.destinationFor("region_ironroot", RESOLVED_ONE),
@@ -143,6 +155,7 @@ return {
                 local expectedEnabled: { [string]: boolean } = {
                     region_bramblewake = true,
                     region_ironroot = true,
+                    region_mireglass = true,
                 }
                 for _, region in Regions do
                     TestRunner.equal(

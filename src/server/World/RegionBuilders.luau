@@ -81,9 +81,12 @@ local ENTRIES: { [string]: any } = {
     },
     region_mireglass = {
         builder = MireglassBuilder,
-        walkable = false,
-        -- Mesh dressing is an art pass: authored assets, not wiring.
-        -- Everything a party needs to walk the region is built.
+        --[[
+            Walked end to end in a live session the day this flipped,
+            through the same assembly seam as the Delve. The missing
+            list is a note for the art pass, not a gate.
+        ]]
+        walkable = true,
         missing = {
             "authored mesh dressing",
         },
