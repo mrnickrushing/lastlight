@@ -10,12 +10,14 @@ it cannot be written in a player's language either. Patch notes in a
 player's language are still the owner's, and QA_RELEASE_PLAN.md's
 checklist says so.
 
-362 merged pull requests. The version column is blank where the
+364 merged pull requests. The version column is blank where the
 handoff did not record one, which is most of the history before it began
 publishing a place per wave.
 
 | PR | Merged | Place | Title |
 |---|---|---|---|
+| #365 | 2026-08-08 | v163 | Open the Mireglass Fen, walked live through the seam the Delve built |
+| #364 | 2026-08-08 |  | Record the Delve's opening in the handoff, wave plan and runbook |
 | #363 | 2026-08-08 | v162 | Open the Ironroot Delve: the region assembly seam, walked live end to end |
 | #362 | 2026-08-08 |  | Point the handoff header at the commit a reader is standing on |
 | #361 | 2026-08-08 |  | Record that the buildable roadmap is finished |

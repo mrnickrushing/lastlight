@@ -7,10 +7,10 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = PR #363, build `0.53.0`,
-save schema 25, 27 services. Published to Roblox as place version 162.
-(#361 added only documentation over v161 and #362 only the header rule
-below.) (#358 produced v159 and #359
+Last updated: 2026-08-09, at `main` = PR #365, build `0.53.0`,
+save schema 25, 27 services. Published to Roblox as place version 163.
+(#364 added only documentation over v162, and #361/#362 only
+documentation over v161.) (#358 produced v159 and #359
 v160; those three are Milestone 13 wave D's closing batches, and each was
 published before the next was started.) (This line used to say ``at `main` = `HEAD` ``,
 and #354 is the wave that noticed `HEAD` is not a revision. The revision a
@@ -95,6 +95,46 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#365** (v163) **The Mireglass Fen opens, walked live through the seam the Delve
+  built - and the seam held.** No new machinery: the Fen's flags flip, its walkable
+  bit flips, and the by-name open-set pins take a third member. Every fix the
+  Delve's walk paid for generalized unchanged - fragments seated on the ground,
+  labels short enough to stay apart, route corridors cut open, the rim ending every
+  sightline - which is the argument the seam was built on, now with a second region
+  as evidence.
+
+  **The one code change the Fen forced was found by reading, before the walk could
+  trip it.** The Lantern Witch's module exports no `strike` at all - her fight is
+  naming and mercy - and the strike router called `module.strike` unconditionally,
+  so a swing inside her ring was a nil call on a live server. A strike at a fight
+  that takes none earns the fight's own instruction now.
+
+  **Walked live end to end before the merge**: the board turned the road to the Fen,
+  arrival on a boardwalk over water glassy enough to mirror the sky, a mirror-reed
+  gather, the Sinking House shored beam by beam for bog iron, the ferryman's tally
+  read at the Ferry Ledger, the Many-Face stripped mirror by mirror inside its
+  counter windows, the Drowned Caller's four doors silted shut, the Witch unlocking,
+  named through three rounds of false lanterns, spent to her question and granted
+  the seal - `region_chapter_resolved chapter=chapter_three decision=spent_copies
+  outcome=bound` - and a Wayhome extraction banking fifteen materials.
+
+  **`RegionEncounterWiring.spec` is the durable half, and writing it caught its own
+  gap by the count.** Handlers and anchors cover each other in both directions in
+  both regions, the Delve's fights drive to exposure through their own levers and
+  lines, and the Witch reaches her question with both answers resolving chapter
+  three against the catalog. The suite stayed at 919 after the spec was written -
+  `tests/run.luau` is an explicit list, and a spec nobody requires is a spec nobody
+  runs. It is in the list, and the count says 922.
+
+  **Open, recorded as design questions rather than defects:** the Witch's `sealed`
+  outcome - the `spared_copies` decision - is unreachable by her own state machine,
+  because sparing returns her to hiding without advancing the phase, so chapter III
+  can end `bound` or `broken` but never `sealed`; whether mercy should advance a
+  phase is the owner's call. The fen banks crossing route corridors stand 2.4
+  studs - under the corridor cutter's height floor, over a walking step, jumpable,
+  and reading as fen rather than fence. And the extra swing after any encounter
+  completes still falls through to the roster's "the tool is calm in daylight,"
+  which is true and reads odd standing over a sealed witch.
 - **#363** (v162) **The region assembly seam, and the Ironroot Delve opens — the first
   region since Bramblewake a player can actually walk.** Every region after the
   forest had all of its content and none of it reachable, and the recorded gap

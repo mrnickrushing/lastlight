@@ -47,8 +47,10 @@ are.
   areas.
 - **Flipping a region's `enabled` flag** once a live session walks it end to
   end. **Ironroot Delve is open** (#363: the region assembly seam, the walk,
-  and the six defects it found, all in one pull request); the Fen, the Reach,
-  the Vale, the Crown and the Hollow still wait on their own walks.
+  and the six defects it found, all in one pull request) and **Mireglass Fen
+  is open** (#365, through the same seam, with the wiring spec that keeps a
+  fight and its arena in agreement); the Reach, the Vale, the Crown and the
+  Hollow still wait on their own walks.
 
 **New with M11 (commerce and social):**
 
@@ -362,9 +364,13 @@ needs a second person in the server, as does every two-player case M11 waves C
 and D left open.
 
 **Decisions.** Which of the still-shut regions' `enabled` flags to flip, once
-a live session has walked each end to end — Ironroot's flipped in #363 with its
-walk, and the region assembly seam that walk forced into existence is what the
-remaining five open through. What to remove for
+a live session has walked each end to end — Ironroot's flipped in #363 and
+Mireglass's in #365, each with its walk, and the region assembly seam the first
+walk forced into existence is what the remaining four open through. One content
+decision the Fen's walk surfaced: the Lantern Witch's `sealed` ending is
+unreachable by her own state machine (sparing never advances a phase), so
+chapter III ends `bound` or `broken` and `spared_copies` is a decision no crew
+can make. What to remove for
 recurring confusion. **Which languages ship**, which is now a capacity decision
 with a number on it rather than an archaeology project: `Strings.luau` holds
 **2,621 source strings** and that is what one language costs. Translating them is
