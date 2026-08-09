@@ -10,12 +10,14 @@ it cannot be written in a player's language either. Patch notes in a
 player's language are still the owner's, and QA_RELEASE_PLAN.md's
 checklist says so.
 
-360 merged pull requests. The version column is blank where the
+362 merged pull requests. The version column is blank where the
 handoff did not record one, which is most of the history before it began
 publishing a place per wave.
 
 | PR | Merged | Place | Title |
 |---|---|---|---|
+| #363 | 2026-08-08 | v162 | Open the Ironroot Delve: the region assembly seam, walked live end to end |
+| #362 | 2026-08-08 |  | Point the handoff header at the commit a reader is standing on |
 | #361 | 2026-08-08 |  | Record that the buildable roadmap is finished |
 | #360 | 2026-08-08 |  | M13 wave D batch five: the last catalogs, and the allowlist reaches its floor |
 | #359 | 2026-08-08 | v160 | M13 wave D batch four: the content the world is made of |
