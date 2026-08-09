@@ -28,11 +28,11 @@ Studio-facing checks not performed are recorded open rather than assumed.
 **Milestone 13's buildable half is four waves done and one in flight and
 guarded.** A (cohort-scoped flags), B (tuning telemetry), C (tuning knobs) and E
 (kill switches and the rollback list) are complete. **D, localization source
-coverage, has its table, its guard and its first batch**, and the reason it sat
+coverage, has its table, its guard and three batches**, and the reason it sat
 unbuilt through two sessions was addressed rather than ignored: the guard landed
 *first*, with the 91 unmigrated files named individually and the count pinned so
-it can only shrink. The wave is finished when that list is empty; after batch two it holds 88 files
-and 2,623 strings, all of them in server announcements and content catalogs.
+it can only shrink. The wave is finished when that list is empty; after batch three it holds 68 files
+and 2,209 strings, all of them content catalogs.
 **Milestone 14's buildable half is complete — waves A through E all shipped.**
 
 **Milestones 0 through 11 are complete, and so is Milestone 12's buildable
@@ -82,6 +82,83 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#358** **M13 wave D, batch three: the server surface, and the batch found the
+  check reporting good news about files it could not read.** 483 strings out of the
+  twenty server files — every announcement, refusal and confirmation the server pushes
+  at a player, and the tutorial's own voice. The allowlist goes 88 files to **68**, and
+  everything left in it is a content catalog.
+
+  **Two things the migration could not have found by counting, and both were found by
+  reading what it was about to move.**
+
+  *A sentence assembled with `..` cannot be translated.* Thirty-one sites read
+  `"THE " .. plot.displayName .. " SNARE IS ALREADY SET"`, and the half of that
+  sentence beginning with a space is invisible to a check anchored on a capital
+  letter — so a mechanical migration would have put `"THE "` in the table, left
+  ` " SNARE IS ALREADY SET"` in the code, and reported the file clean. Worse than
+  before: word order is exactly what a translator moves, and a fragment cannot be
+  moved. They are `string.format` with one complete sentence each now.
+
+  *A string that begins with a format specifier was invisible to the check.* Every
+  test in `player_visible` starts by asking what the first character is, and `%d`
+  is not a letter — so **48 live strings sat inside files this wave had already
+  called covered**, including `"STAMINA · %d"` and `"LIGHT · %d%%"` on the HUD and
+  `"TIER %d · %s"` in the town. The table meanwhile held `"STAMINA · 100"`, which
+  is the *initial* value of the same label: **the migration moved the sample and
+  left the sentence.** That is the half-migrated table looking finished from every
+  direction except the one that matters, happening inside the wave that exists to
+  prevent it. Specifiers are normalized to a letter before the string is judged
+  now, and the four sample keys are gone — an initial label and a live one are one
+  key with a number in it.
+
+  **The guard could not read its own exemption, either.** Its diagnostic test read
+  backwards along the line, so `assert(self:arena(), "...")` lost the `assert` at the
+  inner call's closing paren and four real asserts read as player copy. It balances
+  parentheses now.
+
+  **And running it found a third database key on a plank.** A decoration slot in the
+  town square read `1 heartwood + 3 meadow_fiber`, because the prompt sawed the label
+  off the material id instead of asking the one module that holds material names.
+  `ExtractionPayoff` has had `MEADOW FIBER` all along. This is #339's
+  `THE WOOD IS REGION_BRAMBLEWAKE` and #356's `fishing_kit` in a third place, and like
+  both of them it was never a literal, so no localization check would ever have looked
+  at it. The snare's price had the same shape and a sharper tell: upper-casing the id
+  gives `SHIPS IRON` for `SHIP'S IRON`, which is close enough to look deliberate.
+  Both read the labels now, and a spec holds every material a player is ever quoted a
+  price in — decoration, snare, recipe — against them, because `summarize` **drops** a
+  material it cannot name, which is right for a pouch and silent for a price.
+
+  **Verified live at 392 x 608, against a baseline rather than against a number** —
+  and that turned out to be the only honest way to do it. `world_started
+  interactions=122`, `server_boot_complete services=27`, 132 proximity prompts and 209
+  labels with **none empty and none showing a key**, no empty label anywhere on screen,
+  the tutorial's first interactions still reading `[FREE] Mara`, `[BUILD] Barricade`,
+  `[LIGHT] First Lantern`, `[CHOOSE] HAND AXE`, and two migrated refusals driven
+  through the real remote and read back off the HUD.
+
+  **The world came up at 13,931 descendants, and #354 recorded 15,208.** The
+  difference is not the wave: `main` at `cf3576a` was built in a worktree and walked
+  the same way, and it settles at **13,931 too, subtree for subtree**, on the same
+  expedition seed. **The town's descendant count is a function of the seed the
+  expedition generated with**, and the seed changes when Studio reopens the place —
+  so a live pass that asserts a constant fails for a reason that has nothing to do
+  with the build, which is the shape of a check people learn to ignore. What the
+  count is good for is a *comparison*: same seed, same subtrees, before and after.
+  The one subtree that did change is the one this batch is about, and it changed in
+  words: `EAST PLAZA BANNER · 1 heartwood + 3 meadow_fiber` on the baseline,
+  `· 1 HEARTWOOD + 3 MEADOW FIBER` on this branch.
+
+  **And the portrait pass found a panel sitting at a width of minus twenty-two.**
+  `_layout` sizes the departure panel to `min(420, canvasWidth - 24)` with no lower
+  bound, and a viewport is briefly degenerate while a window is being resized — so
+  `canvasWidth` came back as 2, the panel was written a **negative** width, and it
+  stayed there with three party-size buttons rendering off the right edge, because
+  nothing lays out again until the viewport changes once more. A phone rotating is
+  the same event. The field book's grid has had `math.max(120, …)` since it was
+  written; the departure panel, the call panel and the objective card were sized
+  without one and have it now. **Open:** the transient itself is not reproducible on
+  demand, so this is a fix for a mechanism that was observed rather than a case that
+  is covered.
 - **#357** (v158, unchanged — documentation only) **Where the buildable roadmap
   actually stands, and the owner-gated list gathered against an executable one.**
   Milestones 0 through 12 are complete on their buildable halves, **M14's buildable

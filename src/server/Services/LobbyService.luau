@@ -18,6 +18,8 @@ local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 local RunService = game:GetService("RunService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local LobbyService = {}
 LobbyService.__index = LobbyService
 LobbyService.Name = "LobbyService"
@@ -184,12 +186,12 @@ function LobbyService.requestDeparture(self: LobbyService, player: Player, size:
     self._analyticsService:lobbyDeparture(player, "request", result.accepted, result.reason, size)
     if result.accepted then
         self:_notify(
-            string.format("DEPARTING IN %d — STAND ON THE PLATFORM", result.secondsRemaining)
+            string.format(Strings.get("toast.departing_in_n_stand_on_the"), result.secondsRemaining)
         )
     elseif result.reason == "platform_empty" then
-        self:_notify("STAND ON THE PLATFORM TO DEPART")
+        self:_notify(Strings.get("hud.stand_on_the_platform_to_depart"))
     elseif result.reason == "already_counting" then
-        self:_notify("A DEPARTURE IS ALREADY UNDER WAY")
+        self:_notify(Strings.get("toast.a_departure_is_already_under_way"))
     end
     return result
 end
@@ -368,7 +370,7 @@ function LobbyService._launch(self: LobbyService, boarding: { Player })
     end
     self._logger:info("lobby_departure_launched", { boarded = #boarding })
     self._analyticsService:lobbyDeparture(nil, "launch", true, nil, #boarding)
-    self:_notify(string.format("THE PARTY OF %d HAS LEFT FOR EMBERHOLLOW", #boarding))
+    self:_notify(string.format(Strings.get("toast.the_party_of_n_has_left"), #boarding))
 end
 
 function LobbyService.Start(self: LobbyService)
@@ -432,7 +434,7 @@ function LobbyService.Start(self: LobbyService)
         end
 
         if result.reason == "platform_emptied" then
-            self:_notify("DEPARTURE CANCELLED — THE PLATFORM IS EMPTY")
+            self:_notify(Strings.get("toast.departure_cancelled_the_platform_is_empty"))
             self._lastPublishedSeconds = -1
             return
         end

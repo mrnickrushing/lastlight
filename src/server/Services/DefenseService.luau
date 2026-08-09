@@ -24,6 +24,7 @@
 
 local RunService = game:GetService("RunService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
 local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
 
 local DefenseService = {}
@@ -49,6 +50,7 @@ export type DefenseService = typeof(setmetatable(
         Name: string,
         _logger: Logger,
         _defenseLanes: any,
+        _extractionPayoff: any,
         _worldService: any,
         _enemyService: any,
         _profileService: any,
@@ -76,12 +78,14 @@ function DefenseService.new(
     worldService: any,
     enemyService: any,
     profileService: any,
-    config: any
+    config: any,
+    extractionPayoff: any
 ): DefenseService
     return setmetatable({
         Name = DefenseService.Name,
         _logger = logger,
         _defenseLanes = defenseLanes,
+        _extractionPayoff = extractionPayoff,
         _worldService = worldService,
         _enemyService = enemyService,
         _profileService = profileService,
@@ -203,13 +207,15 @@ function DefenseService._buildPlots(self: DefenseService)
     self._logger:info("defense_plots_built", { lanes = #self._defenseLanes.list() })
 end
 
-local function costLine(cost: { [string]: number }): string
+-- The snare's price, in the materials' own words. Upper-casing an id and
+-- swapping its underscores for spaces reads correctly for most of the catalog
+-- and lies about the rest -- SHIPS IRON for SHIP'S IRON -- so the label comes
+-- from the one place that holds it.
+local function costLine(extractionPayoff: any, cost: { [string]: number }): string
     local parts = {}
-    for materialId, amount in cost do
-        local label = string.upper((string.gsub(materialId, "^material_", "")))
-        table.insert(parts, string.format("%d %s", amount, (string.gsub(label, "_", " "))))
+    for _, entry in extractionPayoff.summarize(cost) do
+        table.insert(parts, string.format("%d %s", entry.amount, entry.label))
     end
-    table.sort(parts)
     return table.concat(parts, " AND ")
 end
 
@@ -225,13 +231,22 @@ function DefenseService._armAttempt(self: DefenseService, player: Player, laneId
         return
     end
     if plot.charges > 0 then
-        self:_toast(player, "THE " .. plot.displayName .. " SNARE IS ALREADY SET")
+        self:_toast(
+            player,
+            string.format(Strings.get("toast.the_n_snare_is_already_set"), plot.displayName)
+        )
         return
     end
     local trap = self._defenseLanes.Trap
     local result = self._profileService:spendMaterials(player, trap.armCost)
     if result.applied ~= true then
-        self:_toast(player, "SETTING THE SNARE TAKES " .. costLine(trap.armCost))
+        self:_toast(
+            player,
+            string.format(
+                Strings.get("toast.setting_the_snare_takes_n"),
+                costLine(self._extractionPayoff, trap.armCost)
+            )
+        )
         return
     end
     plot.charges = trap.charges
@@ -242,7 +257,7 @@ function DefenseService._armAttempt(self: DefenseService, player: Player, laneId
     })
     self:_toast(
         player,
-        string.format("THE %s SNARE IS SET — %d BITES IN IT", plot.displayName, trap.charges)
+        string.format(Strings.get("toast.the_n_snare_is_set_n"), plot.displayName, trap.charges)
     )
 end
 
@@ -311,7 +326,7 @@ function DefenseService.onNightStarted(self: DefenseService, partySize: number)
         self._watchDefender.Parent = workspace
     end
     self._logger:info("defense_watch_posted", { lane = plot.laneId })
-    self:_toast(nil, "THE WATCH STANDS WITH YOU AT THE MEADOW GATE")
+    self:_toast(nil, Strings.get("toast.the_watch_stands_with_you_at"))
 end
 
 function DefenseService.onNightEnded(self: DefenseService)
@@ -367,7 +382,10 @@ function DefenseService._step(self: DefenseService, now: number)
                 })
                 self:_toast(
                     nil,
-                    string.format("THE SNARE BITES — %s IS HELD", string.upper(held))
+                    string.format(
+                        Strings.get("toast.the_snare_bites_n_is_held"),
+                        string.upper(held)
+                    )
                 )
             end
         end

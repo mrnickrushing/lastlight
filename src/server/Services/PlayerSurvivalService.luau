@@ -4,6 +4,8 @@ local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local PlayerSurvivalService = {}
 PlayerSurvivalService.__index = PlayerSurvivalService
 PlayerSurvivalService.Name = "PlayerSurvivalService"
@@ -173,7 +175,7 @@ function PlayerSurvivalService._reviveTuning(self: PlayerSurvivalService, player
             duration = self._config.ReviveChannelSeconds,
             health = self._config.ReviveHealth,
             professionId = nil,
-            rescueTitle = "FIELD RESCUE",
+            rescueTitle = Strings.get("toast.field_rescue"),
             specialized = false,
             wardSeconds = self._config.ReviveInvulnerabilitySeconds,
         }
@@ -293,7 +295,7 @@ function PlayerSurvivalService._createVisual(self: PlayerSurvivalService, player
     local interactionId = string.format("revive:%d:%d", player.UserId, state.revision)
     local prompt = Instance.new("ProximityPrompt")
     prompt.Name = "LastLightRevivePrompt"
-    prompt.ActionText = "REVIVE"
+    prompt.ActionText = Strings.get("toast.revive")
     prompt.ObjectText = playerLabel(player)
     prompt.KeyboardKeyCode = Enum.KeyCode.E
     prompt.GamepadKeyCode = Enum.KeyCode.ButtonX
@@ -424,7 +426,10 @@ function PlayerSurvivalService._bindPlayer(self: PlayerSurvivalService, player: 
                             then "character_reset_safe_retreat"
                             else "character_respawn_safe_retreat"
                     )
-                    self:_notify(player, retreatMessage or "SAFE RETREAT — CHARACTER RESET")
+                    self:_notify(
+                        player,
+                        retreatMessage or Strings.get("toast.safe_retreat_character_reset")
+                    )
                 end
                 self:_notify(nil, nil)
             end
@@ -515,7 +520,7 @@ function PlayerSurvivalService.damage(
     if result.downed then
         self:_createVisual(player)
         self._analyticsService:playerDowned(player, string.sub(source, 1, 48))
-        self:_notify(player, "DOWNED — CRAWL TOWARD LIGHT")
+        self:_notify(player, Strings.get("toast.downed_crawl_toward_light"))
         self:_attemptPartyRecovery()
     else
         self:_notify(nil, nil)
@@ -571,7 +576,7 @@ function PlayerSurvivalService._attemptPartyRecovery(self: PlayerSurvivalService
     self:_notify(
         nil,
         string.format(
-            "THE NIGHT WATCH ANSWERS — %d TRAVELER%s RALLIED · LANTERN -%d",
+            Strings.get("toast.the_night_watch_answers_n_travelern"),
             #recovered,
             if #recovered == 1 then "" else "S",
             result.lanternSpent or result.lanternCost or 0
@@ -586,11 +591,11 @@ function PlayerSurvivalService.canHealInRadius(
     radius: number
 ): (boolean, string)
     if not self:canAct(source) then
-        return false, "YOU CANNOT HEAL WHILE DOWNED"
+        return false, Strings.get("toast.you_cannot_heal_while_downed")
     end
     local sourceRoot = rootPart(source)
     if sourceRoot == nil then
-        return false, "YOUR CHARACTER IS STILL LOADING"
+        return false, Strings.get("toast.your_character_is_still_loading")
     end
     for player, state in self._states do
         local targetRoot = rootPart(player)
@@ -600,10 +605,10 @@ function PlayerSurvivalService.canHealInRadius(
             and targetRoot ~= nil
             and (sourceRoot.Position - targetRoot.Position).Magnitude <= radius
         then
-            return true, "GUIDING PULSE READY"
+            return true, Strings.get("toast.guiding_pulse_ready")
         end
     end
-    return false, "NO INJURED TRAVELER IS WITHIN THE PULSE"
+    return false, Strings.get("toast.no_injured_traveler_is_within_the")
 end
 
 function PlayerSurvivalService.healInRadius(
@@ -691,21 +696,21 @@ function PlayerSurvivalService.beginRevive(
     if target == nil or prompt == nil or not prompt.Enabled then
         return {
             accepted = false,
-            message = "THAT RESCUE MARK IS NO LONGER ACTIVE",
+            message = Strings.get("toast.that_rescue_mark_is_no_longer"),
             reason = "unknown_revive",
         }
     end
     if target == reviver then
         return {
             accepted = false,
-            message = "AN ALLY MUST COMPLETE THE REVIVE",
+            message = Strings.get("toast.an_ally_must_complete_the_revive"),
             reason = "self_revive",
         }
     end
     if not self:canAct(reviver) then
         return {
             accepted = false,
-            message = "YOU CANNOT REVIVE WHILE DOWNED",
+            message = Strings.get("toast.you_cannot_revive_while_downed"),
             reason = "reviver_downed",
         }
     end
@@ -713,14 +718,14 @@ function PlayerSurvivalService.beginRevive(
     if targetState == nil or targetState.status ~= "downed" then
         return {
             accepted = false,
-            message = "THAT ALLY IS ALREADY SAFE",
+            message = Strings.get("toast.that_ally_is_already_safe"),
             reason = "target_not_downed",
         }
     end
     if not self:_canReach(reviver, target) then
         return {
             accepted = false,
-            message = "MOVE CLOSER WITH A CLEAR PATH",
+            message = Strings.get("toast.move_closer_with_a_clear_path"),
             reason = "revive_out_of_range",
         }
     end
@@ -730,8 +735,8 @@ function PlayerSurvivalService.beginRevive(
         return {
             accepted = existing.reviver == reviver,
             message = if existing.reviver == reviver
-                then "REVIVE IN PROGRESS — STAY CLOSE"
-                else "ANOTHER ALLY IS REVIVING THEM",
+                then Strings.get("toast.revive_in_progress_stay_close")
+                else Strings.get("toast.another_ally_is_reviving_them"),
             reason = "revive_in_progress",
         }
     end
@@ -752,7 +757,9 @@ function PlayerSurvivalService.beginRevive(
         ),
     }
     self._channels[target] = channel
-    prompt.ActionText = if tuning.specialized then tuning.rescueTitle else "REVIVING"
+    prompt.ActionText = if tuning.specialized
+        then tuning.rescueTitle
+        else Strings.get("toast.reviving")
     target:SetAttribute("LastLightReviveEndsAt", channel.flow.endsAt)
     target:SetAttribute("LastLightReviverUserId", reviver.UserId)
     target:SetAttribute("LastLightReviveProfessionId", tuning.professionId)
@@ -762,7 +769,7 @@ function PlayerSurvivalService.beginRevive(
     return {
         accepted = true,
         message = string.format(
-            "%s — %s — STAY CLOSE",
+            Strings.get("toast.n_n_stay_close"),
             tuning.rescueTitle,
             string.upper(playerLabel(target))
         ),
@@ -787,14 +794,14 @@ function PlayerSurvivalService._cancelChannel(
     target:SetAttribute("LastLightReviveWardSeconds", nil)
     local visual = self._visuals[target]
     if visual ~= nil then
-        visual.prompt.ActionText = "REVIVE"
+        visual.prompt.ActionText = Strings.get("toast.revive")
     end
     self._logger:info("player_revive_cancelled", {
         reason = reason,
         reviver = channel.reviver.UserId,
         target = target.UserId,
     })
-    self:_notify(channel.reviver, "REVIVE INTERRUPTED")
+    self:_notify(channel.reviver, Strings.get("toast.revive_interrupted"))
 end
 
 function PlayerSurvivalService._completeRevive(
@@ -829,7 +836,7 @@ function PlayerSurvivalService._completeRevive(
     self:_notify(
         target,
         string.format(
-            "BACK ON YOUR FEET — %d HEALTH · %.1fs LIGHT WARD",
+            Strings.get("toast.back_on_your_feet_n_health"),
             result.health,
             channel.tuning.wardSeconds
         )
@@ -862,7 +869,10 @@ function PlayerSurvivalService._recover(self: PlayerSurvivalService, player: Pla
         end
     end
     self._analyticsService:playerRecovered(player, "bleedout_safe_retreat")
-    self:_notify(player, retreatMessage or "SAFE RETREAT — UNBANKED POUCH RETAINED")
+    self:_notify(
+        player,
+        retreatMessage or Strings.get("toast.safe_retreat_unbanked_pouch_retained")
+    )
 end
 
 --[[
@@ -990,15 +1000,15 @@ end
 local function directionLabel(viewerRoot: BasePart, targetRoot: BasePart): string
     local offset = targetRoot.Position - viewerRoot.Position
     if offset.Magnitude < 0.01 then
-        return "HERE"
+        return Strings.get("toast.here")
     end
     local direction = offset.Unit
     local forward = viewerRoot.CFrame.LookVector:Dot(direction)
     local right = viewerRoot.CFrame.RightVector:Dot(direction)
     if math.abs(forward) >= math.abs(right) then
-        return if forward >= 0 then "AHEAD" else "BEHIND"
+        return if forward >= 0 then Strings.get("toast.ahead") else Strings.get("toast.behind")
     end
-    return if right >= 0 then "RIGHT" else "LEFT"
+    return if right >= 0 then Strings.get("toast.right") else Strings.get("hud.left")
 end
 
 function PlayerSurvivalService.snapshot(self: PlayerSurvivalService, viewer: Player): any
@@ -1040,7 +1050,7 @@ function PlayerSurvivalService.snapshot(self: PlayerSurvivalService, viewer: Pla
         ally = {
             bleedoutAt = allyState.bleedoutAt,
             direction = if viewerRoot == nil or allyRoot == nil
-                then "UNKNOWN"
+                then Strings.get("hud.unknown")
                 else directionLabel(viewerRoot, allyRoot),
             distance = if priorityDistance == math.huge
                 then nil
@@ -1074,7 +1084,7 @@ function PlayerSurvivalService.snapshot(self: PlayerSurvivalService, viewer: Pla
         local nearestRoot = rootPart(nearestActive)
         nearestAlly = {
             direction = if nearestRoot == nil
-                then "UNKNOWN"
+                then Strings.get("hud.unknown")
                 else directionLabel(viewerRoot :: BasePart, nearestRoot),
             distance = math.floor(nearestActiveDistance + 0.5),
             displayName = playerLabel(nearestActive),

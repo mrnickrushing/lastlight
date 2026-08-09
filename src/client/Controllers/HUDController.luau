@@ -703,7 +703,7 @@ function HUDController.new(
     local resource = textLabel(
         canvas,
         "ResourcePill",
-        Strings.get("hud.heartwood_0"),
+        string.format(Strings.get("hud.heartwood_nn"), 0, ""),
         UDim2.fromOffset(176, 40),
         UDim2.fromOffset(18, 164),
         14,
@@ -718,7 +718,7 @@ function HUDController.new(
     local health = textLabel(
         canvas,
         "HealthPill",
-        Strings.get("hud.health_100_100"),
+        string.format(Strings.get("hud.health_n_n"), 100, 100),
         UDim2.fromOffset(150, 40),
         UDim2.new(0, 18, 1, -100),
         13,
@@ -756,7 +756,7 @@ function HUDController.new(
     local staminaText = textLabel(
         staminaFrame,
         "Text",
-        Strings.get("hud.stamina_100"),
+        string.format(Strings.get("hud.stamina_n"), 100),
         UDim2.fromScale(1, 1),
         UDim2.fromScale(0, 0),
         13,
@@ -818,7 +818,7 @@ function HUDController.new(
     local lanternText = textLabel(
         lanternFrame,
         "Text",
-        Strings.get("hud.light_100"),
+        string.format(Strings.get("hud.light_n"), 100),
         UDim2.fromScale(1, 1),
         UDim2.fromScale(0, 0),
         13,
@@ -1554,8 +1554,8 @@ function HUDController.new(
             button.BackgroundColor3 = COLORS.panelSoft
             button.Font = Enum.Font.GothamBold
             button.Text = if kind == "save"
-                then string.format("SAVE %d", slot)
-                else string.format("KIT %d", slot)
+                then string.format(Strings.get("hud.save_n"), slot)
+                else string.format(Strings.get("hud.kit_n"), slot)
             button.TextColor3 = if kind == "apply" then COLORS.amber else COLORS.muted
             button.TextSize = 11
             button.ZIndex = 52
@@ -3123,7 +3123,7 @@ function HUDController._updateParty(self: HUDController, state: any)
     self._partyLine.Text = if hasRejoin
         then string.format(Strings.get("hud.your_party_of_n_is_still"), rejoinSize)
         elseif invitedBy ~= nil then string.format(
-            "%s ASKS YOU TO TRAVEL WITH THEM",
+            Strings.get("hud.n_asks_you_to_travel_with"),
             invitedBy
         )
         elseif party.inParty == true and party.leader == true then string.format(
@@ -3385,7 +3385,7 @@ function HUDController._updateCombatClock(self: HUDController)
             Strings.get("hud.low_stamina_n"),
             stamina
         )
-        else string.format("STAMINA · %d", stamina)
+        else string.format(Strings.get("hud.stamina_n"), stamina)
     self._staminaText.TextColor3 = if rooted
             or drowsy
             or stamina < maxStamina * 0.45
@@ -3742,7 +3742,7 @@ function HUDController._updateProgress(self: HUDController)
                 "• %s  ·  RANK %d  ·  %s",
                 string.upper(string.gsub(professionId, "profession_", "")),
                 mastery.level,
-                muted(string.format("%d XP", mastery.xp))
+                muted(string.format(Strings.get("hud.n_xp"), mastery.xp))
             )
         )
     end
@@ -3971,14 +3971,25 @@ function HUDController._layout(self: HUDController)
     local narrow = viewport.X < 700 or viewport.Y < 560 or UserInputService.TouchEnabled
     self._scale.Scale = scale
     self._canvas.Size = UDim2.fromScale(1 / scale, 1 / scale)
-    -- The departure panel is centred, so its own width is the only thing that
-    -- can push it off a narrow screen.
-    self._lobbyFrame.Size = UDim2.fromOffset(math.min(420, canvasWidth - 24), 246)
+    --[[
+        The departure panel is centred, so its own width is the only thing that
+        can push it off a narrow screen.
+
+        The lower bound is not decoration. A viewport is briefly degenerate
+        while a window is being resized, and `canvasWidth - 24` is then
+        *negative* -- the panel was found sitting at a width of -22 with three
+        party-size buttons rendering off the right edge, and it stays there,
+        because nothing lays out again until the viewport changes once more.
+        The field book's grid has had this floor since it was written
+        (`math.max(120, ...)`); the three panels that were sized without one
+        have it now.
+    ]]
+    self._lobbyFrame.Size = UDim2.fromOffset(math.max(260, math.min(420, canvasWidth - 24)), 246)
 
     if narrow then
         -- 470 is a tablet's card, not a phone's: capped to the canvas so the
         -- objective text cannot run past the right edge on a small screen.
-        local cardWidth = math.min(470, canvasWidth - 36)
+        local cardWidth = math.max(260, math.min(470, canvasWidth - 36))
         self._objectiveFrame.Position = UDim2.fromOffset(18, 70)
         self._objectiveFrame.Size =
             UDim2.fromOffset(cardWidth, if self._compactEnabled then 78 else 112)
@@ -4162,7 +4173,7 @@ function HUDController._layout(self: HUDController)
         panel that overlaps the buttons under it turns a press meant for one
         into a press on the other.
     ]]
-    self._callPanel.Size = UDim2.fromOffset(math.min(420, canvasWidth - 24), 260)
+    self._callPanel.Size = UDim2.fromOffset(math.max(260, math.min(420, canvasWidth - 24)), 260)
     self._callPanel.Position =
         UDim2.new(0.5, 0, 1, -(34 + self._actionClusterRows * ACTION_ROW_PITCH + 84 + 14))
     self:_layoutLoadout()
@@ -4367,7 +4378,7 @@ function HUDController._updateClock(self: HUDController)
         local maxHealth = math.max(1, tonumber(apex.maxHealth) or 1)
         local apexPhase = math.clamp(tonumber(apex.phase) or 1, 1, 3)
         self._eliteTitle.Text = string.format(
-            "%s · PHASE %d/3 · %d/%d",
+            Strings.get("hud.n_phase_n_3_n_n"),
             if bossView then Strings.get("hud.warden_stag") else Strings.get("common.old_growth"),
             apexPhase,
             health,
@@ -4617,7 +4628,7 @@ function HUDController.update(self: HUDController, state: any)
     local lanternHealth = math.clamp(tonumber(state.lanternHealth) or 100, 0, 100)
     self._lanternFill.Size = UDim2.new(lanternHealth / 100, -8, 1, -8)
     self._lanternFill.BackgroundColor3 = if lanternHealth <= 35 then COLORS.danger else COLORS.amber
-    self._lanternText.Text = string.format("LIGHT · %d%%", lanternHealth)
+    self._lanternText.Text = string.format(Strings.get("hud.light_n"), lanternHealth)
     self._lanternText.TextColor3 = if lanternHealth <= 55 then COLORS.cream else COLORS.ink
 
     if state.compactHud ~= nil and state.compactHud ~= self._compactEnabled then

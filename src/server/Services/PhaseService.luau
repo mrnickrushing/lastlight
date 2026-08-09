@@ -1,5 +1,7 @@
 --!strict
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local PhaseService = {}
 PhaseService.__index = PhaseService
 PhaseService.Name = "PhaseService"
@@ -92,7 +94,7 @@ function PhaseService.startFirstNight(self: PhaseService): boolean
     self._phase = "dusk"
     self._phaseEndsAt = workspace:GetServerTimeNow() + self._duskSeconds
     self._worldService:setDusk(true)
-    self:_notify("DUSK FALLS — PREPARE THE LIGHT")
+    self:_notify(Strings.get("toast.dusk_falls_prepare_the_light"))
     self._logger:info("first_night_dusk_started", { duration = self._duskSeconds })
 
     task.spawn(function()
@@ -105,7 +107,7 @@ function PhaseService.startFirstNight(self: PhaseService): boolean
         self._phaseEndsAt = nightStartedAt + self._nightSeconds
         self._worldService:setNight(true)
         self._enemyService:startNight()
-        self:_notify("NIGHT HAS ARRIVED")
+        self:_notify(Strings.get("toast.night_has_arrived"))
         self._logger:info("first_night_started", { duration = self._nightSeconds })
 
         for _, beat in self._nightSchedule.beats(self._nightSeconds) do
@@ -117,7 +119,7 @@ function PhaseService.startFirstNight(self: PhaseService): boolean
             elseif beat.kind == "breach" then
                 self._enemyService:setBreach()
             elseif beat.kind == "warning" then
-                self:_notify("THE FOREST GOES QUIET")
+                self:_notify(Strings.get("toast.the_forest_goes_quiet"))
             end
         end
 
@@ -143,7 +145,7 @@ function PhaseService._finishFirstNight(self: PhaseService)
     self._enemyService:stopNight()
     self._worldService:setNight(false)
     self._worldService:setBeaconVisible(true)
-    self:_notify("DAWN BREAKS — A MEMORY CALLS")
+    self:_notify(Strings.get("toast.dawn_breaks_a_memory_calls"))
     -- The night resolving, which is a server fact. Each player's own crossing
     -- is `first_night_completed` from the tutorial, and the two are named
     -- apart on purpose: a gate that reads a completion rate per player must

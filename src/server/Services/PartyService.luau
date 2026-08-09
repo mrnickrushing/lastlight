@@ -28,6 +28,8 @@
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local PartyService = {}
 PartyService.__index = PartyService
 PartyService.Name = "PartyService"
@@ -245,11 +247,11 @@ function PartyService.invite(self: PartyService, player: Player): any
     end
 
     if not onPlatform then
-        self:_toast(player, "STAND ON THE PLATFORM TO GATHER A PARTY")
+        self:_toast(player, Strings.get("toast.stand_on_the_platform_to_gather"))
         return { accepted = false, reason = "not_on_platform" }
     end
     if #eligible == 0 then
-        self:_toast(player, "NOBODY ELSE IS STANDING HERE TO ASK")
+        self:_toast(player, Strings.get("toast.nobody_else_is_standing_here_to"))
         return { accepted = false, reason = "nobody_to_ask" }
     end
 
@@ -282,10 +284,7 @@ function PartyService.invite(self: PartyService, player: Player): any
             self._inviteByUser[other.UserId] = partyId :: string
             self:_toast(
                 other,
-                string.format(
-                    "%s ASKS YOU TO TRAVEL WITH THEM — JOIN OR DECLINE",
-                    player.DisplayName
-                )
+                string.format(Strings.get("toast.n_asks_you_to_travel_with"), player.DisplayName)
             )
         else
             refusal = result.reason
@@ -311,12 +310,12 @@ function PartyService.invite(self: PartyService, player: Player): any
         self:_toast(
             player,
             if refusal == "party_full"
-                then "THERE IS NO ROOM LEFT IN YOUR PARTY"
-                else "NOBODY HERE CAN BE ASKED RIGHT NOW"
+                then Strings.get("toast.there_is_no_room_left_in")
+                else Strings.get("toast.nobody_here_can_be_asked_right")
         )
         return { accepted = false, reason = refusal or "nobody_to_ask" }
     end
-    self:_toast(player, string.format("ASKED %d TO TRAVEL WITH YOU", asked))
+    self:_toast(player, string.format(Strings.get("toast.asked_n_to_travel_with_you"), asked))
     self._logger:info("party_invited", { partyId = partyId, asked = asked })
     return { accepted = true, asked = asked }
 end
@@ -326,7 +325,7 @@ function PartyService.reply(self: PartyService, player: Player, accept: boolean)
     local state = if partyId == nil then nil else self._parties[partyId]
     if state == nil then
         self._inviteByUser[player.UserId] = nil
-        self:_toast(player, "NOBODY HAS ASKED YOU TO TRAVEL WITH THEM")
+        self:_toast(player, Strings.get("toast.nobody_has_asked_you_to_travel"))
         return { accepted = false, reason = "no_invite" }
     end
 
@@ -334,7 +333,7 @@ function PartyService.reply(self: PartyService, player: Player, accept: boolean)
         local nextState = self._partySession.decline(state, player.UserId, now())
         self._inviteByUser[player.UserId] = nil
         self:_store(partyId :: string, nextState)
-        self:_toast(player, "YOU TRAVEL ALONE")
+        self:_toast(player, Strings.get("toast.you_travel_alone"))
         return { accepted = true, joined = false }
     end
 
@@ -345,8 +344,8 @@ function PartyService.reply(self: PartyService, player: Player, accept: boolean)
         self:_toast(
             player,
             if result.reason == "party_full"
-                then "THAT PARTY FILLED BEFORE YOU ANSWERED"
-                else "THAT INVITATION HAS PASSED"
+                then Strings.get("toast.that_party_filled_before_you_answered")
+                else Strings.get("toast.that_invitation_has_passed")
         )
         return { accepted = false, reason = result.reason }
     end
@@ -358,7 +357,11 @@ function PartyService.reply(self: PartyService, player: Player, accept: boolean)
         if member ~= nil then
             self:_toast(
                 member,
-                string.format("PARTY OF %d — %s IS WITH YOU", result.size, player.DisplayName)
+                string.format(
+                    Strings.get("toast.party_of_n_n_is_with"),
+                    result.size,
+                    player.DisplayName
+                )
             )
         end
     end
@@ -369,7 +372,7 @@ end
 function PartyService.leave(self: PartyService, player: Player): any
     local partyId, state = self:_partyOf(player)
     if state == nil then
-        self:_toast(player, "YOU ARE NOT IN A PARTY")
+        self:_toast(player, Strings.get("toast.you_are_not_in_a_party"))
         return { accepted = false, reason = "not_in_party" }
     end
 
@@ -379,12 +382,12 @@ function PartyService.leave(self: PartyService, player: Player): any
     end
     self._partyByUser[player.UserId] = nil
     self:_store(partyId :: string, nextState)
-    self:_toast(player, "YOU TRAVEL ALONE")
+    self:_toast(player, Strings.get("toast.you_travel_alone"))
 
     if result.handedTo ~= nil then
         local leader = Players:GetPlayerByUserId(result.handedTo)
         if leader ~= nil then
-            self:_toast(leader, "THE PARTY IS YOURS TO LEAD NOW")
+            self:_toast(leader, Strings.get("toast.the_party_is_yours_to_lead"))
         end
     end
     return { accepted = true, dissolved = result.dissolved == true }
@@ -558,9 +561,9 @@ function PartyService.rejoin(self: PartyService, player: Player): any
     if not read.rejoin then
         if read.reason == "expired" then
             self._profileService:setRejoinTicket(player, nil)
-            self:_toast(player, "THAT ROAD HAS GONE COLD — THE PLATFORM IS STILL HERE")
+            self:_toast(player, Strings.get("toast.that_road_has_gone_cold_the"))
         else
-            self:_toast(player, "THERE IS NOWHERE TO GO BACK TO")
+            self:_toast(player, Strings.get("toast.there_is_nowhere_to_go_back"))
         end
         return { accepted = false, reason = read.reason }
     end
@@ -570,7 +573,7 @@ function PartyService.rejoin(self: PartyService, player: Player): any
         -- Studio and unpublished builds cannot resolve a reserved server, the
         -- same limit the departure teleport lives with.
         self._logger:info("party_rejoin_skipped", { reason = "unpublished_place" })
-        self:_toast(player, "THE ROAD BACK NEEDS A PUBLISHED WORLD")
+        self:_toast(player, Strings.get("toast.the_road_back_needs_a_published"))
         return { accepted = false, reason = "unpublished_place" }
     end
 
@@ -585,7 +588,7 @@ function PartyService.rejoin(self: PartyService, player: Player): any
             its own soon enough.
         ]]
         self._logger:warn("party_rejoin_failed", { partyId = read.partyId })
-        self:_toast(player, "THE ROAD DID NOT OPEN — TRY AGAIN")
+        self:_toast(player, Strings.get("toast.the_road_did_not_open_try"))
         return { accepted = false, reason = "teleport_failed" }
     end
 
@@ -618,7 +621,7 @@ function PartyService.snapshot(self: PartyService, player: Player): any
             self._inviteByUser[player.UserId] = nil
         else
             local from = Players:GetPlayerByUserId(invite.fromUserId)
-            inviteFrom = if from ~= nil then from.DisplayName else "SOMEONE"
+            inviteFrom = if from ~= nil then from.DisplayName else Strings.get("hud.someone")
         end
     end
 
@@ -670,7 +673,7 @@ function PartyService.Start(self: PartyService)
         end
         self:_toast(
             player,
-            string.format("YOUR PARTY OF %d IS STILL OUT THERE — REJOIN THEM", public.partySize)
+            string.format(Strings.get("toast.your_party_of_n_is_still"), public.partySize)
         )
     end)
 end

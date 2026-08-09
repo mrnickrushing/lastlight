@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
 local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
 
 -- The lantern starts every night here and can never be pushed past it.
@@ -378,8 +379,11 @@ function EnemyService._showDamageFeedback(
     label.Size = UDim2.fromScale(1, 1)
     label.Font = Enum.Font.GothamBlack
     label.Text = if strikeResult == "flanked"
-        then string.format("FLANK  -%d", damage)
-        elseif strikeResult == "shielded" then string.format("BLOCK  -%d", damage)
+        then string.format(Strings.get("toast.flank_n"), damage)
+        elseif strikeResult == "shielded" then string.format(
+            Strings.get("toast.block_n"),
+            damage
+        )
         else string.format("-%d", damage)
     label.TextColor3 = if strikeResult == "flanked"
         then Color3.fromRGB(255, 213, 105)
@@ -1020,16 +1024,18 @@ function EnemyService._stepAttack(self: EnemyService, enemy: Enemy, now: number)
         enemyId
     )
     if result.downed then
-        self:_notify("ALLY DOWN — " .. enemy.definition.attackName)
+        self:_notify(string.format(Strings.get("toast.ally_down_n"), enemy.definition.attackName))
     elseif guarded and result.applied then
-        self:_notify("LANTERN GUARD ABSORBS " .. enemy.definition.attackName)
+        self:_notify(
+            string.format(Strings.get("toast.lantern_guard_absorbs_n"), enemy.definition.attackName)
+        )
     elseif result.applied and enemy.definition.statusEffect == "spark_theft" then
         if lanternPressure <= 0 and lanternAbsorbed > 0 then
-            self:_notify("ROOTLINE BRACE CAUGHT THE STOLEN SPARK")
+            self:_notify(Strings.get("toast.rootline_brace_caught_the_stolen_spark"))
         elseif lanternAbsorbed > 0 then
-            self:_notify("ROOTLINE BRACE SOFTENED THE HOLLOW CROW'S SPARK THEFT")
+            self:_notify(Strings.get("toast.rootline_brace_softened_the_hollow_crow"))
         else
-            self:_notify("HOLLOW CROW STOLE AN EXPOSED LANTERN SPARK")
+            self:_notify(Strings.get("toast.hollow_crow_stole_an_exposed_lantern"))
         end
     else
         self:_notify(nil)
@@ -1114,7 +1120,7 @@ function EnemyService._lanternImpact(self: EnemyService, enemy: Enemy, now: numb
     )
     self._lanternHealth = math.max(0, self._lanternHealth - pressure)
     if pressure <= 0 and absorbed > 0 then
-        self:_notify("ROOTLINE BRACE HOLDS THE FIRST LANTERN")
+        self:_notify(Strings.get("toast.rootline_brace_holds_the_first_lantern"))
         return
     end
     if self._lanternHealth <= 0 then
@@ -1123,9 +1129,9 @@ function EnemyService._lanternImpact(self: EnemyService, enemy: Enemy, now: numb
         self:_destroyActive()
         self._nextSpawnAt = now + 2
         self._logger:info("lantern_emergency_restore", { enemy = collapsedId })
-        self:_notify("THE LIGHT FLICKERS — MARA RESTORES A SPARK")
+        self:_notify(Strings.get("toast.the_light_flickers_mara_restores_a"))
     elseif absorbed > 0 then
-        self:_notify("ROOTLINE BRACE ABSORBS PART OF THE IMPACT")
+        self:_notify(Strings.get("toast.rootline_brace_absorbs_part_of_the"))
     else
         self:_notify(nil)
     end
@@ -1241,18 +1247,18 @@ function EnemyService._enemyInRange(
     range: number
 ): (Enemy?, string?)
     if not self._nightActive then
-        return nil, "NO NIGHT THREAT IS ACTIVE IN DAYLIGHT"
+        return nil, Strings.get("toast.no_night_threat_is_active_in")
     end
     if not self._survivalService:canAct(player) then
-        return nil, "YOU CANNOT TRACK WHILE DOWNED"
+        return nil, Strings.get("toast.you_cannot_track_while_downed")
     end
     local enemy = self._active
     local root = rootPart(player)
     if enemy == nil or root == nil or enemy.model.PrimaryPart == nil then
-        return nil, "NO THREAT CAN BE MARKED"
+        return nil, Strings.get("toast.no_threat_can_be_marked")
     end
     if (root.Position - enemy.model.PrimaryPart.Position).Magnitude > range then
-        return nil, "MOVE CLOSER TO MARK THE THREAT"
+        return nil, Strings.get("toast.move_closer_to_mark_the_threat")
     end
 
     local params = RaycastParams.new()
@@ -1261,7 +1267,7 @@ function EnemyService._enemyInRange(
     local result =
         workspace:Raycast(root.Position, enemy.model.PrimaryPart.Position - root.Position, params)
     if result ~= nil and not result.Instance:IsDescendantOf(enemy.model) then
-        return nil, "THE THREAT IS HIDDEN BEHIND COVER"
+        return nil, Strings.get("toast.the_threat_is_hidden_behind_cover")
     end
     return enemy, nil
 end
@@ -1281,9 +1287,9 @@ function EnemyService.canMarkNearest(
     end
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
-        return false, reason or "NO THREAT CAN BE MARKED"
+        return false, reason or Strings.get("toast.no_threat_can_be_marked")
     end
-    return true, "FOXFIRE MARK READY"
+    return true, Strings.get("toast.foxfire_mark_ready")
 end
 
 function EnemyService.markNearest(
@@ -1298,13 +1304,14 @@ function EnemyService.markNearest(
     end
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
-        return false, reason or "NO THREAT CAN BE MARKED"
+        return false, reason or Strings.get("toast.no_threat_can_be_marked")
     end
     enemy.markedUntil = workspace:GetServerTimeNow() + duration
     self:_setMarkedVisual(enemy, true)
-    local message = "FOXFIRE MARK — "
-        .. string.upper(enemy.definition.displayName)
-        .. " REVEALED AND SLOWED"
+    local message = string.format(
+        Strings.get("toast.foxfire_mark_n_revealed_and_slowed"),
+        string.upper(enemy.definition.displayName)
+    )
     self:_notify(message)
     return true, message
 end
@@ -1327,9 +1334,9 @@ function EnemyService.canLureThreat(
 ): (boolean, string)
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
-        return false, reason or "NO THREAT CAN BE LURED"
+        return false, reason or Strings.get("toast.no_threat_can_be_lured")
     end
-    return true, "BRIAR HOUND READY"
+    return true, Strings.get("toast.briar_hound_ready")
 end
 
 function EnemyService.lureThreat(
@@ -1340,15 +1347,16 @@ function EnemyService.lureThreat(
 ): (boolean, string)
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
-        return false, reason or "NO THREAT CAN BE LURED"
+        return false, reason or Strings.get("toast.no_threat_can_be_lured")
     end
     local now = workspace:GetServerTimeNow()
     self._lurePlayer = player
     self._lureUntil = now + duration
     enemy.luredUntil = now + duration
-    local message = "BRIAR HOUND — "
-        .. string.upper(enemy.definition.displayName)
-        .. " TURNS TO HUNT YOU"
+    local message = string.format(
+        Strings.get("toast.briar_hound_n_turns_to_hunt"),
+        string.upper(enemy.definition.displayName)
+    )
     self:_notify(message)
     return true, message
 end
@@ -1381,9 +1389,9 @@ function EnemyService.canStillThreat(
 ): (boolean, string)
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
-        return false, reason or "NO THREAT CAN BE BOUND"
+        return false, reason or Strings.get("toast.no_threat_can_be_bound")
     end
-    return true, "STILL RUNE READY"
+    return true, Strings.get("toast.still_rune_ready")
 end
 
 function EnemyService.stillThreat(
@@ -1394,14 +1402,15 @@ function EnemyService.stillThreat(
 ): (boolean, string)
     local enemy, reason = self:_enemyInRange(player, range)
     if enemy == nil then
-        return false, reason or "NO THREAT CAN BE BOUND"
+        return false, reason or Strings.get("toast.no_threat_can_be_bound")
     end
     self:_clearAttack(enemy)
     enemy.stilledUntil = workspace:GetServerTimeNow() + duration
     self:_setStilledVisual(enemy, true)
-    local message = "STILL RUNE — "
-        .. string.upper(enemy.definition.displayName)
-        .. " IS BOUND IN LIGHT"
+    local message = string.format(
+        Strings.get("toast.still_rune_n_is_bound_in"),
+        string.upper(enemy.definition.displayName)
+    )
     self:_notify(message)
     return true, message
 end
@@ -1412,19 +1421,19 @@ function EnemyService.canRepairLantern(
     range: number
 ): (boolean, string)
     if not self._nightActive then
-        return false, "THE FIRST LANTERN DOES NOT NEED A NIGHT REPAIR"
+        return false, Strings.get("toast.the_first_lantern_does_not_need")
     end
     if not self._survivalService:canAct(player) then
-        return false, "YOU CANNOT REPAIR WHILE DOWNED"
+        return false, Strings.get("toast.you_cannot_repair_while_downed")
     end
     if self._lanternHealth >= 100 then
-        return false, "THE FIRST LANTERN IS ALREADY AT FULL STRENGTH"
+        return false, Strings.get("toast.the_first_lantern_is_already_at")
     end
     local root = rootPart(player)
     if root == nil or (root.Position - self._worldService:lanternPosition()).Magnitude > range then
-        return false, "MOVE CLOSER TO THE FIRST LANTERN"
+        return false, Strings.get("toast.move_closer_to_the_first_lantern")
     end
-    return true, "EMERGENCY PATCH READY"
+    return true, Strings.get("toast.emergency_patch_ready")
 end
 
 function EnemyService.repairLantern(
@@ -1461,7 +1470,7 @@ function EnemyService.repairLantern(
         )
     end
     local message = string.format(
-        "EMERGENCY PATCH — FIRST LANTERN +%d · ROOTLINE BRACE %d",
+        Strings.get("toast.emergency_patch_first_lantern_n_rootline"),
         restored,
         braceSnapshot.capacity
     )
@@ -1574,16 +1583,16 @@ function EnemyService.damageNearest(
         return encounterService:damageNearest(player)
     end
     if not self._nightActive then
-        return false, "The tool is calm in daylight."
+        return false, Strings.get("toast.the_tool_is_calm_in_daylight")
     end
     if not self._survivalService:canAct(player) then
-        return false, "You cannot strike while downed."
+        return false, Strings.get("toast.you_cannot_strike_while_downed")
     end
 
     local enemy = self._active
     local root = rootPart(player)
     if enemy == nil or root == nil or enemy.model.PrimaryPart == nil then
-        return false, "No threat is close enough."
+        return false, Strings.get("toast.no_threat_is_close_enough")
     end
     local displayName = enemy.definition.displayName
     local primary = enemy.model.PrimaryPart
@@ -1594,7 +1603,7 @@ function EnemyService.damageNearest(
         reach = math.max(reach, context.weaponRange)
     end
     if distance > reach then
-        return false, "Move closer to the " .. displayName .. "."
+        return false, string.format(Strings.get("toast.move_closer_to_the_n"), displayName)
     end
 
     local raycastParams = RaycastParams.new()
@@ -1661,18 +1670,20 @@ function EnemyService.damageNearest(
 
     local remaining = tostring(math.max(0, math.ceil(enemy.health)))
     if strikeResult == "shielded" then
-        self:_notify("SHIELD BLOCKED MOST OF THE HIT — FLANK THE BRIARBACK")
-        return true, "The front shield absorbs most of the strike. Flank it."
+        self:_notify(Strings.get("toast.shield_blocked_most_of_the_hit"))
+        return true, Strings.get("toast.the_front_shield_absorbs_most_of")
     elseif strikeResult == "flanked" then
-        self:_notify("FLANK HIT — " .. string.upper(displayName) .. " " .. remaining)
-        return true, "Clean flank hit."
+        self:_notify(
+            string.format(Strings.get("toast.flank_hit_n_n"), string.upper(displayName), remaining)
+        )
+        return true, Strings.get("toast.clean_flank_hit")
     end
     if reactionLabel ~= nil then
         self:_notify(reactionLabel .. " — " .. string.upper(displayName) .. " " .. remaining)
         return true, reactionLabel
     end
-    self:_notify("HIT — " .. string.upper(displayName) .. " " .. remaining)
-    return true, "Your tool strikes the " .. displayName .. "."
+    self:_notify(string.format(Strings.get("toast.hit_n_n"), string.upper(displayName), remaining))
+    return true, string.format(Strings.get("toast.your_tool_strikes_the_n"), displayName)
 end
 
 function EnemyService.threatSnapshot(self: EnemyService, viewer: Player): any
@@ -1695,7 +1706,7 @@ end
 
 function EnemyService.setBreach(self: EnemyService)
     self._breachMultiplier = 1.35
-    self:_notify("THE ROOTS SURGE — HOLD THE LIGHT")
+    self:_notify(Strings.get("toast.the_roots_surge_hold_the_light"))
 end
 
 --[[

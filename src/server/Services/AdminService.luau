@@ -24,6 +24,8 @@
 local Players = game:GetService("Players")
 local TextChatService = game:GetService("TextChatService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local AdminService = {}
 AdminService.__index = AdminService
 AdminService.Name = "AdminService"
@@ -104,11 +106,11 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
         self._profileService:setNightNumber(player, decision.value)
         self:_reply(
             player,
-            string.format("NIGHT SET TO %d — REJOIN TO SEE THE TOWN", decision.value)
+            string.format(Strings.get("toast.night_set_to_n_rejoin_to"), decision.value)
         )
     elseif command == "give" then
         self._tutorialService:adminGrantResources(player, decision.value)
-        self:_reply(player, string.format("HEARTWOOD SET TO %d", decision.value))
+        self:_reply(player, string.format(Strings.get("toast.heartwood_set_to_n"), decision.value))
     elseif command == "perf" then
         -- The headline goes to the toast because a tester on a phone cannot
         -- read a table, and every line goes to the log because whoever closes
@@ -121,14 +123,14 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
     elseif command == "heal" then
         self._survivalService:healInRadius(player, 500)
         self._combatService:restoreStamina(player, 100)
-        self:_reply(player, "HEALED")
+        self:_reply(player, Strings.get("toast.healed"))
     elseif command == "phase" then
         local applied = self._worldService:adminSetPhase(decision.text)
         self:_reply(
             player,
             if applied
                 then string.upper(decision.text) .. " APPLIED"
-                else "PHASE UNAVAILABLE RIGHT NOW"
+                else Strings.get("toast.phase_unavailable_right_now")
         )
     elseif command == "go" then
         -- Uses the same enter and exit the game uses, so an admin cannot
@@ -138,19 +140,26 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
         end
         if decision.text == "bramblewake" then
             if player:GetAttribute("LastLightInExpedition") == true then
-                self:_reply(player, "ALREADY IN BRAMBLEWAKE")
+                self:_reply(player, Strings.get("toast.already_in_bramblewake"))
             else
                 local entered = self._expeditionService:enter(player)
-                self:_reply(player, if entered then "ENTERING BRAMBLEWAKE" else "ENTRY UNAVAILABLE")
+                self:_reply(
+                    player,
+                    if entered
+                        then Strings.get("toast.entering_bramblewake")
+                        else Strings.get("toast.entry_unavailable")
+                )
             end
         else
             if player:GetAttribute("LastLightInExpedition") ~= true then
-                self:_reply(player, "ALREADY IN TOWN")
+                self:_reply(player, Strings.get("toast.already_in_town"))
             else
                 local left = self._worldService:exitBramblewake(player)
                 self:_reply(
                     player,
-                    if left then "RETURNING TO EMBERHOLLOW" else "RETURN UNAVAILABLE"
+                    if left
+                        then Strings.get("toast.returning_to_emberhollow")
+                        else Strings.get("toast.return_unavailable")
                 )
             end
         end
@@ -204,7 +213,10 @@ function AdminService._resolveTarget(self: AdminService, admin: Player, argument
         end
     end
     if resolvedId == nil or resolvedId <= 0 then
-        self:_reply(admin, "NO PLAYER NAMED " .. string.upper(argument))
+        self:_reply(
+            admin,
+            string.format(Strings.get("toast.no_player_named_n"), string.upper(argument))
+        )
         return nil
     end
     return math.floor(resolvedId)
@@ -234,7 +246,7 @@ function AdminService._inspect(self: AdminService, admin: Player, argument: stri
             target = userId,
             found = false,
         })
-        self:_reply(admin, string.format("NO SAVE ON RECORD FOR %d", userId))
+        self:_reply(admin, string.format(Strings.get("toast.no_save_on_record_for_n"), userId))
         return
     end
 
@@ -259,7 +271,7 @@ function AdminService._inspect(self: AdminService, admin: Player, argument: stri
     self:_reply(
         admin,
         string.format(
-            "%d — NIGHT %s · %s%s — SEE OUTPUT FOR FULL REPORT",
+            Strings.get("toast.n_night_n_nn_see_output"),
             userId,
             tostring(report.nightNumber),
             string.upper(tostring(report.tutorialStage)),
@@ -292,14 +304,14 @@ function AdminService._backups(self: AdminService, admin: Player, argument: stri
     })
 
     if summary.count == 0 then
-        self:_reply(admin, string.format("NO BACKUPS ON RECORD FOR %d", userId))
+        self:_reply(admin, string.format(Strings.get("toast.no_backups_on_record_for_n"), userId))
         return
     end
 
     self:_reply(
         admin,
         string.format(
-            "%d — %d BACKUP%s · NEWEST REV %s — SEE OUTPUT",
+            Strings.get("toast.n_n_backupn_newest_rev_n"),
             userId,
             summary.count,
             if summary.count == 1 then "" else "S",
@@ -347,7 +359,7 @@ function AdminService._restoreAt(
         self:_reply(
             admin,
             string.format(
-                "%d — RESTORED COPY %d · REV %s (WAS %s)",
+                Strings.get("toast.n_restored_copy_n_rev_n"),
                 userId,
                 copyIndex,
                 tostring(result.restoredRevision),
@@ -355,11 +367,18 @@ function AdminService._restoreAt(
             )
         )
     elseif result.reason == "no_such_copy" then
-        self:_reply(admin, string.format("%d — NO COPY %d ON RECORD", userId, copyIndex))
+        self:_reply(
+            admin,
+            string.format(Strings.get("toast.n_no_copy_n_on_record"), userId, copyIndex)
+        )
     else
         self:_reply(
             admin,
-            string.format("%d — RESTORE UNAVAILABLE (%s)", userId, tostring(result.reason))
+            string.format(
+                Strings.get("toast.n_restore_unavailable_n"),
+                userId,
+                tostring(result.reason)
+            )
         )
     end
 end
@@ -378,7 +397,7 @@ function AdminService._export(self: AdminService, admin: Player, argument: strin
     if not result.ok then
         self:_reply(
             admin,
-            string.format("%d — EXPORT FAILED (%s)", userId, tostring(result.reason))
+            string.format(Strings.get("toast.n_export_failed_n"), userId, tostring(result.reason))
         )
         return
     end
@@ -396,7 +415,7 @@ function AdminService._export(self: AdminService, admin: Player, argument: strin
     end
     self:_reply(
         admin,
-        string.format("%d — EXPORTED %d CHARS IN %d LOG CHUNKS", userId, #json, chunks)
+        string.format(Strings.get("toast.n_exported_n_chars_in_n"), userId, #json, chunks)
     )
 end
 
@@ -422,7 +441,7 @@ function AdminService._restore(self: AdminService, admin: Player, argument: stri
         self:_reply(
             admin,
             string.format(
-                "%d — RESTORED TO REV %s (WAS %s) · RUN AGAIN TO UNDO",
+                Strings.get("toast.n_restored_to_rev_n_was"),
                 userId,
                 tostring(result.restoredRevision),
                 tostring(result.fromRevision)
@@ -432,16 +451,16 @@ function AdminService._restore(self: AdminService, admin: Player, argument: stri
     end
 
     local reply = if result.reason == "no_backup_on_record"
-        then string.format("NO BACKUPS ON RECORD FOR %d", userId)
+        then string.format(Strings.get("toast.no_backups_on_record_for_n"), userId)
         elseif result.reason == "no_save_on_record" then string.format(
-            "NO SAVE ON RECORD FOR %d",
+            Strings.get("toast.no_save_on_record_for_n"),
             userId
         )
         elseif result.reason == "lock_is_active" then string.format(
-            "%d — A SERVER IS STILL HOLDING THIS SAVE",
+            Strings.get("toast.n_a_server_is_still_holding"),
             userId
         )
-        else string.format("%d — RESTORE UNAVAILABLE RIGHT NOW", userId)
+        else string.format(Strings.get("toast.n_restore_unavailable_right_now"), userId)
     self:_reply(admin, reply)
 end
 
@@ -470,21 +489,24 @@ function AdminService._unlock(self: AdminService, admin: Player, argument: strin
     })
 
     if result.applied then
-        self:_reply(admin, string.format("%d — LOCK CLEARED (%s)", userId, result.reason))
+        self:_reply(
+            admin,
+            string.format(Strings.get("toast.n_lock_cleared_n"), userId, result.reason)
+        )
         return
     end
 
     local reply = if result.reason == "no_save_on_record"
-        then string.format("NO SAVE ON RECORD FOR %d", userId)
+        then string.format(Strings.get("toast.no_save_on_record_for_n"), userId)
         elseif result.reason == "already_unlocked" then string.format(
-            "%d — NOT LOCKED",
+            Strings.get("toast.n_not_locked"),
             userId
         )
         elseif result.reason == "lock_is_active" then string.format(
-            "%d — A SERVER IS STILL HOLDING THIS SAVE",
+            Strings.get("toast.n_a_server_is_still_holding"),
             userId
         )
-        else string.format("%d — UNLOCK UNAVAILABLE RIGHT NOW", userId)
+        else string.format(Strings.get("toast.n_unlock_unavailable_right_now"), userId)
     self:_reply(admin, reply)
 end
 
@@ -504,7 +526,7 @@ function AdminService._onChatted(self: AdminService, player: Player, message: st
                 command = decision.command,
                 error = tostring(err),
             })
-            self:_reply(player, "THAT COMMAND FAILED")
+            self:_reply(player, Strings.get("toast.that_command_failed"))
         end
         return
     end
@@ -541,30 +563,30 @@ function AdminService._onChatted(self: AdminService, player: Player, message: st
         self:_reply(
             player,
             string.format(
-                "%s TAKES %d TO %d",
+                Strings.get("toast.n_takes_n_to_n"),
                 string.upper(tostring(decision.command)),
                 decision.low,
                 decision.high
             )
         )
     elseif decision.reason == "unknown_destination" then
-        self:_reply(player, "GO TAKES TOWN OR BRAMBLEWAKE")
+        self:_reply(player, Strings.get("toast.go_takes_town_or_bramblewake"))
     elseif decision.reason == "unknown_phase" then
-        self:_reply(player, "PHASE TAKES DAY, DUSK, OR NIGHT")
+        self:_reply(player, Strings.get("toast.phase_takes_day_dusk_or_night"))
     elseif decision.reason == "invalid_inspection_target" then
-        self:_reply(player, "INSPECT TAKES A USERNAME OR USER ID")
+        self:_reply(player, Strings.get("toast.inspect_takes_a_username_or_user"))
     elseif decision.reason == "invalid_unlock_target" then
-        self:_reply(player, "UNLOCK TAKES A USERNAME OR USER ID")
+        self:_reply(player, Strings.get("toast.unlock_takes_a_username_or_user"))
     elseif decision.reason == "invalid_backup_target" then
         self:_reply(
             player,
             string.format(
-                "%s TAKES A USERNAME OR USER ID",
+                Strings.get("toast.n_takes_a_username_or_user"),
                 string.upper(tostring(decision.command))
             )
         )
     elseif decision.reason == "admin_disabled" then
-        self:_reply(player, "ADMIN COMMANDS ARE OFF")
+        self:_reply(player, Strings.get("toast.admin_commands_are_off"))
     end
 end
 

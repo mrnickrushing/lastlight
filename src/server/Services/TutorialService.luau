@@ -3,6 +3,8 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local TutorialService = {}
 TutorialService.__index = TutorialService
 TutorialService.Name = "TutorialService"
@@ -242,7 +244,7 @@ function TutorialService.Init(self: TutorialService, context: any)
                     self._worldService:setResidentInjured(residentId, true)
                     self:_toastAll(
                         string.format(
-                            "%s WAS HURT IN THE NIGHT — CHECK ON THEM",
+                            Strings.get("tutorial.n_was_hurt_in_the_night"),
                             string.upper(string.gsub(string.gsub(residentId, "npc_", ""), "_", " "))
                         )
                     )
@@ -269,7 +271,7 @@ function TutorialService.Init(self: TutorialService, context: any)
                     elseif boon.boon == "night_forewarning" then
                         self:_toastAll(
                             string.format(
-                                "%s — NIGHT %d: %s",
+                                Strings.get("tutorial.n_night_n_n"),
                                 boon.label,
                                 nightNumber,
                                 self._townNightService:themeForNight(nightNumber)
@@ -409,7 +411,7 @@ function TutorialService._watchStudioSkip(self: TutorialService)
         for player, session in self._sessions do
             if session.stage ~= "complete" then
                 session.stage = "complete"
-                session.toast = "STUDIO: TUTORIAL SKIPPED"
+                session.toast = Strings.get("tutorial.studio_tutorial_skipped")
                 session.toastRevision += 1
                 player:SetAttribute("LastLightTutorialSurvivalReady", true)
                 --[[
@@ -531,9 +533,9 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
         selectedTool = profile.tutorial.selectedTool,
         compactHud = false,
         toast = if not self._profileService:isWritable(player)
-            then "PROFILE OFFLINE — PROGRESS WILL NOT SAVE"
-            elseif stage == "complete" then "WELCOME BACK TO EMBERHOLLOW"
-            else "FOLLOW THE LANTERN TRAIL",
+            then Strings.get("tutorial.profile_offline_progress_will_not_save")
+            elseif stage == "complete" then Strings.get("tutorial.welcome_back_to_emberhollow")
+            else Strings.get("tutorial.follow_the_lantern_trail"),
         toastRevision = 1,
     }
     self:_applyToolAttributes(player, session.selectedTool)
@@ -543,11 +545,11 @@ function TutorialService._profileLoaded(self: TutorialService, player: Player, p
     local hostInfo = self._townNightService:hostInfo(player.UserId)
     if hostInfo ~= nil and hostInfo.role == "visitor" then
         local hostPlayer = Players:GetPlayerByUserId(hostInfo.hostUserId)
-        local hostName = if hostPlayer ~= nil then hostPlayer.DisplayName else "A FOUNDER"
-        session.toast = string.format(
-            "YOU ARE A GUEST IN %s'S EMBERHOLLOW — HELP IT GROW",
-            string.upper(hostName)
-        )
+        local hostName = if hostPlayer ~= nil
+            then hostPlayer.DisplayName
+            else Strings.get("tutorial.a_founder")
+        session.toast =
+            string.format(Strings.get("tutorial.you_are_a_guest_in_n"), string.upper(hostName))
         session.toastRevision += 1
     end
     self._sessions[player] = session
@@ -649,7 +651,10 @@ function TutorialService._gearCare(self: TutorialService, player: Player): (any,
         consider(itemId)
     end
     local whetTarget = if worstId ~= nil
-        then { itemId = worstId, label = "WHET " .. gearShortName(worstId) }
+        then {
+            itemId = worstId,
+            label = string.format(Strings.get("tutorial.whet_n"), gearShortName(worstId)),
+        }
         else nil
     return care, whetTarget
 end
@@ -707,7 +712,10 @@ function TutorialService._questToastSuffix(self: TutorialService, player: Player
     local parts = {}
     for _, quest in claimed do
         self._analyticsService:questClaimed(player, quest.questId)
-        table.insert(parts, string.format("QUEST COMPLETE: %s", quest.displayName))
+        table.insert(
+            parts,
+            string.format(Strings.get("tutorial.quest_complete_n"), quest.displayName)
+        )
     end
     return table.concat(parts, " · ")
 end
@@ -719,7 +727,7 @@ function TutorialService._advance(
 ): (boolean, string?)
     local session = self._sessions[player]
     if session == nil then
-        return false, "Your profile is still loading."
+        return false, Strings.get("tutorial.your_profile_is_still_loading")
     end
 
     local nextStage, reason = self._tutorialFlow.advance(session.stage, actionId)
@@ -792,7 +800,7 @@ function TutorialService._beginTimedAction(
     self._actions[player] = nextState
     if not result.accepted then
         if result.reason == "already_working" then
-            self:_setToast(player, "ALREADY WORKING")
+            self:_setToast(player, Strings.get("tutorial.already_working"))
             self:_publish(player)
         end
         return true
@@ -888,7 +896,10 @@ function TutorialService._addSurveyTarget(
     end
     local node = self._worldService:nearestResourceNode(root.Position)
     if node ~= nil and node.target ~= nil then
-        add(node.target, "SURVEY · " .. string.upper(tostring(node.objectText)))
+        add(
+            node.target,
+            string.format(Strings.get("tutorial.survey_n"), string.upper(tostring(node.objectText)))
+        )
     end
 end
 
@@ -1063,8 +1074,8 @@ function TutorialService.strike(self: TutorialService, player: Player)
                 and wearResult.conditionAfter ~= "sound"
             then
                 message = if wearResult.conditionAfter == "failing"
-                    then "YOUR WEAPON FAILS — WHET IT AT ITS BENCH"
-                    else "YOUR WEAPON DULLS — HALF STRENGTH UNTIL WHETTED"
+                    then Strings.get("tutorial.your_weapon_fails_whet_it_at")
+                    else Strings.get("tutorial.your_weapon_dulls_half_strength_until")
             end
         end
         self:_setToast(player, message)
@@ -1107,14 +1118,14 @@ function TutorialService._interact(
         return
     end
     if not self._survivalService:canAct(player) then
-        self:_setToast(player, "YOU CANNOT INTERACT WHILE DOWNED")
+        self:_setToast(player, Strings.get("tutorial.you_cannot_interact_while_downed"))
         self:_publishAll()
         return
     end
 
     local prompt = self._worldService:interaction(interactionId)
     if prompt == nil or not prompt.Enabled or not self._worldService:isInRange(player, prompt) then
-        self:_setToast(player, "MOVE CLOSER TO THE MARKED OBJECT")
+        self:_setToast(player, Strings.get("tutorial.move_closer_to_the_marked_object"))
         self:_publish(player)
         return
     end
@@ -1152,9 +1163,9 @@ function TutorialService._interact(
                 string.format("%s — %s", result.fragment.title, result.fragment.body)
             )
         elseif result.reason == "chapter_unresolved" then
-            self:_setToast(player, "THIS MEMORY IS NOT YET YOURS TO READ")
+            self:_setToast(player, Strings.get("tutorial.this_memory_is_not_yet_yours"))
         else
-            self:_setToast(player, "THE MEMORY SLIPS AWAY — TRY AGAIN")
+            self:_setToast(player, Strings.get("tutorial.the_memory_slips_away_try_again"))
         end
         self:_publish(player)
         return
@@ -1173,12 +1184,12 @@ function TutorialService._interact(
         ]]
         local node = self._worldService:resourceNode(interactionId)
         if node == nil then
-            self:_setToast(player, "ALREADY HARVESTED")
+            self:_setToast(player, Strings.get("tutorial.already_harvested"))
             self:_publish(player)
             return
         end
         if player:GetAttribute("LastLightInExpedition") ~= true then
-            self:_setToast(player, "ONLY OUT IN BRAMBLEWAKE")
+            self:_setToast(player, Strings.get("tutorial.only_out_in_bramblewake"))
             self:_publish(player)
             return
         end
@@ -1263,7 +1274,7 @@ function TutorialService._interact(
     end
     if actionId == self._runtimeIds.Actions.CraftItem then
         if session.stage ~= "complete" then
-            self:_setToast(player, "FINISH FIRST LIGHT TO CRAFT")
+            self:_setToast(player, Strings.get("tutorial.finish_first_light_to_craft"))
             self:_publish(player)
             return
         end
@@ -1275,15 +1286,15 @@ function TutorialService._interact(
         self._analyticsService:crafted(player, recipeId, result.accepted, result.reason)
         local toast: string
         if result.accepted then
-            toast = string.format("CRAFTED %s", prompt.ObjectText)
+            toast = string.format(Strings.get("tutorial.crafted_n"), prompt.ObjectText)
             local questSuffix = self:_questToastSuffix(player)
             if questSuffix ~= nil then
                 toast = toast .. " · " .. questSuffix
             end
         elseif result.reason == "insufficient_materials" then
-            toast = "NOT ENOUGH MATERIALS"
+            toast = Strings.get("tutorial.not_enough_materials")
         else
-            toast = "CRAFTING UNAVAILABLE"
+            toast = Strings.get("tutorial.crafting_unavailable")
         end
         self:_setToast(player, toast)
         self:_publish(player)
@@ -1298,7 +1309,11 @@ function TutorialService._interact(
         if result.accepted then
             self:_setToast(
                 player,
-                string.format("%s BUILT TO STAGE %d", prompt.ObjectText, result.stage)
+                string.format(
+                    Strings.get("tutorial.n_built_to_stage_n"),
+                    prompt.ObjectText,
+                    result.stage
+                )
             )
             -- Construction is shared town state, the same reasoning
             -- RepairTown's own _publishAll() call already uses: the stage a
@@ -1312,15 +1327,15 @@ function TutorialService._interact(
         end
         local toast: string
         if result.reason == "tier_not_ready" then
-            toast = "SURVIVE MORE NIGHTS BEFORE BUILDING FURTHER"
+            toast = Strings.get("tutorial.survive_more_nights_before_building_further")
         elseif result.reason == "already_maxed" then
-            toast = "ALREADY FULLY BUILT"
+            toast = Strings.get("tutorial.already_fully_built")
         elseif result.reason == "insufficient_materials" then
-            toast = "NOT ENOUGH MATERIALS TO BUILD"
+            toast = Strings.get("tutorial.not_enough_materials_to_build")
         elseif result.reason == "unknown_building" then
-            toast = "THAT BUILDING DOES NOT EXIST"
+            toast = Strings.get("tutorial.that_building_does_not_exist")
         else
-            toast = "CONSTRUCTION UNAVAILABLE"
+            toast = Strings.get("tutorial.construction_unavailable")
         end
         self:_setToast(player, toast)
         self:_publish(player)
@@ -1337,14 +1352,20 @@ function TutorialService._interact(
         ]]
         local hostInfo = self._townNightService:hostInfo(player.UserId)
         if hostInfo == nil or hostInfo.role ~= "host" then
-            self:_setToast(player, "ONLY THIS TOWN'S FOUNDER SETS ITS GATE")
+            self:_setToast(player, Strings.get("tutorial.only_this_town_s_founder_sets"))
             self:_publish(player)
             return
         end
         local nextPolicy = self._townVisitPolicy.next(self._profileService:visitPolicy(player))
         self._profileService:setVisitPolicy(player, nextPolicy)
         self._townNightService:setHostPolicy(player.UserId, nextPolicy)
-        self:_setToast(player, "THE GATE IS " .. self._townVisitPolicy.label(nextPolicy))
+        self:_setToast(
+            player,
+            string.format(
+                Strings.get("tutorial.the_gate_is_n"),
+                self._townVisitPolicy.label(nextPolicy)
+            )
+        )
         -- Everyone, not just the presser: closing a gate changes what the
         -- people already standing in the town may read, and a snapshot they
         -- do not receive is a showcase they keep looking at.
@@ -1405,7 +1426,7 @@ function TutorialService._interact(
         return
     end
     if actionId == self._runtimeIds.Actions.OpenFieldBook then
-        self:_setToast(player, "FIELD BOOK UPDATED — CHECK RECIPES, QUESTS, AND MASTERY")
+        self:_setToast(player, Strings.get("tutorial.field_book_updated_check_recipes_quests"))
         self:_publish(player)
         return
     end
@@ -1424,13 +1445,17 @@ function TutorialService._interact(
         local result = self._profileService:placeDecoration(player, tostring(decorationId))
         if result.applied then
             self._worldService:setTownDecorations(self._profileService:decorationsSnapshot(player))
-            self:_setToast(player, "DECORATION PLACED — THE TOWN WEARS YOUR WORK")
+            self:_setToast(player, Strings.get("tutorial.decoration_placed_the_town_wears_your"))
         else
             local message = if result.reason == "decoration_cap"
-                then "DECORATION LIMIT REACHED — GROW THE TOWN FOR MORE ROOM"
-                elseif result.reason == "insufficient_materials" then "NOT ENOUGH MATERIALS"
-                elseif result.reason == "already_placed" then "ALREADY DECORATED"
-                else "THAT SPOT CANNOT BE DECORATED"
+                then Strings.get("tutorial.decoration_limit_reached_grow_the_town")
+                elseif result.reason == "insufficient_materials" then Strings.get(
+                    "tutorial.not_enough_materials"
+                )
+                elseif result.reason == "already_placed" then Strings.get(
+                    "tutorial.already_decorated"
+                )
+                else Strings.get("tutorial.that_spot_cannot_be_decorated")
             self:_setToast(player, message)
         end
         self:_publish(player)
@@ -1446,7 +1471,7 @@ function TutorialService._interact(
             self:_setToast(
                 player,
                 string.format(
-                    "%s IS BACK ON THEIR FEET — BOND · %d",
+                    Strings.get("tutorial.n_is_back_on_their_feet"),
                     string.upper(
                         string.gsub(string.gsub(tostring(residentId), "npc_", ""), "_", " ")
                     ),
@@ -1463,7 +1488,7 @@ function TutorialService._interact(
             self._profileService:townConsequence(player)
         )
         if response == nil then
-            self:_setToast(player, "THE RESIDENT IS BUSY WITH THE NIGHT WATCH")
+            self:_setToast(player, Strings.get("tutorial.the_resident_is_busy_with_the"))
         else
             self:_setToast(player, response.message)
             self._analyticsService:residentTalked(
@@ -1478,7 +1503,10 @@ function TutorialService._interact(
     end
     if actionId == self._runtimeIds.Actions.RepairTown then
         if player:GetAttribute("LastLightInExpedition") == true then
-            self:_setToast(player, "RETURN THROUGH WAYHOME BEFORE REPAIRING TOWN")
+            self:_setToast(
+                player,
+                Strings.get("tutorial.return_through_wayhome_before_repairing_town")
+            )
             self:_publish(player)
             return
         end
@@ -1515,7 +1543,7 @@ function TutorialService._interact(
     end
 
     if actionId == self._runtimeIds.Actions.Build and session.resources < 3 then
-        self:_setToast(player, "YOU NEED 3 HEARTWOOD")
+        self:_setToast(player, Strings.get("tutorial.you_need_3_heartwood"))
         self:_publish(player)
         return
     end
@@ -1526,7 +1554,7 @@ function TutorialService._interact(
             -- Entering gets said first; the blackout's announcement follows
             -- rather than replacing it. Same reasoning as the completion
             -- toast in the tutorial's own Reveal handler below.
-            self:_setToast(player, "ENTERING BRAMBLEWAKE")
+            self:_setToast(player, Strings.get("toast.entering_bramblewake"))
             if blackoutResult.message ~= nil then
                 local announcement = blackoutResult.message
                 task.delay(3.4, function()
@@ -1541,7 +1569,7 @@ function TutorialService._interact(
                 self._expeditionService:snapshot(player)
             )
         else
-            self:_setToast(player, "BRAMBLEWAKE IS STILL FORMING")
+            self:_setToast(player, Strings.get("tutorial.bramblewake_is_still_forming"))
         end
         self:_publish(player)
         return
@@ -1592,7 +1620,7 @@ function TutorialService._interact(
     local ok, reason = self:_advance(player, actionId)
     if not ok then
         local expected = self._tutorialFlow.definition(session.stage).objective
-        self:_setToast(player, "CURRENT OBJECTIVE: " .. expected)
+        self:_setToast(player, string.format(Strings.get("tutorial.current_objective_n"), expected))
         self._logger:warn("tutorial_action_rejected", {
             action = actionId,
             player = player.UserId,
@@ -1606,7 +1634,7 @@ function TutorialService._interact(
     if actionId == self._runtimeIds.Actions.Rescue then
         self._worldService:freeMara()
         self._worldService:moveMara(Vector3.new(2, 1.1, -38))
-        self:_setToast(player, "MARA IS SAFE")
+        self:_setToast(player, Strings.get("tutorial.mara_is_safe"))
     elseif actionId == self._runtimeIds.Actions.Gather then
         -- Handled by the timed-action path below, which swings the tool and
         -- runs the progress bar before granting anything.
@@ -1624,9 +1652,9 @@ function TutorialService._interact(
     elseif actionId == self._runtimeIds.Actions.Build then
         session.resources -= 3
         self._worldService:buildBarricade(true)
-        self:_setToast(player, "BARRICADE COMPLETE")
+        self:_setToast(player, Strings.get("tutorial.barricade_complete"))
     elseif actionId == self._runtimeIds.Actions.Prepare then
-        self:_setToast(player, "THE FIRST LANTERN BURNS")
+        self:_setToast(player, Strings.get("tutorial.the_first_lantern_burns"))
         self._phaseService:startFirstNight()
     elseif actionId == self._runtimeIds.Actions.Reveal then
         if self._expeditionService:enter(player) then
@@ -1639,7 +1667,10 @@ function TutorialService._interact(
                 notice standing where the completion belonged. The event
                 line follows a breath later instead of first.
             ]]
-            self:_setToast(player, "FIRST LIGHT COMPLETE — BRAMBLEWAKE REMEMBERS YOU")
+            self:_setToast(
+                player,
+                Strings.get("tutorial.first_light_complete_bramblewake_remembers_y")
+            )
             if blackoutResult.message ~= nil then
                 local announcement = blackoutResult.message
                 task.delay(3.4, function()
@@ -1654,7 +1685,7 @@ function TutorialService._interact(
                 self._expeditionService:snapshot(player)
             )
         else
-            self:_setToast(player, "FIRST LIGHT COMPLETE")
+            self:_setToast(player, Strings.get("tutorial.first_light_complete"))
         end
         -- GATE-METRIC: tutorial_completed
         self._analyticsService:complete(player)
@@ -1678,7 +1709,7 @@ function TutorialService._advanceSurvivorToReveal(
     end
 
     session.stage = nextStage
-    session.toast = "DAWN BREAKS — FOLLOW THE BEACON"
+    session.toast = Strings.get("tutorial.dawn_breaks_follow_the_beacon")
     session.toastRevision += 1
     self._profileService:setTutorial(player, nextStage, session.selectedTool)
     local definition = self._tutorialFlow.definition(nextStage)
@@ -1719,13 +1750,13 @@ function TutorialService._useGear(self: TutorialService, player: Player, itemId:
     local session = self._sessions[player]
     if session == nil or session.stage ~= "complete" then
         self._analyticsService:usedGear(player, itemId, false, "tutorial_incomplete")
-        self:_setToast(player, "FINISH FIRST LIGHT TO USE GEAR")
+        self:_setToast(player, Strings.get("tutorial.finish_first_light_to_use_gear"))
         self:_publish(player)
         return
     end
     if not self._survivalService:canAct(player) then
         self._analyticsService:usedGear(player, itemId, false, "player_downed")
-        self:_setToast(player, "YOU CANNOT USE GEAR WHILE DOWNED")
+        self:_setToast(player, Strings.get("tutorial.you_cannot_use_gear_while_downed"))
         self:_publish(player)
         return
     end
@@ -1749,28 +1780,40 @@ function TutorialService._useGear(self: TutorialService, player: Player, itemId:
         local staminaNow = self._combatService:peekStamina(player)
         if staminaNow == nil or staminaNow >= self._config.MaxStamina then
             self._analyticsService:usedGear(player, itemId, false, "stamina_full")
-            self:_setToast(player, definition.refusedMessage or "NOTHING TO RESTORE")
+            self:_setToast(
+                player,
+                definition.refusedMessage or Strings.get("tutorial.nothing_to_restore")
+            )
             self:_publish(player)
             return
         end
     elseif requires == "lantern_not_full" then
         if self._enemyService:lanternFull() then
             self._analyticsService:usedGear(player, itemId, false, "lantern_full")
-            self:_setToast(player, definition.refusedMessage or "THE LANTERN IS ALREADY FULL")
+            self:_setToast(
+                player,
+                definition.refusedMessage or Strings.get("tutorial.the_lantern_is_already_full")
+            )
             self:_publish(player)
             return
         end
     elseif requires == "status_active" then
         if not self._combatService:isAfflicted(player) then
             self._analyticsService:usedGear(player, itemId, false, "nothing_to_clear")
-            self:_setToast(player, definition.refusedMessage or "NOTHING IS ON YOU")
+            self:_setToast(
+                player,
+                definition.refusedMessage or Strings.get("tutorial.nothing_is_on_you")
+            )
             self:_publish(player)
             return
         end
     elseif requires == "gear_worn" then
         if not self._profileService:hasWornGear(player) then
             self._analyticsService:usedGear(player, itemId, false, "nothing_worn")
-            self:_setToast(player, definition.refusedMessage or "NOTHING NEEDS MENDING")
+            self:_setToast(
+                player,
+                definition.refusedMessage or Strings.get("tutorial.nothing_needs_mending")
+            )
             self:_publish(player)
             return
         end
@@ -1779,7 +1822,10 @@ function TutorialService._useGear(self: TutorialService, player: Player, itemId:
             self._survivalService:canHealInRadius(player, definition.effect.radius or 18)
         if not canHeal then
             self._analyticsService:usedGear(player, itemId, false, tostring(reason))
-            self:_setToast(player, definition.refusedMessage or "NOBODY NEAR YOU NEEDS IT")
+            self:_setToast(
+                player,
+                definition.refusedMessage or Strings.get("tutorial.nobody_near_you_needs_it")
+            )
             self:_publish(player)
             return
         end
@@ -1788,7 +1834,7 @@ function TutorialService._useGear(self: TutorialService, player: Player, itemId:
     local result = self._profileService:useGearItem(player, itemId)
     self._analyticsService:usedGear(player, itemId, result.accepted, result.reason)
     if not result.accepted then
-        self:_setToast(player, "YOU DON'T HAVE THAT ITEM")
+        self:_setToast(player, Strings.get("tutorial.you_don_t_have_that_item"))
         self:_publish(player)
         return
     end
@@ -1859,7 +1905,7 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
         end
         local result = self._lobbyService:requestDeparture(player, payload.partySize)
         if not result.accepted and result.reason == "invalid_party_size" then
-            self:_setToast(player, "CHOOSE A PARTY SIZE FIRST")
+            self:_setToast(player, Strings.get("tutorial.choose_a_party_size_first"))
         end
         self:_publishAll()
     elseif kind == self._runtimeIds.Actions.Interact then
@@ -1900,8 +1946,8 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             self:_setToast(
                 player,
                 if result.applied
-                    then string.format("KIT %d SAVED", slot)
-                    else "KIT COULD NOT BE SAVED"
+                    then string.format(Strings.get("tutorial.kit_n_saved"), slot)
+                    else Strings.get("tutorial.kit_could_not_be_saved")
             )
             self:_publish(player)
         end
@@ -1919,7 +1965,7 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             then self._profileService:loadoutAt(player, slot)
             else nil
         if loadout == nil then
-            self:_setToast(player, "THAT KIT IS EMPTY")
+            self:_setToast(player, Strings.get("tutorial.that_kit_is_empty"))
             self:_publish(player)
         elseif
             session2 == nil
@@ -1927,33 +1973,37 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             or not self._survivalService:canAct(player)
             or player:GetAttribute("LastLightInExpedition") == true
         then
-            self:_setToast(player, "KITS SWAP IN TOWN, ON YOUR FEET")
+            self:_setToast(player, Strings.get("tutorial.kits_swap_in_town_on_your"))
             self:_publish(player)
         else
             local applied = {}
             if loadout.professionId ~= nil then
                 local result = self._professionService:select(player, loadout.professionId)
                 if result.accepted then
-                    table.insert(applied, "PROFESSION")
+                    table.insert(applied, Strings.get("hud.profession"))
                 end
             end
             if loadout.weaponItemId ~= nil then
                 local result = self._profileService:equipItem(player, loadout.weaponItemId)
                 if result.accepted then
-                    table.insert(applied, "WEAPON")
+                    table.insert(applied, Strings.get("tutorial.weapon"))
                 end
             end
             if loadout.toolId ~= nil and self._toolCatalog.isValid(loadout.toolId) then
                 session2.selectedTool = loadout.toolId
                 self:_applyToolAttributes(player, loadout.toolId)
                 self._profileService:setTutorial(player, session2.stage, loadout.toolId)
-                table.insert(applied, "TOOL")
+                table.insert(applied, Strings.get("tutorial.tool"))
             end
             self:_setToast(
                 player,
                 if #applied > 0
-                    then string.format("KIT %d — %s READY", slot, table.concat(applied, " · "))
-                    else "KIT COULD NOT BE APPLIED"
+                    then string.format(
+                        Strings.get("tutorial.kit_n_n_ready"),
+                        slot,
+                        table.concat(applied, " · ")
+                    )
+                    else Strings.get("tutorial.kit_could_not_be_applied")
             )
             self:_publish(player)
         end
@@ -1999,9 +2049,9 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
                 self:_publishAll()
             else
                 if result.reason == "rate_limited" then
-                    self:_setToast(player, "LET THE LAST CALL LAND")
+                    self:_setToast(player, Strings.get("tutorial.let_the_last_call_land"))
                 elseif result.reason == "disabled" then
-                    self:_setToast(player, "CALLS ARE CLOSED RIGHT NOW")
+                    self:_setToast(player, Strings.get("tutorial.calls_are_closed_right_now"))
                 end
                 self:_publish(player)
             end
@@ -2051,10 +2101,14 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             self:_setToast(
                 player,
                 if result.reason == "product_not_configured"
-                    then "THAT ONE IS NOT FOR SALE YET"
-                    elseif result.reason == "unknown_product" then "NO SUCH THING IN THE CASE"
-                    elseif result.reason == "store_closed" then "THE OUTFITTER IS NOT OPEN YET"
-                    else "THE TILL DID NOT ANSWER — TRY AGAIN"
+                    then Strings.get("tutorial.that_one_is_not_for_sale")
+                    elseif result.reason == "unknown_product" then Strings.get(
+                        "tutorial.no_such_thing_in_the_case"
+                    )
+                    elseif result.reason == "store_closed" then Strings.get(
+                        "tutorial.the_outfitter_is_not_open_yet"
+                    )
+                    else Strings.get("tutorial.the_till_did_not_answer_try")
             )
             self:_publish(player)
         end
@@ -2074,12 +2128,18 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             self:_setToast(
                 player,
                 if result.applied and result.reason == "removed"
-                    then "TAKEN OFF"
-                    elseif result.applied then "WORN"
-                    elseif result.reason == "not_owned" then "YOU DO NOT OWN THAT"
-                    elseif result.reason == "unknown_cosmetic" then "NOTHING BY THAT NAME"
-                    elseif result.reason == "profile_loading" then "STILL UNPACKING YOUR THINGS"
-                    else "THAT CANNOT BE WORN"
+                    then Strings.get("tutorial.taken_off")
+                    elseif result.applied then Strings.get("tutorial.worn")
+                    elseif result.reason == "not_owned" then Strings.get(
+                        "tutorial.you_do_not_own_that"
+                    )
+                    elseif result.reason == "unknown_cosmetic" then Strings.get(
+                        "tutorial.nothing_by_that_name"
+                    )
+                    elseif result.reason == "profile_loading" then Strings.get(
+                        "tutorial.still_unpacking_your_things"
+                    )
+                    else Strings.get("tutorial.that_cannot_be_worn")
             )
             self:_publish(player)
         end
@@ -2097,14 +2157,17 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             self:_setToast(
                 player,
                 if result.applied
-                    then "WHETTED — "
-                        .. gearDisplayName(self._equipmentCatalog, itemId)
-                        .. " IS SOUND AGAIN"
-                    elseif
-                        result.reason == "insufficient_materials"
-                    then "WHETTING TAKES HALF THE RECIPE'S MATERIALS"
-                    elseif result.reason == "not_worn" then "THAT GEAR IS ALREADY SOUND"
-                    else "THAT GEAR CANNOT BE WHETTED"
+                    then string.format(
+                        Strings.get("tutorial.whetted_n_is_sound_again"),
+                        gearDisplayName(self._equipmentCatalog, itemId)
+                    )
+                    elseif result.reason == "insufficient_materials" then Strings.get(
+                        "tutorial.whetting_takes_half_the_recipe_s"
+                    )
+                    elseif result.reason == "not_worn" then Strings.get(
+                        "tutorial.that_gear_is_already_sound"
+                    )
+                    else Strings.get("tutorial.that_gear_cannot_be_whetted")
             )
             self:_publish(player)
         end
@@ -2115,8 +2178,11 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             self:_setToast(
                 player,
                 if result.accepted
-                    then "EQUIPPED " .. gearDisplayName(self._equipmentCatalog, itemId)
-                    else "CANNOT EQUIP ITEM"
+                    then string.format(
+                        Strings.get("tutorial.equipped_n"),
+                        gearDisplayName(self._equipmentCatalog, itemId)
+                    )
+                    else Strings.get("tutorial.cannot_equip_item")
             )
             self:_publish(player)
         end
@@ -2186,16 +2252,19 @@ function TutorialService._objectiveTargets(
             if blackout.status == "relay" then
                 self:_addSurveyTarget(player, add)
                 if blackout.carryingFire and blackout.nextNodeId ~= nil then
-                    add(arena.relayNodes[blackout.nextNodeId], "DELIVER ROOTFIRE")
+                    add(
+                        arena.relayNodes[blackout.nextNodeId],
+                        Strings.get("world.deliver_rootfire")
+                    )
                 else
-                    add(arena.fireSource, "TAKE ROOTFIRE")
+                    add(arena.fireSource, Strings.get("world.take_rootfire"))
                     -- deliveredNodeMap, not deliveredNodes: the latter is the
                     -- HUD's lit-count (a number), and iterating it threw
                     -- "attempt to iterate over a number value" on every
                     -- snapshot publish for the whole relay stage.
                     for nodeId, delivered in blackout.deliveredNodeMap or {} do
                         if delivered == true then
-                            add(arena.relayNodes[nodeId], "TAKE ROOTFIRE")
+                            add(arena.relayNodes[nodeId], Strings.get("world.take_rootfire"))
                         end
                     end
                 end
@@ -2203,16 +2272,16 @@ function TutorialService._objectiveTargets(
             elseif blackout.status == "old_growth" then
                 local eliteArena = self._worldService:oldGrowthArena()
                 if eliteArena ~= nil then
-                    add(eliteArena.fireSource, "CLEANSE OLD GROWTH")
+                    add(eliteArena.fireSource, Strings.get("tutorial.cleanse_old_growth"))
                 end
                 return resolved
             elseif blackout.status == "warden" then
                 local bossSeal = self._worldService:wardenSealPart()
-                add(bossSeal, "FACE THE WARDEN STAG")
+                add(bossSeal, Strings.get("tutorial.face_the_warden_stag"))
                 return resolved
             elseif blackout.status == "resolution" then
                 for _, target in arena.decisions do
-                    add(target, "CAST YOUR VOTE")
+                    add(target, Strings.get("tutorial.cast_your_vote"))
                 end
                 return resolved
             end
@@ -2221,7 +2290,7 @@ function TutorialService._objectiveTargets(
         local wayhome = self._worldService:interaction(self._runtimeIds.InteractionIds.Wayhome)
         local holder = if wayhome ~= nil then wayhome.Parent else nil
         if holder ~= nil and holder:IsA("BasePart") then
-            add(holder, "WAYHOME GATE")
+            add(holder, Strings.get("bramblewake.wayhome_gate"))
         end
         self:_addSurveyTarget(player, add)
         return resolved
@@ -2264,15 +2333,15 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
     local detail = definition.detail
     local mara = definition.mara
     local guideSpeaker = "Mara"
-    local trailName = "FIRST LIGHT"
+    local trailName = Strings.get("hud.first_light")
     local expedition = self._expeditionService:snapshot(player)
     if expedition.active then
-        trailName = "BRAMBLEWAKE"
+        trailName = Strings.get("tutorial.bramblewake")
         progress = expedition.moduleIndex
         total = expedition.moduleTotal
         objective = if expedition.moduleIndex == expedition.moduleTotal
-            then "BANK REWARDS AT THE WAYHOME GATE"
-            else "FOLLOW THE FOXFIRE TRAIL"
+            then Strings.get("tutorial.bank_rewards_at_the_wayhome_gate")
+            else Strings.get("tutorial.follow_the_foxfire_trail")
         local discovery = expedition.pointOfInterestName or expedition.eventName
         detail = if discovery == nil
             then expedition.moduleName
@@ -2281,7 +2350,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         -- the stretches of road between them.
         guideSpeaker = "You"
         mara = expedition.pointOfInterestDetail
-            or "The roots remember every traveler who walked out. Stay on the amber path and they remember me kindly."
+            or Strings.get("tutorial.the_roots_remember_every_traveler_who")
         local event = expedition.event
         if event ~= nil then
             if event.status == "dormant" then
@@ -2303,11 +2372,11 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
                 -- deciding whether to start it rather than trying to solve it.
                 mara = event.guidance or event.detail
             elseif event.status == "completed" then
-                objective = "EVENT COMPLETE — FOLLOW THE FOXFIRE TRAIL"
+                objective = Strings.get("tutorial.event_complete_follow_the_foxfire_trail")
                 detail = event.completionMessage
-                mara = "Shared expedition rewards are safe for this server run."
+                mara = Strings.get("tutorial.shared_expedition_rewards_are_safe_for")
             elseif event.status == "failed" then
-                objective = "EVENT ENDED — FOLLOW THE AMBER PATH"
+                objective = Strings.get("tutorial.event_ended_follow_the_amber_path")
                 detail = event.failureMessage
                 mara = event.failureResolution
             end
@@ -2334,25 +2403,29 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
     local survival = self._survivalService:snapshot(player)
     local blackout = self._blackoutService:snapshot(player)
     if blackout ~= nil then
-        trailName = "BRAMBLEWAKE BLACKOUT"
+        trailName = Strings.get("tutorial.bramblewake_blackout")
         progress = blackout.stage
         total = blackout.stageCount
         objective = blackout.instruction
         detail = if blackout.status == "relay"
             then string.format(
-                "%s · NEXT %s · %d/%d",
-                if blackout.carryingFire then "CARRY ROOTFIRE" else "TAKE ROOTFIRE",
-                tostring(blackout.nextNodeLabel or "ROOT"),
+                Strings.get("tutorial.n_next_n_n_n"),
+                if blackout.carryingFire
+                    then Strings.get("tutorial.carry_rootfire")
+                    else Strings.get("world.take_rootfire"),
+                tostring(blackout.nextNodeLabel or Strings.get("tutorial.root")),
                 blackout.deliveredNodes,
                 blackout.relayRequired
             )
-            elseif
-                blackout.status == "old_growth"
-            then "STAGE 2/4 · ROOTED WALLS HOLD UNTIL OLD GROWTH FALLS"
-            elseif blackout.status == "warden" then "STAGE 3/4 · THE WARDEN REMEMBERS EVERY ANTLER"
-            elseif
-                blackout.status == "resolution"
-            then "STAGE 4/4 · FARMLAND, WILD REGROWTH, OR SHARED AGROFOREST"
+            elseif blackout.status == "old_growth" then Strings.get(
+                "tutorial.stage_2_4_rooted_walls_hold"
+            )
+            elseif blackout.status == "warden" then Strings.get(
+                "tutorial.stage_3_4_the_warden_remembers"
+            )
+            elseif blackout.status == "resolution" then Strings.get(
+                "tutorial.stage_4_4_farmland_wild_regrowth"
+            )
             elseif blackout.status == "complete" then string.format(
                 -- Decision IDs are snake_case; a raw one leaked into
                 -- player-facing copy as "SHARED_AGROFOREST · PRESERVED".
@@ -2360,7 +2433,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
                 string.upper(tostring(blackout.decision):gsub("_", " ")),
                 string.upper(tostring(blackout.wardenOutcome):gsub("_", " "))
             )
-            else "THE BLACKOUT HAS NOT BEGUN"
+            else Strings.get("tutorial.the_blackout_has_not_begun")
         --[[
             The traveler talks to themself out here -- the owner asked for
             exactly this: a voice saying what is actually going on and what to
@@ -2372,43 +2445,43 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         guideSpeaker = "You"
         mara = if blackout.status == "relay"
             then if blackout.carryingFire
-                then "It burns fast. The marked root, before the flame forgets my hands."
-                else "The evacuation's fire still burns in that lantern. The living roots are starving for it — I carry, they wake."
-            elseif
-                blackout.status == "resolution"
-            then "The Greenward is asking what this land becomes. Whatever we plant here, the town inherits."
-            elseif
-                blackout.status == "complete"
-            then "The seal answered me. Whatever I am carrying, it is time to bring it home."
-            else "The dark out here is old grief, not weather. Keep moving — nothing I have earned can be taken by the clock."
+                then Strings.get("tutorial.it_burns_fast_the_marked_root")
+                else Strings.get("tutorial.the_evacuation_s_fire_still_burns")
+            elseif blackout.status == "resolution" then Strings.get(
+                "tutorial.the_greenward_is_asking_what_this"
+            )
+            elseif blackout.status == "complete" then Strings.get(
+                "tutorial.the_seal_answered_me_whatever_i"
+            )
+            else Strings.get("tutorial.the_dark_out_here_is_old")
     end
     local elite = self._oldGrowthService:snapshot(player)
     if elite ~= nil and (blackout == nil or blackout.status == "old_growth") then
         if elite.active then
             objective = elite.instruction
             detail = string.format(
-                "OLD GROWTH · PHASE %d/3 · %d/%d",
+                Strings.get("tutorial.old_growth_phase_n_3_n"),
                 elite.phase,
                 elite.health,
                 elite.maxHealth
             )
             mara = if elite.shielded
-                then "Steel means nothing to that shield. Fire does — carry it from the ember to the heart."
-                else "There — the amber heart. Strike it, and mind the roots when they rise."
+                then Strings.get("tutorial.steel_means_nothing_to_that_shield")
+                else Strings.get("tutorial.there_the_amber_heart_strike_it")
         elseif elite.complete then
-            objective = "OLD GROWTH CLEANSED — CONTINUE TO WAYHOME"
+            objective = Strings.get("tutorial.old_growth_cleansed_continue_to_wayhome")
             detail = if elite.rewardEligible
                 then "+3 AMBER SAP UNBANKED"
-                else "THE OLDEST ROOTS HAVE RELEASED THE TRAIL"
+                else Strings.get("tutorial.the_oldest_roots_have_released_the")
             mara = if elite.rewardEligible
-                then "The oldest roots have released their Amber Sap."
-                else "The oldest roots were cleansed before you arrived."
+                then Strings.get("tutorial.the_oldest_roots_have_released_their")
+                else Strings.get("tutorial.the_oldest_roots_were_cleansed_before")
         end
     end
     local boss = self._wardenStagService:snapshot(player)
     if boss ~= nil and (blackout == nil or blackout.status == "warden") then
         if blackout == nil then
-            trailName = "WARDEN'S SEAL"
+            trailName = Strings.get("tutorial.warden_s_seal")
         end
         progress = boss.phase
         total = 3
@@ -2416,32 +2489,32 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             objective = boss.instruction
             detail = if boss.exposed
                 then string.format(
-                    "WARDEN STAG · PHASE %d/3 · %d/%d",
+                    Strings.get("tutorial.warden_stag_phase_n_3_n"),
                     boss.phase,
                     boss.health,
                     boss.maxHealth
                 )
                 else string.format(
-                    "LIVING ROOTS · %d/%d · ANTLERS BROKEN %d/2",
+                    Strings.get("tutorial.living_roots_n_n_antlers_broken"),
                     boss.cleansedNodes,
                     boss.rootNodesRequired,
                     boss.antlersBroken
                 )
             mara = if boss.exposed
-                then "Its memory heart is open. Strike before the roots close again."
-                else "Cleanse living roots to preserve the forest. Breaking antlers is faster, but permanent."
+                then Strings.get("tutorial.its_memory_heart_is_open_strike")
+                else Strings.get("tutorial.cleanse_living_roots_to_preserve_the")
         elseif boss.complete then
             objective = boss.instruction
             detail = if boss.rewardEligible
                 then "+5 AMBER SAP UNBANKED"
-                else "THE WARDEN'S CHOICE WAS SETTLED BEFORE YOU ARRIVED"
+                else Strings.get("tutorial.the_warden_s_choice_was_settled")
             mara = if boss.outcome == "preserved"
-                then "The Warden remembers mercy. A future forest path remains possible."
-                else "The forest remembers what was broken. The chapter can continue, but changed."
+                then Strings.get("tutorial.the_warden_remembers_mercy_a_future")
+                else Strings.get("tutorial.the_forest_remembers_what_was_broken")
         elseif boss.status == "locked" then
             objective = boss.instruction
-            detail = "THE MEMORY SEAL REMAINS ROOTED"
-            mara = "The oldest growth guards the way to the Warden."
+            detail = Strings.get("tutorial.the_memory_seal_remains_rooted")
+            mara = Strings.get("tutorial.the_oldest_growth_guards_the_way")
         end
     end
     local gearCare, whetTarget = self:_gearCare(player)

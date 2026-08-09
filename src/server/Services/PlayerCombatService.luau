@@ -3,6 +3,8 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local PlayerCombatService = {}
 PlayerCombatService.__index = PlayerCombatService
 PlayerCombatService.Name = "PlayerCombatService"
@@ -272,14 +274,18 @@ function PlayerCombatService._step(self: PlayerCombatService, now: number)
             self._lastPublishedDrowsy[player] = status.drowsy
             self:_notify(
                 player,
-                if status.drowsy then "DROWSY — KEEP MOVING" else "DROWSINESS CLEARED"
+                if status.drowsy
+                    then Strings.get("toast.drowsy_keep_moving")
+                    else Strings.get("toast.drowsiness_cleared")
             )
         end
         if rootedChanged then
             self._lastPublishedRooted[player] = status.rooted
             self:_notify(
                 player,
-                if status.rooted then "ROOTED — KEEP MOVING" else "ROOTS RELEASED"
+                if status.rooted
+                    then Strings.get("toast.rooted_keep_moving")
+                    else Strings.get("toast.roots_released")
             )
         end
         if resourcePublish then
@@ -309,7 +315,7 @@ function PlayerCombatService.applyRooted(
     self._lastPublishedRooted[player] = true
     self:_syncPlayer(player)
     self:_markPublished(player, now)
-    self:_notify(player, "ROOTED — MOVEMENT SLOWED")
+    self:_notify(player, Strings.get("toast.rooted_movement_slowed"))
     return true
 end
 
@@ -333,7 +339,7 @@ function PlayerCombatService.applyDrowsy(
     self._lastPublishedDrowsy[player] = true
     self:_syncPlayer(player)
     self:_markPublished(player, now)
-    self:_notify(player, "DROWSY — MOVEMENT SLOWED")
+    self:_notify(player, Strings.get("toast.drowsy_movement_slowed"))
     return true
 end
 
@@ -496,7 +502,7 @@ function PlayerCombatService.setSprint(
     if result.applied then
         self:_notify(player, nil)
     elseif enabled and result.reason == "insufficient_stamina" then
-        self:_notify(player, "STAMINA LOW — RELEASE RUN TO RECOVER")
+        self:_notify(player, Strings.get("toast.stamina_low_release_run_to_recover"))
     end
     return result
 end
@@ -566,9 +572,9 @@ function PlayerCombatService.dodge(self: PlayerCombatService, player: Player): a
     elseif reportResult then
         self._lastRejectionAt[player] = now
         if result.reason == "insufficient_stamina" then
-            self:_notify(player, "STAMINA LOW — DODGE NEEDS 35")
+            self:_notify(player, Strings.get("toast.stamina_low_dodge_needs_35"))
         elseif result.reason == "dodge_cooldown" then
-            self:_notify(player, "DODGE RECHARGING")
+            self:_notify(player, Strings.get("toast.dodge_recharging"))
         end
     end
     return result

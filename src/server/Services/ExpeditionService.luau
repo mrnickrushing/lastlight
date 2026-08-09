@@ -2,6 +2,8 @@
 
 local Players = game:GetService("Players")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local ExpeditionService = {}
 ExpeditionService.__index = ExpeditionService
 ExpeditionService.Name = "ExpeditionService"
@@ -349,15 +351,15 @@ function ExpeditionService.failExpedition(self: ExpeditionService, player: Playe
         return {
             accepted = result.accepted,
             cacheId = result.cacheId,
-            message = "SAFE RETREAT — HALF THE POUCH WAITS IN A LOST SATCHEL",
+            message = Strings.get("toast.safe_retreat_half_the_pouch_waits"),
             reason = result.reason,
         }
     end
     return {
         accepted = result.accepted,
         message = if result.accepted
-            then "SAFE RETREAT — SMALL POUCH RETAINED"
-            else "SAFE RETREAT — POUCH RETAINED WHILE PROFILE RECOVERS",
+            then Strings.get("toast.safe_retreat_small_pouch_retained")
+            else Strings.get("toast.safe_retreat_pouch_retained_while_profile"),
         reason = result.reason,
     }
 end
@@ -368,22 +370,28 @@ function ExpeditionService.recoverCache(
     prompt: ProximityPrompt
 ): any
     if player:GetAttribute("LastLightInExpedition") ~= true then
-        return { accepted = false, message = "ENTER BRAMBLEWAKE TO RECOVER THE SATCHEL" }
+        return {
+            accepted = false,
+            message = Strings.get("toast.enter_bramblewake_to_recover_the_satchel"),
+        }
     end
     if prompt:GetAttribute("OwnerUserId") ~= player.UserId then
-        return { accepted = false, message = "THAT LOST SATCHEL BELONGS TO ANOTHER TRAVELER" }
+        return {
+            accepted = false,
+            message = Strings.get("toast.that_lost_satchel_belongs_to_another"),
+        }
     end
     local cacheId = prompt:GetAttribute("Payload")
     if type(cacheId) ~= "string" then
-        return { accepted = false, message = "THAT RECOVERY MARK IS INVALID" }
+        return { accepted = false, message = Strings.get("toast.that_recovery_mark_is_invalid") }
     end
     local result = self._profileService:recoverExpeditionCache(player, cacheId)
     if not result.accepted then
         return {
             accepted = false,
             message = if result.reason == "save_pending"
-                then "SATCHEL RECOVERY WILL RETRY WHEN YOUR PROFILE IS READY"
-                else "THAT SATCHEL HAS ALREADY BEEN RECOVERED",
+                then Strings.get("toast.satchel_recovery_will_retry_when_your")
+                else Strings.get("toast.that_satchel_has_already_been_recovered"),
             reason = result.reason,
         }
     end
@@ -399,7 +407,10 @@ function ExpeditionService.recoverCache(
     })
     return {
         accepted = true,
-        message = string.format("LOST SATCHEL RECOVERED — %d MATERIALS BACK IN POUCH", amount),
+        message = string.format(
+            Strings.get("toast.lost_satchel_recovered_n_materials_back"),
+            amount
+        ),
         reason = "recovered",
     }
 end
@@ -555,7 +566,7 @@ function ExpeditionService.interact(
     if player:GetAttribute("LastLightInExpedition") ~= true then
         return {
             accepted = false,
-            message = "ENTER BRAMBLEWAKE TO ANSWER THIS EVENT",
+            message = Strings.get("toast.enter_bramblewake_to_answer_this_event"),
             reason = "player_not_in_expedition",
         }
     end
@@ -565,7 +576,7 @@ function ExpeditionService.interact(
     if type(eventId) ~= "string" or type(stepId) ~= "string" then
         return {
             accepted = false,
-            message = "THAT EVENT MARK IS INVALID",
+            message = Strings.get("toast.that_event_mark_is_invalid"),
             reason = "invalid_prompt_contract",
         }
     end
@@ -574,7 +585,7 @@ function ExpeditionService.interact(
     if state == nil or definition == nil then
         return {
             accepted = false,
-            message = "THAT EVENT IS NO LONGER AVAILABLE",
+            message = Strings.get("toast.that_event_is_no_longer_available"),
             reason = "unknown_event",
         }
     end
@@ -606,7 +617,7 @@ function ExpeditionService.interact(
     if result.completed then
         result.message = definition.completionMessage
     elseif result.duplicate then
-        result.message = "THAT EVENT MARK IS ALREADY SET"
+        result.message = Strings.get("toast.that_event_mark_is_already_set")
     elseif result.failed or result.reason == "event_failed" or result.reason == "event_expired" then
         result.message = definition.failureMessage
     elseif result.accepted then
@@ -617,9 +628,9 @@ function ExpeditionService.interact(
             state.total
         )
     elseif result.reason == "event_disabled" then
-        result.message = "THIS EVENT IS TEMPORARILY DORMANT"
+        result.message = Strings.get("toast.this_event_is_temporarily_dormant")
     else
-        result.message = "THAT EVENT ACTION WAS REJECTED"
+        result.message = Strings.get("toast.that_event_action_was_rejected")
     end
 
     if not result.accepted then
@@ -715,7 +726,7 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
     if player:GetAttribute("LastLightInExpedition") ~= true then
         return {
             accepted = false,
-            message = "YOU ARE NOT INSIDE BRAMBLEWAKE",
+            message = Strings.get("toast.you_are_not_inside_bramblewake"),
             reason = "player_not_in_expedition",
         }
     end
@@ -737,8 +748,8 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
             return {
                 accepted = false,
                 message = if pendingPayoff ~= nil
-                    then "REWARDS BANKED — WAYHOME TRANSITION WILL RETRY"
-                    else "WAYHOME TRANSITION WILL RETRY",
+                    then Strings.get("toast.rewards_banked_wayhome_transition_will_retry")
+                    else Strings.get("toast.wayhome_transition_will_retry"),
                 reason = "transition_unavailable",
             }
         end
@@ -747,8 +758,8 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
             accepted = true,
             banked = combinedPending.banked,
             message = if pendingPayoff ~= nil
-                then "RETURNING TO EMBERHOLLOW — BANKED DELIVERY READY"
-                else "RETURNING TO EMBERHOLLOW — POUCH EMPTY",
+                then Strings.get("toast.returning_to_emberhollow_banked_delivery_rea")
+                else Strings.get("toast.returning_to_emberhollow_pouch_empty"),
             settlementId = if pendingPayoff ~= nil then pendingPayoff.settlementId else nil,
         }
     end
@@ -768,11 +779,11 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
         return {
             accepted = false,
             message = if settlement.reason == "profile_read_only"
-                then "PROFILE OFFLINE — REWARDS REMAIN UNBANKED"
-                elseif
-                    settlement.reason == "save_pending"
-                then "BANKING RETRY NEEDED — REWARDS REMAIN UNBANKED"
-                else "WAYHOME GATE IS WAITING FOR YOUR PROFILE",
+                then Strings.get("toast.profile_offline_rewards_remain_unbanked")
+                elseif settlement.reason == "save_pending" then Strings.get(
+                    "toast.banking_retry_needed_rewards_remain_unbanked"
+                )
+                else Strings.get("toast.wayhome_gate_is_waiting_for_your"),
             reason = settlement.reason,
         }
     end
@@ -795,7 +806,7 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
     if not self:_exitWithPayoff(player) then
         return {
             accepted = false,
-            message = "REWARDS BANKED — WAYHOME TRANSITION WILL RETRY",
+            message = Strings.get("toast.rewards_banked_wayhome_transition_will_retry"),
             reason = "transition_unavailable",
         }
     end
@@ -826,8 +837,8 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
         accepted = true,
         banked = settlement.inventory,
         message = if settlement.empty
-            then "RETURNING TO EMBERHOLLOW — POUCH EMPTY"
-            else string.format("WAYHOME — %d MATERIALS BANKED", bankedAmount),
+            then Strings.get("toast.returning_to_emberhollow_pouch_empty")
+            else string.format(Strings.get("toast.wayhome_n_materials_banked"), bankedAmount),
         settlementId = settlement.settlementId,
     }
 end

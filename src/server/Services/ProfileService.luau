@@ -4,6 +4,8 @@ local DataStoreService = game:GetService("DataStoreService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local ProfileService = {}
 ProfileService.__index = ProfileService
 ProfileService.Name = "ProfileService"
@@ -1321,7 +1323,7 @@ end
 function ProfileService.townConsequence(self: ProfileService, player: Player): any
     local profile = self._profiles[player]
     if profile == nil then
-        return { tier = 0, title = "EMBERHOLLOW AWAKENS", detail = "" }
+        return { tier = 0, title = Strings.get("toast.emberhollow_awakens"), detail = "" }
     end
     return self._saveSchema.townConsequence(profile)
 end
