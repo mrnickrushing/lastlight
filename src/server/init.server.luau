@@ -32,6 +32,7 @@ local ExtractionPayoff = require(root.ExtractionPayoff)
 local NightSchedule = require(root.NightSchedule)
 local OldGrowthEncounter = require(root.OldGrowthEncounter)
 local WardenStagEncounter = require(root.WardenStagEncounter)
+local RegionEncounterWiring = require(root.RegionEncounterWiring)
 local BramblewakeBlackout = require(root.BramblewakeBlackout)
 local ProfessionCatalog = require(root.ProfessionCatalog)
 local ProfessionAbilityVisuals = require(root.ProfessionAbilityVisuals)
@@ -653,6 +654,29 @@ tutorialService:setPartyService(partyService)
 tutorialService:setSocialService(socialService)
 tutorialService:setCommerceService(commerceService)
 tutorialService:setPrivateServerService(privateServerService)
+tutorialService:setRegionEncounterService(regionEncounterService)
+--[[
+    Bind the region encounters to every wood the expedition raises. For
+    Bramblewake the definitions list is empty and the bind clears the
+    previous region's fights, which is exactly what changing destination
+    should do to them.
+]]
+expeditionService:setRegionBuiltHandler(
+    function(regionId: string, runId: string, manifestHash: string, encounters: any)
+        local definitions = RegionEncounterWiring.definitionsFor(regionId)
+        if #definitions == 0 then
+            regionEncounterService:endRun()
+            return
+        end
+        local anchorsById: { [string]: { [string]: BasePart } } = {}
+        local arenasById: { [string]: { center: Vector3, radius: number } } = {}
+        for _, site in encounters do
+            anchorsById[site.id] = site.anchors
+            arenasById[site.id] = { center = site.center, radius = site.radius }
+        end
+        regionEncounterService:beginRun(runId, manifestHash, definitions, anchorsById, arenasById)
+    end
+)
 --[[
     A grant has to arrive somewhere the buyer can see.
 

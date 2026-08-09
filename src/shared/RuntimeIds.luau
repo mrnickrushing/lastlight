@@ -174,6 +174,17 @@ local RuntimeIds = {
             nothing in the payload.
         ]]
         PrivateControl = "private_control",
+        --[[
+            The destination board and the region arenas, both
+            interaction-routed. A destination plank carries its region id
+            as the prompt's payload the way a crafting bench carries its
+            recipe; an arena anchor carries its encounter and its own
+            anchor id as prompt attributes, so the client can name
+            neither a region it is not standing at nor a lever it cannot
+            reach.
+        ]]
+        SelectDestination = "select_destination",
+        RegionEncounter = "region_encounter",
     }),
     InteractionIds = table.freeze({
         Mara = "mara_rescue",

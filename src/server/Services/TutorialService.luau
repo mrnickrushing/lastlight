@@ -4,6 +4,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+local RegionExpeditionAssembly = require(script.Parent.Parent.World.RegionExpeditionAssembly)
 
 local TutorialService = {}
 TutorialService.__index = TutorialService
@@ -73,6 +74,7 @@ export type TutorialService = typeof(setmetatable(
         _socialService: any,
         _commerceService: any,
         _privateServerService: any,
+        _regionEncounterService: any,
         --[[
             Which store view each player is on, so the panel can be told to
             open by the world rather than by a HUD button. It is a revision
@@ -163,6 +165,7 @@ function TutorialService.new(
         _socialService = nil,
         _commerceService = nil,
         _privateServerService = nil,
+        _regionEncounterService = nil,
         _storeRevision = {},
         _actions = {},
         _sessions = {},
@@ -998,6 +1001,16 @@ function TutorialService.setPrivateServerService(self: TutorialService, privateS
     self._privateServerService = privateServerService
 end
 
+-- The toast channel is wired in the bootstrap beside every other
+-- encounter service's; this reference is for routing interactions and
+-- strikes into the arenas.
+function TutorialService.setRegionEncounterService(
+    self: TutorialService,
+    regionEncounterService: any
+)
+    self._regionEncounterService = regionEncounterService
+end
+
 --[[
     Whether the store may open for this player, right now.
 
@@ -1059,7 +1072,24 @@ function TutorialService.strike(self: TutorialService, player: Player)
         )
     then
         local context = self:_strikeContext(player)
-        local landed, message = self._enemyService:damageNearest(player, context)
+        --[[
+            An expedition strike asks the region arenas first: a player
+            standing inside one is fighting that encounter, and only a
+            player standing in none is offered to the roster. nil from
+            strikeNearest means "not my fight", which is what lets one
+            button serve a night wave and an arena without the client
+            naming either.
+        ]]
+        local landed, message
+        if
+            player:GetAttribute("LastLightInExpedition") == true
+            and self._regionEncounterService ~= nil
+        then
+            landed, message = self._regionEncounterService:strikeNearest(player, context)
+        end
+        if landed == nil then
+            landed, message = self._enemyService:damageNearest(player, context)
+        end
         if landed and context.weaponId ~= nil then
             local wearTrait =
                 self._gearTraits.get(self._profileService:gearTraitOf(player, context.weaponId))
@@ -1227,6 +1257,26 @@ function TutorialService._interact(
         local result = self._expeditionService:interact(player, prompt)
         self:_setToast(player, result.message)
         self:_publishAll()
+        return
+    end
+    if actionId == self._runtimeIds.Actions.RegionEncounter then
+        local encounterId = prompt:GetAttribute("EncounterId")
+        local anchorId = prompt:GetAttribute("Payload")
+        if
+            type(encounterId) == "string"
+            and type(anchorId) == "string"
+            and self._regionEncounterService ~= nil
+        then
+            self._regionEncounterService:interact(player, encounterId, anchorId)
+            self:_publishAll()
+        end
+        return
+    end
+    if actionId == self._runtimeIds.Actions.SelectDestination then
+        local regionId = prompt:GetAttribute("Payload")
+        local result = self._expeditionService:selectDestination(player, regionId)
+        self:_setToast(player, result.message)
+        self:_publish(player)
         return
     end
     if actionId == self._runtimeIds.Actions.OldGrowthFire then
@@ -1550,11 +1600,22 @@ function TutorialService._interact(
 
     if actionId == self._runtimeIds.Actions.Reveal and session.stage == "complete" then
         if self._expeditionService:enter(player) then
-            local blackoutResult = self._blackoutService:participantEntered(player)
+            local regionId = self._expeditionService:currentSeed()
+            -- The blackout is Bramblewake's own chapter event; a road
+            -- pointed anywhere else has no blackout to join.
+            local blackoutResult = if regionId == "region_bramblewake"
+                then self._blackoutService:participantEntered(player)
+                else { message = nil }
             -- Entering gets said first; the blackout's announcement follows
             -- rather than replacing it. Same reasoning as the completion
             -- toast in the tutorial's own Reveal handler below.
-            self:_setToast(player, Strings.get("toast.entering_bramblewake"))
+            self:_setToast(
+                player,
+                string.format(
+                    Strings.get("toast.entering_n"),
+                    RegionExpeditionAssembly.displayName(regionId)
+                )
+            )
             if blackoutResult.message ~= nil then
                 local announcement = blackoutResult.message
                 task.delay(3.4, function()
@@ -1569,7 +1630,7 @@ function TutorialService._interact(
                 self._expeditionService:snapshot(player)
             )
         else
-            self:_setToast(player, Strings.get("tutorial.bramblewake_is_still_forming"))
+            self:_setToast(player, Strings.get("tutorial.the_wood_is_still_forming"))
         end
         self:_publish(player)
         return
@@ -1658,7 +1719,10 @@ function TutorialService._interact(
         self._phaseService:startFirstNight()
     elseif actionId == self._runtimeIds.Actions.Reveal then
         if self._expeditionService:enter(player) then
-            local blackoutResult = self._blackoutService:participantEntered(player)
+            local firstRevealRegion = self._expeditionService:currentSeed()
+            local blackoutResult = if firstRevealRegion == "region_bramblewake"
+                then self._blackoutService:participantEntered(player)
+                else { message = nil }
             --[[
                 Finishing First Light gets its own line. The blackout's
                 join announcement used to replace it entirely, so the

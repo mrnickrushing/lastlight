@@ -42,9 +42,14 @@ local ENTRIES: { [string]: any } = {
     },
     region_ironroot = {
         builder = IronrootBuilder,
-        walkable = false,
-        -- Mesh dressing is an art pass: authored assets, not wiring.
-        -- Everything a party needs to walk the region is built.
+        --[[
+            Walked end to end in a live session the day this flipped:
+            departure board, arrival, nodes, a point of interest, an
+            event, a memory fragment, both elites, the Maw, extraction.
+            The missing list is a note for the art pass, not a gate;
+            readiness only reads `walkable`.
+        ]]
+        walkable = true,
         missing = {
             "authored mesh dressing",
         },
@@ -354,7 +359,13 @@ local function labelled(parent: Instance, text: string, color: Color3)
     gui.Size = UDim2.fromOffset(220, 40)
     gui.StudsOffsetWorldSpace = Vector3.new(0, 5, 0)
     gui.AlwaysOnTop = false
-    gui.MaxDistance = 140
+    --[[
+        Close enough to read on approach, far enough to find. The first
+        Delve walk had every point of interest, event socket and node
+        label in a twelve-module wood stacked into one band of gold soup
+        at 140, because 140 studs is two whole cells.
+    ]]
+    gui.MaxDistance = 60
     gui.Parent = parent
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1

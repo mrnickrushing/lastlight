@@ -8,7 +8,12 @@ local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
 
 local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+local Regions = require(
+    game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Content.Definitions.Regions
+)
 local BramblewakeBuilder = require(script.Parent.Parent.World.BramblewakeBuilder)
+local RegionBuilders = require(script.Parent.Parent.World.RegionBuilders)
+local RegionExpeditionAssembly = require(script.Parent.Parent.World.RegionExpeditionAssembly)
 local FoliageBuilder = require(script.Parent.Parent.World.FoliageBuilder)
 local MeshTemplateLoader = require(script.Parent.Parent.World.MeshTemplateLoader)
 local TerrainBuilder = require(script.Parent.Parent.World.TerrainBuilder)
@@ -4535,6 +4540,56 @@ function WorldService._buildLobby(self: WorldService, world: Model)
             * CFrame.Angles(0, math.rad(180), 0),
         Strings.get("world.to_emberhollow")
     )
+
+    --[[
+        The destination board, on the west wall across from the outfitter:
+        one plank per region, walked up to and pressed like everything
+        else in this game. The plank names the region and the press asks
+        the server to point the road at it; every gate -- enabled flag,
+        feature flag, chapter, readiness, an occupied wood -- is checked
+        where the request lands, so a plank for a shut region is a
+        refusal with a reason rather than a secret.
+    ]]
+    local destinationBoard = Instance.new("Folder")
+    destinationBoard.Name = "DestinationBoard"
+    destinationBoard.Parent = lobby
+    local boardAt = LOBBY_CENTER + Vector3.new(-26, 0, -4)
+    part(
+        destinationBoard,
+        "DestinationBoardPlinth",
+        Vector3.new(1.4, 12.5, 10.5),
+        CFrame.new(boardAt + Vector3.new(0, 6.25, 0)),
+        Color3.fromRGB(56, 44, 34),
+        Enum.Material.WoodPlanks
+    )
+    for index, region in ipairs(Regions) do
+        --[[
+            Spaced so the seventh plank still hangs above the floor. The
+            first pass stepped 1.9 studs from 11.4 and put Cinderfall's
+            plank level with the boards and the Hollow's inside them.
+        ]]
+        local plank = part(
+            destinationBoard,
+            "DestinationPlank",
+            Vector3.new(0.6, 1.3, 8.6),
+            CFrame.new(boardAt + Vector3.new(0.9, 12.3 - index * 1.55, 0)),
+            if region.enabled == true
+                then Color3.fromRGB(122, 92, 56)
+                else Color3.fromRGB(64, 58, 52),
+            Enum.Material.Wood,
+            false
+        )
+        self:_registerInteraction(
+            plank,
+            "destination_" .. region.id,
+            self._runtimeIds.Actions.SelectDestination,
+            Strings.get("world.set_course"),
+            RegionExpeditionAssembly.displayName(region.id),
+            region.id,
+            nil,
+            Vector3.new(5, 3.4, 10)
+        )
+    end
 
     -- Spawn at the back of the room, facing the platform and the doorway
     -- beyond it, so the first thing a player sees is where to go.
@@ -13823,74 +13878,21 @@ function WorldService.showExtractionPayoff(
     end)
 end
 
-function WorldService.buildBramblewake(
+function WorldService._placeMemoryFragments(
     self: WorldService,
+    model: Instance,
     manifest: any,
-    generator: any,
-    catalog: any
-): any
-    local world = assert(self._world, "world service has not initialized")
-    for interactionId, prompt in self._interactions do
-        local actionId = prompt:GetAttribute("ActionId")
-        if
-            actionId == self._runtimeIds.Actions.ExpeditionEvent
-            or actionId == self._runtimeIds.Actions.Extract
-            or actionId == self._runtimeIds.Actions.OldGrowthFire
-            or actionId == self._runtimeIds.Actions.WardenStagChoice
-            or actionId == self._runtimeIds.Actions.BramblewakeBlackout
-            or actionId == self._runtimeIds.Actions.RecoverExpeditionCache
-        then
-            self._interactions[interactionId] = nil
-        end
-    end
-    self._eventSockets = {}
-    self._eventTargets = {}
-    self._oldGrowthArena = nil
-    self._wardenStagArena = nil
-    self._blackoutArena = nil
-
-    local result = BramblewakeBuilder.build(world, manifest, generator, catalog, self._runtimeIds)
-    self:_placeAuthoredMeshes(
-        result.meshPlacements,
-        result.model,
-        result.model,
-        "expedition_mesh_dressing_ready"
-    )
-    self._expeditionEntry = result.entryCFrame
-    self._expeditionManifest = manifest
-    self._expeditionModuleCenters = result.moduleCenters
-    self._eventSockets = result.eventSockets
-    self._oldGrowthArena = result.eliteArena
-    self._wardenStagArena = result.bossArena
-    self._blackoutArena = result.blackout
-    self:_registerInteraction(
-        result.extractionTarget,
-        self._runtimeIds.InteractionIds.Wayhome,
-        self._runtimeIds.Actions.Extract,
-        "BANK & RETURN",
-        "Wayhome Gate",
-        nil,
-        nil
-    )
-    -- Harvest nodes: the reason to walk the route. Registered with the same
-    -- generous click volume everything else uses, and remembered here so the
-    -- tutorial service can look up what a given node grants.
-    self._resourceNodes = {}
-    for _, node in result.resourceNodes or {} do
-        self:_registerInteraction(
-            node.target,
-            node.interactionId,
-            self._runtimeIds.Actions.GatherResource,
-            Strings.get("world.harvest"),
-            node.objectText,
-            nil,
-            nil,
-            Vector3.new(10, 12, 10)
-        )
-        self._resourceNodes[node.interactionId] = node
-        addBillboard(node.target, string.upper(node.objectText), AMBER, 90)
-    end
-
+    extractionTarget: BasePart?,
+    bossSeal: BasePart?,
+    --[[
+        Where the ground-measuring ray starts, above the anchor. It has
+        to clear whatever scenery holds the anchor, and it must not
+        clear the region's own ceiling: fourteen studs is right for
+        Bramblewake's open sky and put both Delve shards on top of the
+        shored roof, nine studs above anyone who could read them.
+    ]]
+    rayStartOffset: number?
+)
     --[[
         Memory fragments: chapter one's story, resting on scenery that was
         already standing there.
@@ -13913,7 +13915,7 @@ function WorldService.buildBramblewake(
             return nil
         end
         if kind == "story" then
-            for _, descendant in result.model:GetDescendants() do
+            for _, descendant in model:GetDescendants() do
                 if
                     descendant:IsA("BasePart")
                     and descendant:GetAttribute("StoryLandmark") == key
@@ -13923,9 +13925,9 @@ function WorldService.buildBramblewake(
             end
             return nil
         elseif kind == "poi" then
-            local model = result.model:FindFirstChild("PhysicalPOI_" .. key, true)
-            local anchorPart = if model ~= nil
-                then model:FindFirstChild("PointOfInterest", true)
+            local wrapper = model:FindFirstChild("PhysicalPOI_" .. key, true)
+            local anchorPart = if wrapper ~= nil
+                then wrapper:FindFirstChild("PointOfInterest", true)
                 else nil
             if anchorPart ~= nil and anchorPart:IsA("BasePart") then
                 return anchorPart
@@ -13939,7 +13941,7 @@ function WorldService.buildBramblewake(
                 rather than by the name of a wrapper only one builder
                 makes.
             ]]
-            for _, descendant in result.model:GetDescendants() do
+            for _, descendant in model:GetDescendants() do
                 if
                     descendant:IsA("BasePart")
                     and descendant.Name == "PointOfInterest"
@@ -13950,9 +13952,9 @@ function WorldService.buildBramblewake(
             end
             return nil
         elseif kind == "site" and key == "wayhome" then
-            return result.extractionTarget
+            return extractionTarget
         elseif kind == "site" and key == "warden_seal" then
-            local seal = result.bossArena ~= nil and result.bossArena.seal or nil
+            local seal = bossSeal
             return if seal ~= nil and seal:IsA("BasePart") then seal else nil
         end
         return nil
@@ -13978,7 +13980,7 @@ function WorldService.buildBramblewake(
             local shard = Instance.new("Model")
             shard.Name = "MemoryFragment_" .. fragment.id
             shard:SetAttribute("MemoryFragmentId", fragment.id)
-            shard.Parent = result.model
+            shard.Parent = model
             --[[
                 Seat the shard on the ground, not on its anchor's height.
 
@@ -14019,7 +14021,8 @@ function WorldService.buildBramblewake(
                 could stand on.
             ]]
             local groundY = anchorPart.Position.Y
-            local origin = Vector3.new(shardX, anchorPart.Position.Y + 14, shardZ)
+            local origin =
+                Vector3.new(shardX, anchorPart.Position.Y + (rayStartOffset or 14), shardZ)
             for _ = 1, 8 do
                 local groundHit = workspace:Raycast(origin, Vector3.new(0, -90, 0), groundParams)
                 if groundHit == nil then
@@ -14109,6 +14112,231 @@ function WorldService.buildBramblewake(
             }
         end
     end
+end
+
+--[[
+    Clear everything a previous expedition registered, whichever builder
+    made it. The prompts themselves die with the expedition model; these
+    are the table entries that would otherwise hold destroyed prompts and
+    answer for them.
+]]
+function WorldService._clearExpeditionRegistrations(self: WorldService)
+    for interactionId, prompt in self._interactions do
+        local actionId = prompt:GetAttribute("ActionId")
+        if
+            actionId == self._runtimeIds.Actions.ExpeditionEvent
+            or actionId == self._runtimeIds.Actions.Extract
+            or actionId == self._runtimeIds.Actions.OldGrowthFire
+            or actionId == self._runtimeIds.Actions.WardenStagChoice
+            or actionId == self._runtimeIds.Actions.BramblewakeBlackout
+            or actionId == self._runtimeIds.Actions.RecoverExpeditionCache
+            or actionId == self._runtimeIds.Actions.RegionEncounter
+        then
+            self._interactions[interactionId] = nil
+        end
+    end
+    --[[
+        Nodes and memory shards are registered under ids that differ per
+        region, so a region switch leaves the old ids stale rather than
+        overwritten. Both tables are rebuilt by whichever builder runs
+        next; the prompts they point at are already destroyed.
+    ]]
+    for interactionId in self._resourceNodes do
+        self._interactions[interactionId] = nil
+    end
+    for interactionId in self._memoryFragmentTargets do
+        self._interactions[interactionId] = nil
+    end
+    self._resourceNodes = {}
+    self._memoryFragmentTargets = {}
+    self._eventSockets = {}
+    self._eventTargets = {}
+    self._oldGrowthArena = nil
+    self._wardenStagArena = nil
+    self._blackoutArena = nil
+end
+
+-- Whether a region's world can be raised by this server: Bramblewake
+-- through its own builder, everything else through the assembly and its
+-- region's visual builder.
+function WorldService.canBuildExpeditionRegion(_self: WorldService, regionId: any): boolean
+    if regionId == "region_bramblewake" then
+        return true
+    end
+    return type(regionId) == "string" and RegionBuilders.get(regionId) ~= nil
+end
+
+--[[
+    Raise a non-Bramblewake region as this server's expedition, and wire
+    the pieces the assembly hands back: extraction, harvest nodes, event
+    steps, memory fragments, and each encounter arena's anchors. The
+    shape mirrors buildBramblewake's tail exactly where the two share a
+    contract, because ExpeditionService reads the same fields from both.
+]]
+function WorldService.buildRegionExpedition(
+    self: WorldService,
+    manifest: any,
+    generator: any,
+    catalog: any
+): any
+    local world = assert(self._world, "world service has not initialized")
+    self:_clearExpeditionRegistrations()
+
+    local result =
+        RegionExpeditionAssembly.build(world, manifest, generator, catalog, self._runtimeIds)
+    self._expeditionEntry = result.entryCFrame
+    self._expeditionManifest = manifest
+    self._expeditionModuleCenters = result.moduleCenters
+    self._eventSockets = result.eventSockets
+
+    self:_registerInteraction(
+        result.extractionTarget,
+        self._runtimeIds.InteractionIds.Wayhome,
+        self._runtimeIds.Actions.Extract,
+        "BANK & RETURN",
+        "Wayhome Gate",
+        nil,
+        nil
+    )
+
+    self._resourceNodes = {}
+    for _, node in result.resourceNodes or {} do
+        self:_registerInteraction(
+            node.target,
+            node.interactionId,
+            self._runtimeIds.Actions.GatherResource,
+            Strings.get("world.harvest"),
+            node.objectText,
+            nil,
+            nil,
+            Vector3.new(10, 12, 10)
+        )
+        self._resourceNodes[node.interactionId] = node
+        -- Half Bramblewake's label reach. The region cells are open
+        -- enough that ninety studs put every node name in one gold band.
+        addBillboard(node.target, string.upper(node.objectText), AMBER, 45)
+    end
+
+    self:_placeMemoryFragments(result.model, manifest, result.extractionTarget, nil, 2.5)
+
+    for _, descriptor in result.eventInteractions do
+        self:_registerInteraction(
+            descriptor.target,
+            descriptor.interactionId,
+            self._runtimeIds.Actions.ExpeditionEvent,
+            descriptor.actionText,
+            descriptor.objectText,
+            nil,
+            nil
+        )
+        local prompt = self._interactions[descriptor.interactionId]
+        prompt:SetAttribute("EventId", descriptor.eventId)
+        prompt:SetAttribute("EventStepId", descriptor.stepId)
+        local targets = self._eventTargets[descriptor.eventId]
+        if targets == nil then
+            targets = {}
+            self._eventTargets[descriptor.eventId] = targets
+        end
+        targets[descriptor.stepId] = descriptor.target
+    end
+
+    --[[
+        Every arena anchor is a plain interaction carrying its encounter
+        and its own id as attributes. The client sends the interaction id
+        it is standing at and nothing else, which is the same contract
+        the private-server rail settled on: a payload that could name a
+        lever could throw it from anywhere.
+    ]]
+    for _, encounter in result.encounters do
+        for _, meta in encounter.anchorMeta do
+            local anchorPart = encounter.anchors[meta.id]
+            if anchorPart ~= nil then
+                local interactionId = string.format("enc_%s_%s", encounter.id, meta.id)
+                self:_registerInteraction(
+                    anchorPart,
+                    interactionId,
+                    self._runtimeIds.Actions.RegionEncounter,
+                    meta.action,
+                    meta.object,
+                    meta.id,
+                    nil,
+                    Vector3.new(9, 11, 9)
+                )
+                local prompt = self._interactions[interactionId]
+                prompt:SetAttribute("EncounterId", encounter.id)
+            end
+        end
+    end
+
+    world:SetAttribute("ExpeditionReady", true)
+    world:SetAttribute("ExpeditionManifestHash", manifest.hash)
+    world:SetAttribute("ExpeditionEventInteractions", #result.eventInteractions)
+    return result
+end
+
+function WorldService.buildBramblewake(
+    self: WorldService,
+    manifest: any,
+    generator: any,
+    catalog: any
+): any
+    local world = assert(self._world, "world service has not initialized")
+    self:_clearExpeditionRegistrations()
+    -- A region wood may be standing where the forest is about to be:
+    -- Bramblewake's builder only knows to clear its own model.
+    local regionModel = world:FindFirstChild("RegionExpedition")
+    if regionModel ~= nil then
+        regionModel:Destroy()
+    end
+
+    local result = BramblewakeBuilder.build(world, manifest, generator, catalog, self._runtimeIds)
+    self:_placeAuthoredMeshes(
+        result.meshPlacements,
+        result.model,
+        result.model,
+        "expedition_mesh_dressing_ready"
+    )
+    self._expeditionEntry = result.entryCFrame
+    self._expeditionManifest = manifest
+    self._expeditionModuleCenters = result.moduleCenters
+    self._eventSockets = result.eventSockets
+    self._oldGrowthArena = result.eliteArena
+    self._wardenStagArena = result.bossArena
+    self._blackoutArena = result.blackout
+    self:_registerInteraction(
+        result.extractionTarget,
+        self._runtimeIds.InteractionIds.Wayhome,
+        self._runtimeIds.Actions.Extract,
+        "BANK & RETURN",
+        "Wayhome Gate",
+        nil,
+        nil
+    )
+    -- Harvest nodes: the reason to walk the route. Registered with the same
+    -- generous click volume everything else uses, and remembered here so the
+    -- tutorial service can look up what a given node grants.
+    self._resourceNodes = {}
+    for _, node in result.resourceNodes or {} do
+        self:_registerInteraction(
+            node.target,
+            node.interactionId,
+            self._runtimeIds.Actions.GatherResource,
+            Strings.get("world.harvest"),
+            node.objectText,
+            nil,
+            nil,
+            Vector3.new(10, 12, 10)
+        )
+        self._resourceNodes[node.interactionId] = node
+        addBillboard(node.target, string.upper(node.objectText), AMBER, 90)
+    end
+
+    self:_placeMemoryFragments(
+        result.model,
+        manifest,
+        result.extractionTarget,
+        if result.bossArena ~= nil then result.bossArena.seal else nil
+    )
 
     for _, descriptor in result.eventInteractions do
         self:_registerInteraction(

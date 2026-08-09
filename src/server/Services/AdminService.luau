@@ -25,6 +25,7 @@ local Players = game:GetService("Players")
 local TextChatService = game:GetService("TextChatService")
 
 local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+local RegionExpeditionAssembly = require(script.Parent.Parent.World.RegionExpeditionAssembly)
 
 local AdminService = {}
 AdminService.__index = AdminService
@@ -146,7 +147,12 @@ function AdminService._run(self: AdminService, player: Player, decision: any)
                 self:_reply(
                     player,
                     if entered
-                        then Strings.get("toast.entering_bramblewake")
+                        then string.format(
+                            Strings.get("toast.entering_n"),
+                            RegionExpeditionAssembly.displayName(
+                                (self._expeditionService:currentSeed())
+                            )
+                        )
                         else Strings.get("toast.entry_unavailable")
                 )
             end

@@ -3,6 +3,7 @@
 local Players = game:GetService("Players")
 
 local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+local RegionExpeditionAssembly = require(script.Parent.Parent.World.RegionExpeditionAssembly)
 
 local ExpeditionService = {}
 ExpeditionService.__index = ExpeditionService
@@ -37,6 +38,9 @@ export type ExpeditionService = typeof(setmetatable(
         _eventsEnabled: boolean,
         _runId: string,
         _pendingExtractionPayoffs: { [Player]: any },
+        _bootSeed: number,
+        _regionBuiltHandler: ((string, string, string, any) -> ())?,
+        _lastEncounters: any,
     },
     ExpeditionService
 ))
@@ -82,6 +86,9 @@ function ExpeditionService.new(
         _eventsEnabled = false,
         _runId = "",
         _pendingExtractionPayoffs = {},
+        _bootSeed = seed,
+        _regionBuiltHandler = nil,
+        _lastEncounters = nil,
     }, ExpeditionService)
 end
 
@@ -113,12 +120,122 @@ function ExpeditionService.Init(self: ExpeditionService, _context: any)
     local regionId = self._regionAccess.destinationFor(requestedRegion, nil)
     local catalog = self._generator.catalogFor(regionId)
     assert(
-        regionId == "region_bramblewake",
+        self._worldService:canBuildExpeditionRegion(regionId),
         "region " .. tostring(regionId) .. " is enabled but has no builder wired"
     )
     self._catalog = catalog
     self._regionId = regionId
+    self._bootSeed = seed
     self:_buildRegion(seed)
+end
+
+--[[
+    Called after every region build with the encounter sites the world
+    just raised, so whoever owns the encounters can bind them to this
+    run. Set from the bootstrap rather than constructed here, because
+    the encounter service is built after this one and the seam should be
+    one function wide.
+]]
+function ExpeditionService.setRegionBuiltHandler(
+    self: ExpeditionService,
+    handler: (
+        regionId: string,
+        runId: string,
+        manifestHash: string,
+        encounters: any
+    ) -> ()
+)
+    self._regionBuiltHandler = handler
+    local manifest = self._manifest
+    if manifest ~= nil then
+        handler(self._regionId, self._runId, manifest.hash, self._lastEncounters or {})
+    end
+end
+
+--[[
+    A player at the destination board asking the road to point somewhere.
+
+    Every gate is re-checked here with the asker's own story: the
+    registry flag, the region's feature flag, dependencies, the chapter,
+    and readiness, through the same RegionAccess evaluation every other
+    caller uses. A wood with anybody standing in it refuses -- rebuilding
+    the expedition destroys the model under their feet, which is the rule
+    rebuildWithSeed already enforces at the same door.
+]]
+function ExpeditionService.selectDestination(
+    self: ExpeditionService,
+    player: Player,
+    regionId: any
+): any
+    if type(regionId) ~= "string" or #regionId > 40 then
+        return { accepted = false, message = Strings.get("toast.that_destination_is_unknown") }
+    end
+    local flagName = regionId .. "_enabled"
+    if not self._featureFlags:isEnabled(flagName) then
+        return {
+            accepted = false,
+            message = Strings.get("toast.that_region_is_not_open"),
+            reason = "region_flag_off",
+        }
+    end
+    local story = self._profileService:storySnapshot(player)
+    local verdict = self._regionAccess.evaluate(regionId, story)
+    if not verdict.allowed then
+        local message = if verdict.reason == "chapter_not_reached"
+            then Strings.get("toast.the_story_has_not_reached_that")
+            else Strings.get("toast.that_region_is_not_open")
+        return { accepted = false, message = message, reason = verdict.reason }
+    end
+    if regionId == self._regionId then
+        return {
+            accepted = true,
+            message = string.format(
+                Strings.get("toast.the_road_already_leads_to_n"),
+                RegionExpeditionAssembly.displayName(regionId)
+            ),
+            reason = "already_set",
+        }
+    end
+    if self:occupied() then
+        return {
+            accepted = false,
+            message = Strings.get("toast.the_wood_is_occupied_extract_first"),
+            reason = "expedition_occupied",
+        }
+    end
+    self._regionId = regionId
+    self._catalog = self._generator.catalogFor(regionId)
+    self._rebuilding = true
+    local ok, err = pcall(function()
+        self:_buildRegion(self._bootSeed)
+    end)
+    self._rebuilding = false
+    if not ok then
+        self._logger:warn("expedition_destination_failed", {
+            reason = tostring(err),
+            region = regionId,
+        })
+        self._regionId = "region_bramblewake"
+        self._catalog = self._generator.catalogFor(self._regionId)
+        self:_buildRegion(self._bootSeed)
+        return {
+            accepted = false,
+            message = Strings.get("toast.the_road_would_not_turn"),
+            reason = "build_failed",
+        }
+    end
+    self._logger:info("expedition_destination_set", {
+        player = player.UserId,
+        region = regionId,
+    })
+    return {
+        accepted = true,
+        message = string.format(
+            Strings.get("toast.the_road_now_leads_to_n"),
+            RegionExpeditionAssembly.displayName(regionId)
+        ),
+        reason = "destination_set",
+    }
 end
 
 --[[
@@ -152,9 +269,18 @@ function ExpeditionService._buildRegion(self: ExpeditionService, seed: number)
         self._analyticsService:generatorFallback(regionId, manifest.seed, manifest.source)
     end
 
-    local result = self._worldService:buildBramblewake(manifest, self._generator, self._catalog)
+    local result = if regionId == "region_bramblewake"
+        then self._worldService:buildBramblewake(manifest, self._generator, self._catalog)
+        else self._worldService:buildRegionExpedition(manifest, self._generator, self._catalog)
     self._manifest = manifest
     self._partCount = result.partCount
+    -- Encounter sites are the region path's; Bramblewake's elites live in
+    -- their own services and hand back none.
+    self._lastEncounters = result.encounters or {}
+    local builtHandler = self._regionBuiltHandler
+    if builtHandler ~= nil then
+        builtHandler(regionId, self._runId, manifest.hash, self._lastEncounters)
+    end
     --[[
         Read at every build rather than once at boot.
 
@@ -372,7 +498,10 @@ function ExpeditionService.recoverCache(
     if player:GetAttribute("LastLightInExpedition") ~= true then
         return {
             accepted = false,
-            message = Strings.get("toast.enter_bramblewake_to_recover_the_satchel"),
+            message = string.format(
+                Strings.get("toast.enter_n_to_recover_the_satchel"),
+                RegionExpeditionAssembly.displayName(self._regionId)
+            ),
         }
     end
     if prompt:GetAttribute("OwnerUserId") ~= player.UserId then
@@ -566,7 +695,10 @@ function ExpeditionService.interact(
     if player:GetAttribute("LastLightInExpedition") ~= true then
         return {
             accepted = false,
-            message = Strings.get("toast.enter_bramblewake_to_answer_this_event"),
+            message = string.format(
+                Strings.get("toast.enter_n_to_answer_this_event"),
+                RegionExpeditionAssembly.displayName(self._regionId)
+            ),
             reason = "player_not_in_expedition",
         }
     end
@@ -726,7 +858,10 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
     if player:GetAttribute("LastLightInExpedition") ~= true then
         return {
             accepted = false,
-            message = Strings.get("toast.you_are_not_inside_bramblewake"),
+            message = string.format(
+                Strings.get("toast.you_are_not_inside_n"),
+                RegionExpeditionAssembly.displayName(self._regionId)
+            ),
             reason = "player_not_in_expedition",
         }
     end
@@ -773,9 +908,19 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
     if not settlement.accepted then
         self._analyticsService:expeditionExtractionFailed(player, manifest.hash, settlement.reason)
         -- TUNING-METRIC: repeat_activity
-        self._analyticsService:repeatActivity(player, "expedition_bramblewake", false)
+        self._analyticsService:repeatActivity(
+            player,
+            (string.gsub(self._regionId, "^region_", "expedition_")),
+            false
+        )
         -- TUNING-METRIC: group_outcome
-        self._analyticsService:groupOutcome(player, "expedition_bramblewake", partySize, false, 0)
+        self._analyticsService:groupOutcome(
+            player,
+            (string.gsub(self._regionId, "^region_", "expedition_")),
+            partySize,
+            false,
+            0
+        )
         return {
             accepted = false,
             message = if settlement.reason == "profile_read_only"
@@ -824,11 +969,15 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
     -- TUNING-METRIC: repeat_activity
     -- Counted at the end of the attempt rather than the start, because the
     -- repetition question is about runs that were seen through.
-    self._analyticsService:repeatActivity(player, "expedition_bramblewake", true)
+    self._analyticsService:repeatActivity(
+        player,
+        (string.gsub(self._regionId, "^region_", "expedition_")),
+        true
+    )
     -- TUNING-METRIC: group_outcome
     self._analyticsService:groupOutcome(
         player,
-        "expedition_bramblewake",
+        (string.gsub(self._regionId, "^region_", "expedition_")),
         partySize,
         true,
         bankedAmount

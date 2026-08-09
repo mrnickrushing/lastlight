@@ -36,11 +36,13 @@
         are sealed behind chapter one, which means the walk unseals them,
         and a fragment nothing unseals is a body of text no player reads.
 
-    The honest gap is written as a case rather than as prose: six of the
-    seven regions have `enabled = false`, and the walk cannot flip them.
-    What the walk *can* say is that the flag is the only thing left --
-    every one of them refuses with `region_not_built` on a fully resolved
-    story rather than with a missing dependency or an unreached chapter.
+    The honest gap is written as a case rather than as prose: the
+    regions still shut have `enabled = false`, and the walk cannot flip
+    them -- a flag flips only in the pull request of its own live walk,
+    which is how Ironroot's flipped. What the walk *can* say is that the
+    flag is the only thing left for the rest: every shut region refuses
+    with `region_not_built` on a fully resolved story rather than with a
+    missing dependency or an unreached chapter.
 ]]
 
 local fs = require("@lune/fs")
@@ -391,13 +393,13 @@ return {
         {
             --[[
                 The one thing this spec cannot walk, recorded as a check
-                rather than as a sentence in a document. Six regions are
-                `enabled = false` and flipping one is the owner's call, made
-                after a live session walks it end to end. What is checkable
-                is that the flag is the *only* thing left: a fully resolved
-                story refuses each of them with `region_not_built`, never
-                with a missing dependency and never with an unreached
-                chapter, so nothing but the switch is in the way.
+                rather than as a sentence in a document. A region's flag
+                flips in the pull request of its own live walk -- Ironroot's
+                did -- and the regions still shut are checkable in one way:
+                the flag is the *only* thing left. A fully resolved story
+                refuses each of them with `region_not_built`, never with a
+                missing dependency and never with an unreached chapter, so
+                nothing but the switch and the walk is in the way.
             ]]
             name = "the flag is the only thing between the walk and a live region",
             run = function()
@@ -428,8 +430,11 @@ return {
                         string.format("%s is still chapter-locked after the walk", region.id)
                     )
                 end
-                TestRunner.equal(enabled, 1)
+                -- Bramblewake and the Delve are open; each further region
+                -- joins this count in the pull request of its own live walk.
+                TestRunner.equal(enabled, 2)
                 TestRunner.equal(RegionAccess.available(finished.story)[1], "region_bramblewake")
+                TestRunner.equal(RegionAccess.available(finished.story)[2], "region_ironroot")
             end,
         },
         {

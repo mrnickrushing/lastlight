@@ -16,24 +16,39 @@ return {
     name = "RegionAccess",
     cases = {
         {
-            -- Today, every request resolves to Bramblewake: nothing else is
-            -- built, and access must say so rather than promise a region
-            -- the server cannot construct.
-            name = "only Bramblewake is open while the other builders are unbuilt",
+            --[[
+                The Delve is open, and only behind its chapter: a fresh
+                profile still resolves everywhere to Bramblewake, a
+                resolved chapter one earns Ironroot, and every region past
+                it still refuses as unbuilt. This case pinned "exactly
+                one region" until the Delve was walked end to end in a
+                live session; it pins the new truth now.
+            ]]
+            name = "the Delve is open behind its chapter and the rest stay shut",
             run = function()
                 TestRunner.equal(RegionAccess.evaluate("region_bramblewake", nil).allowed, true)
+                local delveEarly = RegionAccess.evaluate("region_ironroot", nil)
+                TestRunner.equal(delveEarly.allowed, false)
+                TestRunner.equal(delveEarly.reason, "chapter_not_reached")
                 local delve = RegionAccess.evaluate("region_ironroot", RESOLVED_ONE)
-                TestRunner.equal(delve.allowed, false)
-                TestRunner.equal(delve.reason, "region_not_built")
+                TestRunner.equal(delve.allowed, true)
+                local fen = RegionAccess.evaluate("region_mireglass", RESOLVED_ONE)
+                TestRunner.equal(fen.allowed, false)
+                TestRunner.equal(fen.reason, "region_not_built")
                 local nowhere = RegionAccess.evaluate("region_nowhere", nil)
                 TestRunner.equal(nowhere.reason, "region_unknown")
 
                 local open = RegionAccess.available(RESOLVED_ONE)
-                TestRunner.equal(#open, 1)
+                TestRunner.equal(#open, 2)
                 TestRunner.equal(open[1], "region_bramblewake")
+                TestRunner.equal(open[2], "region_ironroot")
 
                 TestRunner.equal(
                     RegionAccess.destinationFor("region_ironroot", RESOLVED_ONE),
+                    "region_ironroot"
+                )
+                TestRunner.equal(
+                    RegionAccess.destinationFor("region_ironroot", nil),
                     "region_bramblewake"
                 )
                 TestRunner.equal(RegionAccess.destinationFor(nil, nil), "region_bramblewake")
@@ -113,20 +128,28 @@ return {
             end,
         },
         {
-            -- The registry itself must stay coherent: exactly one enabled
-            -- region today, and every dependency names a real region. This
-            -- is the case that catches a flag flipped without a builder.
-            name = "the region registry is coherent and singly enabled",
+            --[[
+                The registry stays coherent, and the enabled set is pinned
+                by name rather than by count: a region joins this list in
+                the same pull request as the live walk that earned it, and
+                a flag flipped without that walk fails here.
+            ]]
+            name = "the region registry is coherent and its open set is pinned",
             run = function()
                 local byId: { [string]: any } = {}
                 for _, region in Regions do
                     byId[region.id] = region
                 end
-                local enabled = 0
+                local expectedEnabled: { [string]: boolean } = {
+                    region_bramblewake = true,
+                    region_ironroot = true,
+                }
                 for _, region in Regions do
-                    if region.enabled == true then
-                        enabled += 1
-                    end
+                    TestRunner.equal(
+                        region.enabled == true,
+                        expectedEnabled[region.id] == true,
+                        region.id .. " enabled flag does not match the pinned open set"
+                    )
                     for _, dependencyId in region.dependencies do
                         TestRunner.truthy(
                             byId[dependencyId] ~= nil,
@@ -134,7 +157,6 @@ return {
                         )
                     end
                 end
-                TestRunner.equal(enabled, 1)
                 TestRunner.equal(RegionAccess.DefaultRegionId, "region_bramblewake")
             end,
         },
