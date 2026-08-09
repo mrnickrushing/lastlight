@@ -3,6 +3,8 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local WardenStagService = {}
 WardenStagService.__index = WardenStagService
 WardenStagService.Name = "WardenStagService"
@@ -462,9 +464,11 @@ function WardenStagService._stepAttack(self: WardenStagService, now: number)
         if result.applied then (if guarded then "guarded_hit" else "hit") else "blocked"
     )
     if result.downed then
-        self:_notify("ALLY DOWN — " .. definition.attackName)
+        self:_notify(string.format(Strings.get("toast.ally_down_n"), definition.attackName))
     elseif guarded and result.applied then
-        self:_notify("LANTERN GUARD ABSORBS " .. definition.attackName)
+        self:_notify(
+            string.format(Strings.get("toast.lantern_guard_absorbs_n"), definition.attackName)
+        )
     else
         self:_notify(nil)
     end
@@ -513,7 +517,7 @@ function WardenStagService._step(self: WardenStagService, now: number)
         if result.accepted then
             self._state = nextState
             self._worldService:setWardenStagPresentation(self._state)
-            self:_notify("THE WARDEN'S SEAL OPENS BEYOND OLD GROWTH")
+            self:_notify(Strings.get("toast.the_warden_s_seal_opens_beyond"))
         end
     end
     if self._state.status == "dormant" then
@@ -540,7 +544,7 @@ function WardenStagService._step(self: WardenStagService, now: number)
                         "cleansing_started",
                         self._state.antlersBroken
                     )
-                    self:_notify("WARDEN STAG AWAKENS — CLEANSE THE LIVING ROOTS")
+                    self:_notify(Strings.get("toast.warden_stag_awakens_cleanse_the_living"))
                 end
                 break
             end
@@ -597,7 +601,7 @@ function WardenStagService.interact(
     then
         return {
             accepted = false,
-            message = "ENTER THE WARDEN'S SEAL WHILE ACTIVE",
+            message = Strings.get("toast.enter_the_warden_s_seal_while"),
             reason = "player_unavailable",
         }
     end
@@ -619,21 +623,21 @@ function WardenStagService.interact(
     else
         return {
             accepted = false,
-            message = "THAT WARDEN INTERACTION IS INVALID",
+            message = Strings.get("toast.that_warden_interaction_is_invalid"),
             reason = "invalid_interaction",
         }
     end
     if not result.accepted then
         result.message = if result.reason == "already_cleansed"
-            then "THAT LIVING ROOT IS ALREADY CLEAN"
+            then Strings.get("toast.that_living_root_is_already_clean")
             elseif
                 result.reason == "antler_already_broken"
                 or result.reason == "phase_antler_already_broken"
-            then "THAT ANTLER SHORTCUT IS NO LONGER AVAILABLE"
-            elseif
-                self._state.status == "vulnerable"
-            then "THE MEMORY HEART IS EXPOSED — STRIKE NOW"
-            else "THE WARDEN IS NOT CALLING FOR THAT CHOICE"
+            then Strings.get("toast.that_antler_shortcut_is_no_longer")
+            elseif self._state.status == "vulnerable" then Strings.get(
+                "toast.the_memory_heart_is_exposed_strike"
+            )
+            else Strings.get("toast.the_warden_is_not_calling_for")
         return result
     end
 
@@ -641,7 +645,7 @@ function WardenStagService.interact(
     self._worldService:setWardenStagPresentation(self._state)
     self:_syncModel()
     if result.reason == "antler_broken" then
-        result.message = "ANTLER BROKEN — THE FOREST WILL REMEMBER THIS HARM"
+        result.message = Strings.get("toast.antler_broken_the_forest_will_remember")
         self._analyticsService:bossPhase(
             player,
             self._encounter.Id,
@@ -650,7 +654,7 @@ function WardenStagService.interact(
             self._state.antlersBroken
         )
     elseif result.exposed then
-        result.message = "LIVING ROOTS CLEANSED — MEMORY HEART EXPOSED"
+        result.message = Strings.get("toast.living_roots_cleansed_memory_heart_exposed")
         self._analyticsService:bossPhase(
             player,
             self._encounter.Id,
@@ -659,8 +663,11 @@ function WardenStagService.interact(
             self._state.antlersBroken
         )
     else
-        result.message =
-            string.format("LIVING ROOT CLEANSED — %d / %d", result.cleansed, result.required)
+        result.message = string.format(
+            Strings.get("toast.living_root_cleansed_n_n"),
+            result.cleansed,
+            result.required
+        )
     end
     self:_notify(result.message)
     return result
@@ -690,28 +697,28 @@ end
 
 function WardenStagService.damageNearest(self: WardenStagService, player: Player): (boolean, string)
     if self._state.status ~= "vulnerable" and self._state.status ~= "cleansing" then
-        return false, "No Warden Stag threat is active."
+        return false, Strings.get("toast.no_warden_stag_threat_is_active")
     end
     if self._state.status == "cleansing" then
-        return false, "CLEANSE LIVING ROOTS OR ACCEPT THE ANTLER CONSEQUENCE"
+        return false, Strings.get("toast.cleanse_living_roots_or_accept_the")
     end
     if
         not self:_inArena(player, self._config.BossEncounterRadius)
         or not self._survivalService:canAct(player)
     then
-        return false, "Enter the Warden's Seal to strike."
+        return false, Strings.get("toast.enter_the_warden_s_seal_to")
     end
     local model = self._model
     local root = rootPart(player)
     local heart = if model == nil then nil else weakPoint(model)
     if model == nil or root == nil or heart == nil then
-        return false, "The Warden Stag is still taking shape."
+        return false, Strings.get("toast.the_warden_stag_is_still_taking")
     end
     if (root.Position - heart.Position).Magnitude > self._config.BossStrikeRange then
-        return false, "Move closer to the memory heart."
+        return false, Strings.get("toast.move_closer_to_the_memory_heart")
     end
     if not self:_lineOfSight(player, model) then
-        return false, "The memory heart is hidden behind the Warden."
+        return false, Strings.get("toast.the_memory_heart_is_hidden_behind")
     end
 
     local tuning = self._encounter.Tuning
@@ -720,7 +727,7 @@ function WardenStagService.damageNearest(self: WardenStagService, player: Player
         else tuning.strikeDamage
     local nextState, result = self._encounter.strike(self._state, player.UserId, amount)
     if not result.accepted then
-        return false, "The Warden Stag cannot be struck right now."
+        return false, Strings.get("toast.the_warden_stag_cannot_be_struck")
     end
     self._state = nextState
     self._worldService:setWardenStagPresentation(self._state)
@@ -765,13 +772,19 @@ function WardenStagService.damageNearest(self: WardenStagService, player: Player
             "cleansing_started",
             self._state.antlersBroken
         )
-        self:_notify(string.format("PHASE %d/3 — CLEANSE THE LIVING ROOTS", self._state.phase))
-        return true, "The memory heart closes. Cleanse the next root pattern."
+        self:_notify(
+            string.format(Strings.get("toast.phase_n_3_cleanse_the_living"), self._state.phase)
+        )
+        return true, Strings.get("toast.the_memory_heart_closes_cleanse_the")
     end
     self:_notify(
-        string.format("HIT — WARDEN STAG %d / %d", self._state.health, self._encounter.MaxHealth)
+        string.format(
+            Strings.get("toast.hit_warden_stag_n_n"),
+            self._state.health,
+            self._encounter.MaxHealth
+        )
     )
-    return true, "Your tool strikes the exposed memory heart."
+    return true, Strings.get("toast.your_tool_strikes_the_exposed_memory")
 end
 
 function WardenStagService._participantCount(self: WardenStagService): number
@@ -797,12 +810,12 @@ function WardenStagService.canMarkNearest(
         or not self:_inArena(player, self._config.BossEncounterRadius)
         or not self._survivalService:canAct(player)
     then
-        return false, "NO BOSS THREAT CAN BE MARKED"
+        return false, Strings.get("toast.no_boss_threat_can_be_marked")
     end
     if (root.Position - model.PrimaryPart.Position).Magnitude > range then
-        return false, "MOVE CLOSER TO MARK THE WARDEN STAG"
+        return false, Strings.get("toast.move_closer_to_mark_the_warden")
     end
-    return true, "FOXFIRE MARK READY"
+    return true, Strings.get("toast.foxfire_mark_ready")
 end
 
 function WardenStagService.markNearest(
@@ -817,7 +830,7 @@ function WardenStagService.markNearest(
     end
     self._markedUntil = workspace:GetServerTimeNow() + duration
     self:_syncModel()
-    local message = "FOXFIRE MARK — WARDEN STAG TELEGRAPHS SLOWED"
+    local message = Strings.get("toast.foxfire_mark_warden_stag_telegraphs_slowed")
     self:_notify(message)
     return true, message
 end
@@ -831,7 +844,7 @@ function WardenStagService.threatSnapshot(self: WardenStagService, viewer: Playe
         attackId = attack.definition.attackId,
         displayName = attack.definition.attackName,
         enemyId = self._encounter.Id,
-        enemyName = "WARDEN STAG",
+        enemyName = Strings.get("hud.warden_stag"),
         instruction = attack.definition.instruction,
         resolvesAt = attack.flow.endsAt,
         shape = attack.definition.shape,

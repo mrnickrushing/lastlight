@@ -58,66 +58,6 @@ ALLOWED: dict[str, str] = {
     "src/first/LoadingController.client.luau": (
         "loads before the shared root replicates, which is the whole point of it; reaching for the table would make the loading screen wait for the thing it exists to cover"
     ),
-    "src/server/Services/AdminService.luau": (
-        "server announcements and toasts; 19 strings, migrating with the server batch"
-    ),
-    "src/server/Services/BramblewakeBlackoutService.luau": (
-        "server announcements and toasts; 23 strings, migrating with the server batch"
-    ),
-    "src/server/Services/CompanionService.luau": (
-        "server announcements and toasts; 4 strings, migrating with the server batch"
-    ),
-    "src/server/Services/DefenseService.luau": (
-        "server announcements and toasts; 5 strings, migrating with the server batch"
-    ),
-    "src/server/Services/EnemyService.luau": (
-        "server announcements and toasts; 38 strings, migrating with the server batch"
-    ),
-    "src/server/Services/ExpeditionService.luau": (
-        "server announcements and toasts; 24 strings, migrating with the server batch"
-    ),
-    "src/server/Services/LobbyService.luau": (
-        "server announcements and toasts; 5 strings, migrating with the server batch"
-    ),
-    "src/server/Services/OldGrowthService.luau": (
-        "server announcements and toasts; 30 strings, migrating with the server batch"
-    ),
-    "src/server/Services/PartyService.luau": (
-        "server announcements and toasts; 18 strings, migrating with the server batch"
-    ),
-    "src/server/Services/PhaseService.luau": (
-        "server announcements and toasts; 4 strings, migrating with the server batch"
-    ),
-    "src/server/Services/PlayerCombatService.luau": (
-        "server announcements and toasts; 9 strings, migrating with the server batch"
-    ),
-    "src/server/Services/PlayerSurvivalService.luau": (
-        "server announcements and toasts; 26 strings, migrating with the server batch"
-    ),
-    "src/server/Services/PrivateServerService.luau": (
-        "server announcements and toasts; 10 strings, migrating with the server batch"
-    ),
-    "src/server/Services/ProfessionService.luau": (
-        "server announcements and toasts; 28 strings, migrating with the server batch"
-    ),
-    "src/server/Services/ProfileService.luau": (
-        "server announcements and toasts; 1 strings, migrating with the server batch"
-    ),
-    "src/server/Services/RegionEncounterService.luau": (
-        "server announcements and toasts; 3 strings, migrating with the server batch"
-    ),
-    "src/server/Services/TownNightService.luau": (
-        "server announcements and toasts; 12 strings, migrating with the server batch"
-    ),
-    "src/server/Services/TutorialService.luau": (
-        "server announcements and toasts; 124 strings, migrating with the server batch"
-    ),
-    "src/server/Services/WardenStagService.luau": (
-        "server announcements and toasts; 30 strings, migrating with the server batch"
-    ),
-    "src/server/init.server.luau": (
-        "server announcements and toasts; 5 strings, migrating with the server batch"
-    ),
     "src/shared/AbbeySilenceEncounter.luau": (
         "content catalog; 10 authored strings, migrating with the content batch"
     ),
@@ -322,7 +262,7 @@ ALLOWED: dict[str, str] = {
 }
 
 # Pinned. It shrinks; it does not grow.
-ALLOWLIST_SIZE = 88
+ALLOWLIST_SIZE = 68
 
 COMMENT = re.compile(r"--\[\[.*?\]\]|--[^\n]*", re.DOTALL)
 LITERAL = re.compile(r'"((?:[^"\\\n]|\\.)*)"')
@@ -340,7 +280,18 @@ TECHNICAL = re.compile(
 )
 
 
+# A format specifier is a hole a number goes in, not a word. Judging the string
+# with the holes still in it makes "%d THINGS ARE YOURS" invisible, because the
+# tests below all start by asking whether the first character is a letter -- and
+# that is how forty-eight live strings sat inside files this check had already
+# called covered, including "STAMINA · %d" on the HUD. Every specifier becomes
+# one capital letter first, so a string is judged on the shape it has once a
+# number is in it.
+SPECIFIER = re.compile(r"%[-+ #0-9.]*[a-zA-Z]")
+
+
 def player_visible(value: str) -> bool:
+    value = SPECIFIER.sub("X", value)
     if len(value) < 4 or not re.search(r"[A-Za-z]{2}", value):
         return False
     if TECHNICAL.search(value):
@@ -358,7 +309,36 @@ def player_visible(value: str) -> bool:
 # A message handed to warn, error, print, assert or the analytics log is read by
 # whoever is holding the console, not by a player. Translating it would be paying
 # to make a stack trace harder to search.
-DIAGNOSTIC = re.compile(r"(warn|error|print|assert|log|logEvent|emit)\(\s*$|(warn|error|print|assert)\([^()]*$")
+DIAGNOSTIC = {"warn", "error", "print", "assert", "info", "log", "logEvent", "emit"}
+CALLEE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)\s*$")
+
+
+def enclosing_call(source: str, at: int) -> str | None:
+    """The call a position sits inside, with parentheses balanced.
+
+    Reading backwards along the line stops working the moment the diagnostic
+    takes an argument that is itself a call: in `assert(thing:method(), "...")`
+    the inner parentheses close before the pattern reaches the `assert`, so the
+    message reads as copy and the file cannot leave the allowlist. Four real
+    asserts sat behind that, and none of them is a sentence a player sees.
+    """
+    depth = 0
+    index = at - 1
+    while index >= 0:
+        char = source[index]
+        if char == ")":
+            depth += 1
+        elif char == "(":
+            if depth == 0:
+                match = CALLEE.search(source[:index])
+                return match.group(1) if match else None
+            depth -= 1
+        elif char in "{}" and depth == 0:
+            # A table constructor is not an argument list, so the search stops
+            # rather than wandering into whatever call the table is passed to.
+            return None
+        index -= 1
+    return None
 
 
 def scan(path: pathlib.Path) -> list[str]:
@@ -368,9 +348,7 @@ def scan(path: pathlib.Path) -> list[str]:
         value = match.group(1)
         if not player_visible(value) or value in found:
             continue
-        before = source[max(0, match.start() - 160): match.start()]
-        before = before[before.rfind("\n") + 1:] if "\n" in before else before
-        if DIAGNOSTIC.search(before):
+        if enclosing_call(source, match.start()) in DIAGNOSTIC:
             continue
         found.append(value)
     return found

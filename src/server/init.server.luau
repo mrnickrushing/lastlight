@@ -8,6 +8,7 @@ local root = ReplicatedStorage:WaitForChild("LastLight", 8)
 assert(root ~= nil, "Last Light shared root did not replicate before bootstrap timeout")
 
 local Config = require(root.Config)
+local Strings = require(root.Strings)
 local BramblewakeExpedition = require(root.Content.Definitions.BramblewakeExpedition)
 local CraftingCatalog = require(root.CraftingCatalog)
 local DefenseLanes = require(root.DefenseLanes)
@@ -253,8 +254,15 @@ local companionService = CompanionService.new(logger, CompanionMotion)
 ]]
 local regionEncounterService =
     RegionEncounterService.new(logger, profileService, survivalService, featureFlags)
-local defenseService =
-    DefenseService.new(logger, DefenseLanes, worldService, enemyService, profileService, Config)
+local defenseService = DefenseService.new(
+    logger,
+    DefenseLanes,
+    worldService,
+    enemyService,
+    profileService,
+    Config,
+    ExtractionPayoff
+)
 enemyService:setDefenseLanes(DefenseLanes)
 local oldGrowthService = OldGrowthService.new(
     logger,
@@ -547,13 +555,13 @@ survivalService:setPartyRecoveryProvider(
 professionService:setSwitchProvider(function(player: Player): (boolean, string?)
     local profile = profileService:get(player)
     if profile == nil or profile.tutorial.complete ~= true then
-        return false, "COMPLETE FIRST LIGHT TO CHOOSE A PROFESSION"
+        return false, Strings.get("toast.complete_first_light_to_choose_a")
     end
     if phaseService:snapshot().nightActive or townNightService:isNightActive() then
-        return false, "RETURN TO DAYLIGHT BEFORE SWITCHING PROFESSION"
+        return false, Strings.get("toast.return_to_daylight_before_switching_professi")
     end
     if expeditionService:snapshot(player).active then
-        return false, "RETURN THROUGH THE WAYHOME GATE BEFORE SWITCHING"
+        return false, Strings.get("toast.return_through_the_wayhome_gate_before")
     end
     return true, nil
 end)
@@ -664,8 +672,8 @@ commerceService:setGrantHandler(function(player: Player, granted: { string })
     tutorialService:announceTo(
         player,
         if #granted == 1
-            then "IT IS YOURS — WEAR IT AT THE OUTFITTER"
-            else string.format("%d THINGS ARE YOURS — WEAR THEM AT THE OUTFITTER", #granted)
+            then Strings.get("toast.it_is_yours_wear_it_at")
+            else string.format(Strings.get("toast.n_things_are_yours_wear_them"), #granted)
     )
 end)
 partyService:setToastHandler(function(player: Player?, message: string)
@@ -695,8 +703,11 @@ survivalService:setGearWearAccruer(function(player: Player)
                 tutorialService:toastPlayer(
                     player,
                     if wearResult.conditionAfter == "failing"
-                        then "YOUR " .. name .. " HAS FAILED — IT SHIELDS NOTHING NOW"
-                        else "YOUR " .. name .. " IS WORN — IT PROTECTS LESS"
+                        then string.format(Strings.get("toast.your_n_has_failed_it_shields"), name)
+                        else string.format(
+                            Strings.get("toast.your_n_is_worn_it_protects"),
+                            name
+                        )
                 )
             end
         end

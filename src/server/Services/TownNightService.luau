@@ -2,6 +2,8 @@
 
 local Players = game:GetService("Players")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local TownNightService = {}
 TownNightService.__index = TownNightService
 TownNightService.Name = "TownNightService"
@@ -207,7 +209,7 @@ function TownNightService._expireIncident(
         self._enemyService:applyLanternPressure(result.lanternPenalty, incident.definition.id)
     self:_notify(
         string.format(
-            "%s FAILED — %d SITE%s LOST · FIRST LANTERN -%d",
+            Strings.get("toast.n_failed_n_siten_lost_first"),
             incident.definition.title,
             result.unresolved,
             if result.unresolved == 1 then "" else "S",
@@ -248,7 +250,7 @@ function TownNightService.resolveIncident(
     if self._phase ~= "night" or incident == nil or incident.status ~= "active" then
         return {
             accepted = false,
-            message = "THAT NIGHT INCIDENT IS NO LONGER ACTIVE",
+            message = Strings.get("toast.that_night_incident_is_no_longer"),
             reason = "incident_inactive",
         }
     end
@@ -262,8 +264,8 @@ function TownNightService.resolveIncident(
         return {
             accepted = false,
             message = if result.reason == "site_resolved"
-                then "THAT SITE IS ALREADY SECURE"
-                else "THE INCIDENT WINDOW HAS CLOSED",
+                then Strings.get("toast.that_site_is_already_secure")
+                else Strings.get("toast.the_incident_window_has_closed"),
             reason = result.reason,
         }
     end
@@ -294,7 +296,7 @@ function TownNightService.resolveIncident(
         accepted = true,
         completed = false,
         message = string.format(
-            "%s SECURED — %d SITE%s REMAIN",
+            Strings.get("toast.n_secured_n_siten_remain"),
             string.upper(tostring(result.siteId)),
             result.remaining,
             if result.remaining == 1 then "" else "S"
@@ -610,7 +612,7 @@ function TownNightService._runCycle(self: TownNightService)
         self._worldService:setTownRepairEnabled(false)
         self:_notify(
             string.format(
-                "DUSK FALLS — %s NIGHT %d APPROACHES",
+                Strings.get("toast.dusk_falls_n_night_n_approaches"),
                 self._townNightSchedule.theme(self._nightNumber),
                 self._nightNumber
             )
@@ -638,12 +640,12 @@ function TownNightService._runCycle(self: TownNightService)
         self:_notify(
             if blackoutDue
                 then string.format(
-                    "%s NIGHT %d — THE BLACKOUT LOOMS IN BRAMBLEWAKE",
+                    Strings.get("toast.n_night_n_the_blackout_looms"),
                     theme,
                     activeNight
                 )
                 else string.format(
-                    "%s NIGHT %d — %s",
+                    Strings.get("toast.n_night_n_n"),
                     theme,
                     activeNight,
                     themeProfile.instruction
@@ -702,7 +704,7 @@ function TownNightService._runCycle(self: TownNightService)
                 -- carries the seventh-night Blackout telegraph on the nights
                 -- that matter) — publishing it too would replace that toast
                 -- before a player could read it.
-                self:_notify("THE FOREST GOES QUIET")
+                self:_notify(Strings.get("toast.the_forest_goes_quiet"))
             end
         end
 
@@ -736,17 +738,20 @@ function TownNightService._runCycle(self: TownNightService)
         local damage = tonumber(damageResult.damage) or 0
         local dawnToast = if damage > 0
             then string.format(
-                "DAWN BREAKS — TOWN INTEGRITY %d%% · %d REPAIR%s NEEDED",
+                Strings.get("toast.dawn_breaks_town_integrity_n_n"),
                 conditionSnapshot.integrity,
                 conditionSnapshot.repairsRemaining,
                 if conditionSnapshot.repairsRemaining == 1 then "" else "S"
             )
             elseif conditionSnapshot.repairsRemaining > 0 then string.format(
-                "DAWN BREAKS — NIGHT %d HELD CLEAN · TOWN INTEGRITY %d%%",
+                Strings.get("toast.dawn_breaks_night_n_held_clean"),
                 activeNight,
                 conditionSnapshot.integrity
             )
-            else string.format("DAWN BREAKS — NIGHT %d HELD CLEAN", activeNight)
+            else string.format(
+                Strings.get("toast.dawn_breaks_night_n_held_clean_2"),
+                activeNight
+            )
         self:_notify(dawnToast)
         self._logger:info("town_night_completed", {
             damage = damage,
@@ -874,13 +879,17 @@ end
 
 function TownNightService.repairTown(self: TownNightService, buildingId: any): any
     if self._phase ~= "day" then
-        return { accepted = false, message = "TOWN REPAIRS WAIT FOR DAYLIGHT", reason = "not_day" }
+        return {
+            accepted = false,
+            message = Strings.get("toast.town_repairs_wait_for_daylight"),
+            reason = "not_day",
+        }
     end
     local nextCondition, result = self._townCondition.repair(self._condition, buildingId)
     if not result.applied then
         local message = if result.reason == "unknown_building"
-            then "THERE IS NOTHING TO REPAIR HERE"
-            else "THIS BUILDING IS ALREADY REPAIRED"
+            then Strings.get("toast.there_is_nothing_to_repair_here")
+            else Strings.get("toast.this_building_is_already_repaired")
         return { accepted = false, message = message, reason = result.reason }
     end
     self._condition = nextCondition
@@ -890,7 +899,7 @@ function TownNightService.repairTown(self: TownNightService, buildingId: any): a
         accepted = true,
         condition = snapshot,
         message = string.format(
-            "REPAIRED +%d · %d%% · %d LEFT IN TOWN",
+            Strings.get("toast.repaired_n_n_n_left_in"),
             result.restored,
             result.buildingIntegrity,
             snapshot.repairsRemaining

@@ -3,6 +3,8 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local OldGrowthService = {}
 OldGrowthService.__index = OldGrowthService
 OldGrowthService.Name = "OldGrowthService"
@@ -450,9 +452,11 @@ function OldGrowthService._stepAttack(self: OldGrowthService, now: number)
         if result.applied then (if guarded then "guarded_hit" else "hit") else "blocked"
     )
     if result.downed then
-        self:_notify("ALLY DOWN — " .. definition.attackName)
+        self:_notify(string.format(Strings.get("toast.ally_down_n"), definition.attackName))
     elseif guarded and result.applied then
-        self:_notify("LANTERN GUARD ABSORBS " .. definition.attackName)
+        self:_notify(
+            string.format(Strings.get("toast.lantern_guard_absorbs_n"), definition.attackName)
+        )
     else
         self:_notify(nil)
     end
@@ -519,7 +523,7 @@ function OldGrowthService._step(self: OldGrowthService, now: number)
     self._state = self._encounter.expire(self._state, now)
     if self._state.revision ~= previousRevision then
         self:_syncCarrierVisuals(now)
-        self:_notify("LANTERN FIRE FADED — TAKE ANOTHER FLAME")
+        self:_notify(Strings.get("toast.lantern_fire_faded_take_another_flame"))
     end
 
     if
@@ -542,7 +546,7 @@ function OldGrowthService._step(self: OldGrowthService, now: number)
                         self._encounter.Id,
                         self._state.manifestHash
                     )
-                    self:_notify("OLD GROWTH AWAKENS — STRIKE THE AMBER HEART")
+                    self:_notify(Strings.get("toast.old_growth_awakens_strike_the_amber"))
                 end
                 break
             end
@@ -606,7 +610,7 @@ function OldGrowthService.interact(
     then
         return {
             accepted = false,
-            message = "ENTER THE OLD GROWTH ARENA WHILE ACTIVE",
+            message = Strings.get("toast.enter_the_old_growth_arena_while"),
             reason = "player_unavailable",
         }
     end
@@ -623,15 +627,17 @@ function OldGrowthService.interact(
     else
         return {
             accepted = false,
-            message = "THAT ELITE INTERACTION IS INVALID",
+            message = Strings.get("toast.that_elite_interaction_is_invalid"),
             reason = "invalid_interaction",
         }
     end
     if not result.accepted then
         result.message = if result.reason == "fire_required"
-            then "TAKE LANTERN FIRE BEFORE TOUCHING THE ROOT HEART"
-            elseif result.reason == "fire_claimed" then "AN ALLY ALREADY CARRIES THE FIRE"
-            else "THE ROOT SHIELD IS NOT CALLING FOR FIRE"
+            then Strings.get("toast.take_lantern_fire_before_touching_the")
+            elseif result.reason == "fire_claimed" then Strings.get(
+                "toast.an_ally_already_carries_the_fire"
+            )
+            else Strings.get("toast.the_root_shield_is_not_calling")
         return result
     end
 
@@ -639,10 +645,10 @@ function OldGrowthService.interact(
     self._worldService:setOldGrowthPresentation(self._state.status)
     self:_syncCarrierVisuals(now)
     if result.reason == "fire_taken" then
-        result.message = "LANTERN FIRE HELD — REACH THE ROOT HEART"
+        result.message = Strings.get("toast.lantern_fire_held_reach_the_root")
         self:_notify(result.message)
     else
-        result.message = "ROOT SHIELD BURNED — AMBER HEART EXPOSED"
+        result.message = Strings.get("toast.root_shield_burned_amber_heart_exposed")
         if self._model ~= nil then
             self._builder.setState(self._model, self._state.health, false, now < self._markedUntil)
         end
@@ -683,25 +689,25 @@ end
 
 function OldGrowthService.damageNearest(self: OldGrowthService, player: Player): (boolean, string)
     if self._state.status ~= "vulnerable" and self._state.status ~= "shielded" then
-        return false, "No elite threat is active."
+        return false, Strings.get("toast.no_elite_threat_is_active")
     end
     if
         not self:_inArena(player, self._config.EliteEncounterRadius)
         or not self._survivalService:canAct(player)
     then
-        return false, "Enter the Old Growth arena to strike."
+        return false, Strings.get("toast.enter_the_old_growth_arena_to")
     end
     local model = self._model
     local root = rootPart(player)
     local heart = if model == nil then nil else weakPoint(model)
     if model == nil or root == nil or heart == nil then
-        return false, "Old Growth is still taking shape."
+        return false, Strings.get("toast.old_growth_is_still_taking_shape")
     end
     if (root.Position - heart.Position).Magnitude > self._config.EliteStrikeRange then
-        return false, "Move closer to the amber heart."
+        return false, Strings.get("toast.move_closer_to_the_amber_heart")
     end
     if not self:_lineOfSight(player, model) then
-        return false, "The amber heart is behind the trunk."
+        return false, Strings.get("toast.the_amber_heart_is_behind_the")
     end
 
     local tuning = self._encounter.Tuning
@@ -711,9 +717,9 @@ function OldGrowthService.damageNearest(self: OldGrowthService, player: Player):
     local nextState, result = self._encounter.strike(self._state, player.UserId, amount)
     if not result.accepted then
         if result.reason == "shielded" then
-            return false, "ROOT SHIELD — MOVE LANTERN FIRE TO THE HEART"
+            return false, Strings.get("toast.root_shield_move_lantern_fire_to")
         end
-        return false, "Old Growth cannot be struck right now."
+        return false, Strings.get("toast.old_growth_cannot_be_struck_right")
     end
     self._state = nextState
     self._builder.setState(
@@ -747,7 +753,7 @@ function OldGrowthService.damageNearest(self: OldGrowthService, player: Player):
         -- TUNING-METRIC: difficulty_checkpoint
         self._analyticsService:difficultyCheckpoint(player, self._encounter.Id, true)
         self:_notify("OLD GROWTH CLEANSED — +3 AMBER SAP UNBANKED")
-        return true, "Old Growth cleansed. Amber Sap added to the expedition pouch."
+        return true, Strings.get("toast.old_growth_cleansed_amber_sap_added")
     end
     if result.shieldStarted then
         self._analyticsService:elitePhase(
@@ -756,13 +762,17 @@ function OldGrowthService.damageNearest(self: OldGrowthService, player: Player):
             self._state.shieldIndex,
             "shield_started"
         )
-        self:_notify("ROOT SHIELD — TAKE LANTERN FIRE TO THE HEART")
-        return true, "A root shield closes around the amber heart."
+        self:_notify(Strings.get("toast.root_shield_take_lantern_fire_to"))
+        return true, Strings.get("toast.a_root_shield_closes_around_the")
     end
     self:_notify(
-        string.format("HIT — OLD GROWTH %d / %d", self._state.health, self._encounter.MaxHealth)
+        string.format(
+            Strings.get("toast.hit_old_growth_n_n"),
+            self._state.health,
+            self._encounter.MaxHealth
+        )
     )
-    return true, "Your tool strikes the amber heart."
+    return true, Strings.get("toast.your_tool_strikes_the_amber_heart")
 end
 
 function OldGrowthService._participantCount(self: OldGrowthService): number
@@ -788,15 +798,15 @@ function OldGrowthService.canMarkNearest(
         or not self:_inArena(player, self._config.EliteEncounterRadius)
         or not self._survivalService:canAct(player)
     then
-        return false, "NO ELITE THREAT CAN BE MARKED"
+        return false, Strings.get("toast.no_elite_threat_can_be_marked")
     end
     if (root.Position - model.PrimaryPart.Position).Magnitude > range then
-        return false, "MOVE CLOSER TO MARK OLD GROWTH"
+        return false, Strings.get("toast.move_closer_to_mark_old_growth")
     end
     if not self:_lineOfSight(player, model) then
-        return false, "OLD GROWTH IS HIDDEN BY THE TRUNK"
+        return false, Strings.get("toast.old_growth_is_hidden_by_the")
     end
-    return true, "FOXFIRE MARK READY"
+    return true, Strings.get("toast.foxfire_mark_ready")
 end
 
 function OldGrowthService.markNearest(
@@ -818,7 +828,7 @@ function OldGrowthService.markNearest(
             true
         )
     end
-    local message = "FOXFIRE MARK — OLD GROWTH TELEGRAPHS SLOWED"
+    local message = Strings.get("toast.foxfire_mark_old_growth_telegraphs_slowed")
     self:_notify(message)
     return true, message
 end
@@ -832,7 +842,7 @@ function OldGrowthService.threatSnapshot(self: OldGrowthService, viewer: Player)
         attackId = attack.definition.attackId,
         displayName = attack.definition.attackName,
         enemyId = self._encounter.Id,
-        enemyName = "OLD GROWTH",
+        enemyName = Strings.get("common.old_growth"),
         instruction = attack.definition.instruction,
         resolvesAt = attack.flow.endsAt,
         shape = attack.definition.shape,

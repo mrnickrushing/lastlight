@@ -2,6 +2,8 @@
 
 local Players = game:GetService("Players")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local ProfessionService = {}
 ProfessionService.__index = ProfessionService
 ProfessionService.Name = "ProfessionService"
@@ -143,11 +145,11 @@ function ProfessionService._switchAvailability(
     player: Player
 ): (boolean, string?)
     if not self._survivalService:canAct(player) then
-        return false, "YOU CANNOT SWITCH PROFESSION WHILE DOWNED"
+        return false, Strings.get("toast.you_cannot_switch_profession_while_downed")
     end
     local provider = self._switchProvider
     if provider == nil then
-        return false, "PROFESSION SWITCHING IS STILL LOADING"
+        return false, Strings.get("toast.profession_switching_is_still_loading")
     end
     return provider(player)
 end
@@ -160,7 +162,7 @@ function ProfessionService.select(
     if not self._featureFlags:isEnabled("profession_kits_enabled") then
         return {
             accepted = false,
-            message = "PROFESSIONS ARE TEMPORARILY UNAVAILABLE",
+            message = Strings.get("toast.professions_are_temporarily_unavailable"),
             reason = "feature_disabled",
         }
     end
@@ -168,7 +170,7 @@ function ProfessionService.select(
     if state == nil then
         return {
             accepted = false,
-            message = "YOUR PROFESSION LOADOUT IS STILL LOADING",
+            message = Strings.get("toast.your_profession_loadout_is_still_loading"),
             reason = "player_loading",
         }
     end
@@ -179,12 +181,12 @@ function ProfessionService.select(
     if not result.accepted then
         local message = unavailableMessage
         if result.reason == "unknown_profession" then
-            message = "THAT PROFESSION DOES NOT EXIST"
+            message = Strings.get("toast.that_profession_does_not_exist")
         end
         self._analyticsService:professionSelected(player, professionId, false, result.reason)
         return {
             accepted = false,
-            message = message or "PROFESSION SWITCHING IS UNAVAILABLE",
+            message = message or Strings.get("toast.profession_switching_is_unavailable"),
             reason = result.reason,
         }
     end
@@ -201,8 +203,12 @@ function ProfessionService.select(
         })
     end
     local message = if result.changed
-        then string.format("%s READY — %s", definition.displayName, definition.abilityName)
-        else string.format("%s IS ALREADY EQUIPPED", definition.displayName)
+        then string.format(
+            Strings.get("toast.n_ready_n"),
+            definition.displayName,
+            definition.abilityName
+        )
+        else string.format(Strings.get("toast.n_is_already_equipped"), definition.displayName)
     self:_notify(player, message)
     return {
         accepted = true,
@@ -235,26 +241,35 @@ function ProfessionService.selectSpecialization(
     end
 
     if not self._featureFlags:isEnabled("profession_kits_enabled") then
-        return reject("PROFESSIONS ARE TEMPORARILY UNAVAILABLE", "feature_disabled")
+        return reject(
+            Strings.get("toast.professions_are_temporarily_unavailable"),
+            "feature_disabled"
+        )
     end
     local state = self._states[player]
     if state == nil then
-        return reject("YOUR PROFESSION MASTERY IS STILL LOADING", "player_loading")
+        return reject(
+            Strings.get("toast.your_profession_mastery_is_still_loading"),
+            "player_loading"
+        )
     end
     local snapshot = self._professionState.snapshot(state, workspace:GetServerTimeNow())
     if professionId == nil then
-        return reject("THAT MASTERY PATH DOES NOT EXIST", "invalid_specialization")
+        return reject(
+            Strings.get("toast.that_mastery_path_does_not_exist"),
+            "invalid_specialization"
+        )
     end
     if snapshot.selectedId ~= professionId then
         return reject(
-            "EQUIP THE MATCHING PROFESSION BEFORE CHOOSING THIS PATH",
+            Strings.get("toast.equip_the_matching_profession_before_choosin"),
             "profession_mismatch"
         )
     end
     local canSwitch, unavailableMessage = self:_switchAvailability(player)
     if not canSwitch then
         return reject(
-            unavailableMessage or "MASTERY PATHS CAN ONLY CHANGE IN SAFE DAYLIGHT",
+            unavailableMessage or Strings.get("toast.mastery_paths_can_only_change_in"),
             "switch_unavailable"
         )
     end
@@ -263,12 +278,14 @@ function ProfessionService.selectSpecialization(
     local definition = self._professionMastery.specializationDefinition(specializationId)
     if not result.applied then
         local message = if result.duplicate
-            then string.format("%s IS ALREADY YOUR MASTERY PATH", definition.name)
-            elseif result.reason == "specialization_locked" then "REACH MASTERY RANK 10 FIRST"
-            elseif
-                result.reason == "profile_unavailable"
-            then "YOUR PROFILE IS STILL LOADING OR READ-ONLY — TRY AGAIN"
-            else "THAT MASTERY PATH CANNOT BE CHOSEN"
+            then string.format(Strings.get("toast.n_is_already_your_mastery_path"), definition.name)
+            elseif result.reason == "specialization_locked" then Strings.get(
+                "toast.reach_mastery_rank_10_first"
+            )
+            elseif result.reason == "profile_unavailable" then Strings.get(
+                "toast.your_profile_is_still_loading_or"
+            )
+            else Strings.get("toast.that_mastery_path_cannot_be_chosen")
         local accepted = result.duplicate == true
         self._analyticsService:professionSpecializationSelected(
             player,
@@ -296,7 +313,8 @@ function ProfessionService.selectSpecialization(
         profession = professionId,
         specialization = specializationId,
     })
-    local message = string.format("%s PATH CHOSEN — %s", definition.name, definition.description)
+    local message =
+        string.format(Strings.get("toast.n_path_chosen_n"), definition.name, definition.description)
     self:_notify(player, message)
     return {
         accepted = true,
@@ -357,17 +375,17 @@ function ProfessionService._abilityPreflight(
     local enemyService = self._enemyService
     if definition.id == self._catalog.Ids.Scout then
         if enemyService == nil then
-            return false, "THREAT TRACKING IS STILL LOADING"
+            return false, Strings.get("toast.threat_tracking_is_still_loading")
         end
         return enemyService:canMarkNearest(player, effectRadius)
     elseif definition.id == self._catalog.Ids.Warden then
         if enemyService == nil or not enemyService:combatActive() then
-            return false, "LANTERN GUARD NEEDS AN ACTIVE THREAT"
+            return false, Strings.get("toast.lantern_guard_needs_an_active_threat")
         end
-        return true, "LANTERN GUARD READY"
+        return true, Strings.get("toast.lantern_guard_ready")
     elseif definition.id == self._catalog.Ids.Engineer then
         if enemyService == nil then
-            return false, "LANTERN REPAIRS ARE STILL LOADING"
+            return false, Strings.get("toast.lantern_repairs_are_still_loading")
         end
         return enemyService:canRepairLantern(player, effectRadius)
     elseif definition.id == self._catalog.Ids.Medic then
@@ -378,21 +396,21 @@ function ProfessionService._abilityPreflight(
         -- kits have without making the brew fussier than the pulse.
         local canHeal = self._survivalService:canHealInRadius(player, effectRadius)
         if canHeal or #self:_staminaNeedInRadius(player, effectRadius) > 0 then
-            return true, "SPOREBRIGHT TONIC READY"
+            return true, Strings.get("toast.sporebright_tonic_ready")
         end
-        return false, "EVERYONE IN REACH IS ALREADY HALE"
+        return false, Strings.get("toast.everyone_in_reach_is_already_hale")
     elseif definition.id == self._catalog.Ids.Beastkeeper then
         if enemyService == nil then
-            return false, "YOUR HOUND IS STILL WAKING"
+            return false, Strings.get("toast.your_hound_is_still_waking")
         end
         return enemyService:canLureThreat(player, effectRadius)
     elseif definition.id == self._catalog.Ids.Runebinder then
         if enemyService == nil then
-            return false, "THE RUNES ARE STILL SETTLING"
+            return false, Strings.get("toast.the_runes_are_still_settling")
         end
         return enemyService:canStillThreat(player, effectRadius)
     end
-    return true, "LANTERN GUARD READY"
+    return true, Strings.get("toast.lantern_guard_ready")
 end
 
 function ProfessionService._applyAbility(
@@ -413,7 +431,7 @@ function ProfessionService._applyAbility(
         local _, message = self._enemyService:markNearest(player, effectRadius, activeSeconds)
         return message, 1
     elseif definition.id == self._catalog.Ids.Warden then
-        return "LANTERN GUARD ACTIVE — ENEMY DAMAGE REDUCED", 1
+        return Strings.get("toast.lantern_guard_active_enemy_damage_reduced"), 1
     elseif definition.id == self._catalog.Ids.Engineer then
         local _, message = self._enemyService:repairLantern(player, effectRadius, effectAmount)
         return message, 1
@@ -432,7 +450,7 @@ function ProfessionService._applyAbility(
         end
         local affected = math.max(healResult.affected, restored)
         return string.format(
-            "SPOREBRIGHT TONIC — %d TRAVELER%s RESTORED",
+            Strings.get("toast.sporebright_tonic_n_travelern_restored"),
             affected,
             if affected == 1 then "" else "S"
         ),
@@ -447,7 +465,7 @@ function ProfessionService._applyAbility(
 
     local healResult = self._survivalService:healInRadius(player, effectAmount, effectRadius)
     return string.format(
-        "GUIDING PULSE — %d TRAVELER%s RESTORED",
+        Strings.get("toast.guiding_pulse_n_travelern_restored"),
         healResult.affected,
         if healResult.affected == 1 then "" else "S"
     ),
@@ -458,7 +476,7 @@ function ProfessionService.useAbility(self: ProfessionService, player: Player): 
     if not self._featureFlags:isEnabled("profession_kits_enabled") then
         return {
             accepted = false,
-            message = "PROFESSION ABILITIES ARE TEMPORARILY UNAVAILABLE",
+            message = Strings.get("toast.profession_abilities_are_temporarily_unavail"),
             reason = "feature_disabled",
         }
     end
@@ -466,7 +484,7 @@ function ProfessionService.useAbility(self: ProfessionService, player: Player): 
     if state == nil then
         return {
             accepted = false,
-            message = "YOUR PROFESSION LOADOUT IS STILL LOADING",
+            message = Strings.get("toast.your_profession_loadout_is_still_loading"),
             reason = "player_loading",
         }
     end
@@ -475,12 +493,12 @@ function ProfessionService.useAbility(self: ProfessionService, player: Player): 
     local decision = self._professionState.canUse(state, now, self._survivalService:canAct(player))
     if not decision.accepted then
         local message = if decision.reason == "profession_required"
-            then "CHOOSE A PROFESSION IN EMBERHOLLOW"
+            then Strings.get("toast.choose_a_profession_in_emberhollow")
             elseif decision.reason == "cooldown" then string.format(
-                "ABILITY RECHARGING — %.1fs",
+                Strings.get("toast.ability_recharging_ns"),
                 decision.remaining or 0
             )
-            else "YOU CANNOT USE AN ABILITY RIGHT NOW"
+            else Strings.get("toast.you_cannot_use_an_ability_right")
         self._analyticsService:professionAbility(
             player,
             state.selectedId or "none",
@@ -529,7 +547,7 @@ function ProfessionService.useAbility(self: ProfessionService, player: Player): 
     local masteryResult = self._profileService:awardMastery(player, definition.id, 10)
     if masteryResult.leveledUp then
         message = string.format(
-            "%s · %s RANK %d — %s",
+            Strings.get("toast.n_n_rank_n_n"),
             message,
             definition.displayName,
             masteryResult.level,

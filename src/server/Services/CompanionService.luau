@@ -21,6 +21,8 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local CompanionService = {}
 CompanionService.__index = CompanionService
 CompanionService.Name = "CompanionService"
@@ -176,16 +178,18 @@ end
 function CompanionService.command(self: CompanionService, player: Player, mode: any): any
     local companion = self._companions[player]
     if companion == nil then
-        return { accepted = false, message = "YOUR HOUND IS NOT WITH YOU" }
+        return { accepted = false, message = Strings.get("toast.your_hound_is_not_with_you") }
     end
     if mode ~= "follow" and mode ~= "stay" then
-        return { accepted = false, message = "THE HOUND TILTS ITS HEAD" }
+        return { accepted = false, message = Strings.get("toast.the_hound_tilts_its_head") }
     end
     companion.mode = mode
     self._logger:info("companion_commanded", { player = player.UserId, mode = mode })
     return {
         accepted = true,
-        message = if mode == "stay" then "THE HOUND SETTLES AND WAITS" else "THE HOUND FALLS IN",
+        message = if mode == "stay"
+            then Strings.get("toast.the_hound_settles_and_waits")
+            else Strings.get("toast.the_hound_falls_in"),
     }
 end
 

@@ -22,6 +22,8 @@
     land from latching anything at all.
 ]]
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local PrivateServerService = {}
 PrivateServerService.__index = PrivateServerService
 PrivateServerService.Name = "PrivateServerService"
@@ -189,15 +191,15 @@ end
 function PrivateServerService._ready(self: PrivateServerService, control: any): (boolean, string)
     if control.id == "call_phase" then
         if not self._townNightService:isRunning() then
-            return false, "THERE IS NO CLOCK TO CALL ON YET"
+            return false, Strings.get("toast.there_is_no_clock_to_call")
         end
     elseif control.id == "choose_seed" then
         local expeditionService = self._expeditionService
         if expeditionService == nil then
-            return false, "THE WOOD IS NOT STANDING YET"
+            return false, Strings.get("toast.the_wood_is_not_standing_yet")
         end
         if expeditionService:occupied() then
-            return false, "SOMEBODY IS STILL IN THE WOOD"
+            return false, Strings.get("toast.somebody_is_still_in_the_wood")
         end
     end
     return true, ""
@@ -212,13 +214,17 @@ function PrivateServerService._engage(
 ): string
     if control.id == "hold_clock" then
         self._townNightService:setHold(result.state.hold)
-        return if result.state.hold then "THE CLOCK IS HELD" else "THE CLOCK RUNS AGAIN"
+        return if result.state.hold
+            then Strings.get("toast.the_clock_is_held")
+            else Strings.get("toast.the_clock_runs_again")
     elseif control.id == "still_dark" then
         self._enemyService:setStillness(result.state.still)
-        return if result.state.still then "THE DARK HOLDS STILL" else "THE DARK MOVES AGAIN"
+        return if result.state.still
+            then Strings.get("toast.the_dark_holds_still")
+            else Strings.get("toast.the_dark_moves_again")
     elseif control.id == "call_phase" then
         self._townNightService:stepPhase()
-        return "THE PHASE IS CALLED"
+        return Strings.get("toast.the_phase_is_called")
     elseif control.id == "choose_seed" then
         local chosen = self._controls.chosenSeed(result.state, seeds)
         local expeditionService = self._expeditionService :: any
@@ -234,10 +240,10 @@ function PrivateServerService._engage(
         local rebuilt, why = expeditionService:rebuildWithSeed(seed)
         if not rebuilt then
             return if why == "expedition_occupied"
-                then "SOMEBODY IS STILL IN THE WOOD"
-                else "THAT SEED DOES NOT ANSWER"
+                then Strings.get("toast.somebody_is_still_in_the_wood")
+                else Strings.get("toast.that_seed_does_not_answer")
         end
-        return "THE WOOD IS " .. self:readout(player, control.id)
+        return string.format(Strings.get("toast.the_wood_is_n"), self:readout(player, control.id))
     end
     return "SET"
 end

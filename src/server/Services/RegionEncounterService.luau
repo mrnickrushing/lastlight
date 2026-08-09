@@ -29,6 +29,8 @@
 
 local RunService = game:GetService("RunService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local RegionEncounterService = {}
 RegionEncounterService.__index = RegionEncounterService
 RegionEncounterService.Name = "RegionEncounterService"
@@ -169,7 +171,7 @@ function RegionEncounterService.interact(
         return false
     end
     if not self._survivalService:canAct(player) then
-        self:_toast(player, "YOU CANNOT DO THAT WHILE DOWNED")
+        self:_toast(player, Strings.get("toast.you_cannot_do_that_while_downed"))
         return false
     end
     local handler = live.definition.interactions[interactionId]
@@ -203,10 +205,10 @@ function RegionEncounterService.damageNearest(
 ): (boolean, string)
     local live = self._live[encounterId]
     if live == nil then
-        return false, "No encounter is active."
+        return false, Strings.get("toast.no_encounter_is_active")
     end
     if not self._survivalService:canAct(player) then
-        return false, "You cannot strike while downed."
+        return false, Strings.get("toast.you_cannot_strike_while_downed")
     end
     local strike = live.definition.module.strike
     local nextState, result =

@@ -27,6 +27,15 @@ local TestRunner = require("../TestRunner")
 	move a label off a screen. New surfaces arrive with the batch that migrates
 	them, and the list is here rather than inferred so that a typo in a key
 	fails instead of inventing a fourteenth surface nobody meant.
+
+	`tutorial` is the first key here that names something other than a screen,
+	and the distinction is worth stating rather than letting it arrive by
+	accident. The tutorial's copy is read on three surfaces -- a toast, the
+	objective banner, and Mara's own line -- and it follows the step rather than
+	the screen, so the step is what the key can honestly name. Content batches
+	extend that: a recipe's name is read at a workbench, in the field book and
+	in a toast, and naming one of those three would be a lie about the other
+	two.
 ]]
 local SURFACES = {
     hud = true,
@@ -36,6 +45,8 @@ local SURFACES = {
     world = true,
     bramblewake = true,
     region = true,
+    toast = true,
+    tutorial = true,
 }
 
 return {

@@ -3,6 +3,8 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local BramblewakeBlackoutService = {}
 BramblewakeBlackoutService.__index = BramblewakeBlackoutService
 BramblewakeBlackoutService.Name = "BramblewakeBlackoutService"
@@ -248,7 +250,7 @@ function BramblewakeBlackoutService._step(self: BramblewakeBlackoutService, now:
                 nextState,
                 self:_representativePlayer(),
                 "old_growth_complete",
-                "OLD GROWTH RELEASES THE WARDEN'S SEAL"
+                Strings.get("toast.old_growth_releases_the_warden_s")
             )
         end
     elseif self._state.status == "warden" and self._wardenStagService:isComplete() then
@@ -260,7 +262,7 @@ function BramblewakeBlackoutService._step(self: BramblewakeBlackoutService, now:
                     nextState,
                     self:_representativePlayer(),
                     "warden_complete",
-                    "THE GREENWARD AWAITS YOUR VOTE"
+                    Strings.get("toast.the_greenward_awaits_your_vote")
                 )
             end
         end
@@ -285,7 +287,10 @@ function BramblewakeBlackoutService._step(self: BramblewakeBlackoutService, now:
                 )
             end
             self:_notify(
-                "CHAPTER I RESOLVED — " .. string.upper(self._state.decision:gsub("_", " "))
+                string.format(
+                    Strings.get("toast.chapter_i_resolved_n"),
+                    string.upper(self._state.decision:gsub("_", " "))
+                )
             )
         end
     elseif self._state.status == "complete" then
@@ -310,14 +315,14 @@ function BramblewakeBlackoutService.participantEntered(
     if self._state.status == "disabled" then
         return {
             accepted = false,
-            message = "BLACKOUT PREVIEW DISABLED — BRAMBLEWAKE REMAINS OPEN",
+            message = Strings.get("toast.blackout_preview_disabled_bramblewake_remain"),
             reason = "disabled",
         }
     end
     if not self._oldGrowthService:enabled() or not self._wardenStagService:enabled() then
         return {
             accepted = false,
-            message = "BLACKOUT ENCOUNTERS ARE TEMPORARILY UNAVAILABLE",
+            message = Strings.get("toast.blackout_encounters_are_temporarily_unavaila"),
             reason = "dependency_disabled",
         }
     end
@@ -325,7 +330,7 @@ function BramblewakeBlackoutService.participantEntered(
         if story ~= nil and story.status == "complete" then
             return {
                 accepted = true,
-                message = "CHAPTER I ALREADY RESOLVED — EXPEDITION OPEN",
+                message = Strings.get("toast.chapter_i_already_resolved_expedition_open"),
                 reason = "chapter_complete",
             }
         end
@@ -341,10 +346,10 @@ function BramblewakeBlackoutService.participantEntered(
                 self._state.manifestHash,
                 self._state.duration
             )
-            self:_notify("BLACKOUT — CARRY ROOTFIRE BETWEEN LIVING ROOTS")
+            self:_notify(Strings.get("toast.blackout_carry_rootfire_between_living_roots"))
             return {
                 accepted = true,
-                message = "BLACKOUT — ROOTFIRE RELAY ACTIVE",
+                message = Strings.get("toast.blackout_rootfire_relay_active"),
                 reason = "started",
             }
         end
@@ -359,19 +364,19 @@ function BramblewakeBlackoutService.participantEntered(
         self:_notify(nil)
         return {
             accepted = true,
-            message = "JOINED THE ACTIVE BRAMBLEWAKE BLACKOUT",
+            message = Strings.get("toast.joined_the_active_bramblewake_blackout"),
             reason = "joined",
         }
     elseif self._state.status == "complete" then
         return {
             accepted = true,
-            message = "BLACKOUT COMPLETE — CHAPTER RESULT RECORDED",
+            message = Strings.get("toast.blackout_complete_chapter_result_recorded"),
             reason = "complete",
         }
     end
     return {
         accepted = false,
-        message = "BLACKOUT COULD NOT START",
+        message = Strings.get("toast.blackout_could_not_start"),
         reason = self._state.status,
     }
 end
@@ -387,7 +392,7 @@ function BramblewakeBlackoutService.interact(
     then
         return {
             accepted = false,
-            message = "ENTER BRAMBLEWAKE WHILE ACTIVE",
+            message = Strings.get("toast.enter_bramblewake_while_active"),
             reason = "player_unavailable",
         }
     end
@@ -414,19 +419,21 @@ function BramblewakeBlackoutService.interact(
     else
         return {
             accepted = false,
-            message = "INVALID BLACKOUT INTERACTION",
+            message = Strings.get("toast.invalid_blackout_interaction"),
             reason = "invalid_interaction",
         }
     end
     if not result.accepted then
         result.message = if result.reason == "fire_required"
                 or result.reason == "fire_expired"
-            then "TAKE FRESH ROOTFIRE FROM THE BLACKOUT LANTERN"
-            elseif result.reason == "already_delivered" then "THAT LIVING ROOT ALREADY HOLDS FIRE"
-            elseif
-                self._state.status == "resolution"
-            then "ONLY ACTIVE BLACKOUT PARTICIPANTS CAN VOTE"
-            else "THAT BLACKOUT STEP IS NOT ACTIVE"
+            then Strings.get("toast.take_fresh_rootfire_from_the_blackout")
+            elseif result.reason == "already_delivered" then Strings.get(
+                "toast.that_living_root_already_holds_fire"
+            )
+            elseif self._state.status == "resolution" then Strings.get(
+                "toast.only_active_blackout_participants_can_vote"
+            )
+            else Strings.get("toast.that_blackout_step_is_not_active")
         return result
     end
 
@@ -435,14 +442,17 @@ function BramblewakeBlackoutService.interact(
     self:_syncCarrierVisuals(now)
     if result.reason == "fire_taken" then
         result.message = string.format(
-            "ROOTFIRE TAKEN — DELIVER WITHIN %d SECONDS",
+            Strings.get("toast.rootfire_taken_deliver_within_n_seconds"),
             self._flow.FireCarrySeconds
         )
     elseif result.reason == "fire_delivered" then
-        result.message =
-            string.format("LIVING ROOT LIT — %d / %d", result.delivered, result.required)
+        result.message = string.format(
+            Strings.get("toast.living_root_lit_n_n"),
+            result.delivered,
+            result.required
+        )
     elseif result.reason == "relay_complete" then
-        result.message = "ROOTFIRE RELAY COMPLETE — OLD GROWTH AWAKENS"
+        result.message = Strings.get("toast.rootfire_relay_complete_old_growth_awakens")
         self._analyticsService:blackoutStage(
             player,
             self._flow.Id,
@@ -451,10 +461,12 @@ function BramblewakeBlackoutService.interact(
             self._state.revision
         )
     elseif result.reason == "vote_recorded" then
-        result.message = "GREENWARD VOTE RECORDED — WAITING FOR ACTIVE TRAVELERS"
+        result.message = Strings.get("toast.greenward_vote_recorded_waiting_for_active")
     elseif result.reason == "resolved" then
-        result.message = "CHAPTER I RESOLVED — "
-            .. string.upper(self._state.decision:gsub("_", " "))
+        result.message = string.format(
+            Strings.get("toast.chapter_i_resolved_n"),
+            string.upper(self._state.decision:gsub("_", " "))
+        )
         self._worldService:setBlackoutLighting(false)
         self:_persistResolution()
         self._analyticsService:blackoutResult(
@@ -469,7 +481,7 @@ function BramblewakeBlackoutService.interact(
         -- TUNING-METRIC: difficulty_checkpoint
         self._analyticsService:difficultyCheckpoint(player, self._flow.Id, true)
     else
-        result.message = "BLACKOUT UPDATED"
+        result.message = Strings.get("toast.blackout_updated")
     end
     self:_notify(result.message)
     return result

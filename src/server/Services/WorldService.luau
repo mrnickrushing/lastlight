@@ -8086,14 +8086,17 @@ function WorldService.setTownDecorations(self: WorldService, snapshot: any)
                 false
             )
             marker.CanQuery = true
+            -- The slot's price is read out of the materials' own labels rather
+            -- than sawn off their ids, which is how a plank in the town square
+            -- came to read "meadow_fiber" at a player. Same shape as the
+            -- fishing pedestal in #356 and the seed board in #339: a database
+            -- key on a sign, and never a literal, so no string check could see
+            -- it. DecorationCosts.spec holds every slot's cost against the
+            -- labels so a new material cannot arrive unnamed.
             local costText = {}
-            for materialId, amount in slot.cost do
-                table.insert(
-                    costText,
-                    string.format("%d %s", amount, (string.gsub(materialId, "material_", "")))
-                )
+            for _, entry in self._extractionPayoff.summarize(slot.cost) do
+                table.insert(costText, string.format("%d %s", entry.amount, entry.label))
             end
-            table.sort(costText)
             self:_registerInteraction(
                 marker,
                 "decor_place_" .. slot.id,
@@ -9196,7 +9199,7 @@ local function buildTownConsequenceLandscape(
     )
     WorldSignBuilder.dressBoard(
         sign,
-        string.format("TIER %d · %s", consequence.tier, consequence.title),
+        string.format(Strings.get("world.tier_n_n"), consequence.tier, consequence.title),
         CREAM,
         "consequence"
     )
@@ -13655,7 +13658,7 @@ function WorldService.showExtractionPayoff(
     addBillboard(
         pallet,
         string.format(
-            "%s · WAYHOME DELIVERY · %d",
+            Strings.get("world.n_wayhome_delivery_n"),
             string.upper(string.sub(player.DisplayName, 1, 18)),
             total
         ),

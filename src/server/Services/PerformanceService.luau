@@ -32,6 +32,8 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local Strings = require(game:GetService("ReplicatedStorage"):WaitForChild("LastLight").Strings)
+
 local PerformanceService = {}
 PerformanceService.__index = PerformanceService
 PerformanceService.Name = "PerformanceService"
@@ -495,7 +497,7 @@ function PerformanceService.formattedReport(self: PerformanceService): { string 
         lines,
         1,
         string.format(
-            "%s after %.0f min, %d players",
+            Strings.get("toast.n_after_n_min_n_players"),
             string.upper(report.verdict),
             (os.clock() - self._startedAt) / 60,
             #Players:GetPlayers()
