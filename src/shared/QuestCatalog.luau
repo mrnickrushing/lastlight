@@ -1,5 +1,7 @@
 --!strict
 
+local Strings = require("./Strings")
+
 local QuestCatalog = {}
 
 export type Objective = {
@@ -114,21 +116,21 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_survive_three_nights = table.freeze({
         id = "quest_survive_three_nights",
         residentId = "npc_pip_wren",
-        displayName = "THREE NIGHTS SURVIVED",
+        displayName = Strings.get("quest.three_nights_survived"),
         objective = table.freeze({ kind = "survive_nights", threshold = 3 }),
         reward = table.freeze({ materialId = "material_heartwood", amount = 5 }),
     }),
     quest_first_craft = table.freeze({
         id = "quest_first_craft",
         residentId = "npc_tomas_reed",
-        displayName = "FIRST CRAFT",
+        displayName = Strings.get("quest.first_craft"),
         objective = table.freeze({ kind = "craft_items", threshold = 1 }),
         reward = table.freeze({ materialId = "material_amber_sap", amount = 3 }),
     }),
     quest_bramblewake_veteran = table.freeze({
         id = "quest_bramblewake_veteran",
         residentId = "npc_ena_moss",
-        displayName = "BRAMBLEWAKE VETERAN",
+        displayName = Strings.get("quest.bramblewake_veteran"),
         objective = table.freeze({ kind = "bramblewake_settlements", threshold = 3 }),
         reward = table.freeze({ materialId = "material_brightcap", amount = 3 }),
     }),
@@ -138,7 +140,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_delve_smith = table.freeze({
         id = "quest_delve_smith",
         residentId = "npc_hesper_vane",
-        displayName = "A SMITH'S MEASURE",
+        displayName = Strings.get("quest.a_smith_s_measure"),
         objective = table.freeze({ kind = "gear_traits", threshold = 3 }),
         reward = table.freeze({ materialId = "material_heartwood", amount = 6 }),
     }),
@@ -147,7 +149,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_rail_keeper = table.freeze({
         id = "quest_rail_keeper",
         residentId = "npc_odell_crane",
-        displayName = "THE STORES ARE FULL",
+        displayName = Strings.get("quest.the_stores_are_full"),
         objective = table.freeze({ kind = "materials_banked", threshold = 60 }),
         reward = table.freeze({ materialId = "material_spring_clay", amount = 4 }),
     }),
@@ -155,7 +157,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_lamp_trimmer = table.freeze({
         id = "quest_lamp_trimmer",
         residentId = "npc_junie_falk",
-        displayName = "SEVEN LIT NIGHTS",
+        displayName = Strings.get("quest.seven_lit_nights"),
         objective = table.freeze({ kind = "survive_nights", threshold = 7 }),
         reward = table.freeze({ materialId = "material_amber_sap", amount = 5 }),
     }),
@@ -164,7 +166,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_deep_cook = table.freeze({
         id = "quest_deep_cook",
         residentId = "npc_bartram_hoke",
-        displayName = "SOMEWHERE TO COOK",
+        displayName = Strings.get("quest.somewhere_to_cook"),
         objective = table.freeze({ kind = "buildings_raised", threshold = 4 }),
         reward = table.freeze({ materialId = "material_brightcap", amount = 4 }),
     }),
@@ -174,7 +176,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_ferry_ledger = table.freeze({
         id = "quest_ferry_ledger",
         residentId = "npc_saoirse_quill",
-        displayName = "NAMES OUT, NAMES BACK",
+        displayName = Strings.get("quest.names_out_names_back"),
         objective = table.freeze({ kind = "bramblewake_settlements", threshold = 8 }),
         reward = table.freeze({ materialId = "material_heartwood", amount = 8 }),
     }),
@@ -183,7 +185,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_reed_weaver = table.freeze({
         id = "quest_reed_weaver",
         residentId = "npc_wren_dabbler",
-        displayName = "SOMETHING WOVEN",
+        displayName = Strings.get("quest.something_woven"),
         objective = table.freeze({ kind = "decorations_placed", threshold = 3 }),
         reward = table.freeze({ materialId = "material_meadow_fiber", amount = 6 }),
     }),
@@ -192,7 +194,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_glass_reader = table.freeze({
         id = "quest_glass_reader",
         residentId = "npc_marek_still",
-        displayName = "LOOK TWICE",
+        displayName = Strings.get("quest.look_twice"),
         objective = table.freeze({ kind = "craft_items", threshold = 6 }),
         reward = table.freeze({ materialId = "material_amber_sap", amount = 6 }),
     }),
@@ -200,7 +202,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_fen_healer = table.freeze({
         id = "quest_fen_healer",
         residentId = "npc_lissen_ford",
-        displayName = "COUNT EVERY HEAD",
+        displayName = Strings.get("quest.count_every_head"),
         objective = table.freeze({ kind = "residents_bonded", threshold = 3 }),
         reward = table.freeze({ materialId = "material_brightcap", amount = 6 }),
     }),
@@ -209,7 +211,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_signal_watch = table.freeze({
         id = "quest_signal_watch",
         residentId = "npc_isolde_maren",
-        displayName = "KEEP THE LIGHT",
+        displayName = Strings.get("quest.keep_the_light"),
         objective = table.freeze({ kind = "survive_nights", threshold = 14 }),
         reward = table.freeze({ materialId = "material_storm_glass", amount = 6 }),
     }),
@@ -217,7 +219,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_ropewalk_hands = table.freeze({
         id = "quest_ropewalk_hands",
         residentId = "npc_cass_pell",
-        displayName = "TWENTY GOOD LENGTHS",
+        displayName = Strings.get("quest.twenty_good_lengths"),
         objective = table.freeze({ kind = "craft_items", threshold = 20 }),
         reward = table.freeze({ materialId = "material_salt_kelp", amount = 8 }),
     }),
@@ -226,7 +228,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_harbour_ledger = table.freeze({
         id = "quest_harbour_ledger",
         residentId = "npc_alder_kine",
-        displayName = "THE STORES IN BLACK",
+        displayName = Strings.get("quest.the_stores_in_black"),
         objective = table.freeze({ kind = "materials_banked", threshold = 200 }),
         reward = table.freeze({ materialId = "material_ships_iron", amount = 6 }),
     }),
@@ -237,7 +239,7 @@ local DEFINITIONS: { [string]: Quest } = {
         residentId = "npc_nell_barrow",
         -- "LOADS", not "TRIPS": the objective counts banked Wayhome
         -- deliveries, and a trip that carries nothing settles nothing.
-        displayName = "FOURTEEN LOADS BANKED",
+        displayName = Strings.get("quest.fourteen_loads_banked"),
         objective = table.freeze({ kind = "bramblewake_settlements", threshold = 14 }),
         reward = table.freeze({ materialId = "material_storm_glass", amount = 8 }),
     }),
@@ -246,7 +248,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_bell_keeping = table.freeze({
         id = "quest_bell_keeping",
         residentId = "npc_anselm_rill",
-        displayName = "WHAT THE BELLS REMEMBER",
+        displayName = Strings.get("quest.what_the_bells_remember"),
         objective = table.freeze({ kind = "fragments_recovered", threshold = 4 }),
         reward = table.freeze({ materialId = "material_aurora_salt", amount = 6 }),
     }),
@@ -255,7 +257,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_vale_nursing = table.freeze({
         id = "quest_vale_nursing",
         residentId = "npc_ivy_thorn",
-        displayName = "EIGHT WHO TRUST YOU",
+        displayName = Strings.get("quest.eight_who_trust_you"),
         objective = table.freeze({ kind = "residents_bonded", threshold = 8 }),
         reward = table.freeze({ materialId = "material_ember_moss", amount = 8 }),
     }),
@@ -264,7 +266,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_cold_stores = table.freeze({
         id = "quest_cold_stores",
         residentId = "npc_halvard_sunn",
-        displayName = "EVERY CHAPTER CLOSED",
+        displayName = Strings.get("quest.every_chapter_closed"),
         objective = table.freeze({ kind = "chapters_resolved", threshold = 5 }),
         reward = table.freeze({ materialId = "material_thawed_iron", amount = 6 }),
     }),
@@ -273,7 +275,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_almshouse_doors = table.freeze({
         id = "quest_almshouse_doors",
         residentId = "npc_maud_ferrow",
-        displayName = "TWELVE DOORS STANDING",
+        displayName = Strings.get("quest.twelve_doors_standing"),
         objective = table.freeze({ kind = "buildings_raised", threshold = 12 }),
         reward = table.freeze({ materialId = "material_frostmere_wool", amount = 8 }),
     }),
@@ -282,7 +284,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_glass_hands = table.freeze({
         id = "quest_glass_hands",
         residentId = "npc_sabine_ash",
-        displayName = "FORTY HONEST THINGS",
+        displayName = Strings.get("quest.forty_honest_things"),
         objective = table.freeze({ kind = "craft_items", threshold = 40 }),
         reward = table.freeze({ materialId = "material_memory_glass", amount = 8 }),
     }),
@@ -290,7 +292,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_kept_record = table.freeze({
         id = "quest_kept_record",
         residentId = "npc_theo_marl",
-        displayName = "THE OTHER NAMES",
+        displayName = Strings.get("quest.the_other_names"),
         objective = table.freeze({ kind = "fragments_recovered", threshold = 8 }),
         reward = table.freeze({ materialId = "material_ash_silk", amount = 8 }),
     }),
@@ -299,7 +301,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_named_stones = table.freeze({
         id = "quest_named_stones",
         residentId = "npc_delia_kass",
-        displayName = "FOURTEEN NAMED",
+        displayName = Strings.get("quest.fourteen_named"),
         objective = table.freeze({ kind = "residents_bonded", threshold = 14 }),
         reward = table.freeze({ materialId = "material_cindersteel", amount = 8 }),
     }),
@@ -307,7 +309,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_long_timber = table.freeze({
         id = "quest_long_timber",
         residentId = "npc_bran_holt",
-        displayName = "TWENTY STANDING",
+        displayName = Strings.get("quest.twenty_standing"),
         objective = table.freeze({ kind = "buildings_raised", threshold = 20 }),
         reward = table.freeze({ materialId = "material_heartwood", amount = 12 }),
     }),
@@ -316,7 +318,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_keepers_return = table.freeze({
         id = "quest_keepers_return",
         residentId = "npc_orin_vale",
-        displayName = "THE KEEPER'S RETURN",
+        displayName = Strings.get("quest.the_keeper_s_return"),
         objective = table.freeze({ kind = "chapters_resolved", threshold = 7 }),
         reward = table.freeze({ materialId = "material_crown_coal", amount = 12 }),
     }),
@@ -324,7 +326,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_deep_water = table.freeze({
         id = "quest_deep_water",
         residentId = "npc_signe_marr",
-        displayName = "FOUR HUNDRED IN STORE",
+        displayName = Strings.get("quest.four_hundred_in_store"),
         objective = table.freeze({ kind = "materials_banked", threshold = 400 }),
         reward = table.freeze({ materialId = "material_kiln_pearl", amount = 8 }),
     }),
@@ -332,7 +334,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_full_house = table.freeze({
         id = "quest_full_house",
         residentId = "npc_ruth_calder",
-        displayName = "A TOWN WORTH MEETING IN",
+        displayName = Strings.get("quest.a_town_worth_meeting_in"),
         objective = table.freeze({ kind = "decorations_placed", threshold = 8 }),
         reward = table.freeze({ materialId = "material_ember_moss", amount = 10 }),
     }),
@@ -340,7 +342,7 @@ local DEFINITIONS: { [string]: Quest } = {
     quest_last_ward = table.freeze({
         id = "quest_last_ward",
         residentId = "npc_edda_pyne",
-        displayName = "THIRTY NIGHTS WARDED",
+        displayName = Strings.get("quest.thirty_nights_warded"),
         objective = table.freeze({ kind = "survive_nights", threshold = 30 }),
         reward = table.freeze({ materialId = "material_thawed_iron", amount = 10 }),
     }),
@@ -348,7 +350,7 @@ local DEFINITIONS: { [string]: Quest } = {
     -- that has clearly been used.
     quest_tomas_second_bench = table.freeze({
         id = "quest_tomas_second_bench",
-        displayName = "A BENCH WORTH THE NAME",
+        displayName = Strings.get("quest.a_bench_worth_the_name"),
         objective = table.freeze({ kind = "craft_items", threshold = 12 }),
         requires = "quest_first_craft",
         residentId = "npc_tomas_reed",
@@ -357,7 +359,7 @@ local DEFINITIONS: { [string]: Quest } = {
     -- And the innkeeper's real ambition, which is not about the inn.
     quest_tomas_full_house = table.freeze({
         id = "quest_tomas_full_house",
-        displayName = "EVERY BED FULL",
+        displayName = Strings.get("quest.every_bed_full"),
         objective = table.freeze({ kind = "residents_bonded", threshold = 10 }),
         requires = "quest_tomas_second_bench",
         residentId = "npc_tomas_reed",
@@ -366,7 +368,7 @@ local DEFINITIONS: { [string]: Quest } = {
     -- Pip's second ask is the courier's: not survival, distance.
     quest_pip_further_roads = table.freeze({
         id = "quest_pip_further_roads",
-        displayName = "THE ROADS FURTHER OUT",
+        displayName = Strings.get("quest.the_roads_further_out"),
         objective = table.freeze({ kind = "bramblewake_settlements", threshold = 6 }),
         requires = "quest_survive_three_nights",
         residentId = "npc_pip_wren",
@@ -376,7 +378,7 @@ local DEFINITIONS: { [string]: Quest } = {
     -- nights nobody was surprised.
     quest_pip_every_night = table.freeze({
         id = "quest_pip_every_night",
-        displayName = "A YEAR OF POSTED NIGHTS",
+        displayName = Strings.get("quest.a_year_of_posted_nights"),
         objective = table.freeze({ kind = "survive_nights", threshold = 21 }),
         requires = "quest_pip_further_roads",
         residentId = "npc_pip_wren",
@@ -386,7 +388,7 @@ local DEFINITIONS: { [string]: Quest } = {
     -- than merely standing.
     quest_ena_first_growth = table.freeze({
         id = "quest_ena_first_growth",
-        displayName = "SOMETHING PLANTED",
+        displayName = Strings.get("quest.something_planted"),
         objective = table.freeze({ kind = "decorations_placed", threshold = 5 }),
         requires = "quest_bramblewake_veteran",
         residentId = "npc_ena_moss",
@@ -396,7 +398,7 @@ local DEFINITIONS: { [string]: Quest } = {
     -- the fragments were a story rather than a collection.
     quest_ena_the_archive = table.freeze({
         id = "quest_ena_the_archive",
-        displayName = "WHAT THE FOREST KEPT",
+        displayName = Strings.get("quest.what_the_forest_kept"),
         objective = table.freeze({ kind = "fragments_recovered", threshold = 6 }),
         requires = "quest_ena_first_growth",
         residentId = "npc_ena_moss",
@@ -404,7 +406,7 @@ local DEFINITIONS: { [string]: Quest } = {
     }),
     quest_mastery_scout = table.freeze({
         id = "quest_mastery_scout",
-        displayName = "THE ROAD KNOWN",
+        displayName = Strings.get("quest.the_road_known"),
         objective = table.freeze({
             kind = "profession_mastery",
             professionId = "profession_scout",
@@ -414,7 +416,7 @@ local DEFINITIONS: { [string]: Quest } = {
     }),
     quest_mastery_warden = table.freeze({
         id = "quest_mastery_warden",
-        displayName = "THE WATCH KEPT",
+        displayName = Strings.get("quest.the_watch_kept"),
         objective = table.freeze({
             kind = "profession_mastery",
             professionId = "profession_warden",
@@ -424,7 +426,7 @@ local DEFINITIONS: { [string]: Quest } = {
     }),
     quest_mastery_engineer = table.freeze({
         id = "quest_mastery_engineer",
-        displayName = "THE WORK STANDING",
+        displayName = Strings.get("quest.the_work_standing"),
         objective = table.freeze({
             kind = "profession_mastery",
             professionId = "profession_engineer",
@@ -434,7 +436,7 @@ local DEFINITIONS: { [string]: Quest } = {
     }),
     quest_mastery_medic = table.freeze({
         id = "quest_mastery_medic",
-        displayName = "EVERY HEAD COUNTED",
+        displayName = Strings.get("quest.every_head_counted"),
         objective = table.freeze({
             kind = "profession_mastery",
             professionId = "profession_medic",
@@ -444,7 +446,7 @@ local DEFINITIONS: { [string]: Quest } = {
     }),
     quest_mastery_alchemist = table.freeze({
         id = "quest_mastery_alchemist",
-        displayName = "THE MIXTURE RIGHT",
+        displayName = Strings.get("quest.the_mixture_right"),
         objective = table.freeze({
             kind = "profession_mastery",
             professionId = "profession_alchemist",
@@ -454,7 +456,7 @@ local DEFINITIONS: { [string]: Quest } = {
     }),
     quest_mastery_beastkeeper = table.freeze({
         id = "quest_mastery_beastkeeper",
-        displayName = "THE PACK TRUSTED",
+        displayName = Strings.get("quest.the_pack_trusted"),
         objective = table.freeze({
             kind = "profession_mastery",
             professionId = "profession_beastkeeper",
@@ -464,7 +466,7 @@ local DEFINITIONS: { [string]: Quest } = {
     }),
     quest_mastery_runebinder = table.freeze({
         id = "quest_mastery_runebinder",
-        displayName = "THE MARK HELD",
+        displayName = Strings.get("quest.the_mark_held"),
         objective = table.freeze({
             kind = "profession_mastery",
             professionId = "profession_runebinder",
@@ -474,7 +476,7 @@ local DEFINITIONS: { [string]: Quest } = {
     }),
     quest_mystery_bramblewake = table.freeze({
         id = "quest_mystery_bramblewake",
-        displayName = "WHAT THE FOREST KEPT",
+        displayName = Strings.get("quest.what_the_forest_kept"),
         objective = table.freeze({
             kind = "fragments_in_region",
             regionId = "region_bramblewake",
@@ -484,7 +486,7 @@ local DEFINITIONS: { [string]: Quest } = {
     }),
     quest_mystery_ironroot = table.freeze({
         id = "quest_mystery_ironroot",
-        displayName = "WHAT THE DELVE BURIED",
+        displayName = Strings.get("quest.what_the_delve_buried"),
         objective = table.freeze({
             kind = "fragments_in_region",
             regionId = "region_ironroot",
@@ -494,7 +496,7 @@ local DEFINITIONS: { [string]: Quest } = {
     }),
     quest_mystery_mireglass = table.freeze({
         id = "quest_mystery_mireglass",
-        displayName = "WHAT THE WATER TOOK",
+        displayName = Strings.get("quest.what_the_water_took"),
         objective = table.freeze({
             kind = "fragments_in_region",
             regionId = "region_mireglass",
@@ -504,7 +506,7 @@ local DEFINITIONS: { [string]: Quest } = {
     }),
     quest_mystery_tempest = table.freeze({
         id = "quest_mystery_tempest",
-        displayName = "WHAT THE COAST SIGNALLED",
+        displayName = Strings.get("quest.what_the_coast_signalled"),
         objective = table.freeze({
             kind = "fragments_in_region",
             regionId = "region_tempest",
@@ -514,7 +516,7 @@ local DEFINITIONS: { [string]: Quest } = {
     }),
     quest_mystery_frostmere = table.freeze({
         id = "quest_mystery_frostmere",
-        displayName = "WHAT THE VALLEY STOPPED SAYING",
+        displayName = Strings.get("quest.what_the_valley_stopped_saying"),
         objective = table.freeze({
             kind = "fragments_in_region",
             regionId = "region_frostmere",
@@ -524,7 +526,7 @@ local DEFINITIONS: { [string]: Quest } = {
     }),
     quest_mystery_cinderfall = table.freeze({
         id = "quest_mystery_cinderfall",
-        displayName = "WHAT THE CROWN WOULD NOT SAY",
+        displayName = Strings.get("quest.what_the_crown_would_not_say"),
         objective = table.freeze({
             kind = "fragments_in_region",
             regionId = "region_cinderfall",

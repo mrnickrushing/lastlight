@@ -171,11 +171,11 @@ assert(
     "profession specialization interaction catalog is incomplete"
 )
 assert(
-    TownNightIncident.forTheme("EMBERFALL").id == "incident_emberfall_cinders",
+    TownNightIncident.forTheme("emberfall").id == "incident_emberfall_cinders",
     "town incident catalog is missing"
 )
 assert(
-    TownNightIncident.forTheme("EMBERFALL", 5).id == "incident_emberfall_flues",
+    TownNightIncident.forTheme("emberfall", 5).id == "incident_emberfall_flues",
     "alternate town incident catalog is missing"
 )
 local medicRescue = ProfessionRescue.resolve("profession_medic", 1, 2.5, 35, 3)

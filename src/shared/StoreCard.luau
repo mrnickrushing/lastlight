@@ -28,6 +28,8 @@
     rather than knowing it.
 ]]
 
+local Strings = require("./Strings")
+
 local StoreCard = {}
 
 export type Context = {
@@ -95,10 +97,10 @@ export type WardrobeRow = {
     words. A line a copywriter has to remember to add is a line that will be
     missing from the twelfth product; a line the builder adds cannot be.
 ]]
-local ASSURANCE = "COSMETIC ONLY — ABILITIES ARE EARNED IN PLAY"
+local ASSURANCE = Strings.get("hud.cosmetic_only_abilities_are_earned_in")
 
 local PERMANENCE_LABELS: { [string]: string } = table.freeze({
-    permanent = "PERMANENT — YOURS FOR GOOD",
+    permanent = Strings.get("store.permanent_yours_for_good"),
 })
 
 function StoreCard.assurance(): string
@@ -121,7 +123,7 @@ function StoreCard.priceLabel(priceInRobux: any): string?
     if priceInRobux ~= math.floor(priceInRobux) then
         return nil
     end
-    return string.format("%d ROBUX", priceInRobux)
+    return string.format(Strings.get("store.n_robux"), priceInRobux)
 end
 
 function StoreCard.permanenceLabel(permanence: any): string?
@@ -179,11 +181,13 @@ function StoreCard.build(product: any, context: any): (Card?, string)
         priceLabel = priceLabel,
         priceInRobux = context.priceInRobux,
         permanenceLabel = permanenceLabel,
-        ownedLabel = if owned then "OWNED" else "NOT OWNED",
+        ownedLabel = if owned then Strings.get("store.owned") else Strings.get("store.not_owned"),
         owned = owned,
         equipped = equipped,
         action = if owned then "owned" else "buy",
-        actionLabel = if owned then "OWNED" else "BUY · " .. priceLabel,
+        actionLabel = if owned
+            then Strings.get("store.owned")
+            else string.format(Strings.get("store.buy_n"), priceLabel),
         assurance = ASSURANCE,
         previewParts = #preview,
     },
@@ -222,7 +226,7 @@ function StoreCard.wardrobeRow(cosmetic: any, equipped: any): (WardrobeRow?, str
         displayName = cosmetic.displayName,
         slot = cosmetic.slot,
         equipped = equipped,
-        actionLabel = if equipped then "TAKE OFF" else "WEAR",
+        actionLabel = if equipped then Strings.get("store.take_off") else Strings.get("hud.wear"),
         previewParts = #cosmetic.parts,
     },
         "ok"

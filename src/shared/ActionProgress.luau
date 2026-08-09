@@ -22,6 +22,8 @@
         a duplicated remote or a retried tick cannot grant twice.
 ]]
 
+local Strings = require("./Strings")
+
 local ActionProgress = {}
 
 export type State = {
@@ -49,8 +51,8 @@ local DURATIONS = table.freeze({
 })
 
 local LABELS = table.freeze({
-    gather = "GATHERING",
-    build = "BUILDING",
+    gather = Strings.get("enemy.gathering"),
+    build = Strings.get("enemy.building"),
 })
 
 local SWINGS = table.freeze({
@@ -67,7 +69,8 @@ function ActionProgress.durationFor(actionId: any): number?
 end
 
 function ActionProgress.labelFor(actionId: any): string
-    return (if type(actionId) == "string" then LABELS[actionId] else nil) or "WORKING"
+    return (if type(actionId) == "string" then LABELS[actionId] else nil)
+        or Strings.get("enemy.working")
 end
 
 function ActionProgress.swingsFor(actionId: any): number

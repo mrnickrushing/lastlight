@@ -21,6 +21,8 @@
     scene that never ends -- which is the Crown's actual threat.
 ]]
 
+local Strings = require("./Strings")
+
 local LeadActorEncounter = {}
 
 export type Status = "disabled" | "dormant" | "performing" | "broken" | "complete"
@@ -48,9 +50,9 @@ local LINE_LENGTHS = table.freeze({ 2, 3, 4 })
 
 local STANDING_OVATION = table.freeze({
     attackId = "lead_actor_ovation",
-    attackName = "STANDING OVATION",
+    attackName = Strings.get("encounter.standing_ovation"),
     damage = 24,
-    instruction = "THE HOUSE IS APPLAUDING — GET OFF THE FLOOR MARKS",
+    instruction = Strings.get("encounter.the_house_is_applauding_get_off"),
     radius = 14,
     shape = "circle",
     windup = 1.4,
@@ -58,9 +60,9 @@ local STANDING_OVATION = table.freeze({
 
 local CURTAIN_CALL = table.freeze({
     attackId = "lead_actor_curtain",
-    attackName = "CURTAIN CALL",
+    attackName = Strings.get("encounter.curtain_call"),
     damage = 28,
-    instruction = "CLEAR THE STAGE",
+    instruction = Strings.get("encounter.clear_the_stage"),
     length = 30,
     shape = "lane",
     width = 8,
@@ -243,21 +245,27 @@ end
 function LeadActorEncounter.snapshot(state: State, userId: number): any
     local instruction = if state.status == "performing"
         then string.format(
-            "ANSWER THE LINE — %d OF %d",
+            Strings.get("encounter.answer_the_line_n_of_n"),
             state.position,
             LeadActorEncounter.lineLength(state)
         )
-        elseif state.status == "broken" then "THE SCENE IS BROKEN — STRIKE NOW"
-        elseif state.status == "complete" then "THE ACTOR IS DOWN · THE STAGE IS QUIET"
-        elseif state.status == "disabled" then "ELITE TEMPORARILY DORMANT"
-        else "TAKE THE STAGE"
+        elseif state.status == "broken" then Strings.get(
+            "encounter.the_scene_is_broken_strike_now"
+        )
+        elseif state.status == "complete" then Strings.get(
+            "encounter.the_actor_is_down_the_stage"
+        )
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.elite_temporarily_dormant"
+        )
+        else Strings.get("encounter.take_the_stage")
     return {
         active = state.status == "performing" or state.status == "broken",
         calledBeat = if state.status == "performing"
             then LeadActorEncounter.expectedBeat(state)
             else nil,
         complete = state.status == "complete",
-        displayName = "LEAD ACTOR",
+        displayName = Strings.get("encounter.lead_actor"),
         enabled = state.status ~= "disabled",
         health = state.health,
         instruction = instruction,

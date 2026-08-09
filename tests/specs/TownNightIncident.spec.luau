@@ -10,7 +10,7 @@ return {
             name = "maps every normal-night theme to two distinct physical incidents",
             run = function()
                 local seen = {}
-                for themeIndex, theme in { "EMBERFALL", "MIRETIDE", "ROOTMOON", "ASHEN VEIL" } do
+                for themeIndex, theme in { "emberfall", "miretide", "rootmoon", "ashen_veil" } do
                     for cycle = 0, 1 do
                         local definition = TownNightIncident.forTheme(theme, themeIndex + cycle * 4)
                         TestRunner.truthy(definition ~= nil)
@@ -29,9 +29,9 @@ return {
         {
             name = "alternates incident families every four-night theme cycle",
             run = function()
-                local first = TownNightIncident.create("EMBERFALL", 1, 10)
-                local alternate = TownNightIncident.create("EMBERFALL", 5, 10)
-                local repeated = TownNightIncident.create("EMBERFALL", 9, 10)
+                local first = TownNightIncident.create("emberfall", 1, 10)
+                local alternate = TownNightIncident.create("emberfall", 5, 10)
+                local repeated = TownNightIncident.create("emberfall", 9, 10)
                 TestRunner.equal(first.definition.id, "incident_emberfall_cinders")
                 TestRunner.equal(alternate.definition.id, "incident_emberfall_flues")
                 TestRunner.equal(repeated.definition.id, first.definition.id)
@@ -46,7 +46,7 @@ return {
         {
             name = "creates a bounded deterministic incident window",
             run = function()
-                local state = TownNightIncident.create("EMBERFALL", 3, 100)
+                local state = TownNightIncident.create("emberfall", 3, 100)
                 TestRunner.equal(state.status, "active")
                 TestRunner.equal(state.nightNumber, 3)
                 TestRunner.equal(state.endsAt, 142)
@@ -56,7 +56,7 @@ return {
         {
             name = "completes only after three distinct sites",
             run = function()
-                local state = TownNightIncident.create("MIRETIDE", 2, 10)
+                local state = TownNightIncident.create("miretide", 2, 10)
                 state = TownNightIncident.interact(state, "archive", 12)
                 state = TownNightIncident.interact(state, "workshop", 13)
                 local complete, result = TownNightIncident.interact(state, "inn", 14)
@@ -68,7 +68,7 @@ return {
         {
             name = "keeps repeated site delivery idempotent",
             run = function()
-                local state = TownNightIncident.create("ROOTMOON", 4, 10)
+                local state = TownNightIncident.create("rootmoon", 4, 10)
                 local progressed = TownNightIncident.interact(state, "archive", 12)
                 local unchanged, duplicate = TownNightIncident.interact(progressed, "archive", 13)
                 TestRunner.equal(duplicate.accepted, false)
@@ -79,7 +79,7 @@ return {
         {
             name = "fails at the deadline with one bounded lantern penalty",
             run = function()
-                local state = TownNightIncident.create("ASHEN VEIL", 5, 20)
+                local state = TownNightIncident.create("ashen_veil", 5, 20)
                 state = TownNightIncident.interact(state, "archive", 21)
                 local failed, result = TownNightIncident.expire(state, 62)
                 TestRunner.equal(result.applied, true)
@@ -94,7 +94,7 @@ return {
         {
             name = "rejects unknown sites and late interaction",
             run = function()
-                local state = TownNightIncident.create("EMBERFALL", 1, 0)
+                local state = TownNightIncident.create("emberfall", 1, 0)
                 local same, unknown = TownNightIncident.interact(state, "lantern", 2)
                 TestRunner.equal(same, state)
                 TestRunner.equal(unknown.reason, "unknown_site")

@@ -47,6 +47,17 @@ local SURFACES = {
     region = true,
     toast = true,
     tutorial = true,
+    chat = true,
+    encounter = true,
+    enemy = true,
+    expedition = true,
+    profession = true,
+    quest = true,
+    resident = true,
+    item = true,
+    store = true,
+    story = true,
+    town = true,
 }
 
 return {

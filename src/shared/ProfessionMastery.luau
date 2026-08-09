@@ -1,6 +1,7 @@
 --!strict
 
 local ProfessionCatalog = require("./ProfessionCatalog")
+local Strings = require("./Strings")
 
 local ProfessionMastery = {}
 
@@ -30,12 +31,12 @@ local XP_PER_LEVEL = 100
 local MAX_XP = MAX_LEVEL * XP_PER_LEVEL
 
 local RANKS = table.freeze({
-    table.freeze({ level = 1, name = "INITIATE" }),
-    table.freeze({ level = 2, name = "KEEPER" }),
-    table.freeze({ level = 4, name = "ADEPT" }),
-    table.freeze({ level = 6, name = "VETERAN" }),
-    table.freeze({ level = 8, name = "LUMINARY" }),
-    table.freeze({ level = 10, name = "MASTER" }),
+    table.freeze({ level = 1, name = Strings.get("profession.initiate") }),
+    table.freeze({ level = 2, name = Strings.get("profession.keeper") }),
+    table.freeze({ level = 4, name = Strings.get("profession.adept") }),
+    table.freeze({ level = 6, name = Strings.get("profession.veteran") }),
+    table.freeze({ level = 8, name = Strings.get("profession.luminary") }),
+    table.freeze({ level = 10, name = Strings.get("profession.master") }),
 })
 
 local function specialization(definition: any): Specialization
@@ -57,141 +58,141 @@ local SPECIALIZATIONS: { [string]: { Specialization } } = table.freeze({
     profession_scout = table.freeze({
         specialization({
             id = "specialization_pathfinder",
-            name = "PATHFINDER",
-            description = "Foxfire Mark reaches 8 studs farther.",
+            name = Strings.get("world.pathfinder"),
+            description = Strings.get("profession.foxfire_mark_reaches_8_studs_farther"),
             effectRadiusBonus = 8,
         }),
         specialization({
             id = "specialization_foxfire_trapper",
-            name = "FOXFIRE TRAPPER",
-            description = "Foxfire Mark lasts 3 seconds longer.",
+            name = Strings.get("world.foxfire_trapper"),
+            description = Strings.get("profession.foxfire_mark_lasts_3_seconds_longer"),
             activeSecondsBonus = 3,
         }),
         specialization({
             id = "specialization_trailseer",
-            name = "TRAILSEER",
-            description = "Foxfire Mark recharges 4 seconds faster.",
+            name = Strings.get("world.trailseer"),
+            description = Strings.get("profession.foxfire_mark_recharges_4_seconds_faster"),
             cooldownReduction = 4,
         }),
     }),
     profession_warden = table.freeze({
         specialization({
             id = "specialization_bulwark",
-            name = "BULWARK",
-            description = "Lantern Guard reduces 10% more incoming damage.",
+            name = Strings.get("world.bulwark"),
+            description = Strings.get("profession.lantern_guard_reduces_10nore_incoming_damage"),
             effectAmountBonus = 10,
         }),
         specialization({
             id = "specialization_greenkeeper",
-            name = "GREENKEEPER",
-            description = "Lantern Guard lasts 3 seconds longer.",
+            name = Strings.get("world.greenkeeper"),
+            description = Strings.get("profession.lantern_guard_lasts_3_seconds_longer"),
             activeSecondsBonus = 3,
         }),
         specialization({
             id = "specialization_oathbound",
-            name = "OATHBOUND",
-            description = "Warden rescues grant 1.5 more ward seconds.",
+            name = Strings.get("world.oathbound"),
+            description = Strings.get("profession.warden_rescues_grant_1_5_more"),
             rescueWardBonus = 1.5,
         }),
     }),
     profession_engineer = table.freeze({
         specialization({
             id = "specialization_lamplighter",
-            name = "LAMPLIGHTER",
-            description = "Emergency Patch restores 10 more lantern health.",
+            name = Strings.get("world.lamplighter"),
+            description = Strings.get("profession.emergency_patch_restores_10_more_lantern"),
             effectAmountBonus = 10,
         }),
         specialization({
             id = "specialization_rootwright",
-            name = "ROOTWRIGHT",
-            description = "Emergency Patch reaches 10 studs farther.",
+            name = Strings.get("world.rootwright"),
+            description = Strings.get("profession.emergency_patch_reaches_10_studs_farther"),
             effectRadiusBonus = 10,
         }),
         specialization({
             id = "specialization_salvager",
-            name = "SALVAGER",
-            description = "Emergency Patch recharges 5 seconds faster.",
+            name = Strings.get("world.salvager"),
+            description = Strings.get("profession.emergency_patch_recharges_5_seconds_faster"),
             cooldownReduction = 5,
         }),
     }),
     profession_medic = table.freeze({
         specialization({
             id = "specialization_dawnmender",
-            name = "DAWNMENDER",
-            description = "Guiding Pulse restores 10 more health.",
+            name = Strings.get("world.dawnmender"),
+            description = Strings.get("profession.guiding_pulse_restores_10_more_health"),
             effectAmountBonus = 10,
         }),
         specialization({
             id = "specialization_wayhome_tender",
-            name = "WAYHOME TENDER",
-            description = "Medic rescues are faster and restore 8 more health.",
+            name = Strings.get("world.wayhome_tender"),
+            description = Strings.get("profession.medic_rescues_are_faster_and_restore"),
             rescueDurationMultiplier = 0.82,
             rescueHealthBonus = 8,
         }),
         specialization({
             id = "specialization_brightcap_herbalist",
-            name = "BRIGHTCAP HERBALIST",
-            description = "Guiding Pulse reaches 10 studs farther.",
+            name = Strings.get("world.brightcap_herbalist"),
+            description = Strings.get("profession.guiding_pulse_reaches_10_studs_farther"),
             effectRadiusBonus = 10,
         }),
     }),
     profession_alchemist = table.freeze({
         specialization({
             id = "specialization_brewer",
-            name = "BREWER",
-            description = "Sporebright Tonic restores 8 more stamina and mends deeper.",
+            name = Strings.get("world.brewer"),
+            description = Strings.get("profession.sporebright_tonic_restores_8_more_stamina"),
             effectAmountBonus = 8,
         }),
         specialization({
             id = "specialization_catalyst",
-            name = "CATALYST",
-            description = "Sporebright Tonic recharges 4 seconds faster.",
+            name = Strings.get("world.catalyst"),
+            description = Strings.get("profession.sporebright_tonic_recharges_4_seconds_faster"),
             cooldownReduction = 4,
         }),
         specialization({
             id = "specialization_forager",
-            name = "FORAGER",
-            description = "Sporebright Tonic reaches 8 studs farther.",
+            name = Strings.get("world.forager"),
+            description = Strings.get("profession.sporebright_tonic_reaches_8_studs_farther"),
             effectRadiusBonus = 8,
         }),
     }),
     profession_beastkeeper = table.freeze({
         specialization({
             id = "specialization_handler",
-            name = "HANDLER",
-            description = "Briar Hound harries the threat 2.5 seconds longer.",
+            name = Strings.get("world.handler"),
+            description = Strings.get("profession.briar_hound_harries_the_threat_2"),
             activeSecondsBonus = 2.5,
         }),
         specialization({
             id = "specialization_bondkeeper",
-            name = "BONDKEEPER",
-            description = "Briar Hound can be sent 10 studs farther.",
+            name = Strings.get("world.bondkeeper"),
+            description = Strings.get("profession.briar_hound_can_be_sent_10"),
             effectRadiusBonus = 10,
         }),
         specialization({
             id = "specialization_wildspeaker",
-            name = "WILDSPEAKER",
-            description = "Briar Hound recharges 4 seconds faster.",
+            name = Strings.get("world.wildspeaker"),
+            description = Strings.get("profession.briar_hound_recharges_4_seconds_faster"),
             cooldownReduction = 4,
         }),
     }),
     profession_runebinder = table.freeze({
         specialization({
             id = "specialization_scribe",
-            name = "SCRIBE",
-            description = "Still Rune holds the threat 1.25 seconds longer.",
+            name = Strings.get("world.scribe"),
+            description = Strings.get("profession.still_rune_holds_the_threat_1"),
             activeSecondsBonus = 1.25,
         }),
         specialization({
             id = "specialization_channeler",
-            name = "CHANNELER",
-            description = "Still Rune can be cast 10 studs farther.",
+            name = Strings.get("world.channeler"),
+            description = Strings.get("profession.still_rune_can_be_cast_10"),
             effectRadiusBonus = 10,
         }),
         specialization({
             id = "specialization_veilwalker",
-            name = "VEILWALKER",
-            description = "Still Rune recharges 5 seconds faster.",
+            name = Strings.get("world.veilwalker"),
+            description = Strings.get("profession.still_rune_recharges_5_seconds_faster"),
             cooldownReduction = 5,
         }),
     }),

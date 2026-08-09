@@ -23,6 +23,8 @@
     that must not require co-op.
 ]]
 
+local Strings = require("./Strings")
+
 local AuroraHartEncounter = {}
 
 export type Status = "disabled" | "dormant" | "split" | "banked" | "complete"
@@ -53,9 +55,9 @@ local SPLIT_FRACTION = 0.4
 
 local LIGHT_ANTLER = table.freeze({
     attackId = "aurora_hart_antler",
-    attackName = "LIGHT ANTLER",
+    attackName = Strings.get("encounter.light_antler"),
     damage = 24,
-    instruction = "THE ANTLERS ARE WHERE THE HEAT WENT",
+    instruction = Strings.get("encounter.the_antlers_are_where_the_heat"),
     length = 26,
     shape = "lane",
     width = 8,
@@ -64,9 +66,9 @@ local LIGHT_ANTLER = table.freeze({
 
 local COLD_BOUND = table.freeze({
     attackId = "aurora_hart_bound",
-    attackName = "COLD BOUND",
+    attackName = Strings.get("encounter.cold_bound"),
     damage = 20,
-    instruction = "IT LANDS WHERE THE FIRE IS NOT",
+    instruction = Strings.get("encounter.it_lands_where_the_fire_is"),
     radius = 12,
     shape = "circle",
     windup = 1.15,
@@ -274,20 +276,26 @@ function AuroraHartEncounter.snapshot(state: State, userId: number): any
     end
     local instruction = if state.status == "split"
         then string.format(
-            "CARRY THE EMBERS TOGETHER — %d OF %d IN ONE HEARTH",
+            Strings.get("encounter.carry_the_embers_together_n_of"),
             hottest,
             BANKED_LEVEL
         )
-        elseif state.status == "banked" then "THE HEARTH IS BANKED — STRIKE FROM THE WARMTH"
-        elseif state.status == "complete" then "THE HART IS DOWN · THE CLEARING KEEPS ITS FIRE"
-        elseif state.status == "disabled" then "ELITE TEMPORARILY DORMANT"
-        else "ENTER THE CLEARING"
+        elseif state.status == "banked" then Strings.get(
+            "encounter.the_hearth_is_banked_strike_from"
+        )
+        elseif state.status == "complete" then Strings.get(
+            "encounter.the_hart_is_down_the_clearing"
+        )
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.elite_temporarily_dormant"
+        )
+        else Strings.get("encounter.enter_the_clearing")
     return {
         active = state.status == "split" or state.status == "banked",
         bankedHearth = banked,
         bankedLevel = BANKED_LEVEL,
         complete = state.status == "complete",
-        displayName = "AURORA HART",
+        displayName = Strings.get("encounter.aurora_hart"),
         enabled = state.status ~= "disabled",
         health = state.health,
         hottestLevel = hottest,

@@ -17,6 +17,7 @@
 ]]
 
 local ResidentRoster = require("./ResidentRoster")
+local Strings = require("./Strings")
 
 local ResidentLife = {}
 
@@ -77,10 +78,10 @@ local BOND_CARE = 5
 ResidentLife.Ids = RESIDENT_IDS
 ResidentLife.Jobs = JOBS
 ResidentLife.BondTiers = table.freeze({
-    { threshold = 75, title = "KINDRED" },
-    { threshold = 50, title = "TRUSTED" },
-    { threshold = 25, title = "ACQUAINTED" },
-    { threshold = 0, title = "NEWCOMER" },
+    { threshold = 75, title = Strings.get("town.kindred") },
+    { threshold = 50, title = Strings.get("town.trusted") },
+    { threshold = 25, title = Strings.get("town.acquainted") },
+    { threshold = 0, title = Strings.get("town.newcomer") },
 })
 
 local function defaultResident(): ResidentState
@@ -128,7 +129,7 @@ function ResidentLife.bondTitle(bond: number): string
             return tier.title
         end
     end
-    return "NEWCOMER"
+    return Strings.get("town.newcomer")
 end
 
 local function clone(state: State): State
@@ -178,16 +179,16 @@ function ResidentLife.resolveNight(state: State, context: NightContext): (State,
         report.crisis = {
             id = string.format("crisis_clinic_%d", context.nightNumber),
             kind = "care",
-            title = "THE CLINIC IS FULL",
-            detail = "Check on the injured residents to help them back on their feet.",
+            title = Strings.get("town.the_clinic_is_full"),
+            detail = Strings.get("town.check_on_the_injured_residents_to"),
             startedNight = context.nightNumber,
         }
     elseif context.lanternHitFloor and injuredNow >= 1 then
         report.crisis = {
             id = string.format("crisis_darkwatch_%d", context.nightNumber),
             kind = "care",
-            title = "A HARD NIGHT'S TOLL",
-            detail = "The light nearly failed and someone was hurt. Check on them.",
+            title = Strings.get("town.a_hard_night_s_toll"),
+            detail = Strings.get("town.the_light_nearly_failed_and_someone"),
             startedNight = context.nightNumber,
         }
     end

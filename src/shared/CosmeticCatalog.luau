@@ -78,6 +78,8 @@ export type Product = {
     grants: { string },
 }
 
+local Strings = require("./Strings")
+
 local CosmeticCatalog = {}
 
 --[[
@@ -110,23 +112,23 @@ local SLOTS = table.freeze({
 local LINES = table.freeze({
     table.freeze({
         id = "line_greenward",
-        displayName = "THE GREENWARD",
-        detail = "Bramblewake amber, oiled canvas, and the first keepers' green.",
+        displayName = Strings.get("store.the_greenward"),
+        detail = Strings.get("store.bramblewake_amber_oiled_canvas_and_the"),
     }),
     table.freeze({
         id = "line_ironroot",
-        displayName = "THE IRONROOT",
-        detail = "Pit leather, riveted iron, and a lamp built to survive a fall.",
+        displayName = Strings.get("store.the_ironroot"),
+        detail = Strings.get("store.pit_leather_riveted_iron_and_a"),
     }),
     table.freeze({
         id = "line_mireglass",
-        displayName = "THE MIREGLASS",
-        detail = "Bog oak, reed binding, and glass the colour of standing water.",
+        displayName = Strings.get("store.the_mireglass"),
+        detail = Strings.get("store.bog_oak_reed_binding_and_glass"),
     }),
     table.freeze({
         id = "line_cinderfall",
-        displayName = "THE CINDERFALL",
-        detail = "Scorched plate, bronze at the joins, and an ember that never went out.",
+        displayName = Strings.get("store.the_cinderfall"),
+        detail = Strings.get("store.scorched_plate_bronze_at_the_joins"),
     }),
 })
 
@@ -175,8 +177,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_lantern_keeper_coat",
         line = "line_greenward",
         slot = "outfit",
-        displayName = "LANTERN KEEPER'S COAT",
-        detail = "The long coat the first keepers wore, oiled against the night.",
+        displayName = Strings.get("store.lantern_keeper_s_coat"),
+        detail = Strings.get("store.the_long_coat_the_first_keepers"),
         derived = true,
         parts = {
             part(
@@ -215,8 +217,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_amberglass_edge",
         line = "line_greenward",
         slot = "weapon_skin",
-        displayName = "AMBERGLASS EDGE",
-        detail = "A blade finish poured from cooled sap. It catches lantern light.",
+        displayName = Strings.get("store.amberglass_edge"),
+        detail = Strings.get("store.a_blade_finish_poured_from_cooled"),
         derived = true,
         parts = {
             part(
@@ -245,8 +247,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_rootbound_grip",
         line = "line_greenward",
         slot = "tool_skin",
-        displayName = "ROOTBOUND GRIP",
-        detail = "A tool haft wrapped in living cord that never quite dries.",
+        displayName = Strings.get("store.rootbound_grip"),
+        detail = Strings.get("store.a_tool_haft_wrapped_in_living"),
         derived = true,
         parts = {
             part(
@@ -308,8 +310,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_foxfire_shell",
         line = "line_greenward",
         slot = "lantern_shell",
-        displayName = "FOXFIRE SHELL",
-        detail = "A lantern housing of pale green glass. The flame reads colder.",
+        displayName = Strings.get("store.foxfire_shell"),
+        detail = Strings.get("store.a_lantern_housing_of_pale_green"),
         derived = true,
         parts = {
             part(
@@ -338,8 +340,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_greenward_banner",
         line = "line_greenward",
         slot = "banner",
-        displayName = "GREENWARD BANNER",
-        detail = "The Greenward's mark, for a plot you have already built on.",
+        displayName = Strings.get("store.greenward_banner"),
+        detail = Strings.get("store.the_greenward_s_mark_for_a"),
         derived = true,
         parts = {
             part(
@@ -397,8 +399,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_ironroot_dredger_rig",
         slot = "outfit",
         line = "line_ironroot",
-        displayName = "DREDGER'S RIG",
-        detail = "The apron and strapping of somebody who works below the waterline.",
+        displayName = Strings.get("store.dredger_s_rig"),
+        detail = Strings.get("store.the_apron_and_strapping_of_somebody"),
         derived = true,
         parts = {
             part(
@@ -467,8 +469,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_ironroot_slagcut_edge",
         slot = "weapon_skin",
         line = "line_ironroot",
-        displayName = "SLAGCUT EDGE",
-        detail = "A blade whose back was never filed smooth. It bites on the draw.",
+        displayName = Strings.get("store.slagcut_edge"),
+        detail = Strings.get("store.a_blade_whose_back_was_never"),
         derived = true,
         parts = {
             part(
@@ -527,8 +529,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_ironroot_pitgrip",
         slot = "tool_skin",
         line = "line_ironroot",
-        displayName = "PITGRIP",
-        detail = "An iron-ferruled haft with a lanyard ring, so a dropped tool comes back.",
+        displayName = Strings.get("store.pitgrip"),
+        detail = Strings.get("store.an_iron_ferruled_haft_with_a"),
         derived = true,
         parts = {
             part(
@@ -577,8 +579,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_ironroot_deepwatch_shell",
         slot = "lantern_shell",
         line = "line_ironroot",
-        displayName = "DEEPWATCH SHELL",
-        detail = "A caged safety lamp. The bars are what let you carry it into bad air.",
+        displayName = Strings.get("store.deepwatch_shell"),
+        detail = Strings.get("store.a_caged_safety_lamp_the_bars"),
         derived = true,
         parts = {
             part(
@@ -657,8 +659,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_ironroot_pickmark_banner",
         slot = "banner",
         line = "line_ironroot",
-        displayName = "PICKMARK BANNER",
-        detail = "Two crossed picks over grey. The mark cut into every Ironroot beam.",
+        displayName = Strings.get("store.pickmark_banner"),
+        detail = Strings.get("store.two_crossed_picks_over_grey_the"),
         derived = true,
         parts = {
             part(
@@ -732,8 +734,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_mireglass_wader_cloak",
         slot = "outfit",
         line = "line_mireglass",
-        displayName = "WADER'S CLOAK",
-        detail = "A hooded cloak cut long at the back and short at the knee.",
+        displayName = Strings.get("store.wader_s_cloak"),
+        detail = Strings.get("store.a_hooded_cloak_cut_long_at"),
         derived = true,
         parts = {
             part(
@@ -782,8 +784,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_mireglass_shardline",
         slot = "weapon_skin",
         line = "line_mireglass",
-        displayName = "SHARDLINE",
-        detail = "A blade of set glass, each shard a little out of true with the last.",
+        displayName = Strings.get("store.shardline"),
+        detail = Strings.get("store.a_blade_of_set_glass_each"),
         derived = true,
         parts = {
             part(
@@ -832,8 +834,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_mireglass_reedbind",
         slot = "tool_skin",
         line = "line_mireglass",
-        displayName = "REEDBIND",
-        detail = "A haft bound in split reed, with a tuft left long at the butt.",
+        displayName = Strings.get("store.reedbind"),
+        detail = Strings.get("store.a_haft_bound_in_split_reed"),
         derived = true,
         parts = {
             part(
@@ -902,8 +904,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_mireglass_bogfire_shell",
         slot = "lantern_shell",
         line = "line_mireglass",
-        displayName = "BOGFIRE SHELL",
-        detail = "A round bowl under a wide brim, so rain never reaches the wick.",
+        displayName = Strings.get("store.bogfire_shell"),
+        detail = Strings.get("store.a_round_bowl_under_a_wide"),
         derived = true,
         parts = {
             part(
@@ -952,8 +954,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_mireglass_stillwater_banner",
         slot = "banner",
         line = "line_mireglass",
-        displayName = "STILLWATER BANNER",
-        detail = "A long pennant weighted at the tail, so it hangs even in wind.",
+        displayName = Strings.get("store.stillwater_banner"),
+        detail = Strings.get("store.a_long_pennant_weighted_at_the"),
         derived = true,
         parts = {
             part(
@@ -1017,8 +1019,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_cinderfall_ashwarden_plate",
         slot = "outfit",
         line = "line_cinderfall",
-        displayName = "ASHWARDEN PLATE",
-        detail = "Plate that went through the fall and came out darker.",
+        displayName = Strings.get("store.ashwarden_plate"),
+        detail = Strings.get("store.plate_that_went_through_the_fall"),
         derived = true,
         parts = {
             part(
@@ -1077,8 +1079,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_cinderfall_emberbrand",
         slot = "weapon_skin",
         line = "line_cinderfall",
-        displayName = "EMBERBRAND",
-        detail = "A fuller that never cooled. The light in it is a finish, not a fire.",
+        displayName = Strings.get("store.emberbrand"),
+        detail = Strings.get("store.a_fuller_that_never_cooled_the"),
         derived = true,
         parts = {
             part(
@@ -1127,8 +1129,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_cinderfall_forgegrip",
         slot = "tool_skin",
         line = "line_cinderfall",
-        displayName = "FORGEGRIP",
-        detail = "A bronze-collared haft wrapped against heat, with a counterweight.",
+        displayName = Strings.get("store.forgegrip"),
+        detail = Strings.get("store.a_bronze_collared_haft_wrapped_against"),
         derived = true,
         parts = {
             part(
@@ -1187,8 +1189,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_cinderfall_ashfall_shell",
         slot = "lantern_shell",
         line = "line_cinderfall",
-        displayName = "ASHFALL SHELL",
-        detail = "A vented iron housing. Ash falls through it instead of settling.",
+        displayName = Strings.get("store.ashfall_shell"),
+        detail = Strings.get("store.a_vented_iron_housing_ash_falls"),
         derived = true,
         parts = {
             part(
@@ -1257,8 +1259,8 @@ local COSMETICS: { Cosmetic } = {
         id = "cosmetic_cinderfall_lastfire_banner",
         slot = "banner",
         line = "line_cinderfall",
-        displayName = "LASTFIRE BANNER",
-        detail = "Burnt through in two places, and flown anyway.",
+        displayName = Strings.get("store.lastfire_banner"),
+        detail = Strings.get("store.burnt_through_in_two_places_and"),
         derived = true,
         parts = {
             part(
@@ -1337,160 +1339,160 @@ local PRODUCTS: { Product } = {
     {
         id = "product_lantern_keeper_coat",
         line = "line_greenward",
-        displayName = "LANTERN KEEPER'S COAT",
-        detail = "An outfit for the traveller who keeps the light.",
+        displayName = Strings.get("store.lantern_keeper_s_coat"),
+        detail = Strings.get("store.an_outfit_for_the_traveller_who"),
         permanence = "permanent",
         grants = { "cosmetic_lantern_keeper_coat" },
     },
     {
         id = "product_amberglass_edge",
         line = "line_greenward",
-        displayName = "AMBERGLASS EDGE",
-        detail = "A weapon finish. Changes how a blade looks and nothing else.",
+        displayName = Strings.get("store.amberglass_edge"),
+        detail = Strings.get("store.a_weapon_finish_changes_how_a"),
         permanence = "permanent",
         grants = { "cosmetic_amberglass_edge" },
     },
     {
         id = "product_rootbound_grip",
         line = "line_greenward",
-        displayName = "ROOTBOUND GRIP",
-        detail = "A tool finish, for every tool you carry.",
+        displayName = Strings.get("store.rootbound_grip"),
+        detail = Strings.get("store.a_tool_finish_for_every_tool"),
         permanence = "permanent",
         grants = { "cosmetic_rootbound_grip" },
     },
     {
         id = "product_foxfire_shell",
         line = "line_greenward",
-        displayName = "FOXFIRE SHELL",
-        detail = "A lantern housing. The light is the same light.",
+        displayName = Strings.get("store.foxfire_shell"),
+        detail = Strings.get("store.a_lantern_housing_the_light_is"),
         permanence = "permanent",
         grants = { "cosmetic_foxfire_shell" },
     },
     {
         id = "product_greenward_banner",
         line = "line_greenward",
-        displayName = "GREENWARD BANNER",
-        detail = "A banner for a plot you have already built on.",
+        displayName = Strings.get("store.greenward_banner"),
+        detail = Strings.get("store.a_banner_for_a_plot_you"),
         permanence = "permanent",
         grants = { "cosmetic_greenward_banner" },
     },
     {
         id = "product_ironroot_dredger_rig",
         line = "line_ironroot",
-        displayName = "DREDGER'S RIG",
-        detail = "An outfit for somebody who works below the waterline.",
+        displayName = Strings.get("store.dredger_s_rig"),
+        detail = Strings.get("store.an_outfit_for_somebody_who_works"),
         permanence = "permanent",
         grants = { "cosmetic_ironroot_dredger_rig" },
     },
     {
         id = "product_ironroot_slagcut_edge",
         line = "line_ironroot",
-        displayName = "SLAGCUT EDGE",
-        detail = "A weapon finish with a back that was never filed smooth.",
+        displayName = Strings.get("store.slagcut_edge"),
+        detail = Strings.get("store.a_weapon_finish_with_a_back"),
         permanence = "permanent",
         grants = { "cosmetic_ironroot_slagcut_edge" },
     },
     {
         id = "product_ironroot_pitgrip",
         line = "line_ironroot",
-        displayName = "PITGRIP",
-        detail = "A tool finish, iron-ferruled, with a lanyard ring.",
+        displayName = Strings.get("store.pitgrip"),
+        detail = Strings.get("store.a_tool_finish_iron_ferruled_with"),
         permanence = "permanent",
         grants = { "cosmetic_ironroot_pitgrip" },
     },
     {
         id = "product_ironroot_deepwatch_shell",
         line = "line_ironroot",
-        displayName = "DEEPWATCH SHELL",
-        detail = "A caged lantern housing. The light is the same light.",
+        displayName = Strings.get("store.deepwatch_shell"),
+        detail = Strings.get("store.a_caged_lantern_housing_the_light"),
         permanence = "permanent",
         grants = { "cosmetic_ironroot_deepwatch_shell" },
     },
     {
         id = "product_ironroot_pickmark_banner",
         line = "line_ironroot",
-        displayName = "PICKMARK BANNER",
-        detail = "A banner for a plot you have already built on.",
+        displayName = Strings.get("store.pickmark_banner"),
+        detail = Strings.get("store.a_banner_for_a_plot_you"),
         permanence = "permanent",
         grants = { "cosmetic_ironroot_pickmark_banner" },
     },
     {
         id = "product_mireglass_wader_cloak",
         line = "line_mireglass",
-        displayName = "WADER'S CLOAK",
-        detail = "An outfit cut long at the back and short at the knee.",
+        displayName = Strings.get("store.wader_s_cloak"),
+        detail = Strings.get("store.an_outfit_cut_long_at_the"),
         permanence = "permanent",
         grants = { "cosmetic_mireglass_wader_cloak" },
     },
     {
         id = "product_mireglass_shardline",
         line = "line_mireglass",
-        displayName = "SHARDLINE",
-        detail = "A weapon finish of set glass, shard by shard.",
+        displayName = Strings.get("store.shardline"),
+        detail = Strings.get("store.a_weapon_finish_of_set_glass"),
         permanence = "permanent",
         grants = { "cosmetic_mireglass_shardline" },
     },
     {
         id = "product_mireglass_reedbind",
         line = "line_mireglass",
-        displayName = "REEDBIND",
-        detail = "A tool finish bound in split reed.",
+        displayName = Strings.get("store.reedbind"),
+        detail = Strings.get("store.a_tool_finish_bound_in_split"),
         permanence = "permanent",
         grants = { "cosmetic_mireglass_reedbind" },
     },
     {
         id = "product_mireglass_bogfire_shell",
         line = "line_mireglass",
-        displayName = "BOGFIRE SHELL",
-        detail = "A lantern housing under a wide brim.",
+        displayName = Strings.get("store.bogfire_shell"),
+        detail = Strings.get("store.a_lantern_housing_under_a_wide"),
         permanence = "permanent",
         grants = { "cosmetic_mireglass_bogfire_shell" },
     },
     {
         id = "product_mireglass_stillwater_banner",
         line = "line_mireglass",
-        displayName = "STILLWATER BANNER",
-        detail = "A banner weighted at the tail so it hangs even in wind.",
+        displayName = Strings.get("store.stillwater_banner"),
+        detail = Strings.get("store.a_banner_weighted_at_the_tail"),
         permanence = "permanent",
         grants = { "cosmetic_mireglass_stillwater_banner" },
     },
     {
         id = "product_cinderfall_ashwarden_plate",
         line = "line_cinderfall",
-        displayName = "ASHWARDEN PLATE",
-        detail = "An outfit that went through the fall and came out darker.",
+        displayName = Strings.get("store.ashwarden_plate"),
+        detail = Strings.get("store.an_outfit_that_went_through_the"),
         permanence = "permanent",
         grants = { "cosmetic_cinderfall_ashwarden_plate" },
     },
     {
         id = "product_cinderfall_emberbrand",
         line = "line_cinderfall",
-        displayName = "EMBERBRAND",
-        detail = "A weapon finish with a fuller that never cooled.",
+        displayName = Strings.get("store.emberbrand"),
+        detail = Strings.get("store.a_weapon_finish_with_a_fuller"),
         permanence = "permanent",
         grants = { "cosmetic_cinderfall_emberbrand" },
     },
     {
         id = "product_cinderfall_forgegrip",
         line = "line_cinderfall",
-        displayName = "FORGEGRIP",
-        detail = "A tool finish wrapped against heat.",
+        displayName = Strings.get("store.forgegrip"),
+        detail = Strings.get("store.a_tool_finish_wrapped_against_heat"),
         permanence = "permanent",
         grants = { "cosmetic_cinderfall_forgegrip" },
     },
     {
         id = "product_cinderfall_ashfall_shell",
         line = "line_cinderfall",
-        displayName = "ASHFALL SHELL",
-        detail = "A vented lantern housing. The light is the same light.",
+        displayName = Strings.get("store.ashfall_shell"),
+        detail = Strings.get("store.a_vented_lantern_housing_the_light"),
         permanence = "permanent",
         grants = { "cosmetic_cinderfall_ashfall_shell" },
     },
     {
         id = "product_cinderfall_lastfire_banner",
         line = "line_cinderfall",
-        displayName = "LASTFIRE BANNER",
-        detail = "A banner burnt through in two places, and flown anyway.",
+        displayName = Strings.get("store.lastfire_banner"),
+        detail = Strings.get("store.a_banner_burnt_through_in_two"),
         permanence = "permanent",
         grants = { "cosmetic_cinderfall_lastfire_banner" },
     },
@@ -1510,8 +1512,8 @@ local PRODUCTS: { Product } = {
     {
         id = "product_set_greenward",
         line = "line_greenward",
-        displayName = "THE GREENWARD SET",
-        detail = "Every piece of the Greenward look, in one purchase.",
+        displayName = Strings.get("store.the_greenward_set"),
+        detail = Strings.get("store.every_piece_of_the_greenward_look"),
         permanence = "permanent",
         grants = {
             "cosmetic_lantern_keeper_coat",
@@ -1524,8 +1526,8 @@ local PRODUCTS: { Product } = {
     {
         id = "product_set_ironroot",
         line = "line_ironroot",
-        displayName = "THE IRONROOT SET",
-        detail = "Every piece of the Ironroot look, in one purchase.",
+        displayName = Strings.get("store.the_ironroot_set"),
+        detail = Strings.get("store.every_piece_of_the_ironroot_look"),
         permanence = "permanent",
         grants = {
             "cosmetic_ironroot_dredger_rig",
@@ -1538,8 +1540,8 @@ local PRODUCTS: { Product } = {
     {
         id = "product_set_mireglass",
         line = "line_mireglass",
-        displayName = "THE MIREGLASS SET",
-        detail = "Every piece of the Mireglass look, in one purchase.",
+        displayName = Strings.get("store.the_mireglass_set"),
+        detail = Strings.get("store.every_piece_of_the_mireglass_look"),
         permanence = "permanent",
         grants = {
             "cosmetic_mireglass_wader_cloak",
@@ -1552,8 +1554,8 @@ local PRODUCTS: { Product } = {
     {
         id = "product_set_cinderfall",
         line = "line_cinderfall",
-        displayName = "THE CINDERFALL SET",
-        detail = "Every piece of the Cinderfall look, in one purchase.",
+        displayName = Strings.get("store.the_cinderfall_set"),
+        detail = Strings.get("store.every_piece_of_the_cinderfall_look"),
         permanence = "permanent",
         grants = {
             "cosmetic_cinderfall_ashwarden_plate",

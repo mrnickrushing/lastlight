@@ -220,7 +220,7 @@ local function updateVignettes(snapshot: any, suppress: boolean?)
         local title = Strings.get("client.the_first_night")
         local subtitle = Strings.get("client.keep_the_light_alive")
         if nightNumber >= 1 then
-            local theme = TownNightSchedule.theme(nightNumber)
+            local theme = TownNightSchedule.displayName(TownNightSchedule.theme(nightNumber))
             local profile = TownNightSchedule.profile(nightNumber)
             title = string.format(Strings.get("client.night_n_n"), nightNumber, theme)
             subtitle = tostring(profile.instruction)

@@ -13,10 +13,11 @@ issue is closed that the handoff still describes as open.
 is pinned at a minimum of 9 threads and fails rather than
 producing a short one.
 
-11 open threads.
+12 open threads.
 
 | Found in | Kind | What is open |
 |---|---|---|
+| #359 | Open | a canvas narrower than 446 points still cannot fit that row, and no clamp can make it — the row has to wrap, which is a layout decision rather than a bound. |
 | #358 | Open | the transient itself is not reproducible on demand, so this is a fix for a mechanism that was observed rather than a case that is covered. |
 | #353 | Open, by design rather than by omission | the notes are allowed to lag the tip by the merge commit that lands them, because a strict compare would leave `main` failing its own check the moment any wave merges. What is refused is a hole or a phantom — the rows have to be exactly the tail of the merge stream ending at the newest row recorded. Patch notes in a player's language stay the owner's, and the checklist row `patch_notes` says so beside the `known_issues_published` row this wave turned into a check. |
 | #344 | Open | `profile_bytes` was read correctly and never exercised under change — driving cycles through the private-server rail latches practice, so the profile is never written, and it read a flat 2661 for a reason that is not the profile holding steady. |

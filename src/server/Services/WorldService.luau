@@ -413,7 +413,21 @@ local function buildEmberhollowSanctuary(
     -- openings, four cross rafters, opposing roof wedges, framed windows, stairs,
     -- an open door, and a full-height stone chimney. Last Light owns the palette,
     -- props, dimensions, names, and lighting treatment.
-    local function cabin(center: Vector3, yaw: number, name: string, accent: Color3): Instance
+    --[[
+		`isMara` rather than `name == "MARA'S SHELTER"`, and the difference is
+		not tidiness. Nine branches in here chose a wall colour, a prop seed and
+		whether to build a cot by comparing the cabin's **sign** against the
+		string table -- so translating the sign would have built Mara a
+		wayfarer's cabin, with nothing failing. A thing's identity and the words
+		painted on it are different facts.
+	]]
+    local function cabin(
+        center: Vector3,
+        yaw: number,
+        name: string,
+        accent: Color3,
+        isMara: boolean
+    ): Instance
         local scale = 0.72
         center += Vector3.new(0, 2.2, 0)
         local cabinFrame = CFrame.new(center) * CFrame.Angles(0, yaw, 0)
@@ -425,10 +439,8 @@ local function buildEmberhollowSanctuary(
         shell.Name = "ProceduralCabinShell"
         shell.Parent = cabinFolder
 
-        local wallColor = if name == Strings.get("world.mara_s_shelter")
-            then Color3.fromRGB(69, 85, 66)
-            else Color3.fromRGB(91, 63, 44)
-        local trimColor = if name == Strings.get("world.mara_s_shelter")
+        local wallColor = if isMara then Color3.fromRGB(69, 85, 66) else Color3.fromRGB(91, 63, 44)
+        local trimColor = if isMara
             then Color3.fromRGB(109, 126, 90)
             else Color3.fromRGB(137, 99, 61)
         local roofColor = Color3.fromRGB(48, 54, 49)
@@ -819,7 +831,7 @@ local function buildEmberhollowSanctuary(
             position = referenceCFrame(-9, -4.6, 12.2).Position,
             scale = 0.86,
             yaw = yaw,
-            seed = if name == Strings.get("world.mara_s_shelter") then 9311 else 9312,
+            seed = if isMara then 9311 else 9312,
             swayTag = nil,
             parent = fireplace,
             fallbackInstance = hearthFallback,
@@ -865,7 +877,7 @@ local function buildEmberhollowSanctuary(
         signText.TextScaled = true
         signText.Parent = surface
 
-        if name == Strings.get("world.mara_s_shelter") then
+        if isMara then
             local cotFallback = Instance.new("Model")
             cotFallback.Name = "MaraCotFallback"
             cotFallback.Parent = cabinFolder
@@ -1036,9 +1048,7 @@ local function buildEmberhollowSanctuary(
             "CabinWovenRug",
             Vector3.new(6.4, 0.12, 3.4),
             cabinCFrame(2.5, 0.68, -0.1),
-            if name == Strings.get("world.mara_s_shelter")
-                then Color3.fromRGB(70, 112, 102)
-                else Color3.fromRGB(132, 88, 54),
+            if isMara then Color3.fromRGB(70, 112, 102) else Color3.fromRGB(132, 88, 54),
             Enum.Material.Fabric,
             false
         )
@@ -1057,15 +1067,11 @@ local function buildEmberhollowSanctuary(
         for supplyIndex = -1, 1 do
             local supply = part(
                 cabinFolder,
-                if name == Strings.get("world.mara_s_shelter")
-                    then "MaraHerbBundle"
-                    else "WayfarerSupply",
+                if isMara then "MaraHerbBundle" else "WayfarerSupply",
                 Vector3.new(0.85, 1.05 + math.abs(supplyIndex) * 0.2, 0.75),
                 shelf.CFrame + Vector3.new(supplyIndex * 1.35, 0.7, 0),
                 if supplyIndex == 0 then accent else Color3.fromRGB(121, 96, 58),
-                if name == Strings.get("world.mara_s_shelter")
-                    then Enum.Material.Grass
-                    else Enum.Material.Fabric,
+                if isMara then Enum.Material.Grass else Enum.Material.Fabric,
                 false
             )
             supply.CanQuery = false
@@ -1117,7 +1123,7 @@ local function buildEmberhollowSanctuary(
             position = cabinCFrame(-14.5, -1.75, 4).Position,
             scale = 1,
             yaw = yaw + math.rad(8),
-            seed = if name == Strings.get("world.mara_s_shelter") then 9821 else 9822,
+            seed = if isMara then 9821 else 9822,
             swayTag = nil,
             parent = cabinFolder,
             fallbackInstance = woodpile,
@@ -1128,7 +1134,7 @@ local function buildEmberhollowSanctuary(
             position = cabinCFrame(13.8, -1.75, 4.4).Position,
             scale = 0.9,
             yaw = yaw + math.rad(-7),
-            seed = if name == Strings.get("world.mara_s_shelter") then 9823 else 9824,
+            seed = if isMara then 9823 else 9824,
             swayTag = nil,
             parent = cabinFolder,
             fallbackInstance = nil,
@@ -1151,13 +1157,15 @@ local function buildEmberhollowSanctuary(
             Vector3.new(-CABIN_X, 0, TOWN_CENTER.Z),
             math.rad(-90),
             Strings.get("world.wayfarer_cabin"),
-            AMBER
+            AMBER,
+            false
         ),
         cabin(
             Vector3.new(CABIN_X, 0, TOWN_CENTER.Z),
             math.rad(90),
             Strings.get("world.mara_s_shelter"),
-            FOXFIRE
+            FOXFIRE,
+            true
         ),
     }
 
@@ -7139,6 +7147,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             center = Vector3.new(-78, 0, -76),
             color = FOXFIRE,
+            id = "profession_scout",
             name = Strings.get("world.scout"),
             paths = {
                 { id = "specialization_pathfinder", name = Strings.get("world.pathfinder") },
@@ -7152,6 +7161,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             center = Vector3.new(78, 0, -76),
             color = Color3.fromRGB(112, 151, 119),
+            id = "profession_warden",
             name = Strings.get("world.warden"),
             paths = {
                 { id = "specialization_bulwark", name = Strings.get("world.bulwark") },
@@ -7162,6 +7172,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             center = Vector3.new(-78, 0, -168),
             color = Color3.fromRGB(191, 137, 73),
+            id = "profession_engineer",
             name = Strings.get("world.engineer"),
             paths = {
                 { id = "specialization_lamplighter", name = Strings.get("world.lamplighter") },
@@ -7172,6 +7183,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             center = Vector3.new(78, 0, -168),
             color = Color3.fromRGB(176, 108, 112),
+            id = "profession_medic",
             name = Strings.get("world.medic"),
             paths = {
                 { id = "specialization_dawnmender", name = Strings.get("world.dawnmender") },
@@ -7198,6 +7210,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             center = Vector3.new(-78, 0, -122),
             color = Color3.fromRGB(154, 187, 92),
+            id = "profession_alchemist",
             name = Strings.get("world.alchemist"),
             paths = {
                 { id = "specialization_brewer", name = Strings.get("world.brewer") },
@@ -7208,6 +7221,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             center = Vector3.new(78, 0, -214),
             color = Color3.fromRGB(196, 120, 60),
+            id = "profession_beastkeeper",
             name = Strings.get("world.beastkeeper"),
             paths = {
                 { id = "specialization_handler", name = Strings.get("world.handler") },
@@ -7218,6 +7232,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         {
             center = Vector3.new(-78, 0, -214),
             color = Color3.fromRGB(132, 150, 224),
+            id = "profession_runebinder",
             name = Strings.get("world.runebinder"),
             paths = {
                 { id = "specialization_scribe", name = Strings.get("world.scribe") },
@@ -7497,25 +7512,32 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
                 1.1
             )
         end
-        dais:SetAttribute("ProfessionId", "profession_" .. string.lower(altar.name))
+        --[[
+			Everything below reads the altar's **id**. It read its sign before,
+			and two of these were worse than a wrong colour: the profession id
+			was built by lower-casing the display name, so a translated sign
+			produced an attribute no lookup matches, and the dressing seed was
+			the *length* of the display name, so translating it moved the prop.
+		]]
+        dais:SetAttribute("ProfessionId", altar.id)
         table.insert(self._meshPlacements, {
-            assetId = if altar.name == Strings.get("world.engineer")
+            assetId = if altar.id == "profession_engineer"
                 then "mesh_creator_workbench_a"
                 else "mesh_creator_stump_a",
             fallbackKind = "asset_dressing",
             position = altar.center + Vector3.new(0, 0.85, 2.1),
-            scale = if altar.name == Strings.get("world.engineer") then 0.58 else 0.44,
+            scale = if altar.id == "profession_engineer" then 0.58 else 0.44,
             yaw = math.rad(
-                if altar.name == Strings.get("world.scout")
+                if altar.id == "profession_scout"
                     then -11
-                    elseif altar.name == Strings.get("world.medic") then 14
+                    elseif altar.id == "profession_medic" then 14
                     else 4
             ),
-            seed = 9970 + #altar.name,
+            seed = 9970 + #altar.id,
             swayTag = nil,
             parent = masteryGrove,
             fallbackInstance = nil,
-            profileScale = if altar.name == Strings.get("world.warden")
+            profileScale = if altar.id == "profession_warden"
                 then Vector3.new(1.12, 0.92, 0.88)
                 else Vector3.one,
         })
@@ -14753,10 +14775,10 @@ function WorldService._setDuskSignals(self: WorldService, visible: boolean)
 end
 
 local function nightThemeColor(theme: string?): Color3
-    return if theme == Strings.get("world.miretide")
+    return if theme == "miretide"
         then Color3.fromRGB(90, 192, 170)
-        elseif theme == Strings.get("world.rootmoon") then Color3.fromRGB(174, 128, 205)
-        elseif theme == Strings.get("world.ashen_veil") then Color3.fromRGB(218, 132, 91)
+        elseif theme == "rootmoon" then Color3.fromRGB(174, 128, 205)
+        elseif theme == "ashen_veil" then Color3.fromRGB(218, 132, 91)
         else AMBER
 end
 
@@ -14767,7 +14789,7 @@ local function buildNightThemeDressing(parent: Instance, theme: string): Model
     model.Parent = parent
     local accent = nightThemeColor(theme)
 
-    if theme == Strings.get("world.emberfall") then
+    if theme == "emberfall" then
         for row = 0, 2 do
             for side = -1, 1, 2 do
                 local center = Vector3.new(side * 7.5, 0.45, -144 + row * 12)
@@ -14796,7 +14818,7 @@ local function buildNightThemeDressing(parent: Instance, theme: string): Model
                 coal.Transparency = 0.18
             end
         end
-    elseif theme == Strings.get("world.miretide") then
+    elseif theme == "miretide" then
         for poolIndex = 0, 4 do
             local side = if poolIndex % 2 == 0 then -1 else 1
             local pool = part(
@@ -14821,7 +14843,7 @@ local function buildNightThemeDressing(parent: Instance, theme: string): Model
             )
             reed.CFrame *= CFrame.Angles(0, 0, math.rad(side * 8))
         end
-    elseif theme == Strings.get("world.rootmoon") then
+    elseif theme == "rootmoon" then
         for archIndex = 0, 2 do
             local z = -145 + archIndex * 13
             for side = -1, 1, 2 do
@@ -15553,8 +15575,7 @@ function WorldService.setNight(self: WorldService, enabled: boolean, theme: stri
         self._nightThemeDressing = nil
     end
     if enabled and self._world ~= nil then
-        self._nightThemeDressing =
-            buildNightThemeDressing(self._world, theme or Strings.get("world.emberfall"))
+        self._nightThemeDressing = buildNightThemeDressing(self._world, theme or "emberfall")
     end
     self:_setNightDefenseState(if enabled then "night" else "day", theme)
     self:_setTownResidentRoutine(if enabled then "night" elseif self._dusk then "dusk" else "day")

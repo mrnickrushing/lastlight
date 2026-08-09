@@ -1,5 +1,7 @@
 --!strict
 
+local Strings = require("./Strings")
+
 local ProfessionRescue = {}
 
 local MAX_LEVEL = 10
@@ -29,18 +31,18 @@ function ProfessionRescue.resolve(
     local duration = baseDuration
     local health = baseHealth
     local wardSeconds = baseWardSeconds
-    local rescueTitle = "FIELD RESCUE"
+    local rescueTitle = Strings.get("toast.field_rescue")
     local specialized = false
 
     if professionId == "profession_medic" then
         duration = baseDuration * (0.72 - masterySteps * 0.015)
         health = baseHealth + 10 + masterySteps * 2
         wardSeconds = baseWardSeconds + 0.75 + masterySteps * 0.15
-        rescueTitle = "MEDIC RESCUE"
+        rescueTitle = Strings.get("profession.medic_rescue")
         specialized = true
     elseif professionId == "profession_warden" then
         wardSeconds = baseWardSeconds + 0.5 + masterySteps * 0.1
-        rescueTitle = "WARDEN ESCORT"
+        rescueTitle = Strings.get("profession.warden_escort")
         specialized = true
     end
 

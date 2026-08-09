@@ -24,6 +24,8 @@
     cares which; a party in trouble tonight may not.
 ]]
 
+local Strings = require("./Strings")
+
 local TideboundTitanEncounter = {}
 
 export type Status =
@@ -69,9 +71,9 @@ local GATE_IDS = table.freeze({
 
 local TIDE_SURGE = table.freeze({
     attackId = "tidebound_titan_surge",
-    attackName = "TIDE SURGE",
+    attackName = Strings.get("encounter.tide_surge"),
     damage = 28,
-    instruction = "GET ABOVE THE SURGE LINE",
+    instruction = Strings.get("encounter.get_above_the_surge_line"),
     length = 36,
     shape = "lane",
     width = 12,
@@ -80,9 +82,9 @@ local TIDE_SURGE = table.freeze({
 
 local STORM_CROWN = table.freeze({
     attackId = "tidebound_titan_crown",
-    attackName = "STORM CROWN",
+    attackName = Strings.get("encounter.storm_crown"),
     damage = 32,
-    instruction = "GROUND IT — DO NOT STAND HIGHEST",
+    instruction = Strings.get("encounter.ground_it_do_not_stand_highest"),
     radius = 15,
     shape = "circle",
     windup = 1.7,
@@ -90,9 +92,9 @@ local STORM_CROWN = table.freeze({
 
 local HARBOUR_BREAK = table.freeze({
     attackId = "tidebound_titan_break",
-    attackName = "HARBOUR BREAK",
+    attackName = Strings.get("encounter.harbour_break"),
     damage = 34,
-    instruction = "OFF THE STONE — IT IS TAKING THE WALL",
+    instruction = Strings.get("encounter.off_the_stone_it_is_taking"),
     radius = 17,
     shape = "circle",
     windup = 1.9,
@@ -380,23 +382,33 @@ function TideboundTitanEncounter.snapshot(state: State, userId: number): any
     local climbed = countKeys(state.climbed)
     local required = climbsRequired(state.phase)
     local instruction = if state.status == "unreachable"
-        then string.format("CLIMB THE WRECKS %d/%d", climbed, required)
-        elseif state.status == "grounding" then "GROUND THE STORM BEFORE IT LANDS"
-        elseif state.status == "exposed" then "LOWER THE TIDE — EASE THE GATES OR SLAM THEM"
+        then string.format(Strings.get("encounter.climb_the_wrecks_n_n"), climbed, required)
+        elseif state.status == "grounding" then Strings.get(
+            "encounter.ground_the_storm_before_it_lands"
+        )
+        elseif state.status == "exposed" then Strings.get(
+            "encounter.lower_the_tide_ease_the_gates"
+        )
         elseif state.status == "complete" then if state.outcome == "navigable"
-            then "THE TITAN IS DOWN · THE CHANNEL STILL RUNS"
-            elseif state.outcome == "broken" then "THE TITAN IS DOWN · THE HARBOUR MOUTH IS GONE"
-            else "THE TITAN IS DOWN · THE CHANNEL IS SCOURED"
-        elseif state.status == "dormant" then "ENTER THE CHANNEL"
-        elseif state.status == "locked" then "CLEAR THE REACH'S ELITES TO REACH IT"
-        elseif state.status == "disabled" then "TIDEBOUND TITAN TEMPORARILY DORMANT"
-        else "TIDEBOUND TITAN"
+            then Strings.get("encounter.the_titan_is_down_the_channel")
+            elseif state.outcome == "broken" then Strings.get(
+                "encounter.the_titan_is_down_the_harbour"
+            )
+            else Strings.get("encounter.the_titan_is_down_the_channel_2")
+        elseif state.status == "dormant" then Strings.get("encounter.enter_the_channel")
+        elseif state.status == "locked" then Strings.get(
+            "encounter.clear_the_reach_s_elites_to"
+        )
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.tidebound_titan_temporarily_dormant"
+        )
+        else Strings.get("encounter.tidebound_titan")
     return {
         active = isActive(state.status),
         choiceAvailable = state.status == "exposed",
         climbsRequired = required,
         complete = state.status == "complete",
-        displayName = "TIDEBOUND TITAN",
+        displayName = Strings.get("encounter.tidebound_titan"),
         enabled = state.status ~= "disabled",
         exposed = state.status == "exposed",
         health = state.health,

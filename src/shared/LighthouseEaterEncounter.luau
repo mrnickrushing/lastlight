@@ -24,6 +24,8 @@
     mutation server-called.
 ]]
 
+local Strings = require("./Strings")
+
 local LighthouseEaterEncounter = {}
 
 export type Status = "disabled" | "dormant" | "hidden" | "drawn" | "complete"
@@ -50,9 +52,9 @@ local BEACON_SECONDS = 11
 
 local BEAM_SNUFF = table.freeze({
     attackId = "lighthouse_eater_snuff",
-    attackName = "SNUFFED BEAM",
+    attackName = Strings.get("encounter.snuffed_beam"),
     damage = 24,
-    instruction = "GET OUT OF THE DARK IT MAKES",
+    instruction = Strings.get("encounter.get_out_of_the_dark_it"),
     radius = 12,
     shape = "circle",
     windup = 1.4,
@@ -60,9 +62,9 @@ local BEAM_SNUFF = table.freeze({
 
 local STORM_LUNGE = table.freeze({
     attackId = "lighthouse_eater_lunge",
-    attackName = "LUNGE FROM THE WALL",
+    attackName = Strings.get("encounter.lunge_from_the_wall"),
     damage = 30,
-    instruction = "CLEAR THE LINE TO THE STORM WALL",
+    instruction = Strings.get("encounter.clear_the_line_to_the_storm"),
     length = 30,
     shape = "lane",
     width = 8,
@@ -249,17 +251,21 @@ end
 function LighthouseEaterEncounter.snapshot(state: State, userId: number, now: number): any
     local lit = LighthouseEaterEncounter.litCount(state, now)
     local instruction = if state.status == "hidden"
-        then "IT IS IN THE STORM WALL — LIGHT A BEACON TO DRAW IT"
-        elseif state.status == "drawn" then "IT IS IN THE OPEN — STRIKE WHILE THE BEAM HOLDS"
-        elseif state.status == "complete" then "THE COAST KEEPS ITS LIGHT"
-        elseif state.status == "disabled" then "ELITE TEMPORARILY DORMANT"
-        else "ENTER THE POINT"
+        then Strings.get("encounter.it_is_in_the_storm_wall")
+        elseif state.status == "drawn" then Strings.get("encounter.it_is_in_the_open_strike")
+        elseif state.status == "complete" then Strings.get(
+            "encounter.the_coast_keeps_its_light"
+        )
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.elite_temporarily_dormant"
+        )
+        else Strings.get("encounter.enter_the_point")
     return {
         active = state.status == "hidden" or state.status == "drawn",
         beaconTotal = #BEACON_IDS,
         beaconsLit = lit,
         complete = state.status == "complete",
-        displayName = "LIGHTHOUSE EATER",
+        displayName = Strings.get("encounter.lighthouse_eater"),
         drawn = state.status == "drawn",
         enabled = state.status ~= "disabled",
         health = state.health,

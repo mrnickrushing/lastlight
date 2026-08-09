@@ -23,6 +23,8 @@
     the Maw's vent are -- decided by play, legible in one line.
 ]]
 
+local Strings = require("./Strings")
+
 local LanternWitchEncounter = {}
 
 export type Status = "disabled" | "locked" | "dormant" | "hiding" | "found" | "asking" | "complete"
@@ -55,9 +57,9 @@ local COPY_IDS = table.freeze({
 
 local WITCHLIGHT_RING = table.freeze({
     attackId = "lantern_witch_ring",
-    attackName = "WITCHLIGHT RING",
+    attackName = Strings.get("encounter.witchlight_ring"),
     damage = 24,
-    instruction = "LEAVE THE RING OF LIGHTS",
+    instruction = Strings.get("encounter.leave_the_ring_of_lights"),
     radius = 12,
     shape = "circle",
     windup = 1.4,
@@ -65,9 +67,9 @@ local WITCHLIGHT_RING = table.freeze({
 
 local FALSE_PATH = table.freeze({
     attackId = "lantern_witch_false_path",
-    attackName = "FALSE PATH",
+    attackName = Strings.get("encounter.false_path"),
     damage = 28,
-    instruction = "THAT GROUND IS NOT THERE — GET OFF THE LINE",
+    instruction = Strings.get("encounter.that_ground_is_not_there_get"),
     length = 32,
     shape = "lane",
     width = 8,
@@ -76,9 +78,9 @@ local FALSE_PATH = table.freeze({
 
 local DROWNING_CHOIR = table.freeze({
     attackId = "lantern_witch_choir",
-    attackName = "DROWNING CHOIR",
+    attackName = Strings.get("encounter.drowning_choir"),
     damage = 32,
-    instruction = "COVER YOUR EARS AND MOVE",
+    instruction = Strings.get("encounter.cover_your_ears_and_move"),
     radius = 15,
     shape = "circle",
     windup = 1.8,
@@ -299,17 +301,25 @@ end
 
 function LanternWitchEncounter.snapshot(state: State, userId: number): any
     local instruction = if state.status == "hiding"
-        then "ONE TELL IS WRONG — NAME THE FALSE LANTERN"
-        elseif state.status == "found" then "SPEND ONE OF HER COPIES, OR SPARE IT"
-        elseif state.status == "asking" then "SHE ASKS TO BE SEALED — ANSWER HER"
+        then Strings.get("encounter.one_tell_is_wrong_name_the")
+        elseif state.status == "found" then Strings.get("encounter.spend_one_of_her_copies_or")
+        elseif state.status == "asking" then Strings.get(
+            "encounter.she_asks_to_be_sealed_answer"
+        )
         elseif state.status == "complete" then if state.outcome == "sealed"
-            then "THE WITCH IS SEALED · SHE WENT WILLINGLY"
-            elseif state.outcome == "broken" then "THE WITCH IS BROKEN · THE FEN IS QUIET AND COLD"
-            else "THE WITCH IS BOUND · SOMETHING OF HER REMAINS"
-        elseif state.status == "dormant" then "ENTER THE WITCHLIGHT RING"
-        elseif state.status == "locked" then "CLEAR THE FEN'S ELITES TO REACH HER"
-        elseif state.status == "disabled" then "LANTERN WITCH TEMPORARILY DORMANT"
-        else "LANTERN WITCH"
+            then Strings.get("encounter.the_witch_is_sealed_she_went")
+            elseif state.outcome == "broken" then Strings.get(
+                "encounter.the_witch_is_broken_the_fen"
+            )
+            else Strings.get("encounter.the_witch_is_bound_something_of")
+        elseif state.status == "dormant" then Strings.get(
+            "encounter.enter_the_witchlight_ring"
+        )
+        elseif state.status == "locked" then Strings.get("encounter.clear_the_fen_s_elites_to")
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.lantern_witch_temporarily_dormant"
+        )
+        else Strings.get("encounter.lantern_witch")
     return {
         active = isActive(state.status),
         asking = state.status == "asking",
@@ -317,7 +327,7 @@ function LanternWitchEncounter.snapshot(state: State, userId: number): any
         complete = state.status == "complete",
         copiesRemaining = state.copiesRemaining,
         copiesSpent = state.copiesSpent,
-        displayName = "LANTERN WITCH",
+        displayName = Strings.get("encounter.lantern_witch"),
         enabled = state.status ~= "disabled",
         found = state.status == "found",
         health = state.health,

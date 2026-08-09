@@ -44,6 +44,8 @@
     every other one, and this file still asks the same question.
 ]]
 
+local Strings = require("./Strings")
+
 local PrivateServerControls = {}
 
 export type Control = {
@@ -89,31 +91,31 @@ export type Result = {
 local CONTROLS: { Control } = {
     {
         id = "hold_clock",
-        label = "HOLD THE CLOCK",
+        label = Strings.get("world.hold_the_clock"),
         field = "hold",
         kind = "toggle",
-        why = "A clock you can stop is a night you can wait out.",
+        why = Strings.get("world.a_clock_you_can_stop_is"),
     },
     {
         id = "call_phase",
-        label = "CALL THE NEXT PHASE",
+        label = Strings.get("world.call_the_next_phase"),
         field = nil,
         kind = "moment",
-        why = "Skipping to night is choosing which night you fight.",
+        why = Strings.get("world.skipping_to_night_is_choosing_which"),
     },
     {
         id = "still_dark",
-        label = "STILL THE DARK",
+        label = Strings.get("world.still_the_dark"),
         field = "still",
         kind = "toggle",
-        why = "Creatures that hold still are creatures that are not fighting back.",
+        why = Strings.get("world.creatures_that_hold_still_are_creatures"),
     },
     {
         id = "choose_seed",
-        label = "CHOOSE A SEED",
+        label = Strings.get("world.choose_a_seed"),
         field = "seed",
         kind = "seed",
-        why = "A seed you choose is a drop table you chose.",
+        why = Strings.get("world.a_seed_you_choose_is_a"),
     },
 }
 
@@ -197,15 +199,15 @@ function PrivateServerControls.authority(server: any, actorUserId: any): (boolea
 end
 
 local REFUSALS: { [string]: string } = {
-    not_private_server = "THESE CONTROLS ONLY ANSWER IN A PRIVATE SERVER",
-    reserved_server = "AN EXPEDITION WORLD HAS NO OWNER TO SET THEM",
-    not_server_owner = "ONLY THIS SERVER'S OWNER WORKS THE RAIL",
-    unknown_control = "NOTHING IS WRITTEN ON THAT BOARD",
-    no_seeds_discovered = "YOU HAVE NOT WALKED A SEED WORTH KEEPING YET",
+    not_private_server = Strings.get("world.these_controls_only_answer_in_a"),
+    reserved_server = Strings.get("world.an_expedition_world_has_no_owner"),
+    not_server_owner = Strings.get("world.only_this_server_s_owner_works"),
+    unknown_control = Strings.get("world.nothing_is_written_on_that_board"),
+    no_seeds_discovered = Strings.get("world.you_have_not_walked_a_seed"),
 }
 
 function PrivateServerControls.refusal(reason: any): string
-    return REFUSALS[reason] or "THE RAIL DID NOT ANSWER"
+    return REFUSALS[reason] or Strings.get("world.the_rail_did_not_answer")
 end
 
 --[[
@@ -303,7 +305,7 @@ function PrivateServerControls.readout(state: any, controlId: any, seeds: any): 
     elseif control.kind == "seed" then
         local chosen = PrivateServerControls.chosenSeed(current, seeds)
         if chosen == nil then
-            return "THIS SERVER'S OWN"
+            return Strings.get("world.this_server_s_own")
         end
         -- The catalog's id with its namespace taken off. Read live, the raw
         -- form came back as THE WOOD IS REGION_BRAMBLEWAKE · 32693, which is
@@ -311,7 +313,7 @@ function PrivateServerControls.readout(state: any, controlId: any, seeds: any): 
         local name = string.gsub(chosen.regionId, "^region_", "")
         return string.format("%s · %d", string.upper(name), chosen.seed)
     end
-    return "READY"
+    return Strings.get("chat.ready")
 end
 
 return table.freeze(PrivateServerControls)

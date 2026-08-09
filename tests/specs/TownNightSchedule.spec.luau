@@ -110,7 +110,7 @@ return {
                 for _, beat in TownNightSchedule.beats(360, 4) do
                     if beat.kind == "incident" then
                         incidents += 1
-                        TestRunner.equal(beat.theme, "ASHEN VEIL")
+                        TestRunner.equal(beat.theme, "ashen_veil")
                         TestRunner.truthy(beat.at <= 360 - 42)
                     end
                 end
@@ -160,8 +160,8 @@ return {
         {
             name = "rotates readable themes and roster order by night",
             run = function()
-                TestRunner.equal(TownNightSchedule.theme(1), "EMBERFALL")
-                TestRunner.equal(TownNightSchedule.theme(5), "EMBERFALL")
+                TestRunner.equal(TownNightSchedule.theme(1), "emberfall")
+                TestRunner.equal(TownNightSchedule.theme(5), "emberfall")
                 local nightOne = TownNightSchedule.beats(120, 1)
                 local nightTwo = TownNightSchedule.beats(120, 2)
                 TestRunner.equal(nightOne[2].enemyId, "enemy_rootling")

@@ -2,6 +2,7 @@
 
 local ChapterCatalog = require("./ChapterCatalog")
 local ResidentRoster = require("./ResidentRoster")
+local Strings = require("./Strings")
 
 local TownProgression = {}
 
@@ -218,15 +219,15 @@ function TownProgression.resolve(profile: any): Consequence
         tier = math.max(7, tier)
     end
     local title = if decision == "restore_farmland"
-        then "FARMLAND RENEWED"
-        elseif decision == "wild_regrowth" then "WILD REGROWTH"
-        elseif decision == "shared_agroforest" then "SHARED AGROFOREST"
-        else "EMBERHOLLOW AWAKENS"
+        then Strings.get("town.farmland_renewed")
+        elseif decision == "wild_regrowth" then Strings.get("town.wild_regrowth")
+        elseif decision == "shared_agroforest" then Strings.get("town.shared_agroforest")
+        else Strings.get("toast.emberhollow_awakens")
     local detail = if outcome == "preserved"
-        then "The Warden's mercy keeps the old paths open."
-        elseif outcome == "scarred" then "Scored roots mark a harder road through the forest."
-        elseif outcome == "harmed" then "Broken antlers leave the town under a watchful shadow."
-        else "Every safe night makes the lantern town stronger."
+        then Strings.get("town.the_warden_s_mercy_keeps_the")
+        elseif outcome == "scarred" then Strings.get("town.scored_roots_mark_a_harder_road")
+        elseif outcome == "harmed" then Strings.get("town.broken_antlers_leave_the_town_under")
+        else Strings.get("town.every_safe_night_makes_the_lantern")
     local landscapeKind = if decision == "restore_farmland"
         then "cultivated_fields"
         elseif decision == "wild_regrowth" then "living_grove"

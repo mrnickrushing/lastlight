@@ -20,6 +20,8 @@
     one reward per participant per run, disable-able, server-called.
 ]]
 
+local Strings = require("./Strings")
+
 local AbbeySilenceEncounter = {}
 
 export type Status = "disabled" | "dormant" | "silent" | "ringing" | "complete"
@@ -47,9 +49,9 @@ local SILENT_FRACTION = 0.35
 
 local SMOTHERED_STEP = table.freeze({
     attackId = "abbey_silence_step",
-    attackName = "SMOTHERED STEP",
+    attackName = Strings.get("encounter.smothered_step"),
     damage = 22,
-    instruction = "WATCH THE SNOW — YOU WILL NOT HEAR THIS",
+    instruction = Strings.get("encounter.watch_the_snow_you_will_not"),
     radius = 11,
     shape = "circle",
     windup = 1.5,
@@ -57,9 +59,9 @@ local SMOTHERED_STEP = table.freeze({
 
 local HELD_BREATH = table.freeze({
     attackId = "abbey_silence_breath",
-    attackName = "HELD BREATH",
+    attackName = Strings.get("encounter.held_breath"),
     damage = 26,
-    instruction = "CLEAR THE AISLE",
+    instruction = Strings.get("encounter.clear_the_aisle"),
     length = 28,
     shape = "lane",
     width = 7,
@@ -247,17 +249,27 @@ end
 function AbbeySilenceEncounter.snapshot(state: State, userId: number, now: number): any
     local ringing = AbbeySilenceEncounter.ringingCount(state, now)
     local instruction = if state.status == "silent"
-        then string.format("RING THE CLOISTER BELLS — %d OF %d SOUNDING", ringing, #BELL_IDS)
-        elseif state.status == "ringing" then "THE ROOM HAS SOUND — STRIKE WHILE IT LASTS"
-        elseif state.status == "complete" then "THE ABBEY CAN BE HEARD AGAIN"
-        elseif state.status == "disabled" then "ELITE TEMPORARILY DORMANT"
-        else "ENTER THE CLOISTER"
+        then string.format(
+            Strings.get("encounter.ring_the_cloister_bells_n_of"),
+            ringing,
+            #BELL_IDS
+        )
+        elseif state.status == "ringing" then Strings.get(
+            "encounter.the_room_has_sound_strike_while"
+        )
+        elseif state.status == "complete" then Strings.get(
+            "encounter.the_abbey_can_be_heard_again"
+        )
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.elite_temporarily_dormant"
+        )
+        else Strings.get("encounter.enter_the_cloister")
     return {
         active = state.status == "silent" or state.status == "ringing",
         bellTotal = #BELL_IDS,
         bellsRinging = ringing,
         complete = state.status == "complete",
-        displayName = "ABBEY SILENCE",
+        displayName = Strings.get("encounter.abbey_silence"),
         enabled = state.status ~= "disabled",
         health = state.health,
         heard = ringing > 0,

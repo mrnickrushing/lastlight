@@ -25,6 +25,8 @@
     every mutation server-called.
 ]]
 
+local Strings = require("./Strings")
+
 local ManyFaceEncounter = {}
 
 export type Status = "disabled" | "dormant" | "wearing" | "countered" | "complete"
@@ -66,9 +68,9 @@ local GUARDED_FRACTION = 0.25
 
 local MIRROR_SPRAY = table.freeze({
     attackId = "many_face_mirror_spray",
-    attackName = "MIRROR SPRAY",
+    attackName = Strings.get("encounter.mirror_spray"),
     damage = 22,
-    instruction = "GET OUT OF THE GLASS RING",
+    instruction = Strings.get("encounter.get_out_of_the_glass_ring"),
     radius = 11,
     shape = "circle",
     windup = 1.35,
@@ -76,9 +78,9 @@ local MIRROR_SPRAY = table.freeze({
 
 local BORROWED_REACH = table.freeze({
     attackId = "many_face_borrowed_reach",
-    attackName = "BORROWED REACH",
+    attackName = Strings.get("encounter.borrowed_reach"),
     damage = 28,
-    instruction = "CLEAR THE LINE — IT HAS SOMEONE'S LANCE",
+    instruction = Strings.get("encounter.clear_the_line_it_has_someone"),
     length = 30,
     shape = "lane",
     width = 7,
@@ -295,19 +297,23 @@ function ManyFaceEncounter.snapshot(state: State, userId: number, now: number): 
     local countered = state.status == "countered" and now < state.counteredUntil
     local face = ManyFaceEncounter.faceAt(state.faceIndex)
     local instruction = if countered
-        then "THE FACE IS STRIPPED — STRIKE NOW"
-        elseif
-            state.status == "wearing"
-        then "IT WEARS ANOTHER'S FACE — TURN THE ANSWERING MIRROR"
-        elseif state.status == "complete" then "THE FACES ARE ITS OWN AGAIN"
-        elseif state.status == "disabled" then "ELITE TEMPORARILY DORMANT"
-        else "ENTER THE MIRROR COURT"
+        then Strings.get("encounter.the_face_is_stripped_strike_now")
+        elseif state.status == "wearing" then Strings.get(
+            "encounter.it_wears_another_s_face_turn"
+        )
+        elseif state.status == "complete" then Strings.get(
+            "encounter.the_faces_are_its_own_again"
+        )
+        elseif state.status == "disabled" then Strings.get(
+            "encounter.elite_temporarily_dormant"
+        )
+        else Strings.get("encounter.enter_the_mirror_court")
     return {
         active = state.status == "wearing" or state.status == "countered",
         complete = state.status == "complete",
         countered = countered,
         counteredUntil = if countered then state.counteredUntil else 0,
-        displayName = "THE MANY-FACE",
+        displayName = Strings.get("encounter.the_many_face"),
         enabled = state.status ~= "disabled",
         face = face,
         health = state.health,
