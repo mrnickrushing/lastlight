@@ -7,11 +7,12 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-08, at `main` = PR #360, build `0.53.0`,
+Last updated: 2026-08-08, at `main` = PR #361, build `0.53.0`,
 save schema 25, 27 services. Published to Roblox as place version 161,
-matching PR #360 exactly. (#358 produced v159 and #359 v160; the three
-together are Milestone 13 wave D's closing batches, and each was published
-before the next was started.) (This line used to say ``at `main` = `HEAD` ``,
+matching PR #360 exactly; #361 adds only documentation and republishing it
+returned the version #360 had already produced. (#358 produced v159 and #359
+v160; those three are Milestone 13 wave D's closing batches, and each was
+published before the next was started.) (This line used to say ``at `main` = `HEAD` ``,
 and #354 is the wave that noticed `HEAD` is not a revision. The revision a
 rollback restores is recorded properly in
 [ROLLBACK.md](ROLLBACK.md#the-rollback-target).) (#352 leaves the built place
