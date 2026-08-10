@@ -28,6 +28,7 @@ local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionContracts = require(root.ExpeditionContracts)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local ExpeditionRewardLedger = require(root.ExpeditionRewardLedger)
+local ExtractionOutcome = require(root.ExtractionOutcome)
 local ExtractionPayoff = require(root.ExtractionPayoff)
 local NightSchedule = require(root.NightSchedule)
 local OldGrowthEncounter = require(root.OldGrowthEncounter)
@@ -176,6 +177,7 @@ local expeditionService = ExpeditionService.new(
     ExpeditionEventFlow,
     ExpeditionRewardLedger,
     ExtractionPayoff,
+    ExtractionOutcome,
     profileService,
     analyticsService,
     Config.BramblewakePreviewSeed,

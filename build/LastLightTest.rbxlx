@@ -4900,7 +4900,7 @@ return table.freeze(CompanionMotion)
 
 return table.freeze({
     GameName = "Last Light",
-    BuildVersion = "0.53.0",
+    BuildVersion = "0.53.1",
     MaxExpeditionPlayers = 8,
     NormalDaySeconds = 12 * 60,
     DuskSeconds = 2 * 60,
@@ -19924,6 +19924,68 @@ return table.freeze(ExpeditionRewardLedger)
       </Item>
       <Item class="ModuleScript" referent="54">
         <Properties>
+          <string name="Name">ExtractionOutcome</string>
+          <string name="Source"><![CDATA[--!strict
+
+-- Wayhome is a door, not a reward gate.
+--
+-- Banking a pouch can fail for reasons a player has no control over and
+-- cannot clear from inside the wood: a session lock lost to a server
+-- migration, a DataStore write that has not confirmed durable yet, a profile
+-- still loading, an unbanked pouch that has hit its transaction cap. The
+-- first version of the extraction flow returned early on every one of those
+-- and never asked the world to move the player, so the failure a player
+-- actually experienced was being stuck in the expedition -- and because an
+-- empty pouch skips settlement entirely, *earning rewards* was what trapped
+-- them.
+--
+-- Every decision this module returns leaves. Rewards that did not bank stay
+-- unsettled in the session ledger and in the profile's pending rewards, so
+-- the next extraction retries them; nothing here spends or discards value.
+-- The only thing a failed settlement costs is the banking, and the message
+-- says so.
+--
+-- No wording lives here. The localization guard only recognizes a literal
+-- `Strings.get("...")`, so an indirect key handed back from this module would
+-- read to it as a table entry nobody uses. This module owns the decision --
+-- whether the player leaves, and whether anything banked -- and the caller
+-- picks the sentence.
+
+local ExtractionOutcome = {}
+
+export type Decision = {
+    exit: boolean,
+    settled: boolean,
+    reason: string?,
+}
+
+function ExtractionOutcome.unbanked(reason: any): Decision
+    return {
+        exit = true,
+        reason = if type(reason) == "string" and reason ~= "" then reason else nil,
+        settled = false,
+    }
+end
+
+-- Used when the world itself could not move the player (no character, or a
+-- transition already in flight). This is the one outcome that legitimately
+-- leaves someone in the wood, and it clears by pressing the prompt again --
+-- unlike a settlement failure, which never clears on its own.
+function ExtractionOutcome.transitionUnavailable(reason: any): Decision
+    local key = if type(reason) == "string" and reason ~= "" then reason else nil
+    return {
+        exit = false,
+        reason = key or "transition_unavailable",
+        settled = false,
+    }
+end
+
+return table.freeze(ExtractionOutcome)
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="55">
+        <Properties>
           <string name="Name">ExtractionPayoff</string>
           <string name="Source"><![CDATA[--!strict
 
@@ -20114,7 +20176,7 @@ return table.freeze(ExtractionPayoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="55">
+      <Item class="ModuleScript" referent="56">
         <Properties>
           <string name="Name">ForemanEchoEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -20432,7 +20494,7 @@ return table.freeze(ForemanEchoEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="56">
+      <Item class="ModuleScript" referent="57">
         <Properties>
           <string name="Name">FrostmereEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -20716,7 +20778,7 @@ return table.freeze(FrostmereEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="57">
+      <Item class="ModuleScript" referent="58">
         <Properties>
           <string name="Name">GearTraits</string>
           <string name="Source"><![CDATA[--!strict
@@ -20859,7 +20921,7 @@ return table.freeze(GearTraits)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="58">
+      <Item class="ModuleScript" referent="59">
         <Properties>
           <string name="Name">GearVisualPlan</string>
           <string name="Source"><![CDATA[--!strict
@@ -21541,7 +21603,7 @@ return table.freeze(GearVisualPlan)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="59">
+      <Item class="ModuleScript" referent="60">
         <Properties>
           <string name="Name">GearWear</string>
           <string name="Source"><![CDATA[--!strict
@@ -21688,7 +21750,7 @@ return table.freeze(GearWear)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="60">
+      <Item class="ModuleScript" referent="61">
         <Properties>
           <string name="Name">GlassBailiffEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -22008,7 +22070,7 @@ return table.freeze(GlassBailiffEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="61">
+      <Item class="ModuleScript" referent="62">
         <Properties>
           <string name="Name">IronWidowEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -22314,7 +22376,7 @@ return table.freeze(IronWidowEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="62">
+      <Item class="ModuleScript" referent="63">
         <Properties>
           <string name="Name">IronrootEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -22613,7 +22675,7 @@ return table.freeze(IronrootEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="63">
+      <Item class="ModuleScript" referent="64">
         <Properties>
           <string name="Name">LanternWitchEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -22974,7 +23036,7 @@ return table.freeze(LanternWitchEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="64">
+      <Item class="ModuleScript" referent="65">
         <Properties>
           <string name="Name">LeadActorEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -23273,7 +23335,7 @@ return table.freeze(LeadActorEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="65">
+      <Item class="ModuleScript" referent="66">
         <Properties>
           <string name="Name">LighthouseEaterEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -23570,7 +23632,7 @@ return table.freeze(LighthouseEaterEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="66">
+      <Item class="ModuleScript" referent="67">
         <Properties>
           <string name="Name">LobbyDeparture</string>
           <string name="Source"><![CDATA[--!strict
@@ -23746,7 +23808,7 @@ return table.freeze(LobbyDeparture)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="67">
+      <Item class="ModuleScript" referent="68">
         <Properties>
           <string name="Name">ManyFaceEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -24091,7 +24153,7 @@ return table.freeze(ManyFaceEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="68">
+      <Item class="ModuleScript" referent="69">
         <Properties>
           <string name="Name">MemoryFragments</string>
           <string name="Source"><![CDATA[--!strict
@@ -24490,7 +24552,7 @@ return table.freeze(MemoryFragments)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="69">
+      <Item class="ModuleScript" referent="70">
         <Properties>
           <string name="Name">MireglassEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -24776,7 +24838,7 @@ return table.freeze(MireglassEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="70">
+      <Item class="ModuleScript" referent="71">
         <Properties>
           <string name="Name">MusicCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -25137,7 +25199,7 @@ return table.freeze(MusicCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="71">
+      <Item class="ModuleScript" referent="72">
         <Properties>
           <string name="Name">NamelessNightEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -25631,7 +25693,7 @@ return table.freeze(NamelessNightEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="72">
+      <Item class="ModuleScript" referent="73">
         <Properties>
           <string name="Name">NightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -25679,7 +25741,7 @@ return table.freeze(NightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="73">
+      <Item class="ModuleScript" referent="74">
         <Properties>
           <string name="Name">OldGrowthEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -25970,7 +26032,7 @@ return table.freeze(OldGrowthEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="74">
+      <Item class="ModuleScript" referent="75">
         <Properties>
           <string name="Name">PartySession</string>
           <string name="Source"><![CDATA[--!strict
@@ -26679,7 +26741,7 @@ return table.freeze(PartySession)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="75">
+      <Item class="ModuleScript" referent="76">
         <Properties>
           <string name="Name">PerformanceBudget</string>
           <string name="Source"><![CDATA[--!strict
@@ -27076,7 +27138,7 @@ return table.freeze(PerformanceBudget)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="76">
+      <Item class="ModuleScript" referent="77">
         <Properties>
           <string name="Name">PrivateServerControls</string>
           <string name="Source"><![CDATA[--!strict
@@ -27401,7 +27463,7 @@ return table.freeze(PrivateServerControls)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="77">
+      <Item class="ModuleScript" referent="78">
         <Properties>
           <string name="Name">ProfessionAbilityVisuals</string>
           <string name="Source"><![CDATA[--!strict
@@ -27495,7 +27557,7 @@ return table.freeze(ProfessionAbilityVisuals)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="78">
+      <Item class="ModuleScript" referent="79">
         <Properties>
           <string name="Name">ProfessionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -27663,7 +27725,7 @@ return table.freeze(ProfessionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="79">
+      <Item class="ModuleScript" referent="80">
         <Properties>
           <string name="Name">ProfessionMastery</string>
           <string name="Source"><![CDATA[--!strict
@@ -28105,7 +28167,7 @@ return table.freeze(ProfessionMastery)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="80">
+      <Item class="ModuleScript" referent="81">
         <Properties>
           <string name="Name">ProfessionRescue</string>
           <string name="Source"><![CDATA[--!strict
@@ -28186,7 +28248,7 @@ return table.freeze(ProfessionRescue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="81">
+      <Item class="ModuleScript" referent="82">
         <Properties>
           <string name="Name">ProfessionState</string>
           <string name="Source"><![CDATA[--!strict
@@ -28353,7 +28415,7 @@ return table.freeze(ProfessionState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="82">
+      <Item class="ModuleScript" referent="83">
         <Properties>
           <string name="Name">ProfileBackup</string>
           <string name="Source"><![CDATA[--!strict
@@ -28667,7 +28729,7 @@ return table.freeze(ProfileBackup)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="83">
+      <Item class="ModuleScript" referent="84">
         <Properties>
           <string name="Name">ProfilePersistence</string>
           <string name="Source"><![CDATA[--!strict
@@ -28841,7 +28903,7 @@ return table.freeze(ProfilePersistence)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="84">
+      <Item class="ModuleScript" referent="85">
         <Properties>
           <string name="Name">QuestCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -29402,7 +29464,7 @@ return table.freeze(QuestCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="85">
+      <Item class="ModuleScript" referent="86">
         <Properties>
           <string name="Name">Quests</string>
           <string name="Source"><![CDATA[--!strict
@@ -29594,7 +29656,7 @@ return table.freeze(Quests)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="86">
+      <Item class="ModuleScript" referent="87">
         <Properties>
           <string name="Name">QuickChat</string>
           <string name="Source"><![CDATA[--!strict
@@ -30073,7 +30135,7 @@ return table.freeze(QuickChat)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="87">
+      <Item class="ModuleScript" referent="88">
         <Properties>
           <string name="Name">RateLimiter</string>
           <string name="Source"><![CDATA[--!strict
@@ -30132,7 +30194,7 @@ return table.freeze(RateLimiter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="88">
+      <Item class="ModuleScript" referent="89">
         <Properties>
           <string name="Name">RegionAccess</string>
           <string name="Source"><![CDATA[--!strict
@@ -30276,7 +30338,7 @@ return table.freeze(RegionAccess)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="89">
+      <Item class="ModuleScript" referent="90">
         <Properties>
           <string name="Name">RegionEncounterWiring</string>
           <string name="Source"><![CDATA[--!strict
@@ -30996,7 +31058,7 @@ return table.freeze(RegionEncounterWiring)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="90">
+      <Item class="ModuleScript" referent="91">
         <Properties>
           <string name="Name">ResidentDialogue</string>
           <string name="Source"><![CDATA[--!strict
@@ -31264,7 +31326,7 @@ return table.freeze(ResidentDialogue)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="91">
+      <Item class="ModuleScript" referent="92">
         <Properties>
           <string name="Name">ResidentLife</string>
           <string name="Source"><![CDATA[--!strict
@@ -31588,7 +31650,7 @@ return table.freeze(ResidentLife)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="92">
+      <Item class="ModuleScript" referent="93">
         <Properties>
           <string name="Name">ResidentRoster</string>
           <string name="Source"><![CDATA[--!strict
@@ -32224,7 +32286,7 @@ return table.freeze(ResidentRoster)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="93">
+      <Item class="ModuleScript" referent="94">
         <Properties>
           <string name="Name">ReviveFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -32339,7 +32401,7 @@ return table.freeze(ReviveFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="94">
+      <Item class="ModuleScript" referent="95">
         <Properties>
           <string name="Name">RolloutCohorts</string>
           <string name="Source"><![CDATA[--!strict
@@ -32563,7 +32625,7 @@ return table.freeze(RolloutCohorts)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="95">
+      <Item class="ModuleScript" referent="96">
         <Properties>
           <string name="Name">RunHandoff</string>
           <string name="Source"><![CDATA[--!strict
@@ -32732,7 +32794,7 @@ return table.freeze(RunHandoff)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="96">
+      <Item class="ModuleScript" referent="97">
         <Properties>
           <string name="Name">RuntimeIds</string>
           <string name="Source"><![CDATA[--!strict
@@ -33004,7 +33066,7 @@ return table.freeze(RuntimeIds)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="97">
+      <Item class="ModuleScript" referent="98">
         <Properties>
           <string name="Name">SaveSchema</string>
           <string name="Source"><![CDATA[--!strict
@@ -34775,7 +34837,7 @@ return table.freeze(SaveSchema)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="98">
+      <Item class="ModuleScript" referent="99">
         <Properties>
           <string name="Name">SessionSegment</string>
           <string name="Source"><![CDATA[--!strict
@@ -34965,7 +35027,7 @@ return table.freeze(SessionSegment)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="99">
+      <Item class="ModuleScript" referent="100">
         <Properties>
           <string name="Name">SfxCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -35132,7 +35194,7 @@ return table.freeze(SfxCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="100">
+      <Item class="ModuleScript" referent="101">
         <Properties>
           <string name="Name">SoakProbe</string>
           <string name="Source"><![CDATA[--!strict
@@ -35523,7 +35585,7 @@ return table.freeze(SoakProbe)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="101">
+      <Item class="ModuleScript" referent="102">
         <Properties>
           <string name="Name">StatusEffectState</string>
           <string name="Source"><![CDATA[--!strict
@@ -35667,7 +35729,7 @@ return table.freeze(StatusEffectState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="102">
+      <Item class="ModuleScript" referent="103">
         <Properties>
           <string name="Name">StoreAvailability</string>
           <string name="Source"><![CDATA[--!strict
@@ -35817,7 +35879,7 @@ return table.freeze(StoreAvailability)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="103">
+      <Item class="ModuleScript" referent="104">
         <Properties>
           <string name="Name">StoreCard</string>
           <string name="Source"><![CDATA[--!strict
@@ -36058,7 +36120,7 @@ return table.freeze(StoreCard)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="104">
+      <Item class="ModuleScript" referent="105">
         <Properties>
           <string name="Name">Strings</string>
           <string name="Source"><![CDATA[--!strict
@@ -36567,9 +36629,14 @@ local SOURCE: { [string]: string } = {
     ["toast.wayhome_transition_will_retry"] = "WAYHOME TRANSITION WILL RETRY",
     ["toast.returning_to_emberhollow_banked_delivery_rea"] = "RETURNING TO EMBERHOLLOW — BANKED DELIVERY READY",
     ["toast.returning_to_emberhollow_pouch_empty"] = "RETURNING TO EMBERHOLLOW — POUCH EMPTY",
-    ["toast.profile_offline_rewards_remain_unbanked"] = "PROFILE OFFLINE — REWARDS REMAIN UNBANKED",
-    ["toast.banking_retry_needed_rewards_remain_unbanked"] = "BANKING RETRY NEEDED — REWARDS REMAIN UNBANKED",
-    ["toast.wayhome_gate_is_waiting_for_your"] = "WAYHOME GATE IS WAITING FOR YOUR PROFILE",
+    -- A failed settlement no longer keeps anyone in the wood, so every one of
+    -- these says where the player is going as well as what did not happen.
+    -- The old wording ("REWARDS REMAIN UNBANKED") described a refusal that the
+    -- player then had to stand in.
+    ["toast.profile_offline_returning_unbanked"] = "PROFILE OFFLINE — RETURNING WITH AN UNBANKED POUCH",
+    ["toast.banking_retry_needed_returning_unbanked"] = "BANKING RETRY NEEDED — RETURNING WITH AN UNBANKED POUCH",
+    ["toast.wayhome_opens_your_pouch_stays_unbanked"] = "WAYHOME OPENS — YOUR POUCH STAYS UNBANKED",
+    ["toast.rewards_unbanked_wayhome_transition_will_retry"] = "REWARDS UNBANKED — WAYHOME TRANSITION WILL RETRY",
     ["toast.wayhome_n_materials_banked"] = "WAYHOME — %d MATERIALS BANKED",
     ["toast.departing_in_n_stand_on_the"] = "DEPARTING IN %d — STAND ON THE PLATFORM",
     ["toast.a_departure_is_already_under_way"] = "A DEPARTURE IS ALREADY UNDER WAY",
@@ -38823,7 +38890,7 @@ return Strings
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="105">
+      <Item class="ModuleScript" referent="106">
         <Properties>
           <string name="Name">SurvivalState</string>
           <string name="Source"><![CDATA[--!strict
@@ -39080,7 +39147,7 @@ return table.freeze(SurvivalState)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="106">
+      <Item class="ModuleScript" referent="107">
         <Properties>
           <string name="Name">TempestEnemies</string>
           <string name="Source"><![CDATA[--!strict
@@ -39360,7 +39427,7 @@ return table.freeze(TempestEnemies)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="107">
+      <Item class="ModuleScript" referent="108">
         <Properties>
           <string name="Name">TideboundTitanEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -39803,7 +39870,7 @@ return table.freeze(TideboundTitanEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="108">
+      <Item class="ModuleScript" referent="109">
         <Properties>
           <string name="Name">ToolCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -39949,7 +40016,7 @@ return table.freeze(ToolCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="109">
+      <Item class="ModuleScript" referent="110">
         <Properties>
           <string name="Name">TownCondition</string>
           <string name="Source"><![CDATA[--!strict
@@ -40359,7 +40426,7 @@ return table.freeze(TownCondition)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="110">
+      <Item class="ModuleScript" referent="111">
         <Properties>
           <string name="Name">TownConstruction</string>
           <string name="Source"><![CDATA[--!strict
@@ -40540,7 +40607,7 @@ return table.freeze(TownConstruction)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="111">
+      <Item class="ModuleScript" referent="112">
         <Properties>
           <string name="Name">TownConstructionCatalog</string>
           <string name="Source"><![CDATA[--!strict
@@ -40604,7 +40671,7 @@ return table.freeze(TownConstructionCatalog)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="112">
+      <Item class="ModuleScript" referent="113">
         <Properties>
           <string name="Name">TownDecorations</string>
           <string name="Source"><![CDATA[--!strict
@@ -40780,7 +40847,7 @@ return table.freeze(TownDecorations)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="113">
+      <Item class="ModuleScript" referent="114">
         <Properties>
           <string name="Name">TownGuardLastStand</string>
           <string name="Source"><![CDATA[--!strict
@@ -40872,7 +40939,7 @@ return table.freeze(TownGuardLastStand)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="114">
+      <Item class="ModuleScript" referent="115">
         <Properties>
           <string name="Name">TownNightIncident</string>
           <string name="Source"><![CDATA[--!strict
@@ -41086,7 +41153,7 @@ return table.freeze(TownNightIncident)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="115">
+      <Item class="ModuleScript" referent="116">
         <Properties>
           <string name="Name">TownNightSchedule</string>
           <string name="Source"><![CDATA[--!strict
@@ -41292,7 +41359,7 @@ return table.freeze(TownNightSchedule)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="116">
+      <Item class="ModuleScript" referent="117">
         <Properties>
           <string name="Name">TownPermissions</string>
           <string name="Source"><![CDATA[--!strict
@@ -41445,7 +41512,7 @@ return table.freeze(TownPermissions)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="117">
+      <Item class="ModuleScript" referent="118">
         <Properties>
           <string name="Name">TownProgression</string>
           <string name="Source"><![CDATA[--!strict
@@ -41779,7 +41846,7 @@ return table.freeze(TownProgression)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="118">
+      <Item class="ModuleScript" referent="119">
         <Properties>
           <string name="Name">TownVisitPolicy</string>
           <string name="Source"><![CDATA[--!strict
@@ -41954,7 +42021,7 @@ return table.freeze(TownVisitPolicy)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="119">
+      <Item class="ModuleScript" referent="120">
         <Properties>
           <string name="Name">TutorialFlow</string>
           <string name="Source"><![CDATA[--!strict
@@ -42118,7 +42185,7 @@ return table.freeze(TutorialFlow)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="120">
+      <Item class="ModuleScript" referent="121">
         <Properties>
           <string name="Name">Types</string>
           <string name="Source"><![CDATA[--!strict
@@ -42154,7 +42221,7 @@ return {}
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="121">
+      <Item class="ModuleScript" referent="122">
         <Properties>
           <string name="Name">WardenStagEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -42546,7 +42613,7 @@ return table.freeze(WardenStagEncounter)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="122">
+      <Item class="ModuleScript" referent="123">
         <Properties>
           <string name="Name">WeatherProfile</string>
           <string name="Source"><![CDATA[--!strict
@@ -42616,7 +42683,7 @@ return table.freeze(WeatherProfile)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="ModuleScript" referent="123">
+      <Item class="ModuleScript" referent="124">
         <Properties>
           <string name="Name">WhiteHowlerEncounter</string>
           <string name="Source"><![CDATA[--!strict
@@ -43088,11 +43155,11 @@ return table.freeze(WhiteHowlerEncounter)
       </Item>
     </Item>
   </Item>
-  <Item class="ServerScriptService" referent="124">
+  <Item class="ServerScriptService" referent="125">
     <Properties>
       <string name="Name">ServerScriptService</string>
     </Properties>
-    <Item class="Script" referent="125">
+    <Item class="Script" referent="126">
       <Properties>
         <string name="Name">LastLightServer</string>
         <token name="RunContext">0</token>
@@ -43126,6 +43193,7 @@ local ExpeditionEventFlow = require(root.ExpeditionEventFlow)
 local ExpeditionContracts = require(root.ExpeditionContracts)
 local ExpeditionGenerator = require(root.ExpeditionGenerator)
 local ExpeditionRewardLedger = require(root.ExpeditionRewardLedger)
+local ExtractionOutcome = require(root.ExtractionOutcome)
 local ExtractionPayoff = require(root.ExtractionPayoff)
 local NightSchedule = require(root.NightSchedule)
 local OldGrowthEncounter = require(root.OldGrowthEncounter)
@@ -43274,6 +43342,7 @@ local expeditionService = ExpeditionService.new(
     ExpeditionEventFlow,
     ExpeditionRewardLedger,
     ExtractionPayoff,
+    ExtractionOutcome,
     profileService,
     analyticsService,
     Config.BramblewakePreviewSeed,
@@ -43884,7 +43953,7 @@ logger:info("server_boot_complete", {
 })
 ]]></string>
       </Properties>
-      <Item class="ModuleScript" referent="126">
+      <Item class="ModuleScript" referent="127">
         <Properties>
           <string name="Name">ServiceRegistry</string>
           <string name="Source"><![CDATA[--!strict
@@ -43982,11 +44051,11 @@ return table.freeze(ServiceRegistry)
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Folder" referent="127">
+      <Item class="Folder" referent="128">
         <Properties>
           <string name="Name">Services</string>
         </Properties>
-        <Item class="ModuleScript" referent="128">
+        <Item class="ModuleScript" referent="129">
           <Properties>
             <string name="Name">AdminService</string>
             <string name="Source"><![CDATA[--!strict
@@ -44651,7 +44720,7 @@ return AdminService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="129">
+        <Item class="ModuleScript" referent="130">
           <Properties>
             <string name="Name">AnalyticsService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46167,7 +46236,7 @@ return table.freeze(AnalyticsService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="130">
+        <Item class="ModuleScript" referent="131">
           <Properties>
             <string name="Name">BramblewakeBlackoutService</string>
             <string name="Source"><![CDATA[--!strict
@@ -46682,7 +46751,7 @@ return table.freeze(BramblewakeBlackoutService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="131">
+        <Item class="ModuleScript" referent="132">
           <Properties>
             <string name="Name">CommerceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47507,7 +47576,7 @@ return table.freeze(CommerceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="132">
+        <Item class="ModuleScript" referent="133">
           <Properties>
             <string name="Name">CompanionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -47782,7 +47851,7 @@ return table.freeze(CompanionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="133">
+        <Item class="ModuleScript" referent="134">
           <Properties>
             <string name="Name">DefenseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -48219,7 +48288,7 @@ return table.freeze(DefenseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="134">
+        <Item class="ModuleScript" referent="135">
           <Properties>
             <string name="Name">EnemyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -49994,7 +50063,7 @@ return table.freeze(EnemyService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="135">
+        <Item class="ModuleScript" referent="136">
           <Properties>
             <string name="Name">ExpeditionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -50025,6 +50094,7 @@ export type ExpeditionService = typeof(setmetatable(
         _eventFlow: any,
         _rewardLedger: any,
         _extractionPayoff: any,
+        _extractionOutcome: any,
         _profileService: any,
         _analyticsService: any,
         _seed: number,
@@ -50054,6 +50124,7 @@ function ExpeditionService.new(
     eventFlow: any,
     rewardLedger: any,
     extractionPayoff: any,
+    extractionOutcome: any,
     profileService: any,
     analyticsService: any,
     seed: number,
@@ -50073,6 +50144,7 @@ function ExpeditionService.new(
         _eventFlow = eventFlow,
         _rewardLedger = rewardLedger,
         _extractionPayoff = extractionPayoff,
+        _extractionOutcome = extractionOutcome,
         _profileService = profileService,
         _analyticsService = analyticsService,
         _seed = seed,
@@ -50920,15 +50992,36 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
             false,
             0
         )
+        -- Banking failed, so the pouch stays unsettled in the session ledger
+        -- and retries on the next extraction. What must not happen is the
+        -- player staying in the wood over it: none of these reasons can be
+        -- cleared from inside an expedition, so an early return here is a
+        -- permanent trap. Send them home unbanked instead.
+        local decision = self._extractionOutcome.unbanked(settlement.reason)
+        self._logger:warn("expedition_extraction_unbanked", {
+            manifest = manifest.hash,
+            player = player.UserId,
+            reason = decision.reason,
+            region = self._regionId,
+        })
+        if not self:_exitWithPayoff(player) then
+            local retry = self._extractionOutcome.transitionUnavailable(decision.reason)
+            return {
+                accepted = false,
+                message = Strings.get("toast.rewards_unbanked_wayhome_transition_will_retry"),
+                reason = retry.reason,
+            }
+        end
         return {
             accepted = false,
-            message = if settlement.reason == "profile_read_only"
-                then Strings.get("toast.profile_offline_rewards_remain_unbanked")
-                elseif settlement.reason == "save_pending" then Strings.get(
-                    "toast.banking_retry_needed_rewards_remain_unbanked"
+            message = if decision.reason == "profile_read_only"
+                then Strings.get("toast.profile_offline_returning_unbanked")
+                elseif decision.reason == "save_pending" then Strings.get(
+                    "toast.banking_retry_needed_returning_unbanked"
                 )
-                else Strings.get("toast.wayhome_gate_is_waiting_for_your"),
-            reason = settlement.reason,
+                else Strings.get("toast.wayhome_opens_your_pouch_stays_unbanked"),
+            reason = decision.reason,
+            unbanked = true,
         }
     end
 
@@ -51038,7 +51131,7 @@ return table.freeze(ExpeditionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="136">
+        <Item class="ModuleScript" referent="137">
           <Properties>
             <string name="Name">FeatureFlagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -51262,7 +51355,7 @@ return table.freeze(FeatureFlagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="137">
+        <Item class="ModuleScript" referent="138">
           <Properties>
             <string name="Name">GearVisualService</string>
             <string name="Source"><![CDATA[--!strict
@@ -51571,7 +51664,7 @@ return GearVisualService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="138">
+        <Item class="ModuleScript" referent="139">
           <Properties>
             <string name="Name">LobbyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -52029,7 +52122,7 @@ return LobbyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="139">
+        <Item class="ModuleScript" referent="140">
           <Properties>
             <string name="Name">Logger</string>
             <string name="Source"><![CDATA[--!strict
@@ -52123,7 +52216,7 @@ return table.freeze(Logger)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="140">
+        <Item class="ModuleScript" referent="141">
           <Properties>
             <string name="Name">NetworkService</string>
             <string name="Source"><![CDATA[--!strict
@@ -52341,7 +52434,7 @@ return table.freeze(NetworkService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="141">
+        <Item class="ModuleScript" referent="142">
           <Properties>
             <string name="Name">OldGrowthService</string>
             <string name="Source"><![CDATA[--!strict
@@ -53235,7 +53328,7 @@ return table.freeze(OldGrowthService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="142">
+        <Item class="ModuleScript" referent="143">
           <Properties>
             <string name="Name">PartyService</string>
             <string name="Source"><![CDATA[--!strict
@@ -53922,7 +54015,7 @@ return PartyService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="143">
+        <Item class="ModuleScript" referent="144">
           <Properties>
             <string name="Name">PerformanceService</string>
             <string name="Source"><![CDATA[--!strict
@@ -54445,7 +54538,7 @@ return table.freeze(PerformanceService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="144">
+        <Item class="ModuleScript" referent="145">
           <Properties>
             <string name="Name">PhaseService</string>
             <string name="Source"><![CDATA[--!strict
@@ -54630,7 +54723,7 @@ return table.freeze(PhaseService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="145">
+        <Item class="ModuleScript" referent="146">
           <Properties>
             <string name="Name">PlayerCombatService</string>
             <string name="Source"><![CDATA[--!strict
@@ -55252,7 +55345,7 @@ return table.freeze(PlayerCombatService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="146">
+        <Item class="ModuleScript" referent="147">
           <Properties>
             <string name="Name">PlayerSurvivalService</string>
             <string name="Source"><![CDATA[--!strict
@@ -56404,7 +56497,7 @@ return table.freeze(PlayerSurvivalService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="147">
+        <Item class="ModuleScript" referent="148">
           <Properties>
             <string name="Name">PrivateServerService</string>
             <string name="Source"><![CDATA[--!strict
@@ -56685,7 +56778,7 @@ return PrivateServerService
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="148">
+        <Item class="ModuleScript" referent="149">
           <Properties>
             <string name="Name">ProfessionService</string>
             <string name="Source"><![CDATA[--!strict
@@ -57328,7 +57421,7 @@ return table.freeze(ProfessionService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="149">
+        <Item class="ModuleScript" referent="150">
           <Properties>
             <string name="Name">ProfileService</string>
             <string name="Source"><![CDATA[--!strict
@@ -59701,7 +59794,7 @@ return table.freeze(ProfileService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="150">
+        <Item class="ModuleScript" referent="151">
           <Properties>
             <string name="Name">RegionEncounterService</string>
             <string name="Source"><![CDATA[--!strict
@@ -60173,7 +60266,7 @@ return table.freeze(RegionEncounterService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="151">
+        <Item class="ModuleScript" referent="152">
           <Properties>
             <string name="Name">SocialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -60462,7 +60555,7 @@ return table.freeze(SocialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="152">
+        <Item class="ModuleScript" referent="153">
           <Properties>
             <string name="Name">TownNightService</string>
             <string name="Source"><![CDATA[--!strict
@@ -61438,7 +61531,7 @@ return table.freeze(TownNightService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="153">
+        <Item class="ModuleScript" referent="154">
           <Properties>
             <string name="Name">TutorialService</string>
             <string name="Source"><![CDATA[--!strict
@@ -64203,7 +64296,7 @@ return table.freeze(TutorialService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="154">
+        <Item class="ModuleScript" referent="155">
           <Properties>
             <string name="Name">WardenStagService</string>
             <string name="Source"><![CDATA[--!strict
@@ -65096,7 +65189,7 @@ return table.freeze(WardenStagService)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="155">
+        <Item class="ModuleScript" referent="156">
           <Properties>
             <string name="Name">WorldService</string>
             <string name="Source"><![CDATA[--!strict
@@ -79838,6 +79931,28 @@ function WorldService.setOldGrowthPresentation(self: WorldService, status: strin
     keepReplacedAnchorHidden(arena.fireSource)
     keepReplacedAnchorHidden(arena.rootHeart)
 
+    -- The anchors above are mesh-replaced, so everything just assigned to them
+    -- is blanked by the two calls above and only ever mattered when the
+    -- authored meshes failed to load. The cores are what the player actually
+    -- sees, and they carry the labels that name the objective.
+    local fireCore = arena.fireCore
+    if fireCore ~= nil then
+        fireCore.Color = if shielded then AMBER else Color3.fromRGB(96, 87, 68)
+        fireCore.Material = if shielded then Enum.Material.Neon else Enum.Material.SmoothPlastic
+        fireCore.Transparency = if shielded then 0.12 else 0.58
+    end
+    local heartCore = arena.heartCore
+    if heartCore ~= nil then
+        heartCore.Color = if complete
+            then FOXFIRE
+            elseif shielded then Color3.fromRGB(255, 117, 74)
+            else Color3.fromRGB(83, 102, 82)
+        heartCore.Material = if shielded or complete
+            then Enum.Material.Neon
+            else Enum.Material.SmoothPlastic
+        heartCore.Transparency = if shielded or complete then 0.14 else 0.58
+    end
+
     local firePrompt = self._interactions[self._runtimeIds.InteractionIds.OldGrowthFireSource]
     local heartPrompt = self._interactions[self._runtimeIds.InteractionIds.OldGrowthHeart]
     if firePrompt ~= nil then
@@ -81072,11 +81187,11 @@ return table.freeze(WorldService)
           </Properties>
         </Item>
       </Item>
-      <Item class="Folder" referent="156">
+      <Item class="Folder" referent="157">
         <Properties>
           <string name="Name">World</string>
         </Properties>
-        <Item class="ModuleScript" referent="157">
+        <Item class="ModuleScript" referent="158">
           <Properties>
             <string name="Name">BramblewakeBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -81671,11 +81786,22 @@ local function rootArch(parent: Instance, center: Vector3, scale: number, facing
         accents can afford near-black; anything silhouetted overhead needs
         enough color for the wood grain to survive being backlit.
     ]]
+    --[[
+        The crown has to turn with the legs.
+
+        The two uprights sit on the (1, 0, 1) diagonal and are then rotated by
+        `facing` so the gate meets the road; the crown spanning them was left
+        at a hardcoded 45 degrees, which only lined up when `facing` was zero.
+        Every module the route turns at raised its legs to the road and left
+        the beam behind, so the arch read as a crossbeam lying askew over two
+        posts -- sideways, from the road you actually walk in on.
+    ]]
     part(
         parent,
         "RootCrown",
         Vector3.new(29 * scale, 2.8 * scale, 3 * scale),
-        CFrame.new(center + Vector3.new(0, 17 * scale, 0)) * CFrame.Angles(0, math.rad(45), 0),
+        CFrame.new(center + Vector3.new(0, 17 * scale, 0))
+            * CFrame.Angles(0, (facing or 0) + math.rad(45), 0),
         Color3.fromRGB(97, 72, 52),
         Enum.Material.Wood
     )
@@ -82597,7 +82723,10 @@ local function buildModuleVisual(
             2403
         )
     elseif visual == "root_arch" then
-        rootArch(parent, center + Vector3.new(0, 0, -7), 0.9)
+        -- The authored mesh on the next line is turned to `facing`; the
+        -- procedural arch under it was not, so the two disagreed by the road's
+        -- whole yaw whenever the mesh failed to load.
+        rootArch(parent, center + Vector3.new(0, 0, -7), 0.9, facing)
         dress(extra, "mesh_root_arch_a", parent, center + Vector3.new(0, 0, -7), 0.9, facing, 2411)
         dress(extra, "mesh_fern_cluster_a", parent, center + Vector3.new(-11, 0, 6), 1.2, 0.4, 2412)
         dress(extra, "mesh_fern_cluster_a", parent, center + Vector3.new(12, 0, 4), 1.1, 2.2, 2413)
@@ -84774,6 +84903,21 @@ local function buildBlackoutLayer(
             target = node,
         })
 
+        --[[
+            The rooted walls are silhouettes, not obstacles.
+
+            Three 3.5-stud pillars at 5.5-stud spacing leave 2-stud gaps, and
+            they stand 4.5 studs off the relay on the side the road arrives
+            from -- so built solid they are a barricade across the one thing
+            the player is running an 18-second carried-fire timer to reach, at
+            all three relays. Delivering rootfire only recolored them and left
+            them solid, so succeeding changed how they looked without changing
+            whether anyone could get past them.
+
+            They frame the relay and they take the light; they never decide
+            whether a carry is possible. CanQuery is off as well so a tap on
+            touch hardware reaches the relay behind them rather than a pillar.
+        ]]
         for rootIndex = -1, 1 do
             local rootedWall = part(
                 layer,
@@ -84783,8 +84927,9 @@ local function buildBlackoutLayer(
                     * CFrame.Angles(math.rad(rootIndex * 8), 0, math.rad(rootIndex * 10)),
                 DARK_BARK,
                 Enum.Material.Wood,
-                true
+                false
             )
+            rootedWall.CanQuery = false
             rootedWall:SetAttribute("BlackoutNodeId", definition.nodeId)
         end
     end
@@ -85116,8 +85261,6 @@ function BramblewakeBuilder.build(
             cagedLanternShell(module, fireSource.Position, 0.86, "OldGrowthLantern")
             fireSource:SetAttribute("EliteId", definition.eliteId)
             fireSource:SetAttribute("EliteInteraction", "fire_source")
-            billboard(fireSource, Strings.get("bramblewake.lantern_fire"), CREAM)
-            objectIcon(fireSource, "rootfire", AMBER)
 
             local rootHeart = orb(
                 module,
@@ -85131,13 +85274,64 @@ function BramblewakeBuilder.build(
             livingRootShell(module, rootHeart.Position, 1.08, "OldGrowthHeart")
             rootHeart:SetAttribute("EliteId", definition.eliteId)
             rootHeart:SetAttribute("EliteInteraction", "root_heart")
-            billboard(rootHeart, Strings.get("bramblewake.root_heart"), CREAM)
-            objectIcon(rootHeart, "root", FOXFIRE)
+
+            --[[
+                The Old Growth's two glowing objects live outside their anchors
+                on purpose, exactly like FirstLanternCore and BeaconCore in
+                WorldService.
+
+                Both orbs above are queued for authored-mesh replacement below,
+                which means keepReplacedAnchorHidden forces their Transparency
+                to 1 and disables every BillboardGui under them for the rest of
+                the run. Every colour, material and transparency
+                setOldGrowthPresentation assigned to them was therefore dead on
+                arrival, and so were their labels: shielding the elite told the
+                player to find the heart while the heart was invisible and
+                unlabelled, standing in an unlit root mound.
+
+                These cores are never mesh-replacement anchors, so they are the
+                thing that actually lights up. The anchors keep the attributes,
+                tags and proximity prompts -- those always worked.
+            ]]
+            local fireCore = orb(
+                module,
+                "OldGrowthFireCore",
+                fireSource.Position,
+                1.05,
+                AMBER,
+                Enum.Material.Neon
+            )
+            fireCore.Transparency = 0.58
+            fireCore.CastShadow = false
+            fireCore.CanQuery = false
+            fireCore.CanCollide = false
+            fireCore.CanTouch = false
+            billboard(fireCore, Strings.get("bramblewake.lantern_fire"), CREAM)
+            objectIcon(fireCore, "rootfire", AMBER)
+
+            local heartCore = orb(
+                module,
+                "OldGrowthHeartCore",
+                rootHeart.Position,
+                1.25,
+                FOXFIRE,
+                Enum.Material.Neon
+            )
+            heartCore.Transparency = 0.58
+            heartCore.CastShadow = false
+            heartCore.CanQuery = false
+            heartCore.CanCollide = false
+            heartCore.CanTouch = false
+            billboard(heartCore, Strings.get("bramblewake.root_heart"), CREAM)
+            objectIcon(heartCore, "root", FOXFIRE)
+
             CollectionService:AddTag(fireSource, runtimeIds.ExpeditionEliteTag)
             CollectionService:AddTag(rootHeart, runtimeIds.ExpeditionEliteTag)
             eliteArena = {
                 center = center,
+                fireCore = fireCore,
                 fireSource = fireSource,
+                heartCore = heartCore,
                 rootHeart = rootHeart,
             }
             queueItemAsset(
@@ -85395,7 +85589,7 @@ return table.freeze(BramblewakeBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="158">
+        <Item class="ModuleScript" referent="159">
           <Properties>
             <string name="Name">BramblewakeEnemyBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -86494,7 +86688,7 @@ return table.freeze(BramblewakeEnemyBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="159">
+        <Item class="ModuleScript" referent="160">
           <Properties>
             <string name="Name">CinderfallBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -87361,7 +87555,7 @@ return table.freeze(CinderfallBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="160">
+        <Item class="ModuleScript" referent="161">
           <Properties>
             <string name="Name">FoliageBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -88056,7 +88250,7 @@ return table.freeze(FoliageBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="161">
+        <Item class="ModuleScript" referent="162">
           <Properties>
             <string name="Name">FrostmereBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -89105,7 +89299,7 @@ return table.freeze(FrostmereBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="162">
+        <Item class="ModuleScript" referent="163">
           <Properties>
             <string name="Name">IronrootBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -90120,7 +90314,7 @@ return table.freeze(IronrootBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="163">
+        <Item class="ModuleScript" referent="164">
           <Properties>
             <string name="Name">MeshAssetRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -90979,7 +91173,7 @@ return table.freeze(MeshAssetRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="164">
+        <Item class="ModuleScript" referent="165">
           <Properties>
             <string name="Name">MeshMaterialPlan</string>
             <string name="Source"><![CDATA[--!strict
@@ -91065,7 +91259,7 @@ return table.freeze(MeshMaterialPlan)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="165">
+        <Item class="ModuleScript" referent="166">
           <Properties>
             <string name="Name">MeshTemplateLoader</string>
             <string name="Source"><![CDATA[--!strict
@@ -91439,7 +91633,7 @@ return table.freeze(MeshTemplateLoader)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="166">
+        <Item class="ModuleScript" referent="167">
           <Properties>
             <string name="Name">MireglassBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -92195,7 +92389,7 @@ return table.freeze(MireglassBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="167">
+        <Item class="ModuleScript" referent="168">
           <Properties>
             <string name="Name">OldGrowthBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -92375,7 +92569,7 @@ return table.freeze(OldGrowthBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="168">
+        <Item class="ModuleScript" referent="169">
           <Properties>
             <string name="Name">RegionBuilders</string>
             <string name="Source"><![CDATA[--!strict
@@ -93161,7 +93355,7 @@ return table.freeze(RegionBuilders)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="169">
+        <Item class="ModuleScript" referent="170">
           <Properties>
             <string name="Name">RegionExpeditionAssembly</string>
             <string name="Source"><![CDATA[--!strict
@@ -93810,7 +94004,7 @@ return table.freeze(RegionExpeditionAssembly)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="170">
+        <Item class="ModuleScript" referent="171">
           <Properties>
             <string name="Name">TempestBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -94631,7 +94825,7 @@ return table.freeze(TempestBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="171">
+        <Item class="ModuleScript" referent="172">
           <Properties>
             <string name="Name">TerrainBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -95227,7 +95421,7 @@ return table.freeze(TerrainBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="172">
+        <Item class="ModuleScript" referent="173">
           <Properties>
             <string name="Name">WardenStagBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -95464,7 +95658,7 @@ return table.freeze(WardenStagBuilder)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="173">
+        <Item class="ModuleScript" referent="174">
           <Properties>
             <string name="Name">WorldArtRegistry</string>
             <string name="Source"><![CDATA[--!strict
@@ -95553,7 +95747,7 @@ return table.freeze(WorldArtRegistry)
 ]]></string>
           </Properties>
         </Item>
-        <Item class="ModuleScript" referent="174">
+        <Item class="ModuleScript" referent="175">
           <Properties>
             <string name="Name">WorldSignBuilder</string>
             <string name="Source"><![CDATA[--!strict
@@ -95889,11 +96083,11 @@ return table.freeze(WorldSignBuilder)
         </Item>
       </Item>
     </Item>
-    <Item class="Folder" referent="175">
+    <Item class="Folder" referent="176">
       <Properties>
         <string name="Name">LastLightTests</string>
       </Properties>
-      <Item class="Script" referent="176">
+      <Item class="Script" referent="177">
         <Properties>
           <string name="Name">FoundationIntegration</string>
           <token name="RunContext">0</token>
@@ -95947,7 +96141,7 @@ local TerrainBuilder = require(serverRoot.World.TerrainBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 25, "unexpected save schema version")
-assert(Config.BuildVersion == "0.53.0", "unexpected build version")
+assert(Config.BuildVersion == "0.53.1", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#MusicCatalog.regionIds() == 8, "every playable world needs an adaptive score")
@@ -97395,6 +97589,40 @@ assert(oldGrowthCageBars == 4, "Old Growth fire needs a recognizable lantern cag
 assert(oldGrowthHeartRoots == 3, "Old Growth heart needs a rooted physical shell")
 assert(wardenLivingRoots == 12, "Warden nodes need three living roots each")
 
+-- The Old Growth's two objectives are named by billboards and lit by neon, and
+-- both of their prompt anchors are authored-mesh replacements. An anchor is
+-- blanked by keepReplacedAnchorHidden -- Transparency forced to 1, every
+-- LayerCollector beneath it disabled -- so a label or a glow parented to one is
+-- invisible for the whole run. That is exactly how "find the heart" came to
+-- point at an unlit, unlabelled root mound. The glow and the labels belong on
+-- the cores; the anchors keep only the prompt.
+for _, coreName in { "OldGrowthFireCore", "OldGrowthHeartCore" } do
+    local core = world:FindFirstChild(coreName, true)
+    assert(
+        core ~= nil and core:IsA("BasePart"),
+        string.format(
+            "%s is missing -- the Old Growth objective has nothing that can glow",
+            coreName
+        )
+    )
+    assert(
+        core:GetAttribute("ReplacedByAuthoredMesh") ~= true,
+        string.format("%s became a mesh anchor, which blanks the thing it exists to show", coreName)
+    )
+    assert(
+        core:FindFirstChildWhichIsA("LayerCollector") ~= nil,
+        string.format("%s must carry the label that names the objective", coreName)
+    )
+end
+for _, anchorName in { "OldGrowthFireSource", "OldGrowthRootHeart" } do
+    local anchor = world:FindFirstChild(anchorName, true)
+    assert(anchor ~= nil and anchor:IsA("BasePart"), anchorName .. " is missing")
+    assert(
+        anchor:FindFirstChildWhichIsA("LayerCollector") == nil,
+        anchorName .. " is mesh-replaced, so a label parented to it is never shown"
+    )
+end
+
 --[[
     54 fixed prompts, measured rather than remembered.
 
@@ -97589,6 +97817,24 @@ for _, target in blackoutTargets do
         "Blackout prompt does not route to its server action"
     )
 end
+-- The rooted walls are silhouettes. They stand between the road and the relay
+-- the player is carrying an 18-second fire to, three pillars with 2-stud gaps
+-- at every one of the three relays, and the chapter's own traversal gate is
+-- that every carry is possible with base movement. Solid, they are a barricade;
+-- queryable, they eat the tap that should reach the relay behind them.
+local rootedWalls = 0
+for _, descendant in blackoutLayer:GetChildren() do
+    if descendant:IsA("BasePart") and descendant.Name == "RootedWall" then
+        rootedWalls += 1
+        assert(
+            not descendant.CanCollide,
+            "a rooted wall is solid, which barricades the relay it only exists to frame"
+        )
+        assert(not descendant.CanQuery, "a rooted wall must not intercept a tap aimed at its relay")
+    end
+end
+assert(rootedWalls == 9, "expected three rooted wall silhouettes at each of the three relays")
+
 local poiTargets = CollectionService:GetTagged(RuntimeIds.ExpeditionPointOfInterestTag)
 assert(#poiTargets == BramblewakeExpedition.PointOfInterestCount, "expected four Bramblewake POIs")
 local poiVisuals = {}
@@ -97730,7 +97976,7 @@ print("[Last Light] PASS FoundationIntegration")
 ]]></string>
         </Properties>
       </Item>
-      <Item class="Script" referent="177">
+      <Item class="Script" referent="178">
         <Properties>
           <string name="Name">ModuleGallery</string>
           <token name="RunContext">0</token>
@@ -97821,15 +98067,15 @@ end
       </Item>
     </Item>
   </Item>
-  <Item class="StarterPlayer" referent="178">
+  <Item class="StarterPlayer" referent="179">
     <Properties>
       <string name="Name">StarterPlayer</string>
     </Properties>
-    <Item class="StarterPlayerScripts" referent="179">
+    <Item class="StarterPlayerScripts" referent="180">
       <Properties>
         <string name="Name">StarterPlayerScripts</string>
       </Properties>
-      <Item class="LocalScript" referent="180">
+      <Item class="LocalScript" referent="181">
         <Properties>
           <string name="Name">LastLightClient</string>
           <string name="Source"><![CDATA[--!strict
@@ -98217,11 +98463,11 @@ task.spawn(function()
 end)
 ]]></string>
         </Properties>
-        <Item class="Folder" referent="181">
+        <Item class="Folder" referent="182">
           <Properties>
             <string name="Name">Controllers</string>
           </Properties>
-          <Item class="ModuleScript" referent="182">
+          <Item class="ModuleScript" referent="183">
             <Properties>
               <string name="Name">AmbientController</string>
               <string name="Source"><![CDATA[--!strict
@@ -98352,7 +98598,7 @@ return AmbientController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="183">
+          <Item class="ModuleScript" referent="184">
             <Properties>
               <string name="Name">HUDController</string>
               <string name="Source"><![CDATA[--!strict
@@ -103058,7 +103304,7 @@ return HUDController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="184">
+          <Item class="ModuleScript" referent="185">
             <Properties>
               <string name="Name">InputController</string>
               <string name="Source"><![CDATA[--!strict
@@ -103426,7 +103672,7 @@ return InputController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="185">
+          <Item class="ModuleScript" referent="186">
             <Properties>
               <string name="Name">InteractionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -103534,7 +103780,7 @@ return InteractionController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="186">
+          <Item class="ModuleScript" referent="187">
             <Properties>
               <string name="Name">MusicController</string>
               <string name="Source"><![CDATA[--!strict
@@ -103653,7 +103899,7 @@ return MusicController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="187">
+          <Item class="ModuleScript" referent="188">
             <Properties>
               <string name="Name">ObjectiveMarkerController</string>
               <string name="Source"><![CDATA[--!strict
@@ -103930,7 +104176,7 @@ return table.freeze(ObjectiveMarkerController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="188">
+          <Item class="ModuleScript" referent="189">
             <Properties>
               <string name="Name">PerformanceController</string>
               <string name="Source"><![CDATA[--!strict
@@ -104085,7 +104331,7 @@ return table.freeze(PerformanceController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="189">
+          <Item class="ModuleScript" referent="190">
             <Properties>
               <string name="Name">SfxController</string>
               <string name="Source"><![CDATA[--!strict
@@ -104197,7 +104443,7 @@ return table.freeze(SfxController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="190">
+          <Item class="ModuleScript" referent="191">
             <Properties>
               <string name="Name">SocialPingController</string>
               <string name="Source"><![CDATA[--!strict
@@ -104579,7 +104825,7 @@ return table.freeze(SocialPingController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="191">
+          <Item class="ModuleScript" referent="192">
             <Properties>
               <string name="Name">TapController</string>
               <string name="Source"><![CDATA[--!strict
@@ -104781,7 +105027,7 @@ return table.freeze(TapController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="192">
+          <Item class="ModuleScript" referent="193">
             <Properties>
               <string name="Name">VignetteController</string>
               <string name="Source"><![CDATA[--!strict
@@ -104990,7 +105236,7 @@ return table.freeze(VignetteController)
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="193">
+          <Item class="ModuleScript" referent="194">
             <Properties>
               <string name="Name">WeatherController</string>
               <string name="Source"><![CDATA[--!strict
@@ -105135,7 +105381,7 @@ return WeatherController
 ]]></string>
             </Properties>
           </Item>
-          <Item class="ModuleScript" referent="194">
+          <Item class="ModuleScript" referent="195">
             <Properties>
               <string name="Name">WorldMotionController</string>
               <string name="Source"><![CDATA[--!strict
@@ -105435,13 +105681,13 @@ return WorldMotionController
       </Item>
     </Item>
   </Item>
-  <Item class="TextChatService" referent="195">
+  <Item class="TextChatService" referent="196">
     <Properties>
       <string name="Name">TextChatService</string>
       <token name="ChatVersion">1</token>
     </Properties>
   </Item>
-  <Item class="Workspace" referent="196">
+  <Item class="Workspace" referent="197">
     <Properties>
       <string name="Name">Workspace</string>
       <float name="FallenPartsDestroyHeight">-80</float>

@@ -26,6 +26,7 @@ export type ExpeditionService = typeof(setmetatable(
         _eventFlow: any,
         _rewardLedger: any,
         _extractionPayoff: any,
+        _extractionOutcome: any,
         _profileService: any,
         _analyticsService: any,
         _seed: number,
@@ -55,6 +56,7 @@ function ExpeditionService.new(
     eventFlow: any,
     rewardLedger: any,
     extractionPayoff: any,
+    extractionOutcome: any,
     profileService: any,
     analyticsService: any,
     seed: number,
@@ -74,6 +76,7 @@ function ExpeditionService.new(
         _eventFlow = eventFlow,
         _rewardLedger = rewardLedger,
         _extractionPayoff = extractionPayoff,
+        _extractionOutcome = extractionOutcome,
         _profileService = profileService,
         _analyticsService = analyticsService,
         _seed = seed,
@@ -921,15 +924,36 @@ function ExpeditionService.extract(self: ExpeditionService, player: Player): any
             false,
             0
         )
+        -- Banking failed, so the pouch stays unsettled in the session ledger
+        -- and retries on the next extraction. What must not happen is the
+        -- player staying in the wood over it: none of these reasons can be
+        -- cleared from inside an expedition, so an early return here is a
+        -- permanent trap. Send them home unbanked instead.
+        local decision = self._extractionOutcome.unbanked(settlement.reason)
+        self._logger:warn("expedition_extraction_unbanked", {
+            manifest = manifest.hash,
+            player = player.UserId,
+            reason = decision.reason,
+            region = self._regionId,
+        })
+        if not self:_exitWithPayoff(player) then
+            local retry = self._extractionOutcome.transitionUnavailable(decision.reason)
+            return {
+                accepted = false,
+                message = Strings.get("toast.rewards_unbanked_wayhome_transition_will_retry"),
+                reason = retry.reason,
+            }
+        end
         return {
             accepted = false,
-            message = if settlement.reason == "profile_read_only"
-                then Strings.get("toast.profile_offline_rewards_remain_unbanked")
-                elseif settlement.reason == "save_pending" then Strings.get(
-                    "toast.banking_retry_needed_rewards_remain_unbanked"
+            message = if decision.reason == "profile_read_only"
+                then Strings.get("toast.profile_offline_returning_unbanked")
+                elseif decision.reason == "save_pending" then Strings.get(
+                    "toast.banking_retry_needed_returning_unbanked"
                 )
-                else Strings.get("toast.wayhome_gate_is_waiting_for_your"),
-            reason = settlement.reason,
+                else Strings.get("toast.wayhome_opens_your_pouch_stays_unbanked"),
+            reason = decision.reason,
+            unbanked = true,
         }
     end
 

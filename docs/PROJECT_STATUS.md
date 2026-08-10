@@ -7,8 +7,9 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-09, at `main` = PR #365, build `0.53.0`,
-save schema 25, 27 services. Published to Roblox as place version 163.
+Last updated: 2026-08-10, at `main` = PR #367, build `0.53.1`,
+save schema 25, 27 services. Published to Roblox as place version 163;
+`0.53.1` is a source-only owner-playtest fix pass and has not been published.
 (#364 added only documentation over v162, and #361/#362 only
 documentation over v161.) (#358 produced v159 and #359
 v160; those three are Milestone 13 wave D's closing batches, and each was
@@ -2448,6 +2449,49 @@ pick/sickle harvest timing + the survey marker on a real trail.
 
 Verified against `git log`, newest first:
 
+- **In flight (not yet merged):** owner-playtest fix pass on Bramblewake —
+  four reports from a real session, all four traced to source and fixed. All
+  four were still present on `main` at #367; none had been fixed by the region
+  waves that ran over them.
+  - **Could not leave Bramblewake after clearing the area** — fixed, and it was
+    the blocker. `ExpeditionService.extract` returned early on every
+    `settleExpedition` failure without ever asking the world to move the
+    player, and none of those reasons (`profile_read_only`, `save_pending`,
+    `profile_loading`, a full unbanked pouch, a refused reward or settlement)
+    can be cleared from inside an expedition. Because the empty-pouch branch
+    exits *before* settlement is attempted, **earning rewards was what caused
+    the trap** — a player who cleared the wood was strictly worse off than one
+    who took nothing. Wayhome is a door, not a reward gate: the decision moved
+    into the new `src/shared/ExtractionOutcome.luau`, every failure now leaves
+    with the pouch unbanked, and the rewards stay unsettled in the session
+    ledger and the profile's pending rewards so the next extraction retries
+    them. Nothing is spent or discarded. A new `expedition_extraction_unbanked`
+    warn records which reason fired, because the reports could not tell us.
+  - **Old Growth: the lantern said to find the heart, and the heart was not
+    there** — fixed. `rootHeart` and `fireSource` are both authored-mesh
+    anchors, so `keepReplacedAnchorHidden` forced their transparency to 1 and
+    disabled the billboards under them; all six colour/material/transparency
+    assignments in `setOldGrowthPresentation` were dead code, and the objective
+    had no label either. This is the third time this exact failure mode has
+    shipped (`FirstLanternCore`, `BeaconCore` — see DECISIONS.md), and it is
+    fixed the same way: `OldGrowthFireCore`/`OldGrowthHeartCore` carry the glow
+    and the labels, the anchors keep only prompts, attributes and tags. A
+    Studio assertion now fails if a label is ever parented to either anchor
+    again.
+  - **The arch is sideways** — fixed. `rootArch` turns its two uprights by the
+    road's `facing` but pinned its crown to a hardcoded 45°, so the crossbeam
+    sat askew over the posts at every module the route turns at; and the
+    `root_arch` visual passed `facing` to the authored mesh while never passing
+    it to the procedural arch underneath.
+  - **Something blocking the rootfire relays** — fixed. The nine `RootedWall`
+    parts this chapter's own doc calls "silhouettes" were built solid: three
+    3.5-stud pillars with 2-stud gaps, 4.5 studs off each relay on the side the
+    road arrives from, at all three relays, with an 18-second carried-fire
+    timer running. Delivering fire recoloured them and left them collidable, so
+    succeeding changed how they looked without changing whether anyone could
+    get past. They are non-colliding and non-queryable now, which is what the
+    chapter's traversal gate ("every carry is possible with base movement")
+    already asked for.
 - **#208** Milestone 6 wave B: **the six weapon families.** Heartwood Maul
   (1.45x melee ceiling), Briar Lance (full-strength 14-stud reach), Foxfire
   Sling (ranged 22, 0.7x, 2.5s snare at 0.75x speed — between the mark and
