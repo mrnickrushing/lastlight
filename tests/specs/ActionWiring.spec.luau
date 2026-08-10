@@ -89,7 +89,18 @@ local INTERACTION_ROUTED: { [string]: boolean } = {
     contribute_construction = true,
     select_profession_specialization = true,
     old_growth_fire = true,
-    craft_item = true,
+    --[[
+        The crafting table is the only door, the same reasoning open_store
+        gives just below -- there is no HUD button that opens it, so the
+        client sends a plain Interact naming the table and the server reads
+        the ActionId off its prompt. CraftItem itself is NOT here: picking a
+        recipe in the panel that opens is a real client-composed payload
+        (which recipe), the same way StorePurchase names a product once the
+        outfitter's stand has already been walked up to. It used to be
+        interaction-routed too, back when the recipe was a bench's own
+        attribute rather than something a player chose from a list.
+    ]]
+    open_crafting_station = true,
     warden_stag_choice = true,
     recover_memory_fragment = true,
     set_visit_policy = true,

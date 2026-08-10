@@ -172,6 +172,10 @@ hud:setWhetHandler(function(itemId: string)
     send(RuntimeIds.Actions.RepairGear, { itemId = itemId })
 end)
 
+hud:setCraftingHandler(function(recipeId: string)
+    send(RuntimeIds.Actions.CraftItem, { recipeId = recipeId })
+end)
+
 hud:setCompanionHandler(function(mode: string)
     send(RuntimeIds.Actions.CompanionCommand, { mode = mode })
 end)

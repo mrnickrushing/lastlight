@@ -83,6 +83,14 @@ export type TutorialService = typeof(setmetatable(
             would reopen the panel on every push.
         ]]
         _storeRevision: { [Player]: number },
+        --[[
+            Which crafting-table view each player is on, the same revision
+            pattern as _storeRevision above and for the same reason: opening
+            is the world's business (the interaction bumps this), closing is
+            the client's own, and a boolean the client cannot clear would
+            reopen the panel on every push.
+        ]]
+        _craftingRevision: { [Player]: number },
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -167,6 +175,7 @@ function TutorialService.new(
         _privateServerService = nil,
         _regionEncounterService = nil,
         _storeRevision = {},
+        _craftingRevision = {},
         _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -449,6 +458,7 @@ function TutorialService.Start(self: TutorialService)
         self._expeditionEventRevision[player] = nil
         self._expeditionEventSecond[player] = nil
         self._storeRevision[player] = nil
+        self._craftingRevision[player] = nil
         self._limiter:clear(tostring(player.UserId))
         self._analyticsService:clear(player)
     end)
@@ -1340,31 +1350,25 @@ function TutorialService._interact(
         self:_publishAll()
         return
     end
-    if actionId == self._runtimeIds.Actions.CraftItem then
+    if actionId == self._runtimeIds.Actions.OpenCraftingStation then
+        --[[
+            The crafting table, and the only door into it -- the same
+            reasoning OpenStore gives just below. The refusal lives here
+            rather than on a HUD button so a client cannot decide for
+            itself that crafting may always open.
+        ]]
         if session.stage ~= "complete" then
             self:_setToast(player, Strings.get("tutorial.finish_first_light_to_craft"))
             self:_publish(player)
             return
         end
-        local recipeId = prompt:GetAttribute("Payload")
-        if type(recipeId) ~= "string" then
-            return
-        end
-        local result = self._profileService:craftItem(player, recipeId)
-        self._analyticsService:crafted(player, recipeId, result.accepted, result.reason)
-        local toast: string
-        if result.accepted then
-            toast = string.format(Strings.get("tutorial.crafted_n"), prompt.ObjectText)
-            local questSuffix = self:_questToastSuffix(player)
-            if questSuffix ~= nil then
-                toast = toast .. " · " .. questSuffix
-            end
-        elseif result.reason == "insufficient_materials" then
-            toast = Strings.get("tutorial.not_enough_materials")
-        else
-            toast = Strings.get("tutorial.crafting_unavailable")
-        end
-        self:_setToast(player, toast)
+        --[[
+            A revision rather than a flag, the same pattern _storeRevision
+            uses just below and for the same reason: closing the panel is
+            the client's own business, and a server-held boolean the client
+            cannot clear would reopen it on the next push.
+        ]]
+        self._craftingRevision[player] = (self._craftingRevision[player] or 0) + 1
         self:_publish(player)
         return
     end
@@ -2194,6 +2198,46 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             )
             self:_publish(player)
         end
+    elseif kind == self._runtimeIds.Actions.CraftItem then
+        --[[
+            The recipe the player picked in the crafting table's panel,
+            where it used to be an attribute on whichever of the ten
+            benches was pressed. Naming a recipe here grants nothing by
+            itself -- craftItem below still refuses an unknown or
+            unaffordable one -- the same trust boundary StorePurchase
+            already draws around productId, so the gate is re-checked here
+            too rather than trusted from whenever the panel was opened.
+        ]]
+        local recipeId = payload.recipeId
+        if type(recipeId) ~= "string" or #recipeId > 48 then
+            return
+        end
+        local session = self._sessions[player]
+        if session == nil or session.stage ~= "complete" then
+            self:_setToast(player, Strings.get("tutorial.finish_first_light_to_craft"))
+            self:_publish(player)
+            return
+        end
+        local result = self._profileService:craftItem(player, recipeId)
+        self._analyticsService:crafted(player, recipeId, result.accepted, result.reason)
+        local toast: string
+        if result.accepted then
+            local recipe = self._craftingCatalog.get(recipeId)
+            toast = string.format(
+                Strings.get("tutorial.crafted_n"),
+                if recipe ~= nil then recipe.outputDisplayName else recipeId
+            )
+            local questSuffix = self:_questToastSuffix(player)
+            if questSuffix ~= nil then
+                toast = toast .. " · " .. questSuffix
+            end
+        elseif result.reason == "insufficient_materials" then
+            toast = Strings.get("tutorial.not_enough_materials")
+        else
+            toast = Strings.get("tutorial.crafting_unavailable")
+        end
+        self:_setToast(player, toast)
+        self:_publish(player)
     elseif kind == self._runtimeIds.Actions.EquipCosmetic then
         --[[
             Wearing is not buying, so it is not gated on the store being open.
@@ -2671,6 +2715,16 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             store.revision = self._storeRevision[player] or 0
             return store
         end)(),
+        --[[
+            The crafting table, the same revision-only shape the store uses
+            just above: opening is the world's business (the interaction
+            bumps this), closing is the client's own. There is no
+            available/closedLabel pair here the way the store has one --
+            the crafting table has exactly one gate (first light finished),
+            already enforced before this revision ever moves, so nothing
+            needs re-explaining to a client that is already looking at it.
+        ]]
+        crafting = { revision = self._craftingRevision[player] or 0 },
         --[[
             Whether this server still pays, and it is pushed to everyone rather
             than to the owner who latched it.

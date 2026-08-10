@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local sharedRoot = ReplicatedStorage:WaitForChild("LastLight")
 local Consumables = require(sharedRoot.Consumables)
 local CosmeticCatalog = require(sharedRoot.CosmeticCatalog)
+local CraftingCatalog = require(sharedRoot.CraftingCatalog)
 local Equipment = require(sharedRoot.Equipment)
 local QuickChat = require(sharedRoot.QuickChat)
 local StoreAvailability = require(sharedRoot.StoreAvailability)
@@ -419,6 +420,35 @@ local function canvasMetrics(): (Vector2, number, number, number)
     return viewport, scale, viewport.X / scale, viewport.Y / scale
 end
 
+--[[
+    "material_meadow_fiber" -> "Meadow Fiber", derived rather than looked up.
+
+    A hand-authored Strings entry per material is one more table that drifts
+    out of sync with CraftingCatalog's own keys -- today's whole session was
+    that exact class of bug, over and over, in the Luau specs. Every material
+    id in the catalog is already an English phrase spelled in snake_case, so
+    splitting on "_" and dropping the "material_" prefix reads the same
+    catalog everything else here does, and a recipe added later needs no
+    second edit to be named correctly.
+]]
+local function materialDisplayName(materialId: string): string
+    local words = materialId:gsub("^material_", ""):gsub("_", " ")
+    return (
+        words:gsub("%a[%w']*", function(word: string): string
+            return word:sub(1, 1):upper() .. word:sub(2)
+        end)
+    )
+end
+
+local function recipeMaterialsSummary(recipe: any): string
+    local parts = {}
+    for materialId, amount in recipe.materials do
+        table.insert(parts, string.format("%dx %s", amount, materialDisplayName(materialId)))
+    end
+    table.sort(parts)
+    return table.concat(parts, "  ·  ")
+end
+
 -- Tall enough for the largest button in the run (the 116-point primary) plus
 -- a gap, so a wrapped row can never be drawn through the row below it.
 local ACTION_ROW_PITCH = 128
@@ -561,6 +591,23 @@ export type HUDController =
             _onStoreDetail: ((string) -> ())?,
             _onStorePurchase: ((string) -> ())?,
             _onCosmeticEquip: ((string) -> ())?,
+            _craftingOverlay: Frame,
+            _craftingPanel: Frame,
+            _craftingScroll: ScrollingFrame,
+            _craftingClose: TextButton,
+            _craftingRows: {
+                [string]: {
+                    frame: Frame,
+                    name: TextLabel,
+                    materials: TextLabel,
+                    action: TextButton,
+                    recipeId: string,
+                },
+            },
+            -- The last open instruction this client acted on, the same
+            -- revision pattern _storeRevision uses just above.
+            _craftingRevision: number,
+            _onCraftItem: ((string) -> ())?,
             _equipmentButtons: { [string]: TextButton },
             _loadoutButtons: { [string]: TextButton },
             _whetButton: TextButton,
@@ -1992,6 +2039,174 @@ function HUDController.new(
         }
     end
 
+    --[[
+        The crafting table's panel, one door for every recipe in the catalog
+        rather than the ten benches it replaced -- see the note above
+        WorldService's craftingStation for why there were ten, then a hundred
+        and thirty, before there was one. Built to the same portrait canvas
+        as the outfitter's panel above, and for the same #327 reason: CLOSE
+        stays along the bottom, out of Roblox's own topbar and player list.
+
+        Flat rather than grouped: CraftingCatalog carries no category field
+        the way CosmeticCatalog carries lines, and inventing groups here
+        would be a client-side taxonomy the catalog itself does not have --
+        exactly the kind of copy that drifts from its source. Catalog order
+        is authored order, so it is the order the list renders in.
+    ]]
+    local craftingOverlay = Instance.new("Frame")
+    craftingOverlay.Name = "CraftingOverlay"
+    craftingOverlay.Size = UDim2.fromScale(1, 1)
+    craftingOverlay.BackgroundColor3 = COLORS.ink
+    craftingOverlay.BackgroundTransparency = 0.18
+    craftingOverlay.Active = true
+    craftingOverlay.Visible = false
+    craftingOverlay.ZIndex = 54
+    craftingOverlay.Parent = canvas
+
+    local craftingPanel = Instance.new("Frame")
+    craftingPanel.Name = "CraftingPanel"
+    craftingPanel.AnchorPoint = Vector2.new(0.5, 0)
+    craftingPanel.Position = UDim2.new(0.5, 0, 0, 80)
+    craftingPanel.Size = UDim2.fromOffset(540, 560)
+    craftingPanel.BackgroundColor3 = COLORS.panel
+    craftingPanel.BackgroundTransparency = 0.02
+    craftingPanel.ZIndex = 55
+    craftingPanel.Parent = craftingOverlay
+    corner(craftingPanel, 20)
+    stroke(craftingPanel, COLORS.amber, 0.2)
+
+    local craftingTitle = textLabel(
+        craftingPanel,
+        "Title",
+        Strings.get("world.crafting_table"),
+        UDim2.new(1, -40, 0, 26),
+        UDim2.fromOffset(20, 16),
+        18,
+        COLORS.amber
+    )
+    craftingTitle.Font = Enum.Font.GothamBold
+    craftingTitle.ZIndex = 56
+
+    local craftingSubtitle = textLabel(
+        craftingPanel,
+        "Subtitle",
+        Strings.get("hud.everything_you_know_how_to_make"),
+        UDim2.new(1, -40, 0, 16),
+        UDim2.fromOffset(20, 44),
+        11,
+        COLORS.muted
+    )
+    craftingSubtitle.ZIndex = 56
+
+    local craftingClose = Instance.new("TextButton")
+    craftingClose.Name = "Close"
+    craftingClose.AnchorPoint = Vector2.new(0.5, 1)
+    craftingClose.Position = UDim2.new(0.5, 0, 1, -12)
+    craftingClose.Size = UDim2.fromOffset(220, 38)
+    craftingClose.BackgroundColor3 = COLORS.panelSoft
+    craftingClose.Font = Enum.Font.GothamBold
+    craftingClose.Text = Strings.get("hud.close")
+    craftingClose.TextColor3 = COLORS.cream
+    craftingClose.TextSize = 11
+    craftingClose.Selectable = true
+    craftingClose.ZIndex = 57
+    craftingClose.Parent = craftingPanel
+    corner(craftingClose, 10)
+    stroke(craftingClose, COLORS.cream, 0.58)
+
+    local craftingScroll = Instance.new("ScrollingFrame")
+    craftingScroll.Name = "CraftingScroll"
+    craftingScroll.Position = UDim2.fromOffset(16, 70)
+    craftingScroll.Size = UDim2.new(1, -32, 1, -132)
+    craftingScroll.BackgroundTransparency = 1
+    craftingScroll.BorderSizePixel = 0
+    craftingScroll.ScrollBarThickness = 6
+    craftingScroll.ScrollBarImageColor3 = COLORS.amber
+    craftingScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    craftingScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    craftingScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+    craftingScroll.Selectable = true
+    craftingScroll.ZIndex = 56
+    craftingScroll.Parent = craftingPanel
+    local craftingLayout = Instance.new("UIListLayout")
+    craftingLayout.FillDirection = Enum.FillDirection.Vertical
+    craftingLayout.Padding = UDim.new(0, 8)
+    craftingLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    craftingLayout.Parent = craftingScroll
+
+    local craftingRows: {
+        [string]: {
+            frame: Frame,
+            name: TextLabel,
+            materials: TextLabel,
+            action: TextButton,
+            recipeId: string,
+        },
+    } =
+        {}
+    for order, recipe in CraftingCatalog.list() do
+        local row = Instance.new("Frame")
+        row.Name = "Recipe_" .. recipe.id
+        row.LayoutOrder = order
+        row.Size = UDim2.new(1, -8, 0, 64)
+        row.BackgroundColor3 = COLORS.panelSoft
+        row.BackgroundTransparency = 0.15
+        row.ZIndex = 57
+        row.Parent = craftingScroll
+        corner(row, 10)
+        stroke(row, COLORS.amber, 0.68)
+
+        local rowName = textLabel(
+            row,
+            "Name",
+            recipe.outputDisplayName,
+            UDim2.new(1, -190, 0, 20),
+            UDim2.fromOffset(14, 8),
+            14,
+            COLORS.cream
+        )
+        rowName.Font = Enum.Font.GothamBold
+        rowName.ZIndex = 58
+
+        local rowMaterials = textLabel(
+            row,
+            "Materials",
+            recipeMaterialsSummary(recipe),
+            UDim2.new(1, -190, 0, 32),
+            UDim2.fromOffset(14, 28),
+            11,
+            COLORS.muted
+        )
+        rowMaterials.TextWrapped = true
+        rowMaterials.TextYAlignment = Enum.TextYAlignment.Top
+        rowMaterials.ZIndex = 58
+
+        local rowAction = Instance.new("TextButton")
+        rowAction.Name = "Action"
+        rowAction.AnchorPoint = Vector2.new(1, 0.5)
+        rowAction.Position = UDim2.new(1, -10, 0.5, 0)
+        rowAction.Size = UDim2.fromOffset(96, 36)
+        rowAction.BackgroundColor3 = COLORS.panel
+        rowAction.AutoButtonColor = true
+        rowAction.Font = Enum.Font.GothamBold
+        rowAction.Text = Strings.get("world.craft")
+        rowAction.TextColor3 = COLORS.amber
+        rowAction.TextSize = 12
+        rowAction.Selectable = true
+        rowAction.ZIndex = 59
+        rowAction.Parent = row
+        corner(rowAction, 9)
+        stroke(rowAction, COLORS.amber, 0.3)
+
+        craftingRows[recipe.id] = {
+            frame = row,
+            name = rowName,
+            materials = rowMaterials,
+            action = rowAction,
+            recipeId = recipe.id,
+        }
+    end
+
     local professionGrid = Instance.new("Frame")
     professionGrid.Name = "ProfessionGrid"
     professionGrid.BackgroundTransparency = 1
@@ -2458,6 +2673,13 @@ function HUDController.new(
         _onStoreDetail = nil,
         _onStorePurchase = nil,
         _onCosmeticEquip = nil,
+        _craftingOverlay = craftingOverlay,
+        _craftingPanel = craftingPanel,
+        _craftingScroll = craftingScroll,
+        _craftingClose = craftingClose,
+        _craftingRows = craftingRows,
+        _craftingRevision = 0,
+        _onCraftItem = nil,
         _equipmentButtons = equipmentButtons,
         _whetButton = whetButton,
         _whetItemId = nil,
@@ -2574,6 +2796,26 @@ function HUDController.new(
             local callback = self._onCosmeticEquip
             if callback ~= nil then
                 callback(cosmeticId)
+            end
+        end)
+    end
+    craftingClose.Activated:Connect(function()
+        self:setCraftingOpen(false)
+    end)
+    for recipeId, row in craftingRows do
+        row.action.Activated:Connect(function()
+            -- The row's own affordability check sets this attribute each
+            -- update, the same way the store card's "buy vs owned" state
+            -- does: a button that cannot afford its recipe does not send
+            -- anything, because a press that just toasts back "not enough
+            -- materials" is a press CraftingCatalog already answered on
+            -- screen.
+            if row.action:GetAttribute("CraftAction") == "unaffordable" then
+                return
+            end
+            local callback = self._onCraftItem
+            if callback ~= nil then
+                callback(recipeId)
             end
         end)
     end
@@ -3009,6 +3251,104 @@ function HUDController._updateStore(self: HUDController, state: any)
         else Strings.get("hud.nothing_is_on_the_rail_yet")
 end
 
+function HUDController.setCraftingHandler(self: HUDController, callback: (string) -> ())
+    self._onCraftItem = callback
+end
+
+function HUDController.craftingPanel(self: HUDController): Frame
+    return self._craftingPanel
+end
+
+function HUDController.craftingClose(self: HUDController): TextButton
+    return self._craftingClose
+end
+
+function HUDController.isCraftingOpen(self: HUDController): boolean
+    return self._craftingOverlay.Visible
+end
+
+function HUDController.setCraftingOpen(self: HUDController, open: boolean)
+    self._craftingOverlay.Visible = open
+    if open then
+        self:_layoutCrafting()
+        if self._currentState ~= nil then
+            self:_updateCrafting(self._currentState)
+        end
+        -- A pad needs a target inside the panel, and CLOSE is the one target
+        -- always there -- the store panel's own #327 reasoning above.
+        self._craftingClose.NextSelectionUp = self._craftingScroll
+        self._craftingScroll.NextSelectionDown = self._craftingClose
+        local assigned = pcall(function()
+            GuiService.SelectedObject = self._craftingClose
+        end)
+        if not assigned then
+            warn("[Last Light] crafting focus refused")
+        end
+    else
+        local selected = GuiService.SelectedObject
+        if selected ~= nil and selected:IsDescendantOf(self._craftingOverlay) then
+            GuiService.SelectedObject = nil
+        end
+    end
+end
+
+--[[
+    What the panel shows, and when it has to shut itself.
+
+    The open instruction is the same revision-only shape the store uses --
+    _storeRevision's own comment explains why -- but there is no verdict to
+    re-evaluate each frame the way the store has one: the table has exactly
+    one gate (First Light finished), already enforced server-side before the
+    revision it publishes ever moves, so nothing here can refuse a press the
+    server would have accepted. The one thing the client still owns is
+    safety: a downed player looking at a modal recipe list is a player who
+    cannot see the thing that downed them, so the panel closes under it the
+    same way the store already does.
+]]
+function HUDController._updateCrafting(self: HUDController, state: any)
+    local crafting = if type(state) == "table" then state.crafting else nil
+    if type(crafting) ~= "table" then
+        self:setCraftingOpen(false)
+        return
+    end
+
+    local revision = tonumber(crafting.revision) or 0
+    if revision > self._craftingRevision then
+        self._craftingRevision = revision
+        if not self._craftingOverlay.Visible then
+            self:setCraftingOpen(true)
+            return
+        end
+    end
+    if not self._craftingOverlay.Visible then
+        return
+    end
+    if self._playerDowned then
+        self:setCraftingOpen(false)
+        return
+    end
+
+    local banked = if type(state.bankedMaterials) == "table" then state.bankedMaterials else {}
+    for recipeId, row in self._craftingRows do
+        local recipe = CraftingCatalog.get(recipeId)
+        local affordable = recipe ~= nil
+        if recipe ~= nil then
+            for materialId, amount in recipe.materials do
+                if (tonumber(banked[materialId]) or 0) < amount then
+                    affordable = false
+                    break
+                end
+            end
+        end
+        row.action:SetAttribute("CraftAction", if affordable then "craft" else "unaffordable")
+        row.action.Text = if affordable
+            then Strings.get("world.craft")
+            else Strings.get("hud.not_enough_yet")
+        row.action.TextColor3 = if affordable then COLORS.amber else COLORS.muted
+        row.frame.BackgroundTransparency = if affordable then 0.15 else 0.4
+    end
+end
+
 --[[
     The panel, measured against the canvas rather than against a desktop.
 
@@ -3069,6 +3409,30 @@ function HUDController._layoutStore(self: HUDController)
         local rowActionWidth = math.min(110, math.max(76, math.floor(panelWidth * 0.24)))
         entry.action.Size = UDim2.fromOffset(rowActionWidth, 32)
         entry.name.Size = UDim2.new(1, -66 - rowActionWidth - 20, 0, 40)
+    end
+end
+
+-- Measured the same way _layoutStore measures its own panel, and for the
+-- same #327 reason: a literal here is a bet on a screen.
+function HUDController._layoutCrafting(self: HUDController)
+    local _viewport, scale, canvasWidth, canvasHeight = canvasMetrics()
+    local margin = 16
+    local panelWidth = math.min(560, math.max(260, canvasWidth - margin * 2))
+    local topbar = math.max(GuiService.TopbarInset.Height, 0) / math.max(scale, 0.01)
+    local top = topbar + 10
+    local panelHeight = math.min(600, math.max(240, canvasHeight - top - 24))
+    self._craftingPanel.AnchorPoint = Vector2.new(0.5, 0)
+    self._craftingPanel.Position = UDim2.new(0.5, 0, 0, top)
+    self._craftingPanel.Size = UDim2.fromOffset(panelWidth, panelHeight)
+    self._craftingClose.Size = UDim2.fromOffset(math.min(240, panelWidth - margin * 2), 38)
+
+    local narrow = panelWidth < 400
+    local actionWidth = math.min(110, math.max(76, math.floor(panelWidth * 0.22)))
+    for _, entry in self._craftingRows do
+        entry.frame.Size = UDim2.new(1, -8, 0, if narrow then 78 else 64)
+        entry.action.Size = UDim2.fromOffset(actionWidth, 36)
+        entry.name.Size = UDim2.new(1, -14 - actionWidth - 24, 0, 20)
+        entry.materials.Size = UDim2.new(1, -14 - actionWidth - 24, 0, 32)
     end
 end
 
@@ -4275,6 +4639,7 @@ function HUDController._layout(self: HUDController)
         UDim2.new(0.5, 0, 1, -(34 + self._actionClusterRows * ACTION_ROW_PITCH + 84 + 14))
     self:_layoutLoadout()
     self:_layoutStore()
+    self:_layoutCrafting()
 end
 
 --[[
@@ -4733,6 +5098,7 @@ function HUDController.update(self: HUDController, state: any)
     self:_updateGear()
     self:_updateProgress()
     self:_updateStore(state)
+    self:_updateCrafting(state)
     local eliteVisible = (type(boss) == "table" and (boss.active == true or boss.complete == true))
         or (type(elite) == "table" and (elite.active == true or elite.complete == true))
     eliteVisible = eliteVisible and not self._playerDowned

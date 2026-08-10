@@ -95,6 +95,12 @@ function ActionPayloadContract.extraField(runtimeIds: any, kind: string): string
         -- about that id, and a payload with no slot in it cannot name the
         -- wrong one.
         return "cosmeticId"
+    elseif kind == actions.CraftItem then
+        -- Which recipe the player picked in the crafting table's panel. A
+        -- payload naming one grants nothing by itself -- Crafting.craft
+        -- still refuses an unknown or unaffordable recipe -- the same trust
+        -- boundary StorePurchase already draws around productId.
+        return "recipeId"
     end
     return nil
 end
