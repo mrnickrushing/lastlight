@@ -46,9 +46,9 @@ return {
             -- Every handler answers an anchor the arena builds, and every
             -- anchor the arena builds has a handler. Either direction
             -- broken is a prompt wired to nothing.
-            name = "handlers and anchors cover each other in both regions",
+            name = "handlers and anchors cover each other in every wired region",
             run = function()
-                for _, regionId in { "region_ironroot", "region_mireglass" } do
+                for _, regionId in { "region_ironroot", "region_mireglass", "region_tempest" } do
                     local definitions = RegionEncounterWiring.definitionsFor(regionId)
                     TestRunner.equal(#definitions, 3, regionId .. " should wire three fights")
                     for _, definition in definitions do
@@ -168,6 +168,139 @@ return {
                 local refusedResolution = resolve(refused)
                 TestRunner.equal(refusedResolution.decision, "refused_her")
                 TestRunner.equal(refusedResolution.outcome, "broken")
+            end,
+        },
+        {
+            --[[
+                The Reach's elites rent their windows rather than buying
+                them: the Eater's beacons gutter and the Admiral's crew
+                re-rigs cut lines, and both clocks live in the wiring
+                because neither state keeps a timestamp. Driven through
+                the definitions' own ticks so the region cannot ship with
+                a window that never closes.
+            ]]
+            name = "the Reach's elites open their windows and the clocks close them",
+            run = function()
+                local definitions = RegionEncounterWiring.definitionsFor("region_tempest")
+                local byId: { [string]: any } = {}
+                for _, definition in definitions do
+                    byId[definition.id] = definition
+                end
+
+                local eater = byId.elite_lighthouse_eater
+                local state = eater.module.create("run", "hash", true)
+                state = (drive(eater, state, "challenge"))
+                TestRunner.equal(state.status, "hidden")
+                state = (drive(eater, state, "beacon_point"))
+                TestRunner.equal(state.status, "drawn")
+                local guttered = eater.tick(state, 1000 + eater.module.BeaconSeconds + 1) :: any
+                TestRunner.equal(guttered.status, "hidden")
+
+                local wreck = byId.elite_admiral_wreck
+                local wreckState = wreck.module.create("run", "hash", true)
+                wreckState = (drive(wreck, wreckState, "challenge"))
+                TestRunner.equal(wreckState.status, "covered")
+                for _, lineId in wreck.module.LineIds do
+                    wreckState = (drive(wreck, wreckState, lineId))
+                end
+                TestRunner.equal(wreckState.status, "exposed")
+                -- the tick's first sight of a cut only starts its clock
+                TestRunner.equal(wreck.tick(wreckState, 2000), nil)
+                local rerigged =
+                    wreck.tick(wreckState, 2000 + wreck.module.Tuning.lineRerigSeconds) :: any
+                TestRunner.equal(rerigged.status, "covered")
+                TestRunner.truthy(wreck.module.cutCount(rerigged) < #wreck.module.LineIds)
+            end,
+        },
+        {
+            --[[
+                The Titan's whole verb chain -- climb, ground, work the
+                gates, strike -- driven through the wiring to completion,
+                with the gate cadence the module's outcome thresholds
+                assume: a gate answers once a phase, whichever verb worked
+                it, so slams count decisions rather than presses.
+            ]]
+            name = "the Titan falls through its verbs and the gates resolve chapter four",
+            run = function()
+                local definitions = RegionEncounterWiring.definitionsFor("region_tempest")
+                local byId: { [string]: any } = {}
+                for _, definition in definitions do
+                    byId[definition.id] = definition
+                end
+                local titan = byId.boss_tidebound_titan
+                TestRunner.truthy(titan.lockedUntil ~= nil, "the Titan must wait on the elites")
+
+                local state = titan.module.create("run", "hash", true)
+                TestRunner.equal(state.status, "locked")
+                state = select(1, titan.module.unlock(state))
+                state = (drive(titan, state, "challenge"))
+                TestRunner.equal(state.status, "unreachable")
+
+                -- ease both, then mixed, then slam both: three slams in
+                -- all, which is a night that went both ways
+                local gatePlan = {
+                    { gate_north = "gate_north", gate_south = "gate_south" },
+                    { gate_north = "gate_north", gate_south = "gate_south_slam" },
+                    { gate_north = "gate_north_slam", gate_south = "gate_south_slam" },
+                }
+                for phase = 1, 3 do
+                    TestRunner.equal(state.phase, phase)
+                    for _, wreckId in titan.module.WreckIds do
+                        if state.status == "unreachable" then
+                            state = (drive(titan, state, wreckId))
+                        end
+                    end
+                    TestRunner.equal(state.status, "grounding")
+                    for _, rodId in titan.module.RodIds do
+                        state = (drive(titan, state, rodId))
+                    end
+                    TestRunner.equal(state.status, "exposed")
+                    state = (drive(titan, state, gatePlan[phase].gate_north))
+                    state = (drive(titan, state, gatePlan[phase].gate_south))
+                    if phase == 1 then
+                        -- a second working of the same gate in the same
+                        -- phase is refused, by either verb
+                        local held, easedAgain = drive(titan, state, "gate_north")
+                        TestRunner.equal(easedAgain.accepted, false)
+                        TestRunner.equal(held.slammedGates, state.slammedGates)
+                        local heldSlam, slamAfter = drive(titan, state, "gate_north_slam")
+                        TestRunner.equal(slamAfter.accepted, false)
+                        TestRunner.equal(heldSlam.slammedGates, state.slammedGates)
+                    end
+                    local finished = false
+                    for _ = 1, 8 do
+                        local result
+                        state, result = titan.module.strike(state, PLAYER.UserId, 100)
+                        if result.phaseFinished then
+                            finished = result.completed == true
+                            break
+                        end
+                    end
+                    TestRunner.equal(finished, phase == 3, "phase " .. phase .. " did not turn")
+                end
+                TestRunner.equal(state.status, "complete")
+                TestRunner.equal(state.slammedGates, 3)
+                TestRunner.equal(state.outcome, "scoured")
+
+                local resolve = assert(titan.chapterResolution, "the Titan resolves no chapter")
+                local resolution = resolve(state)
+                TestRunner.equal(resolution.chapterId, "chapter_four")
+                TestRunner.equal(resolution.decision, "mixed_gates")
+                TestRunner.equal(resolution.outcome, "scoured")
+                TestRunner.truthy(ChapterCatalog.isDecision("chapter_four", resolution.decision))
+                TestRunner.truthy(ChapterCatalog.isOutcome("chapter_four", resolution.outcome))
+
+                -- and the two policies map to their own decisions
+                local eased = table.clone(state)
+                eased.slammedGates = 0
+                eased.outcome = "navigable"
+                TestRunner.equal(resolve(eased).decision, "eased_gates")
+                TestRunner.truthy(ChapterCatalog.isDecision("chapter_four", "eased_gates"))
+                local slammed = table.clone(state)
+                slammed.slammedGates = 6
+                slammed.outcome = "broken"
+                TestRunner.equal(resolve(slammed).decision, "slammed_gates")
+                TestRunner.truthy(ChapterCatalog.isOutcome("chapter_four", "broken"))
             end,
         },
     },

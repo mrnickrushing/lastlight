@@ -100,6 +100,49 @@ return {
             end,
         },
         {
+            --[[
+                Placeable is not placed: the case above proves an anchor
+                exists in its region's catalog, and the Reach's first live
+                walk still arrived with one fragment missing, because the
+                catalog pinned nothing and the seed rolled no Lighthouse
+                Stump. A story beat that only turns up some runs is a
+                lottery ticket, so a region in the open set pins every
+                point of interest its fragments anchor to -- in the same
+                pull request as the walk that opened it.
+            ]]
+            name = "an open region pins every point of interest its fragments anchor to",
+            run = function()
+                local ExpeditionGenerator = require("../../src/shared/ExpeditionGenerator")
+                local Regions = require("../../src/shared/Content/Definitions/Regions")
+                for _, region in Regions do
+                    if region.enabled == true then
+                        local catalog = ExpeditionGenerator.catalogFor(region.id) :: any
+                        TestRunner.truthy(catalog ~= nil, region.id .. " has no catalog")
+                        local pinned: { [string]: boolean } = {}
+                        for _, poiId in catalog.FixedPointOfInterestIds or {} do
+                            pinned[poiId] = true
+                        end
+                        for _, fragment in MemoryFragments.List do
+                            if fragment.regionId == region.id then
+                                local kind, key = string.match(fragment.anchorKey, "^(%a+):(.+)$")
+                                if kind == "poi" then
+                                    TestRunner.truthy(
+                                        pinned[key :: string],
+                                        string.format(
+                                            "%s anchors %s, which %s does not pin",
+                                            fragment.id,
+                                            tostring(key),
+                                            region.id
+                                        )
+                                    )
+                                end
+                            end
+                        end
+                    end
+                end
+            end,
+        },
+        {
             name = "recovers a fragment exactly once",
             run = function()
                 local collected = MemoryFragments.normalize(nil)

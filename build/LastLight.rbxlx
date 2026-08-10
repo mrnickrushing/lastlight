@@ -5137,7 +5137,7 @@ return table.freeze({
         region_bramblewake_enabled = true,
         region_ironroot_enabled = true,
         region_mireglass_enabled = true,
-        region_tempest_enabled = false,
+        region_tempest_enabled = true,
         region_frostmere_enabled = false,
         region_cinderfall_enabled = false,
         region_hollow_enabled = false,
@@ -5207,7 +5207,7 @@ return table.freeze({
         region_bramblewake_enabled = table.freeze({ stage = "everyone", percent = 100 }),
         region_ironroot_enabled = table.freeze({ stage = "everyone", percent = 100 }),
         region_mireglass_enabled = table.freeze({ stage = "everyone", percent = 100 }),
-        region_tempest_enabled = table.freeze({ stage = "off", percent = 0 }),
+        region_tempest_enabled = table.freeze({ stage = "everyone", percent = 100 }),
         region_frostmere_enabled = table.freeze({ stage = "off", percent = 0 }),
         region_cinderfall_enabled = table.freeze({ stage = "off", percent = 0 }),
         region_hollow_enabled = table.freeze({ stage = "off", percent = 0 }),
@@ -10835,7 +10835,7 @@ local regions = {
         id = "region_tempest",
         kind = "region",
         version = 1,
-        enabled = false,
+        enabled = true,
         displayNameKey = "content.region.tempest.name",
         analyticsKey = "region_tempest",
         assetBundle = "region_tempest_v1",
@@ -11496,7 +11496,7 @@ local events = {
         tags = { "rescue", "urgent" },
         objective = Strings.get("expedition.cut_the_rigging_and_get_them"),
         detail = Strings.get("expedition.somebody_is_tangled_in_the_shrouds"),
-        completionMessage = "THEY ARE OFF THE WRECK — +3 SHIPS IRON",
+        completionMessage = "THEY ARE OFF THE WRECK — +3 SHIP'S IRON",
         failureMessage = Strings.get("expedition.the_hull_goes_over"),
         durationSeconds = 110,
         defaultSolution = true,
@@ -11693,7 +11693,7 @@ local events = {
         tags = { "hazard", "story" },
         objective = Strings.get("expedition.relight_the_beacon_before_the_next"),
         detail = Strings.get("expedition.the_beacon_is_dark_the_channel"),
-        completionMessage = "THE BEACON BURNS — +3 SHIPS IRON",
+        completionMessage = "THE BEACON BURNS — +3 SHIP'S IRON",
         failureMessage = Strings.get("expedition.the_channel_stays_dark"),
         durationSeconds = 105,
         defaultSolution = true,
@@ -11762,6 +11762,17 @@ return table.freeze({
     }),
     RequiredModuleIds = table.freeze({
         "module_tr_titan_approach",
+    }),
+    --[[
+        The two fragment-anchored POIs place in every run, Bramblewake's
+        rule applied the day the region opened: a memory fragment whose
+        anchor only turns up some runs is a story beat demoted to a
+        lottery ticket. The Reach's first live walk found exactly that,
+        with the Signal Book's stump missing from the seed it rolled.
+    ]]
+    FixedPointOfInterestIds = table.freeze({
+        "poi_tr_lighthouse_stump",
+        "poi_tr_anchor_field",
     }),
     FixedMiddleIds = table.freeze({
         "module_tr_jetty_span",
@@ -30295,13 +30306,16 @@ return table.freeze(RegionAccess)
     text would drift from the first.
 ]]
 
+local AdmiralWreckEncounter = require("./AdmiralWreckEncounter")
 local BellowsMawEncounter = require("./BellowsMawEncounter")
 local DrownedCallerEncounter = require("./DrownedCallerEncounter")
 local ForemanEchoEncounter = require("./ForemanEchoEncounter")
 local IronWidowEncounter = require("./IronWidowEncounter")
 local LanternWitchEncounter = require("./LanternWitchEncounter")
+local LighthouseEaterEncounter = require("./LighthouseEaterEncounter")
 local ManyFaceEncounter = require("./ManyFaceEncounter")
 local Strings = require("./Strings")
+local TideboundTitanEncounter = require("./TideboundTitanEncounter")
 
 local RegionEncounterWiring = {}
 
@@ -30719,6 +30733,250 @@ function RegionEncounterWiring.definitionsFor(regionId: string): { Definition }
                         else "spent_copies"
                     return {
                         chapterId = "chapter_three",
+                        decision = decision,
+                        outcome = tostring(state.outcome),
+                    }
+                end,
+            },
+        }
+    elseif regionId == "region_tempest" then
+        local eaterInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(LighthouseEaterEncounter),
+        }
+        local eaterAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.lighthouse_eater")
+            ),
+        }
+        local beaconObjects: { [string]: string } = {
+            beacon_point = Strings.get("encounter.point_beacon"),
+            beacon_jetty = Strings.get("encounter.jetty_beacon"),
+            beacon_shoal = Strings.get("encounter.shoal_beacon"),
+            beacon_wall = Strings.get("encounter.wall_beacon"),
+        }
+        for _, beaconId in LighthouseEaterEncounter.BeaconIds do
+            table.insert(
+                eaterAnchors,
+                anchor(beaconId, Strings.get("world.light"), beaconObjects[beaconId])
+            )
+            eaterInteractions[beaconId] = verb(
+                LighthouseEaterEncounter,
+                function(state: any, userId: number, now: number): (any, any)
+                    return LighthouseEaterEncounter.lightBeacon(state, userId, beaconId, now)
+                end
+            )
+        end
+
+        local wreckInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(AdmiralWreckEncounter),
+        }
+        local wreckAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.admiral_wreck")
+            ),
+        }
+        local lineObjects: { [string]: string } = {
+            tow_bow = Strings.get("encounter.bow_tow_line"),
+            tow_quarter = Strings.get("encounter.quarter_tow_line"),
+            tow_stern = Strings.get("encounter.stern_tow_line"),
+            tow_spring = Strings.get("encounter.spring_tow_line"),
+        }
+        for _, lineId in AdmiralWreckEncounter.LineIds do
+            table.insert(
+                wreckAnchors,
+                anchor(lineId, Strings.get("encounter.cut"), lineObjects[lineId])
+            )
+            wreckInteractions[lineId] = verb(
+                AdmiralWreckEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return AdmiralWreckEncounter.cutLine(state, userId, lineId)
+                end
+            )
+        end
+        --[[
+            His crew re-rigs each cut line after a fixed span. The state
+            keeps no timestamps -- a cut is a boolean -- so the cadence
+            lives here, the way the Many-Face's face clock does: remember
+            when each cut appeared, and give it back when its time is up.
+        ]]
+        local rerigAt: { [string]: number } = {}
+        local function wreckTick(state: any, now: number): any?
+            if state.status ~= "covered" and state.status ~= "exposed" then
+                if next(rerigAt) ~= nil then
+                    rerigAt = {}
+                end
+                return nil
+            end
+            local nextState = state
+            for _, lineId in AdmiralWreckEncounter.LineIds do
+                if nextState.lines[lineId] then
+                    if rerigAt[lineId] == nil then
+                        rerigAt[lineId] = now + AdmiralWreckEncounter.Tuning.lineRerigSeconds
+                    elseif now >= rerigAt[lineId] then
+                        rerigAt[lineId] = nil
+                        nextState = (AdmiralWreckEncounter.rerigLine(nextState, lineId))
+                    end
+                else
+                    rerigAt[lineId] = nil
+                end
+            end
+            return if nextState == state then nil else nextState
+        end
+
+        local titanInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(TideboundTitanEncounter),
+        }
+        local titanAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.tidebound_titan")
+            ),
+        }
+        local wreckObjects: { [string]: string } = {
+            wreck_collier = Strings.get("encounter.collier_wreck"),
+            wreck_packet = Strings.get("encounter.packet_wreck"),
+            wreck_trawler = Strings.get("encounter.trawler_wreck"),
+            wreck_cutter = Strings.get("encounter.cutter_wreck"),
+        }
+        for _, wreckId in TideboundTitanEncounter.WreckIds do
+            table.insert(
+                titanAnchors,
+                anchor(wreckId, Strings.get("encounter.climb"), wreckObjects[wreckId])
+            )
+            titanInteractions[wreckId] = verb(
+                TideboundTitanEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return TideboundTitanEncounter.climbWreck(state, userId, wreckId)
+                end
+            )
+        end
+        local rodObjects: { [string]: string } = {
+            rod_seaward = Strings.get("encounter.seaward_storm_rod"),
+            rod_landward = Strings.get("encounter.landward_storm_rod"),
+        }
+        for _, rodId in TideboundTitanEncounter.RodIds do
+            table.insert(
+                titanAnchors,
+                anchor(rodId, Strings.get("encounter.ground"), rodObjects[rodId])
+            )
+            titanInteractions[rodId] = verb(
+                TideboundTitanEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return TideboundTitanEncounter.groundRod(state, userId, rodId)
+                end
+            )
+        end
+        --[[
+            The chapter's decision, worked with two verbs per gate rather
+            than chosen at a menu -- and easing shares no anchor with
+            slamming, for the Witch's reason: a decision that shares a
+            button with its opposite is a misclick with a consequence.
+            The module counts slams and nothing else, so the once-a-phase
+            cadence its outcome comment assumes ("three phases offer two
+            gates each") is held here: a gate already worked this phase
+            answers with its own refusal instead of double-counting.
+        ]]
+        local gateWorkedInPhase: { [string]: number } = {}
+        local gateObjects: { [string]: string } = {
+            gate_north = Strings.get("encounter.north_tide_gate"),
+            gate_south = Strings.get("encounter.south_tide_gate"),
+        }
+        for gateId in TideboundTitanEncounter.GateIds :: { [string]: boolean } do
+            local function workGate(state: any, player: any, now: number, slam: boolean): (any, any)
+                if state.status == "exposed" and gateWorkedInPhase[gateId] == state.phase then
+                    return state,
+                        {
+                            accepted = false,
+                            completed = false,
+                            message = Strings.get("encounter.this_gate_is_worked_the_tide"),
+                        }
+                end
+                local nextState, result =
+                    TideboundTitanEncounter.lowerTide(state, player.UserId, gateId, slam)
+                if type(result) == "table" and result.accepted == true then
+                    gateWorkedInPhase[gateId] = nextState.phase
+                end
+                return nextState,
+                    {
+                        accepted = if type(result) == "table" then result.accepted else false,
+                        completed = false,
+                        message = instructionOf(
+                            TideboundTitanEncounter,
+                            nextState,
+                            player.UserId,
+                            now
+                        ),
+                    }
+            end
+            table.insert(
+                titanAnchors,
+                anchor(gateId, Strings.get("encounter.ease"), gateObjects[gateId])
+            )
+            titanInteractions[gateId] = function(state: any, player: any, now: number): (any, any)
+                return workGate(state, player, now, false)
+            end
+            local slamId = gateId .. "_slam"
+            table.insert(
+                titanAnchors,
+                anchor(slamId, Strings.get("encounter.slam"), gateObjects[gateId])
+            )
+            titanInteractions[slamId] = function(state: any, player: any, now: number): (any, any)
+                return workGate(state, player, now, true)
+            end
+        end
+        table.sort(titanAnchors, function(left: Anchor, right: Anchor): boolean
+            if left.id == RegionEncounterWiring.ChallengeAnchorId then
+                return true
+            elseif right.id == RegionEncounterWiring.ChallengeAnchorId then
+                return false
+            end
+            return left.id < right.id
+        end)
+
+        return {
+            {
+                id = LighthouseEaterEncounter.Id,
+                regionId = regionId,
+                module = LighthouseEaterEncounter,
+                anchors = eaterAnchors,
+                interactions = eaterInteractions,
+                tick = LighthouseEaterEncounter.expire,
+            },
+            {
+                id = AdmiralWreckEncounter.Id,
+                regionId = regionId,
+                module = AdmiralWreckEncounter,
+                anchors = wreckAnchors,
+                interactions = wreckInteractions,
+                tick = wreckTick,
+            },
+            {
+                id = TideboundTitanEncounter.Id,
+                regionId = regionId,
+                module = TideboundTitanEncounter,
+                anchors = titanAnchors,
+                interactions = titanInteractions,
+                lockedUntil = { LighthouseEaterEncounter.Id, AdmiralWreckEncounter.Id },
+                chapterResolution = function(state: any)
+                    --[[
+                        Slams are the only thing the fight counts, so the
+                        decision reads off the same thresholds the outcome
+                        does: never slammed is a party that took the long
+                        turn every time, four or more is a policy, and the
+                        stretch between is a night that went both ways.
+                    ]]
+                    local slams = tonumber(state.slammedGates) or 0
+                    local decision = if slams == 0
+                        then "eased_gates"
+                        elseif slams >= 4 then "slammed_gates"
+                        else "mixed_gates"
+                    return {
+                        chapterId = "chapter_four",
                         decision = decision,
                         outcome = tostring(state.outcome),
                     }
@@ -36739,6 +36997,27 @@ local SOURCE: { [string]: string } = {
     ["encounter.name"] = "NAME",
     ["encounter.spare"] = "SPARE",
     ["encounter.refuse"] = "REFUSE",
+    ["encounter.climb"] = "CLIMB",
+    ["encounter.ground"] = "GROUND",
+    ["encounter.ease"] = "EASE",
+    ["encounter.slam"] = "SLAM",
+    ["encounter.point_beacon"] = "POINT BEACON",
+    ["encounter.jetty_beacon"] = "JETTY BEACON",
+    ["encounter.shoal_beacon"] = "SHOAL BEACON",
+    ["encounter.wall_beacon"] = "WALL BEACON",
+    ["encounter.bow_tow_line"] = "BOW TOW LINE",
+    ["encounter.quarter_tow_line"] = "QUARTER TOW LINE",
+    ["encounter.stern_tow_line"] = "STERN TOW LINE",
+    ["encounter.spring_tow_line"] = "SPRING TOW LINE",
+    ["encounter.collier_wreck"] = "COLLIER WRECK",
+    ["encounter.packet_wreck"] = "PACKET WRECK",
+    ["encounter.trawler_wreck"] = "TRAWLER WRECK",
+    ["encounter.cutter_wreck"] = "CUTTER WRECK",
+    ["encounter.seaward_storm_rod"] = "SEAWARD STORM ROD",
+    ["encounter.landward_storm_rod"] = "LANDWARD STORM ROD",
+    ["encounter.north_tide_gate"] = "NORTH TIDE GATE",
+    ["encounter.south_tide_gate"] = "SOUTH TIDE GATE",
+    ["encounter.this_gate_is_worked_the_tide"] = "THIS GATE IS ALREADY WORKED — THE TIDE ANSWERS ONCE A PHASE",
     ["encounter.north_signal_lever"] = "NORTH SIGNAL LEVER",
     ["encounter.shaft_signal_lever"] = "SHAFT SIGNAL LEVER",
     ["encounter.south_signal_lever"] = "SOUTH SIGNAL LEVER",
@@ -61514,7 +61793,7 @@ function TutorialService.Init(self: TutorialService, context: any)
     self._blackoutService:setChangedHandler(function(toast: string?)
         if toast ~= nil then
             for player, session in self._sessions do
-                if self._blackoutService:snapshot(player) ~= nil then
+                if self:_blackoutSnapshot(player) ~= nil then
                     session.toast = toast
                     session.toastRevision += 1
                 end
@@ -62179,6 +62458,24 @@ function TutorialService.setRegionEncounterService(
     regionEncounterService: any
 )
     self._regionEncounterService = regionEncounterService
+end
+
+--[[
+    The Blackout is chapter I's event and Bramblewake's alone, but its
+    service only asks whether the player is out, so with the road turned
+    to any later region the HUD's trail card still read BRAMBLEWAKE
+    BLACKOUT and told the player to enter a wood that was not standing.
+    Found on the Reach's first live walk. The road's own region is the
+    gate: a Blackout snapshot exists only while the wood it happens in
+    does, which is the same test participantEntered already makes at the
+    expedition door.
+]]
+function TutorialService._blackoutSnapshot(self: TutorialService, player: Player): any
+    local regionId = self._expeditionService:currentSeed()
+    if regionId ~= "region_bramblewake" then
+        return nil
+    end
+    return self._blackoutService:snapshot(player)
 end
 
 --[[
@@ -63480,7 +63777,7 @@ function TutorialService._objectiveTargets(
                 })
             end
         end
-        local blackout = self._blackoutService:snapshot(player)
+        local blackout = self:_blackoutSnapshot(player)
         local arena = self._worldService:blackoutArena()
         if blackout ~= nil and arena ~= nil then
             if blackout.status == "relay" then
@@ -63635,7 +63932,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
         then self._townNightService:snapshot()
         else self._phaseService:snapshot()
     local survival = self._survivalService:snapshot(player)
-    local blackout = self._blackoutService:snapshot(player)
+    local blackout = self:_blackoutSnapshot(player)
     if blackout ~= nil then
         trailName = Strings.get("tutorial.bramblewake_blackout")
         progress = blackout.stage
@@ -92145,7 +92442,12 @@ local ENTRIES: { [string]: any } = {
     },
     region_tempest = {
         builder = TempestBuilder,
-        walkable = false,
+        --[[
+            Walked end to end in a live session the day this flipped,
+            through the same assembly seam as the Delve and the Fen. The
+            missing list is a note for the art pass, not a gate.
+        ]]
+        walkable = true,
         missing = {
             "authored mesh dressing",
         },
@@ -92977,11 +93279,17 @@ local function ground(parent: Instance, center: Vector3, size: number, look: any
     return slab
 end
 
-local function billboardLabel(target: BasePart, text: string, color: Color3, maxDistance: number?)
+local function billboardLabel(
+    target: BasePart,
+    text: string,
+    color: Color3,
+    maxDistance: number?,
+    height: number?
+)
     local gui = Instance.new("BillboardGui")
     gui.Name = "Label"
     gui.Size = UDim2.fromOffset(230, 42)
-    gui.StudsOffsetWorldSpace = Vector3.new(0, 5.5, 0)
+    gui.StudsOffsetWorldSpace = Vector3.new(0, height or 5.5, 0)
     gui.AlwaysOnTop = false
     gui.MaxDistance = maxDistance or 80
     gui.Parent = target
@@ -93353,12 +93661,28 @@ function RegionExpeditionAssembly.build(
             Named at the anchor, not only at the prompt: the first walk
             found four identical glowing pillars, distinguishable only by
             standing at each one. The label reach is short so the arena
-            does not join the label soup two cells away.
+            does not join the label soup two cells away -- and shorter
+            again when the ring is crowded, because the Titan's eleven
+            anchors at the reach the Maw's seven walked fine with read as
+            one mashed band from the arena's edge. Past nine anchors,
+            only the names near you render.
         ]]
-        for _, meta in definition.anchors do
+        local crowded = #definition.anchors >= 10
+        local anchorLabelReach = if crowded then 26 else 40
+        for metaIndex, meta in definition.anchors do
             local anchorPart = anchors[meta.id]
             if anchorPart ~= nil then
-                billboardLabel(anchorPart, meta.object, look.arenaAnchor, 40)
+                -- Neighbors on a crowded ring alternate label heights,
+                -- because two names thirteen studs apart on one sightline
+                -- overlap at any reach that still lets you read either.
+                local labelHeight = if crowded and metaIndex % 2 == 0 then 3.4 else 5.5
+                billboardLabel(
+                    anchorPart,
+                    meta.object,
+                    look.arenaAnchor,
+                    anchorLabelReach,
+                    labelHeight
+                )
             end
         end
         clearRouteCorridor(expedition, hostCenter, arenaCenter)

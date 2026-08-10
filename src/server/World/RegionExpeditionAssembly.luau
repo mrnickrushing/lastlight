@@ -107,11 +107,17 @@ local function ground(parent: Instance, center: Vector3, size: number, look: any
     return slab
 end
 
-local function billboardLabel(target: BasePart, text: string, color: Color3, maxDistance: number?)
+local function billboardLabel(
+    target: BasePart,
+    text: string,
+    color: Color3,
+    maxDistance: number?,
+    height: number?
+)
     local gui = Instance.new("BillboardGui")
     gui.Name = "Label"
     gui.Size = UDim2.fromOffset(230, 42)
-    gui.StudsOffsetWorldSpace = Vector3.new(0, 5.5, 0)
+    gui.StudsOffsetWorldSpace = Vector3.new(0, height or 5.5, 0)
     gui.AlwaysOnTop = false
     gui.MaxDistance = maxDistance or 80
     gui.Parent = target
@@ -483,12 +489,28 @@ function RegionExpeditionAssembly.build(
             Named at the anchor, not only at the prompt: the first walk
             found four identical glowing pillars, distinguishable only by
             standing at each one. The label reach is short so the arena
-            does not join the label soup two cells away.
+            does not join the label soup two cells away -- and shorter
+            again when the ring is crowded, because the Titan's eleven
+            anchors at the reach the Maw's seven walked fine with read as
+            one mashed band from the arena's edge. Past nine anchors,
+            only the names near you render.
         ]]
-        for _, meta in definition.anchors do
+        local crowded = #definition.anchors >= 10
+        local anchorLabelReach = if crowded then 26 else 40
+        for metaIndex, meta in definition.anchors do
             local anchorPart = anchors[meta.id]
             if anchorPart ~= nil then
-                billboardLabel(anchorPart, meta.object, look.arenaAnchor, 40)
+                -- Neighbors on a crowded ring alternate label heights,
+                -- because two names thirteen studs apart on one sightline
+                -- overlap at any reach that still lets you read either.
+                local labelHeight = if crowded and metaIndex % 2 == 0 then 3.4 else 5.5
+                billboardLabel(
+                    anchorPart,
+                    meta.object,
+                    look.arenaAnchor,
+                    anchorLabelReach,
+                    labelHeight
+                )
             end
         end
         clearRouteCorridor(expedition, hostCenter, arenaCenter)
