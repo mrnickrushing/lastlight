@@ -7,7 +7,7 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-10, at `main` = PR #373, build `0.53.1`,
+Last updated: 2026-08-10, at `main` = PR #374, build `0.53.1`,
 save schema 25, 27 services. Published to Roblox as place version 164;
 `0.53.1` is published from the merged Frostmere build through PR #372.
 (#364 added only documentation over v162, and #361/#362 only
@@ -96,6 +96,24 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#374** **Bramblewake's complete Studio walkthrough closes the defects it
+  found instead of only recording them.** Codex connected to the same live
+  Studio MCP relay as Claude, walked the generated route end to end, harvested
+  and banked Amber Sap exactly once, completed Stag Tracks, the three blackout
+  relays, Old Growth, the preserved Warden Stag route and Shared Agroforest,
+  and exercised combat, dodge, downing, retreat, re-entry, rewards and chapter
+  resolution through the real server-validated interactions. The visual pass
+  reduces harvest labels from horizon-filling cards to compact nearby
+  confirmations and rebuilds the distant canopy as overlapping forest ranks
+  rather than sparse ball-on-stick silhouettes. The departure panel now names
+  party size and route contract, explains every contract, summarizes the two
+  choices together and marks selection without relying on color alone. It fits
+  both desktop and a simulated Samsung Galaxy A06 landscape safe viewport;
+  scene analysis measured 351,962 opaque triangles and 230 draws. Full local
+  validation passes: **935 Luau tests**, format, lint, typecheck, all repository
+  validators, both regenerated places, built-DataModel verification and the
+  rollback build. Roblox publication is the next gate after this PR merges;
+  place version 164 remains the recorded live build until that succeeds.
 - **#371** (v164) **Frostmere Vale opens after its live
   end-to-end walk.** The region flag and builder walkability switch are on,
   chapter-five access is pinned beside the Delve, Fen and Reach, and the two
