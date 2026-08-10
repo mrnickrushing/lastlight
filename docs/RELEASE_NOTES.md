@@ -10,12 +10,14 @@ it cannot be written in a player's language either. Patch notes in a
 player's language are still the owner's, and QA_RELEASE_PLAN.md's
 checklist says so.
 
-378 merged pull requests. The version column is blank where the
+380 merged pull requests. The version column is blank where the
 handoff did not record one, which is most of the history before it began
 publishing a place per wave.
 
 | PR | Merged | Place | Title |
 |---|---|---|---|
+| #381 | 2026-08-10 | v168 | Give enemies a real light so they render solid at night, not just an outline |
+| #380 | 2026-08-10 |  | Record Roblox place version 167 (#379) |
 | #379 | 2026-08-10 | v167 | Replace the ten crafting benches with one crafting table |
 | #378 | 2026-08-10 |  | Record Roblox place version 166 (#377) |
 | #377 | 2026-08-10 | v166 | Fix three Bramblewake visual bugs found in a live Studio walkthrough |

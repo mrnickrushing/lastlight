@@ -7,17 +7,22 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-10, at `main` = PR #379, build `0.53.1`,
-save schema 25, 27 services. Published to Roblox as place version 167;
-`0.53.1` is published from PR #379, which replaced the ten crafting benches
-in Emberhollow with one Crafting Table station whose interaction opens a
-client panel listing every recipe in the catalog — the owner's own
-description of the old layout was "2345748357 of them". (#378 left the
-built place byte-identical — the place-version-166 documentation record for
-PR #377, no source under `src/`.) `0.53.1` was also published from the
-merged Bramblewake visual-bug-fix build in PR #377. (#376 left the built
-place byte-identical — Studio-MCP wrapper and docs only, no source under
-`src/`.)
+Last updated: 2026-08-10, at `main` = PR #381, build `0.53.1`,
+save schema 25, 27 services. Published to Roblox as place version 168;
+`0.53.1` is published from PR #381, which gave every enemy a real light so
+its authored PBR mesh renders solid at night instead of going black behind
+only the ThreatOutline's rim — the owner's own description was "invisible
+with a red line around them". (#380 left the built place byte-identical —
+the place-version-167 documentation record for PR #379, no source under
+`src/`.) `0.53.1` was also published from PR #379, which replaced the ten
+crafting benches in Emberhollow with one Crafting Table station whose
+interaction opens a client panel listing every recipe in the catalog — the
+owner's own description of the old layout was "2345748357 of them". (#378
+left the built place byte-identical — the place-version-166 documentation
+record for PR #377, no source under `src/`.) `0.53.1` was also published
+from the merged Bramblewake visual-bug-fix build in PR #377. (#376 left the
+built place byte-identical — Studio-MCP wrapper and docs only, no source
+under `src/`.)
 (#364 added only documentation over v162, and #361/#362 only
 documentation over v161.) (#358 produced v159 and #359
 v160; those three are Milestone 13 wave D's closing batches, and each was
@@ -104,6 +109,37 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#381** (v168) **Enemies render solid at night now, not an outline around
+  nothing.** The owner's report: "the monsters look like they are invisible
+  with a red line around them." Reproduced and root-caused live in Studio
+  rather than guessed at: every authored enemy mesh is a PBR
+  `SurfaceAppearance` MeshPart (Meshy-generated, `preserveSourceMaterials =
+  true`), and that surface renders correctly under the day sun but solid
+  black at night no matter how bright `Lighting.Ambient`/`OutdoorAmbient`
+  are set — pushed both to pure white with zero effect. Those two
+  properties light the plain fallback parts fine, which is why nobody ever
+  reported the fallback silhouette itself as broken; a PBR mesh needs a
+  real light source, and past the sun's night hours there wasn't one
+  anywhere on the creature. The `ThreatOutline` Highlight added earlier for
+  the same "disappearing at night" complaint is a screen overlay
+  independent of scene lighting, so it kept rendering fine regardless —
+  the outline was never the bug, the unlit body inside it was.
+  `BramblewakeEnemyBuilder` now gives every enemy a `PointLight`, anchored
+  just above the creature rather than parented into `core` directly: dead
+  centre lit the (small) rootling fine and did nothing for the (wider)
+  briarback even far past a sane brightness, because a light buried inside
+  a wide enough body has no line of sight to its own outward-facing
+  surface. Anchored above and scaled off each species' own `core.Size.Y`,
+  it reached both, confirmed live through the real player camera across
+  five enemy sizes. This is the one shared builder every enemy in the game
+  uses — town night defense, Bramblewake, and Old Growth's elite — so the
+  fix is not Bramblewake-specific despite the file's name. Full local
+  validation passes: 935 Luau tests, format, lint, typecheck, every
+  repository validator, both regenerated places, built-DataModel
+  verification and the rollback build. The exact merged commit `0dfb7c2`
+  was rebuilt and passed the full suite again on synchronized `main`, then
+  Open Cloud published that artifact to start place `115897110071287` as
+  place version 168.
 - **#379** (v167) **The ten crafting benches in Emberhollow are one Crafting
   Table now.** The owner's own words for the old layout: "2345748357 of
   them." It was ten, and `WorldService`'s own comments already recorded why
