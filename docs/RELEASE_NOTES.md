@@ -10,12 +10,14 @@ it cannot be written in a player's language either. Patch notes in a
 player's language are still the owner's, and QA_RELEASE_PLAN.md's
 checklist says so.
 
-371 merged pull requests. The version column is blank where the
+373 merged pull requests. The version column is blank where the
 handoff did not record one, which is most of the history before it began
 publishing a place per wave.
 
 | PR | Merged | Place | Title |
 |---|---|---|---|
+| #374 | 2026-08-09 | v165 | Polish Bramblewake walkthrough and departure UX |
+| #373 | 2026-08-09 |  | Record Roblox place version 164 |
 | #372 | 2026-08-09 |  | Record Frostmere delivery |
 | #371 | 2026-08-09 | v164 | Open Frostmere Vale after live walk |
 | #370 | 2026-08-09 |  | Fix Studio MCP launch under Vinegar |
