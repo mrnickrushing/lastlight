@@ -86851,6 +86851,66 @@ function BramblewakeEnemyBuilder.build(definition: any, origin: Vector3, target:
     highlight.Parent = model
 
     --[[
+        The outline's other half, and the one that was still missing: the
+        owner reported enemies as "invisible with a red line around them"
+        rather than solid, and a live Studio check found exactly that --
+        the outline above, alone, on a creature with nothing left to see.
+
+        Every authored enemy mesh is a PBR SurfaceAppearance MeshPart
+        (`preserveSourceMaterials = true` in MeshAssetRegistry, so its own
+        color/normal/roughness maps carry the look). Measured directly:
+        that surface renders correctly under the day sun, and renders
+        solid black at night NO MATTER how bright `Lighting.Ambient` or
+        `OutdoorAmbient` is set -- pushing both to pure white changed
+        nothing. Those two properties light the plain Wood/Grass/Plastic
+        fallback parts below fine (that is why the fallback silhouette was
+        never the complaint), but a PBR SurfaceAppearance mesh is lit by
+        real light sources, not the flat ambient fill, and past the sun's
+        night hours there was no other light source is on the creature
+        at all -- only the Highlight's outline, which is a screen overlay
+        and was never dependent on scene lighting to begin with. That gap
+        between "the outline still shows" and "the mesh needs a real
+        light and has none" is the whole bug.
+
+        A point light fixes it, confirmed the same way: adding one at a
+        workable brightness turned the same black cutout back into the same
+        lit, textured creature the day sun already proves this mesh can look
+        like -- with one catch measured on the way there. Parented dead
+        centre in `core`, the light worked on the rootling and did nothing
+        at all on the briarback even cranked far past a sane brightness: a
+        point light buried inside a wide enough body has no line of sight to
+        its own outward-facing surface, so the light exists and the creature
+        stays black regardless of how bright it is. Anchored just above the
+        creature instead -- clear of every species' own volume, the same way
+        a torch is held above what it lights rather than embedded in it --
+        it reached both.
+
+        The anchor is a fresh Part rather than a light directly on `core`
+        for that reason, and scaled off `core.Size.Y` rather than a fixed
+        offset so a tall species (or a short one) still clears its own body.
+    ]]
+    local threatGlowAnchor = Instance.new("Part")
+    threatGlowAnchor.Name = "ThreatGlowAnchor"
+    threatGlowAnchor.Anchored = true
+    threatGlowAnchor.CanCollide = false
+    threatGlowAnchor.CanTouch = false
+    threatGlowAnchor.CanQuery = false
+    threatGlowAnchor.CastShadow = false
+    threatGlowAnchor.Transparency = 1
+    threatGlowAnchor.Massless = true
+    threatGlowAnchor.Size = Vector3.new(0.2, 0.2, 0.2)
+    threatGlowAnchor.CFrame = core.CFrame * CFrame.new(0, core.Size.Y / 2 + 2, 0)
+    threatGlowAnchor.Parent = model
+
+    local threatGlow = Instance.new("PointLight")
+    threatGlow.Name = "ThreatGlow"
+    threatGlow.Color = highlight.OutlineColor
+    threatGlow.Brightness = 6
+    threatGlow.Range = 22
+    threatGlow.Shadows = false
+    threatGlow.Parent = threatGlowAnchor
+
+    --[[
         Tap the creature to hit it.
 
         Combat used to require finding a STRIKE button while a telegraph was
