@@ -24,7 +24,7 @@ return {
                 one region" until the Delve was walked end to end in a
                 live session; it pins the new truth now.
             ]]
-            name = "the Delve, the Fen and the Reach open behind their chapters and the rest stay shut",
+            name = "the Delve, the Fen, the Reach and the Vale open behind their chapters and the rest stay shut",
             run = function()
                 TestRunner.equal(RegionAccess.evaluate("region_bramblewake", nil).allowed, true)
                 local delveEarly = RegionAccess.evaluate("region_ironroot", nil)
@@ -57,18 +57,34 @@ return {
                 }
                 local reach = RegionAccess.evaluate("region_tempest", throughThree)
                 TestRunner.equal(reach.allowed, true)
-                local vale = RegionAccess.evaluate("region_frostmere", throughThree)
-                TestRunner.equal(vale.allowed, false)
-                TestRunner.equal(vale.reason, "region_not_built")
+                -- The Vale is open now, so a profile short of chapter IV
+                -- is refused for the chapter rather than for the build.
+                local valeEarly = RegionAccess.evaluate("region_frostmere", throughThree)
+                TestRunner.equal(valeEarly.allowed, false)
+                TestRunner.equal(valeEarly.reason, "chapter_not_reached")
+                local throughFour = {
+                    chapterOne = RESOLVED_ONE.chapterOne,
+                    chapters = {
+                        chapter_four = { status = "complete", outcome = "scoured" },
+                        chapter_three = { status = "complete", outcome = "bound" },
+                        chapter_two = { status = "complete", outcome = "cleared" },
+                    },
+                }
+                local vale = RegionAccess.evaluate("region_frostmere", throughFour)
+                TestRunner.equal(vale.allowed, true)
+                local crown = RegionAccess.evaluate("region_cinderfall", throughFour)
+                TestRunner.equal(crown.allowed, false)
+                TestRunner.equal(crown.reason, "region_not_built")
                 local nowhere = RegionAccess.evaluate("region_nowhere", nil)
                 TestRunner.equal(nowhere.reason, "region_unknown")
 
-                local open = RegionAccess.available(throughThree)
-                TestRunner.equal(#open, 4)
+                local open = RegionAccess.available(throughFour)
+                TestRunner.equal(#open, 5)
                 TestRunner.equal(open[1], "region_bramblewake")
                 TestRunner.equal(open[2], "region_ironroot")
                 TestRunner.equal(open[3], "region_mireglass")
                 TestRunner.equal(open[4], "region_tempest")
+                TestRunner.equal(open[5], "region_frostmere")
 
                 TestRunner.equal(
                     RegionAccess.destinationFor("region_ironroot", RESOLVED_ONE),
@@ -172,6 +188,7 @@ return {
                     region_ironroot = true,
                     region_mireglass = true,
                     region_tempest = true,
+                    region_frostmere = true,
                 }
                 for _, region in Regions do
                     TestRunner.equal(

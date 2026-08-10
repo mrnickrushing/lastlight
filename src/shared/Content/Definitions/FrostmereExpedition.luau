@@ -695,7 +695,7 @@ local events = {
         tags = { "story", "gentle" },
         objective = Strings.get("expedition.thaw_the_letter_without_losing_it"),
         detail = Strings.get("expedition.a_letter_frozen_into_the_post"),
-        completionMessage = "THE LETTER IS READABLE — +2 WOOL",
+        completionMessage = "THE LETTER IS READABLE — +2 FROSTMERE WOOL",
         failureMessage = Strings.get("expedition.the_ink_runs_and_takes_the"),
         durationSeconds = 85,
         defaultSolution = true,
@@ -777,7 +777,7 @@ local events = {
         tags = { "quiet", "risk" },
         objective = Strings.get("expedition.take_the_hunt_without_making_a"),
         detail = Strings.get("expedition.something_is_stalking_the_same_herd"),
-        completionMessage = "THE HUNT IS YOURS — +3 WOOL",
+        completionMessage = "THE HUNT IS YOURS — +3 FROSTMERE WOOL",
         failureMessage = Strings.get("expedition.it_hears_you_first"),
         durationSeconds = 95,
         defaultSolution = true,
@@ -881,6 +881,17 @@ return table.freeze({
     }),
     RequiredModuleIds = table.freeze({
         "module_fv_howler_approach",
+    }),
+    --[[
+        The two fragment-anchored POIs place in every run, the rule the
+        Reach's walk paid for: a memory fragment whose anchor only turns
+        up some runs is a story beat demoted to a lottery ticket, and
+        four points of interest drawn from twelve is a coin flip either
+        of the Vale's two beats can lose.
+    ]]
+    FixedPointOfInterestIds = table.freeze({
+        "poi_fv_bell_without_rope",
+        "poi_fv_cold_hearth",
     }),
     FixedMiddleIds = table.freeze({
         "module_fv_snow_lane",

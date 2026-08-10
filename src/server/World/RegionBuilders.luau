@@ -77,9 +77,13 @@ local ENTRIES: { [string]: any } = {
     },
     region_frostmere = {
         builder = FrostmereBuilder,
-        walkable = false,
-        -- Mesh dressing is an art pass: authored assets, not wiring.
-        -- Everything a party needs to walk the region is built.
+        --[[
+            Walked end to end in a live session the day this flipped,
+            through the same assembly seam as the Delve, the Fen and the
+            Reach. The missing list is a note for the art pass, not a
+            gate.
+        ]]
+        walkable = true,
         missing = {
             "authored mesh dressing",
         },

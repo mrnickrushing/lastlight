@@ -4587,7 +4587,20 @@ function WorldService._buildLobby(self: WorldService, world: Model)
             RegionExpeditionAssembly.displayName(region.id),
             region.id,
             nil,
-            Vector3.new(5, 3.4, 10)
+            --[[
+                A click volume grows upward off its anchor, which is right
+                for a pedestal with the visible thing standing on it and
+                wrong for a plank that is the visible thing. At 3.4 studs
+                on a 1.55-stud pitch every volume covered its neighbour
+                and sat a stud above its own plank, so a tap aimed at the
+                words FROSTMERE VALE resolved to Cinderfall -- five of the
+                seven planks sent a player somewhere they had not asked
+                for, and the two that did not were raycast order rather
+                than correctness. 1.5 keeps each volume inside its own
+                pitch and centred within a tenth of a stud of its plank,
+                so the only thing a tap can hit is the name under it.
+            ]]
+            Vector3.new(5, 1.5, 10)
         )
     end
 

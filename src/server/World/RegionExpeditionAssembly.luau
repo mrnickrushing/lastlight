@@ -495,15 +495,26 @@ function RegionExpeditionAssembly.build(
             one mashed band from the arena's edge. Past nine anchors,
             only the names near you render.
         ]]
+        --[[
+            Two heights part a crowded ring and stop parting a dense one.
+            The Titan's eleven sit fourteen studs apart and read cleanly
+            on alternating heights; the Howler's fifteen sit nine and a
+            half studs apart, and the walk found KETTLE LINE, BELL ROPE
+            and WIND VANE stacked into one block from the bowl's edge.
+            Thirteen anchors or more get a third height and a shorter
+            reach, which leaves every ring already walked exactly as it
+            was walked.
+        ]]
         local crowded = #definition.anchors >= 10
-        local anchorLabelReach = if crowded then 26 else 40
+        local dense = #definition.anchors >= 13
+        local anchorLabelReach = if dense then 20 elseif crowded then 26 else 40
         for metaIndex, meta in definition.anchors do
             local anchorPart = anchors[meta.id]
             if anchorPart ~= nil then
-                -- Neighbors on a crowded ring alternate label heights,
-                -- because two names thirteen studs apart on one sightline
-                -- overlap at any reach that still lets you read either.
-                local labelHeight = if crowded and metaIndex % 2 == 0 then 3.4 else 5.5
+                local labelHeight = if dense
+                    then ({ 5.5, 3.4, 7.4 })[metaIndex % 3 + 1]
+                    elseif crowded and metaIndex % 2 == 0 then 3.4
+                    else 5.5
                 billboardLabel(
                     anchorPart,
                     meta.object,

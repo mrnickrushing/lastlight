@@ -48,7 +48,14 @@ return {
             -- broken is a prompt wired to nothing.
             name = "handlers and anchors cover each other in every wired region",
             run = function()
-                for _, regionId in { "region_ironroot", "region_mireglass", "region_tempest" } do
+                for _, regionId in
+                    {
+                        "region_ironroot",
+                        "region_mireglass",
+                        "region_tempest",
+                        "region_frostmere",
+                    }
+                do
                     local definitions = RegionEncounterWiring.definitionsFor(regionId)
                     TestRunner.equal(#definitions, 3, regionId .. " should wire three fights")
                     for _, definition in definitions do
@@ -301,6 +308,222 @@ return {
                 slammed.outcome = "broken"
                 TestRunner.equal(resolve(slammed).decision, "slammed_gates")
                 TestRunner.truthy(ChapterCatalog.isOutcome("chapter_four", "broken"))
+            end,
+        },
+        {
+            --[[
+                The Vale's elites both rent their windows on a clock, and
+                only one of the two states keeps a timestamp. The Silence
+                writes its bells' own expiry into the state, so its tick
+                is the module's; the Hart counts splits and times nothing,
+                so its clock lives in the wiring the way the Admiral's
+                re-rig does. Driven through the definitions' own ticks so
+                neither can ship with a window that never closes -- or
+                one that closes on the tick that opened it.
+            ]]
+            name = "the Vale's elites open their windows and the clocks close them",
+            run = function()
+                local definitions = RegionEncounterWiring.definitionsFor("region_frostmere")
+                local byId: { [string]: any } = {}
+                for _, definition in definitions do
+                    byId[definition.id] = definition
+                end
+
+                local silence = byId.elite_abbey_silence
+                local state = silence.module.create("run", "hash", true)
+                state = (drive(silence, state, "challenge"))
+                TestRunner.equal(state.status, "silent")
+                state = (drive(silence, state, "bell_cloister"))
+                TestRunner.equal(state.status, "ringing")
+                local smothered = silence.tick(state, 1000 + silence.module.BellSeconds + 1) :: any
+                TestRunner.equal(smothered.status, "silent")
+
+                local hart = byId.elite_aurora_hart
+                local hartState = hart.module.create("run", "hash", true)
+                hartState = (drive(hart, hartState, "challenge"))
+                -- the clearing starts gathered, which is what the Hart is
+                -- there to undo
+                TestRunner.equal(hartState.status, "banked")
+                -- the tick's first sight of a live fight only starts the
+                -- clock; nothing splits on the tick that opened the fight
+                TestRunner.equal(hart.tick(hartState, 2000), nil)
+                local split =
+                    hart.tick(hartState, 2000 + hart.module.Tuning.splitIntervalSeconds) :: any
+                TestRunner.equal(split.status, "split")
+                TestRunner.equal(split.splits, 1)
+
+                --[[
+                    Every accepted carry gathers, which is the whole
+                    reason the anchor is the hearth warmth leaves rather
+                    than the one it arrives at. Written the other way
+                    round this case passes its first assertion and then
+                    the fight comes apart under a player pressing the
+                    hearth they are trying to build up.
+                ]]
+                local scattered: string? = nil
+                for _, hearthId in hart.module.HearthIds do
+                    if hearthId ~= "hearth_north" and (split.hearths[hearthId] or 0) > 0 then
+                        scattered = hearthId
+                    end
+                end
+                TestRunner.truthy(scattered ~= nil, "the Hart split nothing out of the north")
+                local regathered = (drive(hart, split, scattered :: string))
+                TestRunner.equal(regathered.status, "banked")
+                TestRunner.equal(regathered.hearths[scattered :: string], 0)
+                TestRunner.equal(regathered.hearths.hearth_north, hart.module.BankedLevel)
+                -- the hearth that holds the fire is refused rather than
+                -- emptied into a cold one
+                local held, refused = drive(hart, regathered, "hearth_north")
+                TestRunner.equal(refused.accepted, false)
+                TestRunner.equal(held.hearths.hearth_north, hart.module.BankedLevel)
+                -- and so is a hearth with nothing left in it
+                local stillHeld, cold = drive(hart, regathered, scattered :: string)
+                TestRunner.equal(cold.accepted, false)
+                TestRunner.equal(stillHeld.status, "banked")
+            end,
+        },
+        {
+            --[[
+                The Howler's whole verb chain -- hush the bowl, share the
+                warmth, read the aurora in order, strike -- driven through
+                the wiring to completion three times over, because the
+                chapter's decision is made once per phase and only the
+                count of them is recorded.
+            ]]
+            name = "the Howler falls through its verbs and the warmth resolves chapter five",
+            run = function()
+                local definitions = RegionEncounterWiring.definitionsFor("region_frostmere")
+                local byId: { [string]: any } = {}
+                for _, definition in definitions do
+                    byId[definition.id] = definition
+                end
+                local howler = byId.boss_white_howler
+                TestRunner.truthy(howler.lockedUntil ~= nil, "the Howler must wait on the elites")
+
+                local state = howler.module.create("run", "hash", true)
+                TestRunner.equal(state.status, "locked")
+                state = select(1, howler.module.unlock(state))
+                state = (drive(howler, state, "challenge"))
+                TestRunner.equal(state.status, "listening")
+
+                -- our fire, then the den, then the den: two phases paid,
+                -- which is the night that went both ways
+                local warmthPlan = {
+                    { "warmth_lantern", "warmth_kettle" },
+                    { "warmth_lantern_den", "warmth_kettle" },
+                    { "warmth_lantern_den", "warmth_kettle" },
+                }
+                for phase = 1, 3 do
+                    TestRunner.equal(state.phase, phase)
+                    for _, noiseId in howler.module.NoiseIds do
+                        if state.status == "listening" then
+                            state = (drive(howler, state, noiseId))
+                        end
+                    end
+                    TestRunner.equal(state.status, "warming")
+                    for _, warmthId in warmthPlan[phase] do
+                        state = (drive(howler, state, warmthId))
+                    end
+                    TestRunner.equal(state.status, "tracking")
+                    local required = howler.module.tracksRequired(state)
+                    -- the den is paid for in marks: a phase that warmed it
+                    -- has one more of them to read
+                    TestRunner.equal(required, if phase == 1 then 2 else 3)
+                    for index = 1, required do
+                        state = (drive(howler, state, howler.module.TrackIds[index]))
+                    end
+                    TestRunner.equal(state.status, "exposed")
+                    for _ = 1, 20 do
+                        local result
+                        state, result = howler.module.strike(state, PLAYER.UserId, 45)
+                        if result.phase > phase or result.completed then
+                            break
+                        end
+                    end
+                end
+                TestRunner.equal(state.status, "complete")
+                TestRunner.equal(state.outcome, "thinned")
+
+                local resolve = assert(howler.chapterResolution, "the Howler resolves no chapter")
+                local resolution = resolve(state)
+                TestRunner.equal(resolution.chapterId, "chapter_five")
+                TestRunner.equal(resolution.decision, "split_warmth")
+                TestRunner.equal(resolution.outcome, "thinned")
+                TestRunner.truthy(ChapterCatalog.isDecision("chapter_five", resolution.decision))
+                TestRunner.truthy(ChapterCatalog.isOutcome("chapter_five", resolution.outcome))
+
+                -- and the two policies map to their own decisions
+                local kept = table.clone(state)
+                kept.denPhases = { false, false, false }
+                kept.outcome = "silenced"
+                TestRunner.equal(resolve(kept).decision, "kept_warmth")
+                TestRunner.truthy(ChapterCatalog.isDecision("chapter_five", "kept_warmth"))
+                TestRunner.truthy(ChapterCatalog.isOutcome("chapter_five", "silenced"))
+                local warmed = table.clone(state)
+                warmed.denPhases = { true, true, true }
+                warmed.outcome = "sheltered"
+                TestRunner.equal(resolve(warmed).decision, "warmed_den")
+                TestRunner.truthy(ChapterCatalog.isDecision("chapter_five", "warmed_den"))
+                TestRunner.truthy(ChapterCatalog.isOutcome("chapter_five", "sheltered"))
+            end,
+        },
+        {
+            --[[
+                A lost trail is the one branch in the Vale where the next
+                instruction is a lie by omission. The module sends the
+                phase back to the noise, so the generic wrapper would
+                answer a party that had just hushed the bowl and spent
+                its warmth with "QUIET THE BOWL -- 0 OF 3" and no reason.
+                The walk read exactly that and could not tell a reset
+                from a press that did nothing.
+            ]]
+            name = "a misread aurora mark says so instead of reading as a fresh phase",
+            run = function()
+                local definitions = RegionEncounterWiring.definitionsFor("region_frostmere")
+                local howler
+                for _, definition in definitions do
+                    if definition.id == "boss_white_howler" then
+                        howler = definition
+                    end
+                end
+                local state = howler.module.create("run", "hash", true)
+                state = select(1, howler.module.unlock(state))
+                state = (drive(howler, state, "challenge"))
+                for _, noiseId in howler.module.NoiseIds do
+                    if state.status == "listening" then
+                        state = (drive(howler, state, noiseId))
+                    end
+                end
+                state = (drive(howler, state, "warmth_lantern"))
+                state = (drive(howler, state, "warmth_kettle"))
+                TestRunner.equal(state.status, "tracking")
+                local expected = howler.module.TrackIds[1]
+                local wrong = howler.module.TrackIds[#howler.module.TrackIds]
+                TestRunner.truthy(wrong ~= expected, "the Vale needs more than one aurora mark")
+                local lost, result = drive(howler, state, wrong)
+                TestRunner.equal(result.accepted, false)
+                TestRunner.equal(lost.status, "listening")
+                local reset = howler.module.snapshot(lost, PLAYER.UserId, 1000).instruction
+                TestRunner.truthy(
+                    result.message ~= reset,
+                    "a lost trail answered with the phase's opening instruction"
+                )
+                -- and the marks carry the aurora's own order, because the
+                -- fight is lost by guessing at an order nothing states
+                local names = {}
+                for _, entry in howler.anchors do
+                    names[entry.id] = entry.object
+                end
+                for index, trackId in howler.module.TrackIds do
+                    TestRunner.truthy(
+                        names[trackId] ~= nil and #names[trackId] > 0,
+                        trackId .. " has no name"
+                    )
+                    TestRunner.truthy(
+                        names[trackId] ~= names[howler.module.TrackIds[1]] or index == 1,
+                        "two aurora marks share a name"
+                    )
+                end
             end,
         },
     },

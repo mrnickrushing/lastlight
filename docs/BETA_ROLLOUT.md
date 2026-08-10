@@ -85,7 +85,7 @@ same commit.
 | `region_ironroot_enabled` | `everyone` | 100 | walked end to end in a live session before it opened |
 | `region_mireglass_enabled` | `everyone` | 100 | walked end to end in a live session before it opened |
 | `region_tempest_enabled` | `everyone` | 100 | walked end to end in a live session before it opened |
-| `region_frostmere_enabled` | `off` | 0 | owner-gated: as above |
+| `region_frostmere_enabled` | `everyone` | 100 | walked end to end in a live session before it opened |
 | `region_cinderfall_enabled` | `off` | 0 | owner-gated: as above |
 | `region_hollow_enabled` | `off` | 0 | owner-gated: as above |
 | `quick_chat_enabled` | `everyone` | 100 | shipped; a closed vocabulary, so the flag is a withdrawal switch |

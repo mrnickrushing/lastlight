@@ -382,16 +382,24 @@ function AnalyticsService.expeditionStarted(self: AnalyticsService, player: Play
     end
     self._expeditionStarted[player] = true
 
+    --[[
+        The region is the run's own, not a constant. It was written the
+        day Bramblewake was the only region anybody could reach, and it
+        stayed a literal through four openings -- so a Frostmere run was
+        logged as a Bramblewake run, and every count grouped by region
+        would have said the same thing however many roads opened. The
+        platform event carried the same claim in its name.
+    ]]
     self._logger:info("expedition_started", {
         hash = snapshot.manifestHash,
         player = player.UserId,
-        region = "region_bramblewake",
+        region = snapshot.regionId,
         seed = snapshot.seed,
         source = snapshot.source,
     })
     if not RunService:IsStudio() then
         pcall(function()
-            RobloxAnalytics:LogCustomEvent(player, "BramblewakeExpeditionStarted", 1, {})
+            RobloxAnalytics:LogCustomEvent(player, "ExpeditionStarted", 1, {})
         end)
     end
 end

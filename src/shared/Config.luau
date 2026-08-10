@@ -234,7 +234,7 @@ return table.freeze({
         region_ironroot_enabled = true,
         region_mireglass_enabled = true,
         region_tempest_enabled = true,
-        region_frostmere_enabled = false,
+        region_frostmere_enabled = true,
         region_cinderfall_enabled = false,
         region_hollow_enabled = false,
         --[[
@@ -304,7 +304,7 @@ return table.freeze({
         region_ironroot_enabled = table.freeze({ stage = "everyone", percent = 100 }),
         region_mireglass_enabled = table.freeze({ stage = "everyone", percent = 100 }),
         region_tempest_enabled = table.freeze({ stage = "everyone", percent = 100 }),
-        region_frostmere_enabled = table.freeze({ stage = "off", percent = 0 }),
+        region_frostmere_enabled = table.freeze({ stage = "everyone", percent = 100 }),
         region_cinderfall_enabled = table.freeze({ stage = "off", percent = 0 }),
         region_hollow_enabled = table.freeze({ stage = "off", percent = 0 }),
         quick_chat_enabled = table.freeze({ stage = "everyone", percent = 100 }),
