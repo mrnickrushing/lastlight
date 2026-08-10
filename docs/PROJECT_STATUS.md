@@ -7,7 +7,7 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-10, at `main` = PR #371, build `0.53.1`,
+Last updated: 2026-08-10, at `main` = PR #372, build `0.53.1`,
 save schema 25, 27 services. Published to Roblox as place version 163;
 `0.53.1` is a source-only owner-playtest fix pass and has not been published.
 (#364 added only documentation over v162, and #361/#362 only
