@@ -86,7 +86,7 @@ if [[ -z "${WINEPREFIX:-}" || ! -d "${WINEPREFIX:-}/drive_c" ]]; then
 fi
 export WINEPREFIX
 
-command -v "$wine_bin" >/dev/null 2>&1 \
+[[ -x "$wine_bin" ]] || command -v "$wine_bin" >/dev/null 2>&1 \
     || die "'$wine_bin' is not on PATH. Set WINE_BIN." \
            "Vinegar's own Flatpak runtime does not export a wine binary; this needs" \
            "a host Wine (Debian/Kali: apt install wine)."
@@ -146,6 +146,30 @@ if [[ -z "${STUDIO_MCP_BAT:-}" || ! -f "$STUDIO_MCP_BAT" ]]; then
         "WINEPREFIX alone does not pick between them."
 fi
 
+# Roblox currently writes the exact StudioMCP.exe for the running Studio
+# version into the first `if exist` branch of mcp.bat. Prefer that executable
+# when it can be resolved. Wine's cmd.exe has a real compatibility edge here:
+# `cd /d "Z:\..."` reports "Path not found" for this redirected Vinegar path,
+# even though an unquoted cd and direct execution of the same file both work.
+# Launching the executable named by Roblox also avoids Wine's batch parser
+# emitting `Syntax error: unexpected ELSE` after the MCP process exits.
+studio_mcp_exe=""
+studio_mcp_exe_win="$(
+    sed -n 's/^[[:space:]]*if exist "\([^"]*StudioMCP\.exe\)".*/\1/p' \
+        "$STUDIO_MCP_BAT" | head -n 1
+)"
+if [[ -n "$studio_mcp_exe_win" ]]; then
+    if command -v winepath >/dev/null 2>&1; then
+        studio_mcp_exe="$(winepath -u "$studio_mcp_exe_win" 2>>"$log" | tr -d '\r\n' || true)"
+    elif [[ "$studio_mcp_exe_win" =~ ^[Zz]:\\ ]]; then
+        studio_mcp_exe="/${studio_mcp_exe_win:3}"
+        studio_mcp_exe="${studio_mcp_exe//\\//}"
+    fi
+fi
+if [[ -n "$studio_mcp_exe" && ! -f "$studio_mcp_exe" ]]; then
+    studio_mcp_exe=""
+fi
+
 # --- Host path to Windows path -------------------------------------------
 #
 # winepath is authoritative and ships with Wine. The fallback is the same
@@ -168,8 +192,13 @@ fi
     echo "--- studio-mcp-wrapper $(date -Is)"
     echo "    WINEPREFIX=$WINEPREFIX"
     echo "    STUDIO_MCP_BAT=$STUDIO_MCP_BAT"
+    echo "    STUDIO_MCP_EXE=${studio_mcp_exe:-<batch fallback>}"
     echo "    win_dir=$win_dir"
 } >>"$log" 2>/dev/null || true
+
+if [[ -n "$studio_mcp_exe" ]]; then
+    exec "$wine_bin" "$studio_mcp_exe" "$@" 2>>"$log"
+fi
 
 # `cd /d` first because mcp.bat resolves what it launches relative to its own
 # directory. stdout stays untouched: it is the JSON-RPC stream.
