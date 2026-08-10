@@ -10,12 +10,19 @@ it cannot be written in a player's language either. Patch notes in a
 player's language are still the owner's, and QA_RELEASE_PLAN.md's
 checklist says so.
 
-364 merged pull requests. The version column is blank where the
+371 merged pull requests. The version column is blank where the
 handoff did not record one, which is most of the history before it began
 publishing a place per wave.
 
 | PR | Merged | Place | Title |
 |---|---|---|---|
+| #372 | 2026-08-09 |  | Record Frostmere delivery |
+| #371 | 2026-08-09 | v164 | Open Frostmere Vale after live walk |
+| #370 | 2026-08-09 |  | Fix Studio MCP launch under Vinegar |
+| #369 | 2026-08-09 |  | Point the Studio wrapper at mcp.bat, where mcp.bat actually is |
+| #368 | 2026-08-09 |  | Merge pull request #368 from mrnickrushing/claude/repo-docs-review-7iw0vr |
+| #367 | 2026-08-09 |  | Open Tempest Reach: chapter IV walked live, three defects fixed in the walk's own PR |
+| #366 | 2026-08-08 |  | Record the Fen's opening beside the Delve's |
 | #365 | 2026-08-08 | v163 | Open the Mireglass Fen, walked live through the seam the Delve built |
 | #364 | 2026-08-08 |  | Record the Delve's opening in the handoff, wave plan and runbook |
 | #363 | 2026-08-08 | v162 | Open the Ironroot Delve: the region assembly seam, walked live end to end |
