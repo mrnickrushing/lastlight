@@ -5132,7 +5132,7 @@ return table.freeze({
         region_ironroot_enabled = true,
         region_mireglass_enabled = true,
         region_tempest_enabled = true,
-        region_frostmere_enabled = false,
+        region_frostmere_enabled = true,
         region_cinderfall_enabled = false,
         region_hollow_enabled = false,
         --[[
@@ -5202,7 +5202,7 @@ return table.freeze({
         region_ironroot_enabled = table.freeze({ stage = "everyone", percent = 100 }),
         region_mireglass_enabled = table.freeze({ stage = "everyone", percent = 100 }),
         region_tempest_enabled = table.freeze({ stage = "everyone", percent = 100 }),
-        region_frostmere_enabled = table.freeze({ stage = "off", percent = 0 }),
+        region_frostmere_enabled = table.freeze({ stage = "everyone", percent = 100 }),
         region_cinderfall_enabled = table.freeze({ stage = "off", percent = 0 }),
         region_hollow_enabled = table.freeze({ stage = "off", percent = 0 }),
         quick_chat_enabled = table.freeze({ stage = "everyone", percent = 100 }),
@@ -8464,7 +8464,7 @@ local events = {
         tags = { "story", "gentle" },
         objective = Strings.get("expedition.thaw_the_letter_without_losing_it"),
         detail = Strings.get("expedition.a_letter_frozen_into_the_post"),
-        completionMessage = "THE LETTER IS READABLE — +2 WOOL",
+        completionMessage = "THE LETTER IS READABLE — +2 FROSTMERE WOOL",
         failureMessage = Strings.get("expedition.the_ink_runs_and_takes_the"),
         durationSeconds = 85,
         defaultSolution = true,
@@ -8546,7 +8546,7 @@ local events = {
         tags = { "quiet", "risk" },
         objective = Strings.get("expedition.take_the_hunt_without_making_a"),
         detail = Strings.get("expedition.something_is_stalking_the_same_herd"),
-        completionMessage = "THE HUNT IS YOURS — +3 WOOL",
+        completionMessage = "THE HUNT IS YOURS — +3 FROSTMERE WOOL",
         failureMessage = Strings.get("expedition.it_hears_you_first"),
         durationSeconds = 95,
         defaultSolution = true,
@@ -8650,6 +8650,17 @@ return table.freeze({
     }),
     RequiredModuleIds = table.freeze({
         "module_fv_howler_approach",
+    }),
+    --[[
+        The two fragment-anchored POIs place in every run, the rule the
+        Reach's walk paid for: a memory fragment whose anchor only turns
+        up some runs is a story beat demoted to a lottery ticket, and
+        four points of interest drawn from twelve is a coin flip either
+        of the Vale's two beats can lose.
+    ]]
+    FixedPointOfInterestIds = table.freeze({
+        "poi_fv_bell_without_rope",
+        "poi_fv_cold_hearth",
     }),
     FixedMiddleIds = table.freeze({
         "module_fv_snow_lane",
@@ -10841,7 +10852,7 @@ local regions = {
         id = "region_frostmere",
         kind = "region",
         version = 1,
-        enabled = false,
+        enabled = true,
         displayNameKey = "content.region.frostmere.name",
         analyticsKey = "region_frostmere",
         assetBundle = "region_frostmere_v1",
@@ -30362,7 +30373,9 @@ return table.freeze(RegionAccess)
     text would drift from the first.
 ]]
 
+local AbbeySilenceEncounter = require("./AbbeySilenceEncounter")
 local AdmiralWreckEncounter = require("./AdmiralWreckEncounter")
+local AuroraHartEncounter = require("./AuroraHartEncounter")
 local BellowsMawEncounter = require("./BellowsMawEncounter")
 local DrownedCallerEncounter = require("./DrownedCallerEncounter")
 local ForemanEchoEncounter = require("./ForemanEchoEncounter")
@@ -30372,6 +30385,7 @@ local LighthouseEaterEncounter = require("./LighthouseEaterEncounter")
 local ManyFaceEncounter = require("./ManyFaceEncounter")
 local Strings = require("./Strings")
 local TideboundTitanEncounter = require("./TideboundTitanEncounter")
+local WhiteHowlerEncounter = require("./WhiteHowlerEncounter")
 
 local RegionEncounterWiring = {}
 
@@ -31033,6 +31047,283 @@ function RegionEncounterWiring.definitionsFor(regionId: string): { Definition }
                         else "mixed_gates"
                     return {
                         chapterId = "chapter_four",
+                        decision = decision,
+                        outcome = tostring(state.outcome),
+                    }
+                end,
+            },
+        }
+    elseif regionId == "region_frostmere" then
+        local silenceInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(AbbeySilenceEncounter),
+        }
+        local silenceAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.abbey_silence")
+            ),
+        }
+        local bellObjects: { [string]: string } = {
+            bell_cloister = Strings.get("encounter.cloister_bell"),
+            bell_refectory = Strings.get("encounter.refectory_bell"),
+            bell_stair = Strings.get("encounter.stair_bell"),
+        }
+        for _, bellId in AbbeySilenceEncounter.BellIds do
+            table.insert(
+                silenceAnchors,
+                anchor(bellId, Strings.get("encounter.toll"), bellObjects[bellId])
+            )
+            silenceInteractions[bellId] = verb(
+                AbbeySilenceEncounter,
+                function(state: any, userId: number, now: number): (any, any)
+                    return AbbeySilenceEncounter.ringBell(state, userId, bellId, now)
+                end
+            )
+        end
+
+        local hartInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(AuroraHartEncounter),
+        }
+        local hartAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.aurora_hart")
+            ),
+        }
+        local hearthObjects: { [string]: string } = {
+            hearth_north = Strings.get("encounter.north_embers"),
+            hearth_east = Strings.get("encounter.east_embers"),
+            hearth_south = Strings.get("encounter.south_embers"),
+            hearth_west = Strings.get("encounter.west_embers"),
+        }
+        --[[
+            The module's verb names both ends of the carry and an anchor
+            names one, so the wiring finds the other -- and the anchor has
+            to be the end warmth *leaves*, with the hottest hearth always
+            the end it arrives at. Anchored the other way round, touching
+            a cold hearth pulls an ember back out of the banked one, so
+            the press that reads most like pursuing the fight's goal is
+            the press that undoes it. This way every accepted carry
+            gathers, and touching the hearth that already holds the fire
+            is refused by the module as the same hearth, which is the
+            true answer rather than a wiring branch.
+        ]]
+        for _, hearthId in AuroraHartEncounter.HearthIds do
+            table.insert(
+                hartAnchors,
+                anchor(hearthId, Strings.get("world.gather"), hearthObjects[hearthId])
+            )
+            hartInteractions[hearthId] = verb(
+                AuroraHartEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    local hottest = AuroraHartEncounter.HearthIds[1]
+                    for _, candidate in AuroraHartEncounter.HearthIds do
+                        if (state.hearths[candidate] or 0) > (state.hearths[hottest] or 0) then
+                            hottest = candidate
+                        end
+                    end
+                    return AuroraHartEncounter.carryEmber(state, userId, hearthId, hottest)
+                end
+            )
+        end
+        --[[
+            The Hart divides the clearing on its own clock and the state
+            counts splits without timing them, so the cadence lives here
+            the way the Admiral's re-rig does. Its first sight of a live
+            fight only starts the clock; nothing splits on the tick that
+            opened the fight.
+        ]]
+        local nextSplitAt: number? = nil
+        local function hartTick(state: any, now: number): any?
+            if state.status ~= "split" and state.status ~= "banked" then
+                nextSplitAt = nil
+                return nil
+            end
+            if nextSplitAt == nil or now < nextSplitAt then
+                if nextSplitAt == nil then
+                    nextSplitAt = now + AuroraHartEncounter.Tuning.splitIntervalSeconds
+                end
+                return nil
+            end
+            nextSplitAt = now + AuroraHartEncounter.Tuning.splitIntervalSeconds
+            local nextState = AuroraHartEncounter.split(state)
+            return if nextState == state then nil else nextState
+        end
+
+        local howlerInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(WhiteHowlerEncounter),
+        }
+        local howlerAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.white_howler")
+            ),
+        }
+        local noiseObjects: { [string]: string } = {
+            noise_bell_rope = Strings.get("encounter.bell_rope"),
+            noise_kettle_line = Strings.get("encounter.kettle_line"),
+            noise_wind_vane = Strings.get("encounter.wind_vane"),
+            noise_kennel_gate = Strings.get("encounter.kennel_gate"),
+        }
+        for _, noiseId in WhiteHowlerEncounter.NoiseIds do
+            table.insert(
+                howlerAnchors,
+                anchor(noiseId, Strings.get("encounter.hush"), noiseObjects[noiseId])
+            )
+            howlerInteractions[noiseId] = verb(
+                WhiteHowlerEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return WhiteHowlerEncounter.hush(state, userId, noiseId)
+                end
+            )
+        end
+        --[[
+            The chapter's decision, and like the Titan's gates it is two
+            anchors rather than a menu on one. The Reach left both of its
+            anchors carrying the same name, which the walk recorded as an
+            authoring question; here each destination is written into the
+            name, because where the warmth went is the whole decision and
+            a player should be able to read it off the post they are
+            standing at.
+        ]]
+        local warmthFireObjects: { [string]: string } = {
+            warmth_lantern = Strings.get("encounter.lantern_to_our_fire"),
+            warmth_kettle = Strings.get("encounter.kettle_to_our_fire"),
+            warmth_coat = Strings.get("encounter.coat_to_our_fire"),
+        }
+        local warmthDenObjects: { [string]: string } = {
+            warmth_lantern = Strings.get("encounter.lantern_to_the_den"),
+            warmth_kettle = Strings.get("encounter.kettle_to_the_den"),
+            warmth_coat = Strings.get("encounter.coat_to_the_den"),
+        }
+        for _, warmthId in WhiteHowlerEncounter.WarmthIds do
+            table.insert(
+                howlerAnchors,
+                anchor(warmthId, Strings.get("encounter.share"), warmthFireObjects[warmthId])
+            )
+            howlerInteractions[warmthId] = verb(
+                WhiteHowlerEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return WhiteHowlerEncounter.shareWarmth(state, userId, warmthId, false)
+                end
+            )
+            local denId = warmthId .. "_den"
+            table.insert(
+                howlerAnchors,
+                anchor(denId, Strings.get("encounter.carry_up"), warmthDenObjects[warmthId])
+            )
+            howlerInteractions[denId] = verb(
+                WhiteHowlerEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return WhiteHowlerEncounter.shareWarmth(state, userId, warmthId, true)
+                end
+            )
+        end
+        --[[
+            The aurora's own order, written on the marks.
+
+            The module reads them in a fixed order and a wrong one loses
+            the trail, which sends the phase back to the noise -- and the
+            instruction never names which mark is next, so the first read
+            of a walk is a one-in-four guess that throws away every hush
+            and every warmth already spent. That is not the fight the
+            module describes: "only the light over the ridge shows where"
+            means the aurora *tells* you, so it tells you here. What the
+            phase still costs is getting quiet, spending the warmth, and
+            reading four marks under a whiteout while the clock runs.
+        ]]
+        local trackObjects: { [string]: string } = {
+            track_ridge = Strings.get("encounter.first_mark_ridge"),
+            track_bowl = Strings.get("encounter.second_mark_bowl"),
+            track_stair = Strings.get("encounter.third_mark_stair"),
+            track_cairn = Strings.get("encounter.fourth_mark_cairn"),
+        }
+        for _, trackId in WhiteHowlerEncounter.TrackIds do
+            table.insert(
+                howlerAnchors,
+                anchor(trackId, Strings.get("encounter.trace"), trackObjects[trackId])
+            )
+            howlerInteractions[trackId] = function(state: any, player: any, now: number): (any, any)
+                local nextState, result =
+                    WhiteHowlerEncounter.followTrack(state, player.UserId, trackId)
+                --[[
+                    A lost trail is the one branch in this region where
+                    the next instruction is a lie by omission: it reads
+                    "QUIET THE BOWL -- 0 OF 3" and a party that just did
+                    all of that is told nothing happened. The loss gets
+                    its own line, the way the Titan's already-worked gate
+                    does.
+                ]]
+                if type(result) == "table" and result.lost == true then
+                    return nextState,
+                        {
+                            accepted = false,
+                            completed = false,
+                            message = Strings.get("encounter.the_trail_is_lost_the_bowl"),
+                        }
+                end
+                return nextState,
+                    {
+                        accepted = if type(result) == "table" then result.accepted else false,
+                        completed = false,
+                        message = instructionOf(
+                            WhiteHowlerEncounter,
+                            nextState,
+                            player.UserId,
+                            now
+                        ),
+                    }
+            end
+        end
+
+        return {
+            {
+                id = AbbeySilenceEncounter.Id,
+                regionId = regionId,
+                module = AbbeySilenceEncounter,
+                anchors = silenceAnchors,
+                interactions = silenceInteractions,
+                tick = AbbeySilenceEncounter.expire,
+            },
+            {
+                id = AuroraHartEncounter.Id,
+                regionId = regionId,
+                module = AuroraHartEncounter,
+                anchors = hartAnchors,
+                interactions = hartInteractions,
+                tick = hartTick,
+            },
+            {
+                id = WhiteHowlerEncounter.Id,
+                regionId = regionId,
+                module = WhiteHowlerEncounter,
+                anchors = howlerAnchors,
+                interactions = howlerInteractions,
+                lockedUntil = { AbbeySilenceEncounter.Id, AuroraHartEncounter.Id },
+                chapterResolution = function(state: any)
+                    --[[
+                        Warmth carried to the den is the only thing the
+                        fight records about the decision, so the decision
+                        reads off the same count the outcome does: every
+                        phase paid is a party that chose the pups over
+                        itself, none is a party that kept its fire, and
+                        the middle is the night that went both ways.
+                    ]]
+                    local dens = 0
+                    for _, warmed in state.denPhases do
+                        if warmed then
+                            dens += 1
+                        end
+                    end
+                    local decision = if dens >= #state.denPhases
+                        then "warmed_den"
+                        elseif dens == 0 then "kept_warmth"
+                        else "split_warmth"
+                    return {
+                        chapterId = "chapter_five",
                         decision = decision,
                         outcome = tostring(state.outcome),
                     }
@@ -36820,7 +37111,7 @@ local SOURCE: { [string]: string } = {
     ["tutorial.this_memory_is_not_yet_yours"] = "THIS MEMORY IS NOT YET YOURS TO READ",
     ["tutorial.the_memory_slips_away_try_again"] = "THE MEMORY SLIPS AWAY — TRY AGAIN",
     ["tutorial.already_harvested"] = "ALREADY HARVESTED",
-    ["tutorial.only_out_in_bramblewake"] = "ONLY OUT IN BRAMBLEWAKE",
+    ["tutorial.only_out_on_the_road"] = "ONLY OUT ON THE ROAD",
     ["tutorial.finish_first_light_to_craft"] = "FINISH FIRST LIGHT TO CRAFT",
     ["tutorial.not_enough_materials"] = "NOT ENOUGH MATERIALS",
     ["tutorial.crafting_unavailable"] = "CRAFTING UNAVAILABLE",
@@ -36883,7 +37174,6 @@ local SOURCE: { [string]: string } = {
     ["tutorial.cleanse_old_growth"] = "CLEANSE OLD GROWTH",
     ["tutorial.face_the_warden_stag"] = "FACE THE WARDEN STAG",
     ["tutorial.cast_your_vote"] = "CAST YOUR VOTE",
-    ["tutorial.bramblewake"] = "BRAMBLEWAKE",
     ["tutorial.bank_rewards_at_the_wayhome_gate"] = "BANK REWARDS AT THE WAYHOME GATE",
     ["tutorial.follow_the_foxfire_trail"] = "FOLLOW THE FOXFIRE TRAIL",
     ["tutorial.the_roots_remember_every_traveler_who"] = "The roots remember every traveler who walked out. Stay on the amber path and they remember me kindly.",
@@ -37079,6 +37369,33 @@ local SOURCE: { [string]: string } = {
     ["encounter.north_tide_gate"] = "NORTH TIDE GATE",
     ["encounter.south_tide_gate"] = "SOUTH TIDE GATE",
     ["encounter.this_gate_is_worked_the_tide"] = "THIS GATE IS ALREADY WORKED — THE TIDE ANSWERS ONCE A PHASE",
+    ["encounter.toll"] = "TOLL",
+    ["encounter.hush"] = "HUSH",
+    ["encounter.share"] = "SHARE",
+    ["encounter.carry_up"] = "CARRY UP",
+    ["encounter.trace"] = "TRACE",
+    ["encounter.cloister_bell"] = "CLOISTER BELL",
+    ["encounter.refectory_bell"] = "REFECTORY BELL",
+    ["encounter.stair_bell"] = "STAIR BELL",
+    ["encounter.north_embers"] = "NORTH EMBERS",
+    ["encounter.east_embers"] = "EAST EMBERS",
+    ["encounter.south_embers"] = "SOUTH EMBERS",
+    ["encounter.west_embers"] = "WEST EMBERS",
+    ["encounter.bell_rope"] = "BELL ROPE",
+    ["encounter.kettle_line"] = "KETTLE LINE",
+    ["encounter.wind_vane"] = "WIND VANE",
+    ["encounter.kennel_gate"] = "KENNEL GATE",
+    ["encounter.lantern_to_our_fire"] = "LANTERN · OUR FIRE",
+    ["encounter.kettle_to_our_fire"] = "KETTLE · OUR FIRE",
+    ["encounter.coat_to_our_fire"] = "COAT · OUR FIRE",
+    ["encounter.lantern_to_the_den"] = "LANTERN · THE DEN",
+    ["encounter.kettle_to_the_den"] = "KETTLE · THE DEN",
+    ["encounter.coat_to_the_den"] = "COAT · THE DEN",
+    ["encounter.first_mark_ridge"] = "FIRST MARK · RIDGE",
+    ["encounter.second_mark_bowl"] = "SECOND MARK · BOWL",
+    ["encounter.third_mark_stair"] = "THIRD MARK · STAIR",
+    ["encounter.fourth_mark_cairn"] = "FOURTH MARK · CAIRN",
+    ["encounter.the_trail_is_lost_the_bowl"] = "THE TRAIL IS LOST — THE BOWL WAKES BEHIND YOU",
     ["encounter.north_signal_lever"] = "NORTH SIGNAL LEVER",
     ["encounter.shaft_signal_lever"] = "SHAFT SIGNAL LEVER",
     ["encounter.south_signal_lever"] = "SOUTH SIGNAL LEVER",
@@ -45107,16 +45424,24 @@ function AnalyticsService.expeditionStarted(self: AnalyticsService, player: Play
     end
     self._expeditionStarted[player] = true
 
+    --[[
+        The region is the run's own, not a constant. It was written the
+        day Bramblewake was the only region anybody could reach, and it
+        stayed a literal through four openings -- so a Frostmere run was
+        logged as a Bramblewake run, and every count grouped by region
+        would have said the same thing however many roads opened. The
+        platform event carried the same claim in its name.
+    ]]
     self._logger:info("expedition_started", {
         hash = snapshot.manifestHash,
         player = player.UserId,
-        region = "region_bramblewake",
+        region = snapshot.regionId,
         seed = snapshot.seed,
         source = snapshot.source,
     })
     if not RunService:IsStudio() then
         pcall(function()
-            RobloxAnalytics:LogCustomEvent(player, "BramblewakeExpeditionStarted", 1, {})
+            RobloxAnalytics:LogCustomEvent(player, "ExpeditionStarted", 1, {})
         end)
     end
 end
@@ -51102,6 +51427,14 @@ function ExpeditionService.snapshot(self: ExpeditionService, player: Player): an
     local eventDefinition = if snapshot.eventId == nil
         then nil
         else self._generator.eventDefinition(snapshot.eventId)
+    --[[
+        Which region this run is in. Carried because the HUD's own trail
+        card named Bramblewake for every run in every region, and a card
+        that reads BRAMBLEWAKE while a player is standing in the Vale is
+        the Blackout card's cross-region bleed one seam deeper: the name
+        was never a fact about the run, it was a constant.
+    ]]
+    snapshot.regionId = self._regionId
     snapshot.moduleName = moduleDefinition.displayName
     snapshot.pointOfInterestName = if poiDefinition == nil then nil else poiDefinition.displayName
     -- Carried so the point of interest can say something specific to itself.
@@ -62773,7 +63106,7 @@ function TutorialService._interact(
             return
         end
         if player:GetAttribute("LastLightInExpedition") ~= true then
-            self:_setToast(player, Strings.get("tutorial.only_out_in_bramblewake"))
+            self:_setToast(player, Strings.get("tutorial.only_out_on_the_road"))
             self:_publish(player)
             return
         end
@@ -63954,7 +64287,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
     local trailName = Strings.get("hud.first_light")
     local expedition = self._expeditionService:snapshot(player)
     if expedition.active then
-        trailName = Strings.get("tutorial.bramblewake")
+        trailName = RegionExpeditionAssembly.displayName(expedition.regionId)
         progress = expedition.moduleIndex
         total = expedition.moduleTotal
         objective = if expedition.moduleIndex == expedition.moduleTotal
@@ -69781,7 +70114,20 @@ function WorldService._buildLobby(self: WorldService, world: Model)
             RegionExpeditionAssembly.displayName(region.id),
             region.id,
             nil,
-            Vector3.new(5, 3.4, 10)
+            --[[
+                A click volume grows upward off its anchor, which is right
+                for a pedestal with the visible thing standing on it and
+                wrong for a plank that is the visible thing. At 3.4 studs
+                on a 1.55-stud pitch every volume covered its neighbour
+                and sat a stud above its own plank, so a tap aimed at the
+                words FROSTMERE VALE resolved to Cinderfall -- five of the
+                seven planks sent a player somewhere they had not asked
+                for, and the two that did not were raycast order rather
+                than correctness. 1.5 keeps each volume inside its own
+                pitch and centred within a tenth of a stud of its plank,
+                so the only thing a tap can hit is the name under it.
+            ]]
+            Vector3.new(5, 1.5, 10)
         )
     end
 
@@ -92651,9 +92997,13 @@ local ENTRIES: { [string]: any } = {
     },
     region_frostmere = {
         builder = FrostmereBuilder,
-        walkable = false,
-        -- Mesh dressing is an art pass: authored assets, not wiring.
-        -- Everything a party needs to walk the region is built.
+        --[[
+            Walked end to end in a live session the day this flipped,
+            through the same assembly seam as the Delve, the Fen and the
+            Reach. The missing list is a note for the art pass, not a
+            gate.
+        ]]
+        walkable = true,
         missing = {
             "authored mesh dressing",
         },
@@ -93855,15 +94205,26 @@ function RegionExpeditionAssembly.build(
             one mashed band from the arena's edge. Past nine anchors,
             only the names near you render.
         ]]
+        --[[
+            Two heights part a crowded ring and stop parting a dense one.
+            The Titan's eleven sit fourteen studs apart and read cleanly
+            on alternating heights; the Howler's fifteen sit nine and a
+            half studs apart, and the walk found KETTLE LINE, BELL ROPE
+            and WIND VANE stacked into one block from the bowl's edge.
+            Thirteen anchors or more get a third height and a shorter
+            reach, which leaves every ring already walked exactly as it
+            was walked.
+        ]]
         local crowded = #definition.anchors >= 10
-        local anchorLabelReach = if crowded then 26 else 40
+        local dense = #definition.anchors >= 13
+        local anchorLabelReach = if dense then 20 elseif crowded then 26 else 40
         for metaIndex, meta in definition.anchors do
             local anchorPart = anchors[meta.id]
             if anchorPart ~= nil then
-                -- Neighbors on a crowded ring alternate label heights,
-                -- because two names thirteen studs apart on one sightline
-                -- overlap at any reach that still lets you read either.
-                local labelHeight = if crowded and metaIndex % 2 == 0 then 3.4 else 5.5
+                local labelHeight = if dense
+                    then ({ 5.5, 3.4, 7.4 })[metaIndex % 3 + 1]
+                    elseif crowded and metaIndex % 2 == 0 then 3.4
+                    else 5.5
                 billboardLabel(
                     anchorPart,
                     meta.object,

@@ -1034,6 +1034,14 @@ function ExpeditionService.snapshot(self: ExpeditionService, player: Player): an
     local eventDefinition = if snapshot.eventId == nil
         then nil
         else self._generator.eventDefinition(snapshot.eventId)
+    --[[
+        Which region this run is in. Carried because the HUD's own trail
+        card named Bramblewake for every run in every region, and a card
+        that reads BRAMBLEWAKE while a player is standing in the Vale is
+        the Blackout card's cross-region bleed one seam deeper: the name
+        was never a fact about the run, it was a constant.
+    ]]
+    snapshot.regionId = self._regionId
     snapshot.moduleName = moduleDefinition.displayName
     snapshot.pointOfInterestName = if poiDefinition == nil then nil else poiDefinition.displayName
     -- Carried so the point of interest can say something specific to itself.

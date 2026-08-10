@@ -1237,7 +1237,7 @@ function TutorialService._interact(
             return
         end
         if player:GetAttribute("LastLightInExpedition") ~= true then
-            self:_setToast(player, Strings.get("tutorial.only_out_in_bramblewake"))
+            self:_setToast(player, Strings.get("tutorial.only_out_on_the_road"))
             self:_publish(player)
             return
         end
@@ -2418,7 +2418,7 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
     local trailName = Strings.get("hud.first_light")
     local expedition = self._expeditionService:snapshot(player)
     if expedition.active then
-        trailName = Strings.get("tutorial.bramblewake")
+        trailName = RegionExpeditionAssembly.displayName(expedition.regionId)
         progress = expedition.moduleIndex
         total = expedition.moduleTotal
         objective = if expedition.moduleIndex == expedition.moduleTotal

@@ -19,7 +19,9 @@
     text would drift from the first.
 ]]
 
+local AbbeySilenceEncounter = require("./AbbeySilenceEncounter")
 local AdmiralWreckEncounter = require("./AdmiralWreckEncounter")
+local AuroraHartEncounter = require("./AuroraHartEncounter")
 local BellowsMawEncounter = require("./BellowsMawEncounter")
 local DrownedCallerEncounter = require("./DrownedCallerEncounter")
 local ForemanEchoEncounter = require("./ForemanEchoEncounter")
@@ -29,6 +31,7 @@ local LighthouseEaterEncounter = require("./LighthouseEaterEncounter")
 local ManyFaceEncounter = require("./ManyFaceEncounter")
 local Strings = require("./Strings")
 local TideboundTitanEncounter = require("./TideboundTitanEncounter")
+local WhiteHowlerEncounter = require("./WhiteHowlerEncounter")
 
 local RegionEncounterWiring = {}
 
@@ -690,6 +693,283 @@ function RegionEncounterWiring.definitionsFor(regionId: string): { Definition }
                         else "mixed_gates"
                     return {
                         chapterId = "chapter_four",
+                        decision = decision,
+                        outcome = tostring(state.outcome),
+                    }
+                end,
+            },
+        }
+    elseif regionId == "region_frostmere" then
+        local silenceInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(AbbeySilenceEncounter),
+        }
+        local silenceAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.abbey_silence")
+            ),
+        }
+        local bellObjects: { [string]: string } = {
+            bell_cloister = Strings.get("encounter.cloister_bell"),
+            bell_refectory = Strings.get("encounter.refectory_bell"),
+            bell_stair = Strings.get("encounter.stair_bell"),
+        }
+        for _, bellId in AbbeySilenceEncounter.BellIds do
+            table.insert(
+                silenceAnchors,
+                anchor(bellId, Strings.get("encounter.toll"), bellObjects[bellId])
+            )
+            silenceInteractions[bellId] = verb(
+                AbbeySilenceEncounter,
+                function(state: any, userId: number, now: number): (any, any)
+                    return AbbeySilenceEncounter.ringBell(state, userId, bellId, now)
+                end
+            )
+        end
+
+        local hartInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(AuroraHartEncounter),
+        }
+        local hartAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.aurora_hart")
+            ),
+        }
+        local hearthObjects: { [string]: string } = {
+            hearth_north = Strings.get("encounter.north_embers"),
+            hearth_east = Strings.get("encounter.east_embers"),
+            hearth_south = Strings.get("encounter.south_embers"),
+            hearth_west = Strings.get("encounter.west_embers"),
+        }
+        --[[
+            The module's verb names both ends of the carry and an anchor
+            names one, so the wiring finds the other -- and the anchor has
+            to be the end warmth *leaves*, with the hottest hearth always
+            the end it arrives at. Anchored the other way round, touching
+            a cold hearth pulls an ember back out of the banked one, so
+            the press that reads most like pursuing the fight's goal is
+            the press that undoes it. This way every accepted carry
+            gathers, and touching the hearth that already holds the fire
+            is refused by the module as the same hearth, which is the
+            true answer rather than a wiring branch.
+        ]]
+        for _, hearthId in AuroraHartEncounter.HearthIds do
+            table.insert(
+                hartAnchors,
+                anchor(hearthId, Strings.get("world.gather"), hearthObjects[hearthId])
+            )
+            hartInteractions[hearthId] = verb(
+                AuroraHartEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    local hottest = AuroraHartEncounter.HearthIds[1]
+                    for _, candidate in AuroraHartEncounter.HearthIds do
+                        if (state.hearths[candidate] or 0) > (state.hearths[hottest] or 0) then
+                            hottest = candidate
+                        end
+                    end
+                    return AuroraHartEncounter.carryEmber(state, userId, hearthId, hottest)
+                end
+            )
+        end
+        --[[
+            The Hart divides the clearing on its own clock and the state
+            counts splits without timing them, so the cadence lives here
+            the way the Admiral's re-rig does. Its first sight of a live
+            fight only starts the clock; nothing splits on the tick that
+            opened the fight.
+        ]]
+        local nextSplitAt: number? = nil
+        local function hartTick(state: any, now: number): any?
+            if state.status ~= "split" and state.status ~= "banked" then
+                nextSplitAt = nil
+                return nil
+            end
+            if nextSplitAt == nil or now < nextSplitAt then
+                if nextSplitAt == nil then
+                    nextSplitAt = now + AuroraHartEncounter.Tuning.splitIntervalSeconds
+                end
+                return nil
+            end
+            nextSplitAt = now + AuroraHartEncounter.Tuning.splitIntervalSeconds
+            local nextState = AuroraHartEncounter.split(state)
+            return if nextState == state then nil else nextState
+        end
+
+        local howlerInteractions: { [string]: any } = {
+            [RegionEncounterWiring.ChallengeAnchorId] = challenge(WhiteHowlerEncounter),
+        }
+        local howlerAnchors = {
+            anchor(
+                RegionEncounterWiring.ChallengeAnchorId,
+                Strings.get("encounter.face"),
+                Strings.get("encounter.white_howler")
+            ),
+        }
+        local noiseObjects: { [string]: string } = {
+            noise_bell_rope = Strings.get("encounter.bell_rope"),
+            noise_kettle_line = Strings.get("encounter.kettle_line"),
+            noise_wind_vane = Strings.get("encounter.wind_vane"),
+            noise_kennel_gate = Strings.get("encounter.kennel_gate"),
+        }
+        for _, noiseId in WhiteHowlerEncounter.NoiseIds do
+            table.insert(
+                howlerAnchors,
+                anchor(noiseId, Strings.get("encounter.hush"), noiseObjects[noiseId])
+            )
+            howlerInteractions[noiseId] = verb(
+                WhiteHowlerEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return WhiteHowlerEncounter.hush(state, userId, noiseId)
+                end
+            )
+        end
+        --[[
+            The chapter's decision, and like the Titan's gates it is two
+            anchors rather than a menu on one. The Reach left both of its
+            anchors carrying the same name, which the walk recorded as an
+            authoring question; here each destination is written into the
+            name, because where the warmth went is the whole decision and
+            a player should be able to read it off the post they are
+            standing at.
+        ]]
+        local warmthFireObjects: { [string]: string } = {
+            warmth_lantern = Strings.get("encounter.lantern_to_our_fire"),
+            warmth_kettle = Strings.get("encounter.kettle_to_our_fire"),
+            warmth_coat = Strings.get("encounter.coat_to_our_fire"),
+        }
+        local warmthDenObjects: { [string]: string } = {
+            warmth_lantern = Strings.get("encounter.lantern_to_the_den"),
+            warmth_kettle = Strings.get("encounter.kettle_to_the_den"),
+            warmth_coat = Strings.get("encounter.coat_to_the_den"),
+        }
+        for _, warmthId in WhiteHowlerEncounter.WarmthIds do
+            table.insert(
+                howlerAnchors,
+                anchor(warmthId, Strings.get("encounter.share"), warmthFireObjects[warmthId])
+            )
+            howlerInteractions[warmthId] = verb(
+                WhiteHowlerEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return WhiteHowlerEncounter.shareWarmth(state, userId, warmthId, false)
+                end
+            )
+            local denId = warmthId .. "_den"
+            table.insert(
+                howlerAnchors,
+                anchor(denId, Strings.get("encounter.carry_up"), warmthDenObjects[warmthId])
+            )
+            howlerInteractions[denId] = verb(
+                WhiteHowlerEncounter,
+                function(state: any, userId: number, _now: number): (any, any)
+                    return WhiteHowlerEncounter.shareWarmth(state, userId, warmthId, true)
+                end
+            )
+        end
+        --[[
+            The aurora's own order, written on the marks.
+
+            The module reads them in a fixed order and a wrong one loses
+            the trail, which sends the phase back to the noise -- and the
+            instruction never names which mark is next, so the first read
+            of a walk is a one-in-four guess that throws away every hush
+            and every warmth already spent. That is not the fight the
+            module describes: "only the light over the ridge shows where"
+            means the aurora *tells* you, so it tells you here. What the
+            phase still costs is getting quiet, spending the warmth, and
+            reading four marks under a whiteout while the clock runs.
+        ]]
+        local trackObjects: { [string]: string } = {
+            track_ridge = Strings.get("encounter.first_mark_ridge"),
+            track_bowl = Strings.get("encounter.second_mark_bowl"),
+            track_stair = Strings.get("encounter.third_mark_stair"),
+            track_cairn = Strings.get("encounter.fourth_mark_cairn"),
+        }
+        for _, trackId in WhiteHowlerEncounter.TrackIds do
+            table.insert(
+                howlerAnchors,
+                anchor(trackId, Strings.get("encounter.trace"), trackObjects[trackId])
+            )
+            howlerInteractions[trackId] = function(state: any, player: any, now: number): (any, any)
+                local nextState, result =
+                    WhiteHowlerEncounter.followTrack(state, player.UserId, trackId)
+                --[[
+                    A lost trail is the one branch in this region where
+                    the next instruction is a lie by omission: it reads
+                    "QUIET THE BOWL -- 0 OF 3" and a party that just did
+                    all of that is told nothing happened. The loss gets
+                    its own line, the way the Titan's already-worked gate
+                    does.
+                ]]
+                if type(result) == "table" and result.lost == true then
+                    return nextState,
+                        {
+                            accepted = false,
+                            completed = false,
+                            message = Strings.get("encounter.the_trail_is_lost_the_bowl"),
+                        }
+                end
+                return nextState,
+                    {
+                        accepted = if type(result) == "table" then result.accepted else false,
+                        completed = false,
+                        message = instructionOf(
+                            WhiteHowlerEncounter,
+                            nextState,
+                            player.UserId,
+                            now
+                        ),
+                    }
+            end
+        end
+
+        return {
+            {
+                id = AbbeySilenceEncounter.Id,
+                regionId = regionId,
+                module = AbbeySilenceEncounter,
+                anchors = silenceAnchors,
+                interactions = silenceInteractions,
+                tick = AbbeySilenceEncounter.expire,
+            },
+            {
+                id = AuroraHartEncounter.Id,
+                regionId = regionId,
+                module = AuroraHartEncounter,
+                anchors = hartAnchors,
+                interactions = hartInteractions,
+                tick = hartTick,
+            },
+            {
+                id = WhiteHowlerEncounter.Id,
+                regionId = regionId,
+                module = WhiteHowlerEncounter,
+                anchors = howlerAnchors,
+                interactions = howlerInteractions,
+                lockedUntil = { AbbeySilenceEncounter.Id, AuroraHartEncounter.Id },
+                chapterResolution = function(state: any)
+                    --[[
+                        Warmth carried to the den is the only thing the
+                        fight records about the decision, so the decision
+                        reads off the same count the outcome does: every
+                        phase paid is a party that chose the pups over
+                        itself, none is a party that kept its fire, and
+                        the middle is the night that went both ways.
+                    ]]
+                    local dens = 0
+                    for _, warmed in state.denPhases do
+                        if warmed then
+                            dens += 1
+                        end
+                    end
+                    local decision = if dens >= #state.denPhases
+                        then "warmed_den"
+                        elseif dens == 0 then "kept_warmth"
+                        else "split_warmth"
+                    return {
+                        chapterId = "chapter_five",
                         decision = decision,
                         outcome = tostring(state.outcome),
                     }
