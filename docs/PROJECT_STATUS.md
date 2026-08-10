@@ -7,9 +7,11 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-10, at `main` = PR #375, build `0.53.1`,
-save schema 25, 27 services. Published to Roblox as place version 165;
-`0.53.1` is published from the merged Bramblewake polish build in PR #374.
+Last updated: 2026-08-10, at `main` = PR #377, build `0.53.1`,
+save schema 25, 27 services. Published to Roblox as place version 166;
+`0.53.1` is published from the merged Bramblewake visual-bug-fix build in
+PR #377. (#376 left the built place byte-identical — Studio-MCP wrapper
+and docs only, no source under `src/`.)
 (#364 added only documentation over v162, and #361/#362 only
 documentation over v161.) (#358 produced v159 and #359
 v160; those three are Milestone 13 wave D's closing batches, and each was
@@ -96,6 +98,31 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#377** (v166) **Three visual bugs from a live Studio walkthrough of
+  Bramblewake, found and fixed by Claude connected to the same Studio MCP
+  relay #374 and #376 used.** The Hungry Homestead's Water Cask was an
+  un-rotated `Cylinder` (its long axis is local X, not Y) lying on its side
+  and sinking roughly half its body through the porch floor; it and its two
+  neighbors (Seed Bin, Root Cellar) now sit flush against the porch's
+  measured surface. Blackout's relay fire and Old Growth's fire/heart labels
+  were readable at full distance long before either system activates —
+  `setBlackoutPresentation`/`setOldGrowthPresentation` already gated the
+  prompt and material on `relay`/`shielded`, but the `LandmarkLabel`
+  billboard wasn't wired to the same state, so a player could read "NEEDS
+  CARRIED FIRE" at the arrival gate hours before Blackout is explained; now
+  gated identically. The Moving Hedge event's whole visible objective sits
+  boxed in by trees with no direct light reaching it; `Grass` material's
+  normal map crushed to a flat black slab under ambient-only light, so it
+  and its crown now use `LeafyGrass`, the material every hero tree canopy in
+  the same file already uses for exactly that reason, at no light-budget
+  cost. Full local validation passes: 935 Luau tests, format, lint,
+  typecheck, every repository validator, both regenerated places, and
+  built-DataModel verification. The one failure in
+  `test-studio-mcp-wrapper.sh` (wine-dependent) reproduces identically on
+  unmodified `main` and is this sandbox's environment, not the change. The
+  exact merged commit `e080ba2` was rebuilt and passed the full suite again
+  on synchronized `main`, then Open Cloud published that artifact to start
+  place `115897110071287` as place version 166.
 - **#376** hardens the Studio-MCP wrapper's batch fallback, the route #370's
   direct-exe launch does not take when Roblox's `mcp.bat` cannot be parsed for
   its `StudioMCP.exe` path. That fallback still built a host-translated `cd /d
