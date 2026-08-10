@@ -3271,11 +3271,12 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
         local canopy = part(
             folder,
             "BackdropCanopy",
-            -- Narrower and set higher: a ball nearly five trunks wide sitting
-            -- at shoulder height is a bush; a crown riding a visible trunk is
-            -- a tree.
-            Vector3.new(width * 3.4, height * 0.6, width * 3.4),
-            CFrame.new(at + Vector3.new(0, height * 0.95, 0))
+            -- The old crown was narrow against a very tall trunk. Seen from
+            -- the route, the four ranks became identical balls on poles and
+            -- left strips of bare sky between them. A broad, lower crown
+            -- keeps the trunk readable while making the rank read as forest.
+            Vector3.new(width * 5.4, height * 0.46, width * 5.4),
+            CFrame.new(at + Vector3.new(0, height * 0.78, 0))
                 * CFrame.Angles(lean, (seed % 211) * 0.021, 0),
             Color3.fromRGB(math.floor(64 * lift), math.floor(96 * lift), math.floor(66 * lift)),
             Enum.Material.Grass,
@@ -3296,10 +3297,10 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
         it -- density still climbs with distance, just starting politely.
     ]]
     local ranks = {
-        { radius = reach + 72, count = 20, height = 46, width = 4.2, shade = 1.0 },
-        { radius = reach + 150, count = 40, height = 62, width = 5.0, shade = 0.86 },
-        { radius = reach + 250, count = 56, height = 84, width = 6.0, shade = 0.7 },
-        { radius = reach + 360, count = 66, height = 108, width = 7.2, shade = 0.56 },
+        { radius = reach + 36, count = 26, height = 40, width = 5.2, shade = 1.0 },
+        { radius = reach + 124, count = 42, height = 54, width = 6.2, shade = 0.86 },
+        { radius = reach + 232, count = 58, height = 70, width = 7.6, shade = 0.7 },
+        { radius = reach + 350, count = 68, height = 88, width = 9.2, shade = 0.56 },
     }
     for rankIndex, rank in ranks do
         for index = 1, rank.count do
@@ -3323,7 +3324,7 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
     local heroes = { "mesh_conifer_hero_a", "mesh_conifer_hero_b", "mesh_broadleaf_hero_a" }
     for index = 1, 14 do
         local angle = (index / 14) * math.pi * 2 + 0.4
-        local radius = reach + 12 + ((index * 29) % 56)
+        local radius = reach - 24 + ((index * 29) % 48)
         dress(
             extra,
             heroes[(index % #heroes) + 1],

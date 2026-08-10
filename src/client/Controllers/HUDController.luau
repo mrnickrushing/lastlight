@@ -510,6 +510,9 @@ export type HUDController =
             _lobbySizes: Frame,
             _lobbySizeButtons: { TextButton },
             _contractButtons: { [string]: TextButton },
+            _contractDetails: { [string]: string },
+            _lobbyContractDetail: TextLabel,
+            _lobbySelectionSummary: TextLabel,
             _selectedContractId: string,
             _onLobbyDepart: ((number) -> ())?,
             _selectedPartySize: number?,
@@ -2053,7 +2056,7 @@ function HUDController.new(
     lobbyFrame.Name = "LobbyPanel"
     lobbyFrame.AnchorPoint = Vector2.new(0.5, 1)
     lobbyFrame.Position = UDim2.new(0.5, 0, 1, -104)
-    lobbyFrame.Size = UDim2.fromOffset(420, 246)
+    lobbyFrame.Size = UDim2.fromOffset(420, 294)
     lobbyFrame.BackgroundColor3 = Color3.fromRGB(16, 22, 26)
     lobbyFrame.BackgroundTransparency = 0.12
     lobbyFrame.BorderSizePixel = 0
@@ -2100,11 +2103,24 @@ function HUDController.new(
     lobbyDetail.ZIndex = 41
     lobbyDetail.Parent = lobbyFrame
 
+    local partySizeLabel = Instance.new("TextLabel")
+    partySizeLabel.Name = "LobbyPartySizeLabel"
+    partySizeLabel.BackgroundTransparency = 1
+    partySizeLabel.Position = UDim2.fromOffset(14, 57)
+    partySizeLabel.Size = UDim2.new(1, -28, 0, 14)
+    partySizeLabel.Font = Enum.Font.GothamBold
+    partySizeLabel.Text = Strings.get("hud.party_size")
+    partySizeLabel.TextColor3 = Color3.fromRGB(178, 194, 183)
+    partySizeLabel.TextSize = 11
+    partySizeLabel.TextXAlignment = Enum.TextXAlignment.Left
+    partySizeLabel.ZIndex = 41
+    partySizeLabel.Parent = lobbyFrame
+
     local lobbySizes = Instance.new("Frame")
     lobbySizes.Name = "LobbySizes"
     lobbySizes.BackgroundTransparency = 1
-    lobbySizes.Position = UDim2.fromOffset(14, 66)
-    lobbySizes.Size = UDim2.new(1, -28, 0, 44)
+    lobbySizes.Position = UDim2.fromOffset(14, 74)
+    lobbySizes.Size = UDim2.new(1, -28, 0, 38)
     lobbySizes.ZIndex = 41
     lobbySizes.Parent = lobbyFrame
     local lobbyLayout = Instance.new("UIListLayout")
@@ -2139,11 +2155,24 @@ function HUDController.new(
         selected at a time; the selection rides the depart payload and the
         server resolves it (junk falls back to the standard sweep).
     ]]
+    local contractLabel = Instance.new("TextLabel")
+    contractLabel.Name = "LobbyContractLabel"
+    contractLabel.BackgroundTransparency = 1
+    contractLabel.Position = UDim2.fromOffset(14, 119)
+    contractLabel.Size = UDim2.new(1, -28, 0, 14)
+    contractLabel.Font = Enum.Font.GothamBold
+    contractLabel.Text = Strings.get("hud.route_contract")
+    contractLabel.TextColor3 = Color3.fromRGB(178, 194, 183)
+    contractLabel.TextSize = 11
+    contractLabel.TextXAlignment = Enum.TextXAlignment.Left
+    contractLabel.ZIndex = 41
+    contractLabel.Parent = lobbyFrame
+
     local contractRow = Instance.new("Frame")
     contractRow.Name = "LobbyContracts"
     contractRow.BackgroundTransparency = 1
-    contractRow.Position = UDim2.fromOffset(14, 116)
-    contractRow.Size = UDim2.new(1, -28, 0, 58)
+    contractRow.Position = UDim2.fromOffset(14, 136)
+    contractRow.Size = UDim2.new(1, -28, 0, 46)
     contractRow.ZIndex = 41
     contractRow.Parent = lobbyFrame
     local contractLayout = Instance.new("UIListLayout")
@@ -2152,6 +2181,8 @@ function HUDController.new(
     contractLayout.SortOrder = Enum.SortOrder.LayoutOrder
     contractLayout.Parent = contractRow
     local contractButtons: { [string]: TextButton } = {}
+    local contractDetails: { [string]: string } = {}
+    local initialContractDetail = ""
     for order, contract in contracts or {} do
         local contractButton = Instance.new("TextButton")
         contractButton.Name = "Contract_" .. contract.id
@@ -2163,7 +2194,8 @@ function HUDController.new(
         contractButton.AutoButtonColor = true
         contractButton.Font = Enum.Font.GothamBold
         contractButton.TextWrapped = true
-        contractButton.Text = contract.title
+        contractButton.Text = (if order == 1 then "✓ " else "") .. contract.title
+        contractButton:SetAttribute("BaseTitle", contract.title)
         contractButton.TextColor3 = Color3.fromRGB(244, 230, 197)
         contractButton.TextSize = 11
         contractButton.ZIndex = 42
@@ -2172,7 +2204,39 @@ function HUDController.new(
         contractCorner.CornerRadius = UDim.new(0, 8)
         contractCorner.Parent = contractButton
         contractButtons[contract.id] = contractButton
+        contractDetails[contract.id] = contract.detail
+        if order == 1 then
+            initialContractDetail = contract.detail
+        end
     end
+
+    local contractDetail = Instance.new("TextLabel")
+    contractDetail.Name = "LobbyContractDetail"
+    contractDetail.BackgroundTransparency = 1
+    contractDetail.Position = UDim2.fromOffset(14, 187)
+    contractDetail.Size = UDim2.new(1, -28, 0, 31)
+    contractDetail.Font = Enum.Font.Gotham
+    contractDetail.Text = initialContractDetail
+    contractDetail.TextColor3 = Color3.fromRGB(206, 211, 200)
+    contractDetail.TextSize = 12
+    contractDetail.TextWrapped = true
+    contractDetail.TextXAlignment = Enum.TextXAlignment.Left
+    contractDetail.TextYAlignment = Enum.TextYAlignment.Top
+    contractDetail.ZIndex = 41
+    contractDetail.Parent = lobbyFrame
+
+    local selectionSummary = Instance.new("TextLabel")
+    selectionSummary.Name = "LobbySelectionSummary"
+    selectionSummary.BackgroundTransparency = 1
+    selectionSummary.Position = UDim2.fromOffset(14, 219)
+    selectionSummary.Size = UDim2.new(1, -28, 0, 16)
+    selectionSummary.Font = Enum.Font.GothamBold
+    selectionSummary.Text = Strings.get("hud.choose_party_size_standard_sweep")
+    selectionSummary.TextColor3 = Color3.fromRGB(255, 181, 76)
+    selectionSummary.TextSize = 12
+    selectionSummary.TextXAlignment = Enum.TextXAlignment.Left
+    selectionSummary.ZIndex = 41
+    selectionSummary.Parent = lobbyFrame
 
     --[[
         The party row: who is travelling with you, and the way back to them.
@@ -2186,7 +2250,7 @@ function HUDController.new(
     local partyLine = Instance.new("TextLabel")
     partyLine.Name = "LobbyPartyLine"
     partyLine.BackgroundTransparency = 1
-    partyLine.Position = UDim2.fromOffset(14, 180)
+    partyLine.Position = UDim2.fromOffset(14, 238)
     partyLine.Size = UDim2.new(1, -28, 0, 16)
     partyLine.Font = Enum.Font.Gotham
     partyLine.Text = Strings.get("hud.travelling_alone")
@@ -2199,7 +2263,7 @@ function HUDController.new(
     local partyRow = Instance.new("Frame")
     partyRow.Name = "LobbyParty"
     partyRow.BackgroundTransparency = 1
-    partyRow.Position = UDim2.fromOffset(14, 200)
+    partyRow.Position = UDim2.fromOffset(14, 258)
     partyRow.Size = UDim2.new(1, -28, 0, 36)
     partyRow.ZIndex = 41
     partyRow.Parent = lobbyFrame
@@ -2301,6 +2365,9 @@ function HUDController.new(
         _lobbyDetail = lobbyDetail,
         _lobbySizes = lobbySizes,
         _lobbySizeButtons = lobbySizeButtons,
+        _contractDetails = contractDetails,
+        _lobbyContractDetail = contractDetail,
+        _lobbySelectionSummary = selectionSummary,
         _partyLine = partyLine,
         _partyButtons = partyButtons,
         _contractButtons = contractButtons,
@@ -3041,6 +3108,13 @@ function HUDController._setSelectedPartySize(self: HUDController, size: number?)
             else Color3.fromRGB(31, 40, 44)
         button.TextColor3 = if chosen then COLORS.amber else COLORS.cream
     end
+    local contractButton = self._contractButtons[self._selectedContractId]
+    local contractTitle = if contractButton == nil
+        then Strings.get("expedition.standard_sweep")
+        else tostring(contractButton:GetAttribute("BaseTitle"))
+    self._lobbySelectionSummary.Text = if size == nil
+        then string.format(Strings.get("hud.choose_party_size_n"), contractTitle)
+        else string.format(Strings.get("hud.party_of_n_contract_n"), size, contractTitle)
 end
 
 function HUDController.setLobbyDepartHandler(self: HUDController, callback: (number, string) -> ())
@@ -3067,11 +3141,16 @@ function HUDController.setLobbyDepartHandler(self: HUDController, callback: (num
     for contractId, button in self._contractButtons do
         button.Activated:Connect(function()
             self._selectedContractId = contractId
+            self._lobbyContractDetail.Text = self._contractDetails[contractId] or ""
             for otherId, otherButton in self._contractButtons do
-                otherButton.BackgroundColor3 = if otherId == contractId
+                local chosen = otherId == contractId
+                otherButton.BackgroundColor3 = if chosen
                     then Color3.fromRGB(37, 68, 55)
                     else Color3.fromRGB(31, 40, 44)
+                local baseTitle = tostring(otherButton:GetAttribute("BaseTitle"))
+                otherButton.Text = (if chosen then "✓ " else "") .. baseTitle
             end
+            self:_setSelectedPartySize(self._selectedPartySize)
         end)
     end
 end
@@ -4002,7 +4081,7 @@ function HUDController._layout(self: HUDController)
         have it now.
     ]]
     self._lobbyFrame.Size =
-        UDim2.fromOffset(math.max(LOBBY_MIN_WIDTH, math.min(420, canvasWidth - 24)), 246)
+        UDim2.fromOffset(math.max(LOBBY_MIN_WIDTH, math.min(420, canvasWidth - 24)), 294)
 
     if narrow then
         -- 470 is a tablet's card, not a phone's: capped to the canvas so the

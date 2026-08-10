@@ -1699,32 +1699,35 @@ local function addBillboard(
     partInstance: BasePart,
     title: string,
     accent: Color3,
-    maxDistance: number?
+    maxDistance: number?,
+    compact: boolean?
 )
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "WorldLabel"
     billboard.Adornee = partInstance
     billboard.AlwaysOnTop = false
     billboard.LightInfluence = 0.35
-    billboard.Size = UDim2.fromOffset(165, 38)
+    billboard.Size = if compact then UDim2.fromOffset(126, 30) else UDim2.fromOffset(165, 38)
     -- Labels used to sit ~3.6 studs up, which on a waist-high display put the
     -- card directly over the object it was naming. Sitting them well clear
     -- keeps the prop readable, which is the order the visual standard asks
     -- for: recognize the object first, read the label second.
-    billboard.StudsOffsetWorldSpace = Vector3.new(0, 7.4, 0)
+    billboard.StudsOffsetWorldSpace = if compact
+        then Vector3.new(0, 5.7, 0)
+        else Vector3.new(0, 7.4, 0)
     billboard.MaxDistance = maxDistance or 20
     billboard.Parent = partInstance
 
     local text = Instance.new("TextLabel")
     text.BackgroundColor3 = Color3.fromRGB(16, 25, 23)
-    text.BackgroundTransparency = 0.18
+    text.BackgroundTransparency = if compact then 0.38 else 0.18
     text.BorderSizePixel = 0
     text.Size = UDim2.fromScale(1, 1)
     text.Font = Enum.Font.GothamBold
     text.Text = title
     text.TextColor3 = accent
     text.TextScaled = false
-    text.TextSize = 12
+    text.TextSize = if compact then 10 else 12
     text.TextWrapped = true
     text.Parent = billboard
 
@@ -14341,7 +14344,11 @@ function WorldService.buildBramblewake(
             Vector3.new(10, 12, 10)
         )
         self._resourceNodes[node.interactionId] = node
-        addBillboard(node.target, string.upper(node.objectText), AMBER, 90)
+        -- The prop and the interaction rail already identify a harvest node.
+        -- A ninety-stud card made four to six node names hang over the route
+        -- at once and hid the forest the player was meant to read. Keep a
+        -- quiet confirmation only inside ordinary interaction distance.
+        addBillboard(node.target, string.upper(node.objectText), AMBER, 24, true)
     end
 
     self:_placeMemoryFragments(
