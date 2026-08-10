@@ -7,7 +7,7 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-10, at `main` = PR #367, build `0.53.1`,
+Last updated: 2026-08-10, at `main` = PR #368, build `0.53.1`,
 save schema 25, 27 services. Published to Roblox as place version 163;
 `0.53.1` is a source-only owner-playtest fix pass and has not been published.
 (#364 added only documentation over v162, and #361/#362 only
@@ -2449,7 +2449,24 @@ pick/sickle harvest timing + the survey marker on a real trail.
 
 Verified against `git log`, newest first:
 
-- **In flight (not yet merged):** owner-playtest fix pass on Bramblewake —
+- **In flight (not yet merged):** the Linux Studio-MCP wrapper, corrected
+  against a machine it was actually run on. `scripts/studio-mcp-wrapper.sh`
+  shipped in #178 searching the Wine prefix for `StudioMCP.exe`, and was wrong
+  twice over: the launcher Studio writes is **`mcp.bat`**, and Vinegar
+  redirects `%LOCALAPPDATA%` *out of the prefix* onto the host through Wine's
+  `Z:` drive — so a search rooted at `drive_c` searches the one directory the
+  file is not in. Both facts came from the owner's terminal, not from
+  inference; the honest search is `find ~ -name mcp.bat`. The wrapper now
+  probes Vinegar's Flatpak and native appdata plus the plain-Wine `drive_c`
+  layout, converts the host path with `winepath` (falling back to the `Z:`
+  mapping), and runs `cmd /c "cd /d <dir> && mcp.bat"` — the invocation that
+  reached `✔ Connected`. It also says so when Wine is missing, because
+  Vinegar's Flatpak runtime does not export a `wine` binary and the host must
+  supply one. Exercised against eight simulated layouts (both Vinegar
+  variants, plain Wine, override, bounded-find fallback, a path containing a
+  space, and three failure paths) with a stub `wine`; **the one thing not
+  tested is Wine itself**, which needs the owner's machine.
+- **#368** Owner-playtest fix pass on Bramblewake —
   four reports from a real session, all four traced to source and fixed. All
   four were still present on `main` at #367; none had been fixed by the region
   waves that ran over them.

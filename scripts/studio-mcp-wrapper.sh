@@ -4,25 +4,50 @@
 # can drive a Studio that is itself running under Wine (Vinegar).
 #
 # Why a wrapper exists at all: the MCP client speaks stdio, so it spawns the
-# server as a child process and talks over pipes. Studio's server ships as a
-# Windows executable inside the Wine prefix, so something has to bridge the two.
-# That is all this does -- find the executable, run it under the right prefix,
-# and keep the pipe clean.
+# server as a child process and talks over pipes. Studio's server lives inside
+# the Wine prefix, so something has to bridge the two. That is all this does --
+# find the launcher, run it under the right prefix, and keep the pipe clean.
 #
-# The one non-obvious part is the stderr redirect at the bottom. MCP over stdio
-# is JSON-RPC on stdout, and Wine prints `fixme:` chatter constantly. Anything
-# that leaks into stdout corrupts the stream and the connection dies with a
-# parse error that says nothing about Wine. Sending Wine's noise to a log keeps
-# stdout clean and gives you somewhere to look when it misbehaves.
+# ---------------------------------------------------------------------------
+# Two things the first version of this script got wrong, both measured since:
+#
+#   1. **The launcher is `mcp.bat`, not `StudioMCP.exe`.** Enabling "Studio as
+#      MCP server" writes a small batch file; there is no such executable to
+#      find, so the old probe could only ever fail.
+#
+#   2. **It is not under `drive_c`.** Vinegar redirects `%LOCALAPPDATA%` out of
+#      the prefix entirely, onto the host filesystem through Wine's `Z:` drive.
+#      On the machine this was measured on, Wine reports:
+#
+#        %LOCALAPPDATA% = Z:\home\<user>\.var\app\org.vinegarhq.Vinegar\data\vinegar\appdata
+#
+#      while `drive_c/users/*/AppData/Local/Roblox/` exists and holds only
+#      plugin and instance directories. So a search rooted at `drive_c` -- which
+#      is what the old script did -- searches the one place the file is not.
+#
+# `%LOCALAPPDATA%\Roblox` is the correct answer in *both* layouts: under Vinegar
+# it resolves to the redirected host directory, and under a plain Wine prefix it
+# resolves inside `drive_c`. This script still locates the file host-side first,
+# so a failure names a path instead of dying inside `cmd`.
+# ---------------------------------------------------------------------------
+#
+# The other non-obvious part is the stderr redirect at the bottom. MCP over
+# stdio is JSON-RPC on stdout, and Wine prints `fixme:` chatter constantly.
+# Anything that leaks into stdout corrupts the stream and the connection dies
+# with a parse error that says nothing about Wine. Sending Wine's noise to a log
+# keeps stdout clean and gives you somewhere to look when it misbehaves.
 #
 # Usage, once (from the repository root):
 #
-#   claude mcp add roblox-studio --transport stdio -- \
-#       "$PWD/scripts/studio-mcp-wrapper.sh" --stdio
+#   claude mcp add roblox-studio --scope user --transport stdio -- \
+#       "$PWD/scripts/studio-mcp-wrapper.sh"
+#
+# No `--stdio` argument: `mcp.bat` takes none. Anything passed here is forwarded
+# to it anyway, so an old registration still runs.
 #
 # Override any of these if your install differs:
 #
-#   STUDIO_MCP_EXE   full path to StudioMCP.exe
+#   STUDIO_MCP_BAT   full host path to mcp.bat
 #   WINEPREFIX       the Wine prefix Studio runs in
 #   STUDIO_MCP_LOG   where Wine's stderr goes (default /tmp/studio-mcp.log)
 #   WINE_BIN         wine binary to use (default: wine on PATH)
@@ -32,13 +57,20 @@ set -euo pipefail
 log="${STUDIO_MCP_LOG:-/tmp/studio-mcp.log}"
 wine_bin="${WINE_BIN:-wine}"
 
-# Prefix candidates, most specific first. Vinegar's location differs between a
-# native install and a Flatpak one, which is exactly the kind of thing that is
-# wrong in a hardcoded path six months from now.
+die() {
+    printf 'studio-mcp-wrapper: %s\n' "$@" >&2
+    exit 1
+}
+
+# --- The prefix -----------------------------------------------------------
+#
+# Vinegar's location differs between a Flatpak install and a native one, which
+# is exactly the kind of thing that is wrong in a hardcoded path six months
+# from now. Flatpak first: that is the supported install and the one measured.
 if [[ -z "${WINEPREFIX:-}" ]]; then
     for candidate in \
-        "$HOME/.local/share/vinegar/prefixes/studio" \
         "$HOME/.var/app/org.vinegarhq.Vinegar/data/vinegar/prefixes/studio" \
+        "$HOME/.local/share/vinegar/prefixes/studio" \
         "$HOME/.local/share/vinegar/prefix" \
         "$HOME/.wine"
     do
@@ -49,44 +81,80 @@ if [[ -z "${WINEPREFIX:-}" ]]; then
     done
 fi
 
-if [[ -z "${WINEPREFIX:-}" || ! -d "$WINEPREFIX/drive_c" ]]; then
-    echo "studio-mcp-wrapper: no Wine prefix found. Set WINEPREFIX to the" \
-         "directory containing drive_c." >&2
-    exit 1
+if [[ -z "${WINEPREFIX:-}" || ! -d "${WINEPREFIX:-}/drive_c" ]]; then
+    die "no Wine prefix found. Set WINEPREFIX to the directory containing drive_c."
 fi
 export WINEPREFIX
 
-# Studio's version directory changes with every update, so the executable is
-# searched for rather than pinned. Newest match wins, because an old version
-# directory often lingers after an update and would otherwise be picked first.
-if [[ -z "${STUDIO_MCP_EXE:-}" ]]; then
-    STUDIO_MCP_EXE="$(
-        find "$WINEPREFIX/drive_c" -name 'StudioMCP.exe' -type f -printf '%T@ %p\n' 2>/dev/null \
-            | sort -rn | head -1 | cut -d' ' -f2-
+command -v "$wine_bin" >/dev/null 2>&1 \
+    || die "'$wine_bin' is not on PATH. Set WINE_BIN." \
+           "Vinegar's own Flatpak runtime does not export a wine binary; this needs" \
+           "a host Wine (Debian/Kali: apt install wine)."
+
+# --- The launcher ---------------------------------------------------------
+#
+# Ordered by how likely each is to be right, most specific first. The last
+# entry is the plain-Wine layout, where LOCALAPPDATA is not redirected.
+if [[ -z "${STUDIO_MCP_BAT:-}" ]]; then
+    for candidate in \
+        "$HOME/.var/app/org.vinegarhq.Vinegar/data/vinegar/appdata/Roblox/mcp.bat" \
+        "$HOME/.local/share/vinegar/appdata/Roblox/mcp.bat" \
+        "$WINEPREFIX"/drive_c/users/*/AppData/Local/Roblox/mcp.bat
+    do
+        if [[ -f "$candidate" ]]; then
+            STUDIO_MCP_BAT="$candidate"
+            break
+        fi
+    done
+fi
+
+# Last resort. Bounded, because an unbounded search of $HOME on a machine with a
+# large home directory takes long enough that the client gives up on the
+# handshake and reports a connection failure rather than a slow start.
+if [[ -z "${STUDIO_MCP_BAT:-}" ]]; then
+    STUDIO_MCP_BAT="$(
+        find "$HOME/.var/app/org.vinegarhq.Vinegar" "$HOME/.local/share/vinegar" "$WINEPREFIX" \
+            -maxdepth 8 -name 'mcp.bat' -type f -print 2>/dev/null | head -1 || true
     )"
 fi
 
-if [[ -z "${STUDIO_MCP_EXE:-}" || ! -f "$STUDIO_MCP_EXE" ]]; then
-    {
-        echo "studio-mcp-wrapper: StudioMCP.exe not found under $WINEPREFIX/drive_c."
-        echo "Enable it first in Studio: Assistant -> ... -> Manage MCP Servers ->"
-        echo "\"Enable Studio as MCP server\", then set STUDIO_MCP_EXE if it still"
-        echo "cannot be found automatically."
-    } >&2
-    exit 1
+if [[ -z "${STUDIO_MCP_BAT:-}" || ! -f "$STUDIO_MCP_BAT" ]]; then
+    die "mcp.bat not found." \
+        "Enable it first in Studio: Assistant -> ... -> Manage MCP Servers ->" \
+        "\"Enable Studio as MCP server\". Studio writes mcp.bat when you do." \
+        "Then, if it still cannot be found: find ~ -name mcp.bat, and set" \
+        "STUDIO_MCP_BAT to what that prints."
 fi
 
-if ! command -v "$wine_bin" >/dev/null 2>&1; then
-    echo "studio-mcp-wrapper: '$wine_bin' is not on PATH. Set WINE_BIN." >&2
-    exit 1
+# --- Host path to Windows path -------------------------------------------
+#
+# winepath is authoritative and ships with Wine. The fallback is the same
+# mapping by hand: Wine's Z: drive is the host root, universally and by
+# default -- which is exactly what `wine cmd /c echo %LOCALAPPDATA%` reports on
+# a Vinegar install.
+bat_dir="$(dirname "$STUDIO_MCP_BAT")"
+if command -v winepath >/dev/null 2>&1; then
+    win_dir="$(winepath -w "$bat_dir" 2>>"$log" || true)"
+    win_dir="${win_dir%$'\r'}"
+else
+    win_dir=""
+fi
+if [[ -z "$win_dir" ]]; then
+    win_dir="Z:${bat_dir//\//\\}"
 fi
 
 # Stamp the log so a stale one is not mistaken for the current run.
 {
     echo "--- studio-mcp-wrapper $(date -Is)"
     echo "    WINEPREFIX=$WINEPREFIX"
-    echo "    STUDIO_MCP_EXE=$STUDIO_MCP_EXE"
+    echo "    STUDIO_MCP_BAT=$STUDIO_MCP_BAT"
+    echo "    win_dir=$win_dir"
 } >>"$log" 2>/dev/null || true
 
-# stdout stays untouched: it is the JSON-RPC stream.
-exec "$wine_bin" "$STUDIO_MCP_EXE" "$@" 2>>"$log"
+# `cd /d` first because mcp.bat resolves what it launches relative to its own
+# directory. stdout stays untouched: it is the JSON-RPC stream.
+command_line="cd /d \"$win_dir\" && mcp.bat"
+if [[ $# -gt 0 ]]; then
+    command_line="$command_line $*"
+fi
+exec "$wine_bin" cmd /c "$command_line" 2>>"$log"

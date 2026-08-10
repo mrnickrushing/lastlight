@@ -36,20 +36,53 @@ instead, which installs a plugin plus a local binary.
 Desktop, Cursor, VS Code, Codex CLI, and Gemini CLI directly. Nothing below is
 needed.
 
-**Linux, with Studio under Wine (Vinegar)** — Studio's MCP server is a Windows
-executable inside the Wine prefix, so it needs a wrapper.
+**Linux, with Studio under Wine (Vinegar)** — Studio's MCP server runs inside
+the Wine prefix, so it needs a wrapper.
 [`scripts/studio-mcp-wrapper.sh`](../scripts/studio-mcp-wrapper.sh) is that
-wrapper: it finds the prefix, finds the newest `StudioMCP.exe` inside it, and
-runs it under Wine.
+wrapper: it finds the prefix, finds `mcp.bat`, and runs it under Wine.
 
 ```bash
-claude mcp add roblox-studio --transport stdio -- \
-    "$PWD/scripts/studio-mcp-wrapper.sh" --stdio
+claude mcp add roblox-studio --scope user --transport stdio -- \
+    "$PWD/scripts/studio-mcp-wrapper.sh"
 claude mcp list
 ```
 
-Override `WINEPREFIX`, `STUDIO_MCP_EXE`, `WINE_BIN`, or `STUDIO_MCP_LOG` if the
+You want `roblox-studio: … - ✔ Connected` in that list. There is no `--stdio`
+argument — `mcp.bat` takes none.
+
+Override `WINEPREFIX`, `STUDIO_MCP_BAT`, `WINE_BIN`, or `STUDIO_MCP_LOG` if the
 install differs from the defaults it probes.
+
+**Wine must be the host's, not Vinegar's.** Vinegar's Flatpak runtime does not
+export a `wine` binary — `flatpak run --command=sh org.vinegarhq.Vinegar -c
+'command -v wine'` finds nothing — so the wrapper needs Wine installed on the
+host (`apt install wine` on Debian/Kali). It still uses Vinegar's *prefix*; only
+the binary is the host's.
+
+#### Two things about where Studio's MCP server actually lives
+
+Both of these were wrong in the first version of this wrapper, and neither is
+guessable — they were measured.
+
+1. **The launcher is `mcp.bat`.** Enabling "Studio as MCP server" writes a small
+   batch file. There is no `StudioMCP.exe` to find.
+2. **It is not under `drive_c`.** Vinegar redirects `%LOCALAPPDATA%` out of the
+   prefix entirely, onto the host filesystem through Wine's `Z:` drive:
+
+   ```console
+   $ WINEPREFIX=~/.var/app/org.vinegarhq.Vinegar/data/vinegar/prefixes/studio \
+       wine cmd /c "echo %LOCALAPPDATA%"
+   Z:\home\<user>\.var\app\org.vinegarhq.Vinegar\data\vinegar\appdata
+   ```
+
+   Meanwhile `drive_c/users/*/AppData/Local/Roblox/` exists and holds only
+   plugin and instance directories. So `find "$WINEPREFIX/drive_c" -name
+   mcp.bat` searches the one place the file is not, and the honest search is
+   `find ~ -name mcp.bat`.
+
+`%LOCALAPPDATA%\Roblox` is the right answer in both layouts — redirected under
+Vinegar, inside `drive_c` under a plain prefix — which is why the wrapper works
+for either.
 
 ### 3. Confirm it is actually connected
 
@@ -62,7 +95,8 @@ works. Anything else, see the troubleshooting table.
 | Symptom | Cause |
 |---|---|
 | JSON parse errors, connection drops immediately | Something is writing to stdout besides the protocol. Wine's `fixme:` chatter is the usual culprit; the wrapper redirects stderr to `/tmp/studio-mcp.log` for exactly this reason. Check that log. |
-| `StudioMCP.exe not found` | The MCP server has not been enabled in Studio yet, or the prefix probe missed. Run `find ~ -name StudioMCP.exe` and set `STUDIO_MCP_EXE`. |
+| `mcp.bat not found` | The MCP server has not been enabled in Studio yet — Studio writes the file when you enable it — or the probe missed. Run `find ~ -name mcp.bat` (search `~`, not the prefix; see above) and set `STUDIO_MCP_BAT`. |
+| `'wine' is not on PATH` | Vinegar's Flatpak runtime does not export a wine binary. Install Wine on the host, or set `WINE_BIN`. |
 | Connects, but sees nothing | Studio is open without a place loaded, or a different place is in focus. |
 | Worked yesterday, not today | Roblox ships Studio updates that periodically break under Wine. VinegarHQ states plainly that they cannot guarantee functionality and that fixes can take days. Check the Vinegar issue tracker before debugging your own setup. |
 
@@ -120,7 +154,7 @@ flatpak run --command=vinegar --file-forwarding org.vinegarhq.Vinegar \
 The `@@` markers are Flatpak file-forwarding (they hand the place file
 through the document portal); the invocation comes straight from Vinegar's
 own desktop entry. Run it in the background — Studio takes a couple of
-minutes to boot the place. The MCP bridge (`StudioMCP.exe`) survives the
+minutes to boot the place. The MCP bridge survives the
 kill because it belongs to the session's wrapper, not to Studio; after the
 relaunch, `list_roblox_studios` shows the new instance and
 `set_active_studio` attaches to it. This is how the profession-roster wave
