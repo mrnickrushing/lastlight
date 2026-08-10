@@ -6608,19 +6608,25 @@ local events = {
                 id = "stock_seed",
                 actionText = Strings.get("expedition.stock"),
                 objectText = "Seed Bin",
-                offset = { x = -6, y = 1.4, z = 1 },
+                -- Porch floor sits at anchor.y + 0.7 (HomesteadPorch in
+                -- BramblewakeBuilder); this box is 2.5 tall, so its base
+                -- needs y = 0.7 + 1.25 to rest on the boards instead of
+                -- sinking into them.
+                offset = { x = -6, y = 1.95, z = 1 },
             },
             {
                 id = "fill_water",
                 actionText = Strings.get("expedition.fill"),
                 objectText = "Water Cask",
-                offset = { x = 0, y = 1.7, z = -2 },
+                -- Cask is now an upright 3-tall cylinder (BramblewakeBuilder
+                -- fix); base needs y = 0.7 (porch top) + 1.5 (half height).
+                offset = { x = 0, y = 2.2, z = -2 },
             },
             {
                 id = "store_roots",
                 actionText = Strings.get("expedition.store"),
                 objectText = "Root Cellar",
-                offset = { x = 6, y = 1.4, z = 1 },
+                offset = { x = 6, y = 1.95, z = 1 },
             },
         },
     }),
@@ -80092,6 +80098,15 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
     if firePrompt ~= nil then
         firePrompt.Enabled = relay
     end
+    local fireLabel = arena.fireSource:FindFirstChild("LandmarkLabel")
+    if fireLabel ~= nil and fireLabel:IsA("BillboardGui") then
+        -- The physical relay fire is always in the world, but its "carry
+        -- this" instruction only makes sense once Blackout is actually in
+        -- its relay stage. Outside that window the label was readable up
+        -- close hours before Blackout is even explained, which read as an
+        -- unexplained, unusable prompt on an ordinary walkthrough.
+        fireLabel.Enabled = relay
+    end
 
     for nodeId, target in arena.relayNodes do
         local delivered = deliveredNodes[nodeId] == true
@@ -80104,6 +80119,10 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
             else Enum.Material.SmoothPlastic
         target.Transparency = if delivered then 0.28 elseif relay then 0.12 else 0.58
         keepReplacedAnchorHidden(target)
+        local nodeLabel = target:FindFirstChild("LandmarkLabel")
+        if nodeLabel ~= nil and nodeLabel:IsA("BillboardGui") then
+            nodeLabel.Enabled = relay
+        end
         local prompt = target:FindFirstChildOfClass("ProximityPrompt")
         if prompt ~= nil then
             prompt.Enabled = relay
@@ -80298,6 +80317,13 @@ function WorldService.setOldGrowthPresentation(self: WorldService, status: strin
         fireCore.Color = if shielded then AMBER else Color3.fromRGB(96, 87, 68)
         fireCore.Material = if shielded then Enum.Material.Neon else Enum.Material.SmoothPlastic
         fireCore.Transparency = if shielded then 0.12 else 0.58
+        local fireLabel = fireCore:FindFirstChild("LandmarkLabel")
+        if fireLabel ~= nil and fireLabel:IsA("BillboardGui") then
+            -- Same fix as Blackout's relay labels: this was readable from
+            -- across the approach long before the elite fight that gives
+            -- it meaning, so it read as an unexplained, unusable prompt.
+            fireLabel.Enabled = shielded
+        end
     end
     local heartCore = arena.heartCore
     if heartCore ~= nil then
@@ -80309,6 +80335,10 @@ function WorldService.setOldGrowthPresentation(self: WorldService, status: strin
             then Enum.Material.Neon
             else Enum.Material.SmoothPlastic
         heartCore.Transparency = if shielded or complete then 0.14 else 0.58
+        local heartLabel = heartCore:FindFirstChild("LandmarkLabel")
+        if heartLabel ~= nil and heartLabel:IsA("BillboardGui") then
+            heartLabel.Enabled = shielded or complete
+        end
     end
 
     local firePrompt = self._interactions[self._runtimeIds.InteractionIds.OldGrowthFireSource]
@@ -84362,14 +84392,21 @@ local function buildEventSocket(
                 2610 + hedgeIndex
             )
         end
-        part(
+        local movingHedge = part(
             scene,
             "MovingHedge",
             Vector3.new(18, 9, 5),
             CFrame.new(anchor.Position + Vector3.new(0, 4.5, 0)),
             DEEP_GRASS,
-            Enum.Material.Grass
+            -- This is the event's whole visible objective, and it sits
+            -- boxed in by trees on three sides -- no direct light ever
+            -- reaches it. Grass's normal map goes flat black under
+            -- ambient-only light; LeafyGrass is the material every hero
+            -- tree canopy in this file already uses for exactly that
+            -- reason, at no extra light-budget cost.
+            Enum.Material.LeafyGrass
         )
+        movingHedge.CastShadow = false
         for branchIndex = -3, 3 do
             part(
                 scene,
@@ -84387,7 +84424,7 @@ local function buildEventSocket(
                 anchor.Position + Vector3.new(branchIndex * 2.7, 6 + math.abs(branchIndex % 2), 0),
                 2.3 + (math.abs(branchIndex) % 2) * 0.5,
                 if branchIndex % 2 == 0 then DEEP_GRASS else MOSS,
-                Enum.Material.Grass
+                Enum.Material.LeafyGrass
             )
             leaf.CanQuery = false
         end
@@ -84666,7 +84703,15 @@ local function buildEventSocket(
                 false
             )
             if step.id == "fill_water" then
+                -- A Cylinder's long axis is local X, not Y: left at the
+                -- default orientation this cask lay on its side and sank
+                -- roughly half its body through the porch floor. Stand it
+                -- up, then size height and diameter explicitly instead of
+                -- reusing the pre-rotation Vector3 as if it still meant
+                -- (width, height, depth).
                 target.Shape = Enum.PartType.Cylinder
+                target.CFrame *= CFrame.Angles(0, 0, math.rad(90))
+                target.Size = Vector3.new(3, 2.6, 2.6)
             end
         elseif definition.visual == "stag_tracks" then
             target = part(
