@@ -807,19 +807,25 @@ local events = {
                 id = "stock_seed",
                 actionText = Strings.get("expedition.stock"),
                 objectText = "Seed Bin",
-                offset = { x = -6, y = 1.4, z = 1 },
+                -- Porch floor sits at anchor.y + 0.7 (HomesteadPorch in
+                -- BramblewakeBuilder); this box is 2.5 tall, so its base
+                -- needs y = 0.7 + 1.25 to rest on the boards instead of
+                -- sinking into them.
+                offset = { x = -6, y = 1.95, z = 1 },
             },
             {
                 id = "fill_water",
                 actionText = Strings.get("expedition.fill"),
                 objectText = "Water Cask",
-                offset = { x = 0, y = 1.7, z = -2 },
+                -- Cask is now an upright 3-tall cylinder (BramblewakeBuilder
+                -- fix); base needs y = 0.7 (porch top) + 1.5 (half height).
+                offset = { x = 0, y = 2.2, z = -2 },
             },
             {
                 id = "store_roots",
                 actionText = Strings.get("expedition.store"),
                 objectText = "Root Cellar",
-                offset = { x = 6, y = 1.4, z = 1 },
+                offset = { x = 6, y = 1.95, z = 1 },
             },
         },
     }),

@@ -2808,14 +2808,21 @@ local function buildEventSocket(
                 2610 + hedgeIndex
             )
         end
-        part(
+        local movingHedge = part(
             scene,
             "MovingHedge",
             Vector3.new(18, 9, 5),
             CFrame.new(anchor.Position + Vector3.new(0, 4.5, 0)),
             DEEP_GRASS,
-            Enum.Material.Grass
+            -- This is the event's whole visible objective, and it sits
+            -- boxed in by trees on three sides -- no direct light ever
+            -- reaches it. Grass's normal map goes flat black under
+            -- ambient-only light; LeafyGrass is the material every hero
+            -- tree canopy in this file already uses for exactly that
+            -- reason, at no extra light-budget cost.
+            Enum.Material.LeafyGrass
         )
+        movingHedge.CastShadow = false
         for branchIndex = -3, 3 do
             part(
                 scene,
@@ -2833,7 +2840,7 @@ local function buildEventSocket(
                 anchor.Position + Vector3.new(branchIndex * 2.7, 6 + math.abs(branchIndex % 2), 0),
                 2.3 + (math.abs(branchIndex) % 2) * 0.5,
                 if branchIndex % 2 == 0 then DEEP_GRASS else MOSS,
-                Enum.Material.Grass
+                Enum.Material.LeafyGrass
             )
             leaf.CanQuery = false
         end
@@ -3112,7 +3119,15 @@ local function buildEventSocket(
                 false
             )
             if step.id == "fill_water" then
+                -- A Cylinder's long axis is local X, not Y: left at the
+                -- default orientation this cask lay on its side and sank
+                -- roughly half its body through the porch floor. Stand it
+                -- up, then size height and diameter explicitly instead of
+                -- reusing the pre-rotation Vector3 as if it still meant
+                -- (width, height, depth).
                 target.Shape = Enum.PartType.Cylinder
+                target.CFrame *= CFrame.Angles(0, 0, math.rad(90))
+                target.Size = Vector3.new(3, 2.6, 2.6)
             end
         elseif definition.visual == "stag_tracks" then
             target = part(

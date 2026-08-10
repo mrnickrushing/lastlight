@@ -14560,6 +14560,15 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
     if firePrompt ~= nil then
         firePrompt.Enabled = relay
     end
+    local fireLabel = arena.fireSource:FindFirstChild("LandmarkLabel")
+    if fireLabel ~= nil and fireLabel:IsA("BillboardGui") then
+        -- The physical relay fire is always in the world, but its "carry
+        -- this" instruction only makes sense once Blackout is actually in
+        -- its relay stage. Outside that window the label was readable up
+        -- close hours before Blackout is even explained, which read as an
+        -- unexplained, unusable prompt on an ordinary walkthrough.
+        fireLabel.Enabled = relay
+    end
 
     for nodeId, target in arena.relayNodes do
         local delivered = deliveredNodes[nodeId] == true
@@ -14572,6 +14581,10 @@ function WorldService.setBlackoutPresentation(self: WorldService, state: any)
             else Enum.Material.SmoothPlastic
         target.Transparency = if delivered then 0.28 elseif relay then 0.12 else 0.58
         keepReplacedAnchorHidden(target)
+        local nodeLabel = target:FindFirstChild("LandmarkLabel")
+        if nodeLabel ~= nil and nodeLabel:IsA("BillboardGui") then
+            nodeLabel.Enabled = relay
+        end
         local prompt = target:FindFirstChildOfClass("ProximityPrompt")
         if prompt ~= nil then
             prompt.Enabled = relay
@@ -14766,6 +14779,13 @@ function WorldService.setOldGrowthPresentation(self: WorldService, status: strin
         fireCore.Color = if shielded then AMBER else Color3.fromRGB(96, 87, 68)
         fireCore.Material = if shielded then Enum.Material.Neon else Enum.Material.SmoothPlastic
         fireCore.Transparency = if shielded then 0.12 else 0.58
+        local fireLabel = fireCore:FindFirstChild("LandmarkLabel")
+        if fireLabel ~= nil and fireLabel:IsA("BillboardGui") then
+            -- Same fix as Blackout's relay labels: this was readable from
+            -- across the approach long before the elite fight that gives
+            -- it meaning, so it read as an unexplained, unusable prompt.
+            fireLabel.Enabled = shielded
+        end
     end
     local heartCore = arena.heartCore
     if heartCore ~= nil then
@@ -14777,6 +14797,10 @@ function WorldService.setOldGrowthPresentation(self: WorldService, status: strin
             then Enum.Material.Neon
             else Enum.Material.SmoothPlastic
         heartCore.Transparency = if shielded or complete then 0.14 else 0.58
+        local heartLabel = heartCore:FindFirstChild("LandmarkLabel")
+        if heartLabel ~= nil and heartLabel:IsA("BillboardGui") then
+            heartLabel.Enabled = shielded or complete
+        end
     end
 
     local firePrompt = self._interactions[self._runtimeIds.InteractionIds.OldGrowthFireSource]
