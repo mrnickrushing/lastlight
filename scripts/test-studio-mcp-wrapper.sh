@@ -197,6 +197,23 @@ case_forwards_arguments() {
     fi
 }
 
+case_direct_exe_from_generated_batch() {
+    local home; home="$(make_home direct_exe)"
+    local root_dir="$home$vinegar_flatpak"
+    local exe="$root_dir/versions/version-current/StudioMCP.exe"
+    mkdir -p "$root_dir/prefixes/studio/drive_c" "$root_dir/appdata/Roblox" \
+             "$(dirname "$exe")"
+    : >"$exe"
+    printf 'if exist "Z:%s" ( "Z:%s" %%* )\n' \
+        "${exe//\//\\}" "${exe//\//\\}" >"$root_dir/appdata/Roblox/mcp.bat"
+    local out; out="$(run_wrapper "$home" --stdio)"
+    if [[ "$out" == *"WINE-ARGS: [$exe] [--stdio]"* ]]; then
+        pass "generated batch: launches its exact StudioMCP executable directly"
+    else
+        fail "generated batch: launches its exact StudioMCP executable directly" "$out"
+    fi
+}
+
 case_no_launcher() {
     local home; home="$(make_home no_bat)"
     mkdir -p "$home$vinegar_flatpak/prefixes/studio/drive_c"
@@ -223,8 +240,9 @@ case_no_wine() {
     mkdir -p "$home$vinegar_flatpak/prefixes/studio/drive_c" "$home$vinegar_flatpak/appdata/Roblox"
     : >"$home$vinegar_flatpak/appdata/Roblox/mcp.bat"
     local out
-    out="$(env -i HOME="$home" PATH="/usr/bin:/bin" STUDIO_MCP_LOG="$home/log" \
-        bash "$wrapper" 2>&1)"
+    out="$(env -i HOME="$home" PATH="/usr/bin:/bin" \
+        WINE_BIN="$home/bin/missing-wine" STUDIO_MCP_LOG="$home/log" \
+        /usr/bin/bash "$wrapper" 2>&1)"
     if [[ "$out" == *"is not on PATH"* ]]; then
         pass "no wine on PATH: explains the Flatpak/host split"
     else
@@ -241,6 +259,7 @@ case_wine_query_fallback
 case_override_wins
 case_path_with_space
 case_forwards_arguments
+case_direct_exe_from_generated_batch
 case_no_launcher
 case_no_prefix
 case_no_wine
