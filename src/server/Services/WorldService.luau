@@ -6577,12 +6577,26 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
     local craftingFallback = Instance.new("Model")
     craftingFallback.Name = "CraftingDisplayFallback"
     craftingFallback.Parent = interactables
+    --[[
+        Every bench below used to share exactly one Z (workshopZ), evenly
+        spaced 12 studs apart with zero depth or facing variation anywhere
+        in the construction loop -- ten identical dark stall silhouettes in
+        a dead-straight line read, on an actual Studio walkthrough, like a
+        conveyor belt rather than a market. The `z` field this loop already
+        accepted (`benchZ = definition.z or workshopZ`) just had nothing
+        setting it. A gentle zigzag, alternating which side of workshopZ
+        each bench sits on along the row, breaks the ruler-straight line
+        into something that reads as ten separate stalls without touching
+        each bench's X (still the deliberate authored-ten spacing) or the
+        shared construction geometry itself.
+    ]]
     local craftingBenches = {
         {
             id = self._runtimeIds.InteractionIds.CraftMeadowSatchel,
             recipeId = "recipe_meadow_satchel",
             label = Strings.get("world.meadow_satchel"),
             x = -48,
+            z = -147,
             color = Color3.fromRGB(133, 176, 108),
         },
         {
@@ -6590,6 +6604,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             recipeId = "recipe_amber_charm",
             label = Strings.get("world.amber_charm"),
             x = 36,
+            z = -148,
             color = AMBER,
         },
         {
@@ -6597,6 +6612,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             recipeId = "recipe_ironroot_hood",
             label = Strings.get("world.ironroot_hood"),
             x = -36,
+            z = -136,
             color = Color3.fromRGB(122, 148, 132),
         },
         {
@@ -6604,6 +6620,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             recipeId = "recipe_bramble_boots",
             label = Strings.get("world.bramble_boots"),
             x = 48,
+            z = -137,
             color = Color3.fromRGB(142, 112, 84),
         },
         {
@@ -6611,6 +6628,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             recipeId = "recipe_thornwood_bow",
             label = Strings.get("world.thornwood_bow"),
             x = -60,
+            z = -137,
             color = Color3.fromRGB(164, 132, 78),
         },
         -- The five other weapon families, filling the row outward from the
@@ -6622,6 +6640,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             recipeId = "recipe_heartwood_maul",
             label = Strings.get("world.heartwood_maul"),
             x = -72,
+            z = -148,
             color = Color3.fromRGB(139, 98, 54),
         },
         {
@@ -6629,6 +6648,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             recipeId = "recipe_briar_lance",
             label = Strings.get("world.briar_lance"),
             x = -24,
+            z = -146,
             color = Color3.fromRGB(104, 128, 68),
         },
         {
@@ -6636,6 +6656,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             recipeId = "recipe_foxfire_sling",
             label = Strings.get("world.foxfire_sling"),
             x = 24,
+            z = -136,
             color = Color3.fromRGB(94, 206, 176),
         },
         {
@@ -6643,6 +6664,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             recipeId = "recipe_amber_edge",
             label = Strings.get("world.amber_edge"),
             x = 60,
+            z = -147,
             color = Color3.fromRGB(255, 181, 76),
         },
         {
@@ -6650,6 +6672,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             recipeId = "recipe_warden_cudgel",
             label = Strings.get("world.warden_cudgel"),
             x = 72,
+            z = -136,
             color = Color3.fromRGB(112, 151, 119),
         },
     }
