@@ -48,7 +48,7 @@ local TerrainBuilder = require(serverRoot.World.TerrainBuilder)
 
 local content = Registry.new(Regions)
 assert(Config.SaveSchemaVersion == 25, "unexpected save schema version")
-assert(Config.BuildVersion == "0.53.0", "unexpected build version")
+assert(Config.BuildVersion == "0.53.1", "unexpected build version")
 assert(content:count() == 7, "all launch region definitions must load")
 assert(content:has("region_bramblewake"), "starter region is missing")
 assert(#MusicCatalog.regionIds() == 8, "every playable world needs an adaptive score")
@@ -1496,6 +1496,40 @@ assert(oldGrowthCageBars == 4, "Old Growth fire needs a recognizable lantern cag
 assert(oldGrowthHeartRoots == 3, "Old Growth heart needs a rooted physical shell")
 assert(wardenLivingRoots == 12, "Warden nodes need three living roots each")
 
+-- The Old Growth's two objectives are named by billboards and lit by neon, and
+-- both of their prompt anchors are authored-mesh replacements. An anchor is
+-- blanked by keepReplacedAnchorHidden -- Transparency forced to 1, every
+-- LayerCollector beneath it disabled -- so a label or a glow parented to one is
+-- invisible for the whole run. That is exactly how "find the heart" came to
+-- point at an unlit, unlabelled root mound. The glow and the labels belong on
+-- the cores; the anchors keep only the prompt.
+for _, coreName in { "OldGrowthFireCore", "OldGrowthHeartCore" } do
+    local core = world:FindFirstChild(coreName, true)
+    assert(
+        core ~= nil and core:IsA("BasePart"),
+        string.format(
+            "%s is missing -- the Old Growth objective has nothing that can glow",
+            coreName
+        )
+    )
+    assert(
+        core:GetAttribute("ReplacedByAuthoredMesh") ~= true,
+        string.format("%s became a mesh anchor, which blanks the thing it exists to show", coreName)
+    )
+    assert(
+        core:FindFirstChildWhichIsA("LayerCollector") ~= nil,
+        string.format("%s must carry the label that names the objective", coreName)
+    )
+end
+for _, anchorName in { "OldGrowthFireSource", "OldGrowthRootHeart" } do
+    local anchor = world:FindFirstChild(anchorName, true)
+    assert(anchor ~= nil and anchor:IsA("BasePart"), anchorName .. " is missing")
+    assert(
+        anchor:FindFirstChildWhichIsA("LayerCollector") == nil,
+        anchorName .. " is mesh-replaced, so a label parented to it is never shown"
+    )
+end
+
 --[[
     54 fixed prompts, measured rather than remembered.
 
@@ -1690,6 +1724,24 @@ for _, target in blackoutTargets do
         "Blackout prompt does not route to its server action"
     )
 end
+-- The rooted walls are silhouettes. They stand between the road and the relay
+-- the player is carrying an 18-second fire to, three pillars with 2-stud gaps
+-- at every one of the three relays, and the chapter's own traversal gate is
+-- that every carry is possible with base movement. Solid, they are a barricade;
+-- queryable, they eat the tap that should reach the relay behind them.
+local rootedWalls = 0
+for _, descendant in blackoutLayer:GetChildren() do
+    if descendant:IsA("BasePart") and descendant.Name == "RootedWall" then
+        rootedWalls += 1
+        assert(
+            not descendant.CanCollide,
+            "a rooted wall is solid, which barricades the relay it only exists to frame"
+        )
+        assert(not descendant.CanQuery, "a rooted wall must not intercept a tap aimed at its relay")
+    end
+end
+assert(rootedWalls == 9, "expected three rooted wall silhouettes at each of the three relays")
+
 local poiTargets = CollectionService:GetTagged(RuntimeIds.ExpeditionPointOfInterestTag)
 assert(#poiTargets == BramblewakeExpedition.PointOfInterestCount, "expected four Bramblewake POIs")
 local poiVisuals = {}

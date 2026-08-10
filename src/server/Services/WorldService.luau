@@ -14737,6 +14737,28 @@ function WorldService.setOldGrowthPresentation(self: WorldService, status: strin
     keepReplacedAnchorHidden(arena.fireSource)
     keepReplacedAnchorHidden(arena.rootHeart)
 
+    -- The anchors above are mesh-replaced, so everything just assigned to them
+    -- is blanked by the two calls above and only ever mattered when the
+    -- authored meshes failed to load. The cores are what the player actually
+    -- sees, and they carry the labels that name the objective.
+    local fireCore = arena.fireCore
+    if fireCore ~= nil then
+        fireCore.Color = if shielded then AMBER else Color3.fromRGB(96, 87, 68)
+        fireCore.Material = if shielded then Enum.Material.Neon else Enum.Material.SmoothPlastic
+        fireCore.Transparency = if shielded then 0.12 else 0.58
+    end
+    local heartCore = arena.heartCore
+    if heartCore ~= nil then
+        heartCore.Color = if complete
+            then FOXFIRE
+            elseif shielded then Color3.fromRGB(255, 117, 74)
+            else Color3.fromRGB(83, 102, 82)
+        heartCore.Material = if shielded or complete
+            then Enum.Material.Neon
+            else Enum.Material.SmoothPlastic
+        heartCore.Transparency = if shielded or complete then 0.14 else 0.58
+    end
+
     local firePrompt = self._interactions[self._runtimeIds.InteractionIds.OldGrowthFireSource]
     local heartPrompt = self._interactions[self._runtimeIds.InteractionIds.OldGrowthHeart]
     if firePrompt ~= nil then

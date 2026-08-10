@@ -504,9 +504,14 @@ local SOURCE: { [string]: string } = {
     ["toast.wayhome_transition_will_retry"] = "WAYHOME TRANSITION WILL RETRY",
     ["toast.returning_to_emberhollow_banked_delivery_rea"] = "RETURNING TO EMBERHOLLOW — BANKED DELIVERY READY",
     ["toast.returning_to_emberhollow_pouch_empty"] = "RETURNING TO EMBERHOLLOW — POUCH EMPTY",
-    ["toast.profile_offline_rewards_remain_unbanked"] = "PROFILE OFFLINE — REWARDS REMAIN UNBANKED",
-    ["toast.banking_retry_needed_rewards_remain_unbanked"] = "BANKING RETRY NEEDED — REWARDS REMAIN UNBANKED",
-    ["toast.wayhome_gate_is_waiting_for_your"] = "WAYHOME GATE IS WAITING FOR YOUR PROFILE",
+    -- A failed settlement no longer keeps anyone in the wood, so every one of
+    -- these says where the player is going as well as what did not happen.
+    -- The old wording ("REWARDS REMAIN UNBANKED") described a refusal that the
+    -- player then had to stand in.
+    ["toast.profile_offline_returning_unbanked"] = "PROFILE OFFLINE — RETURNING WITH AN UNBANKED POUCH",
+    ["toast.banking_retry_needed_returning_unbanked"] = "BANKING RETRY NEEDED — RETURNING WITH AN UNBANKED POUCH",
+    ["toast.wayhome_opens_your_pouch_stays_unbanked"] = "WAYHOME OPENS — YOUR POUCH STAYS UNBANKED",
+    ["toast.rewards_unbanked_wayhome_transition_will_retry"] = "REWARDS UNBANKED — WAYHOME TRANSITION WILL RETRY",
     ["toast.wayhome_n_materials_banked"] = "WAYHOME — %d MATERIALS BANKED",
     ["toast.departing_in_n_stand_on_the"] = "DEPARTING IN %d — STAND ON THE PLATFORM",
     ["toast.a_departure_is_already_under_way"] = "A DEPARTURE IS ALREADY UNDER WAY",

@@ -590,11 +590,22 @@ local function rootArch(parent: Instance, center: Vector3, scale: number, facing
         accents can afford near-black; anything silhouetted overhead needs
         enough color for the wood grain to survive being backlit.
     ]]
+    --[[
+        The crown has to turn with the legs.
+
+        The two uprights sit on the (1, 0, 1) diagonal and are then rotated by
+        `facing` so the gate meets the road; the crown spanning them was left
+        at a hardcoded 45 degrees, which only lined up when `facing` was zero.
+        Every module the route turns at raised its legs to the road and left
+        the beam behind, so the arch read as a crossbeam lying askew over two
+        posts -- sideways, from the road you actually walk in on.
+    ]]
     part(
         parent,
         "RootCrown",
         Vector3.new(29 * scale, 2.8 * scale, 3 * scale),
-        CFrame.new(center + Vector3.new(0, 17 * scale, 0)) * CFrame.Angles(0, math.rad(45), 0),
+        CFrame.new(center + Vector3.new(0, 17 * scale, 0))
+            * CFrame.Angles(0, (facing or 0) + math.rad(45), 0),
         Color3.fromRGB(97, 72, 52),
         Enum.Material.Wood
     )
@@ -1516,7 +1527,10 @@ local function buildModuleVisual(
             2403
         )
     elseif visual == "root_arch" then
-        rootArch(parent, center + Vector3.new(0, 0, -7), 0.9)
+        -- The authored mesh on the next line is turned to `facing`; the
+        -- procedural arch under it was not, so the two disagreed by the road's
+        -- whole yaw whenever the mesh failed to load.
+        rootArch(parent, center + Vector3.new(0, 0, -7), 0.9, facing)
         dress(extra, "mesh_root_arch_a", parent, center + Vector3.new(0, 0, -7), 0.9, facing, 2411)
         dress(extra, "mesh_fern_cluster_a", parent, center + Vector3.new(-11, 0, 6), 1.2, 0.4, 2412)
         dress(extra, "mesh_fern_cluster_a", parent, center + Vector3.new(12, 0, 4), 1.1, 2.2, 2413)
@@ -3693,6 +3707,21 @@ local function buildBlackoutLayer(
             target = node,
         })
 
+        --[[
+            The rooted walls are silhouettes, not obstacles.
+
+            Three 3.5-stud pillars at 5.5-stud spacing leave 2-stud gaps, and
+            they stand 4.5 studs off the relay on the side the road arrives
+            from -- so built solid they are a barricade across the one thing
+            the player is running an 18-second carried-fire timer to reach, at
+            all three relays. Delivering rootfire only recolored them and left
+            them solid, so succeeding changed how they looked without changing
+            whether anyone could get past them.
+
+            They frame the relay and they take the light; they never decide
+            whether a carry is possible. CanQuery is off as well so a tap on
+            touch hardware reaches the relay behind them rather than a pillar.
+        ]]
         for rootIndex = -1, 1 do
             local rootedWall = part(
                 layer,
@@ -3702,8 +3731,9 @@ local function buildBlackoutLayer(
                     * CFrame.Angles(math.rad(rootIndex * 8), 0, math.rad(rootIndex * 10)),
                 DARK_BARK,
                 Enum.Material.Wood,
-                true
+                false
             )
+            rootedWall.CanQuery = false
             rootedWall:SetAttribute("BlackoutNodeId", definition.nodeId)
         end
     end
@@ -4035,8 +4065,6 @@ function BramblewakeBuilder.build(
             cagedLanternShell(module, fireSource.Position, 0.86, "OldGrowthLantern")
             fireSource:SetAttribute("EliteId", definition.eliteId)
             fireSource:SetAttribute("EliteInteraction", "fire_source")
-            billboard(fireSource, Strings.get("bramblewake.lantern_fire"), CREAM)
-            objectIcon(fireSource, "rootfire", AMBER)
 
             local rootHeart = orb(
                 module,
@@ -4050,13 +4078,64 @@ function BramblewakeBuilder.build(
             livingRootShell(module, rootHeart.Position, 1.08, "OldGrowthHeart")
             rootHeart:SetAttribute("EliteId", definition.eliteId)
             rootHeart:SetAttribute("EliteInteraction", "root_heart")
-            billboard(rootHeart, Strings.get("bramblewake.root_heart"), CREAM)
-            objectIcon(rootHeart, "root", FOXFIRE)
+
+            --[[
+                The Old Growth's two glowing objects live outside their anchors
+                on purpose, exactly like FirstLanternCore and BeaconCore in
+                WorldService.
+
+                Both orbs above are queued for authored-mesh replacement below,
+                which means keepReplacedAnchorHidden forces their Transparency
+                to 1 and disables every BillboardGui under them for the rest of
+                the run. Every colour, material and transparency
+                setOldGrowthPresentation assigned to them was therefore dead on
+                arrival, and so were their labels: shielding the elite told the
+                player to find the heart while the heart was invisible and
+                unlabelled, standing in an unlit root mound.
+
+                These cores are never mesh-replacement anchors, so they are the
+                thing that actually lights up. The anchors keep the attributes,
+                tags and proximity prompts -- those always worked.
+            ]]
+            local fireCore = orb(
+                module,
+                "OldGrowthFireCore",
+                fireSource.Position,
+                1.05,
+                AMBER,
+                Enum.Material.Neon
+            )
+            fireCore.Transparency = 0.58
+            fireCore.CastShadow = false
+            fireCore.CanQuery = false
+            fireCore.CanCollide = false
+            fireCore.CanTouch = false
+            billboard(fireCore, Strings.get("bramblewake.lantern_fire"), CREAM)
+            objectIcon(fireCore, "rootfire", AMBER)
+
+            local heartCore = orb(
+                module,
+                "OldGrowthHeartCore",
+                rootHeart.Position,
+                1.25,
+                FOXFIRE,
+                Enum.Material.Neon
+            )
+            heartCore.Transparency = 0.58
+            heartCore.CastShadow = false
+            heartCore.CanQuery = false
+            heartCore.CanCollide = false
+            heartCore.CanTouch = false
+            billboard(heartCore, Strings.get("bramblewake.root_heart"), CREAM)
+            objectIcon(heartCore, "root", FOXFIRE)
+
             CollectionService:AddTag(fireSource, runtimeIds.ExpeditionEliteTag)
             CollectionService:AddTag(rootHeart, runtimeIds.ExpeditionEliteTag)
             eliteArena = {
                 center = center,
+                fireCore = fireCore,
                 fireSource = fireSource,
+                heartCore = heartCore,
                 rootHeart = rootHeart,
             }
             queueItemAsset(

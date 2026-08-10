@@ -53,6 +53,7 @@ TestRunner.run({
     require("./specs/ExpeditionInventory.spec"),
     require("./specs/ExploitGate.spec"),
     require("./specs/ExpeditionRewardLedger.spec"),
+    require("./specs/ExtractionOutcome.spec"),
     require("./specs/ExtractionPayoff.spec"),
     require("./specs/FeatureFlagService.spec"),
     require("./specs/RolloutCohorts.spec"),
