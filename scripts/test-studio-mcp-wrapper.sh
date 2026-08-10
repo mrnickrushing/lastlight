@@ -2,17 +2,29 @@
 #
 # Tests for scripts/studio-mcp-wrapper.sh.
 #
-# This wrapper has shipped wrong twice. The first version looked for a
+# This wrapper has shipped wrong three times. The first version looked for a
 # StudioMCP.exe that does not exist, under a drive_c that does not hold it. The
 # second fixed both of those and still paired an explicitly chosen Wine prefix
-# with another installation's launcher. Neither failure is visible by reading
-# the script; both are obvious the moment it is run against a directory tree.
+# with another installation's launcher. The third fixed that too and still
+# failed to launch on the real machine: it pre-resolved a host path to a
+# Windows path and handed cmd.exe that literal string, and cmd refused it with
+# "Path not found" for the exact string that Wine's own expansion of
+# %LOCALAPPDATA% resolves to without complaint. None of the three was visible
+# by reading the script; the first two were obvious the moment it ran against
+# a directory tree, and the third only on the machine Studio runs on.
 #
-# So it gets run. Each case builds a throwaway $HOME with a known layout and a
-# stub `wine` that prints its argv instead of executing anything, then asserts
-# on what the wrapper resolved. What is NOT covered is Wine itself -- whether
-# mcp.bat actually launches and speaks JSON-RPC needs the machine Studio runs
-# on, and no fixture here can stand in for that.
+# So it gets run, as far as it can be. Each case builds a throwaway $HOME with
+# a known layout and a stub `wine` that prints its argv instead of executing
+# anything, then asserts on what the wrapper resolved and what it would launch.
+#
+# What is NOT covered, and could not have caught bug 3: the stub never runs a
+# real `cd`, so it cannot distinguish a Windows path string that merely looks
+# right from one Wine actually accepts. That gap is why the fix for bug 3 is
+# to stop building such strings at all wherever a proven one (Wine's own
+# %LOCALAPPDATA%, left for Wine to expand) is available -- the harness can
+# confirm the wrapper reaches for the literal instead of inventing an
+# equivalent, but only the real machine can confirm the literal still works
+# after the next Vinegar or Wine update.
 
 set -uo pipefail
 
@@ -95,10 +107,17 @@ case_flatpak_default() {
     mkdir -p "$home$vinegar_flatpak/prefixes/studio/drive_c" "$home$vinegar_flatpak/appdata/Roblox"
     : >"$home$vinegar_flatpak/appdata/Roblox/mcp.bat"
     local out; out="$(run_wrapper "$home")"
-    if [[ "$out" == *"appdata\\Roblox\" && mcp.bat"* ]]; then
-        pass "Vinegar Flatpak: finds the redirected appdata launcher"
+    # The launch command uses Wine's own %LOCALAPPDATA%, unresolved -- not a
+    # host-translated absolute path. That literal is the fix for bug 3.
+    if [[ "$out" == *'[cd /d "%LOCALAPPDATA%\Roblox" && .\mcp.bat]'* ]]; then
+        pass "Vinegar Flatpak: finds the launcher and launches via %LOCALAPPDATA%"
     else
-        fail "Vinegar Flatpak: finds the redirected appdata launcher" "$out"
+        fail "Vinegar Flatpak: finds the launcher and launches via %LOCALAPPDATA%" "$out"
+    fi
+    if [[ "$(resolved "$home")" == "$home$vinegar_flatpak/appdata/Roblox/mcp.bat" ]]; then
+        pass "Vinegar Flatpak: discovery still finds the redirected appdata launcher"
+    else
+        fail "Vinegar Flatpak: discovery still finds the redirected appdata launcher" "$(resolved "$home")"
     fi
 }
 
@@ -106,11 +125,21 @@ case_plain_wine() {
     local home; home="$(make_home plain)"
     mkdir -p "$home/.wine/drive_c/users/nick/AppData/Local/Roblox"
     : >"$home/.wine/drive_c/users/nick/AppData/Local/Roblox/mcp.bat"
-    local out; out="$(run_wrapper "$home")"
-    if [[ "$out" == *"drive_c\\users\\nick\\AppData\\Local\\Roblox\" && mcp.bat"* ]]; then
-        pass "plain Wine: finds the launcher inside drive_c"
+    # The drive_c/users/* candidate is only trusted for the %LOCALAPPDATA%
+    # literal once Wine's own answer confirms it (bug 4) -- a real single-user
+    # Wine would confirm it, so the fixture must say so too.
+    local out
+    out="$(run_wrapper "$home" \
+        STUB_LOCALAPPDATA="Z:${home//\//\\}\\.wine\\drive_c\\users\\nick\\AppData\\Local")"
+    if [[ "$out" == *'[cd /d "%LOCALAPPDATA%\Roblox" && .\mcp.bat]'* ]]; then
+        pass "plain Wine: finds the launcher and launches via %LOCALAPPDATA%"
     else
-        fail "plain Wine: finds the launcher inside drive_c" "$out"
+        fail "plain Wine: finds the launcher and launches via %LOCALAPPDATA%" "$out"
+    fi
+    if [[ "$(resolved "$home")" == "$home/.wine/drive_c/users/nick/AppData/Local/Roblox/mcp.bat" ]]; then
+        pass "plain Wine: discovery still finds the launcher inside drive_c"
+    else
+        fail "plain Wine: discovery still finds the launcher inside drive_c" "$(resolved "$home")"
     fi
 }
 
@@ -150,38 +179,128 @@ case_wine_query_fallback() {
     local home; home="$(make_home unknown_layout)"
     mkdir -p "$home/odd/prefix/drive_c" "$home/somewhere/else/Roblox"
     : >"$home/somewhere/else/Roblox/mcp.bat"
-    run_wrapper "$home" WINEPREFIX="$home/odd/prefix" \
-        STUB_LOCALAPPDATA="Z:${home//\//\\}\\somewhere\\else" >/dev/null
+    local out
+    out="$(run_wrapper "$home" WINEPREFIX="$home/odd/prefix" \
+        STUB_LOCALAPPDATA="Z:${home//\//\\}\\somewhere\\else")"
     if [[ "$(resolved "$home")" == "$home/somewhere/else/Roblox/mcp.bat" ]]; then
         pass "unknown layout: asks Wine where LOCALAPPDATA points"
     else
         fail "unknown layout: asks Wine where LOCALAPPDATA points" "$(resolved "$home")"
     fi
+    # Found via the wine-query fallback rather than a pattern match, but it is
+    # still %LOCALAPPDATA%\Roblox by definition -- the launch stays literal.
+    if [[ "$out" == *'[cd /d "%LOCALAPPDATA%\Roblox" && .\mcp.bat]'* ]]; then
+        pass "unknown layout: still launches via %LOCALAPPDATA%, not a resolved path"
+    else
+        fail "unknown layout: still launches via %LOCALAPPDATA%, not a resolved path" "$out"
+    fi
 }
 
+# The one case that still needs a host->Windows path translation: an explicit
+# STUDIO_MCP_BAT pointing somewhere %LOCALAPPDATA%\Roblox does not reach. This
+# is also the only remaining place bug 3's class of failure could still recur,
+# since it is the only launch path that builds a resolved string instead of
+# handing Wine its own variable.
 case_override_wins() {
     local home; home="$(make_home override)"
     mkdir -p "$home$vinegar_flatpak/prefixes/studio/drive_c" "$home$vinegar_flatpak/appdata/Roblox" \
              "$home/custom"
     : >"$home$vinegar_flatpak/appdata/Roblox/mcp.bat"
     : >"$home/custom/mcp.bat"
-    run_wrapper "$home" STUDIO_MCP_BAT="$home/custom/mcp.bat" >/dev/null
+    local out; out="$(run_wrapper "$home" STUDIO_MCP_BAT="$home/custom/mcp.bat")"
     if [[ "$(resolved "$home")" == "$home/custom/mcp.bat" ]]; then
         pass "STUDIO_MCP_BAT overrides discovery"
     else
         fail "STUDIO_MCP_BAT overrides discovery" "$(resolved "$home")"
     fi
+    if [[ "$out" == *'[cd /d "Z:'*'custom" && .\mcp.bat]'* ]]; then
+        pass "an override launches from its own translated directory, not %LOCALAPPDATA%"
+    else
+        fail "an override launches from its own translated directory, not %LOCALAPPDATA%" "$out"
+    fi
 }
 
-case_path_with_space() {
-    local home; home="$(make_home 'spaced')"
+# A prefix path containing a space, discovered through the ordinary candidate
+# list (not an override). This exercises the common case -- %LOCALAPPDATA% is
+# left for Wine to expand, so a space in WINEPREFIX never reaches a
+# hand-built command-line string at all.
+case_prefix_with_space() {
+    local home; home="$(make_home 'spaced prefix')"
     mkdir -p "$home/My Prefix/drive_c/users/nick/AppData/Local/Roblox"
     : >"$home/My Prefix/drive_c/users/nick/AppData/Local/Roblox/mcp.bat"
-    local out; out="$(run_wrapper "$home" WINEPREFIX="$home/My Prefix")"
-    if [[ "$out" == *'[cd /d "Z:'*'My Prefix'*'" && mcp.bat]'* ]]; then
-        pass "a prefix path containing a space stays quoted"
+    local out
+    out="$(run_wrapper "$home" WINEPREFIX="$home/My Prefix" \
+        STUB_LOCALAPPDATA="Z:${home//\//\\}\\My Prefix\\drive_c\\users\\nick\\AppData\\Local")"
+    if [[ "$(resolved "$home")" == "$home/My Prefix/drive_c/users/nick/AppData/Local/Roblox/mcp.bat" ]]; then
+        pass "a prefix path containing a space is still discovered correctly"
     else
-        fail "a prefix path containing a space stays quoted" "$out"
+        fail "a prefix path containing a space is still discovered correctly" "$(resolved "$home")"
+    fi
+    if [[ "$out" == *'[cd /d "%LOCALAPPDATA%\Roblox" && .\mcp.bat]'* ]]; then
+        pass "a spaced prefix still launches via the %LOCALAPPDATA% literal"
+    else
+        fail "a spaced prefix still launches via the %LOCALAPPDATA% literal" "$out"
+    fi
+}
+
+# A directory containing a space, this time on the one path that DOES build a
+# literal Windows path string -- an explicit override. Proves the quoting
+# still holds where it actually matters now.
+case_override_path_with_space() {
+    local home; home="$(make_home 'spaced override')"
+    mkdir -p "$home$vinegar_flatpak/prefixes/studio/drive_c" "$home/My Custom Roblox"
+    : >"$home/My Custom Roblox/mcp.bat"
+    local out
+    out="$(run_wrapper "$home" WINEPREFIX="$home$vinegar_flatpak/prefixes/studio" \
+        STUDIO_MCP_BAT="$home/My Custom Roblox/mcp.bat")"
+    if [[ "$out" == *'[cd /d "Z:'*'My Custom Roblox" && .\mcp.bat]'* ]]; then
+        pass "an overridden path containing a space stays quoted"
+    else
+        fail "an overridden path containing a space stays quoted" "$out"
+    fi
+}
+
+# Codex's finding on the prefix-tied fix above: a plain-Wine prefix can hold
+# more than one Windows user profile, and the drive_c/users/* glob can match a
+# stale one while Wine itself currently answers %LOCALAPPDATA% for someone
+# else. Trusting the literal there would make discovery succeed (it found a
+# real mcp.bat) while launch still fails (Wine's own %LOCALAPPDATA%\Roblox
+# does not hold that file). The mismatch must fall back to the translated path
+# of the file actually found, never to a directory that might belong to
+# another profile.
+case_multi_user_mismatch_falls_back() {
+    local home; home="$(make_home multi_user_mismatch)"
+    mkdir -p "$home/.wine/drive_c/users/alice/AppData/Local/Roblox"
+    : >"$home/.wine/drive_c/users/alice/AppData/Local/Roblox/mcp.bat"
+    local out
+    out="$(run_wrapper "$home" \
+        STUB_LOCALAPPDATA="Z:${home//\//\\}\\.wine\\drive_c\\users\\bob\\AppData\\Local")"
+    if [[ "$(resolved "$home")" == "$home/.wine/drive_c/users/alice/AppData/Local/Roblox/mcp.bat" ]]; then
+        pass "multi-user mismatch: still discovers the file that actually exists"
+    else
+        fail "multi-user mismatch: still discovers the file that actually exists" "$(resolved "$home")"
+    fi
+    if [[ "$out" == *'[cd /d "Z:'*'alice'*'Roblox" && .\mcp.bat]'* ]]; then
+        pass "multi-user mismatch: launches from alice's directory, not bob's %LOCALAPPDATA%"
+    else
+        fail "multi-user mismatch: launches from alice's directory, not bob's %LOCALAPPDATA%" "$out"
+    fi
+}
+
+# The matching counterpart: when Wine's active user genuinely is the one whose
+# mcp.bat was found, the literal stays trusted -- the check should not make
+# the common, unambiguous case pay for the rare one.
+case_single_user_confirmed_uses_literal() {
+    local home; home="$(make_home single_user_confirmed)"
+    mkdir -p "$home/.wine/drive_c/users/carol/AppData/Local/Roblox"
+    : >"$home/.wine/drive_c/users/carol/AppData/Local/Roblox/mcp.bat"
+    local out
+    out="$(run_wrapper "$home" \
+        STUB_LOCALAPPDATA="Z:${home//\//\\}\\.wine\\drive_c\\users\\carol\\AppData\\Local")"
+    if [[ "$out" == *'[cd /d "%LOCALAPPDATA%\Roblox" && .\mcp.bat]'* ]]; then
+        pass "single user confirmed: still launches via the %LOCALAPPDATA% literal"
+    else
+        fail "single user confirmed: still launches via the %LOCALAPPDATA% literal" "$out"
     fi
 }
 
@@ -190,7 +309,7 @@ case_forwards_arguments() {
     mkdir -p "$home$vinegar_flatpak/prefixes/studio/drive_c" "$home$vinegar_flatpak/appdata/Roblox"
     : >"$home$vinegar_flatpak/appdata/Roblox/mcp.bat"
     local out; out="$(run_wrapper "$home" --stdio)"
-    if [[ "$out" == *"&& mcp.bat --stdio]"* ]]; then
+    if [[ "$out" == *'&& .\mcp.bat --stdio]'* ]]; then
         pass "an older --stdio registration still forwards its argument"
     else
         fail "an older --stdio registration still forwards its argument" "$out"
@@ -257,7 +376,10 @@ case_two_installs_native_selected
 case_two_installs_flatpak_selected
 case_wine_query_fallback
 case_override_wins
-case_path_with_space
+case_prefix_with_space
+case_override_path_with_space
+case_multi_user_mismatch_falls_back
+case_single_user_confirmed_uses_literal
 case_forwards_arguments
 case_direct_exe_from_generated_batch
 case_no_launcher
