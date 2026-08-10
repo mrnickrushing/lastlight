@@ -9,11 +9,13 @@
 # find the launcher, run it under the right prefix, and keep the pipe clean.
 #
 # ---------------------------------------------------------------------------
-# Two things the first version of this script got wrong, both measured since:
+# Four things earlier versions of this script got wrong, each measured on real
+# hardware rather than reasoned out from documentation:
 #
 #   1. **The launcher is `mcp.bat`, not `StudioMCP.exe`.** Enabling "Studio as
-#      MCP server" writes a small batch file; there is no such executable to
-#      find, so the old probe could only ever fail.
+#      MCP server" writes a small batch file. `mcp.bat` itself, in turn, is a
+#      thin dispatcher: its first branch runs the real `StudioMCP.exe` for the
+#      Studio version currently installed, when that exists.
 #
 #   2. **It is not under `drive_c`.** Vinegar redirects `%LOCALAPPDATA%` out of
 #      the prefix entirely, onto the host filesystem through Wine's `Z:` drive.
@@ -25,10 +27,44 @@
 #      plugin and instance directories. So a search rooted at `drive_c` -- which
 #      is what the old script did -- searches the one place the file is not.
 #
-# `%LOCALAPPDATA%\Roblox` is the correct answer in *both* layouts: under Vinegar
-# it resolves to the redirected host directory, and under a plain Wine prefix it
-# resolves inside `drive_c`. This script still locates the file host-side first,
-# so a failure names a path instead of dying inside `cmd`.
+#   3. **A host-resolved Windows path handed to `cd` is not the same thing as
+#      the identical string resolved by Wine's own `%LOCALAPPDATA%`, even
+#      though they print identically.** A version that fixed both bugs above
+#      still failed to launch:
+#
+#        cd /d "Z:\home\<user>\.var\app\org.vinegarhq.Vinegar\data\vinegar\appdata\Roblox"
+#        Path not found.
+#
+#      for the *exact same string* `%LOCALAPPDATA%\Roblox` resolves to and
+#      reaches without complaint one line up. Separate investigation of the
+#      same failure also found that an *unquoted* `cd` to that path, and
+#      direct execution of the resolved `.exe`, both succeed where the quoted,
+#      host-translated `cd /d "Z:\..."` does not. Nobody chased the exact Wine
+#      internals responsible -- the fix does not need the cause, only to stop
+#      building a string cd refuses and use one of the two that are proven to
+#      work: launch the resolved executable directly (needs no `cd` at all,
+#      and is what this script now prefers), or hand `cd` Wine's own
+#      unresolved `%LOCALAPPDATA%` and let Wine expand its own variable.
+#      Launching the executable directly also sidesteps a `Syntax error:
+#      unexpected ELSE` Wine's batch parser can emit from `mcp.bat` after the
+#      MCP process exits.
+#
+#   4. **A discovered path is not automatically Wine's own answer.** The
+#      literal-`%LOCALAPPDATA%` fix for bug 3 is only sound when the file
+#      discovery found really is what Wine's `%LOCALAPPDATA%\Roblox` resolves
+#      to. That holds by construction for a Vinegar install (Flatpak or
+#      native), which has exactly one appdata directory -- but a plain Wine
+#      prefix can hold more than one Windows user profile under
+#      `drive_c/users/*`, and the glob below can match a stale one while Wine
+#      itself is currently answering for a different, active user. Discovery
+#      succeeding is then not the same as the literal being safe to use, so
+#      that one ambiguous candidate is checked against Wine's own answer
+#      before being trusted; every other candidate is unambiguous by
+#      construction and skips the check.
+#
+# None of the four was visible by reading the script. The first two were
+# obvious the moment it ran against a directory tree; the third and fourth
+# only on the machine Studio actually runs on.
 # ---------------------------------------------------------------------------
 #
 # The other non-obvious part is the stderr redirect at the bottom. MCP over
@@ -42,8 +78,9 @@
 #   claude mcp add roblox-studio --scope user --transport stdio -- \
 #       "$PWD/scripts/studio-mcp-wrapper.sh"
 #
-# No `--stdio` argument: `mcp.bat` takes none. Anything passed here is forwarded
-# to it anyway, so an old registration still runs.
+# No `--stdio` argument: neither `mcp.bat` nor the `.exe` it launches takes
+# one. Anything passed here is forwarded anyway, so an old registration still
+# runs.
 #
 # Override any of these if your install differs:
 #
@@ -91,7 +128,7 @@ export WINEPREFIX
            "Vinegar's own Flatpak runtime does not export a wine binary; this needs" \
            "a host Wine (Debian/Kali: apt install wine)."
 
-# --- The launcher ---------------------------------------------------------
+# --- The launcher -----------------------------------------------------------
 #
 # **Every candidate is derived from the prefix chosen above, never from a fixed
 # global path.** An earlier version listed Vinegar's Flatpak and native appdata
@@ -106,26 +143,63 @@ export WINEPREFIX
 # <root>/prefixes/studio beside <root>/appdata -- so the appdata is derivable
 # from the prefix rather than guessable. The third form is plain Wine, where
 # LOCALAPPDATA is not redirected and lives inside drive_c.
-if [[ -z "${STUDIO_MCP_BAT:-}" ]]; then
+#
+# `bat_is_localappdata_roblox` tracks whether whatever STUDIO_MCP_BAT ends up
+# holding is, by construction or by verification, what this prefix's Wine
+# calls `%LOCALAPPDATA%\Roblox` -- the launch section below reads this flag to
+# decide whether it is safe to hand Wine that literal, unresolved variable
+# (proven correct, bug 3) instead of a host-computed translation of a
+# specific path (not, for the same reason). An explicit override can point
+# anywhere, so it always starts this false. The two appdata-anchored
+# candidates are unambiguous by construction -- a Vinegar install has exactly
+# one appdata directory -- so they stay true without asking Wine anything. The
+# plain-Wine `drive_c/users/*` candidate is the one pattern that is not
+# unambiguous (bug 4): a prefix can hold more than one Windows user profile,
+# so it is checked against Wine's own answer before being trusted.
+bat_is_localappdata_roblox=true
+if [[ -n "${STUDIO_MCP_BAT:-}" ]]; then
+    bat_is_localappdata_roblox=false
+else
     prefix_parent="$(dirname "$WINEPREFIX")"
-    for candidate in \
-        "$(dirname "$prefix_parent")/appdata/Roblox/mcp.bat" \
-        "$prefix_parent/appdata/Roblox/mcp.bat" \
-        "$WINEPREFIX"/drive_c/users/*/AppData/Local/Roblox/mcp.bat
-    do
-        if [[ -f "$candidate" ]]; then
-            STUDIO_MCP_BAT="$candidate"
-            break
-        fi
-    done
+    flatpak_appdata_bat="$(dirname "$prefix_parent")/appdata/Roblox/mcp.bat"
+    native_appdata_bat="$prefix_parent/appdata/Roblox/mcp.bat"
+    if [[ -f "$flatpak_appdata_bat" ]]; then
+        STUDIO_MCP_BAT="$flatpak_appdata_bat"
+    elif [[ -f "$native_appdata_bat" ]]; then
+        STUDIO_MCP_BAT="$native_appdata_bat"
+    else
+        for candidate in "$WINEPREFIX"/drive_c/users/*/AppData/Local/Roblox/mcp.bat; do
+            if [[ -f "$candidate" ]]; then
+                STUDIO_MCP_BAT="$candidate"
+                bat_is_localappdata_roblox=false
+                if command -v winepath >/dev/null 2>&1; then
+                    localappdata_win="$(
+                        "$wine_bin" cmd /c 'echo %LOCALAPPDATA%' 2>>"$log" | tr -d '\r\n' || true
+                    )"
+                    if [[ -n "$localappdata_win" && "$localappdata_win" != '%LOCALAPPDATA%' ]]; then
+                        localappdata_host="$(
+                            winepath -u "$localappdata_win" 2>>"$log" | tr -d '\r\n' || true
+                        )"
+                        if [[ -n "$localappdata_host" && "$localappdata_host/Roblox/mcp.bat" == "$candidate" ]]; then
+                            bat_is_localappdata_roblox=true
+                        fi
+                    fi
+                fi
+                break
+            fi
+        done
+    fi
 fi
 
-# Last resort, and the authoritative one: ask Wine where LOCALAPPDATA points
-# *for this prefix*. That is true by construction rather than by pattern, so it
-# survives a layout nobody here has seen -- and it cannot stray to another
-# installation, which is the whole point. It is last because it costs a Wine
-# startup, and a slow launcher reads to the client as a failed handshake rather
-# than as a slow one.
+# Last resort, for a layout none of the three patterns match: ask Wine where
+# LOCALAPPDATA points *for this prefix*, directly. That is true by
+# construction rather than by pattern, so it survives a layout nobody here has
+# seen -- and it cannot stray to another installation or another user's
+# profile, which is the whole point. It is last because it costs a Wine
+# startup, and a slow launcher reads to the client as a failed handshake
+# rather than as a slow one. What it finds is `%LOCALAPPDATA%\Roblox` by
+# definition -- it is the same variable, just asked for directly -- so the
+# flag stays true.
 if [[ -z "${STUDIO_MCP_BAT:-}" ]] && command -v winepath >/dev/null 2>&1; then
     localappdata_win="$("$wine_bin" cmd /c 'echo %LOCALAPPDATA%' 2>>"$log" | tr -d '\r\n' || true)"
     if [[ -n "$localappdata_win" && "$localappdata_win" != '%LOCALAPPDATA%' ]]; then
@@ -146,13 +220,14 @@ if [[ -z "${STUDIO_MCP_BAT:-}" || ! -f "$STUDIO_MCP_BAT" ]]; then
         "WINEPREFIX alone does not pick between them."
 fi
 
+# --- Prefer the executable mcp.bat itself would run ------------------------
+#
 # Roblox currently writes the exact StudioMCP.exe for the running Studio
-# version into the first `if exist` branch of mcp.bat. Prefer that executable
-# when it can be resolved. Wine's cmd.exe has a real compatibility edge here:
-# `cd /d "Z:\..."` reports "Path not found" for this redirected Vinegar path,
-# even though an unquoted cd and direct execution of the same file both work.
-# Launching the executable named by Roblox also avoids Wine's batch parser
-# emitting `Syntax error: unexpected ELSE` after the MCP process exits.
+# version into the first `if exist` branch of mcp.bat. Resolving and launching
+# that executable directly is the fix for bug 3: it needs no `cd` at all,
+# so there is no host-translated path for Wine to refuse, and it sidesteps
+# the batch parser entirely, so it cannot hit the `Syntax error: unexpected
+# ELSE` Wine's parser can emit from mcp.bat after the MCP process exits.
 studio_mcp_exe=""
 studio_mcp_exe_win="$(
     sed -n 's/^[[:space:]]*if exist "\([^"]*StudioMCP\.exe\)".*/\1/p' \
@@ -170,21 +245,34 @@ if [[ -n "$studio_mcp_exe" && ! -f "$studio_mcp_exe" ]]; then
     studio_mcp_exe=""
 fi
 
-# --- Host path to Windows path -------------------------------------------
+# --- Batch fallback: host path to Windows path, or not ---------------------
 #
-# winepath is authoritative and ships with Wine. The fallback is the same
-# mapping by hand: Wine's Z: drive is the host root, universally and by
-# default -- which is exactly what `wine cmd /c echo %LOCALAPPDATA%` reports on
-# a Vinegar install.
-bat_dir="$(dirname "$STUDIO_MCP_BAT")"
-if command -v winepath >/dev/null 2>&1; then
-    win_dir="$(winepath -w "$bat_dir" 2>>"$log" || true)"
-    win_dir="${win_dir%$'\r'}"
-else
-    win_dir=""
-fi
-if [[ -z "$win_dir" ]]; then
-    win_dir="Z:${bat_dir//\//\\}"
+# Used only when the executable above could not be resolved -- mcp.bat did not
+# parse the way Roblox currently writes it, or the file it named is missing.
+# This is why discovery above only ever inspects the host filesystem to check
+# *whether* mcp.bat exists (for a fast, specific error before Wine even
+# starts) rather than to build the string handed to `cd`: the string actually
+# used here is Wine's own `%LOCALAPPDATA%`, unresolved, for the reason bug 3
+# exists. The one case that still needs a host->Windows translation is an
+# explicit STUDIO_MCP_BAT override pointing somewhere `%LOCALAPPDATA%\Roblox`
+# does not reach -- or the plain-Wine multi-user case from bug 4, when the
+# check there could not confirm the two agree.
+if [[ -z "$studio_mcp_exe" ]]; then
+    if [[ "$bat_is_localappdata_roblox" == true ]]; then
+        target_dir='%LOCALAPPDATA%\Roblox'
+    else
+        bat_dir="$(dirname "$STUDIO_MCP_BAT")"
+        if command -v winepath >/dev/null 2>&1; then
+            win_dir="$(winepath -w "$bat_dir" 2>>"$log" || true)"
+            win_dir="${win_dir%$'\r'}"
+        else
+            win_dir=""
+        fi
+        if [[ -z "$win_dir" ]]; then
+            win_dir="Z:${bat_dir//\//\\}"
+        fi
+        target_dir="$win_dir"
+    fi
 fi
 
 # Stamp the log so a stale one is not mistaken for the current run.
@@ -193,7 +281,9 @@ fi
     echo "    WINEPREFIX=$WINEPREFIX"
     echo "    STUDIO_MCP_BAT=$STUDIO_MCP_BAT"
     echo "    STUDIO_MCP_EXE=${studio_mcp_exe:-<batch fallback>}"
-    echo "    win_dir=$win_dir"
+    if [[ -z "$studio_mcp_exe" ]]; then
+        echo "    target_dir=$target_dir"
+    fi
 } >>"$log" 2>/dev/null || true
 
 if [[ -n "$studio_mcp_exe" ]]; then
@@ -201,8 +291,11 @@ if [[ -n "$studio_mcp_exe" ]]; then
 fi
 
 # `cd /d` first because mcp.bat resolves what it launches relative to its own
-# directory. stdout stays untouched: it is the JSON-RPC stream.
-command_line="cd /d \"$win_dir\" && mcp.bat"
+# directory. `.\mcp.bat` rather than a bare `mcp.bat`, matching the exact
+# invocation confirmed working, for the same reason `target_dir` above avoids
+# inventing an equivalent string when a proven one is available. stdout stays
+# untouched: it is the JSON-RPC stream.
+command_line="cd /d \"$target_dir\" && .\\mcp.bat"
 if [[ $# -gt 0 ]]; then
     command_line="$command_line $*"
 fi

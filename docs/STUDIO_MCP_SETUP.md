@@ -39,7 +39,9 @@ needed.
 **Linux, with Studio under Wine (Vinegar)** — Studio's MCP server runs inside
 the Wine prefix, so it needs a wrapper.
 [`scripts/studio-mcp-wrapper.sh`](../scripts/studio-mcp-wrapper.sh) is that
-wrapper: it finds the prefix, finds `mcp.bat`, and runs it under Wine.
+wrapper: it finds the prefix, finds `mcp.bat`, and launches the real
+`StudioMCP.exe` that batch file would run — directly, under Wine, when it can
+resolve one — falling back to running the batch file itself otherwise.
 
 ```bash
 claude mcp add roblox-studio --scope user --transport stdio -- \
@@ -59,13 +61,15 @@ export a `wine` binary — `flatpak run --command=sh org.vinegarhq.Vinegar -c
 host (`apt install wine` on Debian/Kali). It still uses Vinegar's *prefix*; only
 the binary is the host's.
 
-#### Two things about where Studio's MCP server actually lives
+#### Four things about where Studio's MCP server actually lives, and how it launches
 
-Both of these were wrong in the first version of this wrapper, and neither is
-guessable — they were measured.
+None of these were guessable — every one was measured, on real hardware, by
+two people hitting the same failure from different angles.
 
 1. **The launcher is `mcp.bat`.** Enabling "Studio as MCP server" writes a small
-   batch file. There is no `StudioMCP.exe` to find.
+   batch file — but that batch file's own first branch names the exact,
+   versioned `StudioMCP.exe` Roblox generated it alongside, and the wrapper
+   prefers launching that directly (see point 3).
 2. **It is not under `drive_c`.** Vinegar redirects `%LOCALAPPDATA%` out of the
    prefix entirely, onto the host filesystem through Wine's `Z:` drive:
 
@@ -79,10 +83,46 @@ guessable — they were measured.
    plugin and instance directories. So `find "$WINEPREFIX/drive_c" -name
    mcp.bat` searches the one place the file is not, and the honest search is
    `find ~ -name mcp.bat`.
+3. **Wine's `cmd.exe` accepts a Windows path built one way and refuses the
+   identical string built another.** A version that fixed both bugs above
+   still failed to launch:
+
+   ```console
+   win_dir=Z:\home\<user>\.var\app\org.vinegarhq.Vinegar\data\vinegar\appdata\Roblox
+   Path not found.
+   ```
+
+   for the *exact same string* that Wine's own expansion of `%LOCALAPPDATA%`
+   resolves to and reaches without complaint — the one in step 2's `echo`
+   output, one line up. Two fixes for this landed close together, both real:
+   invoking the exact `StudioMCP.exe` `mcp.bat` would have run needs no `cd`
+   at all, so there is nothing for `cmd.exe` to refuse — this is what the
+   wrapper prefers, and it also sidesteps a `Syntax error: unexpected ELSE`
+   Wine's batch parser can emit from `mcp.bat` after the MCP process exits.
+   When that `.exe` can't be resolved (an unusual `mcp.bat`, or the named file
+   missing), the wrapper falls back to running the batch file itself, and for
+   that fallback hands Wine the **literal, unresolved** `%LOCALAPPDATA%\Roblox`
+   rather than a host-translated path, letting Wine expand its own variable
+   under the `WINEPREFIX` already exported. Discovery still walks the host
+   filesystem first in both cases — that only decides *whether* `mcp.bat`
+   exists, so a missing server fails fast with a specific message instead of a
+   slow, opaque Wine startup.
+4. **A file discovery finds is not automatically what Wine's own
+   `%LOCALAPPDATA%` currently answers for.** The literal fix in point 3 is only
+   sound when the two agree, which holds by construction for a Vinegar install
+   (Flatpak or native) — it has exactly one appdata directory — but not for a
+   plain Wine prefix holding more than one Windows user profile: the
+   `drive_c/users/*` glob can match a stale profile's `mcp.bat` while Wine
+   itself currently answers `%LOCALAPPDATA%` for someone else. Discovery
+   succeeding is then not the same as the literal being safe to use, so that
+   one candidate is checked against Wine's own answer (`echo %LOCALAPPDATA%`,
+   under the prefix already exported) before being trusted. Every other
+   candidate is unambiguous and skips the check.
 
 `%LOCALAPPDATA%\Roblox` is the right answer in both layouts — redirected under
-Vinegar, inside `drive_c` under a plain prefix — which is why the wrapper works
-for either.
+Vinegar, inside `drive_c` under a plain prefix — which is why letting Wine
+resolve it directly (point 3's fallback) works for either, once point 4's
+check confirms it is safe to.
 
 **If you have both a Flatpak and a native Vinegar, they have one `mcp.bat`
 each.** The wrapper derives the launcher from whichever prefix it selected —
@@ -90,13 +130,25 @@ Vinegar keeps `<root>/prefixes/studio` beside `<root>/appdata`, so the pairing
 is derivable rather than guessable — and it never reaches into a fixed global
 path. Setting `WINEPREFIX` therefore picks the launcher too. If discovery still
 lands on the wrong one, set `STUDIO_MCP_BAT` to the one belonging to that
-prefix; `find ~ -name mcp.bat` will show you both.
+prefix; `find ~ -name mcp.bat` will show you both. An explicit `STUDIO_MCP_BAT`
+override is one case that still needs a host→Windows translation for the batch
+fallback (it can point somewhere `%LOCALAPPDATA%\Roblox` does not reach), and
+the other is a plain-Wine multi-user prefix where point 4's check could not
+confirm the two agree — both are the one place point 3's class of failure
+could still resurface, and both fall back to a translated path rather than
+guess.
 
-`scripts/test-studio-mcp-wrapper.sh` runs the wrapper against eleven throwaway
-directory layouts with a stub `wine`, and is part of `npm test`. It covers
-discovery, quoting, argument forwarding and every failure message. It does not
-cover Wine itself — whether `mcp.bat` launches and speaks JSON-RPC needs the
-machine Studio runs on.
+`scripts/test-studio-mcp-wrapper.sh` runs the wrapper against twenty-one
+throwaway directory layouts with a stub `wine`, and is part of `npm test`. It
+covers discovery, the exact launch-command shape (direct-exe launch from a
+generated batch file, the literal `%LOCALAPPDATA%` form versus the
+translated-path form and that the right one is chosen for each case,
+including the multi-user mismatch), quoting, argument forwarding, and every
+failure message. It does not cover Wine itself — the stub never runs a real
+`cd` or launches a real process, so it cannot tell a Windows path string or an
+`.exe` that merely looks right from one Wine actually accepts. That is
+precisely the gap bugs 3 and 4 lived in; whether the server actually launches
+and speaks JSON-RPC still needs the machine Studio runs on.
 
 ### 3. Confirm it is actually connected
 
@@ -111,6 +163,7 @@ works. Anything else, see the troubleshooting table.
 | JSON parse errors, connection drops immediately | Something is writing to stdout besides the protocol. Wine's `fixme:` chatter is the usual culprit; the wrapper redirects stderr to `/tmp/studio-mcp.log` for exactly this reason. Check that log. |
 | `mcp.bat not found` | The MCP server has not been enabled in Studio yet — Studio writes the file when you enable it — or the probe missed. Run `find ~ -name mcp.bat` (search `~`, not the prefix; see above) and set `STUDIO_MCP_BAT`. |
 | `'wine' is not on PATH` | Vinegar's Flatpak runtime does not export a wine binary. Install Wine on the host, or set `WINE_BIN`. |
+| `Path not found.` in the log, connection closes immediately | The wrapper is invoking `cd` with a resolved absolute path instead of the `%LOCALAPPDATA%` literal — expected only when `STUDIO_MCP_BAT` is set explicitly to a custom location (see bug 3 above). Confirm the override actually points at `mcp.bat`, or unset it and let discovery find the standard one. |
 | Connects, but sees nothing | Studio is open without a place loaded, or a different place is in focus. |
 | Worked yesterday, not today | Roblox ships Studio updates that periodically break under Wine. VinegarHQ states plainly that they cannot guarantee functionality and that fixes can take days. Check the Vinegar issue tracker before debugging your own setup. |
 

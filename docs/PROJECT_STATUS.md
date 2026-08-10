@@ -96,6 +96,25 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#376** hardens the Studio-MCP wrapper's batch fallback, the route #370's
+  direct-exe launch does not take when Roblox's `mcp.bat` cannot be parsed for
+  its `StudioMCP.exe` path. That fallback still built a host-translated `cd /d
+  "Z:\..."` for the common case, the exact string #370 proved Wine's `cmd.exe`
+  refuses — it now hands Wine the literal, unresolved `%LOCALAPPDATA%\Roblox`
+  and lets Wine expand its own variable instead, for every discovery path that
+  is that variable by construction. Codex then found the one construction that
+  is not: a plain Wine prefix can hold more than one Windows user profile, and
+  the `drive_c/users/*` glob can match a stale one while Wine's own
+  `%LOCALAPPDATA%` currently answers for someone else — discovery succeeding
+  is then not the same as the literal being safe, and using it anyway would
+  make launch fail for a reason discovery gave no sign of. That one candidate
+  is now checked against Wine's own answer before being trusted; every other
+  candidate is unambiguous (a Vinegar install has exactly one appdata
+  directory) and skips the check. The reported case was reproduced
+  (`bat_is_localappdata_roblox=true` forced past the check picks the wrong
+  user's directory) before being fixed, and the fixture suite that had used an
+  unconfirmed single-user match to test the literal path was corrected to
+  actually confirm it, the way a real single-user Wine would. Suite: 21/21.
 - **#374** (v165) **Bramblewake's complete Studio walkthrough closes the defects it
   found instead of only recording them.** Codex connected to the same live
   Studio MCP relay as Claude, walked the generated route end to end, harvested
@@ -2517,12 +2536,61 @@ Verified against `git log`, newest first:
   question put to Wine itself (`echo %LOCALAPPDATA%` under that prefix), which
   is prefix-tied by construction.
 
-  A script that has now been wrong three times gets a test:
-  `scripts/test-studio-mcp-wrapper.sh` runs the wrapper against eleven
-  throwaway layouts with a stub `wine`, and is wired into `npm run check`. It
-  was made to fail first — run against the previous commit's wrapper, the
-  two-installs case reproduces Codex's finding exactly. **The one thing it
-  cannot cover is Wine itself**, which needs the owner's machine.
+  A script that had now been wrong three times got a test:
+  `scripts/test-studio-mcp-wrapper.sh` runs the wrapper against throwaway
+  layouts with a stub `wine`, wired into `npm run check`. Its own limit was
+  named plainly — the stub never runs a real `cd`, so it cannot tell a Windows
+  path string that merely looks right from one Wine actually accepts. That gap
+  is exactly where the fourth bug lived.
+
+  On the owner's actual machine, the fixed wrapper still failed to launch.
+  Discovery was correct — the log named the right `mcp.bat` — but the launch
+  itself hit `Path not found.` from a `win_dir` that was, byte for byte, the
+  same string the owner's own manual `%LOCALAPPDATA%` expansion had reached
+  successfully one line earlier in a prior session. Two independent
+  investigations of that failure converged on the same underlying lesson from
+  different angles — Wine's `cmd.exe` accepts a Windows path built one way and
+  refuses the identical string built another — and produced two different,
+  both-real fixes, landed close enough together that this file briefly told
+  each one as if it were the whole story:
+
+  **#370, the fix that actually closes the failure for the common case**,
+  found that invoking the exact versioned `StudioMCP.exe` Roblox writes into
+  `mcp.bat`'s own first branch sidesteps the problem entirely — no `cd` at
+  all, so there is nothing for `cmd.exe` to refuse, and no batch parser left
+  to emit the `Syntax error: unexpected ELSE` it can raise from `mcp.bat`
+  after the MCP process exits. That launch was confirmed for real: a genuine
+  `initialize` response (`RobloxStudio` 1.0.0, protocol `2025-06-18`), Claude
+  reporting the server connected, and a fresh Codex session completing
+  `roblox-studio/list_roblox_studios`.
+
+  **This branch's own fix (folded in here as part of resolving a merge
+  against #370) hardens the batch route that direct-exe launch falls back to**
+  when `mcp.bat` cannot be parsed for that path. That fallback still built a
+  host-translated `cd /d "Z:\..."` — the exact string #370 proved Wine
+  refuses — so it hands Wine the literal, unresolved `%LOCALAPPDATA%\Roblox`
+  instead and lets Wine expand its own variable, for every discovery path
+  that is that variable by construction. Codex then found the one
+  construction that is not, on this branch's own PR: a plain Wine prefix can
+  hold more than one Windows user profile, and the `drive_c/users/*` glob can
+  match a stale one while Wine's `%LOCALAPPDATA%` currently answers for
+  someone else. That candidate is now checked against Wine's own answer
+  before being trusted.
+
+  The test suite grew to twenty-one cases holding both fixes explicit —
+  direct-exe launch from a generated batch file, the literal
+  `%LOCALAPPDATA%\Roblox` form for every path proven to be it, the translated
+  form for an override and for an unconfirmed multi-user match, and the
+  multi-user mismatch itself, reproduced before being fixed — and still says
+  outright what none of it can verify: the stub never runs a real `cd` or a
+  real Wine process, so it cannot tell a Windows path string that merely
+  looks right from one Wine actually accepts, or a `.exe` that merely exists
+  from one that speaks the protocol. **A script wrong five times across two
+  independent efforts, caught by static reasoning zero of those five times**,
+  is the concrete argument for treating "the tests pass" and "it runs on the
+  owner's machine" as two separate, both-required claims — and for reading
+  this file's own header before starting the next session's version of this
+  same fix a third time.
 - **#368** Owner-playtest fix pass on Bramblewake —
   four reports from a real session, all four traced to source and fixed. All
   four were still present on `main` at #367; none had been fixed by the region
