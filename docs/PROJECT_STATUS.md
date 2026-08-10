@@ -2462,10 +2462,23 @@ Verified against `git log`, newest first:
   mapping), and runs `cmd /c "cd /d <dir> && mcp.bat"` — the invocation that
   reached `✔ Connected`. It also says so when Wine is missing, because
   Vinegar's Flatpak runtime does not export a `wine` binary and the host must
-  supply one. Exercised against eight simulated layouts (both Vinegar
-  variants, plain Wine, override, bounded-find fallback, a path containing a
-  space, and three failure paths) with a stub `wine`; **the one thing not
-  tested is Wine itself**, which needs the owner's machine.
+  supply one.
+
+  Codex then caught a third bug in the fix: the candidate list was still
+  *absolute*, so a machine carrying both a Flatpak and a native Vinegar could
+  pair an explicitly set `WINEPREFIX` with the other installation's launcher.
+  Every candidate now derives from the selected prefix — Vinegar keeps
+  `<root>/prefixes/studio` beside `<root>/appdata`, so the pairing is
+  derivable — and the last-resort search is no longer a global `find` but a
+  question put to Wine itself (`echo %LOCALAPPDATA%` under that prefix), which
+  is prefix-tied by construction.
+
+  A script that has now been wrong three times gets a test:
+  `scripts/test-studio-mcp-wrapper.sh` runs the wrapper against eleven
+  throwaway layouts with a stub `wine`, and is wired into `npm run check`. It
+  was made to fail first — run against the previous commit's wrapper, the
+  two-installs case reproduces Codex's finding exactly. **The one thing it
+  cannot cover is Wine itself**, which needs the owner's machine.
 - **#368** Owner-playtest fix pass on Bramblewake —
   four reports from a real session, all four traced to source and fixed. All
   four were still present on `main` at #367; none had been fixed by the region

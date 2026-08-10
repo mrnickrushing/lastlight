@@ -84,6 +84,20 @@ guessable — they were measured.
 Vinegar, inside `drive_c` under a plain prefix — which is why the wrapper works
 for either.
 
+**If you have both a Flatpak and a native Vinegar, they have one `mcp.bat`
+each.** The wrapper derives the launcher from whichever prefix it selected —
+Vinegar keeps `<root>/prefixes/studio` beside `<root>/appdata`, so the pairing
+is derivable rather than guessable — and it never reaches into a fixed global
+path. Setting `WINEPREFIX` therefore picks the launcher too. If discovery still
+lands on the wrong one, set `STUDIO_MCP_BAT` to the one belonging to that
+prefix; `find ~ -name mcp.bat` will show you both.
+
+`scripts/test-studio-mcp-wrapper.sh` runs the wrapper against eleven throwaway
+directory layouts with a stub `wine`, and is part of `npm test`. It covers
+discovery, quoting, argument forwarding and every failure message. It does not
+cover Wine itself — whether `mcp.bat` launches and speaks JSON-RPC needs the
+machine Studio runs on.
+
 ### 3. Confirm it is actually connected
 
 Open `build/LastLight.rbxlx` in Studio, start a session in the repository root,

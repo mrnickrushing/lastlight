@@ -93,12 +93,24 @@ command -v "$wine_bin" >/dev/null 2>&1 \
 
 # --- The launcher ---------------------------------------------------------
 #
-# Ordered by how likely each is to be right, most specific first. The last
-# entry is the plain-Wine layout, where LOCALAPPDATA is not redirected.
+# **Every candidate is derived from the prefix chosen above, never from a fixed
+# global path.** An earlier version listed Vinegar's Flatpak and native appdata
+# directories absolutely, which meant that on a machine carrying both -- or one
+# with stale Flatpak appdata left over from a migration -- an explicitly set
+# WINEPREFIX could be paired with the *other* installation's mcp.bat. That runs
+# one install's launcher against another install's prefix, and the failure is
+# the confusing kind: it starts, and then cannot see the Studio you are
+# actually looking at.
+#
+# Vinegar keeps its prefix and its appdata as siblings under one root --
+# <root>/prefixes/studio beside <root>/appdata -- so the appdata is derivable
+# from the prefix rather than guessable. The third form is plain Wine, where
+# LOCALAPPDATA is not redirected and lives inside drive_c.
 if [[ -z "${STUDIO_MCP_BAT:-}" ]]; then
+    prefix_parent="$(dirname "$WINEPREFIX")"
     for candidate in \
-        "$HOME/.var/app/org.vinegarhq.Vinegar/data/vinegar/appdata/Roblox/mcp.bat" \
-        "$HOME/.local/share/vinegar/appdata/Roblox/mcp.bat" \
+        "$(dirname "$prefix_parent")/appdata/Roblox/mcp.bat" \
+        "$prefix_parent/appdata/Roblox/mcp.bat" \
         "$WINEPREFIX"/drive_c/users/*/AppData/Local/Roblox/mcp.bat
     do
         if [[ -f "$candidate" ]]; then
@@ -108,22 +120,30 @@ if [[ -z "${STUDIO_MCP_BAT:-}" ]]; then
     done
 fi
 
-# Last resort. Bounded, because an unbounded search of $HOME on a machine with a
-# large home directory takes long enough that the client gives up on the
-# handshake and reports a connection failure rather than a slow start.
-if [[ -z "${STUDIO_MCP_BAT:-}" ]]; then
-    STUDIO_MCP_BAT="$(
-        find "$HOME/.var/app/org.vinegarhq.Vinegar" "$HOME/.local/share/vinegar" "$WINEPREFIX" \
-            -maxdepth 8 -name 'mcp.bat' -type f -print 2>/dev/null | head -1 || true
-    )"
+# Last resort, and the authoritative one: ask Wine where LOCALAPPDATA points
+# *for this prefix*. That is true by construction rather than by pattern, so it
+# survives a layout nobody here has seen -- and it cannot stray to another
+# installation, which is the whole point. It is last because it costs a Wine
+# startup, and a slow launcher reads to the client as a failed handshake rather
+# than as a slow one.
+if [[ -z "${STUDIO_MCP_BAT:-}" ]] && command -v winepath >/dev/null 2>&1; then
+    localappdata_win="$("$wine_bin" cmd /c 'echo %LOCALAPPDATA%' 2>>"$log" | tr -d '\r\n' || true)"
+    if [[ -n "$localappdata_win" && "$localappdata_win" != '%LOCALAPPDATA%' ]]; then
+        localappdata_host="$(winepath -u "$localappdata_win" 2>>"$log" | tr -d '\r\n' || true)"
+        if [[ -n "$localappdata_host" && -f "$localappdata_host/Roblox/mcp.bat" ]]; then
+            STUDIO_MCP_BAT="$localappdata_host/Roblox/mcp.bat"
+        fi
+    fi
 fi
 
 if [[ -z "${STUDIO_MCP_BAT:-}" || ! -f "$STUDIO_MCP_BAT" ]]; then
-    die "mcp.bat not found." \
+    die "mcp.bat not found for prefix $WINEPREFIX." \
         "Enable it first in Studio: Assistant -> ... -> Manage MCP Servers ->" \
         "\"Enable Studio as MCP server\". Studio writes mcp.bat when you do." \
         "Then, if it still cannot be found: find ~ -name mcp.bat, and set" \
-        "STUDIO_MCP_BAT to what that prints."
+        "STUDIO_MCP_BAT to whichever one belongs to this prefix. If you have" \
+        "both a Flatpak and a native Vinegar, they have one each -- setting" \
+        "WINEPREFIX alone does not pick between them."
 fi
 
 # --- Host path to Windows path -------------------------------------------
