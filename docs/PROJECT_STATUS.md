@@ -7,9 +7,9 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-10, at `main` = PR #372, build `0.53.1`,
-save schema 25, 27 services. Published to Roblox as place version 163;
-`0.53.1` is a source-only owner-playtest fix pass and has not been published.
+Last updated: 2026-08-10, at `main` = PR #373, build `0.53.1`,
+save schema 25, 27 services. Published to Roblox as place version 164;
+`0.53.1` is published from the merged Frostmere build through PR #372.
 (#364 added only documentation over v162, and #361/#362 only
 documentation over v161.) (#358 produced v159 and #359
 v160; those three are Milestone 13 wave D's closing batches, and each was
@@ -96,7 +96,7 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
-- **#371: Frostmere Vale opens after its live
+- **#371** (v164) **Frostmere Vale opens after its live
   end-to-end walk.** The region flag and builder walkability switch are on,
   chapter-five access is pinned beside the Delve, Fen and Reach, and the two
   memory-bearing points of interest are fixed into every generated Vale run so
