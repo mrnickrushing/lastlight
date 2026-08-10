@@ -38047,6 +38047,11 @@ local SOURCE: { [string]: string } = {
     ["story.the_light_goes_out_and_the"] = "The light goes out and the nights stop being hunted. So does every lantern above it, and the town has to learn the dark.",
     ["story.the_light_is_broken_up_and"] = "The light is broken up and carried out a piece at a time. No lantern town any more, and no single thing left to sit at the bottom of it.",
     ["expedition.standard_sweep"] = "STANDARD SWEEP",
+    ["hud.party_size"] = "PARTY SIZE",
+    ["hud.route_contract"] = "ROUTE CONTRACT",
+    ["hud.choose_party_size_standard_sweep"] = "CHOOSE PARTY SIZE · STANDARD SWEEP",
+    ["hud.choose_party_size_n"] = "CHOOSE PARTY SIZE · %s",
+    ["hud.party_of_n_contract_n"] = "PARTY OF %d · %s",
     ["expedition.the_woods_as_they_are_even"] = "The woods as they are. Even trade.",
     ["expedition.quiet_roads"] = "QUIET ROADS",
     ["expedition.mist_keeps_the_worst_asleep_lighter"] = "Mist keeps the worst asleep. Lighter pouch, lighter bruises.",
@@ -67232,32 +67237,35 @@ local function addBillboard(
     partInstance: BasePart,
     title: string,
     accent: Color3,
-    maxDistance: number?
+    maxDistance: number?,
+    compact: boolean?
 )
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "WorldLabel"
     billboard.Adornee = partInstance
     billboard.AlwaysOnTop = false
     billboard.LightInfluence = 0.35
-    billboard.Size = UDim2.fromOffset(165, 38)
+    billboard.Size = if compact then UDim2.fromOffset(126, 30) else UDim2.fromOffset(165, 38)
     -- Labels used to sit ~3.6 studs up, which on a waist-high display put the
     -- card directly over the object it was naming. Sitting them well clear
     -- keeps the prop readable, which is the order the visual standard asks
     -- for: recognize the object first, read the label second.
-    billboard.StudsOffsetWorldSpace = Vector3.new(0, 7.4, 0)
+    billboard.StudsOffsetWorldSpace = if compact
+        then Vector3.new(0, 5.7, 0)
+        else Vector3.new(0, 7.4, 0)
     billboard.MaxDistance = maxDistance or 20
     billboard.Parent = partInstance
 
     local text = Instance.new("TextLabel")
     text.BackgroundColor3 = Color3.fromRGB(16, 25, 23)
-    text.BackgroundTransparency = 0.18
+    text.BackgroundTransparency = if compact then 0.38 else 0.18
     text.BorderSizePixel = 0
     text.Size = UDim2.fromScale(1, 1)
     text.Font = Enum.Font.GothamBold
     text.Text = title
     text.TextColor3 = accent
     text.TextScaled = false
-    text.TextSize = 12
+    text.TextSize = if compact then 10 else 12
     text.TextWrapped = true
     text.Parent = billboard
 
@@ -79874,7 +79882,11 @@ function WorldService.buildBramblewake(
             Vector3.new(10, 12, 10)
         )
         self._resourceNodes[node.interactionId] = node
-        addBillboard(node.target, string.upper(node.objectText), AMBER, 90)
+        -- The prop and the interaction rail already identify a harvest node.
+        -- A ninety-stud card made four to six node names hang over the route
+        -- at once and hid the forest the player was meant to read. Keep a
+        -- quiet confirmation only inside ordinary interaction distance.
+        addBillboard(node.target, string.upper(node.objectText), AMBER, 24, true)
     end
 
     self:_placeMemoryFragments(
@@ -84819,11 +84831,12 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
         local canopy = part(
             folder,
             "BackdropCanopy",
-            -- Narrower and set higher: a ball nearly five trunks wide sitting
-            -- at shoulder height is a bush; a crown riding a visible trunk is
-            -- a tree.
-            Vector3.new(width * 3.4, height * 0.6, width * 3.4),
-            CFrame.new(at + Vector3.new(0, height * 0.95, 0))
+            -- The old crown was narrow against a very tall trunk. Seen from
+            -- the route, the four ranks became identical balls on poles and
+            -- left strips of bare sky between them. A broad, lower crown
+            -- keeps the trunk readable while making the rank read as forest.
+            Vector3.new(width * 5.4, height * 0.46, width * 5.4),
+            CFrame.new(at + Vector3.new(0, height * 0.78, 0))
                 * CFrame.Angles(lean, (seed % 211) * 0.021, 0),
             Color3.fromRGB(math.floor(64 * lift), math.floor(96 * lift), math.floor(66 * lift)),
             Enum.Material.Grass,
@@ -84844,10 +84857,10 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
         it -- density still climbs with distance, just starting politely.
     ]]
     local ranks = {
-        { radius = reach + 72, count = 20, height = 46, width = 4.2, shade = 1.0 },
-        { radius = reach + 150, count = 40, height = 62, width = 5.0, shade = 0.86 },
-        { radius = reach + 250, count = 56, height = 84, width = 6.0, shade = 0.7 },
-        { radius = reach + 360, count = 66, height = 108, width = 7.2, shade = 0.56 },
+        { radius = reach + 36, count = 26, height = 40, width = 5.2, shade = 1.0 },
+        { radius = reach + 124, count = 42, height = 54, width = 6.2, shade = 0.86 },
+        { radius = reach + 232, count = 58, height = 70, width = 7.6, shade = 0.7 },
+        { radius = reach + 350, count = 68, height = 88, width = 9.2, shade = 0.56 },
     }
     for rankIndex, rank in ranks do
         for index = 1, rank.count do
@@ -84871,7 +84884,7 @@ local function buildBackdrop(parent: Instance, centers: { Vector3 }, extra: { an
     local heroes = { "mesh_conifer_hero_a", "mesh_conifer_hero_b", "mesh_broadleaf_hero_a" }
     for index = 1, 14 do
         local angle = (index / 14) * math.pi * 2 + 0.4
-        local radius = reach + 12 + ((index * 29) % 56)
+        local radius = reach - 24 + ((index * 29) % 48)
         dress(
             extra,
             heroes[(index % #heroes) + 1],
@@ -97497,6 +97510,9 @@ export type HUDController =
             _lobbySizes: Frame,
             _lobbySizeButtons: { TextButton },
             _contractButtons: { [string]: TextButton },
+            _contractDetails: { [string]: string },
+            _lobbyContractDetail: TextLabel,
+            _lobbySelectionSummary: TextLabel,
             _selectedContractId: string,
             _onLobbyDepart: ((number) -> ())?,
             _selectedPartySize: number?,
@@ -99040,7 +99056,7 @@ function HUDController.new(
     lobbyFrame.Name = "LobbyPanel"
     lobbyFrame.AnchorPoint = Vector2.new(0.5, 1)
     lobbyFrame.Position = UDim2.new(0.5, 0, 1, -104)
-    lobbyFrame.Size = UDim2.fromOffset(420, 246)
+    lobbyFrame.Size = UDim2.fromOffset(420, 294)
     lobbyFrame.BackgroundColor3 = Color3.fromRGB(16, 22, 26)
     lobbyFrame.BackgroundTransparency = 0.12
     lobbyFrame.BorderSizePixel = 0
@@ -99087,11 +99103,24 @@ function HUDController.new(
     lobbyDetail.ZIndex = 41
     lobbyDetail.Parent = lobbyFrame
 
+    local partySizeLabel = Instance.new("TextLabel")
+    partySizeLabel.Name = "LobbyPartySizeLabel"
+    partySizeLabel.BackgroundTransparency = 1
+    partySizeLabel.Position = UDim2.fromOffset(14, 57)
+    partySizeLabel.Size = UDim2.new(1, -28, 0, 14)
+    partySizeLabel.Font = Enum.Font.GothamBold
+    partySizeLabel.Text = Strings.get("hud.party_size")
+    partySizeLabel.TextColor3 = Color3.fromRGB(178, 194, 183)
+    partySizeLabel.TextSize = 11
+    partySizeLabel.TextXAlignment = Enum.TextXAlignment.Left
+    partySizeLabel.ZIndex = 41
+    partySizeLabel.Parent = lobbyFrame
+
     local lobbySizes = Instance.new("Frame")
     lobbySizes.Name = "LobbySizes"
     lobbySizes.BackgroundTransparency = 1
-    lobbySizes.Position = UDim2.fromOffset(14, 66)
-    lobbySizes.Size = UDim2.new(1, -28, 0, 44)
+    lobbySizes.Position = UDim2.fromOffset(14, 74)
+    lobbySizes.Size = UDim2.new(1, -28, 0, 38)
     lobbySizes.ZIndex = 41
     lobbySizes.Parent = lobbyFrame
     local lobbyLayout = Instance.new("UIListLayout")
@@ -99126,11 +99155,24 @@ function HUDController.new(
         selected at a time; the selection rides the depart payload and the
         server resolves it (junk falls back to the standard sweep).
     ]]
+    local contractLabel = Instance.new("TextLabel")
+    contractLabel.Name = "LobbyContractLabel"
+    contractLabel.BackgroundTransparency = 1
+    contractLabel.Position = UDim2.fromOffset(14, 119)
+    contractLabel.Size = UDim2.new(1, -28, 0, 14)
+    contractLabel.Font = Enum.Font.GothamBold
+    contractLabel.Text = Strings.get("hud.route_contract")
+    contractLabel.TextColor3 = Color3.fromRGB(178, 194, 183)
+    contractLabel.TextSize = 11
+    contractLabel.TextXAlignment = Enum.TextXAlignment.Left
+    contractLabel.ZIndex = 41
+    contractLabel.Parent = lobbyFrame
+
     local contractRow = Instance.new("Frame")
     contractRow.Name = "LobbyContracts"
     contractRow.BackgroundTransparency = 1
-    contractRow.Position = UDim2.fromOffset(14, 116)
-    contractRow.Size = UDim2.new(1, -28, 0, 58)
+    contractRow.Position = UDim2.fromOffset(14, 136)
+    contractRow.Size = UDim2.new(1, -28, 0, 46)
     contractRow.ZIndex = 41
     contractRow.Parent = lobbyFrame
     local contractLayout = Instance.new("UIListLayout")
@@ -99139,6 +99181,8 @@ function HUDController.new(
     contractLayout.SortOrder = Enum.SortOrder.LayoutOrder
     contractLayout.Parent = contractRow
     local contractButtons: { [string]: TextButton } = {}
+    local contractDetails: { [string]: string } = {}
+    local initialContractDetail = ""
     for order, contract in contracts or {} do
         local contractButton = Instance.new("TextButton")
         contractButton.Name = "Contract_" .. contract.id
@@ -99150,7 +99194,8 @@ function HUDController.new(
         contractButton.AutoButtonColor = true
         contractButton.Font = Enum.Font.GothamBold
         contractButton.TextWrapped = true
-        contractButton.Text = contract.title
+        contractButton.Text = (if order == 1 then "✓ " else "") .. contract.title
+        contractButton:SetAttribute("BaseTitle", contract.title)
         contractButton.TextColor3 = Color3.fromRGB(244, 230, 197)
         contractButton.TextSize = 11
         contractButton.ZIndex = 42
@@ -99159,7 +99204,39 @@ function HUDController.new(
         contractCorner.CornerRadius = UDim.new(0, 8)
         contractCorner.Parent = contractButton
         contractButtons[contract.id] = contractButton
+        contractDetails[contract.id] = contract.detail
+        if order == 1 then
+            initialContractDetail = contract.detail
+        end
     end
+
+    local contractDetail = Instance.new("TextLabel")
+    contractDetail.Name = "LobbyContractDetail"
+    contractDetail.BackgroundTransparency = 1
+    contractDetail.Position = UDim2.fromOffset(14, 187)
+    contractDetail.Size = UDim2.new(1, -28, 0, 31)
+    contractDetail.Font = Enum.Font.Gotham
+    contractDetail.Text = initialContractDetail
+    contractDetail.TextColor3 = Color3.fromRGB(206, 211, 200)
+    contractDetail.TextSize = 12
+    contractDetail.TextWrapped = true
+    contractDetail.TextXAlignment = Enum.TextXAlignment.Left
+    contractDetail.TextYAlignment = Enum.TextYAlignment.Top
+    contractDetail.ZIndex = 41
+    contractDetail.Parent = lobbyFrame
+
+    local selectionSummary = Instance.new("TextLabel")
+    selectionSummary.Name = "LobbySelectionSummary"
+    selectionSummary.BackgroundTransparency = 1
+    selectionSummary.Position = UDim2.fromOffset(14, 219)
+    selectionSummary.Size = UDim2.new(1, -28, 0, 16)
+    selectionSummary.Font = Enum.Font.GothamBold
+    selectionSummary.Text = Strings.get("hud.choose_party_size_standard_sweep")
+    selectionSummary.TextColor3 = Color3.fromRGB(255, 181, 76)
+    selectionSummary.TextSize = 12
+    selectionSummary.TextXAlignment = Enum.TextXAlignment.Left
+    selectionSummary.ZIndex = 41
+    selectionSummary.Parent = lobbyFrame
 
     --[[
         The party row: who is travelling with you, and the way back to them.
@@ -99173,7 +99250,7 @@ function HUDController.new(
     local partyLine = Instance.new("TextLabel")
     partyLine.Name = "LobbyPartyLine"
     partyLine.BackgroundTransparency = 1
-    partyLine.Position = UDim2.fromOffset(14, 180)
+    partyLine.Position = UDim2.fromOffset(14, 238)
     partyLine.Size = UDim2.new(1, -28, 0, 16)
     partyLine.Font = Enum.Font.Gotham
     partyLine.Text = Strings.get("hud.travelling_alone")
@@ -99186,7 +99263,7 @@ function HUDController.new(
     local partyRow = Instance.new("Frame")
     partyRow.Name = "LobbyParty"
     partyRow.BackgroundTransparency = 1
-    partyRow.Position = UDim2.fromOffset(14, 200)
+    partyRow.Position = UDim2.fromOffset(14, 258)
     partyRow.Size = UDim2.new(1, -28, 0, 36)
     partyRow.ZIndex = 41
     partyRow.Parent = lobbyFrame
@@ -99288,6 +99365,9 @@ function HUDController.new(
         _lobbyDetail = lobbyDetail,
         _lobbySizes = lobbySizes,
         _lobbySizeButtons = lobbySizeButtons,
+        _contractDetails = contractDetails,
+        _lobbyContractDetail = contractDetail,
+        _lobbySelectionSummary = selectionSummary,
         _partyLine = partyLine,
         _partyButtons = partyButtons,
         _contractButtons = contractButtons,
@@ -100028,6 +100108,13 @@ function HUDController._setSelectedPartySize(self: HUDController, size: number?)
             else Color3.fromRGB(31, 40, 44)
         button.TextColor3 = if chosen then COLORS.amber else COLORS.cream
     end
+    local contractButton = self._contractButtons[self._selectedContractId]
+    local contractTitle = if contractButton == nil
+        then Strings.get("expedition.standard_sweep")
+        else tostring(contractButton:GetAttribute("BaseTitle"))
+    self._lobbySelectionSummary.Text = if size == nil
+        then string.format(Strings.get("hud.choose_party_size_n"), contractTitle)
+        else string.format(Strings.get("hud.party_of_n_contract_n"), size, contractTitle)
 end
 
 function HUDController.setLobbyDepartHandler(self: HUDController, callback: (number, string) -> ())
@@ -100054,11 +100141,16 @@ function HUDController.setLobbyDepartHandler(self: HUDController, callback: (num
     for contractId, button in self._contractButtons do
         button.Activated:Connect(function()
             self._selectedContractId = contractId
+            self._lobbyContractDetail.Text = self._contractDetails[contractId] or ""
             for otherId, otherButton in self._contractButtons do
-                otherButton.BackgroundColor3 = if otherId == contractId
+                local chosen = otherId == contractId
+                otherButton.BackgroundColor3 = if chosen
                     then Color3.fromRGB(37, 68, 55)
                     else Color3.fromRGB(31, 40, 44)
+                local baseTitle = tostring(otherButton:GetAttribute("BaseTitle"))
+                otherButton.Text = (if chosen then "✓ " else "") .. baseTitle
             end
+            self:_setSelectedPartySize(self._selectedPartySize)
         end)
     end
 end
@@ -100989,7 +101081,7 @@ function HUDController._layout(self: HUDController)
         have it now.
     ]]
     self._lobbyFrame.Size =
-        UDim2.fromOffset(math.max(LOBBY_MIN_WIDTH, math.min(420, canvasWidth - 24)), 246)
+        UDim2.fromOffset(math.max(LOBBY_MIN_WIDTH, math.min(420, canvasWidth - 24)), 294)
 
     if narrow then
         -- 470 is a tablet's card, not a phone's: capped to the canvas so the
