@@ -7,11 +7,17 @@ here is invisible to the next session. The sibling repository learned this the
 hard way — the same feature was once built twice in parallel because nothing
 recorded that it was already in flight.
 
-Last updated: 2026-08-10, at `main` = PR #377, build `0.53.1`,
-save schema 25, 27 services. Published to Roblox as place version 166;
-`0.53.1` is published from the merged Bramblewake visual-bug-fix build in
-PR #377. (#376 left the built place byte-identical — Studio-MCP wrapper
-and docs only, no source under `src/`.)
+Last updated: 2026-08-10, at `main` = PR #379, build `0.53.1`,
+save schema 25, 27 services. Published to Roblox as place version 167;
+`0.53.1` is published from PR #379, which replaced the ten crafting benches
+in Emberhollow with one Crafting Table station whose interaction opens a
+client panel listing every recipe in the catalog — the owner's own
+description of the old layout was "2345748357 of them". (#378 left the
+built place byte-identical — the place-version-166 documentation record for
+PR #377, no source under `src/`.) `0.53.1` was also published from the
+merged Bramblewake visual-bug-fix build in PR #377. (#376 left the built
+place byte-identical — Studio-MCP wrapper and docs only, no source under
+`src/`.)
 (#364 added only documentation over v162, and #361/#362 only
 documentation over v161.) (#358 produced v159 and #359
 v160; those three are Milestone 13 wave D's closing batches, and each was
@@ -98,6 +104,36 @@ catalog-only work now that sequencing exists — an entry with `residentId`
 and `requires` is a new stage and nothing else has to change.
 
 Newest first since the last header:
+- **#379** (v167) **The ten crafting benches in Emberhollow are one Crafting
+  Table now.** The owner's own words for the old layout: "2345748357 of
+  them." It was ten, and `WorldService`'s own comments already recorded why
+  ten was itself a second attempt — a bench derived per recipe (130 of
+  them) closed the "120 recipes nobody can craft" gap and broke something
+  worse, a furniture maze whose click volumes swallowed the tutorial's first
+  prompt; ten authored sample benches fixed the maze but still read, on an
+  actual Studio walkthrough, as a conveyor belt of near-identical stalls.
+  Both were the wrong shape for the same reason a hundred and thirty
+  recipes do not need a hundred and thirty pieces of furniture — they need
+  a menu. One `CraftingStation` model (workbench, an open ledger standing
+  for "browse the catalog" rather than any one recipe's silhouette, a tool
+  rack) now carries a single interaction; `Actions.CraftItem` carries a real
+  client-chosen `recipeId` instead of a prompt attribute, validated by
+  `ActionPayloadContract` the same way `StorePurchase`'s `productId` is and
+  re-checked server-side before anything crafts. `HUDController` gained a
+  crafting panel — a flat scrollable list built from `CraftingCatalog.list()`
+  (no category field exists to group by), each row showing the recipe's
+  output name, its materials derived from the catalog's own already-readable
+  ids rather than a second name table that could drift, and a CRAFT button
+  that greys out and explains itself when the bank can't afford it. Three
+  specs that had encoded the ten-bench shape as correct were rewritten;
+  `ContentCensus`'s own reachability case had said in its own comment "if a
+  crafting menu shipped this should be zero and this case should check
+  that" — it now does. Full local validation passes: 935 Luau tests,
+  format, lint, typecheck, every repository validator, both regenerated
+  places, built-DataModel verification and the rollback build. The exact
+  merged commit `5e596ed` was rebuilt and passed the full suite again on
+  synchronized `main`, then Open Cloud published that artifact to start
+  place `115897110071287` as place version 167.
 - **#377** (v166) **Three visual bugs from a live Studio walkthrough of
   Bramblewake, found and fixed by Claude connected to the same Studio MCP
   relay #374 and #376 used.** The Hungry Homestead's Water Cask was an
