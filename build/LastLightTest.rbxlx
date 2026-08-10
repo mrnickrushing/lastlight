@@ -1103,6 +1103,12 @@ function ActionPayloadContract.extraField(runtimeIds: any, kind: string): string
         -- about that id, and a payload with no slot in it cannot name the
         -- wrong one.
         return "cosmeticId"
+    elseif kind == actions.CraftItem then
+        -- Which recipe the player picked in the crafting table's panel. A
+        -- payload naming one grants nothing by itself -- Crafting.craft
+        -- still refuses an unknown or unaffordable recipe -- the same trust
+        -- boundary StorePurchase already draws around productId.
+        return "recipeId"
     end
     return nil
 end
@@ -33258,6 +33264,18 @@ local RuntimeIds = {
         StorePurchase = "store_purchase",
         EquipCosmetic = "equip_cosmetic",
         --[[
+            One crafting table, browsing every recipe rather than one bench
+            per recipe -- the "hundred and thirty pieces of furniture is the
+            wrong shape" note above the old bench list finally answered.
+            OpenCraftingStation carries nothing, the same reasoning as
+            OpenStore: the crafting table is the only door. CraftItem now
+            carries the recipe the player picked in the panel, where it used
+            to be an attribute on whichever of the ten benches was pressed --
+            a payload id here doesn't grant anything by itself; Crafting.craft
+            still refuses an unaffordable or unknown recipe server-side.
+        ]]
+        OpenCraftingStation = "open_crafting_station",
+        --[[
             A board on the private server's control rail, and it carries no
             payload at all -- not even which board.
 
@@ -33312,16 +33330,8 @@ local RuntimeIds = {
         BlackoutDecisionFarmland = "blackout_decision_farmland",
         BlackoutDecisionWild = "blackout_decision_wild",
         BlackoutDecisionShared = "blackout_decision_shared",
-        CraftMeadowSatchel = "craft_meadow_satchel_bench",
-        CraftAmberCharm = "craft_amber_charm_bench",
-        CraftIronrootHood = "craft_ironroot_hood_bench",
-        CraftBrambleBoots = "craft_bramble_boots_bench",
-        CraftThornwoodBow = "craft_thornwood_bow_bench",
-        CraftHeartwoodMaul = "craft_heartwood_maul_bench",
-        CraftBriarLance = "craft_briar_lance_bench",
-        CraftFoxfireSling = "craft_foxfire_sling_bench",
-        CraftAmberEdge = "craft_amber_edge_bench",
-        CraftWardenCudgel = "craft_warden_cudgel_bench",
+        -- Replaces the ten CraftXxxBench ids: one table, every recipe.
+        CraftingStation = "crafting_station",
         QuestBoard = "quest_board",
         --[[
             The town gate, which is where you decide who comes through it.
@@ -36484,6 +36494,8 @@ local SOURCE: { [string]: string } = {
     ["hud.nothing_is_on_the_rail_yet"] = "NOTHING IS ON THE RAIL YET.",
     ["hud.your_wardrobe"] = "YOUR WARDROBE",
     ["hud.wear"] = "WEAR",
+    ["hud.everything_you_know_how_to_make"] = "EVERYTHING YOU KNOW HOW TO MAKE",
+    ["hud.not_enough_yet"] = "NOT ENOUGH YET",
     ["hud.departure"] = "DEPARTURE",
     ["hud.stand_on_the_platform_to_depart"] = "STAND ON THE PLATFORM TO DEPART",
     ["hud.travelling_alone"] = "TRAVELLING ALONE",
@@ -36604,6 +36616,7 @@ local SOURCE: { [string]: string } = {
     ["world.amber_edge"] = "AMBER EDGE",
     ["world.warden_cudgel"] = "WARDEN CUDGEL",
     ["world.craft"] = "CRAFT",
+    ["world.crafting_table"] = "Crafting Table",
     ["world.open"] = "OPEN",
     ["world.town_gate"] = "TOWN GATE",
     ["world.private_server_controls"] = "PRIVATE SERVER CONTROLS",
@@ -61963,6 +61976,14 @@ export type TutorialService = typeof(setmetatable(
             would reopen the panel on every push.
         ]]
         _storeRevision: { [Player]: number },
+        --[[
+            Which crafting-table view each player is on, the same revision
+            pattern as _storeRevision above and for the same reason: opening
+            is the world's business (the interaction bumps this), closing is
+            the client's own, and a boolean the client cannot clear would
+            reopen the panel on every push.
+        ]]
+        _craftingRevision: { [Player]: number },
         _actions: { [Player]: any },
         _sessions: { [Player]: Session },
         _expeditionModuleIndex: { [Player]: number },
@@ -62047,6 +62068,7 @@ function TutorialService.new(
         _privateServerService = nil,
         _regionEncounterService = nil,
         _storeRevision = {},
+        _craftingRevision = {},
         _actions = {},
         _sessions = {},
         _expeditionModuleIndex = {},
@@ -62329,6 +62351,7 @@ function TutorialService.Start(self: TutorialService)
         self._expeditionEventRevision[player] = nil
         self._expeditionEventSecond[player] = nil
         self._storeRevision[player] = nil
+        self._craftingRevision[player] = nil
         self._limiter:clear(tostring(player.UserId))
         self._analyticsService:clear(player)
     end)
@@ -63220,31 +63243,25 @@ function TutorialService._interact(
         self:_publishAll()
         return
     end
-    if actionId == self._runtimeIds.Actions.CraftItem then
+    if actionId == self._runtimeIds.Actions.OpenCraftingStation then
+        --[[
+            The crafting table, and the only door into it -- the same
+            reasoning OpenStore gives just below. The refusal lives here
+            rather than on a HUD button so a client cannot decide for
+            itself that crafting may always open.
+        ]]
         if session.stage ~= "complete" then
             self:_setToast(player, Strings.get("tutorial.finish_first_light_to_craft"))
             self:_publish(player)
             return
         end
-        local recipeId = prompt:GetAttribute("Payload")
-        if type(recipeId) ~= "string" then
-            return
-        end
-        local result = self._profileService:craftItem(player, recipeId)
-        self._analyticsService:crafted(player, recipeId, result.accepted, result.reason)
-        local toast: string
-        if result.accepted then
-            toast = string.format(Strings.get("tutorial.crafted_n"), prompt.ObjectText)
-            local questSuffix = self:_questToastSuffix(player)
-            if questSuffix ~= nil then
-                toast = toast .. " · " .. questSuffix
-            end
-        elseif result.reason == "insufficient_materials" then
-            toast = Strings.get("tutorial.not_enough_materials")
-        else
-            toast = Strings.get("tutorial.crafting_unavailable")
-        end
-        self:_setToast(player, toast)
+        --[[
+            A revision rather than a flag, the same pattern _storeRevision
+            uses just below and for the same reason: closing the panel is
+            the client's own business, and a server-held boolean the client
+            cannot clear would reopen it on the next push.
+        ]]
+        self._craftingRevision[player] = (self._craftingRevision[player] or 0) + 1
         self:_publish(player)
         return
     end
@@ -64074,6 +64091,46 @@ function TutorialService._handleAction(self: TutorialService, player: Player, pa
             )
             self:_publish(player)
         end
+    elseif kind == self._runtimeIds.Actions.CraftItem then
+        --[[
+            The recipe the player picked in the crafting table's panel,
+            where it used to be an attribute on whichever of the ten
+            benches was pressed. Naming a recipe here grants nothing by
+            itself -- craftItem below still refuses an unknown or
+            unaffordable one -- the same trust boundary StorePurchase
+            already draws around productId, so the gate is re-checked here
+            too rather than trusted from whenever the panel was opened.
+        ]]
+        local recipeId = payload.recipeId
+        if type(recipeId) ~= "string" or #recipeId > 48 then
+            return
+        end
+        local session = self._sessions[player]
+        if session == nil or session.stage ~= "complete" then
+            self:_setToast(player, Strings.get("tutorial.finish_first_light_to_craft"))
+            self:_publish(player)
+            return
+        end
+        local result = self._profileService:craftItem(player, recipeId)
+        self._analyticsService:crafted(player, recipeId, result.accepted, result.reason)
+        local toast: string
+        if result.accepted then
+            local recipe = self._craftingCatalog.get(recipeId)
+            toast = string.format(
+                Strings.get("tutorial.crafted_n"),
+                if recipe ~= nil then recipe.outputDisplayName else recipeId
+            )
+            local questSuffix = self:_questToastSuffix(player)
+            if questSuffix ~= nil then
+                toast = toast .. " · " .. questSuffix
+            end
+        elseif result.reason == "insufficient_materials" then
+            toast = Strings.get("tutorial.not_enough_materials")
+        else
+            toast = Strings.get("tutorial.crafting_unavailable")
+        end
+        self:_setToast(player, toast)
+        self:_publish(player)
     elseif kind == self._runtimeIds.Actions.EquipCosmetic then
         --[[
             Wearing is not buying, so it is not gated on the store being open.
@@ -64551,6 +64608,16 @@ function TutorialService.snapshot(self: TutorialService, player: Player): any
             store.revision = self._storeRevision[player] or 0
             return store
         end)(),
+        --[[
+            The crafting table, the same revision-only shape the store uses
+            just above: opening is the world's business (the interaction
+            bumps this), closing is the client's own. There is no
+            available/closedLabel pair here the way the store has one --
+            the crafting table has exactly one gate (first light finished),
+            already enforced before this revision ever moves, so nothing
+            needs re-explaining to a client that is already looking at it.
+        ]]
+        crafting = { revision = self._craftingRevision[player] or 0 },
         --[[
             Whether this server still pays, and it is pushed to everyone rather
             than to the owner who latched it.
@@ -72112,421 +72179,157 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         })
     end
 
-    local craftingFallback = Instance.new("Model")
-    craftingFallback.Name = "CraftingDisplayFallback"
-    craftingFallback.Parent = interactables
     --[[
-        Every bench below used to share exactly one Z (workshopZ), evenly
-        spaced 12 studs apart with zero depth or facing variation anywhere
-        in the construction loop -- ten identical dark stall silhouettes in
-        a dead-straight line read, on an actual Studio walkthrough, like a
-        conveyor belt rather than a market. The `z` field this loop already
-        accepted (`benchZ = definition.z or workshopZ`) just had nothing
-        setting it. A gentle zigzag, alternating which side of workshopZ
-        each bench sits on along the row, breaks the ruler-straight line
-        into something that reads as ten separate stalls without touching
-        each bench's X (still the deliberate authored-ten spacing) or the
-        shared construction geometry itself.
+        One crafting table instead of ten benches, and the ten used to be a
+        hundred and thirty.
+
+        They did, briefly: deriving a bench per recipe closed a real gap --
+        a hundred and twenty recipes existed that nobody could craft -- and
+        it was verified by counting benches in a console, which is not the
+        same as looking at the town. Thirteen columns by ten rows put them
+        from z -128 to -11 across a plaza that spans -136 to -24. A player
+        spawned into a maze: colliding furniture everywhere, and every
+        bench carrying a ten-by-eleven click volume that swallowed the taps
+        meant for the tutorial's first interaction (#321 reverted it).
+
+        The next shape -- ten authored sample benches standing in for the
+        catalog -- fixed the maze but not the read: on an actual Studio
+        walkthrough it was still ten near-identical dark stall silhouettes
+        in a dead-straight line, which is what prompted the zigzag pass
+        that used to sit here, and then the owner asked the obvious
+        question the file's own comment had already answered: "a bench
+        that lists what a player can make rather than one physical bench
+        per recipe." That bench is this one. It opens a panel
+        (HUDController's crafting overlay) listing every recipe in
+        CraftingCatalog, the same way OpenStore opens the outfitter's --
+        one door, and CraftItem now carries the recipe the panel's CRAFT
+        button was pressed for instead of an attribute baked into whichever
+        bench a player happened to be standing at.
     ]]
-    local craftingBenches = {
-        {
-            id = self._runtimeIds.InteractionIds.CraftMeadowSatchel,
-            recipeId = "recipe_meadow_satchel",
-            label = Strings.get("world.meadow_satchel"),
-            x = -48,
-            z = -147,
-            color = Color3.fromRGB(133, 176, 108),
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftAmberCharm,
-            recipeId = "recipe_amber_charm",
-            label = Strings.get("world.amber_charm"),
-            x = 36,
-            z = -148,
-            color = AMBER,
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftIronrootHood,
-            recipeId = "recipe_ironroot_hood",
-            label = Strings.get("world.ironroot_hood"),
-            x = -36,
-            z = -136,
-            color = Color3.fromRGB(122, 148, 132),
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftBrambleBoots,
-            recipeId = "recipe_bramble_boots",
-            label = Strings.get("world.bramble_boots"),
-            x = 48,
-            z = -137,
-            color = Color3.fromRGB(142, 112, 84),
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftThornwoodBow,
-            recipeId = "recipe_thornwood_bow",
-            label = Strings.get("world.thornwood_bow"),
-            x = -60,
-            z = -137,
-            color = Color3.fromRGB(164, 132, 78),
-        },
-        -- The five other weapon families, filling the row outward from the
-        -- original five benches. Same shared bench construction; each gets
-        -- its own sample silhouette below so the row reads as ten different
-        -- crafts rather than ten copies of one table.
-        {
-            id = self._runtimeIds.InteractionIds.CraftHeartwoodMaul,
-            recipeId = "recipe_heartwood_maul",
-            label = Strings.get("world.heartwood_maul"),
-            x = -72,
-            z = -148,
-            color = Color3.fromRGB(139, 98, 54),
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftBriarLance,
-            recipeId = "recipe_briar_lance",
-            label = Strings.get("world.briar_lance"),
-            x = -24,
-            z = -146,
-            color = Color3.fromRGB(104, 128, 68),
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftFoxfireSling,
-            recipeId = "recipe_foxfire_sling",
-            label = Strings.get("world.foxfire_sling"),
-            x = 24,
-            z = -136,
-            color = Color3.fromRGB(94, 206, 176),
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftAmberEdge,
-            recipeId = "recipe_amber_edge",
-            label = Strings.get("world.amber_edge"),
-            x = 60,
-            z = -147,
-            color = Color3.fromRGB(255, 181, 76),
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftWardenCudgel,
-            recipeId = "recipe_warden_cudgel",
-            label = Strings.get("world.warden_cudgel"),
-            x = 72,
-            z = -136,
-            color = Color3.fromRGB(112, 151, 119),
-        },
-    }
-    --[[
-        The other hundred and twenty recipes do not get a bench here, and
-        the reason is worth keeping.
-
-        They did, briefly. Deriving a bench per recipe closed a real gap
-        -- a hundred and twenty recipes existed that nobody could craft --
-        and it was verified by counting benches in a console, which is not
-        the same as looking at the town. Thirteen columns by ten rows put
-        them from z -128 to -11 across a plaza that spans -136 to -24. A
-        player spawned into a maze: colliding furniture everywhere, and
-        every bench carrying a ten-by-eleven click volume that swallowed
-        the taps meant for the tutorial's first interaction.
-
-        So the benches are the authored ten again, and the reachability
-        gap is open and recorded rather than papered over with geometry
-        nobody walked through. The real fix is a bench that lists what a
-        player can make rather than one physical bench per recipe: a
-        hundred and thirty pieces of furniture is the wrong shape for the
-        problem no matter where it is put.
-
-        Two lessons, both paid for: content counted is not content seen,
-        and a click volume is a wall for taps even when it is not one for
-        bodies.
-    ]]
-    for _, definition in craftingBenches do
-        local benchZ = definition.z or workshopZ
-        local display = Instance.new("Model")
-        display.Name = "CraftingDisplay_" .. definition.recipeId
-        display:SetAttribute("RecipeId", definition.recipeId)
-        display:SetAttribute("DisplayKind", "physical_recipe_sample")
-        display.Parent = craftingFallback
-        local bench = part(
-            display,
-            "CraftingBench_" .. definition.recipeId,
-            Vector3.new(6, 2.6, 6),
-            CFrame.new(definition.x, 1.3, benchZ),
-            Color3.fromRGB(66, 70, 65),
-            Enum.Material.Slate
-        )
-        bench.Transparency = 1
-        bench.CanCollide = false
-        bench.CastShadow = false
-        part(
-            display,
-            "CraftingTableTop",
-            Vector3.new(6.4, 0.55, 4.8),
-            CFrame.new(definition.x, 3.15, benchZ),
-            Color3.fromRGB(91, 64, 44),
-            Enum.Material.WoodPlanks
-        )
-        for side = -1, 1, 2 do
-            for depth = -1, 1, 2 do
-                part(
-                    display,
-                    "CraftingTableLeg",
-                    Vector3.new(0.55, 3.15, 0.55),
-                    CFrame.new(definition.x + side * 2.65, 1.57, benchZ + depth * 1.85)
-                        * CFrame.Angles(0, 0, math.rad(side * 3)),
-                    WET_BARK,
-                    Enum.Material.Wood
-                )
-            end
+    local craftingStation = Instance.new("Model")
+    craftingStation.Name = "CraftingStation"
+    craftingStation.Parent = interactables
+    local stationX, stationZ = -24, workshopZ
+    local craftingBench = part(
+        craftingStation,
+        "CraftingStationBench",
+        Vector3.new(6, 2.6, 6),
+        CFrame.new(stationX, 1.3, stationZ),
+        Color3.fromRGB(66, 70, 65),
+        Enum.Material.Slate
+    )
+    craftingBench.Transparency = 1
+    craftingBench.CanCollide = false
+    craftingBench.CastShadow = false
+    part(
+        craftingStation,
+        "CraftingStationTop",
+        Vector3.new(6.4, 0.55, 4.8),
+        CFrame.new(stationX, 3.15, stationZ),
+        Color3.fromRGB(91, 64, 44),
+        Enum.Material.WoodPlanks
+    )
+    for side = -1, 1, 2 do
+        for depth = -1, 1, 2 do
+            part(
+                craftingStation,
+                "CraftingStationLeg",
+                Vector3.new(0.55, 3.15, 0.55),
+                CFrame.new(stationX + side * 2.65, 1.57, stationZ + depth * 1.85)
+                    * CFrame.Angles(0, 0, math.rad(side * 3)),
+                WET_BARK,
+                Enum.Material.Wood
+            )
         end
+    end
+    part(
+        craftingStation,
+        "CraftingStationApron",
+        Vector3.new(5.4, 0.75, 0.42),
+        CFrame.new(stationX, 2.55, stationZ + 2.18),
+        Color3.fromRGB(68, 48, 36),
+        Enum.Material.Wood,
+        false
+    )
+    --[[
+        An open ledger rather than one recipe's trinket. Every prior bench
+        carried a marker shaped like its one output -- a satchel flap, a
+        bow stave, a cudgel head -- which said "this bench makes one
+        thing". A single station makes all of them, so its marker is the
+        catalog itself: two angled leaves standing open on the table, the
+        same "read before you build" idea CosmeticCatalog's store card
+        already draws a rack for.
+    ]]
+    part(
+        craftingStation,
+        "CraftingLedgerSpine",
+        Vector3.new(0.22, 0.22, 2.6),
+        CFrame.new(stationX, 3.58, stationZ),
+        Color3.fromRGB(90, 63, 41),
+        Enum.Material.Wood,
+        false
+    )
+    for pageSide = -1, 1, 2 do
+        local page = part(
+            craftingStation,
+            "CraftingLedgerPage",
+            Vector3.new(1.9, 0.06, 2.5),
+            CFrame.new(stationX + pageSide * 0.95, 3.66, stationZ)
+                * CFrame.Angles(0, 0, math.rad(-pageSide * 22)),
+            CREAM,
+            Enum.Material.Fabric,
+            false
+        )
+        page.CastShadow = false
+    end
+    local marker = part(
+        craftingStation,
+        "CraftingStationGlow",
+        Vector3.new(0.5, 1.3, 0.5),
+        CFrame.new(stationX, 4.5, stationZ),
+        AMBER,
+        Enum.Material.Neon,
+        false
+    )
+    marker.Shape = Enum.PartType.Cylinder
+    marker.CFrame *= CFrame.Angles(0, 0, math.rad(90))
+    marker.Transparency = 0.06
+    local markerLight = Instance.new("PointLight")
+    markerLight.Color = AMBER
+    markerLight.Brightness = 1.15
+    markerLight.Range = 14
+    markerLight.Parent = marker
+    addBillboard(marker, Strings.get("world.crafting_table"), AMBER)
+    local rackBack = part(
+        craftingStation,
+        "CraftingToolRack",
+        Vector3.new(3.6, 2.2, 0.32),
+        CFrame.new(stationX, 4.6, stationZ - 2.05),
+        WET_BARK,
+        Enum.Material.Wood,
+        false
+    )
+    for hookIndex = -1, 1 do
         part(
-            display,
-            "CraftingWorkbenchApron",
-            Vector3.new(5.4, 0.75, 0.42),
-            CFrame.new(definition.x, 2.55, benchZ + 2.18),
-            Color3.fromRGB(68, 48, 36),
+            craftingStation,
+            "CraftingToolRackTool",
+            Vector3.new(0.24, 1.5, 0.24),
+            rackBack.CFrame
+                * CFrame.new(hookIndex * 1.05, -0.6, 0.3)
+                * CFrame.Angles(math.rad(6), 0, math.rad(hookIndex * 5)),
+            Color3.fromRGB(112, 92, 66),
             Enum.Material.Wood,
             false
         )
-        local marker = part(
-            display,
-            "CraftingBenchGlow",
-            Vector3.new(2, 3.4, 2),
-            CFrame.new(definition.x, 4.3, benchZ),
-            definition.color,
-            Enum.Material.Neon,
-            false
-        )
-        marker.Shape = if definition.recipeId == "recipe_amber_charm"
-            then Enum.PartType.Ball
-            elseif definition.recipeId == "recipe_ironroot_hood" then Enum.PartType.Wedge
-            else Enum.PartType.Block
-        marker.Size = if definition.recipeId == "recipe_meadow_satchel"
-            then Vector3.new(2.6, 1.7, 1.2)
-            elseif definition.recipeId == "recipe_bramble_boots" then Vector3.new(
-                2.2,
-                1.2,
-                1.8
-            )
-            else Vector3.new(1.8, 1.8, 1.8)
-        marker.Material = if definition.recipeId == "recipe_meadow_satchel"
-                or definition.recipeId == "recipe_ironroot_hood"
-            then Enum.Material.Fabric
-            elseif definition.recipeId == "recipe_bramble_boots" then Enum.Material.Leather
-            else Enum.Material.Glass
-        marker.Transparency = 0.06
-        if definition.recipeId == "recipe_meadow_satchel" then
-            part(
-                display,
-                "SatchelFlap",
-                Vector3.new(2.35, 0.32, 1.1),
-                CFrame.new(definition.x, 4.72, benchZ + 0.36) * CFrame.Angles(math.rad(18), 0, 0),
-                Color3.fromRGB(103, 128, 84),
-                Enum.Material.Fabric,
-                false
-            )
-            for strapSide = -1, 1, 2 do
-                part(
-                    display,
-                    "SatchelStrap",
-                    Vector3.new(0.22, 2.4, 0.22),
-                    CFrame.new(definition.x + strapSide * 1.05, 4.65, benchZ - 0.2)
-                        * CFrame.Angles(0, 0, math.rad(strapSide * 24)),
-                    Color3.fromRGB(78, 58, 41),
-                    Enum.Material.Fabric,
-                    false
-                )
-            end
-        elseif definition.recipeId == "recipe_amber_charm" then
-            local charmRing = part(
-                display,
-                "AmberCharmRing",
-                Vector3.new(0.32, 2.4, 2.4),
-                CFrame.new(definition.x, 4.55, benchZ) * CFrame.Angles(0, math.rad(90), 0),
-                Color3.fromRGB(126, 97, 54),
-                Enum.Material.Metal,
-                false
-            )
-            charmRing.Shape = Enum.PartType.Cylinder
-            part(
-                display,
-                "AmberCharmCord",
-                Vector3.new(0.2, 1.7, 0.2),
-                CFrame.new(definition.x, 5.8, benchZ),
-                Color3.fromRGB(73, 54, 38),
-                Enum.Material.Fabric,
-                false
-            )
-        elseif definition.recipeId == "recipe_ironroot_hood" then
-            part(
-                display,
-                "HoodShoulders",
-                Vector3.new(3.6, 0.55, 1.45),
-                CFrame.new(definition.x, 3.82, benchZ),
-                Color3.fromRGB(75, 91, 81),
-                Enum.Material.Fabric,
-                false
-            )
-            part(
-                display,
-                "HoodStand",
-                Vector3.new(0.34, 2.5, 0.34),
-                CFrame.new(definition.x, 4.45, benchZ),
-                Color3.fromRGB(76, 55, 39),
-                Enum.Material.Wood,
-                false
-            )
-        elseif definition.recipeId == "recipe_bramble_boots" then
-            -- Explicit, no longer the chain's else: the fallthrough put a
-            -- pair of boots on every bench without its own branch -- the bow
-            -- bench had displayed boots since it shipped, and all five new
-            -- weapon benches would have inherited the same pair.
-            for bootSide = -1, 1, 2 do
-                part(
-                    display,
-                    "BrambleBoot",
-                    Vector3.new(0.92, 1.45, 1.9),
-                    CFrame.new(definition.x + bootSide * 0.72, 4.05, benchZ + 0.28)
-                        * CFrame.Angles(0, math.rad(bootSide * 8), 0),
-                    Color3.fromRGB(103, 76, 54),
-                    Enum.Material.Leather,
-                    false
-                )
-            end
-        elseif definition.recipeId == "recipe_thornwood_bow" then
-            part(
-                display,
-                "BowSampleStave",
-                Vector3.new(0.3, 3, 0.5),
-                CFrame.new(definition.x + 0.35, 4.6, benchZ) * CFrame.Angles(0, 0, math.rad(14)),
-                Color3.fromRGB(112, 84, 52),
-                Enum.Material.Wood,
-                false
-            )
-            part(
-                display,
-                "BowSampleString",
-                Vector3.new(0.08, 2.8, 0.08),
-                CFrame.new(definition.x - 0.45, 4.6, benchZ),
-                Color3.fromRGB(214, 205, 186),
-                Enum.Material.Fabric,
-                false
-            )
-        elseif definition.recipeId == "recipe_heartwood_maul" then
-            part(
-                display,
-                "MaulSampleHaft",
-                Vector3.new(0.4, 3.1, 0.4),
-                CFrame.new(definition.x, 4.55, benchZ) * CFrame.Angles(0, 0, math.rad(-18)),
-                Color3.fromRGB(96, 68, 44),
-                Enum.Material.Wood,
-                false
-            )
-            part(
-                display,
-                "MaulSampleHead",
-                Vector3.new(1.9, 1.15, 1.15),
-                CFrame.new(definition.x + 0.5, 5.9, benchZ) * CFrame.Angles(0, 0, math.rad(-18)),
-                Color3.fromRGB(139, 98, 54),
-                Enum.Material.Wood,
-                false
-            )
-        elseif definition.recipeId == "recipe_briar_lance" then
-            part(
-                display,
-                "LanceSampleShaft",
-                Vector3.new(0.32, 4.4, 0.32),
-                CFrame.new(definition.x, 4.9, benchZ) * CFrame.Angles(0, 0, math.rad(24)),
-                Color3.fromRGB(104, 128, 68),
-                Enum.Material.Wood,
-                false
-            )
-            local lanceTip = part(
-                display,
-                "LanceSampleTip",
-                Vector3.new(0.5, 1.1, 0.5),
-                CFrame.new(definition.x - 0.95, 6.85, benchZ) * CFrame.Angles(0, 0, math.rad(24)),
-                Color3.fromRGB(74, 96, 46),
-                Enum.Material.Wood,
-                false
-            )
-            lanceTip.Shape = Enum.PartType.Wedge
-        elseif definition.recipeId == "recipe_foxfire_sling" then
-            part(
-                display,
-                "SlingSampleStrap",
-                Vector3.new(0.22, 2.6, 0.22),
-                CFrame.new(definition.x, 4.7, benchZ) * CFrame.Angles(0, 0, math.rad(32)),
-                Color3.fromRGB(78, 58, 41),
-                Enum.Material.Fabric,
-                false
-            )
-            local slingPouch = part(
-                display,
-                "SlingSamplePouch",
-                Vector3.new(0.95, 0.7, 0.95),
-                CFrame.new(definition.x - 0.75, 3.75, benchZ),
-                Color3.fromRGB(94, 206, 176),
-                Enum.Material.Fabric,
-                false
-            )
-            slingPouch.Shape = Enum.PartType.Ball
-        elseif definition.recipeId == "recipe_amber_edge" then
-            local edgeBlade = part(
-                display,
-                "EdgeSampleBlade",
-                Vector3.new(0.35, 2.5, 0.9),
-                CFrame.new(definition.x + 0.2, 4.95, benchZ) * CFrame.Angles(0, 0, math.rad(-9)),
-                Color3.fromRGB(255, 197, 106),
-                Enum.Material.Glass,
-                false
-            )
-            edgeBlade.Shape = Enum.PartType.Wedge
-            part(
-                display,
-                "EdgeSampleGrip",
-                Vector3.new(0.42, 1.05, 0.42),
-                CFrame.new(definition.x - 0.15, 3.6, benchZ) * CFrame.Angles(0, 0, math.rad(-9)),
-                Color3.fromRGB(73, 54, 38),
-                Enum.Material.Leather,
-                false
-            )
-        else
-            -- recipe_warden_cudgel and any future recipe without its own
-            -- silhouette yet: a club on a rest, not somebody else's boots.
-            part(
-                display,
-                "CudgelSampleShaft",
-                Vector3.new(0.45, 2.7, 0.45),
-                CFrame.new(definition.x, 4.5, benchZ) * CFrame.Angles(0, 0, math.rad(12)),
-                Color3.fromRGB(91, 62, 40),
-                Enum.Material.Wood,
-                false
-            )
-            local cudgelHead = part(
-                display,
-                "CudgelSampleHead",
-                Vector3.new(1, 1, 1),
-                CFrame.new(definition.x - 0.35, 5.85, benchZ),
-                Color3.fromRGB(112, 151, 119),
-                Enum.Material.Wood,
-                false
-            )
-            cudgelHead.Shape = Enum.PartType.Ball
-        end
-        local markerLight = Instance.new("PointLight")
-        markerLight.Color = definition.color
-        markerLight.Brightness = 1.15
-        markerLight.Range = 14
-        markerLight.Parent = marker
-        addBillboard(marker, definition.label, definition.color)
-        self:_registerInteraction(
-            bench,
-            definition.id,
-            self._runtimeIds.Actions.CraftItem,
-            Strings.get("world.craft"),
-            definition.label,
-            definition.recipeId
-        )
     end
+    self:_registerInteraction(
+        craftingBench,
+        self._runtimeIds.InteractionIds.CraftingStation,
+        self._runtimeIds.Actions.OpenCraftingStation,
+        Strings.get("world.browse"),
+        Strings.get("world.crafting_table"),
+        nil
+    )
     for index, centerX in { -42, 42 } do
         table.insert(self._meshPlacements, {
             assetId = "mesh_creator_workbench_a",
@@ -72537,7 +72340,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             seed = 9930 + index,
             swayTag = nil,
             parent = interactables,
-            fallbackInstance = if index == 1 then craftingFallback else nil,
+            fallbackInstance = if index == 1 then craftingStation else nil,
         })
     end
 
@@ -98694,6 +98497,10 @@ hud:setWhetHandler(function(itemId: string)
     send(RuntimeIds.Actions.RepairGear, { itemId = itemId })
 end)
 
+hud:setCraftingHandler(function(recipeId: string)
+    send(RuntimeIds.Actions.CraftItem, { recipeId = recipeId })
+end)
+
 hud:setCompanionHandler(function(mode: string)
     send(RuntimeIds.Actions.CompanionCommand, { mode = mode })
 end)
@@ -99054,6 +98861,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local sharedRoot = ReplicatedStorage:WaitForChild("LastLight")
 local Consumables = require(sharedRoot.Consumables)
 local CosmeticCatalog = require(sharedRoot.CosmeticCatalog)
+local CraftingCatalog = require(sharedRoot.CraftingCatalog)
 local Equipment = require(sharedRoot.Equipment)
 local QuickChat = require(sharedRoot.QuickChat)
 local StoreAvailability = require(sharedRoot.StoreAvailability)
@@ -99464,6 +99272,35 @@ local function canvasMetrics(): (Vector2, number, number, number)
     return viewport, scale, viewport.X / scale, viewport.Y / scale
 end
 
+--[[
+    "material_meadow_fiber" -> "Meadow Fiber", derived rather than looked up.
+
+    A hand-authored Strings entry per material is one more table that drifts
+    out of sync with CraftingCatalog's own keys -- today's whole session was
+    that exact class of bug, over and over, in the Luau specs. Every material
+    id in the catalog is already an English phrase spelled in snake_case, so
+    splitting on "_" and dropping the "material_" prefix reads the same
+    catalog everything else here does, and a recipe added later needs no
+    second edit to be named correctly.
+]]
+local function materialDisplayName(materialId: string): string
+    local words = materialId:gsub("^material_", ""):gsub("_", " ")
+    return (
+        words:gsub("%a[%w']*", function(word: string): string
+            return word:sub(1, 1):upper() .. word:sub(2)
+        end)
+    )
+end
+
+local function recipeMaterialsSummary(recipe: any): string
+    local parts = {}
+    for materialId, amount in recipe.materials do
+        table.insert(parts, string.format("%dx %s", amount, materialDisplayName(materialId)))
+    end
+    table.sort(parts)
+    return table.concat(parts, "  ·  ")
+end
+
 -- Tall enough for the largest button in the run (the 116-point primary) plus
 -- a gap, so a wrapped row can never be drawn through the row below it.
 local ACTION_ROW_PITCH = 128
@@ -99606,6 +99443,23 @@ export type HUDController =
             _onStoreDetail: ((string) -> ())?,
             _onStorePurchase: ((string) -> ())?,
             _onCosmeticEquip: ((string) -> ())?,
+            _craftingOverlay: Frame,
+            _craftingPanel: Frame,
+            _craftingScroll: ScrollingFrame,
+            _craftingClose: TextButton,
+            _craftingRows: {
+                [string]: {
+                    frame: Frame,
+                    name: TextLabel,
+                    materials: TextLabel,
+                    action: TextButton,
+                    recipeId: string,
+                },
+            },
+            -- The last open instruction this client acted on, the same
+            -- revision pattern _storeRevision uses just above.
+            _craftingRevision: number,
+            _onCraftItem: ((string) -> ())?,
             _equipmentButtons: { [string]: TextButton },
             _loadoutButtons: { [string]: TextButton },
             _whetButton: TextButton,
@@ -101037,6 +100891,174 @@ function HUDController.new(
         }
     end
 
+    --[[
+        The crafting table's panel, one door for every recipe in the catalog
+        rather than the ten benches it replaced -- see the note above
+        WorldService's craftingStation for why there were ten, then a hundred
+        and thirty, before there was one. Built to the same portrait canvas
+        as the outfitter's panel above, and for the same #327 reason: CLOSE
+        stays along the bottom, out of Roblox's own topbar and player list.
+
+        Flat rather than grouped: CraftingCatalog carries no category field
+        the way CosmeticCatalog carries lines, and inventing groups here
+        would be a client-side taxonomy the catalog itself does not have --
+        exactly the kind of copy that drifts from its source. Catalog order
+        is authored order, so it is the order the list renders in.
+    ]]
+    local craftingOverlay = Instance.new("Frame")
+    craftingOverlay.Name = "CraftingOverlay"
+    craftingOverlay.Size = UDim2.fromScale(1, 1)
+    craftingOverlay.BackgroundColor3 = COLORS.ink
+    craftingOverlay.BackgroundTransparency = 0.18
+    craftingOverlay.Active = true
+    craftingOverlay.Visible = false
+    craftingOverlay.ZIndex = 54
+    craftingOverlay.Parent = canvas
+
+    local craftingPanel = Instance.new("Frame")
+    craftingPanel.Name = "CraftingPanel"
+    craftingPanel.AnchorPoint = Vector2.new(0.5, 0)
+    craftingPanel.Position = UDim2.new(0.5, 0, 0, 80)
+    craftingPanel.Size = UDim2.fromOffset(540, 560)
+    craftingPanel.BackgroundColor3 = COLORS.panel
+    craftingPanel.BackgroundTransparency = 0.02
+    craftingPanel.ZIndex = 55
+    craftingPanel.Parent = craftingOverlay
+    corner(craftingPanel, 20)
+    stroke(craftingPanel, COLORS.amber, 0.2)
+
+    local craftingTitle = textLabel(
+        craftingPanel,
+        "Title",
+        Strings.get("world.crafting_table"),
+        UDim2.new(1, -40, 0, 26),
+        UDim2.fromOffset(20, 16),
+        18,
+        COLORS.amber
+    )
+    craftingTitle.Font = Enum.Font.GothamBold
+    craftingTitle.ZIndex = 56
+
+    local craftingSubtitle = textLabel(
+        craftingPanel,
+        "Subtitle",
+        Strings.get("hud.everything_you_know_how_to_make"),
+        UDim2.new(1, -40, 0, 16),
+        UDim2.fromOffset(20, 44),
+        11,
+        COLORS.muted
+    )
+    craftingSubtitle.ZIndex = 56
+
+    local craftingClose = Instance.new("TextButton")
+    craftingClose.Name = "Close"
+    craftingClose.AnchorPoint = Vector2.new(0.5, 1)
+    craftingClose.Position = UDim2.new(0.5, 0, 1, -12)
+    craftingClose.Size = UDim2.fromOffset(220, 38)
+    craftingClose.BackgroundColor3 = COLORS.panelSoft
+    craftingClose.Font = Enum.Font.GothamBold
+    craftingClose.Text = Strings.get("hud.close")
+    craftingClose.TextColor3 = COLORS.cream
+    craftingClose.TextSize = 11
+    craftingClose.Selectable = true
+    craftingClose.ZIndex = 57
+    craftingClose.Parent = craftingPanel
+    corner(craftingClose, 10)
+    stroke(craftingClose, COLORS.cream, 0.58)
+
+    local craftingScroll = Instance.new("ScrollingFrame")
+    craftingScroll.Name = "CraftingScroll"
+    craftingScroll.Position = UDim2.fromOffset(16, 70)
+    craftingScroll.Size = UDim2.new(1, -32, 1, -132)
+    craftingScroll.BackgroundTransparency = 1
+    craftingScroll.BorderSizePixel = 0
+    craftingScroll.ScrollBarThickness = 6
+    craftingScroll.ScrollBarImageColor3 = COLORS.amber
+    craftingScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    craftingScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    craftingScroll.ScrollingDirection = Enum.ScrollingDirection.Y
+    craftingScroll.Selectable = true
+    craftingScroll.ZIndex = 56
+    craftingScroll.Parent = craftingPanel
+    local craftingLayout = Instance.new("UIListLayout")
+    craftingLayout.FillDirection = Enum.FillDirection.Vertical
+    craftingLayout.Padding = UDim.new(0, 8)
+    craftingLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    craftingLayout.Parent = craftingScroll
+
+    local craftingRows: {
+        [string]: {
+            frame: Frame,
+            name: TextLabel,
+            materials: TextLabel,
+            action: TextButton,
+            recipeId: string,
+        },
+    } =
+        {}
+    for order, recipe in CraftingCatalog.list() do
+        local row = Instance.new("Frame")
+        row.Name = "Recipe_" .. recipe.id
+        row.LayoutOrder = order
+        row.Size = UDim2.new(1, -8, 0, 64)
+        row.BackgroundColor3 = COLORS.panelSoft
+        row.BackgroundTransparency = 0.15
+        row.ZIndex = 57
+        row.Parent = craftingScroll
+        corner(row, 10)
+        stroke(row, COLORS.amber, 0.68)
+
+        local rowName = textLabel(
+            row,
+            "Name",
+            recipe.outputDisplayName,
+            UDim2.new(1, -190, 0, 20),
+            UDim2.fromOffset(14, 8),
+            14,
+            COLORS.cream
+        )
+        rowName.Font = Enum.Font.GothamBold
+        rowName.ZIndex = 58
+
+        local rowMaterials = textLabel(
+            row,
+            "Materials",
+            recipeMaterialsSummary(recipe),
+            UDim2.new(1, -190, 0, 32),
+            UDim2.fromOffset(14, 28),
+            11,
+            COLORS.muted
+        )
+        rowMaterials.TextWrapped = true
+        rowMaterials.TextYAlignment = Enum.TextYAlignment.Top
+        rowMaterials.ZIndex = 58
+
+        local rowAction = Instance.new("TextButton")
+        rowAction.Name = "Action"
+        rowAction.AnchorPoint = Vector2.new(1, 0.5)
+        rowAction.Position = UDim2.new(1, -10, 0.5, 0)
+        rowAction.Size = UDim2.fromOffset(96, 36)
+        rowAction.BackgroundColor3 = COLORS.panel
+        rowAction.AutoButtonColor = true
+        rowAction.Font = Enum.Font.GothamBold
+        rowAction.Text = Strings.get("world.craft")
+        rowAction.TextColor3 = COLORS.amber
+        rowAction.TextSize = 12
+        rowAction.Selectable = true
+        rowAction.ZIndex = 59
+        rowAction.Parent = row
+        corner(rowAction, 9)
+        stroke(rowAction, COLORS.amber, 0.3)
+
+        craftingRows[recipe.id] = {
+            frame = row,
+            name = rowName,
+            materials = rowMaterials,
+            action = rowAction,
+            recipeId = recipe.id,
+        }
+    end
+
     local professionGrid = Instance.new("Frame")
     professionGrid.Name = "ProfessionGrid"
     professionGrid.BackgroundTransparency = 1
@@ -101503,6 +101525,13 @@ function HUDController.new(
         _onStoreDetail = nil,
         _onStorePurchase = nil,
         _onCosmeticEquip = nil,
+        _craftingOverlay = craftingOverlay,
+        _craftingPanel = craftingPanel,
+        _craftingScroll = craftingScroll,
+        _craftingClose = craftingClose,
+        _craftingRows = craftingRows,
+        _craftingRevision = 0,
+        _onCraftItem = nil,
         _equipmentButtons = equipmentButtons,
         _whetButton = whetButton,
         _whetItemId = nil,
@@ -101619,6 +101648,26 @@ function HUDController.new(
             local callback = self._onCosmeticEquip
             if callback ~= nil then
                 callback(cosmeticId)
+            end
+        end)
+    end
+    craftingClose.Activated:Connect(function()
+        self:setCraftingOpen(false)
+    end)
+    for recipeId, row in craftingRows do
+        row.action.Activated:Connect(function()
+            -- The row's own affordability check sets this attribute each
+            -- update, the same way the store card's "buy vs owned" state
+            -- does: a button that cannot afford its recipe does not send
+            -- anything, because a press that just toasts back "not enough
+            -- materials" is a press CraftingCatalog already answered on
+            -- screen.
+            if row.action:GetAttribute("CraftAction") == "unaffordable" then
+                return
+            end
+            local callback = self._onCraftItem
+            if callback ~= nil then
+                callback(recipeId)
             end
         end)
     end
@@ -102054,6 +102103,104 @@ function HUDController._updateStore(self: HUDController, state: any)
         else Strings.get("hud.nothing_is_on_the_rail_yet")
 end
 
+function HUDController.setCraftingHandler(self: HUDController, callback: (string) -> ())
+    self._onCraftItem = callback
+end
+
+function HUDController.craftingPanel(self: HUDController): Frame
+    return self._craftingPanel
+end
+
+function HUDController.craftingClose(self: HUDController): TextButton
+    return self._craftingClose
+end
+
+function HUDController.isCraftingOpen(self: HUDController): boolean
+    return self._craftingOverlay.Visible
+end
+
+function HUDController.setCraftingOpen(self: HUDController, open: boolean)
+    self._craftingOverlay.Visible = open
+    if open then
+        self:_layoutCrafting()
+        if self._currentState ~= nil then
+            self:_updateCrafting(self._currentState)
+        end
+        -- A pad needs a target inside the panel, and CLOSE is the one target
+        -- always there -- the store panel's own #327 reasoning above.
+        self._craftingClose.NextSelectionUp = self._craftingScroll
+        self._craftingScroll.NextSelectionDown = self._craftingClose
+        local assigned = pcall(function()
+            GuiService.SelectedObject = self._craftingClose
+        end)
+        if not assigned then
+            warn("[Last Light] crafting focus refused")
+        end
+    else
+        local selected = GuiService.SelectedObject
+        if selected ~= nil and selected:IsDescendantOf(self._craftingOverlay) then
+            GuiService.SelectedObject = nil
+        end
+    end
+end
+
+--[[
+    What the panel shows, and when it has to shut itself.
+
+    The open instruction is the same revision-only shape the store uses --
+    _storeRevision's own comment explains why -- but there is no verdict to
+    re-evaluate each frame the way the store has one: the table has exactly
+    one gate (First Light finished), already enforced server-side before the
+    revision it publishes ever moves, so nothing here can refuse a press the
+    server would have accepted. The one thing the client still owns is
+    safety: a downed player looking at a modal recipe list is a player who
+    cannot see the thing that downed them, so the panel closes under it the
+    same way the store already does.
+]]
+function HUDController._updateCrafting(self: HUDController, state: any)
+    local crafting = if type(state) == "table" then state.crafting else nil
+    if type(crafting) ~= "table" then
+        self:setCraftingOpen(false)
+        return
+    end
+
+    local revision = tonumber(crafting.revision) or 0
+    if revision > self._craftingRevision then
+        self._craftingRevision = revision
+        if not self._craftingOverlay.Visible then
+            self:setCraftingOpen(true)
+            return
+        end
+    end
+    if not self._craftingOverlay.Visible then
+        return
+    end
+    if self._playerDowned then
+        self:setCraftingOpen(false)
+        return
+    end
+
+    local banked = if type(state.bankedMaterials) == "table" then state.bankedMaterials else {}
+    for recipeId, row in self._craftingRows do
+        local recipe = CraftingCatalog.get(recipeId)
+        local affordable = recipe ~= nil
+        if recipe ~= nil then
+            for materialId, amount in recipe.materials do
+                if (tonumber(banked[materialId]) or 0) < amount then
+                    affordable = false
+                    break
+                end
+            end
+        end
+        row.action:SetAttribute("CraftAction", if affordable then "craft" else "unaffordable")
+        row.action.Text = if affordable
+            then Strings.get("world.craft")
+            else Strings.get("hud.not_enough_yet")
+        row.action.TextColor3 = if affordable then COLORS.amber else COLORS.muted
+        row.frame.BackgroundTransparency = if affordable then 0.15 else 0.4
+    end
+end
+
 --[[
     The panel, measured against the canvas rather than against a desktop.
 
@@ -102114,6 +102261,30 @@ function HUDController._layoutStore(self: HUDController)
         local rowActionWidth = math.min(110, math.max(76, math.floor(panelWidth * 0.24)))
         entry.action.Size = UDim2.fromOffset(rowActionWidth, 32)
         entry.name.Size = UDim2.new(1, -66 - rowActionWidth - 20, 0, 40)
+    end
+end
+
+-- Measured the same way _layoutStore measures its own panel, and for the
+-- same #327 reason: a literal here is a bet on a screen.
+function HUDController._layoutCrafting(self: HUDController)
+    local _viewport, scale, canvasWidth, canvasHeight = canvasMetrics()
+    local margin = 16
+    local panelWidth = math.min(560, math.max(260, canvasWidth - margin * 2))
+    local topbar = math.max(GuiService.TopbarInset.Height, 0) / math.max(scale, 0.01)
+    local top = topbar + 10
+    local panelHeight = math.min(600, math.max(240, canvasHeight - top - 24))
+    self._craftingPanel.AnchorPoint = Vector2.new(0.5, 0)
+    self._craftingPanel.Position = UDim2.new(0.5, 0, 0, top)
+    self._craftingPanel.Size = UDim2.fromOffset(panelWidth, panelHeight)
+    self._craftingClose.Size = UDim2.fromOffset(math.min(240, panelWidth - margin * 2), 38)
+
+    local narrow = panelWidth < 400
+    local actionWidth = math.min(110, math.max(76, math.floor(panelWidth * 0.22)))
+    for _, entry in self._craftingRows do
+        entry.frame.Size = UDim2.new(1, -8, 0, if narrow then 78 else 64)
+        entry.action.Size = UDim2.fromOffset(actionWidth, 36)
+        entry.name.Size = UDim2.new(1, -14 - actionWidth - 24, 0, 20)
+        entry.materials.Size = UDim2.new(1, -14 - actionWidth - 24, 0, 32)
     end
 end
 
@@ -103320,6 +103491,7 @@ function HUDController._layout(self: HUDController)
         UDim2.new(0.5, 0, 1, -(34 + self._actionClusterRows * ACTION_ROW_PITCH + 84 + 14))
     self:_layoutLoadout()
     self:_layoutStore()
+    self:_layoutCrafting()
 end
 
 --[[
@@ -103778,6 +103950,7 @@ function HUDController.update(self: HUDController, state: any)
     self:_updateGear()
     self:_updateProgress()
     self:_updateStore(state)
+    self:_updateCrafting(state)
     local eliteVisible = (type(boss) == "table" and (boss.active == true or boss.complete == true))
         or (type(elite) == "table" and (elite.active == true or elite.complete == true))
     eliteVisible = eliteVisible and not self._playerDowned

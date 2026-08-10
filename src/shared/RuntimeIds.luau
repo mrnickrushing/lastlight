@@ -162,6 +162,18 @@ local RuntimeIds = {
         StorePurchase = "store_purchase",
         EquipCosmetic = "equip_cosmetic",
         --[[
+            One crafting table, browsing every recipe rather than one bench
+            per recipe -- the "hundred and thirty pieces of furniture is the
+            wrong shape" note above the old bench list finally answered.
+            OpenCraftingStation carries nothing, the same reasoning as
+            OpenStore: the crafting table is the only door. CraftItem now
+            carries the recipe the player picked in the panel, where it used
+            to be an attribute on whichever of the ten benches was pressed --
+            a payload id here doesn't grant anything by itself; Crafting.craft
+            still refuses an unaffordable or unknown recipe server-side.
+        ]]
+        OpenCraftingStation = "open_crafting_station",
+        --[[
             A board on the private server's control rail, and it carries no
             payload at all -- not even which board.
 
@@ -216,16 +228,8 @@ local RuntimeIds = {
         BlackoutDecisionFarmland = "blackout_decision_farmland",
         BlackoutDecisionWild = "blackout_decision_wild",
         BlackoutDecisionShared = "blackout_decision_shared",
-        CraftMeadowSatchel = "craft_meadow_satchel_bench",
-        CraftAmberCharm = "craft_amber_charm_bench",
-        CraftIronrootHood = "craft_ironroot_hood_bench",
-        CraftBrambleBoots = "craft_bramble_boots_bench",
-        CraftThornwoodBow = "craft_thornwood_bow_bench",
-        CraftHeartwoodMaul = "craft_heartwood_maul_bench",
-        CraftBriarLance = "craft_briar_lance_bench",
-        CraftFoxfireSling = "craft_foxfire_sling_bench",
-        CraftAmberEdge = "craft_amber_edge_bench",
-        CraftWardenCudgel = "craft_warden_cudgel_bench",
+        -- Replaces the ten CraftXxxBench ids: one table, every recipe.
+        CraftingStation = "crafting_station",
         QuestBoard = "quest_board",
         --[[
             The town gate, which is where you decide who comes through it.

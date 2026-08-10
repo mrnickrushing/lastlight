@@ -251,14 +251,15 @@ return {
         {
             --[[
                 Reachability, which is the thing every other count in this
-                file quietly assumes.
+                file quietly assumes -- and the thing this exact spec has
+                already gotten wrong twice.
 
                 A recipe exists when it is in the catalog. A recipe is
                 *craftable* when something in the world offers it, and for
                 one milestone those were different numbers: the benches
                 were a hardcoded list of ten, written when there were ten
-                recipes, and 120 shipped that nobody could make. Every
-                spec passed. Only walking to the workshop found it.
+                recipes, and 120 shipped that nobody could make. Every spec
+                passed. Only walking to the workshop found it.
 
                 Deriving a bench per recipe closed that gap and broke
                 something worse: thirteen columns by ten rows landed from
@@ -268,37 +269,25 @@ return {
                 interaction. It was "verified" by counting benches in a
                 console, which is exactly why nobody saw it.
 
-                So this asserts the true state -- ten benched, a hundred
-                and twenty not -- and refuses the derivation, because a
-                hundred and thirty pieces of furniture is the wrong shape
-                for the problem wherever they are put. The fix is a bench
-                that lists what a player can make.
+                The fix this now checks is the one the two paragraphs above
+                both concluded was the right shape: one crafting table,
+                which opens a panel listing the whole catalog rather than
+                offering to build the world a mannequin for every recipe in
+                it. Reachability is therefore a property of the panel, not
+                of the world -- so this reads the client source rather than
+                counting furniture, and refuses either regression: the
+                benches coming back, or the panel quietly narrowing to a
+                subset of the catalog it lists from.
             ]]
-            name = "the crafting benches are the authored ten, and the gap is open",
+            name = "every recipe is reachable through the one crafting table, not a bench per recipe",
             run = function()
                 local fs = require("@lune/fs")
                 local world = fs.readFile("src/server/Services/WorldService.luau")
-                local benched: { [string]: boolean } = {}
-                local count = 0
-                for recipeId in string.gmatch(world, 'recipeId = "(recipe_[a-z_]+)"') do
-                    if not benched[recipeId] then
-                        benched[recipeId] = true
-                        count += 1
-                    end
-                end
-                TestRunner.equal(count, 10, "the bench list changed size")
-
-                local unreachable = 0
-                for _, recipe in CraftingCatalog.list() do
-                    if not benched[recipe.id] then
-                        unreachable += 1
-                    end
-                end
                 TestRunner.equal(
-                    unreachable,
-                    120,
-                    "the count of recipes with no bench moved -- if a crafting menu "
-                        .. "shipped this should be zero and this case should check that"
+                    string.find(world, 'recipeId = "recipe_', 1, true),
+                    nil,
+                    "a bench is carrying a recipeId again -- that is the per-bench "
+                        .. "shape this table replaced"
                 )
                 TestRunner.equal(
                     string.find(world, 'id = "craft:" .. recipe.id', 1, true),
@@ -306,6 +295,35 @@ return {
                     "benches are being derived per recipe again -- that put 130 of "
                         .. "them across the plaza once already"
                 )
+                local _, stationCount = string.gsub(
+                    world,
+                    "InteractionIds%.CraftingStation",
+                    "InteractionIds.CraftingStation"
+                )
+                TestRunner.equal(
+                    stationCount,
+                    1,
+                    "the world should register exactly one crafting station interaction"
+                )
+
+                local hud = fs.readFile("src/client/Controllers/HUDController.luau")
+                TestRunner.truthy(
+                    string.find(hud, "CraftingCatalog.list()", 1, true) ~= nil,
+                    "the crafting panel should walk the full catalog to build its rows"
+                )
+                --[[
+                    Every recipe in the catalog has to be nameable by the panel
+                    that lists it -- outputDisplayName is what a row shows, so a
+                    recipe missing one would render blank rather than absent,
+                    which is worse than either of the two numbers this spec used
+                    to fail on.
+                ]]
+                for _, recipe in CraftingCatalog.list() do
+                    TestRunner.truthy(
+                        type(recipe.outputDisplayName) == "string" and #recipe.outputDisplayName > 0,
+                        "recipe " .. recipe.id .. " has no name a crafting row could show"
+                    )
+                end
             end,
         },
         {

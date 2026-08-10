@@ -6574,421 +6574,157 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
         })
     end
 
-    local craftingFallback = Instance.new("Model")
-    craftingFallback.Name = "CraftingDisplayFallback"
-    craftingFallback.Parent = interactables
     --[[
-        Every bench below used to share exactly one Z (workshopZ), evenly
-        spaced 12 studs apart with zero depth or facing variation anywhere
-        in the construction loop -- ten identical dark stall silhouettes in
-        a dead-straight line read, on an actual Studio walkthrough, like a
-        conveyor belt rather than a market. The `z` field this loop already
-        accepted (`benchZ = definition.z or workshopZ`) just had nothing
-        setting it. A gentle zigzag, alternating which side of workshopZ
-        each bench sits on along the row, breaks the ruler-straight line
-        into something that reads as ten separate stalls without touching
-        each bench's X (still the deliberate authored-ten spacing) or the
-        shared construction geometry itself.
+        One crafting table instead of ten benches, and the ten used to be a
+        hundred and thirty.
+
+        They did, briefly: deriving a bench per recipe closed a real gap --
+        a hundred and twenty recipes existed that nobody could craft -- and
+        it was verified by counting benches in a console, which is not the
+        same as looking at the town. Thirteen columns by ten rows put them
+        from z -128 to -11 across a plaza that spans -136 to -24. A player
+        spawned into a maze: colliding furniture everywhere, and every
+        bench carrying a ten-by-eleven click volume that swallowed the taps
+        meant for the tutorial's first interaction (#321 reverted it).
+
+        The next shape -- ten authored sample benches standing in for the
+        catalog -- fixed the maze but not the read: on an actual Studio
+        walkthrough it was still ten near-identical dark stall silhouettes
+        in a dead-straight line, which is what prompted the zigzag pass
+        that used to sit here, and then the owner asked the obvious
+        question the file's own comment had already answered: "a bench
+        that lists what a player can make rather than one physical bench
+        per recipe." That bench is this one. It opens a panel
+        (HUDController's crafting overlay) listing every recipe in
+        CraftingCatalog, the same way OpenStore opens the outfitter's --
+        one door, and CraftItem now carries the recipe the panel's CRAFT
+        button was pressed for instead of an attribute baked into whichever
+        bench a player happened to be standing at.
     ]]
-    local craftingBenches = {
-        {
-            id = self._runtimeIds.InteractionIds.CraftMeadowSatchel,
-            recipeId = "recipe_meadow_satchel",
-            label = Strings.get("world.meadow_satchel"),
-            x = -48,
-            z = -147,
-            color = Color3.fromRGB(133, 176, 108),
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftAmberCharm,
-            recipeId = "recipe_amber_charm",
-            label = Strings.get("world.amber_charm"),
-            x = 36,
-            z = -148,
-            color = AMBER,
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftIronrootHood,
-            recipeId = "recipe_ironroot_hood",
-            label = Strings.get("world.ironroot_hood"),
-            x = -36,
-            z = -136,
-            color = Color3.fromRGB(122, 148, 132),
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftBrambleBoots,
-            recipeId = "recipe_bramble_boots",
-            label = Strings.get("world.bramble_boots"),
-            x = 48,
-            z = -137,
-            color = Color3.fromRGB(142, 112, 84),
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftThornwoodBow,
-            recipeId = "recipe_thornwood_bow",
-            label = Strings.get("world.thornwood_bow"),
-            x = -60,
-            z = -137,
-            color = Color3.fromRGB(164, 132, 78),
-        },
-        -- The five other weapon families, filling the row outward from the
-        -- original five benches. Same shared bench construction; each gets
-        -- its own sample silhouette below so the row reads as ten different
-        -- crafts rather than ten copies of one table.
-        {
-            id = self._runtimeIds.InteractionIds.CraftHeartwoodMaul,
-            recipeId = "recipe_heartwood_maul",
-            label = Strings.get("world.heartwood_maul"),
-            x = -72,
-            z = -148,
-            color = Color3.fromRGB(139, 98, 54),
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftBriarLance,
-            recipeId = "recipe_briar_lance",
-            label = Strings.get("world.briar_lance"),
-            x = -24,
-            z = -146,
-            color = Color3.fromRGB(104, 128, 68),
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftFoxfireSling,
-            recipeId = "recipe_foxfire_sling",
-            label = Strings.get("world.foxfire_sling"),
-            x = 24,
-            z = -136,
-            color = Color3.fromRGB(94, 206, 176),
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftAmberEdge,
-            recipeId = "recipe_amber_edge",
-            label = Strings.get("world.amber_edge"),
-            x = 60,
-            z = -147,
-            color = Color3.fromRGB(255, 181, 76),
-        },
-        {
-            id = self._runtimeIds.InteractionIds.CraftWardenCudgel,
-            recipeId = "recipe_warden_cudgel",
-            label = Strings.get("world.warden_cudgel"),
-            x = 72,
-            z = -136,
-            color = Color3.fromRGB(112, 151, 119),
-        },
-    }
-    --[[
-        The other hundred and twenty recipes do not get a bench here, and
-        the reason is worth keeping.
-
-        They did, briefly. Deriving a bench per recipe closed a real gap
-        -- a hundred and twenty recipes existed that nobody could craft --
-        and it was verified by counting benches in a console, which is not
-        the same as looking at the town. Thirteen columns by ten rows put
-        them from z -128 to -11 across a plaza that spans -136 to -24. A
-        player spawned into a maze: colliding furniture everywhere, and
-        every bench carrying a ten-by-eleven click volume that swallowed
-        the taps meant for the tutorial's first interaction.
-
-        So the benches are the authored ten again, and the reachability
-        gap is open and recorded rather than papered over with geometry
-        nobody walked through. The real fix is a bench that lists what a
-        player can make rather than one physical bench per recipe: a
-        hundred and thirty pieces of furniture is the wrong shape for the
-        problem no matter where it is put.
-
-        Two lessons, both paid for: content counted is not content seen,
-        and a click volume is a wall for taps even when it is not one for
-        bodies.
-    ]]
-    for _, definition in craftingBenches do
-        local benchZ = definition.z or workshopZ
-        local display = Instance.new("Model")
-        display.Name = "CraftingDisplay_" .. definition.recipeId
-        display:SetAttribute("RecipeId", definition.recipeId)
-        display:SetAttribute("DisplayKind", "physical_recipe_sample")
-        display.Parent = craftingFallback
-        local bench = part(
-            display,
-            "CraftingBench_" .. definition.recipeId,
-            Vector3.new(6, 2.6, 6),
-            CFrame.new(definition.x, 1.3, benchZ),
-            Color3.fromRGB(66, 70, 65),
-            Enum.Material.Slate
-        )
-        bench.Transparency = 1
-        bench.CanCollide = false
-        bench.CastShadow = false
-        part(
-            display,
-            "CraftingTableTop",
-            Vector3.new(6.4, 0.55, 4.8),
-            CFrame.new(definition.x, 3.15, benchZ),
-            Color3.fromRGB(91, 64, 44),
-            Enum.Material.WoodPlanks
-        )
-        for side = -1, 1, 2 do
-            for depth = -1, 1, 2 do
-                part(
-                    display,
-                    "CraftingTableLeg",
-                    Vector3.new(0.55, 3.15, 0.55),
-                    CFrame.new(definition.x + side * 2.65, 1.57, benchZ + depth * 1.85)
-                        * CFrame.Angles(0, 0, math.rad(side * 3)),
-                    WET_BARK,
-                    Enum.Material.Wood
-                )
-            end
+    local craftingStation = Instance.new("Model")
+    craftingStation.Name = "CraftingStation"
+    craftingStation.Parent = interactables
+    local stationX, stationZ = -24, workshopZ
+    local craftingBench = part(
+        craftingStation,
+        "CraftingStationBench",
+        Vector3.new(6, 2.6, 6),
+        CFrame.new(stationX, 1.3, stationZ),
+        Color3.fromRGB(66, 70, 65),
+        Enum.Material.Slate
+    )
+    craftingBench.Transparency = 1
+    craftingBench.CanCollide = false
+    craftingBench.CastShadow = false
+    part(
+        craftingStation,
+        "CraftingStationTop",
+        Vector3.new(6.4, 0.55, 4.8),
+        CFrame.new(stationX, 3.15, stationZ),
+        Color3.fromRGB(91, 64, 44),
+        Enum.Material.WoodPlanks
+    )
+    for side = -1, 1, 2 do
+        for depth = -1, 1, 2 do
+            part(
+                craftingStation,
+                "CraftingStationLeg",
+                Vector3.new(0.55, 3.15, 0.55),
+                CFrame.new(stationX + side * 2.65, 1.57, stationZ + depth * 1.85)
+                    * CFrame.Angles(0, 0, math.rad(side * 3)),
+                WET_BARK,
+                Enum.Material.Wood
+            )
         end
+    end
+    part(
+        craftingStation,
+        "CraftingStationApron",
+        Vector3.new(5.4, 0.75, 0.42),
+        CFrame.new(stationX, 2.55, stationZ + 2.18),
+        Color3.fromRGB(68, 48, 36),
+        Enum.Material.Wood,
+        false
+    )
+    --[[
+        An open ledger rather than one recipe's trinket. Every prior bench
+        carried a marker shaped like its one output -- a satchel flap, a
+        bow stave, a cudgel head -- which said "this bench makes one
+        thing". A single station makes all of them, so its marker is the
+        catalog itself: two angled leaves standing open on the table, the
+        same "read before you build" idea CosmeticCatalog's store card
+        already draws a rack for.
+    ]]
+    part(
+        craftingStation,
+        "CraftingLedgerSpine",
+        Vector3.new(0.22, 0.22, 2.6),
+        CFrame.new(stationX, 3.58, stationZ),
+        Color3.fromRGB(90, 63, 41),
+        Enum.Material.Wood,
+        false
+    )
+    for pageSide = -1, 1, 2 do
+        local page = part(
+            craftingStation,
+            "CraftingLedgerPage",
+            Vector3.new(1.9, 0.06, 2.5),
+            CFrame.new(stationX + pageSide * 0.95, 3.66, stationZ)
+                * CFrame.Angles(0, 0, math.rad(-pageSide * 22)),
+            CREAM,
+            Enum.Material.Fabric,
+            false
+        )
+        page.CastShadow = false
+    end
+    local marker = part(
+        craftingStation,
+        "CraftingStationGlow",
+        Vector3.new(0.5, 1.3, 0.5),
+        CFrame.new(stationX, 4.5, stationZ),
+        AMBER,
+        Enum.Material.Neon,
+        false
+    )
+    marker.Shape = Enum.PartType.Cylinder
+    marker.CFrame *= CFrame.Angles(0, 0, math.rad(90))
+    marker.Transparency = 0.06
+    local markerLight = Instance.new("PointLight")
+    markerLight.Color = AMBER
+    markerLight.Brightness = 1.15
+    markerLight.Range = 14
+    markerLight.Parent = marker
+    addBillboard(marker, Strings.get("world.crafting_table"), AMBER)
+    local rackBack = part(
+        craftingStation,
+        "CraftingToolRack",
+        Vector3.new(3.6, 2.2, 0.32),
+        CFrame.new(stationX, 4.6, stationZ - 2.05),
+        WET_BARK,
+        Enum.Material.Wood,
+        false
+    )
+    for hookIndex = -1, 1 do
         part(
-            display,
-            "CraftingWorkbenchApron",
-            Vector3.new(5.4, 0.75, 0.42),
-            CFrame.new(definition.x, 2.55, benchZ + 2.18),
-            Color3.fromRGB(68, 48, 36),
+            craftingStation,
+            "CraftingToolRackTool",
+            Vector3.new(0.24, 1.5, 0.24),
+            rackBack.CFrame
+                * CFrame.new(hookIndex * 1.05, -0.6, 0.3)
+                * CFrame.Angles(math.rad(6), 0, math.rad(hookIndex * 5)),
+            Color3.fromRGB(112, 92, 66),
             Enum.Material.Wood,
             false
         )
-        local marker = part(
-            display,
-            "CraftingBenchGlow",
-            Vector3.new(2, 3.4, 2),
-            CFrame.new(definition.x, 4.3, benchZ),
-            definition.color,
-            Enum.Material.Neon,
-            false
-        )
-        marker.Shape = if definition.recipeId == "recipe_amber_charm"
-            then Enum.PartType.Ball
-            elseif definition.recipeId == "recipe_ironroot_hood" then Enum.PartType.Wedge
-            else Enum.PartType.Block
-        marker.Size = if definition.recipeId == "recipe_meadow_satchel"
-            then Vector3.new(2.6, 1.7, 1.2)
-            elseif definition.recipeId == "recipe_bramble_boots" then Vector3.new(
-                2.2,
-                1.2,
-                1.8
-            )
-            else Vector3.new(1.8, 1.8, 1.8)
-        marker.Material = if definition.recipeId == "recipe_meadow_satchel"
-                or definition.recipeId == "recipe_ironroot_hood"
-            then Enum.Material.Fabric
-            elseif definition.recipeId == "recipe_bramble_boots" then Enum.Material.Leather
-            else Enum.Material.Glass
-        marker.Transparency = 0.06
-        if definition.recipeId == "recipe_meadow_satchel" then
-            part(
-                display,
-                "SatchelFlap",
-                Vector3.new(2.35, 0.32, 1.1),
-                CFrame.new(definition.x, 4.72, benchZ + 0.36) * CFrame.Angles(math.rad(18), 0, 0),
-                Color3.fromRGB(103, 128, 84),
-                Enum.Material.Fabric,
-                false
-            )
-            for strapSide = -1, 1, 2 do
-                part(
-                    display,
-                    "SatchelStrap",
-                    Vector3.new(0.22, 2.4, 0.22),
-                    CFrame.new(definition.x + strapSide * 1.05, 4.65, benchZ - 0.2)
-                        * CFrame.Angles(0, 0, math.rad(strapSide * 24)),
-                    Color3.fromRGB(78, 58, 41),
-                    Enum.Material.Fabric,
-                    false
-                )
-            end
-        elseif definition.recipeId == "recipe_amber_charm" then
-            local charmRing = part(
-                display,
-                "AmberCharmRing",
-                Vector3.new(0.32, 2.4, 2.4),
-                CFrame.new(definition.x, 4.55, benchZ) * CFrame.Angles(0, math.rad(90), 0),
-                Color3.fromRGB(126, 97, 54),
-                Enum.Material.Metal,
-                false
-            )
-            charmRing.Shape = Enum.PartType.Cylinder
-            part(
-                display,
-                "AmberCharmCord",
-                Vector3.new(0.2, 1.7, 0.2),
-                CFrame.new(definition.x, 5.8, benchZ),
-                Color3.fromRGB(73, 54, 38),
-                Enum.Material.Fabric,
-                false
-            )
-        elseif definition.recipeId == "recipe_ironroot_hood" then
-            part(
-                display,
-                "HoodShoulders",
-                Vector3.new(3.6, 0.55, 1.45),
-                CFrame.new(definition.x, 3.82, benchZ),
-                Color3.fromRGB(75, 91, 81),
-                Enum.Material.Fabric,
-                false
-            )
-            part(
-                display,
-                "HoodStand",
-                Vector3.new(0.34, 2.5, 0.34),
-                CFrame.new(definition.x, 4.45, benchZ),
-                Color3.fromRGB(76, 55, 39),
-                Enum.Material.Wood,
-                false
-            )
-        elseif definition.recipeId == "recipe_bramble_boots" then
-            -- Explicit, no longer the chain's else: the fallthrough put a
-            -- pair of boots on every bench without its own branch -- the bow
-            -- bench had displayed boots since it shipped, and all five new
-            -- weapon benches would have inherited the same pair.
-            for bootSide = -1, 1, 2 do
-                part(
-                    display,
-                    "BrambleBoot",
-                    Vector3.new(0.92, 1.45, 1.9),
-                    CFrame.new(definition.x + bootSide * 0.72, 4.05, benchZ + 0.28)
-                        * CFrame.Angles(0, math.rad(bootSide * 8), 0),
-                    Color3.fromRGB(103, 76, 54),
-                    Enum.Material.Leather,
-                    false
-                )
-            end
-        elseif definition.recipeId == "recipe_thornwood_bow" then
-            part(
-                display,
-                "BowSampleStave",
-                Vector3.new(0.3, 3, 0.5),
-                CFrame.new(definition.x + 0.35, 4.6, benchZ) * CFrame.Angles(0, 0, math.rad(14)),
-                Color3.fromRGB(112, 84, 52),
-                Enum.Material.Wood,
-                false
-            )
-            part(
-                display,
-                "BowSampleString",
-                Vector3.new(0.08, 2.8, 0.08),
-                CFrame.new(definition.x - 0.45, 4.6, benchZ),
-                Color3.fromRGB(214, 205, 186),
-                Enum.Material.Fabric,
-                false
-            )
-        elseif definition.recipeId == "recipe_heartwood_maul" then
-            part(
-                display,
-                "MaulSampleHaft",
-                Vector3.new(0.4, 3.1, 0.4),
-                CFrame.new(definition.x, 4.55, benchZ) * CFrame.Angles(0, 0, math.rad(-18)),
-                Color3.fromRGB(96, 68, 44),
-                Enum.Material.Wood,
-                false
-            )
-            part(
-                display,
-                "MaulSampleHead",
-                Vector3.new(1.9, 1.15, 1.15),
-                CFrame.new(definition.x + 0.5, 5.9, benchZ) * CFrame.Angles(0, 0, math.rad(-18)),
-                Color3.fromRGB(139, 98, 54),
-                Enum.Material.Wood,
-                false
-            )
-        elseif definition.recipeId == "recipe_briar_lance" then
-            part(
-                display,
-                "LanceSampleShaft",
-                Vector3.new(0.32, 4.4, 0.32),
-                CFrame.new(definition.x, 4.9, benchZ) * CFrame.Angles(0, 0, math.rad(24)),
-                Color3.fromRGB(104, 128, 68),
-                Enum.Material.Wood,
-                false
-            )
-            local lanceTip = part(
-                display,
-                "LanceSampleTip",
-                Vector3.new(0.5, 1.1, 0.5),
-                CFrame.new(definition.x - 0.95, 6.85, benchZ) * CFrame.Angles(0, 0, math.rad(24)),
-                Color3.fromRGB(74, 96, 46),
-                Enum.Material.Wood,
-                false
-            )
-            lanceTip.Shape = Enum.PartType.Wedge
-        elseif definition.recipeId == "recipe_foxfire_sling" then
-            part(
-                display,
-                "SlingSampleStrap",
-                Vector3.new(0.22, 2.6, 0.22),
-                CFrame.new(definition.x, 4.7, benchZ) * CFrame.Angles(0, 0, math.rad(32)),
-                Color3.fromRGB(78, 58, 41),
-                Enum.Material.Fabric,
-                false
-            )
-            local slingPouch = part(
-                display,
-                "SlingSamplePouch",
-                Vector3.new(0.95, 0.7, 0.95),
-                CFrame.new(definition.x - 0.75, 3.75, benchZ),
-                Color3.fromRGB(94, 206, 176),
-                Enum.Material.Fabric,
-                false
-            )
-            slingPouch.Shape = Enum.PartType.Ball
-        elseif definition.recipeId == "recipe_amber_edge" then
-            local edgeBlade = part(
-                display,
-                "EdgeSampleBlade",
-                Vector3.new(0.35, 2.5, 0.9),
-                CFrame.new(definition.x + 0.2, 4.95, benchZ) * CFrame.Angles(0, 0, math.rad(-9)),
-                Color3.fromRGB(255, 197, 106),
-                Enum.Material.Glass,
-                false
-            )
-            edgeBlade.Shape = Enum.PartType.Wedge
-            part(
-                display,
-                "EdgeSampleGrip",
-                Vector3.new(0.42, 1.05, 0.42),
-                CFrame.new(definition.x - 0.15, 3.6, benchZ) * CFrame.Angles(0, 0, math.rad(-9)),
-                Color3.fromRGB(73, 54, 38),
-                Enum.Material.Leather,
-                false
-            )
-        else
-            -- recipe_warden_cudgel and any future recipe without its own
-            -- silhouette yet: a club on a rest, not somebody else's boots.
-            part(
-                display,
-                "CudgelSampleShaft",
-                Vector3.new(0.45, 2.7, 0.45),
-                CFrame.new(definition.x, 4.5, benchZ) * CFrame.Angles(0, 0, math.rad(12)),
-                Color3.fromRGB(91, 62, 40),
-                Enum.Material.Wood,
-                false
-            )
-            local cudgelHead = part(
-                display,
-                "CudgelSampleHead",
-                Vector3.new(1, 1, 1),
-                CFrame.new(definition.x - 0.35, 5.85, benchZ),
-                Color3.fromRGB(112, 151, 119),
-                Enum.Material.Wood,
-                false
-            )
-            cudgelHead.Shape = Enum.PartType.Ball
-        end
-        local markerLight = Instance.new("PointLight")
-        markerLight.Color = definition.color
-        markerLight.Brightness = 1.15
-        markerLight.Range = 14
-        markerLight.Parent = marker
-        addBillboard(marker, definition.label, definition.color)
-        self:_registerInteraction(
-            bench,
-            definition.id,
-            self._runtimeIds.Actions.CraftItem,
-            Strings.get("world.craft"),
-            definition.label,
-            definition.recipeId
-        )
     end
+    self:_registerInteraction(
+        craftingBench,
+        self._runtimeIds.InteractionIds.CraftingStation,
+        self._runtimeIds.Actions.OpenCraftingStation,
+        Strings.get("world.browse"),
+        Strings.get("world.crafting_table"),
+        nil
+    )
     for index, centerX in { -42, 42 } do
         table.insert(self._meshPlacements, {
             assetId = "mesh_creator_workbench_a",
@@ -6999,7 +6735,7 @@ function WorldService._buildInteractables(self: WorldService, world: Model)
             seed = 9930 + index,
             swayTag = nil,
             parent = interactables,
-            fallbackInstance = if index == 1 then craftingFallback else nil,
+            fallbackInstance = if index == 1 then craftingStation else nil,
         })
     end
 
